@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "weni-chats"
+version = "0.1.0"
+description = ""
+authors = ["helllllllder <heldergsds@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+Django = "^4.0.4"
+Pillow = "^9.1.1"
+django-rest-framework = "^0.1.0"
+django-channels = "^0.7.0"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
