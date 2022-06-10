@@ -1,12 +1,11 @@
 import json
 
 from channels.db import database_sync_to_async
-from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.exceptions import StopConsumer
+from channels.generic.websocket import AsyncWebsocketConsumer
 
-
-from chats.apps.rooms.models import Room
 from chats.apps.msgs.models import Message as ChatMessage
+from chats.apps.rooms.models import Room
 
 
 class RoomConsumer(AsyncWebsocketConsumer):
