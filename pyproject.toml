@@ -16,9 +16,12 @@ pymongo = "3.12.1"
 black = "^22.3.0"
 isort = "^5.10.1"
 channels-redis = "^3.4.0"
+coreapi = "^2.3.3"
+drf-yasg = "^1.20.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
+flake8 = "^4.0.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

@@ -1,6 +1,8 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+# TODO: Use djongo(mongodb) models? Might change how things works
+
 
 class RoomTag(models.Model):
 
@@ -28,6 +30,9 @@ class Room(models.Model):
         on_delete=models.CASCADE,
         null=True,
         blank=True,
+    )
+    sector = models.ForeignKey(
+        "sectors.Sector", verbose_name=_("Sector"), on_delete=models.CASCADE
     )
     started_at = models.DateTimeField(_("Started at"), auto_now_add=False)
     ended_at = models.DateTimeField(

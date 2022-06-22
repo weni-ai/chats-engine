@@ -30,8 +30,18 @@ class SectorPermission(models.Model):
         (ROLE_MANAGER, _("manager")),
     ]
 
+    user = models.ForeignKey(
+        "accounts.User",
+        related_name="sector_permissions",
+        verbose_name=_("User"),
+        on_delete=models.CASCADE,
+    )
+
     sector = models.ForeignKey(
-        Sector, verbose_name=_("Sector"), on_delete=models.CASCADE
+        Sector,
+        related_name="permissions",
+        verbose_name=_("Sector"),
+        on_delete=models.CASCADE,
     )
     role = models.PositiveIntegerField(
         _("role"), choices=ROLE_CHOICES, default=ROLE_NOT_SETTED

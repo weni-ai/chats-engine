@@ -43,6 +43,9 @@ ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[])
 INSTALLED_APPS = [
     # third party apps
     "channels",
+    "drf_yasg",
+    "rest_framework",
+    "rest_framework.authtoken",
     # django
     "django.contrib.admin",
     "django.contrib.auth",
@@ -169,3 +172,30 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/4.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+
+# Django Rest Framework
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication"
+    ],
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination." + "LimitOffsetPagination",
+    "PAGE_SIZE": 20,
+}
+
+
+# Swagger
+
+SWAGGER_SETTINGS = {
+    "USE_SESSION_AUTH": False,
+    "APIS_SORTER": "alpha",
+    "SECURITY_DEFINITIONS": {
+        "api_key": {"type": "apiKey", "name": "Authorization", "in": "header"}
+    },
+}
+
+
+# Query Limiters
+
+OLD_MESSAGES_LIMIT = env.int("OLD_MESSAGES_LIMIT", default=10)

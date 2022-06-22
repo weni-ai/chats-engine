@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram id="62WJzfiFzlyG9oBI5utT" name="Page-1">
-        <mxGraphModel dx="3927" dy="1740" grid="0" gridSize="10" guides="0" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+        <mxGraphModel dx="3005" dy="837" grid="0" gridSize="10" guides="0" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -95,7 +95,7 @@
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
                 <mxCell id="63" value="MESSAGE_MEDIA" style="swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;fontColor=#331A00;strokeColor=#CEFFFF;fillColor=#CCE5FF;shadow=1;" parent="1" vertex="1">
-                    <mxGeometry x="253" y="706" width="140" height="120" as="geometry"/>
+                    <mxGeometry x="250" y="688" width="140" height="120" as="geometry"/>
                 </mxCell>
                 <mxCell id="64" value="MESSAGE_ID" style="text;strokeColor=#CEFFFF;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;fontColor=#FFFFFF;strokeWidth=1;shadow=1;" parent="63" vertex="1">
                     <mxGeometry y="30" width="140" height="30" as="geometry"/>
@@ -154,7 +154,7 @@
                 <mxCell id="72eFd9tCJBYfXQ247pea-141" style="edgeStyle=none;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=1;entryDx=0;entryDy=0;fontSize=12;strokeColor=default;" parent="1" source="72eFd9tCJBYfXQ247pea-131" target="72eFd9tCJBYfXQ247pea-120" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="72eFd9tCJBYfXQ247pea-131" value="CHAT" style="swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;fontColor=#331A00;strokeColor=#CEFFFF;fillColor=#CCE5FF;" parent="1" vertex="1">
+                <mxCell id="72eFd9tCJBYfXQ247pea-131" value="ROOM" style="swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;fontColor=#331A00;strokeColor=#CEFFFF;fillColor=#CCE5FF;" parent="1" vertex="1">
                     <mxGeometry x="1024" y="1010" width="155.5" height="228" as="geometry"/>
                 </mxCell>
                 <mxCell id="72eFd9tCJBYfXQ247pea-132" value="CONTACT" style="text;strokeColor=#CEFFFF;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;fontColor=#FFFFFF;strokeWidth=1;" parent="72eFd9tCJBYfXQ247pea-131" vertex="1">
