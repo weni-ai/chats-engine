@@ -1,9 +1,12 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from chats.core.models import BaseModel
 
 # Create your models here.
-class Project(models.Model):
+
+
+class Project(BaseModel):
 
     name = models.CharField(_("name"), max_length=50)
     connect_pk = models.CharField(
@@ -18,7 +21,7 @@ class Project(models.Model):
         return self.name
 
 
-class ProjectPermission(models.Model):
+class ProjectPermission(BaseModel):
     ROLE_NOT_SETTED = 0
     ROLE_ADMIN = 1
 
@@ -31,7 +34,11 @@ class ProjectPermission(models.Model):
         Project, verbose_name=_("Project"), on_delete=models.CASCADE
     )
     user = models.ForeignKey(
-        "accounts.User", verbose_name=_("users"), on_delete=models.CASCADE
+        "accounts.User",
+        verbose_name=_("users"),
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
     )
     role = models.PositiveIntegerField(
         _("role"), choices=ROLE_CHOICES, default=ROLE_NOT_SETTED

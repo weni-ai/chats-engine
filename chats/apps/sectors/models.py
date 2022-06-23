@@ -1,16 +1,16 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-# Create your models here.
+from chats.core.models import BaseModel
 
 
-class Sector(models.Model):
+class Sector(BaseModel):
     name = models.CharField(_("name"), max_length=120)
     project = models.ForeignKey(
         "projects.Project", verbose_name=_("sectors"), on_delete=models.CASCADE
     )
     # manager = models.ForeignKey("projects.ProjectPermission", verbose_name=_("sectors"), on_delete=models.CASCADE)
-    rooms_limit = models.IntegerField(_("Rooms limit"))
+    rooms_limit = models.IntegerField(_("Rooms limit per employee"))
     work_start = models.IntegerField(_("work start"))
     work_end = models.IntegerField(_("work end"))
 
@@ -18,8 +18,36 @@ class Sector(models.Model):
         verbose_name = _("Contact")
         verbose_name_plural = _("Contacts")
 
+    @property
+    def employee_pks(self):
+        return list(self.permissions.all().values_list("user__pk", flat="True"))
 
-class SectorPermission(models.Model):
+    @property
+    def active_rooms(self):
+        return self.rooms.filter(is_active=True)
+
+    @property
+    def deativated_rooms(self):
+        return self.rooms.filter(is_active=True)
+
+    @property
+    def open_active_rooms(self):
+        return self.rooms.filter(user__isnull=True, is_active=True)
+
+    @property
+    def closed_active_rooms(self):
+        return self.rooms.filter(user__isnull=False, is_active=True)
+
+    @property
+    def open_deactivated_rooms(self):
+        return self.rooms.filter(user__isnull=True, is_active=False)
+
+    @property
+    def vacant_deactivated_rooms(self):
+        return self.rooms.filter(user__isnull=False, is_active=False)
+
+
+class SectorPermission(BaseModel):
     ROLE_NOT_SETTED = 0
     ROLE_AGENT = 1
     ROLE_MANAGER = 2

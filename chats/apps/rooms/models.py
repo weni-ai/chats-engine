@@ -1,10 +1,12 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from chats.core.models import BaseModel
+
 # TODO: Use djongo(mongodb) models? Might change how things works
 
 
-class RoomTag(models.Model):
+class RoomTag(BaseModel):
 
     name = models.CharField(_("Name"), max_length=120)
 
@@ -16,7 +18,7 @@ class RoomTag(models.Model):
         return self.name
 
 
-class Room(models.Model):
+class Room(BaseModel):
     user = models.ForeignKey(
         "accounts.User",
         verbose_name=_("messages"),
@@ -32,7 +34,12 @@ class Room(models.Model):
         blank=True,
     )
     sector = models.ForeignKey(
-        "sectors.Sector", verbose_name=_("Sector"), on_delete=models.CASCADE
+        "sectors.Sector",
+        related_name="rooms",
+        verbose_name=_("Sector"),
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
     )
     started_at = models.DateTimeField(_("Started at"), auto_now_add=False)
     ended_at = models.DateTimeField(

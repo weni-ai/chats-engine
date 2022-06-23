@@ -1,8 +1,10 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from chats.core.models import BaseModel
 
-class Message(models.Model):
+
+class Message(BaseModel):
     room = models.ForeignKey(
         "rooms.Room", verbose_name=_("messages"), on_delete=models.CASCADE
     )
@@ -28,7 +30,7 @@ class Message(models.Model):
         verbose_name_plural = "Messages"
 
 
-class MessageMedia(models.Model):
+class MessageMedia(BaseModel):
     message = models.ForeignKey(
         Message, verbose_name=_("medias"), on_delete=models.CASCADE
     )
