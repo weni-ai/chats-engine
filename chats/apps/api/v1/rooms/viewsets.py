@@ -6,7 +6,7 @@ from chats.apps.rooms.models import Room
 
 
 class RoomViewset(viewsets.ModelViewSet):
-    queryset = Room.objects
+    queryset = Room.objects.all()
     serializer_class = RoomSerializer
     permission_classes = [
         IsAuthenticated,

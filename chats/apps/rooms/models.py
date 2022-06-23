@@ -21,6 +21,7 @@ class RoomTag(BaseModel):
 class Room(BaseModel):
     user = models.ForeignKey(
         "accounts.User",
+        related_name="rooms",
         verbose_name=_("messages"),
         on_delete=models.CASCADE,
         null=True,
@@ -28,6 +29,7 @@ class Room(BaseModel):
     )
     contact = models.ForeignKey(
         "contacts.Contact",
+        related_name="rooms",
         verbose_name=_("messages"),
         on_delete=models.CASCADE,
         null=True,
@@ -41,13 +43,14 @@ class Room(BaseModel):
         null=True,
         blank=True,
     )
-    started_at = models.DateTimeField(_("Started at"), auto_now_add=False)
     ended_at = models.DateTimeField(
         _("Ended at"), auto_now_add=False, null=True, blank=True
     )
     is_active = models.BooleanField(_("is active?"), default=True)
 
-    tags = models.ManyToManyField(RoomTag, verbose_name=_("tags"))
+    tags = models.ManyToManyField(
+        RoomTag, verbose_name=_("tags"), null=True, blank=True
+    )
 
     class Meta:
         verbose_name = _("Room")
