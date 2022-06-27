@@ -2,6 +2,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from chats.core.models import BaseModel
+from chats.utils.websockets import send_channels_group
 
 
 class Sector(BaseModel):
@@ -46,6 +47,20 @@ class Sector(BaseModel):
     def vacant_deactivated_rooms(self):
         return self.rooms.filter(user__isnull=False, is_active=False)
 
+    def notify_sector(self, action):
+        """ """
+
+        send_channels_group(
+            group_name=f"sector_{self.sector.pk}",
+            type="notify",
+            content=self,
+            action=f"sector.{action}",
+        )
+
+    def add_users_group(self):
+        for auth in self.permissions.filter(role__gte=1):
+            auth.notify_user()
+
 
 class SectorPermission(BaseModel):
     ROLE_NOT_SETTED = 0
@@ -81,3 +96,12 @@ class SectorPermission(BaseModel):
 
     def __str__(self):
         return self.name
+
+    def notify_user(self, action):
+        """ """
+        send_channels_group(
+            group_name=f"user_{self.user.pk}",
+            type="notify",
+            content=self,
+            action=f"sector.{action}",
+        )

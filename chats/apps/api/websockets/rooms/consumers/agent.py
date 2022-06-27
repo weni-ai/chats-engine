@@ -18,23 +18,26 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
 
     rooms = []
     sectors = []
-    user = []
+    user = None
 
     async def connect(self, *args, **kwargs):
         """
         Called when the websocket is handshaking as part of initial connection.
         """
         # Are they logged in?
-        if self.scope["user"].is_anonymous:
+        self.user = self.scope["user"]
+        if self.user.is_anonymous:
             # Reject the connection
             await self.close()
         else:
             # Accept the connection
             await self.accept()
+            await self.agent_load_rooms()
+            await self.agent_load_queues()
+            await self.agent_notification_room()
+        # import pdb
 
-        await self.agent_load_rooms()
-        await self.agent_load_queues()
-        await self.agent_notification_room()
+        # pdb.set_trace()
 
     async def disconnect(self, *args, **kwargs):
         for room in self.rooms:
@@ -90,21 +93,15 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
     # SUBSCRIPTIONS
     async def room_messages(self, event):
         """ """
-        await self.send_json(
-            text_data=json.dumps({"type": "room_messages", "content": event})
-        )
+        await self.send_json(json.dumps({"type": "room_messages", "content": event}))
 
     async def room_changed(self, event):
         """ """
-        await self.send_json(
-            text_data=json.dumps({"type": "room_changed", "content": event})
-        )
+        await self.send_json(json.dumps({"type": "room_changed", "content": event}))
 
     async def sector_changed(self, event):
         """ """
-        await self.send_json(
-            text_data=json.dumps({"type": "new_room", "content": event})
-        )
+        await self.send_json(json.dumps({"type": "new_room", "content": event}))
 
     async def join_room(self, event):
         """ """
@@ -123,19 +120,25 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         await self.channel_layer.group_add(f"{group_name}_{id}", self.channel_name)
 
     @database_sync_to_async
-    def get_user_rooms(self, user, *args, **kwargs):
+    def get_user_rooms(self, *args, **kwargs):
         """ """
-        rooms = Room.objects.filter(Q(user=user) | Q(user__isnull=True), is_active=True)
+
+        rooms = Room.objects.filter(
+            Q(user=self.user) | Q(user__isnull=True), is_active__in=[True]
+        )
+
         return list(rooms.values_list("pk", flat=True))
 
+    @database_sync_to_async
     def get_valid_room(self, room, *args, **kwargs):
         """ """
         room = Room.objects.get(pk=room, user=self.user)
         return room
 
+    @database_sync_to_async
     def get_sectors(self, *args, **kwargs):
         """ """
-        self.sectors = self.user.sector_permissions.all().values_list(
-            "sector__pk", flat=True
+        self.sectors = list(
+            self.user.sector_permissions.all().values_list("sector__pk", flat=True)
         )
         return self.sectors

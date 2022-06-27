@@ -2,6 +2,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from chats.core.models import BaseModel
+from chats.utils.websockets import send_channels_group
 
 # TODO: Use djongo(mongodb) models? Might change how things works
 
@@ -48,6 +49,8 @@ class Room(BaseModel):
     )
     is_active = models.BooleanField(_("is active?"), default=True)
 
+    agent_history = models.TextField(_("Agent History"))
+
     tags = models.ManyToManyField(
         RoomTag, verbose_name=_("tags"), null=True, blank=True
     )
@@ -55,3 +58,41 @@ class Room(BaseModel):
     class Meta:
         verbose_name = _("Room")
         verbose_name_plural = _("Rooms")
+
+    def notify_sector(self, action):
+        """
+        Used to notify channels groups when something happens on the instance.
+
+        Actions:
+        Create
+
+        e.g.:
+        Contact create new room,
+        Call the sector group(all agents) and send the 'create' action to add them in the room group
+        """
+
+        send_channels_group(
+            group_name=f"sector_{self.sector.pk}",
+            type="notify",
+            content=self,
+            action=f"rooms.{action}",
+        )
+
+    def notify_room(self, action):
+        """
+        Used to notify channels groups when something happens on the instance.
+
+        Actions:
+        Update, Delete
+
+        e.g.:
+        Agent enters room,
+        Call the sector group(all agents) and send the 'update' action to remove them from the group
+        """
+
+        send_channels_group(
+            group_name=f"room_{self.pk}",
+            type="notify",
+            content=self,
+            action=f"rooms.{action}",
+        )
