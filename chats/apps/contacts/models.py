@@ -14,3 +14,9 @@ class Contact(BaseModel):
 
     def __str__(self):
         return self.email
+
+    @property
+    def serialized_ws_data(self):
+        from chats.apps.api.v1.contacts.serializers import ContactWSSerializer
+
+        return ContactWSSerializer(self).data

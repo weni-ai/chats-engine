@@ -49,7 +49,7 @@ class Room(BaseModel):
     )
     is_active = models.BooleanField(_("is active?"), default=True)
 
-    agent_history = models.TextField(_("Agent History"))
+    agent_history = models.TextField(_("Agent History"), null=True, blank=True)
 
     tags = models.ManyToManyField(
         RoomTag, verbose_name=_("tags"), null=True, blank=True
@@ -58,6 +58,12 @@ class Room(BaseModel):
     class Meta:
         verbose_name = _("Room")
         verbose_name_plural = _("Rooms")
+
+    @property
+    def serialized_ws_data(self):
+        from chats.apps.api.v1.rooms.serializers import RoomSerializer  # noqa
+
+        return RoomSerializer(self).data
 
     def notify_sector(self, action):
         """
@@ -74,7 +80,7 @@ class Room(BaseModel):
         send_channels_group(
             group_name=f"sector_{self.sector.pk}",
             type="notify",
-            content=self,
+            content=self.serialized_ws_data,
             action=f"rooms.{action}",
         )
 
@@ -93,6 +99,6 @@ class Room(BaseModel):
         send_channels_group(
             group_name=f"room_{self.pk}",
             type="notify",
-            content=self,
+            content=self.serialized_ws_data,
             action=f"rooms.{action}",
         )

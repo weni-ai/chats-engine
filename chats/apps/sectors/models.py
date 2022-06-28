@@ -47,19 +47,24 @@ class Sector(BaseModel):
     def vacant_deactivated_rooms(self):
         return self.rooms.filter(user__isnull=False, is_active=False)
 
+    @property
+    def serialized_ws_data(self):
+        from chats.apps.api.v1.sectors.serializers import SectorWSSerializer
+
+        return SectorWSSerializer(self).data
+
     def notify_sector(self, action):
         """ """
-
         send_channels_group(
-            group_name=f"sector_{self.sector.pk}",
+            group_name=f"sector_{self.pk}",
             type="notify",
-            content=self,
+            content=self.serialized_ws_data,
             action=f"sector.{action}",
         )
 
     def add_users_group(self):
         for auth in self.permissions.filter(role__gte=1):
-            auth.notify_user()
+            auth.notify_user("created")
 
 
 class SectorPermission(BaseModel):
@@ -97,11 +102,17 @@ class SectorPermission(BaseModel):
     def __str__(self):
         return self.name
 
+    @property
+    def serialized_ws_data(self):
+        from chats.apps.api.v1.sectors.serializers import SectorPermissionWSSerializer
+
+        return SectorPermissionWSSerializer(self).data
+
     def notify_user(self, action):
         """ """
         send_channels_group(
             group_name=f"user_{self.user.pk}",
             type="notify",
-            content=self,
-            action=f"sector.{action}",
+            content=self.serialized_ws_data,
+            action=f"sector_permission.{action}",
         )

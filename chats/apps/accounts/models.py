@@ -63,3 +63,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     class Meta:
         verbose_name = _("user")
         verbose_name_plural = _("users")
+
+    @property
+    def sector_ids(self):
+        return self.sector_permissions.values_list("sector__id", flat=True)

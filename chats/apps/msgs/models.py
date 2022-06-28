@@ -2,6 +2,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from chats.core.models import BaseModel
+from chats.utils.websockets import send_channels_group
 
 
 class Message(BaseModel):
@@ -28,6 +29,21 @@ class Message(BaseModel):
     class Meta:
         verbose_name = "Message"
         verbose_name_plural = "Messages"
+
+    @property
+    def serialized_ws_data(self):
+        from chats.apps.api.v1.msgs.serializers import MessageWSSerializer
+
+        return MessageWSSerializer(self).data
+
+    def notify_room(self, action):
+        """ """
+        send_channels_group(
+            group_name=f"room_{self.room.pk}",
+            type="notify",
+            content=self.serialized_ws_data,
+            action=f"msg.{action}",
+        )
 
 
 class MessageMedia(BaseModel):

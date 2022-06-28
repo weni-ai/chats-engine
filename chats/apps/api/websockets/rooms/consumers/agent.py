@@ -16,8 +16,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
     Agent side of the chat
     """
 
-    rooms = []
-    sectors = []
+    groups = []
     user = None
 
     async def connect(self, *args, **kwargs):
@@ -32,23 +31,13 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         else:
             # Accept the connection
             await self.accept()
-            await self.agent_load_rooms()
-            await self.agent_load_queues()
-            await self.agent_notification_room()
-        # import pdb
-
-        # pdb.set_trace()
+            await self.load_rooms()
+            await self.load_sectors()
+            await self.load_user()
 
     async def disconnect(self, *args, **kwargs):
-        for room in self.rooms:
-            await self.channel_layer.group_discard(f"room_{room}", self.channel_name)
-            await self.channel_layer.group_discard(
-                f"room_notify_{room}", self.channel_name
-            )
-        for sector in self.sectors:
-            await self.channel_layer.group_discard(
-                f"sector_{sector}", self.channel_name
-            )
+        for group in set(self.groups):
+            await self.channel_layer.group_discard(group, self.channel_name)
         await self.channel_layer.group_discard(
             f"user_{self.user.pk}", self.channel_name
         )
@@ -59,86 +48,85 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         for us and pass it as the first argument.
         """
         # Messages will have a "command" key we can switch on
+
         command_name = payload.get("type", None)
-        command = getattr(self, command_name)
-        await command(payload["content"])
+        if command_name == "notify":
+            await self.notify(payload["content"])
+        elif command_name == "method":
+            command = getattr(self, payload["action"])
+            await command(payload["content"])
 
-    # INITIALIZE GROUPS
-    async def agent_load_rooms(self, *args, **kwargs):
-        """Enter room notification groups"""
-        self.rooms = await self.get_user_rooms()
-        for room in self.rooms:
-            await self._add_to_group("room", room)
+    # METHODS
 
-    async def agent_load_queues(self, *args, **kwargs):
-        """Enter queue notification groups"""
-        sector_queues = await self.get_sectors()
-        for sector in sector_queues:
-            await self._add_to_group("sector", sector)
+    async def exit(self, event):
+        """
+        Exit group by event
+        """
+        group_name = f"{event['name']}_{event['id']}"
+        await self.channel_layer.group_discard(group_name, self.channel_name)
+        self.groups.remove(group_name)
+        # for debugging
+        await self.notify(
+            {
+                "type": "notify",
+                "action": "group_exit",
+                "content": {"msg": f"Exited {group_name} to your listening groups"},
+            }
+        )
 
-    async def agent_notification_room(self, *args, **kwargs):
-        """Enter user notification group"""
-        await self._add_to_group("user", self.user.pk)
-
-    # GROUP MANAGEMENT
-
-    async def agent_join_room(self, user, room, type, *args, **kwargs):
-        """ """
-        await self._add_to_group("room", room)
-
-    async def agent_exit_room(self, user, room, type, *args, **kwargs):
-        """ """
-        await self.channel_layer.group_discard(f"room_{room}", self.channel_name)
+    async def join(self, event):
+        """
+        Add group by event(dictionary) or group_name
+        """
+        group_name = f"{event['name']}_{event['id']}"
+        await self.channel_layer.group_add(group_name, self.channel_name)
+        self.groups.append(group_name)
+        # for debugging
+        await self.notify(
+            {
+                "type": "notify",
+                "action": "group_join",
+                "content": {"msg": f"Added {group_name} to your listening groups"},
+            }
+        )
 
     # SUBSCRIPTIONS
-    async def room_messages(self, event):
+    async def notify(self, event):
         """ """
-        await self.send_json(json.dumps({"type": "room_messages", "content": event}))
-
-    async def room_changed(self, event):
-        """ """
-        await self.send_json(json.dumps({"type": "room_changed", "content": event}))
-
-    async def sector_changed(self, event):
-        """ """
-        await self.send_json(json.dumps({"type": "new_room", "content": event}))
-
-    async def join_room(self, event):
-        """ """
-        room_pk = event["room"]
-        await self._add_to_group("room", room_pk)
-
-    async def join_sector(self, event):
-        """ """
-        room_pk = event["room"]
-        await self._add_to_group("room", room_pk)
+        await self.send_json(json.dumps(event))
 
     # SYNC HELPER FUNCTIONS
-
-    async def _add_to_group(self, group_name, id):
-        """Just so we don't need to write this big guy"""
-        await self.channel_layer.group_add(f"{group_name}_{id}", self.channel_name)
 
     @database_sync_to_async
     def get_user_rooms(self, *args, **kwargs):
         """ """
 
         rooms = Room.objects.filter(
-            Q(user=self.user) | Q(user__isnull=True), is_active__in=[True]
+            Q(user=self.user) | Q(user__isnull=True),
+            sector__id__in=self.user.sector_ids,
+            is_active=True,
         )
 
         return list(rooms.values_list("pk", flat=True))
 
     @database_sync_to_async
-    def get_valid_room(self, room, *args, **kwargs):
-        """ """
-        room = Room.objects.get(pk=room, user=self.user)
-        return room
-
-    @database_sync_to_async
     def get_sectors(self, *args, **kwargs):
         """ """
-        self.sectors = list(
-            self.user.sector_permissions.all().values_list("sector__pk", flat=True)
-        )
+        self.sectors = list(self.user.sector_ids)
         return self.sectors
+
+    async def load_rooms(self, *args, **kwargs):
+        """Enter room notification groups"""
+        self.rooms = await self.get_user_rooms()
+        for room in self.rooms:
+            await self.join({"name": "room", "id": room})
+
+    async def load_sectors(self, *args, **kwargs):
+        """Enter queue notification groups"""
+        sector_queues = await self.get_sectors()
+        for sector in sector_queues:
+            await self.join({"name": "sector", "id": sector})
+
+    async def load_user(self, *args, **kwargs):
+        """Enter user notification group"""
+        await self.join({"name": "user", "id": self.user.pk})

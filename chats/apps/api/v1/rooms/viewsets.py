@@ -11,3 +11,15 @@ class RoomViewset(viewsets.ModelViewSet):
     permission_classes = [
         IsAuthenticated,
     ]
+
+    def perform_create(self, serializer):
+        serializer.save()
+        serializer.instance.notify_sector("create")
+
+    def perform_update(self, serializer):
+        serializer.save()
+        serializer.instance.notify_room("update")
+
+    def perform_destroy(self, instance):
+        instance.notify_room("destroy")
+        super().perform_destroy(instance)
