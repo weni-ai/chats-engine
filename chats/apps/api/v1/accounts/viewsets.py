@@ -1,11 +1,10 @@
-from django.utils.translation import gettext_lazy as _
-from rest_framework import status, mixins
-from rest_framework.response import Response
-
 from django.utils import timezone
 from django.utils.decorators import method_decorator
+from django.utils.translation import gettext_lazy as _
 from drf_yasg.utils import swagger_auto_schema
+from rest_framework import mixins, status
 from rest_framework.authtoken.models import Token
+from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from chats.apps.accounts.models import User

@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "drf_yasg",
     "rest_framework",
     "rest_framework.authtoken",
+    "corsheaders",
     # django
     "django.contrib.admin",
     "django.contrib.auth",
@@ -68,6 +69,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -194,6 +196,10 @@ SWAGGER_SETTINGS = {
         "api_key": {"type": "apiKey", "name": "Authorization", "in": "header"}
     },
 }
+
+# CORS CONFIG
+
+CORS_ORIGIN_ALLOW_ALL = True
 
 
 # Query Limiters

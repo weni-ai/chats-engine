@@ -1,10 +1,12 @@
 from rest_framework import routers
+
 from chats.apps.api.v1.accounts.viewsets import LoginViewset
-from chats.apps.api.v1.msgs.viewsets import MessageViewset
-from chats.apps.api.v1.rooms.viewsets import RoomViewset
 from chats.apps.api.v1.contacts.viewsets import ContactViewset
-from chats.apps.api.v1.sectors.viewsets import SectorViewset, SectorPermissionViewset
+from chats.apps.api.v1.msgs.viewsets import MessageViewset
 from chats.apps.api.v1.projects.viewsets import ProjectViewset
+from chats.apps.api.v1.rooms.viewsets import RoomViewset
+from chats.apps.api.v1.sectors.viewsets import (SectorPermissionViewset,
+                                                SectorViewset)
 
 
 class Router(routers.SimpleRouter):

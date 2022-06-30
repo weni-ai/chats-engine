@@ -1,12 +1,12 @@
 import json
 
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
-from django.conf import settings
 
+from chats.apps.api.v1.msgs.serializers import MessageSerializer
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.rooms.models import Room
-from chats.apps.api.v1.msgs.serializers import MessageSerializer
 
 
 class RoomSerializer(serializers.ModelSerializer):

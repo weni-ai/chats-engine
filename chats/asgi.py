@@ -9,10 +9,11 @@ https://docs.djangoproject.com/en/4.0/howto/deployment/asgi/
 
 import os
 
-from chats.apps.accounts.authentication.channels.middleware import TokenAuthMiddleware
 from channels.routing import ProtocolTypeRouter, URLRouter
 from django.core.asgi import get_asgi_application
 
+from chats.apps.accounts.authentication.channels.middleware import \
+    TokenAuthMiddleware
 from chats.apps.api.websockets.rooms.routing import websocket_urlpatterns
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "chats.settings")
