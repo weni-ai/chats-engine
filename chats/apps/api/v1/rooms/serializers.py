@@ -22,8 +22,11 @@ class RoomSerializer(serializers.ModelSerializer):
     old_messages = serializers.SerializerMethodField()
 
     def get_old_messages(self, obj):
-        other_rooms = obj.contact.rooms.all()
-        messages = ChatMessage.objects.filter(room__in=other_rooms)[
-            : settings.OLD_MESSAGES_LIMIT
-        ]
-        return MessageSerializer(messages, many=True).data
+        try:
+            other_rooms = obj.contact.rooms.all()
+            messages = ChatMessage.objects.filter(room__in=other_rooms)[
+                : settings.OLD_MESSAGES_LIMIT
+            ]
+            return MessageSerializer(messages, many=True).data
+        except AttributeError:
+            return {}
