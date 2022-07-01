@@ -1,5 +1,3 @@
-import json
-
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
@@ -14,6 +12,6 @@ def send_channels_group(group_name: str, type: str, content: str, action: str):
         {
             "type": type,
             "action": action,
-            "content": json.dumps(content),
+            "content": content,
         },
     )
