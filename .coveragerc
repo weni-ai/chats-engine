@@ -1,0 +1,11 @@
+[run]
+omit =
+    *migrations/*
+    debug_*.py
+    *site-packages/*
+    manage.py
+    marketplace/settings.py
+    *tests/*
+
+[report]
+fail_under = 80
