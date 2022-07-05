@@ -33,7 +33,7 @@ env = environ.Env()
 SECRET_KEY = env.str("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env.bool("DEBUG")
+DEBUG = env.bool("DEBUG", default=False)
 
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[])
 
@@ -104,7 +104,9 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],
+            "hosts": [
+                env.str("CHANNEL_LAYERS_REDIS", default="redis://127.0.0.1:6379/1")
+            ],
         },
     },
 }
@@ -112,20 +114,25 @@ CHANNEL_LAYERS = {
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
+DB_DATA = env.db("DEFAULT_DATABASE", default="sqlite:///db.sqlite3")
 
-DATABASES = {
-    "default": {
-        "ENGINE": "djongo",
-        "NAME": "chats",
-        "ENFORCE_SCHEMA": False,
-        "CLIENT": {
-            "host": "localhost",
-            "port": 27017,
-            "username": "root",
-            "password": "password",
-        },
+# djongo mongodb engine needs a slightly different db config
+if DB_DATA["ENGINE"] == "djongo":
+    DATABASES = {
+        "default": {
+            "ENGINE": DB_DATA["ENGINE"],
+            "NAME": DB_DATA["NAME"],
+            "ENFORCE_SCHEMA": False,
+            "CLIENT": {
+                "host": DB_DATA["HOST"],
+                "port": DB_DATA["PORT"],
+                "username": DB_DATA["USER"],
+                "password": DB_DATA["PASSWORD"],
+            },
+        }
     }
-}
+else:
+    DATABASES = {"default": DB_DATA}
 
 # User
 
@@ -183,7 +190,7 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.TokenAuthentication"
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination." + "LimitOffsetPagination",
-    "PAGE_SIZE": 20,
+    "PAGE_SIZE": env.int("REST_PAGINATION_SIZE", default=20),
 }
 
 
