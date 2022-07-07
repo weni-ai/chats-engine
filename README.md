@@ -67,7 +67,7 @@ You can set environment variables in your OS or write on .env file.
 
 ### Guidelines
 
-If you want to contribute with bothub's projects, we made a guideline to help you. See here [contributing guidelines](https://github.com/bothub-it/Ilhasoft/chats-engine/blob/main/docs/CONTRIBUTING.md) for the appropriate contribution.
+If you want to contribute with bothub's projects, we made a guideline to help you. See here [contributing guidelines](https://github.com/Ilhasoft/chats-engine/blob/main/docs/CONTRIBUTING.md) for the appropriate contribution.
 
 ## License
 
