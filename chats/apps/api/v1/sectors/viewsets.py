@@ -1,8 +1,10 @@
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 
-from chats.apps.api.v1.sectors.serializers import (SectorPermissionSerializer,
-                                                   SectorSerializer)
+from chats.apps.api.v1.sectors.serializers import (
+    SectorPermissionSerializer,
+    SectorSerializer,
+)
 from chats.apps.sectors.models import Sector, SectorPermission
 
 

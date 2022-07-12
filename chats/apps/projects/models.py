@@ -24,6 +24,7 @@ class Project(BaseModel):
 class ProjectPermission(BaseModel):
     ROLE_NOT_SETTED = 0
     ROLE_ADMIN = 1
+    ROLE_EXTERNAL = 2
 
     ROLE_CHOICES = [
         (ROLE_NOT_SETTED, _("not set")),
@@ -50,3 +51,11 @@ class ProjectPermission(BaseModel):
 
     def __str__(self):
         return self.name
+
+    @property
+    def is_admin(self):
+        return self.role == self.ROLE_ADMIN
+
+    @property
+    def is_external(self):
+        return self.role == self.ROLE_EXTERNAL
