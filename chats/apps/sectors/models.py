@@ -10,7 +10,6 @@ class Sector(BaseModel):
     project = models.ForeignKey(
         "projects.Project", verbose_name=_("sectors"), on_delete=models.CASCADE
     )
-    # manager = models.ForeignKey("projects.ProjectPermission", verbose_name=_("sectors"), on_delete=models.CASCADE)
     rooms_limit = models.IntegerField(_("Rooms limit per employee"))
     work_start = models.IntegerField(_("work start"))
     work_end = models.IntegerField(_("work end"))
@@ -104,10 +103,23 @@ class SectorPermission(BaseModel):
 
     @property
     def serialized_ws_data(self):
-        from chats.apps.api.v1.sectors.serializers import \
-            SectorPermissionWSSerializer
+        from chats.apps.api.v1.sectors.serializers import (
+            SectorPermissionWSSerializer,
+        )
 
         return SectorPermissionWSSerializer(self).data
+
+    @property
+    def is_manager(self):
+        return self.role == self.ROLE_MANAGER
+
+    @property
+    def is_agent(self):
+        return self.role == self.ROLE_AGENT
+
+    @property
+    def is_authorized(self):
+        return self.is_agent or self.is_authorized
 
     def notify_user(self, action):
         """ """
