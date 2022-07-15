@@ -1,9 +1,10 @@
 from django.urls import reverse
 from rest_framework import status
-from rest_framework.test import APITestCase, APIClient
+from rest_framework.test import APIClient, APITestCase
+
+from chats.apps.api.utils import create_user_and_token
 from chats.apps.api.v1.quickmessages.serializers import QuickMessageSerializer
 from chats.apps.quickmessages.models import QuickMessage
-from chats.apps.api.utils import create_user_and_token
 
 
 class ViewsetTests(APITestCase):

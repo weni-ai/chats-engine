@@ -1,7 +1,8 @@
+from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
+
 from chats.apps.api.v1.quickmessages.serializers import QuickMessageSerializer
 from chats.apps.quickmessages.models import QuickMessage
-from rest_framework.permissions import IsAuthenticated
-from rest_framework import viewsets
 
 
 class QuickMessageViewset(viewsets.ModelViewSet):
