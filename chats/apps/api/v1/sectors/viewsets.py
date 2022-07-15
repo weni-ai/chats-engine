@@ -2,9 +2,13 @@ from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 
-from chats.apps.api.v1.sectors.serializers import (SectorPermissionSerializer,
-                                                   SectorSerializer)
+from chats.apps.api.v1.sectors.serializers import (
+    SectorPermissionSerializer,
+    SectorSerializer,
+)
+from chats.apps.api.v1.rooms.serializers import RoomTagSectorSerializer
 from chats.apps.sectors.models import Sector, SectorPermission
+from chats.apps.rooms.models import RoomTag
 
 
 class SectorViewset(viewsets.ModelViewSet):
@@ -26,17 +30,13 @@ class SectorViewset(viewsets.ModelViewSet):
         instance.notify_sector("destroy")
         super().perform_destroy(instance)
 
-    @action(detail=True, methods=["GET", "POST", "PUT", "DELETE"], url_name="tags")
-    def tags(self, request, **kwargs):
-        ...
 
-    # @action(detail=True)
-    # def retrieve_tag(self, request, **kwargs):
-    #     ...
-
-    # @action(detail=True)
-    # def destroy_tag(self, request, **kwargs):
-    #     ...
+class RoomTagsViewset(viewsets.ModelViewSet):
+    queryset = RoomTag.objects
+    serializer_class = RoomTagSectorSerializer
+    permission_classes = [
+        IsAuthenticated,
+    ]
 
 
 class SectorPermissionViewset(viewsets.ModelViewSet):

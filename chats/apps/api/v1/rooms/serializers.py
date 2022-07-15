@@ -11,6 +11,12 @@ from chats.apps.api.v1.sectors.serializers import SectorSerializer
 from chats.apps.rooms.models import Room, RoomTag
 
 
+class RoomTagSectorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RoomTag
+        fields = "__all__"
+
+
 class RoomTagSerializer(serializers.ModelSerializer):
     sector = SectorSerializer(many=False, read_only=True)
 
