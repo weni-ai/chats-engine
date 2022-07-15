@@ -89,7 +89,7 @@ class ViewsetTests(APITestCase):
         response = self.client.delete(url)
         q = QuickMessage.objects.filter(id=q.id).first()
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertTrue(q == None)
+        self.assertTrue(q is None)
 
     def test_return_for_not_found_endpoints(self):
         """
