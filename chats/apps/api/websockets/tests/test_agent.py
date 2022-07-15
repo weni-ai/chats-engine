@@ -1,11 +1,11 @@
-from django.test import TestCase
-from django.test import RequestFactory
 from channels.testing import WebsocketCommunicator
+from django.test import RequestFactory, TestCase
+
+from chats.apps.api.utils import create_message, create_user_and_token
 from chats.apps.api.websockets.rooms.consumers.agent import AgentRoomConsumer
-from chats.apps.rooms.models import Room
-from chats.apps.api.utils import create_user_and_token, create_message
 from chats.apps.contacts.models import Contact
 from chats.apps.projects.models import Project
+from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorPermission
 
 

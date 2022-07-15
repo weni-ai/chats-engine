@@ -1,9 +1,8 @@
-from rest_framework import permissions
 from django.contrib.auth.models import AnonymousUser
+from rest_framework import permissions
 
-from chats.apps.sectors.models import SectorPermission
 from chats.apps.projects.models import ProjectPermission
-
+from chats.apps.sectors.models import SectorPermission
 
 WRITE_METHODS = ["POST"]
 OBJECT_METHODS = ["DELETE", "PATCH", "PUT", "GET"]
