@@ -1,3 +1,5 @@
+import json
+
 from django.utils.translation import gettext_lazy as _
 from djongo.models import Q
 from rest_framework import mixins, permissions, status
@@ -5,8 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
-from chats.apps.api.v1.rooms.serializers import (RoomSerializer,
-                                                 TransferRoomSerializer)
+from chats.apps.api.v1.rooms.serializers import RoomSerializer, TransferRoomSerializer
 from chats.apps.rooms.models import Room
 
 
@@ -62,7 +63,21 @@ class RoomViewset(
         serializer.instance.notify_sector("create")
 
     def perform_update(self, serializer):
-        serializer.save()
+        transfer_history = self.get_object().transfer_history
+        transfer_history = (
+            [] if transfer_history is None else json.loads(transfer_history)
+        )
+        user = serializer.data.get("user")
+        sector = serializer.data.get("sector")
+        if user:
+            _content = {"type": "user", "id": user}
+            transfer_history.append(_content)
+        if sector:
+            _content = {"type": "sector", "id": sector}
+            transfer_history.append(_content)
+
+        serializer.save(transfer_history=json.dumps(transfer_history))
+
         serializer.instance.notify_room("update")
 
     def perform_destroy(self, instance):

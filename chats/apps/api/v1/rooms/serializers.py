@@ -5,6 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from chats.apps.api.v1.contacts.serializers import ContactSerializer
+
 # from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.sectors.serializers import SectorSerializer
 from chats.apps.rooms.models import Room, RoomTag
