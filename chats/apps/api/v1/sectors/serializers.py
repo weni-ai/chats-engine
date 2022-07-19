@@ -2,7 +2,7 @@ from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
-from chats.apps.sectors.models import Sector, SectorPermission
+from chats.apps.sectors.models import Sector, SectorAuthorization
 
 
 class SectorSerializer(serializers.ModelSerializer):
@@ -21,13 +21,13 @@ class SectorWSSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class SectorPermissionSerializer(serializers.ModelSerializer):
+class SectorAuthorizationSerializer(serializers.ModelSerializer):
     class Meta:
-        model = SectorPermission
+        model = SectorAuthorization
         fields = "__all__"
 
 
-class SectorPermissionWSSerializer(serializers.ModelSerializer):
+class SectorAuthorizationWSSerializer(serializers.ModelSerializer):
     class Meta:
-        model = SectorPermission
+        model = SectorAuthorization
         fields = "__all__"

@@ -33,7 +33,7 @@ class Sector(BaseModel):
         return self.rooms.filter(is_active=True)
 
     @property
-    def deativated_rooms(self):
+    def deactivated_rooms(self):
         return self.rooms.filter(is_active=True)
 
     @property
@@ -59,9 +59,7 @@ class Sector(BaseModel):
         return SectorWSSerializer(self).data
 
     def get_user_authorization(self, user):
-        sector_auth, created = SectorPermission.objects.get_or_create(
-            user=user, repository=self
-        )
+        sector_auth, created = self.permissions.get_or_create(user=user)
 
         return sector_auth
 
@@ -79,7 +77,7 @@ class Sector(BaseModel):
             auth.notify_user("created")
 
 
-class SectorPermission(BaseModel):
+class SectorAuthorization(BaseModel):
     ROLE_NOT_SETTED = 0
     ROLE_AGENT = 1
     ROLE_MANAGER = 2
@@ -110,6 +108,10 @@ class SectorPermission(BaseModel):
     class Meta:
         verbose_name = _("Project Permission")
         verbose_name_plural = _("Project Permissions")
+        unique_together = [
+            "user",
+            "sector",
+        ]  # only one permission on the sector per user
 
     def __str__(self):
         return self.name
@@ -117,7 +119,7 @@ class SectorPermission(BaseModel):
     def save(self, *args, **kwargs):
         if self.is_owner:
             self.role = self.ROLE_MANAGER
-        super(SectorPermission, self).save(*args, **kwargs)
+        super(SectorAuthorization, self).save(*args, **kwargs)
 
     @property
     def is_owner(self):
@@ -130,9 +132,9 @@ class SectorPermission(BaseModel):
     @property
     def serialized_ws_data(self):
         from chats.apps.api.v1.sectors.serializers import \
-            SectorPermissionWSSerializer
+            SectorAuthorizationWSSerializer
 
-        return SectorPermissionWSSerializer(self).data
+        return SectorAuthorizationWSSerializer(self).data
 
     @property
     def is_manager(self):

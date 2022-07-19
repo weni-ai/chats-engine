@@ -1,22 +1,22 @@
 from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 
-from chats.apps.api.v1.sectors.serializers import (
-    SectorPermissionSerializer,
-    SectorSerializer,
-)
 from chats.apps.api.v1.rooms.serializers import RoomTagSectorSerializer
-from chats.apps.sectors.models import Sector, SectorPermission
+from chats.apps.api.v1.sectors.serializers import (
+    SectorAuthorizationSerializer, SectorSerializer)
+from chats.apps.projects.models import ProjectPermission
 from chats.apps.rooms.models import RoomTag
+from chats.apps.sectors.models import Sector, SectorAuthorization
 
 
 class SectorViewset(viewsets.ModelViewSet):
-    queryset = Sector.objects
+    queryset = Sector.objects.all()
     serializer_class = SectorSerializer
     permission_classes = [
         IsAuthenticated,
     ]
+    lookup_field = "project"
 
     def perform_create(self, serializer):
         serializer.save()
@@ -39,9 +39,9 @@ class RoomTagsViewset(viewsets.ModelViewSet):
     ]
 
 
-class SectorPermissionViewset(viewsets.ModelViewSet):
-    queryset = SectorPermission.objects
-    serializer_class = SectorPermissionSerializer
+class SectorAuthorizationViewset(viewsets.ModelViewSet):
+    queryset = SectorAuthorization.objects
+    serializer_class = SectorAuthorizationSerializer
     permission_classes = [
         IsAuthenticated,
     ]

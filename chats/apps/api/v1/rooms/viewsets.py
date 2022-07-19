@@ -7,7 +7,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
-from chats.apps.api.v1.rooms.serializers import RoomSerializer, TransferRoomSerializer
+from chats.apps.api.v1.rooms.serializers import (RoomSerializer,
+                                                 TransferRoomSerializer)
 from chats.apps.rooms.models import Room
 
 
