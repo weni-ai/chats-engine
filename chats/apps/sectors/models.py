@@ -16,9 +16,10 @@ class Sector(BaseModel):
         related_name="sectors",
         on_delete=models.CASCADE,
     )
-    rooms_limit = models.IntegerField(_("Rooms limit per employee"))
-    work_start = models.IntegerField(_("work start"))
-    work_end = models.IntegerField(_("work end"))
+    rooms_limit = models.PositiveIntegerField(_("Rooms limit per employee"))
+    work_start = models.TimeField(_("work start"), auto_now=False, auto_now_add=False)
+    work_end = models.TimeField(_("work end"), auto_now=False, auto_now_add=False)
+    is_deleted = models.BooleanField(_("is deleted?"), default=False)
 
     class Meta:
         verbose_name = _("Contact")
@@ -57,6 +58,22 @@ class Sector(BaseModel):
         from chats.apps.api.v1.sectors.serializers import SectorWSSerializer
 
         return SectorWSSerializer(self).data
+
+    @property
+    def agent_count(self):
+        return self.permissions.filter(role=SectorAuthorization.ROLE_AGENT).count()
+
+    @property
+    def contact_count(self):
+        qs = (
+            self.rooms.filter(contact__isnull=False)
+            .order_by("contact")
+            .distinct()
+            .count()
+        )
+        return len(
+            qs
+        )  # cannot use distinct and count on the same query, djongo bug, probably better to stick to postgres
 
     def get_user_authorization(self, user):
         sector_auth, created = self.permissions.get_or_create(user=user)
@@ -131,8 +148,9 @@ class SectorAuthorization(BaseModel):
 
     @property
     def serialized_ws_data(self):
-        from chats.apps.api.v1.sectors.serializers import \
-            SectorAuthorizationWSSerializer
+        from chats.apps.api.v1.sectors.serializers import (
+            SectorAuthorizationWSSerializer,
+        )
 
         return SectorAuthorizationWSSerializer(self).data
 

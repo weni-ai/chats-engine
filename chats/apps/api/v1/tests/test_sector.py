@@ -55,13 +55,16 @@ class SectorTests(APITestCase):
         """
         Ensure we can create a new account object.
         """
-        url = reverse("sector-list")
-        client = self.client
-        client.credentials(HTTP_AUTHORIZATION="Token " + self.owner_token.key)
-        response = self.client.get(url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        url = reverse("sector-list") + "?project=Lol"
+        print(url)
         import pdb
 
         pdb.set_trace()
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.owner_token.key)
+        response = self.client.get(
+            url,
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         # self.assertEqual(response.)

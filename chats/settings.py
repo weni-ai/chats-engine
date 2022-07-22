@@ -191,6 +191,8 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination." + "LimitOffsetPagination",
     "PAGE_SIZE": env.int("REST_PAGINATION_SIZE", default=20),
+    "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
+    "DEFAULT_METADATA_CLASS": "chats.apps.api.v1.metadata.Metadata",
 }
 
 

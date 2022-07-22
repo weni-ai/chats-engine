@@ -31,6 +31,9 @@ class SectorTests(APITestCase):
         self.project = Project.objects.create(
             name="Test Project", connect_pk="asdasdas-dad-as-sda-d-ddd"
         )
+        self.project_2 = Project.objects.create(
+            name="Test Project", connect_pk="asdasdas-dad-as-sda-d-ddd"
+        )
         self.sector_1 = Sector.objects.create(
             name="Test Sector",
             project=self.project,
@@ -54,12 +57,12 @@ class SectorTests(APITestCase):
 
     def test_get_sector_list_with_right_project_token(self):
         """
-        Ensure we can create a new account object.
+        Ensure that the user need to pass a project_id in order to get the sectors related to them
         """
         url = reverse("sector-list")
         client = self.client
         client.credentials(HTTP_AUTHORIZATION="Token " + self.owner_token.key)
-        response = self.client.get(url)
+        response = self.client.get(url, data={"project": self.project.id})
         results = response.json().get("results")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json().get("count"), 2)
@@ -68,11 +71,13 @@ class SectorTests(APITestCase):
 
     def test_get_sector_list_with_wrong_project_token(self):
         """
-        Ensure we can create a new account object.
+        Ensure that an unauthorized user cannot the sector list of the project
         """
         url = reverse("sector-list")
         client = self.client
         client.credentials(HTTP_AUTHORIZATION="Token " + self.user_3_token.key)
         response = self.client.get(url)
-        results = response.json().get("results")
+
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    # def
