@@ -8,6 +8,9 @@ WRITE_METHODS = ["POST"]
 OBJECT_METHODS = ["DELETE", "PATCH", "PUT", "GET"]
 
 
+# class ProjectAdminORSectorManager(permissions.BasePermission):
+
+
 class SectorAnyPermission(permissions.BasePermission):
     def has_object_permission(self, request, view, obj) -> bool:
         if isinstance(request.user, AnonymousUser):

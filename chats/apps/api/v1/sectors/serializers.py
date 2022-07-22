@@ -48,7 +48,7 @@ class SectorReadOnlyRetrieveSerializer(serializers.ModelSerializer):
             "manager",
             "work_start",
             "work_end",
-            "limit",
+            # "limit",
         ]
 
 

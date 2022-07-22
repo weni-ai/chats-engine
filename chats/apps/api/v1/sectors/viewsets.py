@@ -6,7 +6,6 @@ from rest_framework.response import Response
 
 from chats.apps.api.v1.rooms.serializers import RoomTagSectorSerializer
 from chats.apps.api.v1.sectors import serializers as sector_serializers
-from chats.apps.projects.models import ProjectPermission
 from chats.apps.rooms.models import RoomTag
 from chats.apps.sectors.models import Sector, SectorAuthorization
 from chats.apps.api.v1.permissions import (
