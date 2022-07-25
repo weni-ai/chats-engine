@@ -1,8 +1,7 @@
 from django.utils.translation import gettext_lazy as _
-
 from django_filters import rest_framework as filters
 
-from chats.apps.sectors.models import Sector, SectorAuthorization
+from chats.apps.sectors.models import Sector
 
 
 class SectorFilter(filters.FilterSet):
@@ -18,4 +17,4 @@ class SectorFilter(filters.FilterSet):
     )
 
     def filter_project(self, queryset, name, value):
-        return queryset
+        return queryset.filter(project_uuid=value)
