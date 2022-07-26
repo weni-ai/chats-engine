@@ -30,11 +30,6 @@ class RoomSerializer(serializers.ModelSerializer):
 
 
 class TransferRoomSerializer(serializers.ModelSerializer):
-    # user = UserSerializer(many=False, read_only=False)
-    sector = SectorSerializer(many=False, read_only=False)
-    contact = ContactSerializer(many=False, read_only=True)
-    tags = DetailSectorTagSerializer(many=True, read_only=True)
-
     class Meta:
         model = Room
         fields = "__all__"
@@ -43,5 +38,10 @@ class TransferRoomSerializer(serializers.ModelSerializer):
             "ended_at",
             "is_active",
             "transfer_history",
-            "tags",
         ]
+
+        extra_kwargs = {
+            "tags": {"required": False},
+            "user": {"required": False, "allow_null": False},
+            "sector": {"required": False, "allow_null": False},
+        }

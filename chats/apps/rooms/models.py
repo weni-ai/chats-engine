@@ -37,6 +37,9 @@ class Room(BaseModel):
     ended_at = models.DateTimeField(
         _("Ended at"), auto_now_add=False, null=True, blank=True
     )
+
+    ended_by = models.CharField(_("Ended by"), max_length=50)
+
     is_active = models.BooleanField(_("is active?"), default=True)
 
     transfer_history = JSONField(_("Transfer History"))
@@ -57,9 +60,10 @@ class Room(BaseModel):
 
         return RoomSerializer(self).data
 
-    def close(self, tags=None):
+    def close(self, tags=None, end_by: str = ""):
         self.is_active = False
         self.ended_at = timezone.now()
+        self.ended_by = end_by
         for tag_id in tags:
             self.tags.add(tag_id)
         self.save()
