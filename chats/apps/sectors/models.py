@@ -67,10 +67,13 @@ class Sector(BaseModel):
 
     @property
     def contact_count(self):
-        qs = self.rooms.filter(contact__isnull=False).order_by("contact").distinct()
-        return len(
-            qs
-        )  # cannot use distinct and count on the same query, djongo bug, probably better to stick to postgres
+        qs = (
+            self.rooms.filter(contact__isnull=False)
+            .order_by("contact")
+            .distinct()
+            .count()
+        )
+        return qs
 
     def get_or_create_user_authorization(self, user):
         sector_auth, created = self.authorizations.get_or_create(user=user)
@@ -157,7 +160,7 @@ class SectorAuthorization(BaseModel):
 
     @property
     def is_authorized(self):
-        return self.is_agent or self.is_authorized
+        return self.is_agent or self.is_manager
 
     @property
     def can_edit(self):

@@ -1,14 +1,13 @@
 import json
 
 from django.utils.translation import gettext_lazy as _
-from djongo.models import Q
+from django.db.models import Q
 from rest_framework import mixins, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
-from chats.apps.api.v1.rooms.serializers import (RoomSerializer,
-                                                 TransferRoomSerializer)
+from chats.apps.api.v1.rooms.serializers import RoomSerializer, TransferRoomSerializer
 from chats.apps.rooms.models import Room
 
 

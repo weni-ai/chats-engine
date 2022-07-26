@@ -11,6 +11,19 @@ class SectorSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class SectorUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Sector
+        fields = [
+            "name",
+            "rooms_limit",
+            "work_start",
+            "work_end",
+            "is_deleted",
+        ]
+        extra_kwargs = {field: {"required": False} for field in fields}
+
+
 class SectorReadOnlyListSerializer(serializers.ModelSerializer):
     agents = serializers.SerializerMethodField()
     contacts = serializers.SerializerMethodField()
@@ -82,6 +95,7 @@ class SectorTagSerializer(serializers.ModelSerializer):
     class Meta:
         model = SectorTag
         fields = "__all__"
+        extra_kwargs = {"sector": {"required": False}}
 
 
 class DetailSectorTagSerializer(serializers.ModelSerializer):

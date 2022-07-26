@@ -18,15 +18,6 @@ class SectorAnyPermission(permissions.BasePermission):
     to check the user roles within the sector.
     """
 
-    def has_permission(self, request, view) -> bool:
-        sector_uuid = request.query_params.get("sector")
-        try:
-            sector = Sector.objects.get(uuid=sector_uuid)
-            authorization = sector.get_permission(request.user)
-        except (SectorAuthorization.DoesNotExist, Sector.DoesNotExist):
-            return False
-        return authorization.is_authorized
-
     def has_object_permission(self, request, view, obj) -> bool:
         if isinstance(request.user, AnonymousUser):
             return False

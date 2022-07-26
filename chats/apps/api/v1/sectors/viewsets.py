@@ -23,6 +23,11 @@ class SectorViewset(viewsets.ModelViewSet):
     ]
     lookup_field = "uuid"
 
+    def get_queryset(self):
+        if self.action != "list":
+            self.filterset_class = None
+        return super().get_queryset()
+
     def get_permissions(self):
         permission_classes = self.permission_classes
         if self.action == "retrieve":
@@ -36,8 +41,18 @@ class SectorViewset(viewsets.ModelViewSet):
             return sector_serializers.SectorReadOnlyListSerializer
         elif self.action == "retrieve":
             return sector_serializers.SectorReadOnlyRetrieveSerializer
+        elif self.action == "update":
+            return sector_serializers.SectorUpdateSerializer
 
         return super().get_serializer_class()
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response(
+            {"is_deleted": True},
+            status.HTTP_200_OK,
+        )
 
     def perform_create(self, serializer):
         serializer.save()
@@ -67,10 +82,18 @@ class SectorTagsViewset(viewsets.ModelViewSet):
     ]
     lookup_field = "uuid"
 
+    def get_queryset(self):
+        if self.action != "list":
+            self.filterset_class = None
+        return super().get_queryset()
+
     def get_permissions(self):
         permission_classes = self.permission_classes
         if self.action in ["list", "retrieve"]:
             permission_classes.append(SectorAnyPermission)
+        else:
+            permission_classes.append(SectorManagerPermission)
+
         return super().get_permissions()
 
 

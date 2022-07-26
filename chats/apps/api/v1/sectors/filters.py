@@ -2,7 +2,7 @@ from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 from chats.apps.projects.models import Project
 
-from chats.apps.sectors.models import Sector, SectorTag
+from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 
 
 class SectorFilter(filters.FilterSet):
@@ -39,8 +39,14 @@ class SectorTagFilter(filters.FilterSet):
         field_name="sector",
         required=True,
         method="filter_sector",
-        help_text=_("Sector's ID"),
+        help_text=_("Sector's UUID"),
     )
 
     def filter_sector(self, queryset, name, value):
-        return queryset.filter(sector_uuid=value)
+        try:
+            sector = Sector.objects.get(uuid=value)
+            auth = sector.get_permission(self.request.user)
+            auth.is_authorized
+        except (Project.DoesNotExist, Sector.DoesNotExist, AttributeError):
+            return SectorAuthorization.objects.none()
+        return queryset.filter(sector__uuid=value)
