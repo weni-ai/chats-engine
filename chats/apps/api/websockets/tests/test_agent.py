@@ -6,7 +6,7 @@ from chats.apps.api.websockets.rooms.consumers.agent import AgentRoomConsumer
 from chats.apps.contacts.models import Contact
 from chats.apps.projects.models import Project
 from chats.apps.rooms.models import Room
-from chats.apps.sectors.models import Sector, SectorPermission
+from chats.apps.sectors.models import Sector, SectorAuthorization
 
 
 class AgentConsumerTestCase(TestCase):
@@ -22,7 +22,7 @@ class AgentConsumerTestCase(TestCase):
             work_start=7,
             work_end=17,
         )
-        self.sector_permission = SectorPermission.objects.create(
+        self.sector_permission = SectorAuthorization.objects.create(
             sector=self.sector, user=self.user, role=1
         )
         self.contact = Contact.objects.create(

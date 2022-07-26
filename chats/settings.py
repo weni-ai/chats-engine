@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 
 import environ
+from django.utils.log import DEFAULT_LOGGING
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -114,25 +115,7 @@ CHANNEL_LAYERS = {
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
-DB_DATA = env.db("DEFAULT_DATABASE", default="sqlite:///db.sqlite3")
-
-# djongo mongodb engine needs a slightly different db config
-if DB_DATA["ENGINE"] == "djongo":
-    DATABASES = {
-        "default": {
-            "ENGINE": DB_DATA["ENGINE"],
-            "NAME": DB_DATA["NAME"],
-            "ENFORCE_SCHEMA": False,
-            "CLIENT": {
-                "host": DB_DATA["HOST"],
-                "port": DB_DATA["PORT"],
-                "username": DB_DATA["USER"],
-                "password": DB_DATA["PASSWORD"],
-            },
-        }
-    }
-else:
-    DATABASES = {"default": DB_DATA}
+DATABASES = {"default": env.db(var="DEFAULT_DATABASE", default="sqlite:///db.sqlite3")}
 
 # User
 
@@ -191,8 +174,56 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination." + "LimitOffsetPagination",
     "PAGE_SIZE": env.int("REST_PAGINATION_SIZE", default=20),
+    "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
+    "DEFAULT_METADATA_CLASS": "chats.apps.api.v1.metadata.Metadata",
 }
 
+
+# Logging
+
+LOGGING = DEFAULT_LOGGING
+LOGGING["formatters"]["verbose"] = {
+    "format": "%(levelname)s  %(asctime)s  %(module)s "
+    "%(process)d  %(thread)d  %(message)s"
+}
+LOGGING["handlers"]["console"] = {
+    "level": "DEBUG",
+    "class": "logging.StreamHandler",
+    "formatter": "verbose",
+}
+
+
+# mozilla-django-oidc
+
+OIDC_ENABLED = env.bool("OIDC_ENABLED", default=False)
+if OIDC_ENABLED:
+    REST_FRAMEWORK["DEFAULT_AUTHENTICATION_CLASSES"].append(
+        "mozilla_django_oidc.contrib.drf.OIDCAuthentication"
+    )
+    INSTALLED_APPS = (*INSTALLED_APPS, "mozilla_django_oidc")
+    LOGGING["loggers"]["mozilla_django_oidc"] = {
+        "level": "DEBUG",
+        "handlers": ["console"],
+        "propagate": False,
+    }
+    LOGGING["loggers"]["weni_django_oidc"] = {
+        "level": "DEBUG",
+        "handlers": ["console"],
+        "propagate": False,
+    }
+
+    OIDC_RP_CLIENT_ID = env.str("OIDC_RP_CLIENT_ID")
+    OIDC_RP_CLIENT_SECRET = env.str("OIDC_RP_CLIENT_SECRET")
+    OIDC_OP_AUTHORIZATION_ENDPOINT = env.str("OIDC_OP_AUTHORIZATION_ENDPOINT")
+    OIDC_OP_TOKEN_ENDPOINT = env.str("OIDC_OP_TOKEN_ENDPOINT")
+    OIDC_OP_USER_ENDPOINT = env.str("OIDC_OP_USER_ENDPOINT")
+    OIDC_OP_JWKS_ENDPOINT = env.str("OIDC_OP_JWKS_ENDPOINT")
+    OIDC_RP_SIGN_ALGO = env.str("OIDC_RP_SIGN_ALGO", default="RS256")
+    OIDC_DRF_AUTH_BACKEND = env.str(
+        "OIDC_DRF_AUTH_BACKEND",
+        default="chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend",
+    )
+    OIDC_RP_SCOPES = env.str("OIDC_RP_SCOPES", default="openid email")
 
 # Swagger
 

@@ -1,7 +1,7 @@
 import json
 
 from django.utils.translation import gettext_lazy as _
-from djongo.models import Q
+from django.db.models import Q
 from rest_framework import mixins, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response

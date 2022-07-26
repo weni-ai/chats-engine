@@ -1,37 +1,50 @@
 from django.contrib.auth.models import AnonymousUser
 from rest_framework import permissions
 
-from chats.apps.projects.models import ProjectPermission
-from chats.apps.sectors.models import SectorPermission
+from chats.apps.projects.models import Project, ProjectPermission
+from chats.apps.sectors.models import Sector, SectorAuthorization
 
 WRITE_METHODS = ["POST"]
 OBJECT_METHODS = ["DELETE", "PATCH", "PUT", "GET"]
 
 
+# class ProjectAdminORSectorManager(permissions.BasePermission):
+
+
 class SectorAnyPermission(permissions.BasePermission):
+    """
+    Grant permission if the user has *any roles(manager or agent)* in the Sector
+    Each model that uses this permission, need to implement a `get_permission` method
+    to check the user roles within the sector.
+    """
+
     def has_object_permission(self, request, view, obj) -> bool:
         if isinstance(request.user, AnonymousUser):
             return False
         try:
-            authorization = obj.get_permission(
-                request.user
-            ).exists()  # each and every model that users this permission have to implement this method
-        except SectorPermission.DoesNotExist:
+            authorization = obj.get_permission(request.user)
+        except SectorAuthorization.DoesNotExist:
             return False
         return authorization.is_authorized
 
 
 class SectorManagerPermission(permissions.BasePermission):
+    """
+    Grant permission if the user has *manager role* in the Sector or *admin role* in the project
+    Each model that uses this permission, need to implement a `get_permission` method
+    to check the user roles within the sector.
+    """
+
     def has_object_permission(self, request, view, obj) -> bool:
+
         if isinstance(request.user, AnonymousUser):
             return False
+
         try:
-            authorization = obj.get_permission(
-                request.user
-            )  # each and every model that users this permission have to implement this method
-        except SectorPermission.DoesNotExist:
+            authorization = obj.get_permission(request.user)
+        except SectorAuthorization.DoesNotExist:
             return False
-        return authorization.is_manager
+        return authorization.can_edit
 
 
 class ProjectAdminPermission(permissions.BasePermission):
@@ -39,15 +52,22 @@ class ProjectAdminPermission(permissions.BasePermission):
         if isinstance(request.user, AnonymousUser):
             return False
         try:
-            authorization = obj.get_permission(
-                request.user
-            )  # each and every model that users this permission have to implement this method
+            authorization = obj.get_permission(request.user)
         except ProjectPermission.DoesNotExist:
             return False
-        return authorization.is_admin
+        return authorization.can_edit
 
 
 class ProjectExternalPermission(permissions.BasePermission):
+    def has_permission(self, request, view) -> bool:
+        sector_uuid = request.query_params.get("project")
+        try:
+            project = Project.objects.get(uuid=sector_uuid)
+            authorization = project.get_permission(request.user)
+        except (ProjectPermission.DoesNotExist, Project.DoesNotExist):
+            return False
+        return authorization.is_external
+
     def has_object_permission(self, request, view, obj) -> bool:
         if isinstance(request.user, AnonymousUser):
             return False

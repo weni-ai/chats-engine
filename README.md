@@ -60,6 +60,16 @@ You can set environment variables in your OS or write on .env file.
 | ADMIN_USER_EMAIL                  |  String  	|   False  	|       admin@weni.ai    	| Email that will receive emails with logs when something happens in the api.                                                                                                        	|
 | REST_PAGINATION_SIZE              |  Int  	|   False  	|            20           	| Limit the number of objects returned when using pagination on an endpoint.                                                                                                        	|
 | OLD_MESSAGES_LIMIT                |  Int  	|   False  	|            10            	| Limit the messages returned when a chat is opened.                                                                                                                                  	|
+| OIDC_ENABLED | bool | False | False | Enable using OIDC.
+| OIDC_RP_CLIENT_ID | string | False | None | OpenID Connect client ID provided by your OP.
+| OIDC_RP_CLIENT_SECRET | string | False | None | OpenID Connect client secret provided by your OP.
+| OIDC_OP_AUTHORIZATION_ENDPOINT | string | False | None | URL of your OpenID Connect provider authorization endpoint.
+| OIDC_OP_TOKEN_ENDPOINT | string | False | None | URL of your OpenID Connect provider token endpoint.
+| OIDC_OP_USER_ENDPOINT | string | False | None | URL of your OpenID Connect provider userinfo endpoint.
+| OIDC_OP_JWKS_ENDPOINT | string | False | None | URL of your OpenID Connect provider JWKS endpoint.
+| OIDC_RP_SIGN_ALGO | string | False | RS256 | Sets the algorithm the IdP uses to sign ID tokens.
+| OIDC_DRF_AUTH_BACKEND | string | False | chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend | Define the authentication middleware for the django rest framework.
+| OIDC_RP_SCOPES | string | False | openid email | The OpenID Connect scopes to request during login.
 
 
 # CONTRIBUTING

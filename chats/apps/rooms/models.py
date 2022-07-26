@@ -9,24 +9,6 @@ from chats.utils.websockets import send_channels_group
 # TODO: Use djongo(mongodb) models? Might change how things works
 
 
-class RoomTag(BaseModel):
-
-    name = models.CharField(_("Name"), max_length=120)
-    sector = models.ForeignKey(
-        "sectors.Sector",
-        verbose_name=_("Sector"),
-        related_name="tags",
-        on_delete=models.CASCADE,
-    )
-
-    class Meta:
-        verbose_name = _("Room Tag")
-        verbose_name_plural = _("Room Tags")
-
-    def __str__(self):
-        return self.name
-
-
 class Room(BaseModel):
     user = models.ForeignKey(
         "accounts.User",
@@ -60,7 +42,9 @@ class Room(BaseModel):
     transfer_history = JSONField(_("Transfer History"))
 
     tags = models.ManyToManyField(
-        RoomTag, verbose_name=_("tags"), related_name="rooms", null=True, blank=True
+        "sectors.SectorTag",
+        verbose_name=_("tags"),
+        related_name="rooms",
     )
 
     class Meta:
