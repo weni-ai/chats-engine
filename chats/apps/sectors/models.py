@@ -10,7 +10,12 @@ class Sector(BaseModel):
     project = models.ForeignKey(
         "projects.Project", verbose_name=_("sectors"), on_delete=models.CASCADE
     )
-    # manager = models.ForeignKey("projects.ProjectPermission", verbose_name=_("sectors"), on_delete=models.CASCADE)
+    manager = models.OneToOneField(  # Create logic when saving, to create a permission as manager of the sector
+        "accounts.User",
+        verbose_name=_("Manager"),
+        related_name="sectors",
+        on_delete=models.CASCADE,
+    )
     rooms_limit = models.IntegerField(_("Rooms limit per employee"))
     work_start = models.IntegerField(_("work start"))
     work_end = models.IntegerField(_("work end"))
@@ -53,6 +58,13 @@ class Sector(BaseModel):
 
         return SectorWSSerializer(self).data
 
+    def get_user_authorization(self, user):
+        sector_auth, created = SectorPermission.objects.get_or_create(
+            user=user, repository=self
+        )
+
+        return sector_auth
+
     def notify_sector(self, action):
         """ """
         send_channels_group(
@@ -92,7 +104,7 @@ class SectorPermission(BaseModel):
         on_delete=models.CASCADE,
     )
     role = models.PositiveIntegerField(
-        _("role"), choices=ROLE_CHOICES, default=ROLE_NOT_SETTED
+        _("role"), choices=ROLE_CHOICES, default=ROLE_AGENT
     )
 
     class Meta:
@@ -102,12 +114,38 @@ class SectorPermission(BaseModel):
     def __str__(self):
         return self.name
 
+    def save(self, *args, **kwargs):
+        if self.is_owner:
+            self.role = self.ROLE_MANAGER
+        super(SectorPermission, self).save(*args, **kwargs)
+
+    @property
+    def is_owner(self):
+        try:
+            user = self.user
+        except self.user.DoesNotExist:  # pragma: no cover
+            return False  # pragma: no cover
+        return self.sector.manager == user
+
     @property
     def serialized_ws_data(self):
-        from chats.apps.api.v1.sectors.serializers import \
-            SectorPermissionWSSerializer
+        from chats.apps.api.v1.sectors.serializers import (
+            SectorPermissionWSSerializer,
+        )
 
         return SectorPermissionWSSerializer(self).data
+
+    @property
+    def is_manager(self):
+        return self.role == self.ROLE_MANAGER
+
+    @property
+    def is_agent(self):
+        return self.role == self.ROLE_AGENT
+
+    @property
+    def is_authorized(self):
+        return self.is_agent or self.is_authorized
 
     def notify_user(self, action):
         """ """
