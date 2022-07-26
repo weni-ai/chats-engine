@@ -115,25 +115,7 @@ CHANNEL_LAYERS = {
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
-DB_DATA = env.db("DEFAULT_DATABASE", default="sqlite:///db.sqlite3")
-
-# djongo mongodb engine needs a slightly different db config
-if DB_DATA["ENGINE"] == "djongo":
-    DATABASES = {
-        "default": {
-            "ENGINE": DB_DATA["ENGINE"],
-            "NAME": DB_DATA["NAME"],
-            "ENFORCE_SCHEMA": False,
-            "CLIENT": {
-                "host": DB_DATA["HOST"],
-                "port": DB_DATA["PORT"],
-                "username": DB_DATA["USER"],
-                "password": DB_DATA["PASSWORD"],
-            },
-        }
-    }
-else:
-    DATABASES = {"default": DB_DATA}
+DATABASES = {"default": env.db(var="DEFAULT_DATABASE", default="sqlite:///db.sqlite3")}
 
 # User
 
