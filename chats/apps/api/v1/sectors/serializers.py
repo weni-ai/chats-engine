@@ -1,6 +1,8 @@
 from rest_framework import serializers
 
-from chats.apps.sectors.models import Sector, SectorAuthorization
+from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
+
+# Sector serializers
 
 
 class SectorSerializer(serializers.ModelSerializer):
@@ -35,15 +37,12 @@ class SectorManagerSerializer(serializers.ModelSerializer):
 
 
 class SectorReadOnlyRetrieveSerializer(serializers.ModelSerializer):
-    manager = SectorManagerSerializer()
-
     class Meta:
 
         model = Sector
         fields = [
             "uuid",
             "name",
-            "manager",
             "work_start",
             "work_end",
             "rooms_limit",
@@ -61,6 +60,9 @@ class SectorWSSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+# Sector Authorization Serializers
+
+
 class SectorAuthorizationSerializer(serializers.ModelSerializer):
     class Meta:
         model = SectorAuthorization
@@ -71,3 +73,20 @@ class SectorAuthorizationWSSerializer(serializers.ModelSerializer):
     class Meta:
         model = SectorAuthorization
         fields = "__all__"
+
+
+# Sector Tags Serializer
+
+
+class SectorTagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SectorTag
+        fields = "__all__"
+
+
+class DetailSectorTagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SectorTag
+        exclude = [
+            "sector",
+        ]

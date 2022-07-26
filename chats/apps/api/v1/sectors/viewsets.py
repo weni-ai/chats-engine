@@ -1,18 +1,16 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from chats.apps.api.v1.rooms.serializers import RoomTagSectorSerializer
-from chats.apps.api.v1.sectors import serializers as sector_serializers
-from chats.apps.rooms.models import RoomTag
-from chats.apps.sectors.models import Sector, SectorAuthorization
 from chats.apps.api.v1.permissions import (
     ProjectAdminPermission,
+    SectorAnyPermission,
     SectorManagerPermission,
 )
-from chats.apps.api.v1.sectors.filters import SectorFilter
+from chats.apps.api.v1.sectors import serializers as sector_serializers
+from chats.apps.api.v1.sectors.filters import SectorFilter, SectorTagFilter
+from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 
 
 class SectorViewset(viewsets.ModelViewSet):
@@ -20,7 +18,18 @@ class SectorViewset(viewsets.ModelViewSet):
     serializer_class = sector_serializers.SectorSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = SectorFilter
-    permission_classes = [IsAuthenticated, ProjectAdminPermission]
+    permission_classes = [
+        IsAuthenticated,
+    ]
+    lookup_field = "uuid"
+
+    def get_permissions(self):
+        permission_classes = self.permission_classes
+        if self.action == "retrieve":
+            permission_classes.append(SectorManagerPermission)
+        else:
+            permission_classes.append(ProjectAdminPermission)
+        return [permission() for permission in permission_classes]
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -48,18 +57,28 @@ class SectorViewset(viewsets.ModelViewSet):
         )
 
 
-class RoomTagsViewset(viewsets.ModelViewSet):
-    queryset = RoomTag.objects
-    serializer_class = RoomTagSectorSerializer
+class SectorTagsViewset(viewsets.ModelViewSet):
+    queryset = SectorTag.objects.all()
+    serializer_class = sector_serializers.SectorTagSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = SectorTagFilter
     permission_classes = [
         IsAuthenticated,
     ]
+    lookup_field = "uuid"
+
+    def get_permissions(self):
+        permission_classes = self.permission_classes
+        if self.action in ["list", "retrieve"]:
+            permission_classes.append(SectorAnyPermission)
+        return super().get_permissions()
 
 
 class SectorAuthorizationViewset(viewsets.ModelViewSet):
-    queryset = SectorAuthorization.objects
+    queryset = SectorAuthorization.objects.all()
     serializer_class = sector_serializers.SectorAuthorizationSerializer
     permission_classes = [IsAuthenticated, SectorManagerPermission]
+    lookup_field = "uuid"
 
     def perform_create(self, serializer):
         serializer.save()
