@@ -7,10 +7,14 @@ from chats.utils.websockets import send_channels_group
 
 class Message(BaseModel):
     room = models.ForeignKey(
-        "rooms.Room", verbose_name=_("messages"), on_delete=models.CASCADE
+        "rooms.Room",
+        related_name="messages",
+        verbose_name=_("messages"),
+        on_delete=models.CASCADE,
     )
     user = models.ForeignKey(
         "accounts.User",
+        related_name="messages",
         verbose_name=_("messages"),
         on_delete=models.CASCADE,
         null=True,
@@ -18,6 +22,7 @@ class Message(BaseModel):
     )
     contact = models.ForeignKey(
         "contacts.Contact",
+        related_name="messages",
         verbose_name=_("messages"),
         on_delete=models.CASCADE,
         null=True,

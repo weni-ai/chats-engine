@@ -1,3 +1,5 @@
+import json
+
 from django.db import models
 from django.forms import JSONField
 from django.utils import timezone
@@ -59,6 +61,25 @@ class Room(BaseModel):
         from chats.apps.api.v1.rooms.serializers import RoomSerializer  # noqa
 
         return RoomSerializer(self).data
+
+    def transfer_room(self, type: str, data: dict):
+        transfer_history = self.transfer_history
+        transfer_history = (
+            [] if transfer_history is None else json.loads(transfer_history)
+        )
+        user = data.get("user")
+        sector = data.get("sector")
+        if user:
+            _content = {"type": "user", "id": user, "transfered_at": timezone.now()}
+            transfer_history.append(_content)
+        if sector:
+            _content = {"type": "sector", "id": sector}
+            transfer_history.append(_content)
+        self.transfer_history = json.dumps(transfer_history)
+        self.save()
+        msg = self.messages.create(text=self.transfer_history)
+        msg.notify_room("create")
+        self.notify_room("update")
 
     def close(self, tags=None, end_by: str = ""):
         self.is_active = False

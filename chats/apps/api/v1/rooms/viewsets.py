@@ -11,7 +11,7 @@ from rest_framework.viewsets import GenericViewSet
 
 from chats.apps.api.v1.rooms.serializers import RoomSerializer, TransferRoomSerializer
 from chats.apps.rooms.models import Room
-from chats.apps.api.v1.sectors import filters as sector_filters
+from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1 import permissions as api_permissions
 
 
@@ -23,18 +23,23 @@ class RoomViewset(
 ):
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = room_filters
     permission_classes = [
         permissions.IsAuthenticated,
         api_permissions.SectorAnyPermission,
     ]
 
     def get_serializer_class(self):
-        if self.action == "list":
+        if self.action == "update":
             return TransferRoomSerializer
         return super().get_serializer_class()
 
     def get_queryset(self):
         qs = self.queryset
+        is_active = self.request.query_params.get("is_active")
+        if is_active:
+            return qs
         return qs.filter(
             Q(user=self.request.user) | Q(user__isnull=True),
             sector__id__in=self.request.user.sector_ids,
