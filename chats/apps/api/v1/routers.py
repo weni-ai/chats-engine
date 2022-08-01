@@ -5,6 +5,7 @@ from chats.apps.api.v1.contacts.viewsets import ContactViewset
 from chats.apps.api.v1.msgs.viewsets import MessageViewset
 from chats.apps.api.v1.projects.viewsets import ProjectViewset
 from chats.apps.api.v1.rooms.viewsets import RoomViewset
+from chats.apps.api.v1.sectorqueue.viewsets import SectorQueueViewset, SectorQueueAuthorizationViewset
 from chats.apps.api.v1.sectors.viewsets import (
     SectorAuthorizationViewset,
     SectorTagsViewset,
@@ -24,4 +25,6 @@ router.register("contact", ContactViewset)
 router.register("sector", SectorViewset)
 router.register("tag", SectorTagsViewset)
 router.register("project", ProjectViewset)
+router.register("queue", SectorQueueViewset)
 router.register("permission/sector", SectorAuthorizationViewset)
+router.register("permission_queue/sectorqueue", SectorQueueAuthorizationViewset)

@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     "chats.apps.msgs",
     "chats.apps.rooms",
     "chats.apps.sectors",
+    "chats.apps.sectorqueue",
     "chats.apps.projects",
     "chats.apps.api",
     "chats.core",
