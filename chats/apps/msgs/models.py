@@ -53,7 +53,10 @@ class Message(BaseModel):
 
 class MessageMedia(BaseModel):
     message = models.ForeignKey(
-        Message, verbose_name=_("medias"), on_delete=models.CASCADE
+        Message,
+        related_name="medias",
+        verbose_name=_("medias"),
+        on_delete=models.CASCADE,
     )
     url = models.URLField(_("url"), max_length=200)
     media_type = models.CharField(_("media type"), max_length=150)
