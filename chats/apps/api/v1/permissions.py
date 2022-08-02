@@ -1,10 +1,8 @@
 from django.contrib.auth.models import AnonymousUser
 from rest_framework import permissions
-from chats.apps.accounts.models import User
-
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.sectorqueue.models import SectorQueue, SectorQueueAuthorization
-from chats.apps.sectors.models import Sector, SectorAuthorization
+from chats.apps.sectors.models import SectorAuthorization
 
 WRITE_METHODS = ["POST"]
 OBJECT_METHODS = ["DELETE", "PATCH", "PUT", "GET"]
@@ -97,7 +95,7 @@ class SectorAgentReadOnlyPermission(permissions.BasePermission):
             authorization = obj.get_permission(request.user)
         except SectorQueueAuthorization.DoesNotExist:
             return False
-        return authorization.can_edit
+        return authorization
 
 
 class SectorAddQueuePermission(permissions.BasePermission):

@@ -1,9 +1,9 @@
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
-from chats.apps.projects.models import Project
+from chats.apps.projects.models import ProjectPermission
 
-from chats.apps.sectorqueue.models import SectorQueue
-from chats.apps.sectors.models import Sector
+from chats.apps.sectorqueue.models import SectorQueue, SectorQueueAuthorization
+from chats.apps.sectors.models import SectorAuthorization
 
 
 class SectorQueueFilter(filters.FilterSet):
@@ -20,12 +20,50 @@ class SectorQueueFilter(filters.FilterSet):
 
     def filter_sector(self, queryset, name, value):
         """
-        Return sector given a user, will check if the user is the project admin or
-        if they have manager role on sectors inside the project
+        Return queue given a user, will check if the user is the project admin or
+        if they have manager role on sectors inside the project, or if he as a agent.
         """
         try:
-            sector = Project.objects.get(uuid=value)
-            queryset = sector.get_sectors(self.request.user)
-        except (Project.DoesNotExist, SectorQueue.DoesNotExist):
-            return Sector.objects.none()
-        return queryset
+            if ProjectPermission.objects.filter(user=self.request.user):
+                queues = SectorQueue.objects.all()
+            elif SectorAuthorization.objects.filter(user=self.request.user, sector__uuid=value):
+                queues = SectorQueue.objects.filter(sector__uuid=value)
+            elif SectorQueueAuthorization.objects.filter(user=self.request.user, queue__sector__uuid=value):
+                agent_auth = SectorQueueAuthorization.objects.filter(user=self.request.user, queue__sector__uuid=value)
+                queues = SectorQueue.objects.filter(sector_authorizations__in=agent_auth)
+            else:
+                queues = SectorQueue.objects.none()
+        except (ProjectPermission.DoesNotExist, SectorAuthorization.DoesNotExist, SectorQueueAuthorization.DoesNotExist):
+            return SectorQueue.objects.none()
+        return queues
+
+
+class SectorAuthorizationQueueFilter(filters.FilterSet):
+    class Meta:
+        model = SectorQueueAuthorization
+        fields = ["sector"]
+
+    sector = filters.CharFilter(
+        field_name="sector",
+        required=True,
+        method="filter_sector",
+        help_text=_("sector's ID"),
+    )
+
+    def filter_sector(self, queryset, name, value):
+        """
+        Return queue auth given a user, will check if the user is the project admin or
+        if they have manager role on sectors inside the project or if he as a agent of a queue.
+        """
+        try:
+            if ProjectPermission.objects.filter(user=self.request.user):
+                auth_queue = SectorQueueAuthorization.objects.all()
+            elif SectorAuthorization.objects.filter(user=self.request.user, sector__uuid=value):
+                auth_queue = SectorQueueAuthorization.objects.filter(queue__sector__uuid=value)
+            elif SectorQueueAuthorization.objects.filter(user=self.request.user, queue__sector__uuid=value):
+                auth_queue = SectorQueueAuthorization.objects.filter(user=self.request.user, queue__sector__uuid=value)
+            else:
+                auth_queue = SectorQueueAuthorization.objects.none()
+        except (ProjectPermission.DoesNotExist, SectorAuthorization.DoesNotExist, SectorQueueAuthorization.DoesNotExist):
+            return SectorQueueAuthorization.objects.none()
+        return auth_queue

@@ -25,8 +25,12 @@ class SectorQueue(BaseModel):
         try:
             sectorqueue_auth = self.sector.authorizations.get(user=user)
         except SectorAuthorization.DoesNotExist:
-            #ver se o cara tem acesso de admin aqui, caso nao retorna false
-            sectorqueue_auth = False
+            if self.sector.project.authorizations.filter(user=user):
+                sectorqueue_auth = True
+            elif self.sector_authorizations.filter(user=user):
+                sectorqueue_auth = True
+            else:
+                sectorqueue_auth = False
         return sectorqueue_auth
 
     @property
@@ -69,11 +73,14 @@ class SectorQueueAuthorization(BaseModel):
 
     def get_permission(self, user):
         try:
-            #ve se o user tem autorização na fila
-            sectorqueue_auth = self.sector_authorizations.get(user=user)
-        except SectorQueueAuthorization.DoesNotExist:
-            #se nao tiver procura autorização no setor
-            sectorqueue_auth = self.sector.authorizations.get(user=user, role=1)
+            sectorqueue_auth = self.queue.sector.authorizations.get(user=user)
+        except SectorAuthorization.DoesNotExist:
+            if self.queue.sector.project.authorizations.filter(user=user):
+                sectorqueue_auth = True
+            elif self.queue.sector_authorizations.filter(user=user):
+                sectorqueue_auth = True
+            else:
+                sectorqueue_auth = False
         return sectorqueue_auth
 
     @property
@@ -83,4 +90,3 @@ class SectorQueueAuthorization(BaseModel):
     @property
     def can_list(self):
         return self.is_agent
-
