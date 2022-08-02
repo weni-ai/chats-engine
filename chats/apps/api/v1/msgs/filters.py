@@ -24,10 +24,14 @@ class MessageFilter(filters.FilterSet):
         """
         user = self.request.user
 
-        # Check if the user requesting has permition on the sector or project, TODO: Add queue permission here
-        qs = Q(room__sector__authorizations__user=user) | Q(
-            Q(room__sector__project__authorizations__user=user)
-            & Q(room__sector__project__authorizations__role=1)
+        # Check if the user requesting has permition on the sector or project
+        qs = (
+            Q(room__queue__authorizations__user=user)
+            | Q(room__queue__sector__authorizations__user=user)
+            | Q(
+                Q(room__queue__sector__project__authorizations__user=user)
+                & Q(room__queue__sector__project__authorizations__role=1)
+            )
         )
         queryset = queryset.filter(qs)
 
