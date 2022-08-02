@@ -14,6 +14,9 @@ import os
 from pathlib import Path
 
 import environ
+import sentry_sdk
+from sentry_sdk.integrations.django import DjangoIntegration
+
 from django.utils.log import DEFAULT_LOGGING
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -42,16 +45,10 @@ ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[])
 # Application definition
 
 INSTALLED_APPS = [
-    # third party apps
-    "channels",
-    "drf_yasg",
-    "storages",
-    "rest_framework",
-    "rest_framework.authtoken",
-    "corsheaders",
     # django
     "django.contrib.admin",
     "django.contrib.auth",
+    "mozilla_django_oidc",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
@@ -66,6 +63,13 @@ INSTALLED_APPS = [
     "chats.apps.projects",
     "chats.apps.api",
     "chats.core",
+    # third party apps
+    "channels",
+    "drf_yasg",
+    "storages",
+    "rest_framework",
+    "rest_framework.authtoken",
+    "corsheaders",
 ]
 
 MIDDLEWARE = [
@@ -116,7 +120,7 @@ CHANNEL_LAYERS = {
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
-DATABASES = {"default": env.db(var="DEFAULT_DATABASE", default="sqlite:///db.sqlite3")}
+DATABASES = dict(default=env.db(var="DATABASE_URL"))
 
 # User
 
@@ -147,11 +151,13 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/4.0/topics/i18n/
 
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = env.str("LANGUAGE_CODE", default="en-us")
 
-TIME_ZONE = "UTC"
+TIME_ZONE = env.str("TIME_ZONE", default="America/Maceio")
 
 USE_I18N = True
+
+USE_L10N = True
 
 USE_TZ = True
 
@@ -159,7 +165,34 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.0/howto/static-files/
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
+STATIC_ROOT = os.path.join(BASE_DIR, "static")
+
+
+# Media files
+
+USE_S3 = env.bool("USE_S3", default=False)
+
+MEDIA_ROOT = env.str("MEDIA_ROOT", default="media/")
+
+if USE_S3:
+    """
+    Upload files to S3 bucket
+    """
+
+    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+
+    AWS_ACCESS_KEY_ID = env.str("AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = env.str("AWS_SECRET_ACCESS_KEY")
+
+    AWS_STORAGE_BUCKET_NAME = env.str("AWS_STORAGE_BUCKET_NAME")
+
+    AWS_QUERYSTRING_AUTH = False
+    AWS_S3_FILE_OVERWRITE = False
+
+else:
+    MEDIA_URL = "/media/"
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.0/ref/settings/#default-auto-field
@@ -239,6 +272,16 @@ SWAGGER_SETTINGS = {
 # CORS CONFIG
 
 CORS_ORIGIN_ALLOW_ALL = True
+
+# Sentry configuration
+
+USE_SENTRY = env.bool("USE_SENTRY", default=False)
+
+if USE_SENTRY:
+    sentry_sdk.init(
+        dsn=env.str("SENTRY_DSN"),
+        integrations=[DjangoIntegration()],
+    )
 
 
 # Query Limiters
