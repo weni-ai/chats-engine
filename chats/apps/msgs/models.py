@@ -41,6 +41,10 @@ class Message(BaseModel):
 
         return MessageWSSerializer(self).data
 
+    @property
+    def media(self):
+        return self.medias.first()
+
     def notify_room(self, action):
         """ """
         send_channels_group(
@@ -58,8 +62,7 @@ class MessageMedia(BaseModel):
         verbose_name=_("medias"),
         on_delete=models.CASCADE,
     )
-    url = models.URLField(_("url"), max_length=200)
-    media_type = models.CharField(_("media type"), max_length=150)
+    media = models.FileField(_("url"), max_length=100)
 
     class Meta:
         verbose_name = _("MessageMedia")
