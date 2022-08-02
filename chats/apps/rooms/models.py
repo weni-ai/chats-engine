@@ -40,7 +40,7 @@ class Room(BaseModel):
         _("Ended at"), auto_now_add=False, null=True, blank=True
     )
 
-    ended_by = models.CharField(_("Ended by"), max_length=50)
+    # ended_by = models.CharField(_("Ended by"), max_length=50)
 
     is_active = models.BooleanField(_("is active?"), default=True)
 
@@ -84,7 +84,7 @@ class Room(BaseModel):
     def close(self, tags=None, end_by: str = ""):
         self.is_active = False
         self.ended_at = timezone.now()
-        self.ended_by = end_by
+        # self.ended_by = end_by
         for tag_id in tags:
             self.tags.add(tag_id)
         self.save()

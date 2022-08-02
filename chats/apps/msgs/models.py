@@ -41,7 +41,9 @@ class Message(BaseModel):
 
         return MessageWSSerializer(self).data
 
-    @property
+    def get_authorization(self, user):
+        return self.room.get_authorization(user)
+
     def media(self):
         return self.medias.first()
 
@@ -60,6 +62,7 @@ class MessageMedia(BaseModel):
         Message,
         related_name="medias",
         verbose_name=_("medias"),
+        to_field="uuid",
         on_delete=models.CASCADE,
     )
     media = models.FileField(_("url"), max_length=100)
@@ -69,4 +72,11 @@ class MessageMedia(BaseModel):
         verbose_name_plural = _("MessageMedias")
 
     def __str__(self):
-        return f"{self.message.pk} - {self.media_type}"
+        return f"{self.message.pk} - {self.media}"
+
+    @property
+    def url(self):
+        return self.media.url
+
+    def get_authorization(self, user):
+        return self.room.get_authorization(user)

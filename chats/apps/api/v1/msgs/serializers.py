@@ -9,30 +9,25 @@ from chats.apps.msgs.models import MessageMedia
 
 
 class MessageSerializer(serializers.ModelSerializer):
-    # media = serializers.FileField(use_url=True, required=False)
+    media = serializers.FileField(required=True)
 
     class Meta:
         model = ChatMessage
-        fields = ["room", "user", "contact", "text", "seen", "medias"]
+        fields = ["room", "user", "text", "seen", "media"]
         read_only_fields = [
             "created_at",
+            "contact",
         ]
 
-    def create(self, validated_data):
-        instance = super().create(validated_data)
-        if validated_data.get("media_file"):
-            instance.media.create(medias=validated_data.get("media_file"))
-        return
-
-    # def get_media(self, msg):
-    #     media_url = msg.media.url
-    #     return media_url
+    def get_media(self, msg):
+        try:
+            return msg.media.url
+        except AttributeError:
+            return None
 
 
-class MessageWSSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ChatMessage
-        fields = "__all__"
+class MessageWSSerializer(MessageSerializer):
+    pass
 
 
 class MessageMediaSerializer(serializers.ModelSerializer):

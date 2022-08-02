@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     # third party apps
     "channels",
     "drf_yasg",
+    "django_filters",
     "storages",
     "rest_framework",
     "rest_framework.authtoken",

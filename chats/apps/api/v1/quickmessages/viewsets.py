@@ -16,4 +16,7 @@ class QuickMessageViewset(viewsets.ModelViewSet):
         return serializer.save(user=self.request.user)
 
     def get_queryset(self, *args, **kwargs):
-        return QuickMessage.objects.all().filter(user=self.request.user)
+        try:
+            return self.queryset.all().filter(user=self.request.user)
+        except (TypeError, AttributeError):
+            return self.queryset.none()

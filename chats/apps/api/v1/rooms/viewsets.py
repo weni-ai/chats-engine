@@ -24,7 +24,7 @@ class RoomViewset(
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
     filter_backends = [DjangoFilterBackend]
-    filterset_class = room_filters
+    filterset_class = room_filters.RoomFilter
     permission_classes = [
         permissions.IsAuthenticated,
         api_permissions.SectorAnyPermission,
@@ -40,11 +40,14 @@ class RoomViewset(
         is_active = self.request.query_params.get("is_active")
         if is_active:
             return qs
-        return qs.filter(
-            Q(user=self.request.user) | Q(user__isnull=True),
-            sector__id__in=self.request.user.sector_ids,
-            is_active=True,
-        )
+        try:
+            return qs.filter(
+                Q(user=self.request.user) | Q(user__isnull=True),
+                sector__id__in=self.request.user.sector_ids,
+                is_active=True,
+            )
+        except (TypeError, AttributeError):
+            return qs
 
     @action(detail=True, methods=["PUT"], url_name="close")
     def close(
