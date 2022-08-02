@@ -226,66 +226,6 @@ LOGGING["handlers"]["console"] = {
 }
 
 
-# Logging
-
-LOGGING = DEFAULT_LOGGING
-LOGGING["formatters"]["verbose"] = {
-    "format": "%(levelname)s  %(asctime)s  %(module)s "
-    "%(process)d  %(thread)d  %(message)s"
-}
-LOGGING["handlers"]["console"] = {
-    "level": "DEBUG",
-    "class": "logging.StreamHandler",
-    "formatter": "verbose",
-}
-
-
-# mozilla-django-oidc
-
-OIDC_ENABLED = env.bool("OIDC_ENABLED", default=False)
-if OIDC_ENABLED:
-    REST_FRAMEWORK["DEFAULT_AUTHENTICATION_CLASSES"].append(
-        "mozilla_django_oidc.contrib.drf.OIDCAuthentication"
-    )
-    INSTALLED_APPS = (*INSTALLED_APPS, "mozilla_django_oidc")
-    LOGGING["loggers"]["mozilla_django_oidc"] = {
-        "level": "DEBUG",
-        "handlers": ["console"],
-        "propagate": False,
-    }
-    LOGGING["loggers"]["weni_django_oidc"] = {
-        "level": "DEBUG",
-        "handlers": ["console"],
-        "propagate": False,
-    }
-
-    OIDC_RP_CLIENT_ID = env.str("OIDC_RP_CLIENT_ID")
-    OIDC_RP_CLIENT_SECRET = env.str("OIDC_RP_CLIENT_SECRET")
-    OIDC_OP_AUTHORIZATION_ENDPOINT = env.str("OIDC_OP_AUTHORIZATION_ENDPOINT")
-    OIDC_OP_TOKEN_ENDPOINT = env.str("OIDC_OP_TOKEN_ENDPOINT")
-    OIDC_OP_USER_ENDPOINT = env.str("OIDC_OP_USER_ENDPOINT")
-    OIDC_OP_JWKS_ENDPOINT = env.str("OIDC_OP_JWKS_ENDPOINT")
-    OIDC_RP_SIGN_ALGO = env.str("OIDC_RP_SIGN_ALGO", default="RS256")
-    OIDC_DRF_AUTH_BACKEND = env.str(
-        "OIDC_DRF_AUTH_BACKEND",
-        default="chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend",
-    )
-    OIDC_RP_SCOPES = env.str("OIDC_RP_SCOPES", default="openid email")
-
-# Logging
-
-LOGGING = DEFAULT_LOGGING
-LOGGING["formatters"]["verbose"] = {
-    "format": "%(levelname)s  %(asctime)s  %(module)s "
-    "%(process)d  %(thread)d  %(message)s"
-}
-LOGGING["handlers"]["console"] = {
-    "level": "DEBUG",
-    "class": "logging.StreamHandler",
-    "formatter": "verbose",
-}
-
-
 # mozilla-django-oidc
 
 OIDC_ENABLED = env.bool("OIDC_ENABLED", default=False)
