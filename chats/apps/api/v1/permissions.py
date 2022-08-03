@@ -80,13 +80,29 @@ class ProjectExternalPermission(permissions.BasePermission):
         return authorization.is_external
 
 
-class SectorAgentReadOnlyPermission(permissions.BasePermission):
+class SectorAgentReadOnlyListPermission(permissions.BasePermission):
     """
     Grant permission if the user has *agent_role* in the Sector Queue
     Each model that uses this permission, need to implement a `get_permission` method
     to check the user roles within the sector.
     """
+    def has_permission(self, request, view) -> bool:
+        if isinstance(request.user, AnonymousUser):
+            return False
+        try:
+            sector_queue = SectorQueue.objects.filter(sector=request.query_params.get("sector")).first()
+            authorization = sector_queue.get_permission(request.user)
+        except SectorQueue.DoesNotExist:
+            return False
+        return authorization
 
+
+class SectorAgentReadOnlyRetrievePermission(permissions.BasePermission):
+    """
+    Grant permission if the user has *agent_role* in the Sector Queue
+    Each model that uses this permission, need to implement a `get_permission` method
+    to check the user roles within the sector.
+    """
     def has_object_permission(self, request, view, obj) -> bool:
 
         if isinstance(request.user, AnonymousUser):

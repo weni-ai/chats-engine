@@ -3,7 +3,8 @@ from rest_framework import mixins
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import GenericViewSet
 from chats.apps.api.v1.permissions import (
-    SectorAgentReadOnlyPermission,
+    SectorAgentReadOnlyListPermission,
+    SectorAgentReadOnlyRetrievePermission
 )
 
 from chats.apps.api.v1.sectorqueue import serializers as sectorqueue_serializers
@@ -20,9 +21,7 @@ class SectorQueueViewset(
     serializer_class = sectorqueue_serializers.SectorQueueSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = SectorQueueFilter
-    permission_classes = [
-        IsAuthenticated,
-    ]
+    permission_classes = []
     lookup_field = "uuid"
 
     def get_queryset(self):
@@ -32,9 +31,10 @@ class SectorQueueViewset(
 
     def get_permissions(self):
         permission_classes = self.permission_classes
-        if self.action in ["list", "retrieve"]:
-            permission_classes.append(SectorAgentReadOnlyPermission)
-
+        if self.action in ["list"]:
+            permission_classes = [IsAuthenticated, SectorAgentReadOnlyListPermission]
+        if self.action in ["retrieve"]:
+            permission_classes = [IsAuthenticated, SectorAgentReadOnlyRetrievePermission]
         return [permission() for permission in permission_classes]
 
     def get_serializer_class(self):
@@ -52,9 +52,7 @@ class SectorQueueAuthorizationViewset(
     serializer_class = sectorqueue_serializers.SectorQueueAuthorizationSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = SectorAuthorizationQueueFilter
-    permission_classes = [
-        IsAuthenticated,
-    ]
+    permission_classes = []
     lookup_field = "uuid"
 
     def get_queryset(self):
@@ -64,6 +62,8 @@ class SectorQueueAuthorizationViewset(
 
     def get_permissions(self):
         permission_classes = self.permission_classes
-        if self.action in ["list", "retrieve"]:
-            permission_classes.append(SectorAgentReadOnlyPermission)
+        if self.action in ["list"]:
+            permission_classes = [IsAuthenticated, SectorAgentReadOnlyListPermission]
+        if self.action in ["retrieve"]:
+            permission_classes = [IsAuthenticated, SectorAgentReadOnlyRetrievePermission]
         return [permission() for permission in permission_classes]
