@@ -26,5 +26,7 @@ router.register("contact", ContactViewset)
 router.register("sector", SectorViewset)
 router.register("tag", SectorTagsViewset)
 router.register("project", ProjectViewset)
-router.register("permission/sector", SectorAuthorizationViewset)
+router.register(
+    "permission/sector", SectorAuthorizationViewset, basename="sectorpermission"
+)
 router.register("quick_messages", QuickMessageViewset)
