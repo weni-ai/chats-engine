@@ -1,3 +1,4 @@
+from django.urls import reverse
 from rest_framework import routers
 
 from chats.apps.api.v1.accounts.viewsets import LoginViewset
@@ -25,6 +26,6 @@ router.register("contact", ContactViewset)
 router.register("sector", SectorViewset)
 router.register("tag", SectorTagsViewset)
 router.register("project", ProjectViewset)
-router.register("queue", SectorQueueViewset)
+router.register("queue", SectorQueueViewset, basename="queue")
 router.register("permission/sector", SectorAuthorizationViewset)
-router.register("permission_queue/sectorqueue", SectorQueueAuthorizationViewset)
+router.register("permission/queue", SectorQueueAuthorizationViewset, basename="queue_auth")

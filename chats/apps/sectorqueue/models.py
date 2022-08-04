@@ -37,6 +37,14 @@ class SectorQueue(BaseModel):
     def agent_count(self):
         return self.sector_authorizations.filter(role=SectorQueueAuthorization.ROLE_AGENT).count()
 
+    def get_or_create_user_authorization(self, user):
+        sector_auth, created = self.sector_authorizations.get_or_create(user=user)
+        return sector_auth
+
+    def set_queue_authorization(self, user, role: int):
+        sector_auth, created = self.sector_authorizations.get_or_create(user=user, role=role)
+        return sector_auth
+
 
 class SectorQueueAuthorization(BaseModel):
     ROLE_NOT_SETTED = 0
