@@ -1,4 +1,3 @@
-from unittest import result
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -213,7 +212,6 @@ class SectorTagTests(APITestCase):
         response = client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
-
 class SectorQueueTests(APITestCase):
     def setUp(self):
         self.owner, self.owner_token = create_user_and_token("owner")
@@ -386,3 +384,4 @@ class SectorQueueTests(APITestCase):
         response = self.list_queue_auth_request(self.agent_token.key)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json().get("count"), 1)
+
