@@ -1,8 +1,14 @@
 from django.contrib.auth.models import AnonymousUser
 from rest_framework import permissions
+<<<<<<< HEAD
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.sectorqueue.models import SectorQueue, SectorQueueAuthorization
 from chats.apps.sectors.models import SectorAuthorization
+=======
+
+from chats.apps.projects.models import Project, ProjectPermission
+from chats.apps.sectors.models import Sector, SectorAuthorization
+>>>>>>> f06ab257389ccf2e11011eb3cfc9c75f7d2e6a7e
 
 WRITE_METHODS = ["POST"]
 OBJECT_METHODS = ["DELETE", "PATCH", "PUT", "GET"]

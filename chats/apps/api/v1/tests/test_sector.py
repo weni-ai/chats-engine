@@ -1,12 +1,19 @@
+<<<<<<< HEAD
 from unittest import result
+=======
+>>>>>>> f06ab257389ccf2e11011eb3cfc9c75f7d2e6a7e
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from chats.apps.api.utils import create_user_and_token
 from chats.apps.projects.models import Project
+<<<<<<< HEAD
 from chats.apps.sectorqueue.models import SectorQueue
 from chats.apps.sectors.models import Sector, SectorAuthorization
+=======
+from chats.apps.sectors.models import Sector
+>>>>>>> f06ab257389ccf2e11011eb3cfc9c75f7d2e6a7e
 
 
 class SectorTests(APITestCase):
@@ -212,6 +219,7 @@ class SectorTagTests(APITestCase):
         client.credentials(HTTP_AUTHORIZATION="Token " + self.manager_token.key)
         response = client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+<<<<<<< HEAD
 
 
 class SectorQueueTests(APITestCase):
@@ -386,3 +394,5 @@ class SectorQueueTests(APITestCase):
         response = self.list_queue_auth_request(self.agent_token.key)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json().get("count"), 1)
+=======
+>>>>>>> f06ab257389ccf2e11011eb3cfc9c75f7d2e6a7e

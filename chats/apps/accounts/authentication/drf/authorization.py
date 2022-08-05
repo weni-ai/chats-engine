@@ -2,7 +2,10 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import exceptions
 from rest_framework.authentication import (TokenAuthentication,
                                            get_authorization_header)
+<<<<<<< HEAD:chats/apps/accounts/authentication/drf/authorization.py
 
+=======
+>>>>>>> f06ab257389ccf2e11011eb3cfc9c75f7d2e6a7e:chats/apps/accounts/authentication/external/authorization.py
 from chats.apps.projects.models import ProjectPermission
 
 
