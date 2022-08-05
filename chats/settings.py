@@ -14,13 +14,6 @@ import os
 from pathlib import Path
 
 import environ
-<<<<<<< HEAD
-=======
-import sentry_sdk
-from sentry_sdk.integrations.django import DjangoIntegration
-
->>>>>>> f06ab257389ccf2e11011eb3cfc9c75f7d2e6a7e
-from django.utils.log import DEFAULT_LOGGING
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -123,11 +116,25 @@ CHANNEL_LAYERS = {
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
-<<<<<<< HEAD
-DATABASES = {"default": env.db(var="DEFAULT_DATABASE", default="sqlite:///db.sqlite3")}
-=======
-DATABASES = dict(default=env.db(var="DATABASE_URL"))
->>>>>>> f06ab257389ccf2e11011eb3cfc9c75f7d2e6a7e
+DB_DATA = env.db("DEFAULT_DATABASE", default="sqlite:///db.sqlite3")
+
+# djongo mongodb engine needs a slightly different db config
+if DB_DATA["ENGINE"] == "djongo":
+    DATABASES = {
+        "default": {
+            "ENGINE": DB_DATA["ENGINE"],
+            "NAME": DB_DATA["NAME"],
+            "ENFORCE_SCHEMA": False,
+            "CLIENT": {
+                "host": DB_DATA["HOST"],
+                "port": DB_DATA["PORT"],
+                "username": DB_DATA["USER"],
+                "password": DB_DATA["PASSWORD"],
+            },
+        }
+    }
+else:
+    DATABASES = {"default": DB_DATA}
 
 # User
 
