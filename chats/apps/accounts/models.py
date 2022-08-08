@@ -66,4 +66,4 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     @property
     def sector_ids(self):
-        return self.sector_permissions.values_list("sector__id", flat=True)
+        return self.sector_authorizations.values_list("sector__id", flat=True)

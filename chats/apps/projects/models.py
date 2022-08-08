@@ -1,3 +1,4 @@
+from builtins import property
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -20,6 +21,21 @@ class Project(BaseModel):
     def __str__(self):
         return self.name
 
+    def get_permission(self, user):
+        try:
+            return self.authorizations.get(user=user)
+        except ProjectPermission.DoesNotExist:
+            return None
+
+    def get_sectors(self, user):
+        user_permission = self.get_permission(user)
+        if user_permission is not None and user_permission.role == 1:  # Admin role
+            return self.sectors.all()
+        else:
+            return self.sectors.filter(
+                authorizations__user=user
+            )  # If the user have any permission on the sectors
+
 
 class ProjectPermission(BaseModel):
     ROLE_NOT_SETTED = 0
@@ -29,10 +45,14 @@ class ProjectPermission(BaseModel):
     ROLE_CHOICES = [
         (ROLE_NOT_SETTED, _("not set")),
         (ROLE_ADMIN, _("admin")),
+        (ROLE_EXTERNAL, _("external")),
     ]
 
     project = models.ForeignKey(
-        Project, verbose_name=_("Project"), on_delete=models.CASCADE
+        Project,
+        verbose_name=_("Project"),
+        related_name="authorizations",
+        on_delete=models.CASCADE,
     )
     user = models.ForeignKey(
         "accounts.User",
@@ -59,3 +79,7 @@ class ProjectPermission(BaseModel):
     @property
     def is_external(self):
         return self.role == self.ROLE_EXTERNAL
+
+    @property
+    def can_edit(self):
+        return self.is_admin
