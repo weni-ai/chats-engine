@@ -1,5 +1,4 @@
 from rest_framework import serializers
-from yaml import serialize
 
 from chats.apps.api.v1.sectors.serializers import SectorTagSerializer
 from chats.apps.contacts.models import Contact
