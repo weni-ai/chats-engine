@@ -130,3 +130,9 @@ dmypy.json
 
 # VSCode
 .vscode/
+
+# Static files
+media/
+
+# Gunicorn access
+gunicorn.access

@@ -1,22 +1,12 @@
 from django.db import models
+from django.forms import JSONField
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from chats.core.models import BaseModel
 from chats.utils.websockets import send_channels_group
 
 # TODO: Use djongo(mongodb) models? Might change how things works
-
-
-class RoomTag(BaseModel):
-
-    name = models.CharField(_("Name"), max_length=120)
-
-    class Meta:
-        verbose_name = _("Room Tag")
-        verbose_name_plural = _("Room Tags")
-
-    def __str__(self):
-        return self.name
 
 
 class Room(BaseModel):
@@ -49,10 +39,12 @@ class Room(BaseModel):
     )
     is_active = models.BooleanField(_("is active?"), default=True)
 
-    agent_history = models.TextField(_("Agent History"), null=True, blank=True)
+    transfer_history = JSONField(_("Transfer History"))
 
     tags = models.ManyToManyField(
-        RoomTag, verbose_name=_("tags"), null=True, blank=True
+        "sectors.SectorTag",
+        verbose_name=_("tags"),
+        related_name="rooms",
     )
 
     class Meta:
@@ -64,6 +56,13 @@ class Room(BaseModel):
         from chats.apps.api.v1.rooms.serializers import RoomSerializer  # noqa
 
         return RoomSerializer(self).data
+
+    def close(self, tags=None):
+        self.is_active = False
+        self.ended_at = timezone.now()
+        for tag_id in tags:
+            self.tags.add(tag_id)
+        self.save()
 
     def notify_sector(self, action):
         """
