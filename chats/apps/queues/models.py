@@ -4,7 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from chats.apps.sectors.models import Sector, SectorAuthorization
 
 
-class SectorQueue(BaseModel):
+class Queue(BaseModel):
     sector = models.ForeignKey(
         Sector,
         verbose_name=_("queues"),
@@ -22,12 +22,16 @@ class SectorQueue(BaseModel):
         return self.name
 
     def get_permission(self, user):
+        """
+        verify if user has authorizathion in sector, if not verify if user has authorizathion in project,
+        if not verify if user has authorizathion in queue. If user has no authorizathion, return false.
+        """
         try:
             sectorqueue_auth = self.sector.authorizations.get(user=user)
         except SectorAuthorization.DoesNotExist:
             if self.sector.project.authorizations.filter(user=user):
                 sectorqueue_auth = True
-            elif self.sector_authorizations.filter(user=user):
+            elif self.authorizations.filter(user=user):
                 sectorqueue_auth = True
             else:
                 sectorqueue_auth = False
@@ -35,18 +39,18 @@ class SectorQueue(BaseModel):
 
     @property
     def agent_count(self):
-        return self.sector_authorizations.filter(role=SectorQueueAuthorization.ROLE_AGENT).count()
+        return self.authorizations.filter(role=QueueAuthorization.ROLE_AGENT).count()
 
     def get_or_create_user_authorization(self, user):
-        sector_auth, created = self.sector_authorizations.get_or_create(user=user)
+        sector_auth, created = self.authorizations.get_or_create(user=user)
         return sector_auth
 
     def set_queue_authorization(self, user, role: int):
-        sector_auth, created = self.sector_authorizations.get_or_create(user=user, role=role)
+        sector_auth, created = self.authorizations.get_or_create(user=user, role=role)
         return sector_auth
 
 
-class SectorQueueAuthorization(BaseModel):
+class QueueAuthorization(BaseModel):
     ROLE_NOT_SETTED = 0
     ROLE_AGENT = 1
 
@@ -56,9 +60,9 @@ class SectorQueueAuthorization(BaseModel):
     ]
 
     queue = models.ForeignKey(
-        SectorQueue,
-        verbose_name=_("SectorQueueAutorization"),
-        related_name="sector_authorizations",
+        Queue,
+        verbose_name=_("Queue"),
+        related_name="authorizations",
         on_delete=models.CASCADE,
         to_field="uuid"
     )
@@ -68,7 +72,8 @@ class SectorQueueAuthorization(BaseModel):
 
     user = models.ForeignKey(
         "accounts.User",
-        verbose_name=_("SectorQueueAutorization"),
+        verbose_name=_("User"),
+        related_name="queue_authorizations",
         on_delete=models.CASCADE,
     )
 
@@ -80,16 +85,7 @@ class SectorQueueAuthorization(BaseModel):
         return self.get_role_display()
 
     def get_permission(self, user):
-        try:
-            sectorqueue_auth = self.queue.sector.authorizations.get(user=user)
-        except SectorAuthorization.DoesNotExist:
-            if self.queue.sector.project.authorizations.filter(user=user):
-                sectorqueue_auth = True
-            elif self.queue.sector_authorizations.filter(user=user):
-                sectorqueue_auth = True
-            else:
-                sectorqueue_auth = False
-        return sectorqueue_auth
+        return self.queue.get_permission(user)
 
     @property
     def is_agent(self):

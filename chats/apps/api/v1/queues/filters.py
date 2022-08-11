@@ -2,13 +2,13 @@ from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 from chats.apps.projects.models import ProjectPermission
 
-from chats.apps.sectorqueue.models import SectorQueue, SectorQueueAuthorization
+from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.sectors.models import SectorAuthorization
 
 
 class SectorQueueFilter(filters.FilterSet):
     class Meta:
-        model = SectorQueue
+        model = Queue
         fields = ["sector"]
 
     sector = filters.CharFilter(
@@ -25,22 +25,22 @@ class SectorQueueFilter(filters.FilterSet):
         """
         try:
             if ProjectPermission.objects.filter(user=self.request.user):
-                queues = SectorQueue.objects.all()
+                queues = Queue.objects.all()
             elif SectorAuthorization.objects.filter(user=self.request.user, sector__uuid=value):
-                queues = SectorQueue.objects.filter(sector__uuid=value)
-            elif SectorQueueAuthorization.objects.filter(user=self.request.user, queue__sector__uuid=value):
-                agent_auth = SectorQueueAuthorization.objects.filter(user=self.request.user, queue__sector__uuid=value)
-                queues = SectorQueue.objects.filter(sector_authorizations__in=agent_auth)
+                queues = Queue.objects.filter(sector__uuid=value)
+            elif QueueAuthorization.objects.filter(user=self.request.user, queue__sector__uuid=value):
+                agent_auth = QueueAuthorization.objects.filter(user=self.request.user, queue__sector__uuid=value)
+                queues = Queue.objects.filter(authorizations__in=agent_auth)
             else:
-                queues = SectorQueue.objects.none()
-        except (ProjectPermission.DoesNotExist, SectorAuthorization.DoesNotExist, SectorQueueAuthorization.DoesNotExist):
-            return SectorQueue.objects.none()
+                queues = Queue.objects.none()
+        except (ProjectPermission.DoesNotExist, SectorAuthorization.DoesNotExist, QueueAuthorization.DoesNotExist):
+            return Queue.objects.none()
         return queues
 
 
 class SectorAuthorizationQueueFilter(filters.FilterSet):
     class Meta:
-        model = SectorQueueAuthorization
+        model = QueueAuthorization
         fields = ["sector"]
 
     sector = filters.CharFilter(
@@ -57,13 +57,13 @@ class SectorAuthorizationQueueFilter(filters.FilterSet):
         """
         try:
             if ProjectPermission.objects.filter(user=self.request.user):
-                auth_queue = SectorQueueAuthorization.objects.all()
+                auth_queue = QueueAuthorization.objects.all()
             elif SectorAuthorization.objects.filter(user=self.request.user, sector__uuid=value):
-                auth_queue = SectorQueueAuthorization.objects.filter(queue__sector__uuid=value)
-            elif SectorQueueAuthorization.objects.filter(user=self.request.user, queue__sector__uuid=value):
-                auth_queue = SectorQueueAuthorization.objects.filter(user=self.request.user, queue__sector__uuid=value)
+                auth_queue = QueueAuthorization.objects.filter(queue__sector__uuid=value)
+            elif QueueAuthorization.objects.filter(user=self.request.user, queue__sector__uuid=value):
+                auth_queue = QueueAuthorization.objects.filter(user=self.request.user, queue__sector__uuid=value)
             else:
-                auth_queue = SectorQueueAuthorization.objects.none()
-        except (ProjectPermission.DoesNotExist, SectorAuthorization.DoesNotExist, SectorQueueAuthorization.DoesNotExist):
-            return SectorQueueAuthorization.objects.none()
+                auth_queue = QueueAuthorization.objects.none()
+        except (ProjectPermission.DoesNotExist, SectorAuthorization.DoesNotExist, QueueAuthorization.DoesNotExist):
+            return QueueAuthorization.objects.none()
         return auth_queue

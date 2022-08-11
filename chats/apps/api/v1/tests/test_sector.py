@@ -4,7 +4,7 @@ from rest_framework.test import APITestCase
 
 from chats.apps.api.utils import create_user_and_token
 from chats.apps.projects.models import Project
-from chats.apps.sectorqueue.models import SectorQueue
+from chats.apps.queues.models import Queue
 from chats.apps.sectors.models import Sector, SectorAuthorization
 
 
@@ -212,7 +212,7 @@ class SectorTagTests(APITestCase):
         response = client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
-class SectorQueueTests(APITestCase):
+class QueueTests(APITestCase):
     def setUp(self):
         self.owner, self.owner_token = create_user_and_token("owner")
         self.manager, self.manager_token = create_user_and_token("manager")
@@ -240,12 +240,12 @@ class SectorQueueTests(APITestCase):
             work_end="18:00",
         )
 
-        self.queue_1 = SectorQueue.objects.create(
+        self.queue_1 = Queue.objects.create(
             name="suport queue",
             sector=self.sector_1
         )
 
-        self.queue_2 = SectorQueue.objects.create(
+        self.queue_2 = Queue.objects.create(
             name="suport queue wihtout auth",
             sector=self.sector_2
         )

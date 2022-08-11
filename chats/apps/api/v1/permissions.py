@@ -1,7 +1,7 @@
 from django.contrib.auth.models import AnonymousUser
 from rest_framework import permissions
 from chats.apps.projects.models import Project, ProjectPermission
-from chats.apps.sectorqueue.models import SectorQueue, SectorQueueAuthorization
+from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.sectors.models import Sector, SectorAuthorization
 
 WRITE_METHODS = ["POST"]
@@ -90,9 +90,9 @@ class SectorAgentReadOnlyListPermission(permissions.BasePermission):
         if isinstance(request.user, AnonymousUser):
             return False
         try:
-            sector_queue = SectorQueue.objects.filter(sector=request.query_params.get("sector")).first()
+            sector_queue = Queue.objects.filter(sector=request.query_params.get("sector")).first()
             authorization = sector_queue.get_permission(request.user)
-        except SectorQueue.DoesNotExist:
+        except Queue.DoesNotExist:
             return False
         return authorization
 
@@ -109,7 +109,7 @@ class SectorAgentReadOnlyRetrievePermission(permissions.BasePermission):
             return False
         try:
             authorization = obj.get_permission(request.user)
-        except SectorQueueAuthorization.DoesNotExist:
+        except QueueAuthorization.DoesNotExist:
             return False
         return authorization
 
@@ -125,9 +125,9 @@ class SectorAddQueuePermission(permissions.BasePermission):
         if isinstance(request.user, AnonymousUser):
             return False
         try:
-            sector_queue = SectorQueue.objects.filter(sector=request.data["sector"]).first()
+            sector_queue = Queue.objects.filter(sector=request.data["sector"]).first()
             authorization = sector_queue.get_permission(request.user)
-        except SectorQueue.DoesNotExist:
+        except Queue.DoesNotExist:
             return False
         return authorization
 
@@ -145,7 +145,7 @@ class SectorDeleteQueuePermission(permissions.BasePermission):
             return False
         try:
             authorization = obj.get_permission(request.user)
-        except SectorQueue.DoesNotExist:
+        except Queue.DoesNotExist:
             return False
         return authorization
 
@@ -165,6 +165,6 @@ class SectorQueueAddAgentPermission(permissions.BasePermission):
             if not user:
                 return False
             authorization = user.get_permission(request.user)
-        except SectorQueue.DoesNotExist:
+        except Queue.DoesNotExist:
             return False
         return authorization

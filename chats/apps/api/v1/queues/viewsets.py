@@ -7,9 +7,9 @@ from chats.apps.api.v1.permissions import (
     SectorAgentReadOnlyRetrievePermission
 )
 
-from chats.apps.api.v1.sectorqueue import serializers as sectorqueue_serializers
-from chats.apps.sectorqueue.models import SectorQueue, SectorQueueAuthorization
-from chats.apps.api.v1.sectorqueue.filters import SectorQueueFilter, SectorAuthorizationQueueFilter
+from chats.apps.api.v1.queues import serializers as sectorqueue_serializers
+from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.api.v1.queues.filters import SectorQueueFilter, SectorAuthorizationQueueFilter
 
 
 class SectorQueueViewset(
@@ -17,7 +17,7 @@ class SectorQueueViewset(
         mixins.ListModelMixin,
         GenericViewSet
 ):
-    queryset = SectorQueue.objects.all()
+    queryset = Queue.objects.all()
     serializer_class = sectorqueue_serializers.SectorQueueSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = SectorQueueFilter
@@ -48,7 +48,7 @@ class SectorQueueAuthorizationViewset(
         mixins.ListModelMixin,
         GenericViewSet
 ):
-    queryset = SectorQueueAuthorization.objects.all()
+    queryset = QueueAuthorization.objects.all()
     serializer_class = sectorqueue_serializers.SectorQueueAuthorizationSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = SectorAuthorizationQueueFilter

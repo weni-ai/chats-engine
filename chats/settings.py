@@ -61,7 +61,7 @@ INSTALLED_APPS = [
     "chats.apps.msgs",
     "chats.apps.rooms",
     "chats.apps.sectors",
-    "chats.apps.sectorqueue",
+    "chats.apps.queues",
     "chats.apps.projects",
     "chats.apps.api",
     "chats.core",
@@ -122,7 +122,7 @@ CHANNEL_LAYERS = {
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
 
-DATABASES = dict(default=env.db(var="DATABASE_URL"))
+DATABASES = {"default": env.db(var="DEFAULT_DATABASE", default="sqlite:///db.sqlite3")}
 
 # User
 
