@@ -3,6 +3,8 @@ from django.utils.translation import gettext_lazy as _
 
 from chats.core.models import BaseModel
 
+Q = models.Q
+
 
 class Contact(BaseModel):
     name = models.CharField(_("first name"), max_length=30, blank=True)
@@ -41,3 +43,21 @@ class Contact(BaseModel):
     @property
     def tags(self):
         return self.last_room.tags
+
+    def can_retrieve(self, user, project) -> bool:
+        filter_project_uuid = Q(queue__sector__project__uuid=project)
+        is_sector_manager = Q(queue__sector__authorizations__user=user)
+        is_project_admin = Q(
+            Q(queue__sector__project__authorizations__user=user)
+            & Q(queue__sector__project__authorizations__role=1)
+        )
+        is_user_assigned_to_room = Q(user=user)
+        check_admin_manager_agent_role_filter = Q(
+            filter_project_uuid
+            & (is_sector_manager | is_project_admin | is_user_assigned_to_room)
+        )
+
+        rooms_check = self.rooms.filter(
+            check_admin_manager_agent_role_filter,
+        ).exists()
+        return rooms_check
