@@ -70,7 +70,7 @@ class ProjectPermission(BaseModel):
         verbose_name_plural = _("Project Permissions")
 
     def __str__(self):
-        return self.name
+        return self.project.name
 
     @property
     def is_admin(self):

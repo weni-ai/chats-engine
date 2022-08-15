@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 
 import environ
+
 import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
 
@@ -60,6 +61,7 @@ INSTALLED_APPS = [
     "chats.apps.msgs",
     "chats.apps.rooms",
     "chats.apps.sectors",
+    "chats.apps.queues",
     "chats.apps.projects",
     "chats.apps.api",
     "chats.core",
@@ -118,6 +120,7 @@ CHANNEL_LAYERS = {
 
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
+
 
 DATABASES = dict(default=env.db(var="DATABASE_URL"))
 
