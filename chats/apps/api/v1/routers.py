@@ -13,7 +13,14 @@ from chats.apps.api.v1.sectors.viewsets import (
     SectorTagsViewset,
     SectorViewset,
 )
+from chats.apps.api.internal.queues.viewsets import (
+    QueueInternalViewset,
+    QueueAuthInternalViewset
+)
 
+from chats.apps.api.internal.sector.viewsets import (
+    SectorInternalViewset,
+)
 
 
 class Router(routers.SimpleRouter):
@@ -29,7 +36,10 @@ router.register("sector", SectorViewset)
 router.register("tag", SectorTagsViewset)
 router.register("project", ProjectViewset)
 router.register("queue", SectorQueueViewset, basename="queue")
+router.register("internal/sector", SectorInternalViewset, basename="sector_internal")
+router.register("internal/queue", QueueInternalViewset, basename="queue_internal")
 router.register("permission/sector", SectorAuthorizationViewset)
 router.register("permission/queue", SectorQueueAuthorizationViewset, basename="queue_auth")
 router.register("permission/sector", SectorAuthorizationViewset)
 router.register("quick_messages", QuickMessageViewset)
+router.register("internal/permission/queue", QueueAuthInternalViewset, basename="queue_auth_internal")

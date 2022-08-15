@@ -33,3 +33,18 @@ class SectorQueueAuthorizationSerializer(serializers.ModelSerializer):
     class Meta:
         model = QueueAuthorization
         fields = "__all__"
+
+
+class QueueAuthorizationUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QueueAuthorization
+        fields = "__all__"
+
+        extra_kwargs = {field: {"required": False} for field in fields}
+
+
+class QueueAuthorizationReadOnlyListSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = QueueAuthorization
+        fields = ["id", "uuid", "queue", "role", "user"]
