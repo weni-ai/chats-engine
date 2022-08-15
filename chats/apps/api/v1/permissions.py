@@ -136,7 +136,7 @@ class SectorAddQueuePermission(permissions.BasePermission):
         return authorization
 
 
-class SectorDeleteQueuePermission(permissions.BasePermission):
+class DeleteQueuePermission(permissions.BasePermission):
     """
     Grant permission if the user has *manager role* or Sector or *admin role* Sector of queue
     Each model that uses this permission, need to implement a `get_permission` method
@@ -154,7 +154,7 @@ class SectorDeleteQueuePermission(permissions.BasePermission):
         return authorization
 
 
-class SectorQueueAddAgentPermission(permissions.BasePermission):
+class QueueAddAgentPermission(permissions.BasePermission):
     """
     Grant permission to add agent in queue if the user has *manager role* or Sector or *admin role* on Project
     Each model that uses this permission, need to implement a `get_permission` method

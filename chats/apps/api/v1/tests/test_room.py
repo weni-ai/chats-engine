@@ -6,7 +6,7 @@ from chats.apps.api.utils import create_contact, create_user_and_token
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorAuthorization
-from chats.apps.sectorqueues.models import SectorQueue, SectorQueueAuthorization
+from chats.apps.queues.models import Queue, QueueAuthorization
 
 
 class RoomTests(APITestCase):
@@ -74,19 +74,19 @@ class RoomTests(APITestCase):
         )
 
         # QUEUES
-        self.queue_1 = SectorQueue.objects.create(name="Q1", sector=self.sector_1)
-        self.queue_2 = SectorQueue.objects.create(name="Q2", sector=self.sector_1)
-        self.queue_3 = SectorQueue.objects.create(name="Q3", sector=self.sector_2)
+        self.queue_1 = Queue.objects.create(name="Q1", sector=self.sector_1)
+        self.queue_2 = Queue.objects.create(name="Q2", sector=self.sector_1)
+        self.queue_3 = Queue.objects.create(name="Q3", sector=self.sector_2)
 
         # QUEUE AUTHORIZATIONS
         self.agent_1_auth = self.queue_1.authorization.create(
-            user=self.agent, role=SectorQueueAuthorization.ROLE_AGENT
+            user=self.agent, role=QueueAuthorization.ROLE_AGENT
         )
         self.agent_2_auth = self.queue_2.authorization.create(
-            user=self.agent_2, role=SectorQueueAuthorization.ROLE_AGENT
+            user=self.agent_2, role=QueueAuthorization.ROLE_AGENT
         )
         self.agent_2_auth_2 = self.queue_3.authorization.create(
-            user=self.agent_2, role=SectorQueueAuthorization.ROLE_AGENT
+            user=self.agent_2, role=QueueAuthorization.ROLE_AGENT
         )
 
         # ROOMS

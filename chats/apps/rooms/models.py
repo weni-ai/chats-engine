@@ -27,7 +27,7 @@ class Room(BaseModel):
         blank=True,
     )
     queue = models.ForeignKey(
-        "sectorqueue.Queue",
+        "queues.Queue",
         related_name="rooms",
         verbose_name=_("Queue"),
         on_delete=models.CASCADE,

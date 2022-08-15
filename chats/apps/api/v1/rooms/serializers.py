@@ -13,13 +13,13 @@ from chats.apps.api.v1.sectors.serializers import (
 )
 from chats.apps.rooms.models import Room
 from chats.apps.api.v1.accounts.serializers import UserSerializer
-from chats.apps.api.v1.sectorqueue.serializers import SectorQueueSerializer
+from chats.apps.api.v1.queues.serializers import QueueSerializer
 
 
 class RoomSerializer(serializers.ModelSerializer):
     user = UserSerializer(many=False, read_only=True)
     contact = ContactSerializer(many=False, read_only=True)
-    queue = SectorQueueSerializer(many=False, read_only=True)
+    queue = QueueSerializer(many=False, read_only=True)
     tags = DetailSectorTagSerializer(many=True, read_only=True)
 
     class Meta:
@@ -33,7 +33,7 @@ class RoomSerializer(serializers.ModelSerializer):
 
 class TransferRoomSerializer(serializers.ModelSerializer):
     user = UserSerializer(many=False, read_only=False)
-    queue = SectorQueueSerializer(many=False, read_only=False)
+    queue = QueueSerializer(many=False, read_only=False)
     contact = ContactSerializer(many=False, read_only=True)
     tags = DetailSectorTagSerializer(many=True, read_only=True)
 
