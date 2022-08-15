@@ -8,8 +8,6 @@ from django.utils.translation import gettext_lazy as _
 from chats.core.models import BaseModel
 from chats.utils.websockets import send_channels_group
 
-# TODO: Use djongo(mongodb) models? Might change how things works
-
 
 class Room(BaseModel):
     user = models.ForeignKey(
@@ -28,10 +26,10 @@ class Room(BaseModel):
         null=True,
         blank=True,
     )
-    sector = models.ForeignKey(
-        "sectors.Sector",
+    queue = models.ForeignKey(
+        "sectorqueue.Queue",
         related_name="rooms",
-        verbose_name=_("Sector"),
+        verbose_name=_("Queue"),
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -68,12 +66,12 @@ class Room(BaseModel):
             [] if transfer_history is None else json.loads(transfer_history)
         )
         user = data.get("user")
-        sector = data.get("sector")
+        queue = data.get("queue")
         if user:
             _content = {"type": "user", "id": user, "transfered_at": timezone.now()}
             transfer_history.append(_content)
-        if sector:
-            _content = {"type": "sector", "id": sector}
+        if queue:
+            _content = {"type": "queue", "id": queue}
             transfer_history.append(_content)
         self.transfer_history = json.dumps(transfer_history)
         self.save()

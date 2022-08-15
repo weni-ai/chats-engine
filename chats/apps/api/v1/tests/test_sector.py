@@ -4,7 +4,8 @@ from rest_framework.test import APITestCase
 
 from chats.apps.api.utils import create_user_and_token
 from chats.apps.projects.models import Project
-from chats.apps.sectors.models import Sector
+from chats.apps.queues.models import Queue
+from chats.apps.sectors.models import Sector, SectorAuthorization
 
 
 class SectorTests(APITestCase):
@@ -210,3 +211,187 @@ class SectorTagTests(APITestCase):
         client.credentials(HTTP_AUTHORIZATION="Token " + self.manager_token.key)
         response = client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+
+class QueueTests(APITestCase):
+    def setUp(self):
+        self.owner, self.owner_token = create_user_and_token("owner")
+        self.manager, self.manager_token = create_user_and_token("manager")
+        self.agent, self.agent_token = create_user_and_token("agent")
+        self.agent_2, self.agent_2_token = create_user_and_token("agent_2")
+        self.user_without_auth, self.user_without_auth_token = create_user_and_token(
+            "agent_without_auth"
+        )
+
+        self.project = Project.objects.create(
+            name="testeproject", connect_pk="asdasdas-dad-as-sda-d-ddd"
+        )
+
+        self.sector_1 = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=5,
+            work_start="09:00",
+            work_end="18:00",
+        )
+
+        self.sector_2 = Sector.objects.create(
+            name="Test Sector Without Auth",
+            project=self.project,
+            rooms_limit=5,
+            work_start="09:00",
+            work_end="18:00",
+        )
+
+        self.queue_1 = Queue.objects.create(name="suport queue", sector=self.sector_1)
+
+        self.queue_2 = Queue.objects.create(
+            name="suport queue wihtout auth", sector=self.sector_2
+        )
+
+        self.owner_auth = self.project.authorizations.create(
+            user=self.owner, role=1
+        )  # project: admin role
+        self.manager_auth = self.sector_1.set_user_authorization(
+            self.manager, role=2
+        )  # sector: manager role
+        self.agent_auth = self.queue_1.set_queue_authorization(
+            self.agent, role=1
+        )  # sector: agent role
+        self.agent_auth_2 = self.queue_2.set_queue_authorization(
+            self.agent_2, role=1
+        )  # sector: agent 2 role
+
+    def list_queue_request(self, token):
+        url = reverse("queue-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + token)
+        response = client.get(url, data={"sector": self.sector_1.uuid})
+        return response
+
+    def test_list_queue_with_agent_token_without_queue_auth(self):
+        """
+        certifies that users who don't have authorization cannot list queues.
+        """
+        response = self.list_queue_request(self.user_without_auth_token.key)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(
+            response.data["detail"],
+            "You do not have permission to perform this action.",
+        )
+
+    def test_list_queue_with_admin_token(self):
+        response = self.list_queue_request(self.owner_token.key)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get("count"), 2)
+
+    def test_list_queue_with_manager_token(self):
+        response = self.list_queue_request(self.manager_token.key)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get("count"), 1)
+
+    def test_list_queue_with_agent_token(self):
+        response = self.list_queue_request(self.agent_token.key)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get("count"), 1)
+
+    def retrieve_queue_request(self, token):
+        url = reverse("queue-detail", args=[self.queue_1.uuid])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + token)
+        response = client.get(url, data={"sector": self.sector_1.uuid})
+        return response
+
+    def test_retrieve_queue_without_queue_auth(self):
+        """
+        certifies that users who don't have authorization, cannot retrieve queues.
+        """
+        response = self.retrieve_queue_request(self.user_without_auth_token.key)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(
+            response.data["detail"],
+            "You do not have permission to perform this action.",
+        )
+
+    def test_retrieve_queue_with_admin_token(self):
+        response = self.retrieve_queue_request(self.owner_token.key)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["uuid"], str(self.queue_1.uuid))
+
+    def test_retrieve_queue_with_manager_token(self):
+        response = self.retrieve_queue_request(self.manager_token.key)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["uuid"], str(self.queue_1.uuid))
+
+    def test_retrieve_queue_with_agent_token(self):
+        response = self.retrieve_queue_request(self.agent_token.key)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["uuid"], str(self.queue_1.uuid))
+
+    def list_queue_auth_request(self, token):
+        url = reverse("queue_auth-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + token)
+        response = client.get(url, data={"sector": self.sector_1.uuid})
+        return response
+
+    def test_list_auth_queue_without_permission(self):
+        """
+        certifies that users who don't have authorization cannot list queues auth.
+        """
+        response = self.list_queue_auth_request(self.user_without_auth_token.key)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(
+            response.data["detail"],
+            "You do not have permission to perform this action.",
+        )
+
+    def test_list_auth_queue_with_admin_token(self):
+        response = self.list_queue_auth_request(self.owner_token.key)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get("count"), 2)
+
+    def test_list_auth_queue_with_manager_token(self):
+        response = self.list_queue_auth_request(self.manager_token.key)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get("count"), 1)
+
+    def test_list_auth_queue_with_agent_token(self):
+        response = self.list_queue_auth_request(self.agent_token.key)
+        results = response.json().get("results")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get("count"), 1)
+        self.assertEqual(results[0].get("user"), self.agent.id)
+
+    def retrieve_queue_auth_request(self, token):
+        url = reverse("queue_auth-detail", args=[self.agent_auth.uuid])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + token)
+        response = client.get(url, data={"sector": self.sector_1.uuid})
+        return response
+
+    def test_retrieve_auth_queue_without_permission(self):
+        """
+        certifies that users who don't have authorization, cannot retrieve auth queues.
+        """
+        response = self.retrieve_queue_auth_request(self.user_without_auth_token.key)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(
+            response.data["detail"],
+            "You do not have permission to perform this action.",
+        )
+
+    def test_retrieve_auth_queue_with_admin_token(self):
+        response = self.list_queue_auth_request(self.owner_token.key)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get("count"), 2)
+
+    def test_retrieve_auth_queue_with_manager_token(self):
+        response = self.list_queue_auth_request(self.manager_token.key)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get("count"), 1)
+
+    def test_retrieve_auth_queue_with_agent_token(self):
+        response = self.list_queue_auth_request(self.agent_token.key)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get("count"), 1)

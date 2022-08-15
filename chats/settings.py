@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 
 import environ
+
 import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
 
@@ -60,6 +61,7 @@ INSTALLED_APPS = [
     "chats.apps.msgs",
     "chats.apps.rooms",
     "chats.apps.sectors",
+    "chats.apps.queues",
     "chats.apps.projects",
     "chats.apps.api",
     "chats.core",
@@ -213,6 +215,18 @@ REST_FRAMEWORK = {
     "DEFAULT_METADATA_CLASS": "chats.apps.api.v1.metadata.Metadata",
 }
 
+    OIDC_RP_CLIENT_ID = env.str("OIDC_RP_CLIENT_ID")
+    OIDC_RP_CLIENT_SECRET = env.str("OIDC_RP_CLIENT_SECRET")
+    OIDC_OP_AUTHORIZATION_ENDPOINT = env.str("OIDC_OP_AUTHORIZATION_ENDPOINT")
+    OIDC_OP_TOKEN_ENDPOINT = env.str("OIDC_OP_TOKEN_ENDPOINT")
+    OIDC_OP_USER_ENDPOINT = env.str("OIDC_OP_USER_ENDPOINT")
+    OIDC_OP_JWKS_ENDPOINT = env.str("OIDC_OP_JWKS_ENDPOINT")
+    OIDC_RP_SIGN_ALGO = env.str("OIDC_RP_SIGN_ALGO", default="RS256")
+    OIDC_DRF_AUTH_BACKEND = env.str(
+        "OIDC_DRF_AUTH_BACKEND",
+        default="chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend",
+    )
+    OIDC_RP_SCOPES = env.str("OIDC_RP_SCOPES", default="openid email")
 
 # Logging
 

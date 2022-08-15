@@ -9,7 +9,7 @@ from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 class RoomFilter(filters.FilterSet):
     class Meta:
         model = Room
-        fields = ["sector", "is_active"]
+        fields = ["sector", "queue", "is_active"]
 
     sector = filters.CharFilter(
         field_name="sector",

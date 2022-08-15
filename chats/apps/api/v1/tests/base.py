@@ -6,13 +6,17 @@ from chats.apps.api.utils import create_contact, create_user_and_token
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorAuthorization
-from chats.apps.sectorqueues.models import SectorQueue, SectorQueueAuthorization
+from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.contacts.models import Contact
 
 
-class RoomTests(APITestCase):
+class BaseAPIChatsTestCase(APITestCase):
+    base_url = None
+
     def setUp(self):
         # USERS
-        self.owner, self.owner_token = create_user_and_token("owner")
+        self.admin, self.admin_token = create_user_and_token("admin")
+        self.admin_2, self.admin_2_token = create_user_and_token("admin 2")
 
         self.manager, self.manager_token = create_user_and_token("manager")
         self.manager_2, self.manager_2_token = create_user_and_token("manager")
@@ -25,6 +29,7 @@ class RoomTests(APITestCase):
         self.contact = create_contact("Contact", "contatc@mail.com")
         self.contact_2 = create_contact("Contact2", "contatc2@mail.com")
         self.contact_3 = create_contact("Contact3", "contatc3@mail.com")
+        self.contact_4 = create_contact("Contact4", "contatc4@mail.com")
 
         # PROJECTS
         self.project = Project.objects.create(
@@ -35,10 +40,13 @@ class RoomTests(APITestCase):
         )
 
         # PROJECT AUTHORIZATIONS
-        self.owner_auth = self.project.authorizations.create(
-            user=self.owner, role=ProjectPermission.ROLE_ADMIN
+        self.admin_auth = self.project.authorizations.create(
+            user=self.admin, role=ProjectPermission.ROLE_ADMIN
         )
 
+        self.admin_2_auth = self.project.authorizations.create(
+            user=self.admin_2, role=ProjectPermission.ROLE_ADMIN
+        )
         # SECTORS
         self.sector_1 = Sector.objects.create(
             name="Test Sector",
@@ -74,19 +82,21 @@ class RoomTests(APITestCase):
         )
 
         # QUEUES
-        self.queue_1 = SectorQueue.objects.create(name="Q1", sector=self.sector_1)
-        self.queue_2 = SectorQueue.objects.create(name="Q2", sector=self.sector_1)
-        self.queue_3 = SectorQueue.objects.create(name="Q3", sector=self.sector_2)
+        self.queue_1 = Queue.objects.create(name="Q1", sector=self.sector_1)
+        self.queue_2 = Queue.objects.create(name="Q2", sector=self.sector_1)
+        self.queue_3 = Queue.objects.create(name="Q3", sector=self.sector_2)
+
+        self.queue_4 = Queue.objects.create(name="Q4", sector=self.sector_3)
 
         # QUEUE AUTHORIZATIONS
         self.agent_1_auth = self.queue_1.authorization.create(
-            user=self.agent, role=SectorQueueAuthorization.ROLE_AGENT
+            user=self.agent, role=QueueAuthorization.ROLE_AGENT
         )
         self.agent_2_auth = self.queue_2.authorization.create(
-            user=self.agent_2, role=SectorQueueAuthorization.ROLE_AGENT
+            user=self.agent_2, role=QueueAuthorization.ROLE_AGENT
         )
         self.agent_2_auth_2 = self.queue_3.authorization.create(
-            user=self.agent_2, role=SectorQueueAuthorization.ROLE_AGENT
+            user=self.agent_2, role=QueueAuthorization.ROLE_AGENT
         )
 
         # ROOMS
@@ -94,55 +104,17 @@ class RoomTests(APITestCase):
             contact=self.contact, queue=self.queue_1, user=self.agent
         )
         self.room_2 = Room.objects.create(contact=self.contact_2, queue=self.queue_2)
+
         self.room_3 = Room.objects.create(contact=self.contact_3, queue=self.queue_3)
 
-    def _request_list_rooms(self, token, data: dict):
-        url = reverse("rooms-list")
-        client = self.client
-        client.credentials(HTTP_AUTHORIZATION="Token " + token.key)
-        response = client.get(url, data=data)
-        results = response.json().get("results")
-        return response, results
+        self.room_4 = Room.objects.create(contact=self.contact_4, queue=self.queue_4)
 
-    def _ok_list_rooms(self, token, rooms: list, data: dict):
-        response, results = self._request_list_rooms(token, data)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.json().get("count"), len(rooms))
-        for result in results:
-            self.assertIn(result.get("uuid"), rooms)
+        self.count_project_1_contact = 3
+        self.count_manager_contact = 2
+        self.count_agent_contact = 1
 
-    def _not_ok_list_rooms(self, token, data: dict):
-        response, _ = self._request_list_rooms(token, data)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.json().get("count"), 0)
-
-    def test_list_rooms_given_agents(self):
-        self._ok_list_rooms(
-            self.agent_token,
-            [str(self.room_1.uuid)],
-            {"project": self.project.uuid},
-        )
-        self._ok_list_rooms(
-            self.agent_2_token,
-            [str(self.room_2.uuid), str(self.room_3.uuid)],
-            {"project": self.project.uuid},
-        )
-
-    def test_list_rooms_with_manager_and_admin_token(self):
-        self._ok_list_rooms(
-            self.manager_token,
-            [str(self.room_1.uuid), str(self.room_2.uuid)],
-            {"project": self.project.uuid},
-        )
-
-        self._ok_list_rooms(
-            self.owner_token,
-            [str(self.room_1.uuid), str(self.room_2.uuid), str(self.room_3.uuid)],
-            {"project": self.project.uuid},
-        )
-
-    def test_list_rooms_with_not_permitted_manager_token(self):
-        self._not_ok_list_rooms(
-            self.manager_3_token,
-            {"project": self.project.uuid},
-        )
+    def create_contact(
+        self, name: str = "João da Silva", email="joao.da.silva@email.com"
+    ):
+        c = Contact.objects.create(name=name, email=email)
+        return c
