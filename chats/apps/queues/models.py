@@ -7,12 +7,12 @@ from chats.apps.sectors.models import Sector, SectorAuthorization
 class Queue(BaseModel):
     sector = models.ForeignKey(
         Sector,
-        verbose_name=_("queues"),
+        verbose_name=_("sector"),
         related_name="sector_authorizations",
         on_delete=models.CASCADE,
         to_field="uuid",
     )
-    name = models.CharField(_("sector name"), max_length=150, blank=True)
+    name = models.CharField(_("Name"), max_length=150, blank=True)
 
     class Meta:
         verbose_name = _("Sector Queue")

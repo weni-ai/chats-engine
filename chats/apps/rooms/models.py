@@ -1,7 +1,6 @@
 import json
 
 from django.db import models
-from django.forms import JSONField
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
@@ -13,7 +12,7 @@ class Room(BaseModel):
     user = models.ForeignKey(
         "accounts.User",
         related_name="rooms",
-        verbose_name=_("messages"),
+        verbose_name=_("user"),
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -21,7 +20,7 @@ class Room(BaseModel):
     contact = models.ForeignKey(
         "contacts.Contact",
         related_name="rooms",
-        verbose_name=_("messages"),
+        verbose_name=_("contact"),
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -38,16 +37,18 @@ class Room(BaseModel):
         _("Ended at"), auto_now_add=False, null=True, blank=True
     )
 
-    # ended_by = models.CharField(_("Ended by"), max_length=50)
+    ended_by = models.CharField(_("Ended by"), max_length=50, null=True, blank=True)
 
     is_active = models.BooleanField(_("is active?"), default=True)
 
-    transfer_history = JSONField(_("Transfer History"))
+    transfer_history = models.JSONField(_("Transfer History"), blank=True)
 
     tags = models.ManyToManyField(
         "sectors.SectorTag",
-        verbose_name=_("tags"),
         related_name="rooms",
+        verbose_name=_("tags"),
+        null=True,
+        blank=True,
     )
 
     class Meta:

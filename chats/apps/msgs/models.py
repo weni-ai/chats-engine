@@ -9,13 +9,13 @@ class Message(BaseModel):
     room = models.ForeignKey(
         "rooms.Room",
         related_name="messages",
-        verbose_name=_("messages"),
+        verbose_name=_("room"),
         on_delete=models.CASCADE,
     )
     user = models.ForeignKey(
         "accounts.User",
         related_name="messages",
-        verbose_name=_("messages"),
+        verbose_name=_("user"),
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -23,7 +23,7 @@ class Message(BaseModel):
     contact = models.ForeignKey(
         "contacts.Contact",
         related_name="messages",
-        verbose_name=_("messages"),
+        verbose_name=_("contact"),
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -61,7 +61,7 @@ class MessageMedia(BaseModel):
     message = models.ForeignKey(
         Message,
         related_name="medias",
-        verbose_name=_("medias"),
+        verbose_name=_("message"),
         to_field="uuid",
         on_delete=models.CASCADE,
     )
