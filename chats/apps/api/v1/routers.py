@@ -2,6 +2,7 @@ from rest_framework import routers
 
 from chats.apps.api.v1.accounts.viewsets import LoginViewset
 from chats.apps.api.v1.contacts.viewsets import ContactViewset
+from chats.apps.api.v1.internal.sector import views as sector_internal_views
 from chats.apps.api.v1.msgs.viewsets import MessageViewset, MessageMediaViewset
 from chats.apps.api.v1.projects.viewsets import ProjectViewset
 from chats.apps.api.v1.queues.viewsets import (
@@ -34,3 +35,8 @@ router.register("queue", QueueViewset, basename="queue")
 router.register("permission/queue", QueueAuthorizationViewset, basename="queue_auth")
 router.register("permission/sector", SectorAuthorizationViewset)
 router.register("quick_messages", QuickMessageViewset)
+
+
+router.register(
+    "/internal/permissions/sector", sector_internal_views.SectorAuthorizationViewset
+)
