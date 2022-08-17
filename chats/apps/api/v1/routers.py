@@ -31,16 +31,17 @@ router = Router()
 router.register("accounts/login", LoginViewset)
 router.register("room", RoomViewset)
 router.register("msg", MessageViewset)
+router.register("quick_messages", QuickMessageViewset)
 router.register("media", MessageMediaViewset)
 router.register("contact", ContactViewset)
 router.register("sector", SectorViewset)
 router.register("tag", SectorTagsViewset)
 router.register("project", ProjectViewset)
 router.register("queue", QueueViewset, basename="queue")
-router.register("permission/sector", SectorAuthorizationViewset)
-router.register("permission/queue", QueueAuthorizationViewset, basename="queue_auth")
-router.register("permission/sector", SectorAuthorizationViewset)
-router.register("quick_messages", QuickMessageViewset)
+router.register(
+    "authorization/sector", SectorAuthorizationViewset, basename="sector_auth"
+)
+router.register("authorization/queue", QueueAuthorizationViewset, basename="queue_auth")
 router.register("internal/queue", QueueInternalViewset, basename="queue_internal")
 router.register(
     "internal/sector",
@@ -53,15 +54,17 @@ router.register(
     basename="project_internal",
 )
 router.register(
-    "internal/permission/project",
+    "internal/authorization/project",
     project_internal_views.ProjectAuthorizationViewset,
     basename="project_auth_internal",
 )
 router.register(
-    "internal/permissions/sector", sector_internal_views.SectorAuthorizationViewset
+    "internal/authorization/sector",
+    sector_internal_views.SectorAuthorizationViewset,
+    basename="sector_auth_internal",
 )
 router.register(
-    "internal/permission/queue",
+    "internal/authorization/queue",
     QueueAuthInternalViewset,
     basename="queue_auth_internal",
 )

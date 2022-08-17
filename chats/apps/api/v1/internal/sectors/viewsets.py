@@ -1,8 +1,7 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import status, viewsets
+from rest_framework import status, viewsets, filters
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-
 from chats.apps.api.v1.internal.sectors.serializers import SectorTagSerializer
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.api.v1.sectors import serializers as sector_serializers
@@ -63,6 +62,10 @@ class SectorAuthorizationViewset(viewsets.ModelViewSet):
     queryset = SectorAuthorization.objects.all()
     serializer_class = sector_serializers.SectorAuthorizationSerializer
     permission_classes = [IsAuthenticated, ModuleHasPermission]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = [
+        "sector",
+    ]
     lookup_field = "uuid"
 
     def perform_create(self, serializer):
@@ -81,6 +84,7 @@ class SectorAuthorizationViewset(viewsets.ModelViewSet):
 class SectorTagsViewset(viewsets.ModelViewSet):
     queryset = SectorTag.objects.all()
     serializer_class = SectorTagSerializer
-    filter_backends = [DjangoFilterBackend]
     permission_classes = [IsAuthenticated, ModuleHasPermission]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ["sector"]
     lookup_field = "uuid"

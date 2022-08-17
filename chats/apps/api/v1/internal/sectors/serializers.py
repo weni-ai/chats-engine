@@ -6,4 +6,3 @@ class SectorTagSerializer(serializers.ModelSerializer):
     class Meta:
         model = SectorTag
         fields = "__all__"
-        extra_kwargs = {"sector": {"required": False}}

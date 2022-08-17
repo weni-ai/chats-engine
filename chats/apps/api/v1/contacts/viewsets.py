@@ -22,7 +22,7 @@ class ContactViewset(
 
     def get_queryset(self):
         qs = self.queryset
-        user = self.request.user
+        user = self.request.user.pk
         is_sector_manager = Q(rooms__queue__sector__authorizations__user=user)
 
         is_project_admin = Q(

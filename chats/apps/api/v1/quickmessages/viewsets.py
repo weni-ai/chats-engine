@@ -8,14 +8,14 @@ from chats.apps.quickmessages.models import QuickMessage
 
 
 class QuickMessageViewset(viewsets.ModelViewSet):
-    queryset = QuickMessage.objects
+    queryset = QuickMessage.objects.all()
     serializer_class = QuickMessageSerializer
     permission_classes = [
         IsAuthenticated,
     ]
 
     def perform_create(self, serializer):
-        return serializer.save(user=self.request.user)
+        return serializer.save(user=self.request.user.pk)
 
     def update(self, request, *args, **kwargs):
         if self.get_object().user == request.user:
@@ -33,4 +33,4 @@ class QuickMessageViewset(viewsets.ModelViewSet):
         raise PermissionDenied
 
     def get_queryset(self, *args, **kwargs):
-        return QuickMessage.objects.all().filter(user=self.request.user)
+        return QuickMessage.objects.all().filter(user=self.request.user.pk)

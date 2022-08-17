@@ -1,3 +1,4 @@
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 
@@ -8,7 +9,7 @@ from chats.apps.projects.models import Project, ProjectPermission
 
 class ProjectViewset(viewsets.ModelViewSet):
     queryset = Project.objects.all()
-    serializer_class = serializers.ProjectSerializer
+    serializer_class = serializers.ProjectInternalSerializer
     permission_classes = [IsAuthenticated, ModuleHasPermission]
 
 
@@ -16,3 +17,7 @@ class ProjectAuthorizationViewset(viewsets.ModelViewSet):
     queryset = ProjectPermission.objects.all()
     serializer_class = serializers.ProjectAuthorizationSerializer
     permission_classes = [IsAuthenticated, ModuleHasPermission]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = [
+        "project",
+    ]

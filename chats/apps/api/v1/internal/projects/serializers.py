@@ -5,7 +5,7 @@ from rest_framework import serializers
 from chats.apps.projects.models import Project, ProjectPermission
 
 
-class ProjectSerializer(serializers.ModelSerializer):
+class ProjectInternalSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
         fields = "__all__"

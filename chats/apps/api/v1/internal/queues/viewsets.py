@@ -60,13 +60,11 @@ class QueueAuthInternalViewset(viewsets.ModelViewSet):
     queryset = QueueAuthorization.objects.all()
     serializer_class = queue_serializers.QueueAuthorizationSerializer
     filter_backends = [DjangoFilterBackend]
+    filterset_fields = [
+        "queue",
+    ]
     permission_classes = [IsAuthenticated, ModuleHasPermission]
     lookup_field = "uuid"
-
-    def get_queryset(self):
-        if self.action != "list":
-            self.filterset_class = None
-        return super().get_queryset()
 
     def get_serializer_class(self):
         if self.action in ["list", "retrieve"]:
