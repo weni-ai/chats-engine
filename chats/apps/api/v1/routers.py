@@ -2,7 +2,6 @@ from rest_framework import routers
 
 from chats.apps.api.v1.accounts.viewsets import LoginViewset
 from chats.apps.api.v1.contacts.viewsets import ContactViewset
-from chats.apps.api.v1.internal.sector import views as sector_internal_views
 from chats.apps.api.v1.msgs.viewsets import MessageViewset, MessageMediaViewset
 from chats.apps.api.v1.projects.viewsets import ProjectViewset
 from chats.apps.api.v1.queues.viewsets import (
@@ -11,22 +10,16 @@ from chats.apps.api.v1.queues.viewsets import (
 )
 from chats.apps.api.v1.quickmessages.viewsets import QuickMessageViewset
 from chats.apps.api.v1.rooms.viewsets import RoomViewset
-from chats.apps.api.v1.queues.viewsets import (
-    SectorQueueViewset,
-    SectorQueueAuthorizationViewset,
-)
 from chats.apps.api.v1.sectors.viewsets import (
     SectorAuthorizationViewset,
     SectorTagsViewset,
     SectorViewset,
 )
-from chats.apps.api.internal.queues.viewsets import (
+from chats.apps.api.v1.internal.sectors import viewsets as sector_internal_views
+from chats.apps.api.v1.internal.projects import viewsets as project_internal_views
+from chats.apps.api.v1.internal.queues.viewsets import (
     QueueInternalViewset,
     QueueAuthInternalViewset,
-)
-
-from chats.apps.api.internal.sector.viewsets import (
-    SectorInternalViewset,
 )
 
 
@@ -43,22 +36,32 @@ router.register("contact", ContactViewset)
 router.register("sector", SectorViewset)
 router.register("tag", SectorTagsViewset)
 router.register("project", ProjectViewset)
-router.register("queue", SectorQueueViewset, basename="queue")
-router.register("internal/sector", SectorInternalViewset, basename="sector_internal")
-router.register("internal/queue", QueueInternalViewset, basename="queue_internal")
+router.register("queue", QueueViewset, basename="queue")
 router.register("permission/sector", SectorAuthorizationViewset)
-router.register(
-    "permission/queue", SectorQueueAuthorizationViewset, basename="queue_auth"
-)
+router.register("permission/queue", QueueAuthorizationViewset, basename="queue_auth")
 router.register("permission/sector", SectorAuthorizationViewset)
 router.register("quick_messages", QuickMessageViewset)
+router.register("internal/queue", QueueInternalViewset, basename="queue_internal")
+router.register(
+    "internal/sector",
+    sector_internal_views.SectorInternalViewset,
+    basename="sector_internal",
+)
+router.register(
+    "internal/project",
+    project_internal_views.ProjectViewset,
+    basename="project_internal",
+)
+router.register(
+    "internal/permission/project",
+    project_internal_views.ProjectAuthorizationViewset,
+    basename="project_auth_internal",
+)
+router.register(
+    "internal/permissions/sector", sector_internal_views.SectorAuthorizationViewset
+)
 router.register(
     "internal/permission/queue",
     QueueAuthInternalViewset,
     basename="queue_auth_internal",
-)
-
-
-router.register(
-    "/internal/permissions/sector", sector_internal_views.SectorAuthorizationViewset
 )

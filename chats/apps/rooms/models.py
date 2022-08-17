@@ -41,13 +41,12 @@ class Room(BaseModel):
 
     is_active = models.BooleanField(_("is active?"), default=True)
 
-    transfer_history = models.JSONField(_("Transfer History"), blank=True)
+    transfer_history = models.JSONField(_("Transfer History"), null=True, blank=True)
 
     tags = models.ManyToManyField(
         "sectors.SectorTag",
         related_name="rooms",
         verbose_name=_("tags"),
-        null=True,
         blank=True,
     )
 

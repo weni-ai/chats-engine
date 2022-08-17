@@ -495,7 +495,7 @@ class QueueInternalTests(APITestCase):
         self.assertEqual(response.data["is_deleted"], True)
 
 
-class SectorQueueAuthInternalTests(APITestCase):
+class QueueAuthInternalTests(APITestCase):
     def setUp(self):
         self.owner, self.owner_token = create_user_and_token("owner")
         self.manager, self.manager_token = create_user_and_token("manager")

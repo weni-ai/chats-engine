@@ -1,28 +1,18 @@
-from django.conf import settings
-from django.utils.translation import gettext_lazy as _
-from rest_framework import exceptions, mixins, pagination, permissions, viewsets
-from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
-from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.response import Response
+from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
 
-from chats.apps.api.internal.projects import serializers
+from chats.apps.api.v1.internal.permissions import ModuleHasPermission
+from chats.apps.api.v1.internal.projects import serializers
 from chats.apps.projects.models import Project, ProjectPermission
-
-# TODO: ADD THE INTERNALPERMISSION IN THESE ENDPOINTS
 
 
 class ProjectViewset(viewsets.ModelViewSet):
-    queryset = Project.objects
+    queryset = Project.objects.all()
     serializer_class = serializers.ProjectSerializer
-    permission_classes = [
-        IsAuthenticated,
-    ]
+    permission_classes = [IsAuthenticated, ModuleHasPermission]
 
 
 class ProjectAuthorizationViewset(viewsets.ModelViewSet):
     queryset = ProjectPermission.objects.all()
     serializer_class = serializers.ProjectAuthorizationSerializer
-    permission_classes = [
-        IsAuthenticated,
-    ]
+    permission_classes = [IsAuthenticated, ModuleHasPermission]

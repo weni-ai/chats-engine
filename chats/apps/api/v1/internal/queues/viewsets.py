@@ -3,19 +3,18 @@ from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from chats.apps.api.v1.queues import serializers as sectorqueue_serializers
+from chats.apps.api.v1.queues import serializers as queue_serializers
 from chats.apps.queues.models import Queue, QueueAuthorization
-from chats.apps.api.v1.queues.filters import SectorQueueFilter
+from chats.apps.api.v1.queues.filters import QueueFilter
+from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 
 
 class QueueInternalViewset(viewsets.ModelViewSet):
     queryset = Queue.objects.all()
-    serializer_class = sectorqueue_serializers.SectorQueueSerializer
+    serializer_class = queue_serializers.QueueSerializer
     filter_backends = [DjangoFilterBackend]
-    filterset_class = SectorQueueFilter
-    permission_classes = [
-        IsAuthenticated,
-    ]
+    filterset_class = QueueFilter
+    permission_classes = [IsAuthenticated, ModuleHasPermission]
     lookup_field = "uuid"
 
     def get_queryset(self):
@@ -25,9 +24,9 @@ class QueueInternalViewset(viewsets.ModelViewSet):
 
     def get_serializer_class(self):
         if self.action in ["list", "retrieve"]:
-            return sectorqueue_serializers.SectorQueueReadOnlyListSerializer
+            return queue_serializers.QueueReadOnlyListSerializer
         if self.action == "update":
-            return sectorqueue_serializers.SectorQueueUpdateSerializer
+            return queue_serializers.QueueUpdateSerializer
 
         return super().get_serializer_class()
 
@@ -59,11 +58,9 @@ class QueueInternalViewset(viewsets.ModelViewSet):
 
 class QueueAuthInternalViewset(viewsets.ModelViewSet):
     queryset = QueueAuthorization.objects.all()
-    serializer_class = sectorqueue_serializers.SectorQueueAuthorizationSerializer
+    serializer_class = queue_serializers.QueueAuthorizationSerializer
     filter_backends = [DjangoFilterBackend]
-    permission_classes = [
-        IsAuthenticated,
-    ]
+    permission_classes = [IsAuthenticated, ModuleHasPermission]
     lookup_field = "uuid"
 
     def get_queryset(self):
@@ -73,9 +70,9 @@ class QueueAuthInternalViewset(viewsets.ModelViewSet):
 
     def get_serializer_class(self):
         if self.action in ["list", "retrieve"]:
-            return sectorqueue_serializers.QueueAuthorizationReadOnlyListSerializer
+            return queue_serializers.QueueAuthorizationReadOnlyListSerializer
         if self.action == "update":
-            return sectorqueue_serializers.QueueAuthorizationUpdateSerializer
+            return queue_serializers.QueueAuthorizationUpdateSerializer
 
         return super().get_serializer_class()
 
