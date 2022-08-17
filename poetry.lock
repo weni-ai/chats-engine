@@ -556,6 +556,7 @@ MarkupSafe = ">=2.0"
 i18n = ["Babel (>=2.7)"]
 
 [[package]]
+
 name = "jmespath"
 version = "1.0.1"
 description = "JSON Matching Expressions"
@@ -564,6 +565,7 @@ optional = false
 python-versions = ">=3.7"
 
 [[package]]
+
 name = "josepy"
 version = "1.13.0"
 description = "JOSE protocol implementation in Python"
@@ -1398,6 +1400,7 @@ jinja2 = [
     {file = "Jinja2-3.1.2-py3-none-any.whl", hash = "sha256:6088930bfe239f0e6710546ab9c19c9ef35e29792895fed6e6e31a023a182a61"},
     {file = "Jinja2-3.1.2.tar.gz", hash = "sha256:31351a702a408a9e7595a8fc6150fc3f43bb6bf7e319770cbc0db9df9437e852"},
 ]
+
 jmespath = []
 josepy = [
     {file = "josepy-1.13.0-py2.py3-none-any.whl", hash = "sha256:6f64eb35186aaa1776b7a1768651b1c616cab7f9685f9660bffc6491074a5390"},

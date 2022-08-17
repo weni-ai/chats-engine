@@ -11,40 +11,112 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('sectors', '0001_initial'),
+        ("sectors", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='Queue',
+            name="Queue",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('uuid', models.UUIDField(default=uuid.uuid4, editable=False, unique=True)),
-                ('created_on', models.DateTimeField(auto_now_add=True, verbose_name='Created on')),
-                ('modified_on', models.DateTimeField(auto_now=True, verbose_name='Modified on')),
-                ('name', models.CharField(blank=True, max_length=150, verbose_name='sector name')),
-                ('sector', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='sector_authorizations', to='sectors.sector', to_field='uuid', verbose_name='queues')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "uuid",
+                    models.UUIDField(default=uuid.uuid4, editable=False, unique=True),
+                ),
+                (
+                    "created_on",
+                    models.DateTimeField(auto_now_add=True, verbose_name="Created on"),
+                ),
+                (
+                    "modified_on",
+                    models.DateTimeField(auto_now=True, verbose_name="Modified on"),
+                ),
+                (
+                    "name",
+                    models.CharField(
+                        blank=True, max_length=150, verbose_name="sector name"
+                    ),
+                ),
+                (
+                    "sector",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="sector_authorizations",
+                        to="sectors.sector",
+                        to_field="uuid",
+                        verbose_name="queues",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Sector Queue',
-                'verbose_name_plural': 'Sector Queues',
+                "verbose_name": "Sector Queue",
+                "verbose_name_plural": "Sector Queues",
             },
         ),
         migrations.CreateModel(
-            name='QueueAuthorization',
+            name="QueueAuthorization",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('uuid', models.UUIDField(default=uuid.uuid4, editable=False, unique=True)),
-                ('created_on', models.DateTimeField(auto_now_add=True, verbose_name='Created on')),
-                ('modified_on', models.DateTimeField(auto_now=True, verbose_name='Modified on')),
-                ('role', models.PositiveIntegerField(choices=[(0, 'not set'), (1, 'agent')], default=1, verbose_name='role')),
-                ('queue', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='authorizations', to='queues.queue', to_field='uuid', verbose_name='Queue')),
-                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='queue_authorizations', to=settings.AUTH_USER_MODEL, verbose_name='User')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "uuid",
+                    models.UUIDField(default=uuid.uuid4, editable=False, unique=True),
+                ),
+                (
+                    "created_on",
+                    models.DateTimeField(auto_now_add=True, verbose_name="Created on"),
+                ),
+                (
+                    "modified_on",
+                    models.DateTimeField(auto_now=True, verbose_name="Modified on"),
+                ),
+                (
+                    "role",
+                    models.PositiveIntegerField(
+                        choices=[(0, "not set"), (1, "agent")],
+                        default=1,
+                        verbose_name="role",
+                    ),
+                ),
+                (
+                    "queue",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="authorizations",
+                        to="queues.queue",
+                        to_field="uuid",
+                        verbose_name="Queue",
+                    ),
+                ),
+                (
+                    "user",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="queue_authorizations",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="User",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Sector Queue Authorization',
-                'verbose_name_plural': 'Sector Queues Authorization',
+                "verbose_name": "Sector Queue Authorization",
+                "verbose_name_plural": "Sector Queues Authorization",
             },
         ),
     ]

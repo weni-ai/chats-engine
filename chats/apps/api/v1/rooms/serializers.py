@@ -45,6 +45,7 @@ class TransferRoomSerializer(serializers.ModelSerializer):
             "ended_at",
             "is_active",
             "transfer_history",
+            "tags",
         ]
 
         extra_kwargs = {
