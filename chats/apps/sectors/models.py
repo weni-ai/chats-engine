@@ -119,7 +119,7 @@ class SectorAuthorization(BaseModel):
     ]
 
     user = models.ForeignKey(
-        "accounts.User",
+        "projects.ProjectPermission",
         related_name="sector_authorizations",
         verbose_name=_("User"),
         on_delete=models.CASCADE,

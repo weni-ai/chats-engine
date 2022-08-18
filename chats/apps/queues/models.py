@@ -71,7 +71,7 @@ class QueueAuthorization(BaseModel):
     )
 
     user = models.ForeignKey(
-        "accounts.User",
+        "projects.ProjectPermission",
         verbose_name=_("User"),
         related_name="queue_authorizations",
         on_delete=models.CASCADE,
