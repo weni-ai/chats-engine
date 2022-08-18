@@ -18,7 +18,7 @@ def check_module_permission(claims, user):
             name="can communicate internally",
             content_type=content_type,
         )
-        if not user.has_perm("authentication.can_communicate_internally"):
+        if not user.has_perm("accounts.can_communicate_internally"):
             user.user_permissions.add(permission)
         return True
     return False

@@ -7,12 +7,12 @@ from chats.apps.sectors.models import Sector, SectorAuthorization
 class Queue(BaseModel):
     sector = models.ForeignKey(
         Sector,
-        verbose_name=_("queues"),
+        verbose_name=_("sector"),
         related_name="sector_authorizations",
         on_delete=models.CASCADE,
-        to_field="uuid"
+        to_field="uuid",
     )
-    name = models.CharField(_("sector name"), max_length=150, blank=True)
+    name = models.CharField(_("Name"), max_length=150, blank=True)
 
     class Meta:
         verbose_name = _("Sector Queue")
@@ -27,15 +27,15 @@ class Queue(BaseModel):
         if not verify if user has authorizathion in queue. If user has no authorizathion, return false.
         """
         try:
-            sectorqueue_auth = self.sector.authorizations.get(user=user)
+            queue_auth = self.sector.authorizations.get(user=user)
         except SectorAuthorization.DoesNotExist:
             if self.sector.project.authorizations.filter(user=user):
-                sectorqueue_auth = True
+                queue_auth = True
             elif self.authorizations.filter(user=user):
-                sectorqueue_auth = True
+                queue_auth = True
             else:
-                sectorqueue_auth = False
-        return sectorqueue_auth
+                queue_auth = False
+        return queue_auth
 
     @property
     def agent_count(self):
@@ -64,7 +64,7 @@ class QueueAuthorization(BaseModel):
         verbose_name=_("Queue"),
         related_name="authorizations",
         on_delete=models.CASCADE,
-        to_field="uuid"
+        to_field="uuid",
     )
     role = models.PositiveIntegerField(
         _("role"), choices=ROLE_CHOICES, default=ROLE_AGENT

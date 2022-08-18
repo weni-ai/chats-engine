@@ -1,19 +1,18 @@
+import json
+
 from django.db import models
-from django.forms import JSONField
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from chats.core.models import BaseModel
 from chats.utils.websockets import send_channels_group
 
-# TODO: Use djongo(mongodb) models? Might change how things works
-
 
 class Room(BaseModel):
     user = models.ForeignKey(
         "accounts.User",
         related_name="rooms",
-        verbose_name=_("messages"),
+        verbose_name=_("user"),
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -21,15 +20,15 @@ class Room(BaseModel):
     contact = models.ForeignKey(
         "contacts.Contact",
         related_name="rooms",
-        verbose_name=_("messages"),
+        verbose_name=_("contact"),
         on_delete=models.CASCADE,
         null=True,
         blank=True,
     )
-    sector = models.ForeignKey(
-        "sectors.Sector",
+    queue = models.ForeignKey(
+        "queues.Queue",
         related_name="rooms",
-        verbose_name=_("Sector"),
+        verbose_name=_("Queue"),
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -37,14 +36,18 @@ class Room(BaseModel):
     ended_at = models.DateTimeField(
         _("Ended at"), auto_now_add=False, null=True, blank=True
     )
+
+    ended_by = models.CharField(_("Ended by"), max_length=50, null=True, blank=True)
+
     is_active = models.BooleanField(_("is active?"), default=True)
 
-    transfer_history = JSONField(_("Transfer History"))
+    transfer_history = models.JSONField(_("Transfer History"), null=True, blank=True)
 
     tags = models.ManyToManyField(
         "sectors.SectorTag",
-        verbose_name=_("tags"),
         related_name="rooms",
+        verbose_name=_("tags"),
+        blank=True,
     )
 
     class Meta:
@@ -57,9 +60,29 @@ class Room(BaseModel):
 
         return RoomSerializer(self).data
 
-    def close(self, tags=None):
+    def transfer_room(self, type: str, data: dict):
+        transfer_history = self.transfer_history
+        transfer_history = (
+            [] if transfer_history is None else json.loads(transfer_history)
+        )
+        user = data.get("user")
+        queue = data.get("queue")
+        if user:
+            _content = {"type": "user", "id": user, "transfered_at": timezone.now()}
+            transfer_history.append(_content)
+        if queue:
+            _content = {"type": "queue", "id": queue}
+            transfer_history.append(_content)
+        self.transfer_history = json.dumps(transfer_history)
+        self.save()
+        msg = self.messages.create(text=self.transfer_history)
+        msg.notify_room("create")
+        self.notify_room("update")
+
+    def close(self, tags=None, end_by: str = ""):
         self.is_active = False
         self.ended_at = timezone.now()
+        # self.ended_by = end_by
         for tag_id in tags:
             self.tags.add(tag_id)
         self.save()

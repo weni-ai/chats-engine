@@ -67,3 +67,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def sector_ids(self):
         return self.sector_authorizations.values_list("sector__id", flat=True)
+
+    @property
+    def last_interaction(self):
+        return self.messages.last().created_on
