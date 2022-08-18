@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
+from django.utils.translation import gettext_lazy as _
 
 # Sector serializers
 
@@ -9,6 +10,32 @@ class SectorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Sector
         fields = "__all__"
+        
+    def validate(self, data):
+        """
+        Check if the work_end date its greater than work_start date.
+        """
+        if self.instance:
+            if self.instance.work_end < self.instance.work_start:
+                raise serializers.ValidationError({
+                'work_end': _("work_end date must be greater than work_start date.")
+                })
+        else:
+            if data['work_end'] < data['work_start']:
+                raise serializers.ValidationError({
+                'work_end': _("work_end date must be greater than work_start date.")
+                })
+        return data
+
+    def validate_rooms_limit(self, data):
+        """
+        Check if the rooms_limit its greater than 0.
+        """
+        if data <= 0:
+            raise serializers.ValidationError(
+               {"you cant create a sector with rooms_limit lower or equal 0."}
+            )
+        return data
 
 
 class SectorUpdateSerializer(serializers.ModelSerializer):
@@ -96,6 +123,23 @@ class SectorTagSerializer(serializers.ModelSerializer):
         model = SectorTag
         fields = "__all__"
         extra_kwargs = {"sector": {"required": False}}
+
+    
+    def validate(self, data):
+        """
+        Check if tag already exist in sector.
+        """
+        if self.instance:
+            if SectorTag.objects.filter(sector=self.instance.sector, name=data['name']).exists():
+                raise serializers.ValidationError({
+                'name': _("This tag already exists.")
+                })
+        else:
+            if SectorTag.objects.filter(name=data['name'], sector=data['sector']).exists():
+                raise serializers.ValidationError({
+                'name': _("This tag already exists.")
+                })               
+        return data
 
 
 class DetailSectorTagSerializer(serializers.ModelSerializer):
