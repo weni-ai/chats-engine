@@ -71,6 +71,7 @@ class ProjectPermission(BaseModel):
         "accounts.User",
         verbose_name=_("users"),
         on_delete=models.CASCADE,
+        to_field="email",
         null=True,
         blank=True,
     )

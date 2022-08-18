@@ -55,6 +55,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(_("staff status"), default=False)
     is_active = models.BooleanField(_("active"), default=True)
 
+    language = models.CharField(max_length=5, null=True, blank=True)
+
     date_joined = models.DateTimeField(_("date joined"), default=timezone.now)
 
     objects = UserManager()

@@ -1,9 +1,10 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import status, viewsets, filters
+from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from chats.apps.api.v1.internal.sectors.serializers import SectorTagSerializer
+
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
+from chats.apps.api.v1.internal.sectors.serializers import SectorTagSerializer
 from chats.apps.api.v1.sectors import serializers as sector_serializers
 from chats.apps.api.v1.sectors.filters import SectorFilter
 from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag

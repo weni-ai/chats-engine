@@ -13,9 +13,9 @@ class ProjectViewset(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, ModuleHasPermission]
 
 
-class ProjectAuthorizationViewset(viewsets.ModelViewSet):
+class ProjectPermissionViewset(viewsets.ModelViewSet):
     queryset = ProjectPermission.objects.all()
-    serializer_class = serializers.ProjectAuthorizationSerializer
+    serializer_class = serializers.ProjectPermissionSerializer
     permission_classes = [IsAuthenticated, ModuleHasPermission]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = [
