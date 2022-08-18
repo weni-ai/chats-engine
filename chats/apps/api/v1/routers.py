@@ -1,3 +1,4 @@
+from django.urls import reverse
 from rest_framework import routers
 
 from chats.apps.api.v1.accounts.viewsets import LoginViewset

@@ -571,6 +571,7 @@ class QueueAuthInternalTests(APITestCase):
         client.credentials(HTTP_AUTHORIZATION="Token " + self.manager_token.key)
         data = {
             "user": self.manager.id,
+            "queue": str(self.queue_1.uuid),
         }
         response = client.patch(url, data=data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
