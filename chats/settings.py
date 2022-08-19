@@ -124,7 +124,7 @@ CHANNEL_LAYERS = {
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
 
-DATABASES = {"default": env.db(var="DEFAULT_DATABASE", default="sqlite:///db.sqlite3")}
+DATABASES = dict(default=env.db(var="DATABASE_URL"))
 
 # User
 
@@ -289,4 +289,6 @@ if USE_SENTRY:
 
 # Query Limiters
 
-OLD_MESSAGES_LIMIT = env.int("OLD_MESSAGES_LIMIT", default=10)
+OLD_MESSAGES_LIMIT = env.int(
+    "OLD_MESSAGES_LIMIT", default=10
+)  # Limits the messages shown when accessing an active chat

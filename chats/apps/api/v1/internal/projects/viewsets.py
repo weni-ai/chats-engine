@@ -11,6 +11,7 @@ class ProjectViewset(viewsets.ModelViewSet):
     queryset = Project.objects.all()
     serializer_class = serializers.ProjectInternalSerializer
     permission_classes = [IsAuthenticated, ModuleHasPermission]
+    lookup_field = "uuid"
 
 
 class ProjectPermissionViewset(viewsets.ModelViewSet):
@@ -21,3 +22,4 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
     filterset_fields = [
         "project",
     ]
+    lookup_field = "uuid"

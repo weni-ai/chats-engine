@@ -9,9 +9,6 @@ from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
 
 
-# class SectorPagination(pagination.)
-
-
 class MessageViewset(
     mixins.CreateModelMixin,
     mixins.UpdateModelMixin,
@@ -25,6 +22,7 @@ class MessageViewset(
     filterset_class = MessageFilter
     permission_classes = [IsAuthenticated, MessagePermission]
     pagination_class = pagination.PageNumberPagination
+    lookup_field = "uuid"
 
     def get_queryset(self):
         return super().get_queryset()
@@ -48,6 +46,7 @@ class MessageMediaViewset(
     parser_classes = [parsers.MultiPartParser]
     permission_classes = [IsAuthenticated, MessageMediaPermission]
     pagination_class = pagination.PageNumberPagination
+    lookup_field = "uuid"
 
     def get_queryset(self):
         if self.request.query_params.get("contact"):

@@ -1,5 +1,5 @@
 dev_up:
-	@docker-compose -f docker/docker-compose.yml up -d database redis
+	@docker-compose -f docker/docker-compose.yml up -d postgres redis
 
 dev_down:
 	@docker-compose -f docker/docker-compose.yml down

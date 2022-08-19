@@ -16,7 +16,6 @@ from chats.apps.api.v1.sectors.viewsets import (
     SectorTagsViewset,
     SectorViewset,
 )
-from chats.apps.api.v1.internal.sectors import viewsets as sector_internal_views
 from chats.apps.api.v1.internal.users import viewsets as user_internal_views
 from chats.apps.api.v1.internal.projects import viewsets as project_internal_views
 from chats.apps.api.v1.internal.queues.viewsets import (
@@ -45,37 +44,17 @@ router.register(
 )
 router.register("authorization/queue", QueueAuthorizationViewset, basename="queue_auth")
 
-router.register("internal/queue", QueueInternalViewset, basename="queue_internal")
-router.register(
-    "internal/sector",
-    sector_internal_views.SectorInternalViewset,
-    basename="sector_internal",
-)
+# Internal
+
 router.register(
     "internal/project",
     project_internal_views.ProjectViewset,
     basename="project_internal",
 )
 router.register(
-    "internal/authorization/sector",
-    sector_internal_views.SectorAuthorizationViewset,
-    basename="sector_auth_internal",
-)
-router.register(
-    "internal/authorization/queue",
-    QueueAuthInternalViewset,
-    basename="queue_auth_internal",
-)
-
-router.register(
     "internal/permission/project",
     project_internal_views.ProjectPermissionViewset,
     basename="project_permission_internal",
-)
-router.register(
-    "internal/user-language",
-    user_internal_views.UserLanguageViewSet,
-    basename="user_language_internal",
 )
 
 router.register(

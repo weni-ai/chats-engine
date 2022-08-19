@@ -109,12 +109,10 @@ class Sector(BaseModel):
 
 class SectorAuthorization(BaseModel):
     ROLE_NOT_SETTED = 0
-    ROLE_AGENT = 1
-    ROLE_MANAGER = 2
+    ROLE_MANAGER = 1
 
     ROLE_CHOICES = [
         (ROLE_NOT_SETTED, _("not set")),
-        (ROLE_AGENT, _("admin")),
         (ROLE_MANAGER, _("manager")),
     ]
 
@@ -133,7 +131,7 @@ class SectorAuthorization(BaseModel):
         on_delete=models.CASCADE,
     )
     role = models.PositiveIntegerField(
-        _("role"), choices=ROLE_CHOICES, default=ROLE_AGENT
+        _("role"), choices=ROLE_CHOICES, default=ROLE_NOT_SETTED
     )
 
     class Meta:

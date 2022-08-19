@@ -50,11 +50,13 @@ class Project(BaseModel):
 
 
 class ProjectPermission(BaseModel):
-    ROLE_USER = 0
-    ROLE_ADMIN = 1
-    ROLE_EXTERNAL = 2
+    ROLE_NOT_SETTED = 0
+    ROLE_USER = 1
+    ROLE_ADMIN = 2
+    ROLE_EXTERNAL = 3
 
     ROLE_CHOICES = [
+        (ROLE_NOT_SETTED, _("not set")),
         (ROLE_USER, _("user")),
         (ROLE_ADMIN, _("admin")),
         (ROLE_EXTERNAL, _("external")),
@@ -76,7 +78,7 @@ class ProjectPermission(BaseModel):
         blank=True,
     )
     role = models.PositiveIntegerField(
-        _("role"), choices=ROLE_CHOICES, default=ROLE_USER
+        _("role"), choices=ROLE_CHOICES, default=ROLE_NOT_SETTED
     )
 
     class Meta:
@@ -85,6 +87,10 @@ class ProjectPermission(BaseModel):
 
     def __str__(self):
         return self.project.name
+
+    @property
+    def is_user(self):
+        return self.role == self.ROLE_USER
 
     @property
     def is_admin(self):

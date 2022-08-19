@@ -2,7 +2,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ViewSet
 from rest_framework import mixins
 from rest_framework.exceptions import ValidationError
-
+from rest_framework.decorators import action
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.internal.users.serializers import (
@@ -41,17 +41,10 @@ class UserViewSet(ViewSet):
 
         return Response(serializer.data)
 
-
-class UserLanguageViewSet(mixins.UpdateModelMixin, GenericViewSet):
-    serializer_class = UserLanguageSerializer
-    permission_classes = [ModuleHasPermission]
-    queryset = User.objects
-    lookup_field = None
-
-    def update(self, request, **kwargs):
+    @action(detail=False, methods=["put"])
+    def language(self, request, pk=None):
         user, created = User.objects.get_or_create(
-            email=request.query_params.get("user_email"),
-            defaults={"nickname": request.query_params.get("user_email")},
+            email=request.query_params.get("email"),
         )
         serializer = UserLanguageSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

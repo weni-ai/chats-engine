@@ -4,6 +4,7 @@ from rest_framework import serializers
 from timezone_field.rest_framework import TimeZoneSerializerField
 
 from chats.apps.projects.models import Project, ProjectPermission
+from chats.apps.api.v1.internal.users.serializers import UserSerializer
 
 
 class ProjectInternalSerializer(serializers.ModelSerializer):
@@ -12,16 +13,26 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
         fields = [
+            "uuid",
             "name",
             "date_format",
             "timezone",
         ]
         read_only_fields = [
-            "timezone",
+            "uuid",
         ]
+
+        extra_kwargs = {field: {"required": False} for field in fields}
 
 
 class ProjectPermissionSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectPermission
-        fields = "__all__"
+        fields = [
+            "uuid",
+            "created_on",
+            "modified_on",
+            "role",
+            "project",
+            "user",
+        ]

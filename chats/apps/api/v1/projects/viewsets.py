@@ -11,3 +11,4 @@ class ProjectViewset(viewsets.ModelViewSet):
     permission_classes = [
         IsAuthenticated,
     ]
+    lookup_field = "uuid"
