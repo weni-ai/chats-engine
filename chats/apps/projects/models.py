@@ -1,7 +1,7 @@
 from builtins import property
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-
+from timezone_field import TimeZoneField
 from chats.core.models import BaseModel
 
 # Create your models here.
@@ -9,9 +9,21 @@ from chats.core.models import BaseModel
 
 class Project(BaseModel):
 
+    DATE_FORMAT_DAY_FIRST = "D"
+    DATE_FORMAT_MONTH_FIRST = "M"
+    DATE_FORMATS = (
+        (DATE_FORMAT_DAY_FIRST, "DD-MM-YYYY"),
+        (DATE_FORMAT_MONTH_FIRST, "MM-DD-YYYY"),
+    )
+
     name = models.CharField(_("name"), max_length=50)
-    connect_pk = models.CharField(
-        _("Connect ID"), max_length=150, null=True, blank=True
+    timezone = TimeZoneField(verbose_name=_("Timezone"))
+    date_format = models.CharField(
+        verbose_name=_("Date Format"),
+        max_length=1,
+        choices=DATE_FORMATS,
+        default=DATE_FORMAT_DAY_FIRST,
+        help_text=_("Whether day comes first or month comes first in dates"),
     )
 
     class Meta:
@@ -38,12 +50,12 @@ class Project(BaseModel):
 
 
 class ProjectPermission(BaseModel):
-    ROLE_NOT_SETTED = 0
+    ROLE_USER = 0
     ROLE_ADMIN = 1
     ROLE_EXTERNAL = 2
 
     ROLE_CHOICES = [
-        (ROLE_NOT_SETTED, _("not set")),
+        (ROLE_USER, _("user")),
         (ROLE_ADMIN, _("admin")),
         (ROLE_EXTERNAL, _("external")),
     ]
@@ -52,17 +64,19 @@ class ProjectPermission(BaseModel):
         Project,
         verbose_name=_("Project"),
         related_name="authorizations",
+        to_field="uuid",
         on_delete=models.CASCADE,
     )
     user = models.ForeignKey(
         "accounts.User",
         verbose_name=_("users"),
         on_delete=models.CASCADE,
+        to_field="email",
         null=True,
         blank=True,
     )
     role = models.PositiveIntegerField(
-        _("role"), choices=ROLE_CHOICES, default=ROLE_NOT_SETTED
+        _("role"), choices=ROLE_CHOICES, default=ROLE_USER
     )
 
     class Meta:

@@ -5,7 +5,7 @@ from django.utils.translation import gettext_lazy as _
 # Sector Queue serializers
 
 
-class SectorQueueSerializer(serializers.ModelSerializer):
+class QueueSerializer(serializers.ModelSerializer):
     class Meta:
         model = Queue
         fields = "__all__"
@@ -27,7 +27,7 @@ class SectorQueueSerializer(serializers.ModelSerializer):
         return data
 
 
-class SectorQueueUpdateSerializer(serializers.ModelSerializer):
+class QueueUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Queue
         fields = "__all__"
@@ -35,7 +35,7 @@ class SectorQueueUpdateSerializer(serializers.ModelSerializer):
         extra_kwargs = {field: {"required": False} for field in fields}
 
 
-class SectorQueueReadOnlyListSerializer(serializers.ModelSerializer):
+class QueueReadOnlyListSerializer(serializers.ModelSerializer):
     agents = serializers.SerializerMethodField()
 
     class Meta:
@@ -47,6 +47,11 @@ class SectorQueueReadOnlyListSerializer(serializers.ModelSerializer):
 
 
 class SectorQueueAuthorizationSerializer(serializers.ModelSerializer):
+    def get_agents(self, queue: Queue):
+        return queue.agent_count
+
+
+class QueueAuthorizationSerializer(serializers.ModelSerializer):
     class Meta:
         model = QueueAuthorization
         fields = "__all__"
@@ -72,7 +77,6 @@ class QueueAuthorizationUpdateSerializer(serializers.ModelSerializer):
 
 
 class QueueAuthorizationReadOnlyListSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = QueueAuthorization
         fields = ["id", "uuid", "queue", "role", "user"]

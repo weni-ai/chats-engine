@@ -7,18 +7,23 @@ from chats.utils.websockets import send_channels_group
 
 class Message(BaseModel):
     room = models.ForeignKey(
-        "rooms.Room", verbose_name=_("messages"), on_delete=models.CASCADE
+        "rooms.Room",
+        related_name="messages",
+        verbose_name=_("room"),
+        on_delete=models.CASCADE,
     )
     user = models.ForeignKey(
         "accounts.User",
-        verbose_name=_("messages"),
+        related_name="messages",
+        verbose_name=_("user"),
         on_delete=models.CASCADE,
         null=True,
         blank=True,
     )
     contact = models.ForeignKey(
         "contacts.Contact",
-        verbose_name=_("messages"),
+        related_name="messages",
+        verbose_name=_("contact"),
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -36,6 +41,12 @@ class Message(BaseModel):
 
         return MessageWSSerializer(self).data
 
+    def get_authorization(self, user):
+        return self.room.get_authorization(user)
+
+    def media(self):
+        return self.medias.first()
+
     def notify_room(self, action):
         """ """
         send_channels_group(
@@ -48,14 +59,24 @@ class Message(BaseModel):
 
 class MessageMedia(BaseModel):
     message = models.ForeignKey(
-        Message, verbose_name=_("medias"), on_delete=models.CASCADE
+        Message,
+        related_name="medias",
+        verbose_name=_("message"),
+        to_field="uuid",
+        on_delete=models.CASCADE,
     )
-    url = models.URLField(_("url"), max_length=200)
-    media_type = models.CharField(_("media type"), max_length=150)
+    media = models.FileField(_("url"), max_length=100)
 
     class Meta:
         verbose_name = _("MessageMedia")
         verbose_name_plural = _("MessageMedias")
 
     def __str__(self):
-        return f"{self.message.pk} - {self.media_type}"
+        return f"{self.message.pk} - {self.media}"
+
+    @property
+    def url(self):
+        return self.media.url
+
+    def get_authorization(self, user):
+        return self.room.get_authorization(user)

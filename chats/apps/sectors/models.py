@@ -9,19 +9,21 @@ class Sector(BaseModel):
     name = models.CharField(_("name"), max_length=120)
     project = models.ForeignKey(
         "projects.Project",
-        verbose_name=_("sectors"),
+        verbose_name=_("Project"),
         related_name="sectors",
         on_delete=models.CASCADE,
         to_field="uuid",
     )
     rooms_limit = models.PositiveIntegerField(_("Rooms limit per employee"))
     work_start = models.TimeField(_("work start"), auto_now=False, auto_now_add=False)
-    work_end = models.TimeField(_("work end"), auto_now=False, auto_now_add=False)
+    work_end = models.TimeField(
+        _("work end"), auto_now=False, auto_now_add=False
+    )  # TODO add timezone field
     is_deleted = models.BooleanField(_("is deleted?"), default=False)
 
     class Meta:
-        verbose_name = _("Contact")
-        verbose_name_plural = _("Contacts")
+        verbose_name = _("Sector")
+        verbose_name_plural = _("Sectors")
 
     @property
     def manager_authorizations(self):
@@ -117,7 +119,7 @@ class SectorAuthorization(BaseModel):
     ]
 
     user = models.ForeignKey(
-        "accounts.User",
+        "projects.ProjectPermission",
         related_name="sector_authorizations",
         verbose_name=_("User"),
         on_delete=models.CASCADE,

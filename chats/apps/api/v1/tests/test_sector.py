@@ -212,13 +212,16 @@ class SectorTagTests(APITestCase):
         response = client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
+
 class QueueTests(APITestCase):
     def setUp(self):
         self.owner, self.owner_token = create_user_and_token("owner")
         self.manager, self.manager_token = create_user_and_token("manager")
         self.agent, self.agent_token = create_user_and_token("agent")
         self.agent_2, self.agent_2_token = create_user_and_token("agent_2")
-        self.user_without_auth, self.user_without_auth_token = create_user_and_token("agent_without_auth")
+        self.user_without_auth, self.user_without_auth_token = create_user_and_token(
+            "agent_without_auth"
+        )
 
         self.project = Project.objects.create(
             name="testeproject", connect_pk="asdasdas-dad-as-sda-d-ddd"
@@ -240,14 +243,10 @@ class QueueTests(APITestCase):
             work_end="18:00",
         )
 
-        self.queue_1 = Queue.objects.create(
-            name="suport queue",
-            sector=self.sector_1
-        )
+        self.queue_1 = Queue.objects.create(name="suport queue", sector=self.sector_1)
 
         self.queue_2 = Queue.objects.create(
-            name="suport queue wihtout auth",
-            sector=self.sector_2
+            name="suport queue wihtout auth", sector=self.sector_2
         )
 
         self.owner_auth = self.project.authorizations.create(
@@ -276,7 +275,10 @@ class QueueTests(APITestCase):
         """
         response = self.list_queue_request(self.user_without_auth_token.key)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(response.data['detail'], "You do not have permission to perform this action.")
+        self.assertEqual(
+            response.data["detail"],
+            "You do not have permission to perform this action.",
+        )
 
     def test_list_queue_with_admin_token(self):
         response = self.list_queue_request(self.owner_token.key)
@@ -306,22 +308,25 @@ class QueueTests(APITestCase):
         """
         response = self.retrieve_queue_request(self.user_without_auth_token.key)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(response.data['detail'], "You do not have permission to perform this action.")
+        self.assertEqual(
+            response.data["detail"],
+            "You do not have permission to perform this action.",
+        )
 
     def test_retrieve_queue_with_admin_token(self):
         response = self.retrieve_queue_request(self.owner_token.key)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['uuid'], str(self.queue_1.uuid))
+        self.assertEqual(response.data["uuid"], str(self.queue_1.uuid))
 
     def test_retrieve_queue_with_manager_token(self):
         response = self.retrieve_queue_request(self.manager_token.key)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['uuid'], str(self.queue_1.uuid))
+        self.assertEqual(response.data["uuid"], str(self.queue_1.uuid))
 
     def test_retrieve_queue_with_agent_token(self):
         response = self.retrieve_queue_request(self.agent_token.key)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['uuid'], str(self.queue_1.uuid))
+        self.assertEqual(response.data["uuid"], str(self.queue_1.uuid))
 
     def list_queue_auth_request(self, token):
         url = reverse("queue_auth-list")
@@ -336,7 +341,10 @@ class QueueTests(APITestCase):
         """
         response = self.list_queue_auth_request(self.user_without_auth_token.key)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(response.data['detail'], "You do not have permission to perform this action.")
+        self.assertEqual(
+            response.data["detail"],
+            "You do not have permission to perform this action.",
+        )
 
     def test_list_auth_queue_with_admin_token(self):
         response = self.list_queue_auth_request(self.owner_token.key)
@@ -368,8 +376,11 @@ class QueueTests(APITestCase):
         """
         response = self.retrieve_queue_auth_request(self.user_without_auth_token.key)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(response.data['detail'], "You do not have permission to perform this action.")
-
+        self.assertEqual(
+            response.data["detail"],
+            "You do not have permission to perform this action.",
+        )
+        
     def test_retrieve_auth_queue_with_admin_token(self):
         response = self.list_queue_auth_request(self.owner_token.key)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -404,14 +415,10 @@ class QueueInternalTests(APITestCase):
             work_end="18:00",
         )
 
-        self.queue_1 = Queue.objects.create(
-            name="suport queue",
-            sector=self.sector_1
-        )
+        self.queue_1 = Queue.objects.create(name="suport queue", sector=self.sector_1)
 
         self.queue_2 = Queue.objects.create(
-            name="suport queue 02",
-            sector=self.sector_1
+            name="suport queue 02", sector=self.sector_1
         )
 
         self.owner_auth = self.project.authorizations.create(
@@ -456,7 +463,7 @@ class QueueInternalTests(APITestCase):
     def test_retrieve_internal_queue_with_admin_token(self):
         response = self.retrieve_internal_queue_request(self.owner_token.key)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['uuid'], str(self.queue_1.uuid))
+        self.assertEqual(response.data["uuid"], str(self.queue_1.uuid))
 
     def test_create_internal_queue_with_manager_token(self):
         url = reverse("queue_internal-list")
@@ -488,7 +495,7 @@ class QueueInternalTests(APITestCase):
         self.assertEqual(response.data['is_deleted'], True)
 
 
-class SectorQueueAuthInternalTests(APITestCase):
+class QueueAuthInternalTests(APITestCase):
     def setUp(self):
         self.owner, self.owner_token = create_user_and_token("owner")
         self.manager, self.manager_token = create_user_and_token("manager")
@@ -507,14 +514,10 @@ class SectorQueueAuthInternalTests(APITestCase):
             work_end="18:00",
         )
 
-        self.queue_1 = Queue.objects.create(
-            name="suport queue",
-            sector=self.sector_1
-        )
+        self.queue_1 = Queue.objects.create(name="suport queue", sector=self.sector_1)
 
         self.queue_2 = Queue.objects.create(
-            name="suport queue 02",
-            sector=self.sector_1
+            name="suport queue 02", sector=self.sector_1
         )
 
         self.owner_auth = self.project.authorizations.create(
@@ -552,17 +555,13 @@ class SectorQueueAuthInternalTests(APITestCase):
     def test_retrieve_internal_auth_queue_with_admin_token(self):
         response = self.retrieve_internal_auth_queue_request(self.owner_token.key)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['uuid'], str(self.agent_auth.uuid))
+        self.assertEqual(response.data["uuid"], str(self.agent_auth.uuid))
 
     def test_create_internal_auth_queue_with_admin_token(self):
         url = reverse("queue_auth_internal-list")
         client = self.client
         client.credentials(HTTP_AUTHORIZATION="Token " + self.owner_token.key)
-        data = {
-            "role": "1",
-            "queue": str(self.queue_1.uuid),
-            "user": self.owner.id
-        }
+        data = {"role": "1", "queue": str(self.queue_1.uuid), "user": self.owner.id}
         response = client.post(url, data=data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
@@ -583,7 +582,7 @@ class SectorQueueAuthInternalTests(APITestCase):
         client.credentials(HTTP_AUTHORIZATION="Token " + self.manager_token.key)
         response = client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data['is_deleted'], True)
+        self.assertEqual(response.data["is_deleted"], True)
 
 
 class SectorInternalTests(APITestCase):
@@ -678,8 +677,8 @@ class SectorInternalTests(APITestCase):
         response = client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['is_deleted'], True)
-
-
+        
+        
 class ValidatorsTests(APITestCase):
     def setUp(self):
         self.owner, self.owner_token = create_user_and_token("owner")
@@ -803,3 +802,4 @@ class ValidatorsTests(APITestCase):
         self.assertEqual(error_message, 'you cant add a user two times in same queue.')
 
 
+        self.assertEqual(response.data["is_deleted"], True)

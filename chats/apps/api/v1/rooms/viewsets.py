@@ -4,11 +4,15 @@ from django.utils.translation import gettext_lazy as _
 from django.db.models import Q
 from rest_framework import mixins, permissions, status
 from rest_framework.decorators import action
+from django_filters.rest_framework import DjangoFilterBackend
+
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from chats.apps.api.v1.rooms.serializers import RoomSerializer, TransferRoomSerializer
 from chats.apps.rooms.models import Room
+from chats.apps.api.v1.rooms import filters as room_filters
+from chats.apps.api.v1 import permissions as api_permissions
 
 
 class RoomViewset(
@@ -19,30 +23,31 @@ class RoomViewset(
 ):
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = room_filters.RoomFilter
     permission_classes = [
         permissions.IsAuthenticated,
+        api_permissions.SectorAnyPermission,
     ]
 
-    def list(self, request, *args, **kwargs):
-        """
-        Return user related rooms and rooms related to the sectors the user is in what are empty of a user
-        """
-        rooms = Room.objects.filter(
-            Q(user=request.user) | Q(user__isnull=True),
-            sector__id__in=request.user.sector_ids,
-            is_active=True,
-        )
+    def get_serializer_class(self):
+        if self.action == "update":
+            return TransferRoomSerializer
+        return super().get_serializer_class()
 
-        return rooms
-
-    def update(
-        self, request, *args, **kwargs
-    ):  # TODO: Config swagger to show the fields related the serializer below
-        """
-        Update the user and/or the sector of the room, but only if the user is the agent related to the room
-        """
-        self.serializer_class = TransferRoomSerializer
-        return super().update(request, *args, **kwargs)
+    def get_queryset(self):
+        qs = self.queryset
+        is_active = self.request.query_params.get("is_active")
+        if is_active:
+            return qs
+        try:
+            return qs.filter(
+                Q(user=self.request.user) | Q(user__isnull=True),
+                sector__id__in=self.request.user.sector_ids,
+                is_active=True,
+            )
+        except (TypeError, AttributeError):
+            return qs
 
     @action(detail=True, methods=["PUT"], url_name="close")
     def close(
@@ -54,8 +59,9 @@ class RoomViewset(
         # Add send room notification to the channels group
         instance = self.get_object()
         tags = request.data.get("tags", None)
-        instance.close(tags)
+        instance.close(tags, "agent")
         serialized_data = RoomSerializer(instance=instance)
+        instance.notify_sector("close")
         return Response(serialized_data.data, status=status.HTTP_200_OK)
 
     def perform_create(self, serializer):

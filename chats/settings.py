@@ -68,6 +68,8 @@ INSTALLED_APPS = [
     # third party apps
     "channels",
     "drf_yasg",
+    "django_filters",
+    "storages",
     "rest_framework",
     "rest_framework.authtoken",
     "corsheaders",
@@ -213,7 +215,6 @@ REST_FRAMEWORK = {
     "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
     "DEFAULT_METADATA_CLASS": "chats.apps.api.v1.metadata.Metadata",
 }
-
 
 # Logging
 
