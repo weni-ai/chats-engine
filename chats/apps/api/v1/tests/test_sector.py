@@ -678,3 +678,128 @@ class SectorInternalTests(APITestCase):
         response = client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['is_deleted'], True)
+
+
+class ValidatorsTests(APITestCase):
+    def setUp(self):
+        self.owner, self.owner_token = create_user_and_token("owner")
+        self.manager, self.manager_token = create_user_and_token("manager")
+
+        self.project = Project.objects.create(
+            name="Test Project", connect_pk="asdasdas-dad-as-sda-d-ddd"
+        )
+
+        self.sector_1 = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=5,
+            work_start="09:00",
+            work_end="18:00",
+        )
+
+        self.queue_1 = Queue.objects.create(
+            name="suport queue",
+            sector=self.sector_1
+        )
+
+        self.owner_auth = self.queue_1.set_queue_authorization(
+            self.owner, role=1
+        ) 
+
+        self.tag_1 = self.sector_1.tags.create(name="tag 1")
+        self.owner_auth = self.project.authorizations.create(user=self.owner, role=1)
+       
+
+    def test_create_sector_with_end_date_lower_then_start_date(self):
+        url = reverse("sector-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.owner_token.key)
+        data = {
+            "name": "Finances",
+            "rooms_limit": 3,
+            "work_start": "11:00",
+            "work_end": "10:30",
+            "project": str(self.project.uuid),
+        }
+        response = client.post(url, data=data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['work_end'][0], "work_end date must be greater than work_start date.")
+
+    def test_update_sector_with_end_date_lower_then_start_date(self):
+        url = reverse("sector-detail", args=[self.sector_1.uuid])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.owner_token.key)
+        response = client.patch(url, data={"work_start": "11:00",
+                                         "work_end": "10:30",})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['work_end'][0], "work_end date must be greater than work_start date.")
+
+    def test_create_sector_with_rooms_limit_equals_zero(self):
+        url = reverse("sector-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.owner_token.key)
+        data = {
+            "name": "Finances",
+            "rooms_limit": 0,
+            "work_start": "11:00",
+            "work_end": "10:30",
+            "project": str(self.project.uuid),
+        }
+        response = client.post(url, data=data)
+        error_message = response.data['rooms_limit'][0].strip('{}')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(error_message, "'you cant create a sector with rooms_limit lower or equal 0.'")
+
+    def test_create_duplicate_sector_tags(self):
+        url = reverse("sectortag-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.owner_token.key)
+        data = {
+            "name": "tag 1",
+            "sector": str(self.sector_1.uuid),
+        }
+        response = client.post(url, data=data)
+        error_message = response.data['name'][0]
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(error_message, 'This tag already exists.')
+
+    def test_create_duplicate_queue(self):
+        url = reverse("queue_internal-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.owner_token.key)
+        data = {
+            "name": "suport queue",
+            "sector": str(self.sector_1.uuid),
+        }
+        response = client.post(url, data=data)
+        error_message = response.data['queue'][0]
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(error_message, 'This queue already exists.')
+
+    def test_update_duplicate_queue(self):
+        url = reverse("queue_internal-detail", args=[self.queue_1.uuid])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.owner_token.key)
+        data = {
+            "name": "suport queue",
+        }
+        response = client.patch(url, data=data)
+        error_message = response.data['queue'][0]
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(error_message, 'This queue already exists.')
+
+    def test_create_duplicate_auth_queue(self):
+        url = reverse("queue_auth_internal-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.owner_token.key)
+        data = {
+            "role": "1",
+            "queue": str(self.queue_1.uuid),
+            "user": self.owner.id
+        }
+        response = client.post(url, data=data)
+        error_message = response.data['user'][0]
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(error_message, 'you cant add a user two times in same queue.')
+
+

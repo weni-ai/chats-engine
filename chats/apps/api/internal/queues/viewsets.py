@@ -73,9 +73,9 @@ class QueueAuthInternalViewset(viewsets.ModelViewSet):
 
     def get_serializer_class(self):
         if self.action in ["list", "retrieve"]:
-            return sectorqueue_serializers.SectorQueueAuthorizationReadOnlyListSerializer
+            return sectorqueue_serializers.QueueAuthorizationReadOnlyListSerializer
         if self.action == "update":
-            return sectorqueue_serializers.SectorQueueAuthorizationUpdateSerializer
+            return sectorqueue_serializers.QueueAuthorizationUpdateSerializer
 
         return super().get_serializer_class()
 

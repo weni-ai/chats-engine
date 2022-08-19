@@ -16,10 +16,11 @@ class SectorSerializer(serializers.ModelSerializer):
         Check if the work_end date its greater than work_start date.
         """
         if self.instance:
-            if self.instance.work_end < self.instance.work_start:
-                raise serializers.ValidationError({
-                'work_end': _("work_end date must be greater than work_start date.")
-                })
+            if {'work_end','work_start'} <= data.keys():
+                if data['work_end'] < data['work_start']:
+                    raise serializers.ValidationError({
+                    'work_end': _("work_end date must be greater than work_start date.")
+                    })
         else:
             if data['work_end'] < data['work_start']:
                 raise serializers.ValidationError({
