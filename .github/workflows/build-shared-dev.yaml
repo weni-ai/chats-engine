@@ -1,0 +1,110 @@
+name: Build Chats-Engine in Shared
+
+on:
+  push:
+    tags:
+      - '*.*.*-develop*'
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest 
+    steps:
+      - name: Set variables
+        run: |
+            TAG=$(echo $GITHUB_REF|cut -d"/" -f3)
+            if $(echo  $TAG|grep --silent -e 'v*.*.*-develop*')
+            then 
+              echo "Found environment: DEVELOP - $TAG"
+              echo "MANIFESTS_ENVIRONMENT=develop" >> $GITHUB_ENV
+              echo "MANIFESTS_ENVIRONMENT=develop"
+              echo "TAG=$TAG" >> $GITHUB_ENV
+              echo "TAG=$TAG"
+              VERSION=${TAG#v} 
+              echo "VERSION=$VERSION" >> $GITHUB_ENV
+              echo "VERSION=$VERSION"
+              echo "COMMIT_SHA=$GITHUB_SHA" >> $GITHUB_ENV
+              echo "COMMIT_SHA=$GITHUB_SHA"
+              echo "IMAGE_TAG=${{ secrets.ECR }}/chats:engine-$TAG" >> $GITHUB_ENV
+              echo "IMAGE_TAG=${{ secrets.ECR }}/chats:engine-$TAG"
+            else
+              echo 'Not a valid tag. Skipping...'
+              exit 1
+            fi
+
+      - name: Check out the repo
+        uses: actions/checkout@v2
+        with:
+          ref: ${{env.GITHUB_SHA}}         # This is how we use an input edit by user
+          repository: weni-ai/chats-engine
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Login to ECR
+        uses: docker/login-action@v1
+        with:
+          registry: ${{ secrets.ECR }}
+          username: ${{ secrets.AWS_ACCESS_KEY_ID_SHARED }}       # Credentials used to push image to ECR repository
+          password: ${{ secrets.AWS_SECRET_ACCESS_KEY_SHARED }}
+
+      - name: Set Commit ID
+        id: commit_id
+        run: echo "::set-output commit=$(git rev-parse --short $GITHUB_SHA)"
+
+      - name: Build and push - Chats-engine Image
+        id: docker_build1
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          labels: branch=${{env.TAG}},commit=${{env.COMMIT_SHA}},repository=https://github.com/weni-ai/chats-engine
+          file: docker/Dockerfile
+          push: true
+          tags: ${{ secrets.ECR }}/chats:engine-${{env.TAG}}
+          no-cache: true
+
+      - name: Check out Kubernetes Manifests
+        # Now, checkout in kubernetes manifests to update image in deployments patches
+        uses: actions/checkout@master
+        with:
+          ref: main
+          repository: weni-ai/kubernetes-manifests-chats
+          token: ${{ secrets.DEVOPS_GITHUB_PERMANENT_TOKEN }}
+          path: ./kubernetes-manifests/
+          # Its uses other path to not mix with source code repository used to build
+
+      - name: Set variable tag for jq
+        # This is the variable with complete image name
+        run: |
+          echo "IMAGE_TAG=${{ secrets.ECR }}/chats:engine-$TAG" >> $GITHUB_ENV
+
+      - name: Update image on deployment
+        run: |
+            sudo apt update
+            sudo apt install -y jq
+            for e in "develop"; do
+              if [ -d "kubernetes-manifests/chats-engine/${e}" ] ; then
+                echo 'Old image to replace:'
+                cat "kubernetes-manifests/chats-engine/${e}/deployment.json" | jq '.[] | select(.path == "/spec/template/spec/containers/0/image") | .value'
+                echo 'New configurations:'
+                new_configuration=$(
+                  cat "kubernetes-manifests/chats-engine/${e}/deployment.json" \
+                    | jq '(..|select(.path == "/spec/template/spec/containers/0/image")?) += {value: "'"${IMAGE_TAG}"'"}'
+                )
+                echo "$new_configuration"
+                echo "$new_configuration" > "kubernetes-manifests/chats-engine/${e}/deployment.json"
+              else
+                echo "kubernetes-manifests/chats-engine/${e}: Does not exist, skipping"
+              fi
+            done
+
+      - name: Commit & Push changes
+        # Once made a change, commit new configuration
+        uses: actions-js/push@master
+        with:
+          github_token: ${{ secrets.DEVOPS_GITHUB_PERMANENT_TOKEN }}
+          repository: weni-ai/kubernetes-manifests-chats
+          directory: ./kubernetes-manifests/
+          branch: main
