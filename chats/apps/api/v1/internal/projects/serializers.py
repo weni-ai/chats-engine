@@ -18,9 +18,6 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
             "date_format",
             "timezone",
         ]
-        read_only_fields = [
-            "uuid",
-        ]
 
         extra_kwargs = {field: {"required": False} for field in fields}
 

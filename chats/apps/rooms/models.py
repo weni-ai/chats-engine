@@ -33,6 +33,13 @@ class Room(BaseModel):
         null=True,
         blank=True,
     )
+
+    custom_fields = models.JSONField(
+        _("custom fields"),
+        blank=True,
+        null=True,
+    )
+
     ended_at = models.DateTimeField(
         _("Ended at"), auto_now_add=False, null=True, blank=True
     )
