@@ -1,9 +1,11 @@
-name: Build Chats-Engine in Shared
+name: Build Chats-Engine in Shared (Push Tag)
 
 on:
   push:
     tags:
       - '*.*.*-develop*'
+      - '*.*.*-staging'
+      - '*.*.*'
 
 jobs:
   docker:
@@ -17,6 +19,34 @@ jobs:
               echo "Found environment: DEVELOP - $TAG"
               echo "MANIFESTS_ENVIRONMENT=develop" >> $GITHUB_ENV
               echo "MANIFESTS_ENVIRONMENT=develop"
+              echo "TAG=$TAG" >> $GITHUB_ENV
+              echo "TAG=$TAG"
+              VERSION=${TAG#v} 
+              echo "VERSION=$VERSION" >> $GITHUB_ENV
+              echo "VERSION=$VERSION"
+              echo "COMMIT_SHA=$GITHUB_SHA" >> $GITHUB_ENV
+              echo "COMMIT_SHA=$GITHUB_SHA"
+              echo "IMAGE_TAG=${{ secrets.ECR }}/chats:engine-$TAG" >> $GITHUB_ENV
+              echo "IMAGE_TAG=${{ secrets.ECR }}/chats:engine-$TAG"
+            elif $(echo  $TAG|grep --silent -e 'v*.*.*-staging')
+            then 
+              echo "Found environment: STAGING - $TAG"
+              echo "MANIFESTS_ENVIRONMENT=staging" >> $GITHUB_ENV
+              echo "MANIFESTS_ENVIRONMENT=staging"
+              echo "TAG=$TAG" >> $GITHUB_ENV
+              echo "TAG=$TAG"
+              VERSION=${TAG#v} 
+              echo "VERSION=$VERSION" >> $GITHUB_ENV
+              echo "VERSION=$VERSION"
+              echo "COMMIT_SHA=$GITHUB_SHA" >> $GITHUB_ENV
+              echo "COMMIT_SHA=$GITHUB_SHA"
+              echo "IMAGE_TAG=${{ secrets.ECR }}/chats:engine-$TAG" >> $GITHUB_ENV
+              echo "IMAGE_TAG=${{ secrets.ECR }}/chats:engine-$TAG"
+            elif $(echo  $TAG|grep --silent -e 'v*.*.*-develop*')
+            then 
+              echo "No environment found, assuming: PRODUCTION - $TAG"
+              echo "MANIFESTS_ENVIRONMENT=production" >> $GITHUB_ENV
+              echo "MANIFESTS_ENVIRONMENT=production"
               echo "TAG=$TAG" >> $GITHUB_ENV
               echo "TAG=$TAG"
               VERSION=${TAG#v} 
