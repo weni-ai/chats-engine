@@ -12,7 +12,6 @@ class Sector(BaseModel):
         verbose_name=_("Project"),
         related_name="sectors",
         on_delete=models.CASCADE,
-        to_field="uuid",
     )
     rooms_limit = models.PositiveIntegerField(_("Rooms limit per employee"))
     work_start = models.TimeField(_("work start"), auto_now=False, auto_now_add=False)
@@ -26,12 +25,20 @@ class Sector(BaseModel):
         verbose_name_plural = _("Sectors")
 
     @property
+    def sector(self):
+        return self
+
+    @property
     def manager_authorizations(self):
         return self.authorizations.filter(role=2)
 
     @property
     def employee_pks(self):
         return list(self.authorizations.all().values_list("user__pk", flat="True"))
+
+    @property
+    def rooms(self):
+        return self.queues.values("rooms")
 
     @property
     def active_rooms(self):
@@ -65,17 +72,25 @@ class Sector(BaseModel):
 
     @property
     def agent_count(self):
-        return self.authorizations.filter(role=SectorAuthorization.ROLE_AGENT).count()
+        agents_count = list(
+            self.queues.annotate(
+                agents=models.Count(
+                    "authorizations", filter=models.Q(authorizations__role=1)
+                )
+            ).values_list("agents", flat=True)
+        )
+        agents_count = sum(agents_count)
+        return agents_count
 
     @property
     def contact_count(self):
-        qs = (
-            self.rooms.filter(contact__isnull=False)
-            .order_by("contact")
-            .distinct()
-            .count()
-        )
-        return qs
+        # qs = (
+        #     self.rooms.filter(contact__isnull=False)
+        #     .order_by("contact")
+        #     .distinct()
+        #     .count()
+        # )
+        return 0
 
     def get_or_create_user_authorization(self, user):
         sector_auth, created = self.authorizations.get_or_create(user=user)
@@ -87,11 +102,7 @@ class Sector(BaseModel):
         return sector_auth
 
     def get_permission(self, user):
-        try:
-            sector_auth = self.authorizations.get(user=user)
-        except SectorAuthorization.DoesNotExist:
-            sector_auth = self.project.authorizations.get(user=user, role=1)
-        return sector_auth
+        return self.project.permissions.get(user=user)
 
     def notify_sector(self, action):
         """ """
@@ -115,8 +126,8 @@ class SectorAuthorization(BaseModel):
         (ROLE_NOT_SETTED, _("not set")),
         (ROLE_MANAGER, _("manager")),
     ]
-
-    user = models.ForeignKey(
+    # TODO: CONSTRAINT >  A user can only have one auth per sector
+    permission = models.ForeignKey(
         "projects.ProjectPermission",
         related_name="sector_authorizations",
         verbose_name=_("User"),
@@ -127,7 +138,6 @@ class SectorAuthorization(BaseModel):
         Sector,
         related_name="authorizations",
         verbose_name=_("Sector"),
-        to_field="uuid",
         on_delete=models.CASCADE,
     )
     role = models.PositiveIntegerField(
@@ -138,7 +148,7 @@ class SectorAuthorization(BaseModel):
         verbose_name = _("Sector Authorization")
         verbose_name_plural = _("Sector Authorizations")
         unique_together = [
-            "user",
+            "permission",
             "sector",
         ]  # only one permission on the sector per user
 
@@ -155,10 +165,6 @@ class SectorAuthorization(BaseModel):
         return self.role == self.ROLE_MANAGER
 
     @property
-    def is_agent(self):
-        return self.role == self.ROLE_AGENT
-
-    @property
     def is_authorized(self):
         return self.is_agent or self.is_manager
 
@@ -172,7 +178,7 @@ class SectorAuthorization(BaseModel):
     def notify_user(self, action):
         """ """
         send_channels_group(
-            group_name=f"user_{self.user.pk}",
+            group_name=f"user_{self.permission.user.pk}",
             type="notify",
             content=self.serialized_ws_data,
             action=f"sector_authorization.{action}",
@@ -186,7 +192,6 @@ class SectorTag(BaseModel):
         "sectors.Sector",
         verbose_name=_("Sector"),
         related_name="tags",
-        to_field="uuid",
         on_delete=models.CASCADE,
     )
 

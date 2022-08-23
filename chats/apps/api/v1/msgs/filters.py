@@ -2,7 +2,6 @@ from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 from chats.apps.msgs.models import MessageMedia, Message
 from django.db.models import Q
-from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 
 
 class MessageFilter(filters.FilterSet):
@@ -26,11 +25,11 @@ class MessageFilter(filters.FilterSet):
 
         # Check if the user requesting has permition on the sector or project
         querry_filters = (
-            Q(room__queue__authorizations__user=user)
-            | Q(room__queue__sector__authorizations__user=user)
+            Q(room__queue__authorizations__permission__user=user)
+            | Q(room__queue__sector__authorizations__permission__user=user)
             | Q(
-                Q(room__queue__sector__project__authorizations__user=user)
-                & Q(room__queue__sector__project__authorizations__role=1)
+                Q(room__queue__sector__project__permissions__user=user)
+                & Q(room__queue__sector__project__permissions__role=2)
             )
         )
         queryset = queryset.filter(querry_filters)

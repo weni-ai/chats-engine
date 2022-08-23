@@ -46,10 +46,10 @@ class Contact(BaseModel):
 
     def can_retrieve(self, user, project) -> bool:
         filter_project_uuid = Q(queue__sector__project__uuid=project)
-        is_sector_manager = Q(queue__sector__authorizations__user=user)
+        is_sector_manager = Q(queue__sector__authorizations__permission__user=user)
         is_project_admin = Q(
-            Q(queue__sector__project__authorizations__user=user)
-            & Q(queue__sector__project__authorizations__role=1)
+            Q(queue__sector__project__permissions__user=user)
+            & Q(queue__sector__project__permissions__role=2)
         )
         is_user_assigned_to_room = Q(user=user)
         check_admin_manager_agent_role_filter = Q(

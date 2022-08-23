@@ -1,40 +1,29 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import mixins
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.viewsets import GenericViewSet
-from chats.apps.api.v1.permissions import (
-    SectorAgentReadOnlyListPermission,
-    SectorAgentReadOnlyRetrievePermission,
-)
+from rest_framework.viewsets import ModelViewSet
 
+from chats.apps.api.v1.permissions import IsSectorManager
 from chats.apps.api.v1.queues import serializers as queue_serializers
+from chats.apps.api.v1.queues.filters import QueueFilter
 from chats.apps.queues.models import Queue, QueueAuthorization
-from chats.apps.api.v1.queues.filters import QueueFilter, SectorAuthorizationQueueFilter
 
 
-class QueueViewset(mixins.RetrieveModelMixin, mixins.ListModelMixin, GenericViewSet):
+class QueueViewset(ModelViewSet):
     queryset = Queue.objects.all()
     serializer_class = queue_serializers.QueueSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = QueueFilter
-    permission_classes = []
+    permission_classes = [
+        IsAuthenticated,
+        IsSectorManager,
+    ]
+
     lookup_field = "uuid"
 
     def get_queryset(self):
         if self.action != "list":
             self.filterset_class = None
         return super().get_queryset()
-
-    def get_permissions(self):
-        permission_classes = self.permission_classes
-        if self.action in ["list"]:
-            permission_classes = [IsAuthenticated, SectorAgentReadOnlyListPermission]
-        if self.action in ["retrieve"]:
-            permission_classes = [
-                IsAuthenticated,
-                SectorAgentReadOnlyRetrievePermission,
-            ]
-        return [permission() for permission in permission_classes]
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -42,14 +31,18 @@ class QueueViewset(mixins.RetrieveModelMixin, mixins.ListModelMixin, GenericView
         return super().get_serializer_class()
 
 
-class QueueAuthorizationViewset(
-    mixins.RetrieveModelMixin, mixins.ListModelMixin, GenericViewSet
-):
+class QueueAuthorizationViewset(ModelViewSet):
     queryset = QueueAuthorization.objects.all()
     serializer_class = queue_serializers.QueueAuthorizationSerializer
     filter_backends = [DjangoFilterBackend]
-    filterset_class = SectorAuthorizationQueueFilter
-    permission_classes = []
+    # filterset_class = QueueAuthorizationFilter
+    filterset_fields = [
+        "queue",
+    ]
+    permission_classes = [
+        IsAuthenticated,
+        IsSectorManager,
+    ]
     lookup_field = "uuid"
 
     def get_queryset(self):
@@ -57,13 +50,7 @@ class QueueAuthorizationViewset(
             self.filterset_class = None
         return super().get_queryset()
 
-    def get_permissions(self):
-        permission_classes = self.permission_classes
-        if self.action in ["list"]:
-            permission_classes = [IsAuthenticated, SectorAgentReadOnlyListPermission]
-        if self.action in ["retrieve"]:
-            permission_classes = [
-                IsAuthenticated,
-                SectorAgentReadOnlyRetrievePermission,
-            ]
-        return [permission() for permission in permission_classes]
+    def get_serializer_class(self):
+        if self.action in ["list", "retrieve"]:
+            return queue_serializers.QueueAuthorizationReadOnlyListSerializer
+        return super().get_serializer_class()

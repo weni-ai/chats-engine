@@ -23,11 +23,13 @@ class ContactViewset(
     def get_queryset(self):
         qs = self.queryset
         user = self.request.user.pk
-        is_sector_manager = Q(rooms__queue__sector__authorizations__user=user)
+        is_sector_manager = Q(
+            rooms__queue__sector__authorizations__permission__user=user
+        )
 
         is_project_admin = Q(
-            Q(rooms__queue__sector__project__authorizations__user=user)
-            & Q(rooms__queue__sector__project__authorizations__role=1)
+            Q(rooms__queue__sector__project__permissions__user=user)
+            & Q(rooms__queue__sector__project__permissions__role=2)
         )
 
         is_user_assigned_to_room = Q(rooms__user=user)

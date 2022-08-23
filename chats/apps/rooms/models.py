@@ -71,7 +71,7 @@ class Room(BaseModel):
             _content = {"type": "user", "id": user, "transfered_at": timezone.now()}
             transfer_history.append(_content)
         if queue:
-            _content = {"type": "queue", "id": queue}
+            _content = {"type": "queue", "id": queue, "transfered_at": timezone.now()}
             transfer_history.append(_content)
         self.transfer_history = json.dumps(transfer_history)
         self.save()
@@ -82,7 +82,7 @@ class Room(BaseModel):
     def close(self, tags=None, end_by: str = ""):
         self.is_active = False
         self.ended_at = timezone.now()
-        # self.ended_by = end_by
+        self.ended_by = end_by
         for tag_id in tags:
             self.tags.add(tag_id)
         self.save()

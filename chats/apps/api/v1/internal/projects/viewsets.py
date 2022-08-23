@@ -23,3 +23,8 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
         "project",
     ]
     lookup_field = "uuid"
+
+    def get_serializer_class(self):
+        if self.action in ["list", "retrieve"]:
+            return serializers.ProjectPermissionReadSerializer
+        return super().get_serializer_class()

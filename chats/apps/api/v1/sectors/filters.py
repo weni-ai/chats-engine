@@ -1,7 +1,6 @@
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 from chats.apps.projects.models import Project
-from chats.apps.rooms.models import Room
 
 from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 
@@ -24,9 +23,10 @@ class SectorFilter(filters.FilterSet):
         if they have manager role on sectors inside the project
         """
         try:
-            project = Project.objects.get(uuid=value)
-            queryset = project.get_sectors(self.request.user)
-        except (Project.DoesNotExist, Sector.DoesNotExist):
+            queryset = Sector.objects.filter(
+                project__uuid=value, authorizations__permission__user=self.request.user
+            )
+        except Sector.DoesNotExist:
             return Sector.objects.none()
         return queryset
 
@@ -38,16 +38,36 @@ class SectorTagFilter(filters.FilterSet):
 
     sector = filters.CharFilter(
         field_name="sector",
-        required=True,
+        required=False,
         method="filter_sector",
         help_text=_("Sector's UUID"),
+    )
+
+    queue = filters.CharFilter(
+        field_name="queue",
+        required=False,
+        method="filter_queue",
+        help_text=_("Queue's UUID"),
     )
 
     def filter_sector(self, queryset, name, value):
         try:
             sector = Sector.objects.get(uuid=value)
             auth = sector.get_permission(self.request.user)
-            auth.is_authorized
+            auth.is_manager(str(sector.pk))
         except (Project.DoesNotExist, Sector.DoesNotExist, AttributeError):
-            return SectorAuthorization.objects.none()
+            return SectorTag.objects.none()
         return queryset.filter(sector__uuid=value)
+
+    def filter_queue(self, queryset, name, value):
+        try:
+            sector = Sector.objects.get(queues__uuid=value)
+
+            project_permission = sector.get_permission(self.request.user)
+
+            if not project_permission.is_agent(value):
+                return SectorTag.objects.none()
+
+        except (Project.DoesNotExist, Sector.DoesNotExist, AttributeError):
+            return SectorTag.objects.none()
+        return queryset.filter(sector=sector)

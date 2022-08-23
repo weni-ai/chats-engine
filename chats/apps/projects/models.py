@@ -1,8 +1,9 @@
-from builtins import property
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from timezone_field import TimeZoneField
 from chats.core.models import BaseModel
+
+from django.core.exceptions import ObjectDoesNotExist
 
 # Create your models here.
 
@@ -35,17 +36,17 @@ class Project(BaseModel):
 
     def get_permission(self, user):
         try:
-            return self.authorizations.get(user=user)
+            return self.permissions.get(user=user)
         except ProjectPermission.DoesNotExist:
             return None
 
     def get_sectors(self, user):
         user_permission = self.get_permission(user)
-        if user_permission is not None and user_permission.role == 1:  # Admin role
+        if user_permission is not None and user_permission.role == 2:  # Admin role
             return self.sectors.all()
         else:
             return self.sectors.filter(
-                authorizations__user=user
+                authorizations__permission=user_permission
             )  # If the user have any permission on the sectors
 
 
@@ -65,12 +66,12 @@ class ProjectPermission(BaseModel):
     project = models.ForeignKey(
         Project,
         verbose_name=_("Project"),
-        related_name="authorizations",
-        to_field="uuid",
+        related_name="permissions",
         on_delete=models.CASCADE,
     )
     user = models.ForeignKey(
         "accounts.User",
+        related_name="project_permissions",
         verbose_name=_("users"),
         on_delete=models.CASCADE,
         to_field="email",
@@ -100,6 +101,44 @@ class ProjectPermission(BaseModel):
     def is_external(self):
         return self.role == self.ROLE_EXTERNAL
 
+    def is_manager(self, sector: str = None, queue: str = None):
+        if self.is_admin:
+            return True
+        qs = (
+            models.Q(sector__uuid=sector)
+            if sector is not None
+            else models.Q(sector__queues__uuid=queue)
+        )
+        try:
+            sector_authorization = self.sector_authorizations.get(qs)
+            return (
+                sector_authorization.role == 1
+            )  # 1 = manager role at SectorAuthorization
+        except ObjectDoesNotExist:
+            pass
+
+        return False
+
+    def is_agent(self, queue: str):
+        sector = self.project.sectors.get(queues__uuid=queue)
+
+        if self.is_manager(sector=str(sector.uuid)):
+            return True
+        queue_authorization = self.queue_authorizations.get(queue__uuid=queue)
+        return queue_authorization.role == 1  # 1 = agent role at QueueAuthorization
+
     @property
-    def can_edit(self):
-        return self.is_admin
+    def queue_ids(self):
+        if self.is_admin:
+            return list(self.project.sectors.values_list("queues__uuid", flat=True))
+        sector_manager_queues = list(
+            self.sector_authorizations.values_list("sector__queues__uuid", flat=True)
+        )
+        queue_agent_queues = list(
+            self.queue_authorizations.exclude(
+                queue__uuid__in=sector_manager_queues
+            ).values_list("queue", flat=True)
+        )
+        queues = set(sector_manager_queues + queue_agent_queues)
+
+        return queues

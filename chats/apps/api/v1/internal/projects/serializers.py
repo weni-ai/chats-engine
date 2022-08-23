@@ -36,3 +36,19 @@ class ProjectPermissionSerializer(serializers.ModelSerializer):
             "project",
             "user",
         ]
+        extra_kwargs = {field: {"required": False} for field in fields}
+
+
+class ProjectPermissionReadSerializer(serializers.ModelSerializer):
+    user = UserSerializer(many=False, required=False)
+
+    class Meta:
+        model = ProjectPermission
+        fields = [
+            "uuid",
+            "created_on",
+            "modified_on",
+            "role",
+            "project",
+            "user",
+        ]

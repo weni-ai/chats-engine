@@ -1,16 +1,14 @@
 from django.db import models
 from chats.core.models import BaseModel
 from django.utils.translation import gettext_lazy as _
-from chats.apps.sectors.models import Sector, SectorAuthorization
 
 
 class Queue(BaseModel):
     sector = models.ForeignKey(
-        Sector,
+        "sectors.Sector",
         verbose_name=_("sector"),
-        related_name="sector_authorizations",
+        related_name="queues",
         on_delete=models.CASCADE,
-        to_field="uuid",
     )
     name = models.CharField(_("Name"), max_length=150, blank=True)
 
@@ -21,21 +19,16 @@ class Queue(BaseModel):
     def __str__(self):
         return self.name
 
+    @property
+    def queue(self):
+        return self
+
+    @property
+    def limit(self):
+        return self.sector.limit
+
     def get_permission(self, user):
-        """
-        verify if user has authorizathion in sector, if not verify if user has authorizathion in project,
-        if not verify if user has authorizathion in queue. If user has no authorizathion, return false.
-        """
-        try:
-            queue_auth = self.sector.authorizations.get(user=user)
-        except SectorAuthorization.DoesNotExist:
-            if self.sector.project.authorizations.filter(user=user):
-                queue_auth = True
-            elif self.authorizations.filter(user=user):
-                queue_auth = True
-            else:
-                queue_auth = False
-        return queue_auth
+        return self.sector.get_permission(user=user)
 
     @property
     def agent_count(self):
@@ -64,13 +57,12 @@ class QueueAuthorization(BaseModel):
         verbose_name=_("Queue"),
         related_name="authorizations",
         on_delete=models.CASCADE,
-        to_field="uuid",
     )
     role = models.PositiveIntegerField(
         _("role"), choices=ROLE_CHOICES, default=ROLE_AGENT
     )
 
-    user = models.ForeignKey(
+    permission = models.ForeignKey(
         "projects.ProjectPermission",
         verbose_name=_("User"),
         related_name="queue_authorizations",
@@ -86,6 +78,10 @@ class QueueAuthorization(BaseModel):
 
     def get_permission(self, user):
         return self.queue.get_permission(user)
+
+    @property
+    def sector(self):
+        return self.queue.sector
 
     @property
     def is_agent(self):

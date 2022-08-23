@@ -1,10 +1,9 @@
 from django.contrib.auth.models import AnonymousUser
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import permissions
 
-from chats.apps.projects.models import Project, ProjectPermission
-from chats.apps.rooms.models import Room
-from chats.apps.sectors.models import Sector, SectorAuthorization
 from chats.apps.api.v1 import WRITE_METHODS
+from chats.apps.rooms.models import Room
 
 
 class MessagePermission(permissions.BasePermission):
@@ -22,9 +21,9 @@ class MessagePermission(permissions.BasePermission):
             return False
         try:
             authorization = obj.get_permission(request.user)
-        except SectorAuthorization.DoesNotExist:
+        except ObjectDoesNotExist:
             return False
-        return authorization.is_authorized
+        return authorization.is_agent(str(obj.queue.pk))
 
 
 class MessageMediaPermission(permissions.BasePermission):
@@ -42,6 +41,6 @@ class MessageMediaPermission(permissions.BasePermission):
             return False
         try:
             authorization = obj.get_permission(request.user)
-        except SectorAuthorization.DoesNotExist:
+        except ObjectDoesNotExist:
             return False
         return authorization.is_authorized

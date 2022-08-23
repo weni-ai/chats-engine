@@ -27,27 +27,19 @@ class RoomViewset(
     filterset_class = room_filters.RoomFilter
     permission_classes = [
         permissions.IsAuthenticated,
-        api_permissions.SectorAnyPermission,
     ]
+
+    def get_permissions(self):
+        permission_classes = self.permission_classes
+
+        if self.action != "list":
+            permission_classes.append(api_permissions.IsQueueAgent)
+        return [permission() for permission in permission_classes]
 
     def get_serializer_class(self):
         if self.action == "update":
             return TransferRoomSerializer
         return super().get_serializer_class()
-
-    def get_queryset(self):
-        qs = self.queryset
-        is_active = self.request.query_params.get("is_active")
-        if is_active:
-            return qs
-        try:
-            return qs.filter(
-                Q(user=self.request.user) | Q(user__isnull=True),
-                sector__id__in=self.request.user.sector_ids,
-                is_active=True,
-            )
-        except (TypeError, AttributeError):
-            return qs
 
     @action(detail=True, methods=["PUT"], url_name="close")
     def close(
@@ -74,12 +66,12 @@ class RoomViewset(
             [] if transfer_history is None else json.loads(transfer_history)
         )
         user = serializer.data.get("user")
-        sector = serializer.data.get("sector")
+        queue = serializer.data.get("queue")
         if user:
             _content = {"type": "user", "id": user}
             transfer_history.append(_content)
-        if sector:
-            _content = {"type": "sector", "id": sector}
+        if queue:
+            _content = {"type": "queue", "id": queue}
             transfer_history.append(_content)
 
         serializer.save(transfer_history=json.dumps(transfer_history))

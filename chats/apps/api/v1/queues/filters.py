@@ -48,7 +48,7 @@ class QueueFilter(filters.FilterSet):
         return queues
 
 
-class SectorAuthorizationQueueFilter(filters.FilterSet):
+class QueueAuthorizationFilter(filters.FilterSet):
     class Meta:
         model = QueueAuthorization
         fields = ["sector"]

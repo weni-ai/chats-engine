@@ -4,9 +4,9 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from chats.apps.api.v1.permissions import (
-    ProjectAdminPermission,
-    SectorAnyPermission,
-    SectorManagerPermission,
+    IsProjectAdmin,
+    IsSectorManager,
+    IsQueueAgent,
 )
 from chats.apps.api.v1.sectors import serializers as sector_serializers
 from chats.apps.api.v1.sectors.filters import SectorFilter, SectorTagFilter
@@ -30,10 +30,10 @@ class SectorViewset(viewsets.ModelViewSet):
 
     def get_permissions(self):
         permission_classes = self.permission_classes
-        if self.action == "retrieve":
-            permission_classes.append(SectorManagerPermission)
+        if self.action in ["list", "retrieve"]:
+            permission_classes.append(IsSectorManager)
         else:
-            permission_classes.append(ProjectAdminPermission)
+            permission_classes.append(IsProjectAdmin)
         return [permission() for permission in permission_classes]
 
     def get_serializer_class(self):
@@ -90,9 +90,9 @@ class SectorTagsViewset(viewsets.ModelViewSet):
     def get_permissions(self):
         permission_classes = self.permission_classes
         if self.action in ["list", "retrieve"]:
-            permission_classes.append(SectorAnyPermission)
+            permission_classes.append(IsQueueAgent)
         else:
-            permission_classes.append(SectorManagerPermission)
+            permission_classes.append(IsSectorManager)
 
         return super().get_permissions()
 
@@ -100,8 +100,21 @@ class SectorTagsViewset(viewsets.ModelViewSet):
 class SectorAuthorizationViewset(viewsets.ModelViewSet):
     queryset = SectorAuthorization.objects.all()
     serializer_class = sector_serializers.SectorAuthorizationSerializer
-    permission_classes = [IsAuthenticated, SectorManagerPermission]
+    permission_classes = [IsAuthenticated]
     lookup_field = "uuid"
+
+    def get_permissions(self):
+        permission_classes = self.permission_classes
+        if self.action in ["retrieve", "list"]:
+            permission_classes.append(IsSectorManager)
+        else:
+            permission_classes.append(IsProjectAdmin)
+        return [permission() for permission in permission_classes]
+
+    def get_serializer_class(self):
+        if self.action in ["list", "retrieve"]:
+            return sector_serializers.SectorAuthorizationReadOnlySerializer
+        return super().get_serializer_class()
 
     def perform_create(self, serializer):
         serializer.save()

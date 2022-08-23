@@ -74,4 +74,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     @property
     def last_interaction(self):
-        return self.messages.last().created_on
+        try:
+            return self.messages.last().created_on
+        except AttributeError:
+            return ""

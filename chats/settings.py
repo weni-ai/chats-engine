@@ -266,7 +266,6 @@ if OIDC_ENABLED:
 
 SWAGGER_SETTINGS = {
     "USE_SESSION_AUTH": False,
-    "APIS_SORTER": "alpha",
     "SECURITY_DEFINITIONS": {
         "api_key": {"type": "apiKey", "name": "Authorization", "in": "header"}
     },

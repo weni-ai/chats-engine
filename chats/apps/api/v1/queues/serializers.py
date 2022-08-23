@@ -2,7 +2,7 @@ from rest_framework import serializers
 from chats.apps.queues.models import Queue, QueueAuthorization
 from django.utils.translation import gettext_lazy as _
 
-# Sector Queue serializers
+from chats.apps.api.v1.accounts.serializers import UserSerializer
 
 
 class QueueSerializer(serializers.ModelSerializer):
@@ -15,15 +15,17 @@ class QueueSerializer(serializers.ModelSerializer):
         Check if queue already exist in sector.
         """
         if self.instance:
-            if Queue.objects.filter(sector=self.instance.sector, name=data['name']).exists():
-                raise serializers.ValidationError({
-                'queue': _("This queue already exists.")
-                })
+            if Queue.objects.filter(
+                sector=self.instance.sector, name=data["name"]
+            ).exists():
+                raise serializers.ValidationError(
+                    {"queue": _("This queue already exists.")}
+                )
         else:
-            if Queue.objects.filter(sector=data['sector'], name=data['name']).exists():
-                raise serializers.ValidationError({
-                'queue': _("This queue already exists.")
-                })       
+            if Queue.objects.filter(sector=data["sector"], name=data["name"]).exists():
+                raise serializers.ValidationError(
+                    {"queue": _("This queue already exists.")}
+                )
         return data
 
 
@@ -55,11 +57,13 @@ class QueueAuthorizationSerializer(serializers.ModelSerializer):
         """
         Check if user already exist in queue.
         """
-        queue_user = QueueAuthorization.objects.filter(user=data['user'], queue=data['queue'])
+        queue_user = QueueAuthorization.objects.filter(
+            permission=data["permission"], queue=data["queue"]
+        )
         if queue_user:
-            raise serializers.ValidationError({
-               'user': _("you cant add a user two times in same queue.")
-            })
+            raise serializers.ValidationError(
+                {"user": _("you cant add a user two times in same queue.")}
+            )
         return data
 
 
@@ -72,6 +76,16 @@ class QueueAuthorizationUpdateSerializer(serializers.ModelSerializer):
 
 
 class QueueAuthorizationReadOnlyListSerializer(serializers.ModelSerializer):
+    user = serializers.SerializerMethodField()
+
     class Meta:
         model = QueueAuthorization
-        fields = ["id", "uuid", "queue", "role", "user"]
+        fields = [
+            "uuid",
+            "queue",
+            "role",
+            "user",
+        ]
+
+    def get_user(self, auth):
+        return UserSerializer(auth.permission.user).data

@@ -62,7 +62,6 @@ class MessageMedia(BaseModel):
         Message,
         related_name="medias",
         verbose_name=_("message"),
-        to_field="uuid",
         on_delete=models.CASCADE,
     )
     media = models.FileField(_("url"), max_length=100)
