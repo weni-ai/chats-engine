@@ -40,6 +40,8 @@ class Room(BaseModel):
         null=True,
     )
 
+    callback_url = models.URLField(_("Callback URL"), max_length=200)
+
     ended_at = models.DateTimeField(
         _("Ended at"), auto_now_add=False, null=True, blank=True
     )

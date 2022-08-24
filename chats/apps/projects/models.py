@@ -142,3 +142,8 @@ class ProjectPermission(BaseModel):
         queues = set(sector_manager_queues + queue_agent_queues)
 
         return queues
+
+
+class Flow(BaseModel):
+    project_flow = models.CharField(_("Flow project uuid"), max_length=50)
+    ticketer_uuid = models.CharField(_("Flow ticketer uuid"), max_length=50)
