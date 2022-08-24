@@ -24,7 +24,7 @@ class ContactSerializer(serializers.ModelSerializer):
     def get_tags(self, contact: Contact):
         return contact.tags
 
-    def get_agent(contact: Contact):
+    def get_agent(self, contact: Contact):
         return contact.last_agent_name
 
 

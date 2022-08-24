@@ -20,7 +20,6 @@ class UserViewSet(ViewSet):
             raise ValidationError("Not Allowed!")
 
         serializer = UserSerializer(data=request.data)
-
         if not serializer.is_valid():
             raise ValidationError("invalid data!")
 

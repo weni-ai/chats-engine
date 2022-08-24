@@ -89,12 +89,12 @@ class SectorTagsViewset(viewsets.ModelViewSet):
 
     def get_permissions(self):
         permission_classes = self.permission_classes
-        if self.action in ["list", "retrieve"]:
+        if self.action == "list":
             permission_classes.append(IsQueueAgent)
         else:
             permission_classes.append(IsSectorManager)
 
-        return super().get_permissions()
+        return [permission() for permission in permission_classes]
 
 
 class SectorAuthorizationViewset(viewsets.ModelViewSet):

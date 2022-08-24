@@ -2,7 +2,8 @@ from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 from chats.apps.projects.models import Project
 
-from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
+from chats.apps.sectors.models import Sector, SectorTag
+from django.db.models import Q
 
 
 class SectorFilter(filters.FilterSet):
@@ -22,10 +23,15 @@ class SectorFilter(filters.FilterSet):
         Return sectors given a user, will check if the user is the project admin or
         if they have manager role on sectors inside the project
         """
-        try:
-            queryset = Sector.objects.filter(
-                project__uuid=value, authorizations__permission__user=self.request.user
+        user_role_filter = Q(
+            Q(authorizations__permission__user=self.request.user)
+            | Q(
+                Q(project__permissions__user=self.request.user)
+                & Q(project__permissions__role=2)
             )
+        )
+        try:
+            queryset = queryset.filter(user_role_filter, project__uuid=value).distinct()
         except Sector.DoesNotExist:
             return Sector.objects.none()
         return queryset

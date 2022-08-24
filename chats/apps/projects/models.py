@@ -143,6 +143,9 @@ class ProjectPermission(BaseModel):
 
         return queues
 
+    def get_permission(self, user):
+        return self.project.get_permission(user=user)
+
 
 class Flow(BaseModel):
     project_flow = models.CharField(_("Flow project uuid"), max_length=50)

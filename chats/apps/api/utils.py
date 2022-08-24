@@ -1,3 +1,5 @@
+import json
+
 from rest_framework.authtoken.models import Token
 
 from chats.apps.accounts.models import User
@@ -17,5 +19,7 @@ def create_message(text, room, user=None, contact=None):
     return ChatMessage.objects.create(room=room, text=text, user=user, contact=contact)
 
 
-def create_contact(name: str, email: str):
-    return Contact.objects.create(name=name, email=email)
+def create_contact(name: str, email: str, status: str, custom_fields: dict):
+    return Contact.objects.create(
+        name=name, email=email, status=status, custom_fields=json.dumps(custom_fields)
+    )
