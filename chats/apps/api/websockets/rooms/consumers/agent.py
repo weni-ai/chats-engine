@@ -23,14 +23,14 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         """
         # Are they logged in?
         self.user = self.scope["user"]
-        if self.user.is_anonymous:
+        self.project = self.scope["query_params"].get("project")
+        if self.user.is_anonymous or self.project is None:
             # Reject the connection
             await self.close()
         else:
             # Accept the connection
             await self.accept()
             await self.load_rooms()
-            await self.load_sectors()
             await self.load_user()
 
     async def disconnect(self, *args, **kwargs):
@@ -98,10 +98,11 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
     @database_sync_to_async
     def get_user_rooms(self, *args, **kwargs):
         """ """
-
+        permission = self.user.project_permissions.get(project__uuid=self.project)
+        queue_ids = permission.queue_ids
         rooms = Room.objects.filter(
             Q(user=self.user) | Q(user__isnull=True),
-            sector__id__in=self.user.sector_ids,
+            queue__uuid__in=queue_ids,
             is_active=True,
         )
 

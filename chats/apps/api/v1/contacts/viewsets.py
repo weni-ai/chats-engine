@@ -18,11 +18,13 @@ class ContactViewset(
     serializer_class = ContactSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = ContactFilter
-    permission_classes = [permissions.IsAuthenticated, ContactRelatedRetrievePermission]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         qs = self.queryset
         user = self.request.user.pk
+        is_queue_agent = Q(rooms__queue__authorizations__permission__user=user)
+
         is_sector_manager = Q(
             rooms__queue__sector__authorizations__permission__user=user
         )
@@ -35,7 +37,10 @@ class ContactViewset(
         is_user_assigned_to_room = Q(rooms__user=user)
 
         check_admin_manager_agent_role_filter = (
-            is_sector_manager | is_project_admin | is_user_assigned_to_room
+            is_queue_agent
+            | is_sector_manager
+            | is_project_admin
+            | is_user_assigned_to_room
         )
         user_role_related_contacts = qs.filter(check_admin_manager_agent_role_filter)
         return user_role_related_contacts

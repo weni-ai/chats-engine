@@ -1,5 +1,7 @@
+from django.db.models import Q
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import mixins, pagination, parsers, viewsets, filters
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 
 from chats.apps.api.v1.msgs.filters import MessageFilter, MessageMediaFilter
@@ -11,21 +13,17 @@ from chats.apps.msgs.models import MessageMedia
 
 class MessageViewset(
     mixins.CreateModelMixin,
-    mixins.UpdateModelMixin,
     mixins.ListModelMixin,
-    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
     viewsets.GenericViewSet,
 ):
-    queryset = ChatMessage.objects
+    queryset = ChatMessage.objects.all()
     serializer_class = MessageSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = MessageFilter
     permission_classes = [IsAuthenticated, MessagePermission]
     pagination_class = pagination.PageNumberPagination
     lookup_field = "uuid"
-
-    def get_queryset(self):
-        return super().get_queryset()
 
     def perform_create(self, serializer):
         serializer.save()
@@ -49,7 +47,9 @@ class MessageMediaViewset(
     lookup_field = "uuid"
 
     def get_queryset(self):
-        if self.request.query_params.get("contact"):
+        if self.request.query_params.get("contact") or self.request.query_params.get(
+            "room"
+        ):
             return super().get_queryset()
         return self.queryset.none()
 

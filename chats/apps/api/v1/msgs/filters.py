@@ -7,7 +7,7 @@ from django.db.models import Q
 class MessageFilter(filters.FilterSet):
     class Meta:
         model = Message
-        fields = ["contact"]
+        fields = ["contact", "room"]
 
     contact = filters.UUIDFilter(
         field_name="contact",
@@ -15,6 +15,16 @@ class MessageFilter(filters.FilterSet):
         method="filter_contact",
         help_text=_("Contact's UUID"),
     )
+
+    room = filters.UUIDFilter(
+        field_name="room",
+        required=False,
+        method="filter_room",
+        help_text=_("Room's UUID"),
+    )
+
+    def filter_room(self, queryset, name, value):
+        return queryset.filter(room__uuid=value)
 
     def filter_contact(self, queryset, name, value):
         """
@@ -40,7 +50,7 @@ class MessageFilter(filters.FilterSet):
 class MessageMediaFilter(filters.FilterSet):
     class Meta:
         model = MessageMedia
-        fields = ["contact"]
+        fields = ["message"]
 
     contact = filters.UUIDFilter(
         field_name="contact",
@@ -49,10 +59,25 @@ class MessageMediaFilter(filters.FilterSet):
         help_text=_("Contact's UUID"),
     )
 
+    room = filters.UUIDFilter(
+        field_name="room",
+        required=False,
+        method="filter_room",
+        help_text=_("Room's UUID"),
+    )
+
     def filter_contact(self, queryset, name, value):
         """
         Return medias given a contact, using the contact rooms for the search
         """
         queryset = queryset.filter(message__room__contact__uuid=value)
+
+        return queryset
+
+    def filter_room(self, queryset, name, value):
+        """
+        Return medias given a contact, using the contact rooms for the search
+        """
+        queryset = queryset.filter(message__room__uuid=value)
 
         return queryset

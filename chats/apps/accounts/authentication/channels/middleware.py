@@ -1,3 +1,5 @@
+from urllib.parse import parse_qs
+
 from channels.db import database_sync_to_async
 from channels.middleware import BaseMiddleware
 from django.conf import settings
@@ -30,7 +32,9 @@ class TokenAuthMiddleware(BaseMiddleware):
 
     async def __call__(self, scope, receive, send):
         try:
-            _, token_key = scope["query_string"].decode().split("=")
+            query_params = parse_qs(scope["query_string"].decode())
+            scope["query_params"] = query_params
+            token_key = query_params.get("token")
         except ValueError:
             token_key = None
         if settings.OIDC_ENABLED:
