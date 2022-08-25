@@ -4,7 +4,7 @@ on:
   push:
     tags:
       - '*.*.*-develop*'
-      - '*.*.*-staging'
+      - '*.*.*-staging*'
       - '*.*.*'
 
 jobs:
@@ -42,7 +42,7 @@ jobs:
               echo "COMMIT_SHA=$GITHUB_SHA"
               echo "IMAGE_TAG=${{ secrets.ECR }}/chats:engine-$TAG" >> $GITHUB_ENV
               echo "IMAGE_TAG=${{ secrets.ECR }}/chats:engine-$TAG"
-            elif $(echo  $TAG|grep --silent -e 'v*.*.*-develop*')
+            elif $(echo  $TAG|grep --silent -e 'v*.*.*')
             then 
               echo "No environment found, assuming: PRODUCTION - $TAG"
               echo "MANIFESTS_ENVIRONMENT=production" >> $GITHUB_ENV
@@ -164,3 +164,4 @@ jobs:
           repository: weni-ai/kubernetes-manifests-chats
           directory: ./kubernetes-manifests/
           branch: main
+          
