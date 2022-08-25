@@ -3,6 +3,8 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from chats.apps.api.utils import create_user_and_token
+from chats.apps.msgs.models import Message
+from chats.apps.rooms.models import Room
 from chats.apps.projects.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.sectors.models import Sector, SectorAuthorization
@@ -677,3 +679,49 @@ class SectorInternalTests(APITestCase):
         response = client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["is_deleted"], True)
+
+
+class MessageTests(APITestCase):
+    def setUp(self):
+        self.owner, self.owner_token = create_user_and_token("owner")
+
+        self.project = Project.objects.create(
+            name="Test Project", connect_pk="asdasdas-dad-as-sda-d-ddd"
+        )
+
+        self.sector_1 = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=5,
+            work_start="09:00",
+            work_end="18:00",
+        )
+
+        self.room = Room.objects.create(
+            user=self.owner, sector=self.sector_1
+        )
+
+        self.message = Message.objects.create(
+            text= "message created", room = self.room
+        )
+
+    def test_create_message(self):
+        url = reverse("message-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.owner_token.key)
+        message = "message text"
+        data = {"text": message, "room": self.room.id}
+        response = client.post(url, data=data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['text'], message)
+        self.assertEqual(response.data['room'], self.room.id)
+
+    def test_list_message(self):
+        url = reverse("message-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.owner_token.key)
+        response = client.get(url)
+        results = response.json().get("results")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(results[0].get("text"), "message created")
+        self.assertEqual(results[0].get("room"), self.room.id)
