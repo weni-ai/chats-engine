@@ -12,6 +12,7 @@ class ContactSerializer(serializers.ModelSerializer):
     class Meta:
         model = Contact
         fields = [
+            "uuid",
             "name",
             "email",
             "status",
@@ -19,6 +20,9 @@ class ContactSerializer(serializers.ModelSerializer):
             "tags",
             "agent",
             "created_on",
+        ]
+        read_only_fields = [
+            "uuid",
         ]
 
     def get_tags(self, contact: Contact):
