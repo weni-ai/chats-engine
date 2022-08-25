@@ -22,7 +22,7 @@ class MessageViewset(
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = MessageFilter
     permission_classes = [IsAuthenticated, MessagePermission]
-    pagination_class = pagination.PageNumberPagination
+    # pagination_class = pagination.PageNumberPagination
     lookup_field = "uuid"
 
     def create(self, request, *args, **kwargs):
