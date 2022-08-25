@@ -27,6 +27,7 @@ class MessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ChatMessage
         fields = [
+            "uuid",
             "user_email",
             "user",
             "room",
@@ -37,6 +38,7 @@ class MessageSerializer(serializers.ModelSerializer):
             "created_on",
         ]
         read_only_fields = [
+            "uuid",
             "user",
             "created_at",
             "contact",
