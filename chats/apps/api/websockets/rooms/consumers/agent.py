@@ -23,7 +23,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         """
         # Are they logged in?
         self.user = self.scope["user"]
-        self.project = self.scope["query_params"].get("project")
+        self.project = self.scope["query_params"].get("project")[0]
         if self.user.is_anonymous or self.project is None:
             # Reject the connection
             await self.close()

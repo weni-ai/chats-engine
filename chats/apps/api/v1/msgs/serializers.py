@@ -16,11 +16,11 @@ class MessageSerializer(serializers.ModelSerializer):
         fields = [
             "room",
             "user",
+            "contact",
             "text",
             "seen",
             "media",
             "created_on",
-            "contact",
         ]
         read_only_fields = [
             "created_at",

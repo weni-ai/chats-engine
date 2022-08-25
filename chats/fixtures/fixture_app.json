@@ -965,7 +965,9 @@
             "name": "Carlos Norton",
             "email": "c.norton@chats.weni.ai",
             "status": "online",
-            "custom_fields": "{\"phone_number\": \"555555\"}"
+            "custom_fields": {
+                "phone_number": "555555"
+            }
         }
     },
     {
@@ -977,7 +979,9 @@
             "name": "Denise Thomas",
             "email": "denise@chats.weni.ai",
             "status": "online",
-            "custom_fields": "{\"country\": \"spain\"}"
+            "custom_fields": {
+                "country": "spain"
+            }
         }
     },
     {
@@ -989,7 +993,9 @@
             "name": "Roy Mosley",
             "email": "roy@chats.weni.ai",
             "status": "online",
-            "custom_fields": "{\"country\": \"turkey\"}"
+            "custom_fields": {
+                "country": "turkey"
+            }
         }
     },
     {
@@ -1001,7 +1007,9 @@
             "name": "Kelsy Paul",
             "email": "kelsyp@chats.weni.ai",
             "status": "online",
-            "custom_fields": "{\"cep\": \"555555-55\"}"
+            "custom_fields": {
+                "cep": "555555-55"
+            }
         }
     },
     {
@@ -1325,12 +1333,20 @@
             "user": "amywong@chats.weni.ai",
             "contact": "b8e8a66a-7d90-47c9-91fa-c47c5a4848cd",
             "queue": "f2519480-7e58-4fc4-9894-9ab1769e29cf",
-            "custom_fields": "{\"mood\": \"angry\", \"time_waiting\": 56}",
+            "custom_fields": {
+                "mood": "angry",
+                "time_waiting": 56
+            },
             "callback_url": null,
             "ended_at": null,
             "ended_by": null,
             "is_active": true,
-            "transfer_history": "[{\"type\": \"user\", \"name\": \"\"}]",
+            "transfer_history": [
+                {
+                    "type": "user",
+                    "name": ""
+                }
+            ],
             "tags": []
         }
     },

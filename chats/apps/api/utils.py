@@ -21,5 +21,5 @@ def create_message(text, room, user=None, contact=None):
 
 def create_contact(name: str, email: str, status: str, custom_fields: dict):
     return Contact.objects.create(
-        name=name, email=email, status=status, custom_fields=json.dumps(custom_fields)
+        name=name, email=email, status=status, custom_fields=custom_fields
     )

@@ -34,9 +34,10 @@ class TokenAuthMiddleware(BaseMiddleware):
         try:
             query_params = parse_qs(scope["query_string"].decode())
             scope["query_params"] = query_params
-            token_key = query_params.get("token")
+            token_key = query_params.get("Token")[0]
         except ValueError:
             token_key = None
+
         if settings.OIDC_ENABLED:
             user = await get_keycloak_user(token_key)
             scope["user"] = AnonymousUser() if user is None else user
