@@ -14,7 +14,7 @@ class RoomFilter(filters.FilterSet):
 
     project = filters.CharFilter(
         field_name="project",
-        required=True,
+        required=False,
         method="filter_project",
         help_text=_("Project's UUID"),
     )

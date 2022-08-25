@@ -9,11 +9,19 @@ from chats.apps.msgs.models import MessageMedia
 
 
 class MessageSerializer(serializers.ModelSerializer):
-    media = serializers.FileField(required=True)
+    media = serializers.FileField(required=False)
 
     class Meta:
         model = ChatMessage
-        fields = ["room", "user", "text", "seen", "media"]
+        fields = [
+            "room",
+            "user",
+            "text",
+            "seen",
+            "media",
+            "created_on",
+            "contact",
+        ]
         read_only_fields = [
             "created_at",
             "contact",

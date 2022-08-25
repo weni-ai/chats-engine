@@ -6,6 +6,8 @@ from chats.apps.api.v1.contacts.serializers import ContactSerializer
 from chats.apps.api.v1.queues.serializers import QueueSerializer
 from chats.apps.api.v1.sectors.serializers import DetailSectorTagSerializer
 from chats.apps.rooms.models import Room
+from chats.apps.accounts.models import User
+from chats.apps.queues.models import Queue
 
 
 class RoomSerializer(serializers.ModelSerializer):
@@ -24,24 +26,40 @@ class RoomSerializer(serializers.ModelSerializer):
 
 
 class TransferRoomSerializer(serializers.ModelSerializer):
-    user = UserSerializer(many=False, read_only=False)
-    queue = QueueSerializer(many=False, read_only=False)
-    contact = ContactSerializer(many=False, read_only=True)
-    tags = DetailSectorTagSerializer(many=True, read_only=True)
+    user = UserSerializer(many=False, required=False, read_only=True)
+    user_email = serializers.SlugRelatedField(
+        queryset=User.objects.all(),
+        required=False,
+        source="user",
+        slug_field="email",
+        write_only=True,
+        allow_null=True,
+    )
+    queue_uuid = serializers.PrimaryKeyRelatedField(
+        queryset=Queue.objects.all(), required=False, source="queue", write_only=True
+    )
+    queue = QueueSerializer(many=False, required=False, read_only=True)
+    contact = ContactSerializer(many=False, required=False, read_only=True)
+    tags = DetailSectorTagSerializer(many=True, required=False, read_only=True)
 
     class Meta:
         model = Room
-        fields = "__all__"
+        exclude = ["callback_url"]
         read_only_fields = [
+            "uuid",
+            "user",
+            "queue",
             "contact",
             "ended_at",
             "is_active",
+            "custom_fields",
             "transfer_history",
             "tags",
+            "ended_by",
         ]
 
         extra_kwargs = {
-            "tags": {"required": False},
-            "user": {"required": False, "allow_null": False},
-            "queue": {"required": False, "allow_null": False},
+            "queue": {"required": False, "read_only": True, "allow_null": False},
+            "contact": {"required": False, "read_only": True, "allow_null": False},
+            "user": {"required": False, "read_only": True, "allow_null": False},
         }

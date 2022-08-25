@@ -38,11 +38,14 @@ class Contact(BaseModel):
 
     @property
     def last_room(self):
-        return self.rooms.filter(is_active=True).last()
+        return self.rooms.filter(is_active=False).last()
 
     @property
     def tags(self):
-        return self.last_room.tags
+        try:
+            return self.last_room.tags
+        except AttributeError:
+            return None
 
     def can_retrieve(self, user, project) -> bool:
         filter_project_uuid = Q(queue__sector__project__uuid=project)

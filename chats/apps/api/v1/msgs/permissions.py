@@ -8,7 +8,8 @@ from chats.apps.rooms.models import Room
 class MessagePermission(permissions.BasePermission):
     def has_permission(self, request, view):
         if view.action in ["list", "create"]:
-            room = Room.objects.get(uuid=request.data.get("room"))
+            room_uuid = request.data.get("room") or request.query_params.get("room")
+            room = Room.objects.get(uuid=room_uuid)
             return room.user == request.user
 
         return super().has_permission(request, view)

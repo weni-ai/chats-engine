@@ -16,6 +16,7 @@ class Room(BaseModel):
         on_delete=models.CASCADE,
         null=True,
         blank=True,
+        to_field="email",
     )
     contact = models.ForeignKey(
         "contacts.Contact",
@@ -65,6 +66,9 @@ class Room(BaseModel):
         verbose_name = _("Room")
         verbose_name_plural = _("Rooms")
 
+    def get_permission(self, user):
+        return self.queue.get_permission(user)
+
     @property
     def serialized_ws_data(self):
         from chats.apps.api.v1.rooms.serializers import RoomSerializer  # noqa
@@ -90,12 +94,11 @@ class Room(BaseModel):
         msg.notify_room("create")
         self.notify_room("update")
 
-    def close(self, tags=None, end_by: str = ""):
+    def close(self, tags: list = [], end_by: str = ""):
         self.is_active = False
         self.ended_at = timezone.now()
         self.ended_by = end_by
-        for tag_id in tags:
-            self.tags.add(tag_id)
+        self.tags.add(*tags)
         self.save()
 
     def notify_sector(self, action):
@@ -111,7 +114,7 @@ class Room(BaseModel):
         """
 
         send_channels_group(
-            group_name=f"sector_{self.sector.pk}",
+            group_name=f"queue_{self.queue.pk}",
             type="notify",
             content=self.serialized_ws_data,
             action=f"rooms.{action}",

@@ -19,6 +19,7 @@ class Message(BaseModel):
         on_delete=models.CASCADE,
         null=True,
         blank=True,
+        to_field="email",
     )
     contact = models.ForeignKey(
         "contacts.Contact",

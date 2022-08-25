@@ -6,7 +6,10 @@ from chats.core.models import BaseModel
 
 class QuickMessage(BaseModel):
     user = models.ForeignKey(
-        "accounts.User", verbose_name=_("quick_messages"), on_delete=models.CASCADE
+        "accounts.User",
+        verbose_name=_("quick_messages"),
+        on_delete=models.CASCADE,
+        to_field="email",
     )
     shortcut = models.CharField(_("shortcut"), max_length=50)
     text = models.TextField(_("text"))
