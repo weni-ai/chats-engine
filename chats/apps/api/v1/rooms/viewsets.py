@@ -76,7 +76,7 @@ class RoomViewset(
         if queue:
             _content = {"type": "queue", "name": instance.queue.name}
             transfer_history.append(_content)
-        instance.transfer_history = json.dumps(transfer_history)
+        instance.transfer_history = transfer_history
         instance.save()
 
         serializer.instance.notify_room("update")
