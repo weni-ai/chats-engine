@@ -68,7 +68,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             await self.notify(
                 {
                     "type": "notify",
-                    "action": "group_exit",
+                    "action": "group.exit",
                     "content": {"msg": f"Exited {group_name} to your listening groups"},
                 }
             )
@@ -87,7 +87,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             await self.notify(
                 {
                     "type": "notify",
-                    "action": "group_join",
+                    "action": "group.join",
                     "content": {"msg": f"Added {group_name} to your listening groups"},
                 }
             )
