@@ -22,7 +22,7 @@ class ContactViewset(
 
     def get_queryset(self):
         qs = self.queryset
-        user = self.request.user.pk
+        user = self.request.user
         is_queue_agent = Q(rooms__queue__authorizations__permission__user=user)
 
         is_sector_manager = Q(
@@ -42,7 +42,16 @@ class ContactViewset(
             | is_project_admin
             | is_user_assigned_to_room
         )
-        user_role_related_contacts = qs.filter(check_admin_manager_agent_role_filter)
+        user_role_related_contacts = qs.filter(
+            check_admin_manager_agent_role_filter
+        ).distinct()
+        # import pdb
+
+        # pdb.set_trace()
+        # user_role_related_contacts = qs.filter(
+        #     rooms__queue__sector__project__permissions__user=user,
+        # )
+
         return user_role_related_contacts
 
     def retrieve(self, request, *args, **kwargs):

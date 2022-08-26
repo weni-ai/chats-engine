@@ -23,7 +23,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         # Are they logged in?
         self.user = self.scope["user"]
         self.project = self.scope["query_params"].get("project")[0]
-        self.permission = self.user.project_permissions.get(project__uuid=self.project)
+        self.permission = await self.get_permission()
         if self.user.is_anonymous or self.project is None:
             # Reject the connection
             await self.close()
@@ -100,6 +100,10 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
     # SYNC HELPER FUNCTIONS
 
     @database_sync_to_async
+    def get_permission(self):
+        return self.user.project_permissions.get(project__uuid=self.project)
+
+    @database_sync_to_async
     def get_user_rooms(self, *args, **kwargs):
         """ """
         # TODO Think in a new way to query this
@@ -122,14 +126,16 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         """Enter room notification groups"""
         self.rooms = await self.get_user_rooms()
         for room in self.rooms:
-            await self.join({"name": "room", "id": room})
+
+            await self.join({"name": "room", "id": str(room)})
 
     async def load_queues(self, *args, **kwargs):
         """Enter queue notification groups"""
         queues = await self.get_queues()
         for queue in queues:
-            await self.join({"name": "queue", "id": queue})
+
+            await self.join({"name": "queue", "id": str(queue)})
 
     async def load_user(self, *args, **kwargs):
         """Enter user notification group"""
-        await self.join({"name": "user", "id": self.user.email})
+        await self.join({"name": "user", "id": self.user.id})
