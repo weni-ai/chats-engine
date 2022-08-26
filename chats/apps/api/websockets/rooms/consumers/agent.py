@@ -1,5 +1,3 @@
-import json
-
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from django.conf import settings
@@ -95,7 +93,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
     # SUBSCRIPTIONS
     async def notify(self, event):
         """ """
-        await self.send_json(json.dumps(event))
+        await self.send_json(event)
 
     # SYNC HELPER FUNCTIONS
 
