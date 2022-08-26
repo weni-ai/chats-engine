@@ -1,3 +1,5 @@
+import json
+
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from django.conf import settings
@@ -67,7 +69,9 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 {
                     "type": "notify",
                     "action": "group.exit",
-                    "content": {"msg": f"Exited {group_name} to your listening groups"},
+                    "content": json.dumps(
+                        {"msg": f"Exited {group_name} to your listening groups"}
+                    ),
                 }
             )
 
@@ -86,7 +90,9 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 {
                     "type": "notify",
                     "action": "group.join",
-                    "content": {"msg": f"Added {group_name} to your listening groups"},
+                    "content": json.dumps(
+                        {"msg": f"Added {group_name} to your listening groups"}
+                    ),
                 }
             )
 
