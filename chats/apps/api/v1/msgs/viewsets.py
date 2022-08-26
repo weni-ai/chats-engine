@@ -52,7 +52,7 @@ class MessageMediaViewset(
 
     def get_queryset(self):
         if self.request.query_params.get("contact") or self.request.query_params.get(
-            "room"
+            "project"
         ):
             return super().get_queryset()
         return self.queryset.none()

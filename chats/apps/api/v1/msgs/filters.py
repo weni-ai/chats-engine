@@ -23,8 +23,28 @@ class MessageFilter(filters.FilterSet):
         help_text=_("Room's UUID"),
     )
 
+    project = filters.UUIDFilter(
+        field_name="project",
+        required=False,
+        method="filter_project",
+        help_text=_("Projects's UUID"),
+    )
+
+    is_active = filters.BooleanFilter(
+        field_name="is_active",
+        required=False,
+        method="filter_is_active",
+        help_text=_("Is room active"),
+    )
+
     def filter_room(self, queryset, name, value):
         return queryset.filter(room__uuid=value)
+
+    def filter_is_active(self, queryset, name, value):
+        return queryset.filter(room__is_active=value)
+
+    def filter_project(self, queryset, name, value):
+        return queryset.filter(room__queue__sector__project__uuid=value)
 
     def filter_contact(self, queryset, name, value):
         """
@@ -34,15 +54,18 @@ class MessageFilter(filters.FilterSet):
         user = self.request.user
 
         # Check if the user requesting has permition on the sector or project
-        querry_filters = (
-            Q(room__queue__authorizations__permission__user=user)
-            | Q(room__queue__sector__authorizations__permission__user=user)
-            | Q(
-                Q(room__queue__sector__project__permissions__user=user)
-                & Q(room__queue__sector__project__permissions__role=2)
-            )
+        # querry_filters = (
+        #     Q(room__queue__authorizations__permission__user=user)
+        #     | Q(room__queue__sector__authorizations__permission__user=user)
+        #     | Q(
+        #         Q(room__queue__sector__project__permissions__user=user)
+        #         & Q(room__queue__sector__project__permissions__role=2)
+        #     )
+        # )
+        queryset = queryset.filter(
+            room__queue__sector__project__permissions__user=user,
+            room__contact__uuid=value,
         )
-        queryset = queryset.filter(querry_filters)
 
         return queryset
 

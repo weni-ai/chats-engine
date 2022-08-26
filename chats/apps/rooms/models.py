@@ -101,7 +101,7 @@ class Room(BaseModel):
         self.tags.add(*tags)
         self.save()
 
-    def notify_sector(self, action):
+    def notify_queue(self, action):
         """
         Used to notify channels groups when something happens on the instance.
 
