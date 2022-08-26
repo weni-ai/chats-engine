@@ -35,7 +35,7 @@ class TokenAuthMiddleware(BaseMiddleware):
             query_params = parse_qs(scope["query_string"].decode())
             scope["query_params"] = query_params
             token_key = query_params.get("Token")[0]
-        except ValueError:
+        except (ValueError, TypeError):
             token_key = None
 
         if settings.OIDC_ENABLED:
