@@ -2,11 +2,10 @@ import json
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
+from django.conf import settings
 from django.db.models import Q
 
 from chats.apps.rooms.models import Room
-
-# todo: ADD TRY EXCEPTS
 
 
 class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
@@ -24,6 +23,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         # Are they logged in?
         self.user = self.scope["user"]
         self.project = self.scope["query_params"].get("project")[0]
+        self.permission = self.user.project_permissions.get(project__uuid=self.project)
         if self.user.is_anonymous or self.project is None:
             # Reject the connection
             await self.close()
@@ -63,30 +63,34 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         group_name = f"{event['name']}_{event['id']}"
         await self.channel_layer.group_discard(group_name, self.channel_name)
         self.groups.remove(group_name)
-        # for debugging
-        await self.notify(
-            {
-                "type": "notify",
-                "action": "group_exit",
-                "content": {"msg": f"Exited {group_name} to your listening groups"},
-            }
-        )
+        if settings.DEBUG:
+            # for debugging
+            await self.notify(
+                {
+                    "type": "notify",
+                    "action": "group_exit",
+                    "content": {"msg": f"Exited {group_name} to your listening groups"},
+                }
+            )
 
     async def join(self, event):
         """
         Add group by event(dictionary) or group_name
         """
+        # TODO TEST IF A EXTERNAL USER CAN JOIN GROUPS HE DOES NOT HAVE PERMISSION ON e.g: user x joins user y group
+
         group_name = f"{event['name']}_{event['id']}"
         await self.channel_layer.group_add(group_name, self.channel_name)
         self.groups.append(group_name)
         # for debugging
-        await self.notify(
-            {
-                "type": "notify",
-                "action": "group_join",
-                "content": {"msg": f"Added {group_name} to your listening groups"},
-            }
-        )
+        if settings.DEBUG:
+            await self.notify(
+                {
+                    "type": "notify",
+                    "action": "group_join",
+                    "content": {"msg": f"Added {group_name} to your listening groups"},
+                }
+            )
 
     # SUBSCRIPTIONS
     async def notify(self, event):
@@ -98,21 +102,21 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
     @database_sync_to_async
     def get_user_rooms(self, *args, **kwargs):
         """ """
-        permission = self.user.project_permissions.get(project__uuid=self.project)
-        queue_ids = permission.queue_ids
+        # TODO Think in a new way to query this
+        queue_ids = self.permission.queue_ids
         rooms = Room.objects.filter(
             Q(user=self.user) | Q(user__isnull=True),
             queue__uuid__in=queue_ids,
             is_active=True,
-        )
+        ).values_list("pk", flat=True)
 
-        return list(rooms.values_list("pk", flat=True))
+        return list(rooms)
 
     @database_sync_to_async
-    def get_sectors(self, *args, **kwargs):
+    def get_queues(self, *args, **kwargs):
         """ """
-        self.sectors = list(self.user.sector_ids)
-        return self.sectors
+        self.queues = self.permission.queue_ids
+        return self.queues
 
     async def load_rooms(self, *args, **kwargs):
         """Enter room notification groups"""
@@ -120,12 +124,12 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         for room in self.rooms:
             await self.join({"name": "room", "id": room})
 
-    async def load_sectors(self, *args, **kwargs):
+    async def load_queues(self, *args, **kwargs):
         """Enter queue notification groups"""
-        sector_queues = await self.get_sectors()
-        for sector in sector_queues:
-            await self.join({"name": "sector", "id": sector})
+        queues = await self.get_queues()
+        for queue in queues:
+            await self.join({"name": "queue", "id": queue})
 
     async def load_user(self, *args, **kwargs):
         """Enter user notification group"""
-        await self.join({"name": "user", "id": self.user.pk})
+        await self.join({"name": "user", "id": self.user.email})
