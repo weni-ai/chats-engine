@@ -10,6 +10,8 @@ class Contact(BaseModel):
     name = models.CharField(_("first name"), max_length=30, blank=True)
     email = models.EmailField(_("email"), unique=True, help_text=_("User email"))
     status = models.CharField(_("status"), max_length=30, blank=True)
+    phone = models.CharField(_("phone"), max_length=30, blank=True)
+
     custom_fields = models.JSONField(
         _("custom fields"),
         blank=True,

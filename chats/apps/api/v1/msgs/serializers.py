@@ -11,8 +11,22 @@ from chats.apps.msgs.models import MessageMedia
 from chats.apps.accounts.models import User
 
 
+class MessageMediaSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MessageMedia
+        fields = [
+            "content_type",
+            "url",
+        ]
+
+    def get_url(self, media: MessageMedia):
+        return media.url
+
+
 class MessageSerializer(serializers.ModelSerializer):
-    media = serializers.FileField(required=False)
+    media = MessageMediaSerializer(many=True, required=False)
     contact = ContactSerializer(many=False, required=False, read_only=True)
     user = UserSerializer(many=False, required=False, read_only=True)
     user_email = serializers.SlugRelatedField(
@@ -53,9 +67,3 @@ class MessageSerializer(serializers.ModelSerializer):
 
 class MessageWSSerializer(MessageSerializer):
     pass
-
-
-class MessageMediaSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = MessageMedia
-        fields = "__all__"

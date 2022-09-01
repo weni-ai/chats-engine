@@ -46,7 +46,7 @@ class Message(BaseModel):
         return self.room.get_authorization(user)
 
     def media(self):
-        return self.medias.first()
+        return self.medias.all()
 
     def notify_room(self, action):
         """ """
@@ -80,7 +80,9 @@ class MessageMedia(BaseModel):
 
     @property
     def url(self):
-        return self.media.url
+        if self.media_file:
+            return self.media_file.url
+        return self.media_url
 
     def get_authorization(self, user):
         return self.room.get_authorization(user)

@@ -32,6 +32,20 @@ class ContactSerializer(serializers.ModelSerializer):
         return contact.last_agent_name
 
 
+class ContactRelationsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Contact
+        fields = [
+            "uuid",
+            "name",
+            "email",
+            "status",
+            "phone",
+            "custom_fields",
+            "created_on",
+        ]
+
+
 class ContactWSSerializer(serializers.ModelSerializer):
     class Meta:
         model = Contact

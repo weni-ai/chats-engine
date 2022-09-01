@@ -2,13 +2,21 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from chats.apps.api.v1.accounts.serializers import UserSerializer
-from chats.apps.api.v1.contacts.serializers import ContactSerializer
+from chats.apps.api.v1.contacts.serializers import ContactRelationsSerializer
 from chats.apps.msgs.models import Message, MessageMedia
 
+from chats.apps.api.v1.msgs.serializers import MessageMediaSerializer
 
-class AttachmentSerializer(serializers.ListSerializer):
-    content_type = serializers.CharField()
-    url = serializers.URLField()
+
+class AttachmentSerializer(serializers.ModelSerializer):
+    url = serializers.URLField(source="media_url")
+
+    class Meta:
+        model = MessageMedia
+        fields = [
+            "content_type",
+            "url",
+        ]
 
 
 class MsgFlowSerializer(serializers.ModelSerializer):
@@ -17,13 +25,14 @@ class MsgFlowSerializer(serializers.ModelSerializer):
         choices=(
             ("incoming", _("incoming")),
             ("outgoing", _("outgoing")),
-        )
+        ),
+        write_only=True,
     )
-    attachments = AttachmentSerializer()
+    attachments = AttachmentSerializer(many=True, required=False, write_only=True)
 
     # Read
-    media = serializers.FileField(required=False, many=True)
-    contact = ContactSerializer(many=False, required=False, read_only=True)
+    media = MessageMediaSerializer(required=False, many=True, read_only=True)
+    contact = ContactRelationsSerializer(many=False, required=False, read_only=True)
     user = UserSerializer(many=False, required=False, read_only=True)
 
     class Meta:
@@ -45,12 +54,19 @@ class MsgFlowSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "uuid",
             "user",
-            "created_at",
+            "created_on",
             "contact",
+            "media",
         ]
 
+    def create(self, validated_data):
+        direction = validated_data.pop("direction")
+        medias = validated_data.pop("attachments")
+        room = validated_data.get("room")
+        if direction == "incoming":
+            validated_data["contact"] = room.contact
 
-class MessageMediaSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = MessageMedia
-        fields = "__all__"
+        msg = super().create(validated_data)
+        media_list = [MessageMedia(**media_data, message=msg) for media_data in medias]
+        medias = MessageMedia.objects.bulk_create(media_list)
+        return msg

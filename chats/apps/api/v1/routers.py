@@ -23,6 +23,8 @@ from chats.apps.api.v1.internal.queues.viewsets import (
     QueueAuthInternalViewset,
 )
 
+from chats.apps.api.v1.external.msgs.viewsets import MessageFlowViewset
+
 
 class Router(routers.SimpleRouter):
     pass
@@ -63,3 +65,6 @@ router.register(
     user_internal_views.UserViewSet,
     basename="user_internal",
 )
+
+# External
+router.register("external/msgs", MessageFlowViewset)
