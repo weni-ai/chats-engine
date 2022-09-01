@@ -45,9 +45,6 @@ class ContactViewset(
         user_role_related_contacts = qs.filter(
             check_admin_manager_agent_role_filter
         ).distinct()
-        # import pdb
-
-        # pdb.set_trace()
         # user_role_related_contacts = qs.filter(
         #     rooms__queue__sector__project__permissions__user=user,
         # )

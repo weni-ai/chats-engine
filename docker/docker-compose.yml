@@ -20,7 +20,7 @@ services:
       placement:
         constraints: [ node.role == manager ]
   redis:
-    image: redis
+    image: redis:6.2
     ports:
       - 6379:6379
 

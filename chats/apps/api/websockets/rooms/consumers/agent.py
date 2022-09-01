@@ -23,12 +23,12 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         # Are they logged in?
         self.user = self.scope["user"]
         self.project = self.scope["query_params"].get("project")[0]
-        self.permission = await self.get_permission()
         if self.user.is_anonymous or self.project is None:
             # Reject the connection
             await self.close()
         else:
             # Accept the connection
+            self.permission = await self.get_permission()
             await self.accept()
             await self.load_rooms()
             await self.load_user()

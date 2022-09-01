@@ -148,5 +148,14 @@ class ProjectPermission(BaseModel):
 
 
 class Flow(BaseModel):
-    project_flow = models.CharField(_("Flow project uuid"), max_length=50)
-    ticketer_uuid = models.CharField(_("Flow ticketer uuid"), max_length=50)
+    project_flows_uuid = models.CharField(_("Flow project uuid"), max_length=50)
+    project = models.ForeignKey(
+        Project,
+        verbose_name=_("Project"),
+        related_name="flows",
+        on_delete=models.CASCADE,
+    )
+
+    class Meta:
+        verbose_name = _("Flow integration")
+        verbose_name_plural = _("Flow integration")

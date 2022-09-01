@@ -40,7 +40,7 @@ class UserViewSet(ViewSet):
 
         return Response(serializer.data)
 
-    @action(detail=False, methods=["put"])
+    @action(detail=False, methods=["PUT", "PATCH"])
     def language(self, request, pk=None):
         user, created = User.objects.get_or_create(
             email=request.query_params.get("email"),

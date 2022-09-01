@@ -65,7 +65,11 @@ class MessageMedia(BaseModel):
         verbose_name=_("message"),
         on_delete=models.CASCADE,
     )
-    media = models.FileField(_("url"), max_length=100)
+    content_type = models.CharField(_("Content Type"), max_length=50)
+    media_file = models.FileField(
+        _("Media File"), null=True, blank=True, max_length=100
+    )
+    media_url = models.URLField(_("Media url"), null=True, blank=True, max_length=200)
 
     class Meta:
         verbose_name = _("MessageMedia")
