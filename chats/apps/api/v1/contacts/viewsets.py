@@ -31,7 +31,7 @@ class ContactViewset(
 
         is_project_admin = Q(
             Q(rooms__queue__sector__project__permissions__user=user)
-            & Q(rooms__queue__sector__project__permissions__role=2)
+            & Q(rooms__queue__sector__project__permissions__role=1)
         )
 
         is_user_assigned_to_room = Q(rooms__user=user)

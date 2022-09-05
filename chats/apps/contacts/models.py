@@ -59,7 +59,7 @@ class Contact(BaseModel):
         is_sector_manager = Q(queue__sector__authorizations__permission__user=user)
         is_project_admin = Q(
             Q(queue__sector__project__permissions__user=user)
-            & Q(queue__sector__project__permissions__role=2)
+            & Q(queue__sector__project__permissions__role=1)
         )
         is_user_assigned_to_room = Q(user=user)
         check_admin_manager_agent_role_filter = Q(

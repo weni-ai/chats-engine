@@ -93,7 +93,7 @@ class ProjectExternalPermission(permissions.BasePermission):
     def has_permission(self, request, view) -> bool:
         if view.action in ["list", "create"]:
             permission = GetPermission(request).permission
-            return permission.is_external
+            return permission.is_admin
 
         return super().has_permission(request, view)
 
@@ -106,7 +106,7 @@ class ProjectExternalPermission(permissions.BasePermission):
             )  # each and every model that users this permission have to implement this method
         except ProjectPermission.DoesNotExist:
             return False
-        return authorization.is_external
+        return authorization.is_admin
 
 
 class SectorAgentReadOnlyListPermission(permissions.BasePermission):

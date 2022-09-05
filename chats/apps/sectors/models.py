@@ -30,7 +30,7 @@ class Sector(BaseModel):
 
     @property
     def manager_authorizations(self):
-        return self.authorizations.filter(role=2)
+        return self.authorizations.all()
 
     @property
     def employee_pks(self):

@@ -30,6 +30,7 @@ class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_fields = [
         "project",
+        "role"
     ]
     lookup_field = "uuid"
 
@@ -43,7 +44,3 @@ class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
             permission_classes.append(IsProjectAdmin)
         return [permission() for permission in permission_classes]
 
-    def get_queryset(self):
-        qs = super().get_queryset()
-        qs = qs.filter(user__isnull=False, role=1).exclude(user=self.request.user)
-        return qs

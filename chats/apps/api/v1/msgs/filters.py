@@ -52,16 +52,6 @@ class MessageFilter(filters.FilterSet):
         Check if the user requesting has permition on the sector or project
         """
         user = self.request.user
-
-        # Check if the user requesting has permition on the sector or project
-        # querry_filters = (
-        #     Q(room__queue__authorizations__permission__user=user)
-        #     | Q(room__queue__sector__authorizations__permission__user=user)
-        #     | Q(
-        #         Q(room__queue__sector__project__permissions__user=user)
-        #         & Q(room__queue__sector__project__permissions__role=2)
-        #     )
-        # )
         queryset = queryset.filter(
             room__queue__sector__project__permissions__user=user,
             room__contact__uuid=value,
