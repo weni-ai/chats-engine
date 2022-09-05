@@ -3,9 +3,14 @@ from rest_framework import serializers
 
 
 class FlowSerializer(serializers.ModelSerializer):
-    model = Flow
-    fields = "__all__"
-    read_only_fields = [
-        "uuid",
-        "project",
-    ]
+    class Meta:
+        model = Flow
+        fields = [
+            "uuid",
+            "project_flows_uuid",
+            "project",
+        ]
+        read_only_fields = [
+            "uuid",
+            "project",
+        ]

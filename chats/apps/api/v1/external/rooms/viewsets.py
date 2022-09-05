@@ -9,13 +9,38 @@ from chats.apps.api.v1.external.rooms.serializers import RoomFlowSerializer
 from chats.apps.api.v1.external.permissions import IsFlowPermission
 
 
+def add_user_or_queue_to_room(instance, request):
+    # TODO Separate this into smaller methods
+    transfer_history = instance.transfer_history or []
+    user = request.data.get("user_email")
+    queue = request.data.get("queue_uuid")
+
+    # Create transfer object based on whether it's a user or a queue transfer and add it to the history
+    if (user or queue) is None:
+        return None
+
+    if user:
+        _content = {"type": "user", "name": instance.user.first_name}
+        transfer_history.append(_content)
+    if queue:
+        _content = {"type": "queue", "name": instance.queue.name}
+        transfer_history.append(_content)
+    instance.transfer_history = transfer_history
+    instance.save()
+    # Create a message with the transfer data and Send to the room group
+    msg = instance.messages.create(text=json.dumps(_content))
+    msg.notify_room("create")
+
+
 class RoomFlowViewSet(viewsets.ModelViewSet):
     model = Room
+    queryset = Room.objects.all()
     serializer_class = RoomFlowSerializer
     permission_classes = [
         IsFlowPermission,
     ]
     lookup_field = "uuid"
+    authentication_classes = []
 
     @action(detail=True, methods=["PUT", "PATCH"], url_name="close")
     def close(
@@ -33,37 +58,19 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save()
+        instance = serializer.instance
+        add_user_or_queue_to_room(instance, self.request)
+
         serializer.instance.notify_queue("create")
 
     def perform_update(self, serializer):
-        # TODO Separate this into smaller methods
-        transfer_history = self.get_object().transfer_history
-        transfer_history = (
-            [] if transfer_history is None else json.loads(transfer_history)
-        )
-        user = self.request.data.get("user_email")
-        queue = self.request.data.get("queue_uuid")
         serializer.save()
         instance = serializer.instance
+        add_user_or_queue_to_room(instance, self.request)
 
-        # Create transfer object based on whether it's a user or a queue transfer and add it to the history
-        if user:
-            _content = {"type": "user", "name": instance.user.first_name}
-            transfer_history.append(_content)
-        if queue:
-            _content = {"type": "queue", "name": instance.queue.name}
-            transfer_history.append(_content)
-
-        instance.transfer_history = transfer_history
-        instance.save()
-
-        # Create a message with the transfer data and Send to the room group
-        msg = instance.messages.create(text=json.dumps(_content))
-        msg.notify_room("create")
-
-        # Send Updated data to the room group
         instance.notify_room("update")
 
     def perform_destroy(self, instance):
         instance.notify_room("destroy")
+
         super().perform_destroy(instance)

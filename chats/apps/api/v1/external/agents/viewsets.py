@@ -2,9 +2,9 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
 
 
-from chats.apps.queues.models import Queue
-from chats.apps.api.v1.external.queues.serializers import QueueFlowSerializer
-from chats.apps.api.v1.external.queues.filters import QueueFlowFilter
+from chats.apps.projects.models import ProjectPermission
+from chats.apps.api.v1.external.agents.serializers import AgentFlowSerializer
+from chats.apps.api.v1.external.agents.filters import AgentFlowFilter
 from chats.apps.api.v1.external.permissions import IsFlowPermission
 
 
@@ -13,12 +13,12 @@ def get_permission_token_from_request(request):
     return auth_header.split()[1]
 
 
-class QueueFlowViewset(viewsets.ReadOnlyModelViewSet):
-    model = Queue
-    queryset = Queue.objects.all()
-    serializer_class = QueueFlowSerializer
+class AgentFlowViewset(viewsets.ReadOnlyModelViewSet):
+    model = ProjectPermission
+    queryset = ProjectPermission.objects.all()
+    serializer_class = AgentFlowSerializer
     filter_backends = [DjangoFilterBackend]
-    filterset_class = QueueFlowFilter
+    filterset_class = AgentFlowFilter
     permission_classes = [
         IsFlowPermission,
     ]
@@ -28,5 +28,4 @@ class QueueFlowViewset(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         permission = get_permission_token_from_request(self.request)
         qs = super().get_queryset()
-
-        return qs.filter(sector__project__flows__uuid=permission)
+        return qs.filter(project__flows__uuid=permission)

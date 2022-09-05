@@ -7,8 +7,13 @@ Q = models.Q
 
 
 class Contact(BaseModel):
+    external_id = models.CharField(
+        _("External ID"), max_length=200, blank=True, null=True
+    )
     name = models.CharField(_("first name"), max_length=30, blank=True)
-    email = models.EmailField(_("email"), unique=True, help_text=_("User email"))
+    email = models.EmailField(
+        _("email"), unique=False, help_text=_("Contact email"), blank=True, null=True
+    )
     status = models.CharField(_("status"), max_length=30, blank=True)
     phone = models.CharField(_("phone"), max_length=30, blank=True)
 

@@ -23,8 +23,9 @@ class SectorFlowViewset(viewsets.ReadOnlyModelViewSet):
         IsFlowPermission,
     ]
     lookup_field = "uuid"
+    authentication_classes = []
 
     def get_queryset(self):
         permission = get_permission_token_from_request(self.request)
         qs = super().get_queryset()
-        return qs.filter(project__permissions__uuid=permission)
+        return qs.filter(project__flows__uuid=permission)

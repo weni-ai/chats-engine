@@ -37,12 +37,16 @@ class ContactRelationsSerializer(serializers.ModelSerializer):
         model = Contact
         fields = [
             "uuid",
+            "external_id",
             "name",
             "email",
             "status",
             "phone",
             "custom_fields",
             "created_on",
+        ]
+        read_only_fields = [
+            "uuid",
         ]
 
 
