@@ -51,16 +51,16 @@ class Project(BaseModel):
 
 
 class ProjectPermission(BaseModel):
-    NOT_SETTED = 0
-    ADMIN = 1
-    AGENT = 2
-    SERVICE_MANAGER = 3
+    ROLE_NOT_SETTED = 0
+    ROLE_ADMIN = 1
+    ROLE_AGENT = 2
+    ROLE_SERVICE_MANAGER = 3
 
     ROLE_CHOICES = [
-        (NOT_SETTED, _("not set")),
-        (ADMIN, _("admin")),
-        (AGENT, _("agent")),
-        (SERVICE_MANAGER, _("service manager")),
+        (ROLE_NOT_SETTED, _("not set")),
+        (ROLE_ADMIN, _("admin")),
+        (ROLE_AGENT, _("agent")),
+        (ROLE_SERVICE_MANAGER, _("service manager")),
     ]
 
     project = models.ForeignKey(
@@ -79,7 +79,7 @@ class ProjectPermission(BaseModel):
         blank=True,
     )
     role = models.PositiveIntegerField(
-        _("role"), choices=ROLE_CHOICES, default=NOT_SETTED
+        _("role"), choices=ROLE_CHOICES, default=ROLE_NOT_SETTED
     )
 
     class Meta:
