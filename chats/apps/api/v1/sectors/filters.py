@@ -27,7 +27,7 @@ class SectorFilter(filters.FilterSet):
             Q(authorizations__permission__user=self.request.user)
             | Q(
                 Q(project__permissions__user=self.request.user)
-                & Q(project__permissions__role=2)
+                & Q(project__permissions__role=1)
             )
         )
         try:

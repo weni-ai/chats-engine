@@ -765,6 +765,122 @@
         }
     },
     {
+        "model": "auth.permission",
+        "pk": 86,
+        "fields": {
+            "name": "Can add Flow integration",
+            "content_type": 19,
+            "codename": "add_flow"
+        }
+    },
+    {
+        "model": "auth.permission",
+        "pk": 87,
+        "fields": {
+            "name": "Can change Flow integration",
+            "content_type": 19,
+            "codename": "change_flow"
+        }
+    },
+    {
+        "model": "auth.permission",
+        "pk": 88,
+        "fields": {
+            "name": "Can delete Flow integration",
+            "content_type": 19,
+            "codename": "delete_flow"
+        }
+    },
+    {
+        "model": "auth.permission",
+        "pk": 89,
+        "fields": {
+            "name": "Can view Flow integration",
+            "content_type": 19,
+            "codename": "view_flow"
+        }
+    },
+    {
+        "model": "auth.permission",
+        "pk": 90,
+        "fields": {
+            "name": "Can add Token",
+            "content_type": 20,
+            "codename": "add_token"
+        }
+    },
+    {
+        "model": "auth.permission",
+        "pk": 91,
+        "fields": {
+            "name": "Can change Token",
+            "content_type": 20,
+            "codename": "change_token"
+        }
+    },
+    {
+        "model": "auth.permission",
+        "pk": 92,
+        "fields": {
+            "name": "Can delete Token",
+            "content_type": 20,
+            "codename": "delete_token"
+        }
+    },
+    {
+        "model": "auth.permission",
+        "pk": 93,
+        "fields": {
+            "name": "Can view Token",
+            "content_type": 20,
+            "codename": "view_token"
+        }
+    },
+    {
+        "model": "auth.permission",
+        "pk": 94,
+        "fields": {
+            "name": "Can add token",
+            "content_type": 21,
+            "codename": "add_tokenproxy"
+        }
+    },
+    {
+        "model": "auth.permission",
+        "pk": 95,
+        "fields": {
+            "name": "Can change token",
+            "content_type": 21,
+            "codename": "change_tokenproxy"
+        }
+    },
+    {
+        "model": "auth.permission",
+        "pk": 96,
+        "fields": {
+            "name": "Can delete token",
+            "content_type": 21,
+            "codename": "delete_tokenproxy"
+        }
+    },
+    {
+        "model": "auth.permission",
+        "pk": 97,
+        "fields": {
+            "name": "Can view token",
+            "content_type": 21,
+            "codename": "view_tokenproxy"
+        }
+    },
+    {
+        "model": "sessions.session",
+        "pk": "a9nkgjl9zs9g545zoqqutlxrwiv1ke7y",
+        "fields": {
+            "session_data": ".eJxVjDsOwyAQRO9CHSGxFr-U6XMGtLBLcBKBZOzKyt2DJRdJOTPvzS4CbmsJW-clzCSuQilx-S0jphfXY6En1keTqdV1maM8EHmuXd4b8ft2sn8HBXsZtjOWFWRg7aNG47MDGhHJoLPRICuLkyJtU_TeIEQFwHnS6BzpoYnPFw5rOHI:1oRKA7:GvGwpeUFswFUzDD-t73b9M-8qFUZaMhzTeSj1cidTcw",
+            "expire_date": "2022-09-08T21:13:15.534Z"
+        }
+    },
+    {
         "model": "accounts.user",
         "pk": 1,
         "fields": {
@@ -957,14 +1073,35 @@
         }
     },
     {
+        "model": "accounts.user",
+        "pk": 11,
+        "fields": {
+            "password": "pbkdf2_sha256$320000$ywtSUbJ2ptxRWjYsiTA1o4$jZEGoEiPutpFa8Eke6meDLf0WpvddA3CG1u0fgcW7bQ=",
+            "last_login": "2022-08-25T21:13:15.529Z",
+            "is_superuser": true,
+            "first_name": "",
+            "last_name": "",
+            "email": "admin@weni.ai",
+            "photo_url": "",
+            "is_staff": true,
+            "is_active": true,
+            "language": null,
+            "date_joined": "2022-08-25T21:12:39.425Z",
+            "groups": [],
+            "user_permissions": []
+        }
+    },
+    {
         "model": "contacts.contact",
         "pk": "3dda1d84-7c03-4f9a-92a5-24059e10d7a7",
         "fields": {
             "created_on": "2022-08-24T21:59:57.775Z",
             "modified_on": "2022-08-24T21:59:57.775Z",
+            "external_id": null,
             "name": "Carlos Norton",
             "email": "c.norton@chats.weni.ai",
             "status": "online",
+            "phone": "",
             "custom_fields": {
                 "phone_number": "555555"
             }
@@ -976,9 +1113,11 @@
         "fields": {
             "created_on": "2022-08-24T21:59:19.655Z",
             "modified_on": "2022-08-24T21:59:19.655Z",
+            "external_id": null,
             "name": "Denise Thomas",
             "email": "denise@chats.weni.ai",
             "status": "online",
+            "phone": "",
             "custom_fields": {
                 "country": "spain"
             }
@@ -990,9 +1129,11 @@
         "fields": {
             "created_on": "2022-08-24T21:58:57.986Z",
             "modified_on": "2022-08-24T21:58:57.986Z",
+            "external_id": null,
             "name": "Roy Mosley",
             "email": "roy@chats.weni.ai",
             "status": "online",
+            "phone": "",
             "custom_fields": {
                 "country": "turkey"
             }
@@ -1004,12 +1145,28 @@
         "fields": {
             "created_on": "2022-08-24T22:00:35.619Z",
             "modified_on": "2022-08-24T22:00:35.619Z",
+            "external_id": null,
             "name": "Kelsy Paul",
             "email": "kelsyp@chats.weni.ai",
             "status": "online",
+            "phone": "",
             "custom_fields": {
                 "cep": "555555-55"
             }
+        }
+    },
+    {
+        "model": "contacts.contact",
+        "pk": "e0dd0853-8192-4ccd-808d-d4b0b32cdee3",
+        "fields": {
+            "created_on": "2022-09-02T20:59:37.159Z",
+            "modified_on": "2022-09-03T00:20:09.547Z",
+            "external_id": "e3955fd5-5705-40cd-b480-b45594b70282",
+            "name": "Foo Bar",
+            "email": "FooBar@weni.ai",
+            "status": "",
+            "phone": "+250788123123",
+            "custom_fields": {}
         }
     },
     {
@@ -1022,6 +1179,32 @@
             "user": "amywong@chats.weni.ai",
             "contact": null,
             "text": "um acrescimo percentual",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "068342c1-36a6-416c-9863-0e26c70ea886",
+        "fields": {
+            "created_on": "2022-08-26T15:05:10.318Z",
+            "modified_on": "2022-08-26T15:05:10.318Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": "amywong@chats.weni.ai",
+            "contact": null,
+            "text": "xau",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "0a14d348-606d-4535-9e7b-0dc22fe7ff99",
+        "fields": {
+            "created_on": "2022-09-03T00:20:09.586Z",
+            "modified_on": "2022-09-03T00:20:09.586Z",
+            "room": "090da6d1-959e-4dea-994a-41bf0d38ba26",
+            "user": null,
+            "contact": null,
+            "text": "{\"type\": \"queue\", \"name\": \"ENGINE\"}",
             "seen": false
         }
     },
@@ -1040,6 +1223,19 @@
     },
     {
         "model": "msgs.message",
+        "pk": "1ecd9441-6f54-496c-b4a5-f4f4019cbb45",
+        "fields": {
+            "created_on": "2022-08-25T20:44:09.333Z",
+            "modified_on": "2022-08-25T20:44:09.333Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": "amywong@chats.weni.ai",
+            "contact": null,
+            "text": "ola",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
         "pk": "23e4bdb3-6699-4c9b-8103-97d008619659",
         "fields": {
             "created_on": "2022-08-25T05:10:56.981Z",
@@ -1048,6 +1244,97 @@
             "user": "amywong@chats.weni.ai",
             "contact": null,
             "text": "posso ajudar em mais alguma coisa?",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "2b895bd2-f3b2-49b8-bde1-bca5f9ae804b",
+        "fields": {
+            "created_on": "2022-09-01T22:11:21.375Z",
+            "modified_on": "2022-09-01T22:11:21.375Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": null,
+            "contact": "b8e8a66a-7d90-47c9-91fa-c47c5a4848cd",
+            "text": "Testando intregassão",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "2f5e4031-c37b-4fb4-a3ca-89451b2fd359",
+        "fields": {
+            "created_on": "2022-09-01T22:01:25.909Z",
+            "modified_on": "2022-09-01T22:01:25.909Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": null,
+            "contact": "b8e8a66a-7d90-47c9-91fa-c47c5a4848cd",
+            "text": "Testando intregassão",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "4135c0e5-faf4-403f-9d1d-0bdbdffc28e2",
+        "fields": {
+            "created_on": "2022-08-26T19:45:26.669Z",
+            "modified_on": "2022-08-26T19:45:26.669Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": "amywong@chats.weni.ai",
+            "contact": null,
+            "text": "xau",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "43c3ac6b-ef73-4f74-806d-c81f1e6a67c6",
+        "fields": {
+            "created_on": "2022-08-26T20:05:06.675Z",
+            "modified_on": "2022-08-26T20:05:06.675Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": "amywong@chats.weni.ai",
+            "contact": null,
+            "text": "xau",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "4b3e183d-e420-4b47-a3a3-e5738e38386e",
+        "fields": {
+            "created_on": "2022-08-25T19:48:37.764Z",
+            "modified_on": "2022-08-25T19:48:37.764Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": "amywong@chats.weni.ai",
+            "contact": null,
+            "text": "ola",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "4b92aea4-db53-4535-8a38-722a10cf7a47",
+        "fields": {
+            "created_on": "2022-08-26T20:02:12.017Z",
+            "modified_on": "2022-08-26T20:02:12.017Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": "amywong@chats.weni.ai",
+            "contact": null,
+            "text": "xau",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "596348c8-aae4-46a1-85e3-89d88aee1efa",
+        "fields": {
+            "created_on": "2022-09-01T22:09:57.939Z",
+            "modified_on": "2022-09-01T22:09:57.939Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": null,
+            "contact": "b8e8a66a-7d90-47c9-91fa-c47c5a4848cd",
+            "text": "Testando intregassão",
             "seen": false
         }
     },
@@ -1079,6 +1366,32 @@
     },
     {
         "model": "msgs.message",
+        "pk": "642c18e1-65eb-46c4-8538-fb3848b675e7",
+        "fields": {
+            "created_on": "2022-09-01T21:22:39.478Z",
+            "modified_on": "2022-09-01T21:22:39.478Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": null,
+            "contact": "b8e8a66a-7d90-47c9-91fa-c47c5a4848cd",
+            "text": "Testando intregassão",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "65dce7e1-4ace-4c2f-9d29-d16cce81043c",
+        "fields": {
+            "created_on": "2022-09-05T01:53:39.462Z",
+            "modified_on": "2022-09-05T01:53:39.462Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": null,
+            "contact": "b8e8a66a-7d90-47c9-91fa-c47c5a4848cd",
+            "text": "Testando intregassão",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
         "pk": "662a9ffd-34aa-4f32-9ec4-e1981c3cb42d",
         "fields": {
             "created_on": "2022-08-25T05:09:19.839Z",
@@ -1100,6 +1413,97 @@
             "user": "amywong@chats.weni.ai",
             "contact": null,
             "text": "Então sr.pedro, depois de vencido é xau e benção, tenha um bom dia!",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "66db6b6b-f5fa-453c-90cd-f7ca7954adfb",
+        "fields": {
+            "created_on": "2022-08-26T20:02:17.443Z",
+            "modified_on": "2022-08-26T20:02:17.443Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": null,
+            "contact": "b8e8a66a-7d90-47c9-91fa-c47c5a4848cd",
+            "text": "Boa noite",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "6c018269-707a-4f21-a9c2-9b73094c5a56",
+        "fields": {
+            "created_on": "2022-09-04T18:16:00.035Z",
+            "modified_on": "2022-09-04T18:16:00.035Z",
+            "room": "090da6d1-959e-4dea-994a-41bf0d38ba26",
+            "user": null,
+            "contact": null,
+            "text": "{\"type\": \"user\", \"name\": \"\"}",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "71733968-cfe7-4320-88ae-2ab83dc1392c",
+        "fields": {
+            "created_on": "2022-09-01T21:19:10.526Z",
+            "modified_on": "2022-09-01T21:19:10.526Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": null,
+            "contact": "b8e8a66a-7d90-47c9-91fa-c47c5a4848cd",
+            "text": "Testando intregassão",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "7533a6f5-0934-4046-ac80-acc9f5e99d51",
+        "fields": {
+            "created_on": "2022-09-02T20:53:47.627Z",
+            "modified_on": "2022-09-02T20:53:47.627Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": null,
+            "contact": "b8e8a66a-7d90-47c9-91fa-c47c5a4848cd",
+            "text": "Testando intregassão",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "7af9277a-7739-4e4c-8175-a03c3d9c84b2",
+        "fields": {
+            "created_on": "2022-09-01T22:03:51.733Z",
+            "modified_on": "2022-09-01T22:03:51.733Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": null,
+            "contact": "b8e8a66a-7d90-47c9-91fa-c47c5a4848cd",
+            "text": "Testando intregassão",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "7c662039-0279-45f3-96ed-c14ea8b951c2",
+        "fields": {
+            "created_on": "2022-09-01T20:56:17.132Z",
+            "modified_on": "2022-09-01T20:56:17.132Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": null,
+            "contact": "b8e8a66a-7d90-47c9-91fa-c47c5a4848cd",
+            "text": "Testando intregassão",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "85899204-dc7f-4e1c-8710-5ef79300591f",
+        "fields": {
+            "created_on": "2022-09-01T21:28:55.770Z",
+            "modified_on": "2022-09-01T21:28:55.770Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": null,
+            "contact": "b8e8a66a-7d90-47c9-91fa-c47c5a4848cd",
+            "text": "Testando intregassão",
             "seen": false
         }
     },
@@ -1144,6 +1548,45 @@
     },
     {
         "model": "msgs.message",
+        "pk": "95fbdc90-3be3-4cea-bc28-a4a6d9b22c66",
+        "fields": {
+            "created_on": "2022-09-01T21:35:45.240Z",
+            "modified_on": "2022-09-01T21:35:45.240Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": null,
+            "contact": "b8e8a66a-7d90-47c9-91fa-c47c5a4848cd",
+            "text": "Testando intregassão",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "9f0ad523-0ff8-4ca2-b477-0a87fd848203",
+        "fields": {
+            "created_on": "2022-09-01T22:06:47.546Z",
+            "modified_on": "2022-09-01T22:06:47.546Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": null,
+            "contact": "b8e8a66a-7d90-47c9-91fa-c47c5a4848cd",
+            "text": "Testando intregassão",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "a00486d4-d7d8-4bee-9401-ba2352e7fc92",
+        "fields": {
+            "created_on": "2022-09-01T21:11:25.777Z",
+            "modified_on": "2022-09-01T21:11:25.777Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": null,
+            "contact": "b8e8a66a-7d90-47c9-91fa-c47c5a4848cd",
+            "text": "Testando intregassão",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
         "pk": "a13089f3-dbf2-4028-b70a-9628daa3d08f",
         "fields": {
             "created_on": "2022-08-25T05:06:38.524Z",
@@ -1170,6 +1613,45 @@
     },
     {
         "model": "msgs.message",
+        "pk": "a89b64a1-0169-4b5e-9573-f17f005a7938",
+        "fields": {
+            "created_on": "2022-09-01T21:39:25.209Z",
+            "modified_on": "2022-09-01T21:39:25.209Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": null,
+            "contact": "b8e8a66a-7d90-47c9-91fa-c47c5a4848cd",
+            "text": "Testando intregassão",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "b0bdee09-13cf-434f-99cd-01d45f9b1f06",
+        "fields": {
+            "created_on": "2022-09-01T20:54:15.535Z",
+            "modified_on": "2022-09-01T20:54:15.535Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": null,
+            "contact": "b8e8a66a-7d90-47c9-91fa-c47c5a4848cd",
+            "text": "Testando intregassão",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "b367d856-4897-4d79-988f-9b498c0c6cf3",
+        "fields": {
+            "created_on": "2022-08-25T20:40:33.348Z",
+            "modified_on": "2022-08-25T20:40:33.348Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": "amywong@chats.weni.ai",
+            "contact": null,
+            "text": "ola",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
         "pk": "b9312612-c26d-45ec-b9bb-7f116771fdd6",
         "fields": {
             "created_on": "2022-08-25T05:06:55.885Z",
@@ -1183,6 +1665,19 @@
     },
     {
         "model": "msgs.message",
+        "pk": "ba664e84-dd47-42de-abea-618ad580fb86",
+        "fields": {
+            "created_on": "2022-08-25T19:57:25.470Z",
+            "modified_on": "2022-08-25T19:57:25.470Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": "amywong@chats.weni.ai",
+            "contact": null,
+            "text": "ola",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
         "pk": "be0c728b-2ada-4b2b-868a-1a82a7de901c",
         "fields": {
             "created_on": "2022-08-25T05:09:31.460Z",
@@ -1191,6 +1686,58 @@
             "user": null,
             "contact": "b8e8a66a-7d90-47c9-91fa-c47c5a4848cd",
             "text": "boletos",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "bed38869-5856-44af-8043-fcac30ec6fb5",
+        "fields": {
+            "created_on": "2022-08-25T20:46:13.534Z",
+            "modified_on": "2022-08-25T20:46:13.534Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": "amywong@chats.weni.ai",
+            "contact": null,
+            "text": "ola",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "c3076f90-82f2-44e1-9f29-91c495175881",
+        "fields": {
+            "created_on": "2022-08-26T19:41:20.874Z",
+            "modified_on": "2022-08-26T19:41:20.874Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": null,
+            "contact": "b8e8a66a-7d90-47c9-91fa-c47c5a4848cd",
+            "text": "Boa noite",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "c4141d4f-bdb8-48b9-8120-268734b1adbf",
+        "fields": {
+            "created_on": "2022-08-25T21:20:37.686Z",
+            "modified_on": "2022-08-25T21:20:37.686Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": "amywong@chats.weni.ai",
+            "contact": null,
+            "text": "ola",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "c9f46c1a-1188-45a3-b753-84ff1b12a302",
+        "fields": {
+            "created_on": "2022-08-25T22:25:53.871Z",
+            "modified_on": "2022-08-25T22:25:53.871Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": "amywong@chats.weni.ai",
+            "contact": null,
+            "text": "ola",
             "seen": false
         }
     },
@@ -1248,6 +1795,19 @@
     },
     {
         "model": "msgs.message",
+        "pk": "d7ce9065-ad67-4fdf-8e81-ab5167204e6d",
+        "fields": {
+            "created_on": "2022-09-01T21:35:23.572Z",
+            "modified_on": "2022-09-01T21:35:23.572Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": null,
+            "contact": "b8e8a66a-7d90-47c9-91fa-c47c5a4848cd",
+            "text": "Testando intregassão",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
         "pk": "d83f461c-b615-47fd-80d5-6bae8edc0c26",
         "fields": {
             "created_on": "2022-08-25T04:57:50.331Z",
@@ -1256,6 +1816,58 @@
             "user": "amywong@chats.weni.ai",
             "contact": null,
             "text": "Opa mensagem errada, qual sua duvida sobre o modulo de chats?",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "da109148-8338-4a50-8df0-179e5f1818ef",
+        "fields": {
+            "created_on": "2022-09-01T22:03:29.115Z",
+            "modified_on": "2022-09-01T22:03:29.115Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": null,
+            "contact": "b8e8a66a-7d90-47c9-91fa-c47c5a4848cd",
+            "text": "Testando intregassão",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "dddb1294-8abf-461d-a50a-ef8cc7920f67",
+        "fields": {
+            "created_on": "2022-08-26T21:00:59.998Z",
+            "modified_on": "2022-08-26T21:00:59.998Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": "amywong@chats.weni.ai",
+            "contact": null,
+            "text": "xau",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "dfbad736-1045-4a35-8707-e76974bbce07",
+        "fields": {
+            "created_on": "2022-08-26T14:40:59.342Z",
+            "modified_on": "2022-08-26T14:40:59.342Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": "amywong@chats.weni.ai",
+            "contact": null,
+            "text": "xau",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "e29d216e-b321-4bff-8f91-aabac2f9184f",
+        "fields": {
+            "created_on": "2022-09-01T21:39:25.192Z",
+            "modified_on": "2022-09-01T21:39:25.192Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": null,
+            "contact": "b8e8a66a-7d90-47c9-91fa-c47c5a4848cd",
+            "text": "Testando intregassão",
             "seen": false
         }
     },
@@ -1274,6 +1886,19 @@
     },
     {
         "model": "msgs.message",
+        "pk": "f0c603d0-141d-4063-ad8c-42863c6cf00e",
+        "fields": {
+            "created_on": "2022-09-01T22:02:31.953Z",
+            "modified_on": "2022-09-01T22:02:31.953Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": null,
+            "contact": "b8e8a66a-7d90-47c9-91fa-c47c5a4848cd",
+            "text": "Testando intregassão",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
         "pk": "f1b0600c-c244-4fbd-8c4a-b7602c5c71c5",
         "fields": {
             "created_on": "2022-08-25T05:11:14.095Z",
@@ -1282,6 +1907,19 @@
             "user": null,
             "contact": "b8e8a66a-7d90-47c9-91fa-c47c5a4848cd",
             "text": "era so isso mesmo, obrigado e tenha um bom dia",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "f8b45081-5c6e-4e83-bb6e-bf9044c2781a",
+        "fields": {
+            "created_on": "2022-08-25T22:25:59.989Z",
+            "modified_on": "2022-08-25T22:25:59.989Z",
+            "room": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
+            "user": "amywong@chats.weni.ai",
+            "contact": null,
+            "text": "xau",
             "seen": false
         }
     },
@@ -1325,11 +1963,281 @@
         }
     },
     {
+        "model": "msgs.messagemedia",
+        "pk": "026ae6d6-fdb1-4c43-ab5f-42c7087ce5e6",
+        "fields": {
+            "created_on": "2022-09-05T01:53:39.474Z",
+            "modified_on": "2022-09-05T01:53:39.474Z",
+            "message": "65dce7e1-4ace-4c2f-9d29-d16cce81043c",
+            "content_type": "audio/wav",
+            "media_file": "",
+            "media_url": "http://domain.com/recording.wav"
+        }
+    },
+    {
+        "model": "msgs.messagemedia",
+        "pk": "0ac5cdf3-25d5-410f-bb3a-4200c35edf3c",
+        "fields": {
+            "created_on": "2022-09-02T20:53:47.639Z",
+            "modified_on": "2022-09-02T20:53:47.639Z",
+            "message": "7533a6f5-0934-4046-ac80-acc9f5e99d51",
+            "content_type": "audio/wav",
+            "media_file": "",
+            "media_url": "http://domain.com/recording.wav"
+        }
+    },
+    {
+        "model": "msgs.messagemedia",
+        "pk": "0c44f8f7-9508-45c3-8383-4485de24f41e",
+        "fields": {
+            "created_on": "2022-09-01T22:03:29.126Z",
+            "modified_on": "2022-09-01T22:03:29.126Z",
+            "message": "da109148-8338-4a50-8df0-179e5f1818ef",
+            "content_type": "audio/wav",
+            "media_file": "",
+            "media_url": "http://domain.com/recording.wav"
+        }
+    },
+    {
+        "model": "msgs.messagemedia",
+        "pk": "451bb3cd-dc53-45a2-9ab5-601c50ff6226",
+        "fields": {
+            "created_on": "2022-09-01T22:11:21.386Z",
+            "modified_on": "2022-09-01T22:11:21.386Z",
+            "message": "2b895bd2-f3b2-49b8-bde1-bca5f9ae804b",
+            "content_type": "audio/wav",
+            "media_file": "",
+            "media_url": "http://domain.com/recording.wav"
+        }
+    },
+    {
+        "model": "msgs.messagemedia",
+        "pk": "58fc09cb-4d01-4a96-b29a-a5bb91928910",
+        "fields": {
+            "created_on": "2022-09-01T22:06:47.550Z",
+            "modified_on": "2022-09-01T22:06:47.550Z",
+            "message": "9f0ad523-0ff8-4ca2-b477-0a87fd848203",
+            "content_type": "audio/wav",
+            "media_file": "",
+            "media_url": "http://domain.com/recording.wav"
+        }
+    },
+    {
+        "model": "msgs.messagemedia",
+        "pk": "6944f4ec-9ab7-4750-ad29-d10672c983bd",
+        "fields": {
+            "created_on": "2022-09-01T22:01:25.921Z",
+            "modified_on": "2022-09-01T22:01:25.921Z",
+            "message": "2f5e4031-c37b-4fb4-a3ca-89451b2fd359",
+            "content_type": "audio/wav",
+            "media_file": "",
+            "media_url": "http://domain.com/recording.wav"
+        }
+    },
+    {
+        "model": "msgs.messagemedia",
+        "pk": "6c4fc6ee-bbb8-48bd-8f67-661b79de3fee",
+        "fields": {
+            "created_on": "2022-09-01T22:02:31.957Z",
+            "modified_on": "2022-09-01T22:02:31.957Z",
+            "message": "f0c603d0-141d-4063-ad8c-42863c6cf00e",
+            "content_type": "audio/wav",
+            "media_file": "",
+            "media_url": "http://domain.com/recording.wav"
+        }
+    },
+    {
+        "model": "msgs.messagemedia",
+        "pk": "81fcb0ba-2a2e-43c3-827b-24a78d3f85dc",
+        "fields": {
+            "created_on": "2022-09-01T22:03:29.126Z",
+            "modified_on": "2022-09-01T22:03:29.126Z",
+            "message": "da109148-8338-4a50-8df0-179e5f1818ef",
+            "content_type": "audio/wav",
+            "media_file": "",
+            "media_url": "http://domain.com/recording.wav"
+        }
+    },
+    {
+        "model": "msgs.messagemedia",
+        "pk": "8cc3410d-6ebd-4210-af0e-e295e02b91ef",
+        "fields": {
+            "created_on": "2022-09-01T21:39:25.205Z",
+            "modified_on": "2022-09-01T21:39:25.205Z",
+            "message": "e29d216e-b321-4bff-8f91-aabac2f9184f",
+            "content_type": "audio/wav",
+            "media_file": "",
+            "media_url": "http://domain.com/recording.wav"
+        }
+    },
+    {
+        "model": "msgs.messagemedia",
+        "pk": "8fb7582d-3f64-46a5-9ef0-29da45e6d1eb",
+        "fields": {
+            "created_on": "2022-09-01T22:01:25.921Z",
+            "modified_on": "2022-09-01T22:01:25.921Z",
+            "message": "2f5e4031-c37b-4fb4-a3ca-89451b2fd359",
+            "content_type": "audio/wav",
+            "media_file": "",
+            "media_url": "http://domain.com/recording.wav"
+        }
+    },
+    {
+        "model": "msgs.messagemedia",
+        "pk": "90de9a24-5cda-4f3d-b231-a578765ceac3",
+        "fields": {
+            "created_on": "2022-09-02T20:53:47.639Z",
+            "modified_on": "2022-09-02T20:53:47.639Z",
+            "message": "7533a6f5-0934-4046-ac80-acc9f5e99d51",
+            "content_type": "audio/wav",
+            "media_file": "",
+            "media_url": "http://domain.com/recording.wav"
+        }
+    },
+    {
+        "model": "msgs.messagemedia",
+        "pk": "91df752e-9ad4-469d-afd1-9452ca607c12",
+        "fields": {
+            "created_on": "2022-09-01T21:39:25.205Z",
+            "modified_on": "2022-09-01T21:39:25.205Z",
+            "message": "e29d216e-b321-4bff-8f91-aabac2f9184f",
+            "content_type": "audio/wav",
+            "media_file": "",
+            "media_url": "http://domain.com/recording.wav"
+        }
+    },
+    {
+        "model": "msgs.messagemedia",
+        "pk": "92ecff26-2cb8-40e9-9b10-6fbb15dc4e1e",
+        "fields": {
+            "created_on": "2022-09-01T22:03:51.744Z",
+            "modified_on": "2022-09-01T22:03:51.744Z",
+            "message": "7af9277a-7739-4e4c-8175-a03c3d9c84b2",
+            "content_type": "audio/wav",
+            "media_file": "",
+            "media_url": "http://domain.com/recording.wav"
+        }
+    },
+    {
+        "model": "msgs.messagemedia",
+        "pk": "a4db938c-2184-4260-b929-2c9a29ef0c64",
+        "fields": {
+            "created_on": "2022-09-01T22:02:31.957Z",
+            "modified_on": "2022-09-01T22:02:31.957Z",
+            "message": "f0c603d0-141d-4063-ad8c-42863c6cf00e",
+            "content_type": "audio/wav",
+            "media_file": "",
+            "media_url": "http://domain.com/recording.wav"
+        }
+    },
+    {
+        "model": "msgs.messagemedia",
+        "pk": "acfe7b8d-c919-4818-b412-652929243a50",
+        "fields": {
+            "created_on": "2022-09-05T01:53:39.473Z",
+            "modified_on": "2022-09-05T01:53:39.473Z",
+            "message": "65dce7e1-4ace-4c2f-9d29-d16cce81043c",
+            "content_type": "audio/wav",
+            "media_file": "",
+            "media_url": "http://domain.com/recording.wav"
+        }
+    },
+    {
+        "model": "msgs.messagemedia",
+        "pk": "b2c24c03-364d-47ca-a83e-0d4760f04e40",
+        "fields": {
+            "created_on": "2022-09-01T22:11:21.386Z",
+            "modified_on": "2022-09-01T22:11:21.386Z",
+            "message": "2b895bd2-f3b2-49b8-bde1-bca5f9ae804b",
+            "content_type": "audio/wav",
+            "media_file": "",
+            "media_url": "http://domain.com/recording.wav"
+        }
+    },
+    {
+        "model": "msgs.messagemedia",
+        "pk": "ce5754d6-282f-4b26-ba93-6ac3619bdb4f",
+        "fields": {
+            "created_on": "2022-09-01T22:03:51.744Z",
+            "modified_on": "2022-09-01T22:03:51.744Z",
+            "message": "7af9277a-7739-4e4c-8175-a03c3d9c84b2",
+            "content_type": "audio/wav",
+            "media_file": "",
+            "media_url": "http://domain.com/recording.wav"
+        }
+    },
+    {
+        "model": "msgs.messagemedia",
+        "pk": "d14484d3-4475-45e3-8a87-38986d821009",
+        "fields": {
+            "created_on": "2022-09-01T22:06:47.550Z",
+            "modified_on": "2022-09-01T22:06:47.550Z",
+            "message": "9f0ad523-0ff8-4ca2-b477-0a87fd848203",
+            "content_type": "audio/wav",
+            "media_file": "",
+            "media_url": "http://domain.com/recording.wav"
+        }
+    },
+    {
+        "model": "msgs.messagemedia",
+        "pk": "d74fee83-510c-499d-87bf-fe7e7e4cee6a",
+        "fields": {
+            "created_on": "2022-09-01T22:09:57.954Z",
+            "modified_on": "2022-09-01T22:09:57.954Z",
+            "message": "596348c8-aae4-46a1-85e3-89d88aee1efa",
+            "content_type": "audio/wav",
+            "media_file": "",
+            "media_url": "http://domain.com/recording.wav"
+        }
+    },
+    {
+        "model": "msgs.messagemedia",
+        "pk": "ecba72e8-c672-485f-a778-d9a3d0270f73",
+        "fields": {
+            "created_on": "2022-09-01T22:09:57.954Z",
+            "modified_on": "2022-09-01T22:09:57.954Z",
+            "message": "596348c8-aae4-46a1-85e3-89d88aee1efa",
+            "content_type": "audio/wav",
+            "media_file": "",
+            "media_url": "http://domain.com/recording.wav"
+        }
+    },
+    {
+        "model": "rooms.room",
+        "pk": "090da6d1-959e-4dea-994a-41bf0d38ba26",
+        "fields": {
+            "created_on": "2022-09-03T00:20:09.559Z",
+            "modified_on": "2022-09-04T18:16:00.031Z",
+            "user": "amywong@chats.weni.ai",
+            "contact": "e0dd0853-8192-4ccd-808d-d4b0b32cdee3",
+            "queue": "f2519480-7e58-4fc4-9894-9ab1769e29cf",
+            "custom_fields": {
+                "mood": "angry",
+                "country": "brazil"
+            },
+            "callback_url": "https://flows.weni.ai/callback/uuid",
+            "ended_at": null,
+            "ended_by": null,
+            "is_active": true,
+            "transfer_history": [
+                {
+                    "name": "ENGINE",
+                    "type": "queue"
+                },
+                {
+                    "name": "",
+                    "type": "user"
+                }
+            ],
+            "tags": []
+        }
+    },
+    {
         "model": "rooms.room",
         "pk": "8ecb1e4a-b457-4645-a161-e2b02ddffa88",
         "fields": {
             "created_on": "2022-08-24T22:05:10.928Z",
-            "modified_on": "2022-08-25T04:55:50.771Z",
+            "modified_on": "2022-08-26T14:09:52.391Z",
             "user": "amywong@chats.weni.ai",
             "contact": "b8e8a66a-7d90-47c9-91fa-c47c5a4848cd",
             "queue": "f2519480-7e58-4fc4-9894-9ab1769e29cf",
@@ -1338,16 +2246,19 @@
                 "time_waiting": 56
             },
             "callback_url": null,
-            "ended_at": null,
-            "ended_by": null,
+            "ended_at": "2022-08-26T11:30:05.198Z",
+            "ended_by": "agent",
             "is_active": true,
             "transfer_history": [
                 {
-                    "type": "user",
-                    "name": ""
+                    "name": "",
+                    "type": "user"
                 }
             ],
-            "tags": []
+            "tags": [
+                "f4b8aa78-7735-4dd2-9999-941ebb8e4e35",
+                "1a84b46e-0f91-41da-ac9d-a68c0b9753ab"
+            ]
         }
     },
     {
@@ -1369,12 +2280,26 @@
         "pk": "4f88b656-194d-4a83-a166-5d84ba825b8d",
         "fields": {
             "created_on": "2022-08-24T20:58:36.420Z",
-            "modified_on": "2022-08-24T20:58:36.420Z",
+            "modified_on": "2022-09-05T21:10:24.340Z",
             "name": "Inteligencia",
             "project": "34a93b52-231e-11ed-861d-0242ac120002",
             "rooms_limit": 3,
-            "work_start": "08:00:00",
+            "work_start": "09:00:00",
             "work_end": "17:00:00",
+            "is_deleted": false
+        }
+    },
+    {
+        "model": "sectors.sector",
+        "pk": "9038b080-e69a-400d-876d-5c64d220aef8",
+        "fields": {
+            "created_on": "2022-09-05T21:10:49.540Z",
+            "modified_on": "2022-09-05T21:10:49.540Z",
+            "name": "esboço",
+            "project": "34a93b52-231e-11ed-861d-0242ac120002",
+            "rooms_limit": 2,
+            "work_start": "09:00:00",
+            "work_end": "16:00:00",
             "is_deleted": false
         }
     },
@@ -1500,8 +2425,8 @@
         "model": "queues.queueauthorization",
         "pk": "90a19e3e-6f6b-46ab-b51a-dbbc3d69138c",
         "fields": {
-            "created_on": "2022-08-24T21:45:25.000Z",
-            "modified_on": "2022-08-24T21:45:25.000Z",
+            "created_on": "2022-08-24T21:45:25Z",
+            "modified_on": "2022-08-24T21:45:25Z",
             "queue": "e17ca4d6-af57-4d12-8dd2-a25952c94400",
             "role": 1,
             "permission": "ce3f052c-e71d-402c-b02e-1dfaca8b3d45"
@@ -1559,7 +2484,7 @@
             "modified_on": "2022-08-24T20:25:54.375Z",
             "project": "34a93b52-231e-11ed-861d-0242ac120002",
             "user": "johndoe@chats.weni.ai",
-            "role": 1
+            "role": 3
         }
     },
     {
@@ -1570,7 +2495,7 @@
             "modified_on": "2022-08-24T20:25:36.278Z",
             "project": "34a93b52-231e-11ed-861d-0242ac120002",
             "user": "foobar@chats.weni.ai",
-            "role": 1
+            "role": 3
         }
     },
     {
@@ -1581,7 +2506,7 @@
             "modified_on": "2022-08-24T20:19:28.826Z",
             "project": "34a93b52-231e-11ed-861d-0242ac120002",
             "user": "amazoninhaweni@chats.weni.ai",
-            "role": 2
+            "role": 1
         }
     },
     {
@@ -1592,7 +2517,7 @@
             "modified_on": "2022-08-24T20:28:05.281Z",
             "project": "34a93b52-231e-11ed-861d-0242ac120002",
             "user": "amywong@chats.weni.ai",
-            "role": 1
+            "role": 2
         }
     },
     {
@@ -1603,7 +2528,7 @@
             "modified_on": "2022-08-24T20:28:22.966Z",
             "project": "34a93b52-231e-11ed-861d-0242ac120002",
             "user": "linalawson@chats.weni.ai",
-            "role": 1
+            "role": 2
         }
     },
     {
@@ -1626,6 +2551,16 @@
             "project": "34a93b52-231e-11ed-861d-0242ac120002",
             "user": "janeduren@chats.weni.ai",
             "role": 1
+        }
+    },
+    {
+        "model": "projects.flow",
+        "pk": "56336d40-ff31-49f1-ace4-edf08a0ee71e",
+        "fields": {
+            "created_on": "2022-09-02T20:39:55.075Z",
+            "modified_on": "2022-09-02T20:39:55.075Z",
+            "project_flows_uuid": "20f82849-5189-40d1-bd93-62adaaa644d2",
+            "project": "34a93b52-231e-11ed-861d-0242ac120002"
         }
     },
     {
