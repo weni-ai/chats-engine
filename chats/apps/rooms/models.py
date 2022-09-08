@@ -63,14 +63,14 @@ class Room(BaseModel):
         blank=True,
     )
 
+    class Meta:
+        verbose_name = _("Room")
+        verbose_name_plural = _("Rooms")
+
     def save(self, *args, **kwargs) -> None:
         if self.is_active is False:
             raise ValidationError(_("Closed rooms cannot receive updates"))
         return super().save(*args, **kwargs)
-
-    class Meta:
-        verbose_name = _("Room")
-        verbose_name_plural = _("Rooms")
 
     def get_permission(self, user):
         return self.queue.get_permission(user)

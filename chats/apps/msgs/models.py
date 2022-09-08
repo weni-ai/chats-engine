@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from rest_framework.exceptions import ValidationError
 
 from chats.core.models import BaseModel
 from chats.utils.websockets import send_channels_group
@@ -35,6 +36,11 @@ class Message(BaseModel):
     class Meta:
         verbose_name = "Message"
         verbose_name_plural = "Messages"
+
+    def save(self, *args, **kwargs) -> None:
+        if self.room.is_active is False:
+            raise ValidationError(_("Closed rooms cannot receive messages"))
+        return super().save(*args, **kwargs)
 
     @property
     def serialized_ws_data(self):
@@ -77,6 +83,11 @@ class MessageMedia(BaseModel):
 
     def __str__(self):
         return f"{self.message.pk} - {self.media}"
+
+    def save(self, *args, **kwargs) -> None:
+        if self.message.room.is_active is False:
+            raise ValidationError(_("Closed rooms cannot receive messages"))
+        return super().save(*args, **kwargs)
 
     @property
     def url(self):
