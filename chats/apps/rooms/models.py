@@ -3,6 +3,7 @@ import json
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from rest_framework.exceptions import ValidationError
 
 from chats.core.models import BaseModel
 from chats.utils.websockets import send_channels_group
@@ -61,6 +62,11 @@ class Room(BaseModel):
         verbose_name=_("tags"),
         blank=True,
     )
+
+    def save(self, *args, **kwargs) -> None:
+        if self.is_active is False:
+            raise ValidationError(_("Closed rooms cannot receive updates"))
+        return super().save(*args, **kwargs)
 
     class Meta:
         verbose_name = _("Room")
