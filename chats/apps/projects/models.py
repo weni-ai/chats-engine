@@ -159,7 +159,7 @@ class ProjectPermission(BaseModel):
         return self.project.get_permission(user=user)
 
     @property
-    def get_rooms_limit(self):
+    def rooms_limit(self):
         if self.role == self.ROLE_AGENT:
             limits = (
                 self.queue_authorizations.all()
