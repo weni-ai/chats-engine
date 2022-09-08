@@ -3,13 +3,13 @@ from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from chats.apps.api.v1.permissions import (
-    IsProjectAdmin,
-    IsSectorManager,
-    IsQueueAgent,
-)
+from chats.apps.api.v1.permissions import IsProjectAdmin, IsQueueAgent, IsSectorManager
 from chats.apps.api.v1.sectors import serializers as sector_serializers
-from chats.apps.api.v1.sectors.filters import SectorFilter, SectorTagFilter
+from chats.apps.api.v1.sectors.filters import (
+    SectorAuthorizationFilter,
+    SectorFilter,
+    SectorTagFilter,
+)
 from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 
 
@@ -100,6 +100,8 @@ class SectorTagsViewset(viewsets.ModelViewSet):
 class SectorAuthorizationViewset(viewsets.ModelViewSet):
     queryset = SectorAuthorization.objects.all()
     serializer_class = sector_serializers.SectorAuthorizationSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = SectorAuthorizationFilter
     permission_classes = [IsAuthenticated]
     lookup_field = "uuid"
 
