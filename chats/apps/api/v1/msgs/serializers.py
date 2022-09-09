@@ -18,6 +18,8 @@ class MessageMediaSerializer(serializers.ModelSerializer):
         model = MessageMedia
         fields = [
             "content_type",
+            "message",
+            "media_file",
             "url",
         ]
 
