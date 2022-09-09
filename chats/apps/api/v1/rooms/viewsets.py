@@ -7,6 +7,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
+from rest_framework.exceptions import ValidationError
 
 from chats.apps.api.v1.rooms.serializers import RoomSerializer, TransferRoomSerializer
 from chats.apps.rooms.models import Room
@@ -50,6 +51,10 @@ class RoomViewset(
         # Add send room notification to the channels group
         instance = self.get_object()
         tags = request.data.get("tags", None)
+        if tags is None:
+            raise ValidationError(
+                _("You cannot close a room without giving tags to it")
+            )
         instance.close(tags, "agent")
         serialized_data = RoomSerializer(instance=instance)
         instance.notify_queue("close")
