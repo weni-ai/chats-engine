@@ -72,22 +72,6 @@ class Room(BaseModel):
             raise ValidationError(_("Closed rooms cannot receive updates"))
         return super().save(*args, **kwargs)
 
-    def set_random_agent(self):
-        if self.user:
-            return None
-        project = self.sector.project
-        qauth = self.queue.authorizations.annotate(
-            limit=models.Max(
-                "permission__queue_authorizations__queue__sector__rooms_limit"
-            )
-        )
-        qauth.annotate(
-            rooms=models.Count(
-                "user__rooms",
-                filter=models.Q(user__rooms__queue__sector__project=project),
-            )
-        )
-
     def get_permission(self, user):
         return self.queue.get_permission(user)
 

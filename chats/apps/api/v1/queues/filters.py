@@ -60,6 +60,16 @@ class QueueAuthorizationFilter(filters.FilterSet):
         help_text=_("sector's ID"),
     )
 
+    status = filters.CharFilter(
+        field_name="status",
+        required=False,
+        method="filter_status",
+        help_text=_("User Status"),
+    )
+
+    def filter_status(self, queryset, name, value):
+        return queryset.filter(permission__status=value)
+
     def filter_sector(self, queryset, name, value):
         """
         Return queue auth given a user, will check if the user is the project admin or

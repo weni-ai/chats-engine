@@ -4,7 +4,7 @@ from rest_framework.viewsets import ModelViewSet
 
 from chats.apps.api.v1.permissions import IsSectorManager
 from chats.apps.api.v1.queues import serializers as queue_serializers
-from chats.apps.api.v1.queues.filters import QueueFilter
+from chats.apps.api.v1.queues.filters import QueueFilter, QueueAuthorizationFilter
 from chats.apps.queues.models import Queue, QueueAuthorization
 
 
@@ -35,7 +35,7 @@ class QueueAuthorizationViewset(ModelViewSet):
     queryset = QueueAuthorization.objects.all()
     serializer_class = queue_serializers.QueueAuthorizationSerializer
     filter_backends = [DjangoFilterBackend]
-    # filterset_class = QueueAuthorizationFilter
+    filterset_class = QueueAuthorizationFilter
     filterset_fields = [
         "queue",
     ]

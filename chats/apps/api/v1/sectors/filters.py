@@ -49,8 +49,18 @@ class SectorAuthorizationFilter(filters.FilterSet):
         help_text=_("Sector's UUID"),
     )
 
+    status = filters.CharFilter(
+        field_name="status",
+        required=False,
+        method="filter_status",
+        help_text=_("User Status"),
+    )
+
     def filter_sector(self, queryset, name, value):
         return queryset.filter(sector__uuid=value)
+
+    def filter_status(self, queryset, name, value):
+        return queryset.filter(permission__status=value)
 
 
 class SectorTagFilter(filters.FilterSet):
