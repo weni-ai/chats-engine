@@ -64,4 +64,6 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         queue = validated_data.pop("queue")
 
         room = Room.objects.create(**validated_data, contact=contact, queue=queue)
+        if room.user is None:
+            room.set_random_agent()
         return room
