@@ -32,6 +32,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             await self.accept()
             await self.load_rooms()
             await self.load_user()
+            await self.set_user_status("online")
 
     async def disconnect(self, *args, **kwargs):
         for group in set(self.groups):
@@ -102,6 +103,11 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         await self.send_json(event)
 
     # SYNC HELPER FUNCTIONS
+
+    @database_sync_to_async
+    def set_user_status(self, status: str):
+        self.permission.status = status
+        self.permission.save()
 
     @database_sync_to_async
     def get_permission(self):

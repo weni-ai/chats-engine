@@ -36,9 +36,6 @@ class QueueAuthorizationViewset(ModelViewSet):
     serializer_class = queue_serializers.QueueAuthorizationSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = QueueAuthorizationFilter
-    filterset_fields = [
-        "queue",
-    ]
     permission_classes = [
         IsAuthenticated,
         IsSectorManager,
