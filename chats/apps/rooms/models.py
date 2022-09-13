@@ -1,4 +1,5 @@
 import json
+import requests
 
 from django.db import models
 from django.utils import timezone
@@ -126,7 +127,7 @@ class Room(BaseModel):
             action=f"rooms.{action}",
         )
 
-    def notify_room(self, action):
+    def notify_room(self, action: str, callback: bool = False):
         """
         Used to notify channels groups when something happens on the instance.
 
@@ -144,3 +145,8 @@ class Room(BaseModel):
             content=self.serialized_ws_data,
             action=f"rooms.{action}",
         )
+
+        if self.room.callback_url and callback and action in ["update", "destroy"]:
+            requests.post(
+                self.callback_url, data={"type": "room.update", "content": self}
+            )

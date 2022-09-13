@@ -1,3 +1,5 @@
+import requests
+
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
@@ -54,7 +56,7 @@ class Message(BaseModel):
     def media(self):
         return self.medias.all()
 
-    def notify_room(self, action):
+    def notify_room(self, action: str, callback: bool = False):
         """ """
         send_channels_group(
             group_name=f"room_{self.room.pk}",
@@ -62,6 +64,11 @@ class Message(BaseModel):
             content=self.serialized_ws_data,
             action=f"msg.{action}",
         )
+
+        if self.room.callback_url and callback:
+            requests.post(
+                self.room.callback_url, data={"type": "room.update", "content": self}
+            )
 
 
 class MessageMedia(BaseModel):

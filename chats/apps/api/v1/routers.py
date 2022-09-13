@@ -23,7 +23,6 @@ from chats.apps.api.v1.internal.queues.viewsets import (
     QueueAuthInternalViewset,
 )
 
-from chats.apps.api.v1.external.flows.viewsets import FlowViewSet
 from chats.apps.api.v1.external.msgs.viewsets import MessageFlowViewset
 from chats.apps.api.v1.external.rooms.viewsets import RoomFlowViewSet
 from chats.apps.api.v1.external.sectors.viewsets import SectorFlowViewset
@@ -72,7 +71,6 @@ router.register(
 )
 
 # External
-router.register("external/flows", FlowViewSet)
 router.register("external/msgs", MessageFlowViewset)
 router.register("external/rooms", RoomFlowViewSet)
 router.register("external/sectors", SectorFlowViewset)

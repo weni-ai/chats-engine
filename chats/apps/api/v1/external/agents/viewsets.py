@@ -5,7 +5,9 @@ from rest_framework import viewsets
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.api.v1.external.agents.serializers import AgentFlowSerializer
 from chats.apps.api.v1.external.agents.filters import AgentFlowFilter
-from chats.apps.api.v1.external.permissions import IsFlowPermission
+from chats.apps.accounts.authentication.drf.authorization import (
+    ProjectAdminAuthentication,
+)
 
 
 def get_permission_token_from_request(request):
@@ -19,13 +21,10 @@ class AgentFlowViewset(viewsets.ReadOnlyModelViewSet):
     serializer_class = AgentFlowSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = AgentFlowFilter
-    permission_classes = [
-        IsFlowPermission,
-    ]
     lookup_field = "uuid"
-    authentication_classes = []
+    authentication_classes = [ProjectAdminAuthentication]
 
     def get_queryset(self):
         permission = get_permission_token_from_request(self.request)
         qs = super().get_queryset()
-        return qs.filter(project__flows__uuid=permission)
+        return qs.filter(project__permissions=permission, project__permissions__role=1)

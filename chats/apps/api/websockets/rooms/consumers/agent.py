@@ -37,6 +37,9 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
     async def disconnect(self, *args, **kwargs):
         for group in set(self.groups):
             await self.channel_layer.group_discard(group, self.channel_name)
+        await self.set_user_status(
+            "offline"
+        )  # What if the user has two or more channels connected?
         await self.channel_layer.group_discard(
             f"user_{self.user.pk}", self.channel_name
         )
@@ -148,4 +151,6 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
 
     async def load_user(self, *args, **kwargs):
         """Enter user notification group"""
-        await self.join({"name": "user", "id": self.user.id})
+        await self.join(
+            {"name": "user", "id": self.user.id}
+        )  # Group name must be a valid unicode string containing only ASCII alphanumerics, hyphens, or periods.

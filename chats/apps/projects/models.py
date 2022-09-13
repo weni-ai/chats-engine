@@ -168,17 +168,3 @@ class ProjectPermission(BaseModel):
             )
             return max(limits)
         return 0  # If the user is not an agent, it won't be possible to receive rooms automatically
-
-
-class Flow(BaseModel):
-    project_flows_uuid = models.CharField(_("Flow project uuid"), max_length=50)
-    project = models.ForeignKey(
-        Project,
-        verbose_name=_("Project"),
-        related_name="flows",
-        on_delete=models.CASCADE,
-    )
-
-    class Meta:
-        verbose_name = _("Flow integration")
-        verbose_name_plural = _("Flow integration")

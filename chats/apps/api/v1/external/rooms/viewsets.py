@@ -6,7 +6,10 @@ from rest_framework.response import Response
 
 from chats.apps.rooms.models import Room
 from chats.apps.api.v1.external.rooms.serializers import RoomFlowSerializer
-from chats.apps.api.v1.external.permissions import IsFlowPermission
+from chats.apps.api.v1.external.permissions import IsAdminPermission
+from chats.apps.accounts.authentication.drf.authorization import (
+    ProjectAdminAuthentication,
+)
 
 
 def add_user_or_queue_to_room(instance, request):
@@ -37,10 +40,10 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
     queryset = Room.objects.all()
     serializer_class = RoomFlowSerializer
     permission_classes = [
-        IsFlowPermission,
+        IsAdminPermission,
     ]
     lookup_field = "uuid"
-    authentication_classes = []
+    authentication_classes = [ProjectAdminAuthentication]
 
     @action(detail=True, methods=["PUT", "PATCH"], url_name="close")
     def close(
