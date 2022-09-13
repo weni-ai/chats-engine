@@ -2,6 +2,7 @@ import json
 import requests
 
 from django.db import models
+from django.core.serializers.json import DjangoJSONEncoder
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
@@ -11,6 +12,10 @@ from chats.utils.websockets import send_channels_group
 
 
 class Room(BaseModel):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__original_is_active = self.is_active
+
     user = models.ForeignKey(
         "accounts.User",
         related_name="rooms",
@@ -69,7 +74,8 @@ class Room(BaseModel):
         verbose_name_plural = _("Rooms")
 
     def save(self, *args, **kwargs) -> None:
-        if self.is_active is False:
+        print("entrous")
+        if self.__original_is_active is False:
             raise ValidationError(_("Closed rooms cannot receive updates"))
         return super().save(*args, **kwargs)
 
@@ -108,7 +114,7 @@ class Room(BaseModel):
         self.tags.add(*tags)
         self.save()
 
-    def notify_queue(self, action):
+    def notify_queue(self, action: str, callback: bool = False):
         """
         Used to notify channels groups when something happens on the instance.
 
@@ -126,6 +132,18 @@ class Room(BaseModel):
             content=self.serialized_ws_data,
             action=f"rooms.{action}",
         )
+
+        if self.callback_url and callback and action in ["update", "destroy", "close"]:
+            requests.post(
+                self.callback_url,
+                data=json.dumps(
+                    {"type": "room.update", "content": self.serialized_ws_data},
+                    sort_keys=True,
+                    indent=1,
+                    cls=DjangoJSONEncoder,
+                ),
+                headers={"content-type": "application/json"},
+            )
 
     def notify_room(self, action: str, callback: bool = False):
         """
@@ -146,7 +164,14 @@ class Room(BaseModel):
             action=f"rooms.{action}",
         )
 
-        if self.room.callback_url and callback and action in ["update", "destroy"]:
+        if self.callback_url and callback and action in ["update", "destroy", "close"]:
             requests.post(
-                self.callback_url, data={"type": "room.update", "content": self}
+                self.callback_url,
+                data=json.dumps(
+                    {"type": "room.update", "content": self.serialized_ws_data},
+                    sort_keys=True,
+                    indent=1,
+                    cls=DjangoJSONEncoder,
+                ),
+                headers={"content-type": "application/json"},
             )

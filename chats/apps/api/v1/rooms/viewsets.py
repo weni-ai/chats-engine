@@ -41,7 +41,7 @@ class RoomViewset(
             return TransferRoomSerializer
         return super().get_serializer_class()
 
-    @action(detail=True, methods=["PUT"], url_name="close")
+    @action(detail=True, methods=["PUT", "PATCH"], url_name="close")
     def close(
         self, request, *args, **kwargs
     ):  # TODO: Remove the body options on swagger as it won't use any
@@ -57,7 +57,7 @@ class RoomViewset(
             )
         instance.close(tags, "agent")
         serialized_data = RoomSerializer(instance=instance)
-        instance.notify_queue("close")
+        instance.notify_queue("close", callback=True)
         return Response(serialized_data.data, status=status.HTTP_200_OK)
 
     def perform_create(self, serializer):
@@ -66,10 +66,7 @@ class RoomViewset(
 
     def perform_update(self, serializer):
         # TODO Separate this into smaller methods
-        transfer_history = self.get_object().transfer_history
-        transfer_history = (
-            [] if transfer_history is None else json.loads(transfer_history)
-        )
+        transfer_history = self.get_object().transfer_history or []
         user = self.request.data.get("user_email")
         queue = self.request.data.get("queue_uuid")
         serializer.save()
@@ -91,8 +88,8 @@ class RoomViewset(
         msg.notify_room("create")
 
         # Send Updated data to the room group
-        instance.notify_room("update")
+        instance.notify_room("update", callback=True)
 
     def perform_destroy(self, instance):
-        instance.notify_room("destroy")
+        instance.notify_room("destroy", callback=True)
         super().perform_destroy(instance)

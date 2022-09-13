@@ -14,7 +14,7 @@ from chats.apps.accounts.authentication.drf.authorization import (
 
 def add_user_or_queue_to_room(instance, request):
     # TODO Separate this into smaller methods
-    transfer_history = instance.transfer_history or []
+    new_transfer_history = instance.transfer_history or []
     user = request.data.get("user_email")
     queue = request.data.get("queue_uuid")
 
@@ -24,11 +24,11 @@ def add_user_or_queue_to_room(instance, request):
 
     if user:
         _content = {"type": "user", "name": instance.user.first_name}
-        transfer_history.append(_content)
+        new_transfer_history.append(_content)
     if queue:
         _content = {"type": "queue", "name": instance.queue.name}
-        transfer_history.append(_content)
-    instance.transfer_history = transfer_history
+        new_transfer_history.append(_content)
+    instance.transfer_history = new_transfer_history
     instance.save()
     # Create a message with the transfer data and Send to the room group
     msg = instance.messages.create(text=json.dumps(_content))
@@ -52,7 +52,6 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         """
         Close a room, setting the ended_at date and turning the is_active flag as false
         """
-        # Add send room notification to the channels group
         instance = self.get_object()
         instance.close(None, "agent")
         serialized_data = RoomFlowSerializer(instance=instance)

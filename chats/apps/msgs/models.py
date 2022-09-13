@@ -1,6 +1,8 @@
+import json
 import requests
 
 from django.db import models
+from django.core.serializers.json import DjangoJSONEncoder
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 
@@ -45,10 +47,10 @@ class Message(BaseModel):
         return super().save(*args, **kwargs)
 
     @property
-    def serialized_ws_data(self):
+    def serialized_ws_data(self) -> dict:
         from chats.apps.api.v1.msgs.serializers import MessageWSSerializer
 
-        return MessageWSSerializer(self).data
+        return dict(MessageWSSerializer(self).data)
 
     def get_authorization(self, user):
         return self.room.get_authorization(user)
@@ -64,10 +66,16 @@ class Message(BaseModel):
             content=self.serialized_ws_data,
             action=f"msg.{action}",
         )
-
         if self.room.callback_url and callback:
             requests.post(
-                self.room.callback_url, data={"type": "room.update", "content": self}
+                self.room.callback_url,
+                data=json.dumps(
+                    {"type": "msg.create", "content": self.serialized_ws_data},
+                    sort_keys=True,
+                    indent=1,
+                    cls=DjangoJSONEncoder,
+                ),
+                headers={"content-type": "application/json"},
             )
 
 
@@ -104,3 +112,20 @@ class MessageMedia(BaseModel):
 
     def get_authorization(self, user):
         return self.room.get_authorization(user)
+
+    def callback(self):
+        """ """
+        msg_data = self.message.serialized_ws_data
+        msg_data["text"] = ""
+
+        if self.message.room.callback_url:
+            requests.post(
+                self.message.room.callback_url,
+                data=json.dumps(
+                    {"type": "msg.create", "content": msg_data},
+                    sort_keys=True,
+                    indent=1,
+                    cls=DjangoJSONEncoder,
+                ),
+                headers={"content-type": "application/json"},
+            )
