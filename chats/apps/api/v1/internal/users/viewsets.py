@@ -17,11 +17,11 @@ class UserViewSet(ViewSet):
 
     def create(self, request):
         if not request.user.has_perm("accounts.can_communicate_internally"):
-            raise ValidationError("Not Allowed!")
+            raise ValidationError({"detail": "Not Allowed!"})
 
         serializer = UserSerializer(data=request.data)
         if not serializer.is_valid():
-            raise ValidationError("invalid data!")
+            raise ValidationError({"detail": "invalid data!"})
 
         user = User.objects.get_or_create(email=serializer.data.get("email"))[0]
 

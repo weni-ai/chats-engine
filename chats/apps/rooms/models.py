@@ -74,9 +74,8 @@ class Room(BaseModel):
         verbose_name_plural = _("Rooms")
 
     def save(self, *args, **kwargs) -> None:
-        print("entrous")
         if self.__original_is_active is False:
-            raise ValidationError(_("Closed rooms cannot receive updates"))
+            raise ValidationError({"detail": _("Closed rooms cannot receive updates")})
         return super().save(*args, **kwargs)
 
     def get_permission(self, user):

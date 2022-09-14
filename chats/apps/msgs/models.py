@@ -43,7 +43,7 @@ class Message(BaseModel):
 
     def save(self, *args, **kwargs) -> None:
         if self.room.is_active is False:
-            raise ValidationError(_("Closed rooms cannot receive messages"))
+            raise ValidationError({"detail": _("Closed rooms cannot receive messages")})
         return super().save(*args, **kwargs)
 
     @property
@@ -101,7 +101,7 @@ class MessageMedia(BaseModel):
 
     def save(self, *args, **kwargs) -> None:
         if self.message.room.is_active is False:
-            raise ValidationError(_("Closed rooms cannot receive messages"))
+            raise ValidationError({"detail": _("Closed rooms cannot receive messages")})
         return super().save(*args, **kwargs)
 
     @property

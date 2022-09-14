@@ -1,3 +1,5 @@
+import json
+
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
@@ -59,10 +61,16 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         queue = validated_data.pop("queue")
-        work_start = queue.sectort.work_start
+        work_start = queue.sector.work_start
         work_end = queue.sector.work_end
-        if work_start < timezone.now().time() < work_end:
-            raise ValidationError(_("Contact cannot be done outside working hours"))
+        created_on = validated_data.get("created_on", timezone.now().time())
+        import pdb
+
+        pdb.set_trace()
+        if (work_start < created_on < work_end) is False:
+            raise ValidationError(
+                {"detail": _("Contact cannot be done outside working hours")}
+            )
 
         contact_data = validated_data.pop("contact")
         contact_external_id = contact_data.pop("external_id")
@@ -73,6 +81,6 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         room = Room.objects.create(**validated_data, contact=contact, queue=queue)
         if room.user is None:
             new_agent = queue.available_agents.first()
-            room.user = new_agent
+            room.user = None if new_agent is None else new_agent.user
             room.save()
         return room

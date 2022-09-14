@@ -19,12 +19,12 @@ class QueueSerializer(serializers.ModelSerializer):
                 sector=self.instance.sector, name=data["name"]
             ).exists():
                 raise serializers.ValidationError(
-                    {"queue": _("This queue already exists.")}
+                    {"detail": _("This queue already exists.")}
                 )
         else:
             if Queue.objects.filter(sector=data["sector"], name=data["name"]).exists():
                 raise serializers.ValidationError(
-                    {"queue": _("This queue already exists.")}
+                    {"detail": _("This queue already exists.")}
                 )
         return data
 
@@ -62,7 +62,7 @@ class QueueAuthorizationSerializer(serializers.ModelSerializer):
         )
         if queue_user:
             raise serializers.ValidationError(
-                {"user": _("you cant add a user two times in same queue.")}
+                {"detail": _("you cant add a user two times in same queue.")}
             )
         return data
 

@@ -108,5 +108,9 @@ class QueueAuthorization(BaseModel):
         return self.role == self.ROLE_AGENT
 
     @property
+    def user(self):
+        return self.permission.user
+
+    @property
     def can_list(self):
         return self.is_agent

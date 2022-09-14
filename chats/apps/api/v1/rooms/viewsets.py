@@ -53,7 +53,7 @@ class RoomViewset(
         tags = request.data.get("tags", None)
         if tags is None:
             raise ValidationError(
-                _("You cannot close a room without giving tags to it")
+                {"detail": _("You cannot close a room without giving tags to it")}
             )
         instance.close(tags, "agent")
         serialized_data = RoomSerializer(instance=instance)

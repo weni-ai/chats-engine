@@ -18,20 +18,12 @@ class SectorSerializer(serializers.ModelSerializer):
         if self.instance:
             if self.instance.work_end < self.instance.work_start:
                 raise serializers.ValidationError(
-                    {
-                        "work_end": _(
-                            "work_end date must be greater than work_start date."
-                        )
-                    }
+                    {"detail": _("work_end date must be greater than work_start date.")}
                 )
         else:
             if data["work_end"] < data["work_start"]:
                 raise serializers.ValidationError(
-                    {
-                        "work_end": _(
-                            "work_end date must be greater than work_start date."
-                        )
-                    }
+                    {"detail": _("work_end date must be greater than work_start date.")}
                 )
         return data
 
@@ -41,7 +33,11 @@ class SectorSerializer(serializers.ModelSerializer):
         """
         if data <= 0:
             raise serializers.ValidationError(
-                {"you cant create a sector with rooms_limit lower or equal 0."}
+                {
+                    "detail": _(
+                        "Cannot create a sector with rooms_limit lower or equal 0."
+                    )
+                }
             )
         return data
 
@@ -147,14 +143,14 @@ class SectorTagSerializer(serializers.ModelSerializer):
                 sector=self.instance.sector, name=data["name"]
             ).exists():
                 raise serializers.ValidationError(
-                    {"name": _("This tag already exists.")}
+                    {"detail": _("This tag already exists.")}
                 )
         else:
             if SectorTag.objects.filter(
                 name=data["name"], sector=data["sector"]
             ).exists():
                 raise serializers.ValidationError(
-                    {"name": _("This tag already exists.")}
+                    {"detail": _("This tag already exists.")}
                 )
         return data
 
