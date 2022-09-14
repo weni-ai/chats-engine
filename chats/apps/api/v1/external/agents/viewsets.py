@@ -1,5 +1,6 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
 
 
 from chats.apps.projects.models import ProjectPermission
@@ -21,6 +22,9 @@ class AgentFlowViewset(viewsets.ReadOnlyModelViewSet):
     serializer_class = AgentFlowSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = AgentFlowFilter
+    permission_classes = [
+        IsAuthenticated,
+    ]
     lookup_field = "uuid"
     authentication_classes = [ProjectAdminAuthentication]
 
