@@ -1,5 +1,10 @@
+import json
+import requests
+
 from django.db import models
+from django.core.serializers.json import DjangoJSONEncoder
 from django.utils.translation import gettext_lazy as _
+from rest_framework.exceptions import ValidationError
 
 from chats.core.models import BaseModel
 from chats.utils.websockets import send_channels_group
@@ -36,11 +41,16 @@ class Message(BaseModel):
         verbose_name = "Message"
         verbose_name_plural = "Messages"
 
+    def save(self, *args, **kwargs) -> None:
+        if self.room.is_active is False:
+            raise ValidationError(_("Closed rooms cannot receive messages"))
+        return super().save(*args, **kwargs)
+
     @property
-    def serialized_ws_data(self):
+    def serialized_ws_data(self) -> dict:
         from chats.apps.api.v1.msgs.serializers import MessageWSSerializer
 
-        return MessageWSSerializer(self).data
+        return dict(MessageWSSerializer(self).data)
 
     def get_authorization(self, user):
         return self.room.get_authorization(user)
@@ -48,7 +58,7 @@ class Message(BaseModel):
     def media(self):
         return self.medias.all()
 
-    def notify_room(self, action):
+    def notify_room(self, action: str, callback: bool = False):
         """ """
         send_channels_group(
             group_name=f"room_{self.room.pk}",
@@ -56,6 +66,17 @@ class Message(BaseModel):
             content=self.serialized_ws_data,
             action=f"msg.{action}",
         )
+        if self.room.callback_url and callback:
+            requests.post(
+                self.room.callback_url,
+                data=json.dumps(
+                    {"type": "msg.create", "content": self.serialized_ws_data},
+                    sort_keys=True,
+                    indent=1,
+                    cls=DjangoJSONEncoder,
+                ),
+                headers={"content-type": "application/json"},
+            )
 
 
 class MessageMedia(BaseModel):
@@ -78,6 +99,11 @@ class MessageMedia(BaseModel):
     def __str__(self):
         return f"{self.message.pk} - {self.media}"
 
+    def save(self, *args, **kwargs) -> None:
+        if self.message.room.is_active is False:
+            raise ValidationError(_("Closed rooms cannot receive messages"))
+        return super().save(*args, **kwargs)
+
     @property
     def url(self):
         if self.media_file:
@@ -86,3 +112,20 @@ class MessageMedia(BaseModel):
 
     def get_authorization(self, user):
         return self.room.get_authorization(user)
+
+    def callback(self):
+        """ """
+        msg_data = self.message.serialized_ws_data
+        msg_data["text"] = ""
+
+        if self.message.room.callback_url:
+            requests.post(
+                self.message.room.callback_url,
+                data=json.dumps(
+                    {"type": "msg.create", "content": msg_data},
+                    sort_keys=True,
+                    indent=1,
+                    cls=DjangoJSONEncoder,
+                ),
+                headers={"content-type": "application/json"},
+            )

@@ -1,9 +1,12 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
 
-from chats.apps.api.v1.external.permissions import IsFlowPermission
+from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.external.sectors.serializers import SectorFlowSerializer
 from chats.apps.sectors.models import Sector
+from chats.apps.accounts.authentication.drf.authorization import (
+    ProjectAdminAuthentication,
+)
 
 
 def get_permission_token_from_request(request):
@@ -20,12 +23,12 @@ class SectorFlowViewset(viewsets.ReadOnlyModelViewSet):
         "name",
     ]
     permission_classes = [
-        IsFlowPermission,
+        IsAdminPermission,
     ]
     lookup_field = "uuid"
-    authentication_classes = []
+    authentication_classes = [ProjectAdminAuthentication]
 
     def get_queryset(self):
         permission = get_permission_token_from_request(self.request)
         qs = super().get_queryset()
-        return qs.filter(project__flows__uuid=permission)
+        return qs.filter(project__permission__uuid=permission)

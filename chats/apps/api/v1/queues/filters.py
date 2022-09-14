@@ -51,41 +51,24 @@ class QueueFilter(filters.FilterSet):
 class QueueAuthorizationFilter(filters.FilterSet):
     class Meta:
         model = QueueAuthorization
-        fields = ["sector"]
+        fields = ["queue"]
 
-    sector = filters.CharFilter(
-        field_name="sector",
+    queue = filters.CharFilter(
+        field_name="queue",
         required=True,
-        method="filter_sector",
-        help_text=_("sector's ID"),
+        method="filter_queue",
+        help_text=_("queue's ID"),
     )
 
-    def filter_sector(self, queryset, name, value):
-        """
-        Return queue auth given a user, will check if the user is the project admin or
-        if they have manager role on sectors inside the project or if he as a agent of a queue.
-        """
-        try:
-            if ProjectPermission.objects.filter(user=self.request.user):
-                auth_queue = QueueAuthorization.objects.all()
-            elif SectorAuthorization.objects.filter(
-                user=self.request.user, sector__uuid=value
-            ):
-                auth_queue = QueueAuthorization.objects.filter(
-                    queue__sector__uuid=value
-                )
-            elif QueueAuthorization.objects.filter(
-                user=self.request.user, queue__sector__uuid=value
-            ):
-                auth_queue = QueueAuthorization.objects.filter(
-                    user=self.request.user, queue__sector__uuid=value
-                )
-            else:
-                auth_queue = QueueAuthorization.objects.none()
-        except (
-            ProjectPermission.DoesNotExist,
-            SectorAuthorization.DoesNotExist,
-            QueueAuthorization.DoesNotExist,
-        ):
-            return QueueAuthorization.objects.none()
-        return auth_queue
+    status = filters.CharFilter(
+        field_name="status",
+        required=False,
+        method="filter_status",
+        help_text=_("User Status"),
+    )
+
+    def filter_status(self, queryset, name, value):
+        return queryset.filter(permission__status=value)
+
+    def filter_queue(self, queryset, name, value):
+        return queryset.filter(queue=value)

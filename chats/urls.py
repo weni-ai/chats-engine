@@ -55,3 +55,6 @@ else:
     urlpatterns.append(
         re_path(regex_path, serve, {"document_root": settings.STATIC_ROOT})
     )
+
+if hasattr(settings, "MEDIA_URL"):
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

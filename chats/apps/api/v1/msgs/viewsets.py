@@ -31,17 +31,17 @@ class MessageViewset(
 
     def perform_create(self, serializer):
         serializer.save()
-        serializer.instance.notify_room("create")
+        serializer.instance.notify_room("create", True)
 
     def perform_update(self, serializer):
         serializer.save()
-        serializer.instance.notify_room("update")
+        serializer.instance.notify_room("update", True)
 
 
 class MessageMediaViewset(
     mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
 ):
-    queryset = MessageMedia.objects
+    queryset = MessageMedia.objects.all()
     serializer_class = MessageMediaSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = MessageMediaFilter
@@ -59,4 +59,6 @@ class MessageMediaViewset(
 
     def perform_create(self, serializer):
         serializer.save()
-        serializer.instance.message.notify_room("update")
+        instance = serializer.instance
+        instance.message.notify_room("update")
+        instance.callback()

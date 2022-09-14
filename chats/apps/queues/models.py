@@ -42,6 +42,26 @@ class Queue(BaseModel):
         sector_auth, created = self.authorizations.get_or_create(user=user, role=role)
         return sector_auth
 
+    @property
+    def available_agents(self):
+        project = self.sector.project
+        qauth = self.authorizations.annotate(
+            limit=models.Max(
+                "permission__queue_authorizations__queue__sector__rooms_limit"
+            )
+        )
+        qauth = qauth.annotate(
+            rooms=models.Count(
+                "permission__user__rooms",
+                filter=models.Q(
+                    permission__user__rooms__queue__sector__project=project
+                ),
+                distinct=True,
+            )
+        )  # TODO: CHECK IF IT WILL RETURN ROOMS FROM OTHER PROJECTS THAT THE USER HAS PERMISSION TO
+
+        return qauth.filter(permission__status="online", limit__gt=models.F("rooms"))
+
 
 class QueueAuthorization(BaseModel):
     ROLE_NOT_SETTED = 0

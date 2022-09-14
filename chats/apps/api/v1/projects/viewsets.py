@@ -28,10 +28,7 @@ class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
     serializer_class = ProjectPermissionReadSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = [
-        "project",
-        "role"
-    ]
+    filterset_fields = ["project", "role", "status"]
     lookup_field = "uuid"
 
     def get_permissions(self):
@@ -43,4 +40,3 @@ class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
         else:
             permission_classes.append(IsProjectAdmin)
         return [permission() for permission in permission_classes]
-

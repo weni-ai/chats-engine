@@ -63,6 +63,18 @@ class ProjectPermission(BaseModel):
         (ROLE_SERVICE_MANAGER, _("service manager")),
     ]
 
+    STATUS_ONLINE = "ONLINE"
+    STATUS_OFFLINE = "OFFLINE"
+    STATUS_AWAY = "AWAY"
+    STATUS_BUSY = "BUSY"
+
+    STATUS_CHOICES = [
+        (STATUS_ONLINE, _("online")),
+        (STATUS_OFFLINE, _("offline")),
+        (STATUS_AWAY, _("away")),
+        (STATUS_BUSY, _("busy")),
+    ]
+
     project = models.ForeignKey(
         Project,
         verbose_name=_("Project"),
@@ -80,6 +92,10 @@ class ProjectPermission(BaseModel):
     )
     role = models.PositiveIntegerField(
         _("role"), choices=ROLE_CHOICES, default=ROLE_NOT_SETTED
+    )
+
+    status = models.CharField(
+        _("User Status"), max_length=10, choices=ROLE_CHOICES, default=STATUS_OFFLINE
     )
 
     class Meta:
@@ -142,16 +158,13 @@ class ProjectPermission(BaseModel):
     def get_permission(self, user):
         return self.project.get_permission(user=user)
 
-
-class Flow(BaseModel):
-    project_flows_uuid = models.CharField(_("Flow project uuid"), max_length=50)
-    project = models.ForeignKey(
-        Project,
-        verbose_name=_("Project"),
-        related_name="flows",
-        on_delete=models.CASCADE,
-    )
-
-    class Meta:
-        verbose_name = _("Flow integration")
-        verbose_name_plural = _("Flow integration")
+    @property
+    def rooms_limit(self):
+        if self.role == self.ROLE_AGENT:
+            limits = (
+                self.queue_authorizations.all()
+                .distinct("queue__sector")
+                .values_list("queue__sector__limit", flat=True)
+            )
+            return max(limits)
+        return 0  # If the user is not an agent, it won't be possible to receive rooms automatically
