@@ -11,6 +11,7 @@ from chats.apps.api.v1.sectors.filters import (
     SectorTagFilter,
 )
 from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
+from chats.apps.api.v1.internal.connect_rest_client import ConnectRESTClient
 
 
 class SectorViewset(viewsets.ModelViewSet):
@@ -55,8 +56,18 @@ class SectorViewset(viewsets.ModelViewSet):
         )
 
     def perform_create(self, serializer):
-        serializer.save()
-        serializer.instance.notify_sector("create")
+        instance = serializer.save()
+
+        connect = ConnectRESTClient()
+        connect.create_ticketer(
+            project_uuid=instance.project.uuid,
+            name=instance.name,
+            config={
+                "project_auth": instance.get_permission(self.request.user).pk,
+                "sector_uuid": instance.uuid,
+            },
+        )
+        instance.notify_sector("create")
 
     def perform_update(self, serializer):
         serializer.save()

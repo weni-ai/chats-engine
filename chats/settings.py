@@ -261,6 +261,9 @@ if OIDC_ENABLED:
     )
     OIDC_RP_SCOPES = env.str("OIDC_RP_SCOPES", default="openid email")
 
+
+CONNECT_API_URL = env.str("CONNECT_API_URL", default="https://api.dev.cloud.weni.ai")
+
 # Swagger
 
 SWAGGER_SETTINGS = {
