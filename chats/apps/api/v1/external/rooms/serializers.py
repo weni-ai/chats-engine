@@ -25,7 +25,9 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         write_only=True,
         allow_null=True,
     )
-    sector_uuid = serializers.CharField(required=False, write_only=True)
+    sector_uuid = serializers.CharField(
+        required=False, write_only=True, allow_null=True
+    )
     queue_uuid = serializers.PrimaryKeyRelatedField(
         queryset=Queue.objects.all(), required=False, source="queue", write_only=True
     )
@@ -58,6 +60,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             "is_active",
             "transfer_history",
         ]
+        extra_kwargs = {"queue": {"required": False, "read_only": True}}
 
     def create(self, validated_data):
         queue = validated_data.pop("queue")
