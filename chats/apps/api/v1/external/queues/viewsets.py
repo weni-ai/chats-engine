@@ -32,4 +32,4 @@ class QueueFlowViewset(viewsets.ReadOnlyModelViewSet):
         permission = get_permission_token_from_request(self.request)
         qs = super().get_queryset()
 
-        return qs.filter(sector__project__permission__uuid=permission)
+        return qs.filter(sector__project__permissions__uuid=permission)
