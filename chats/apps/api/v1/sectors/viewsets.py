@@ -58,15 +58,15 @@ class SectorViewset(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         instance = serializer.save()
 
-        connect = ConnectRESTClient()
-        connect.create_ticketer(
-            project_uuid=instance.project.uuid,
-            name=instance.name,
-            config={
-                "project_auth": instance.get_permission(self.request.user).pk,
-                "sector_uuid": instance.uuid,
-            },
-        )
+        # connect = ConnectRESTClient()
+        # connect.create_ticketer(
+        #     project_uuid=instance.project.uuid,
+        #     name=instance.name,
+        #     config={
+        #         "project_auth": instance.get_permission(self.request.user).pk,
+        #         "sector_uuid": instance.uuid,
+        #     },
+        # )
         instance.notify_sector("create")
 
     def perform_update(self, serializer):

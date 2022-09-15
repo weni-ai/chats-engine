@@ -2,6 +2,7 @@ import json
 import requests
 
 from django.db import models
+from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
@@ -97,7 +98,7 @@ class MessageMedia(BaseModel):
         verbose_name_plural = _("MessageMedias")
 
     def __str__(self):
-        return f"{self.message.pk} - {self.media}"
+        return f"{self.message.pk} - {self.url}"
 
     def save(self, *args, **kwargs) -> None:
         if self.message.room.is_active is False:
@@ -106,9 +107,10 @@ class MessageMedia(BaseModel):
 
     @property
     def url(self):
-        if self.media_file:
-            return self.media_file.url
-        return self.media_url
+        url = self.media_file.url if self.media_file else self.media_url
+        if url.startswith("/"):
+            url = settings.ENGINE_BASE_URL + url
+        return url
 
     def get_authorization(self, user):
         return self.room.get_authorization(user)

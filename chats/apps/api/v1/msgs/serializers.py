@@ -12,7 +12,7 @@ from chats.apps.accounts.models import User
 
 
 class MessageMediaSerializer(serializers.ModelSerializer):
-    url = serializers.SerializerMethodField()
+    url = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = MessageMedia
@@ -22,6 +22,10 @@ class MessageMediaSerializer(serializers.ModelSerializer):
             "media_file",
             "url",
         ]
+
+        extra_kwargs = {
+            "media_file": {"write_only": True},
+        }
 
     def get_url(self, media: MessageMedia):
         return media.url
@@ -59,12 +63,6 @@ class MessageSerializer(serializers.ModelSerializer):
             "created_at",
             "contact",
         ]
-
-    def get_media(self, msg):
-        try:
-            return msg.media.url
-        except AttributeError:
-            return None
 
 
 class MessageWSSerializer(MessageSerializer):

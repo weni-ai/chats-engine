@@ -5,7 +5,11 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 
 from chats.apps.api.v1.msgs.filters import MessageFilter, MessageMediaFilter
-from chats.apps.api.v1.msgs.serializers import MessageMediaSerializer, MessageSerializer
+from chats.apps.api.v1.msgs.serializers import (
+    MessageMediaSerializer,
+    MessageSerializer,
+    MessageWSSerializer,
+)
 from chats.apps.api.v1.msgs.permissions import MessagePermission, MessageMediaPermission
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
@@ -18,7 +22,7 @@ class MessageViewset(
     viewsets.GenericViewSet,
 ):
     queryset = ChatMessage.objects.all()
-    serializer_class = MessageSerializer
+    serializer_class = MessageWSSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = MessageFilter
     permission_classes = [IsAuthenticated, MessagePermission]
