@@ -25,15 +25,14 @@ class RoomViewset(
     serializer_class = RoomSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = room_filters.RoomFilter
-    permission_classes = [
-        permissions.IsAuthenticated,
-    ]
 
     def get_permissions(self):
-        permission_classes = self.permission_classes
-
+        permission_classes = [permissions.IsAuthenticated]
         if self.action != "list":
-            permission_classes.append(api_permissions.IsQueueAgent)
+            permission_classes = (
+                permissions.IsAuthenticated,
+                api_permissions.IsQueueAgent,
+            )
         return [permission() for permission in permission_classes]
 
     def get_serializer_class(self):

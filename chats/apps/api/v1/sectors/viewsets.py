@@ -19,9 +19,6 @@ class SectorViewset(viewsets.ModelViewSet):
     serializer_class = sector_serializers.SectorSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = SectorFilter
-    permission_classes = [
-        IsAuthenticated,
-    ]
     lookup_field = "uuid"
 
     def get_queryset(self):
@@ -32,9 +29,9 @@ class SectorViewset(viewsets.ModelViewSet):
     def get_permissions(self):
         permission_classes = self.permission_classes
         if self.action in ["list", "retrieve"]:
-            permission_classes.append(IsSectorManager)
+            permission_classes = (IsAuthenticated, IsSectorManager)
         else:
-            permission_classes.append(IsProjectAdmin)
+            permission_classes = (IsAuthenticated, IsProjectAdmin)
         return [permission() for permission in permission_classes]
 
     def get_serializer_class(self):
@@ -88,9 +85,6 @@ class SectorTagsViewset(viewsets.ModelViewSet):
     serializer_class = sector_serializers.SectorTagSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = SectorTagFilter
-    permission_classes = [
-        IsAuthenticated,
-    ]
     lookup_field = "uuid"
 
     def get_queryset(self):
@@ -101,9 +95,9 @@ class SectorTagsViewset(viewsets.ModelViewSet):
     def get_permissions(self):
         permission_classes = self.permission_classes
         if self.action == "list":
-            permission_classes.append(IsQueueAgent)
+            permission_classes = (IsAuthenticated, IsQueueAgent)
         else:
-            permission_classes.append(IsSectorManager)
+            permission_classes = (IsAuthenticated, IsSectorManager)
 
         return [permission() for permission in permission_classes]
 
@@ -113,15 +107,14 @@ class SectorAuthorizationViewset(viewsets.ModelViewSet):
     serializer_class = sector_serializers.SectorAuthorizationSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = SectorAuthorizationFilter
-    permission_classes = [IsAuthenticated]
     lookup_field = "uuid"
 
     def get_permissions(self):
         permission_classes = self.permission_classes
         if self.action in ["retrieve", "list"]:
-            permission_classes.append(IsSectorManager)
+            permission_classes = (IsAuthenticated, IsSectorManager)
         else:
-            permission_classes.append(IsProjectAdmin)
+            permission_classes = (IsAuthenticated, IsProjectAdmin)
         return [permission() for permission in permission_classes]
 
     def get_serializer_class(self):

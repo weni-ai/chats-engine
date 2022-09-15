@@ -26,17 +26,16 @@ class ProjectViewset(viewsets.ModelViewSet):
 class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
     queryset = ProjectPermission.objects.all()
     serializer_class = ProjectPermissionReadSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = []
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["project", "role", "status"]
     lookup_field = "uuid"
 
     def get_permissions(self):
         sector = self.request.query_params.get("sector")
-        permission_classes = self.permission_classes
 
         if sector:
-            permission_classes.append(IsSectorManager)
+            permission_classes = (IsAuthenticated, IsSectorManager)
         else:
-            permission_classes.append(IsProjectAdmin)
+            permission_classes = (IsAuthenticated, IsProjectAdmin)
         return [permission() for permission in permission_classes]
