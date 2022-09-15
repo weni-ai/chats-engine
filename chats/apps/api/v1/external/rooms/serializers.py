@@ -9,10 +9,10 @@ from chats.apps.accounts.models import User
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactRelationsSerializer
 from chats.apps.api.v1.queues.serializers import QueueSerializer
-from chats.apps.api.v1.sectors.serializers import DetailSectorTagSerializer
 from chats.apps.contacts.models import Contact
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
+from chats.apps.sectors.models import Sector
 
 
 class RoomFlowSerializer(serializers.ModelSerializer):
@@ -63,9 +63,18 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         extra_kwargs = {"queue": {"required": False, "read_only": True}}
 
     def create(self, validated_data):
-        queue = validated_data.pop("queue")
-        work_start = queue.sector.work_start
-        work_end = queue.sector.work_end
+        try:
+            queue = validated_data.pop("queue")
+            sector = queue.sector
+        except KeyError:
+            sector = validated_data.pop("sector_uuid")
+            sector = Sector.objects.get(pk=sector)
+            queue = sector.queues.first()
+        work_start = sector.work_start
+        work_end = sector.work_end
+        import pdb
+
+        pdb.set_trace()
         created_on = validated_data.get("created_on", timezone.now().time())
         if (work_start < created_on < work_end) is False:
             raise ValidationError(
