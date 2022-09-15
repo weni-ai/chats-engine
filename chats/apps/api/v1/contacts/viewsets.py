@@ -36,11 +36,14 @@ class ContactViewset(
 
         is_user_assigned_to_room = Q(rooms__user=user)
 
+        is_room_inactive = Q(rooms__is_active=False)
+
         check_admin_manager_agent_role_filter = (
             is_queue_agent
             | is_sector_manager
             | is_project_admin
             | is_user_assigned_to_room
+            | is_room_inactive
         )
         user_role_related_contacts = qs.filter(
             check_admin_manager_agent_role_filter

@@ -16,8 +16,18 @@ class ContactFilter(filters.FilterSet):
         help_text=_("Projects's UUID"),
     )
 
+    sector = filters.CharFilter(
+        field_name="sector",
+        required=False,
+        method="filter_sector",
+        help_text=_("Sector's UUID"),
+    )
+
     tags = filters.MultipleChoiceFilter(conjoined=True)
     created_on = filters.DateRangeFilter()
 
     def filter_project(self, queryset, name, value):
         return queryset.filter(rooms__queue__sector__project__uuid=value)
+
+    def filter_sector(self, queryset, name, value):
+        return queryset.filter(rooms__queue__sector__uuid=value)
