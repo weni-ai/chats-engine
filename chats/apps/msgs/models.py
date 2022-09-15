@@ -108,8 +108,11 @@ class MessageMedia(BaseModel):
     @property
     def url(self):
         url = self.media_file.url if self.media_file else self.media_url
-        if url.startswith("/"):
-            url = settings.ENGINE_BASE_URL + url
+        try:
+            if url.startswith("/"):
+                url = settings.ENGINE_BASE_URL + url
+        except AttributeError:
+            return ""
         return url
 
     def get_authorization(self, user):
