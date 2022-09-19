@@ -1,13 +1,11 @@
 from rest_framework import serializers
 
-from chats.apps.api.v1.sectors.serializers import SectorTagSerializer
 from chats.apps.contacts.models import Contact
 
 
 class ContactSerializer(serializers.ModelSerializer):
 
-    tags = SectorTagSerializer(many=True)
-    agent = serializers.SerializerMethodField()
+    room = serializers.SerializerMethodField()
 
     class Meta:
         model = Contact
@@ -17,19 +15,20 @@ class ContactSerializer(serializers.ModelSerializer):
             "email",
             "status",
             "custom_fields",
-            "tags",
-            "agent",
+            "room",
             "created_on",
         ]
         read_only_fields = [
             "uuid",
         ]
 
-    def get_tags(self, contact: Contact):
-        return contact.tags
+    def get_room(self, contact: Contact):
+        # TODO: Needs refactoring, used to fix circular import as rooms serializers uses contact serializers
+        from chats.apps.api.v1.rooms.serializers import RoomContactSerializer
 
-    def get_agent(self, contact: Contact):
-        return contact.last_agent_name
+        return RoomContactSerializer(
+            contact.last_room(self.context.get("request")), many=False
+        ).data
 
 
 class ContactRelationsSerializer(serializers.ModelSerializer):

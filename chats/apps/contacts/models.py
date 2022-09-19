@@ -43,14 +43,34 @@ class Contact(BaseModel):
 
         return ContactWSSerializer(self).data
 
-    @property
-    def last_room(self):
-        return self.rooms.filter(is_active=False).last()
+    def last_room(self, request):
+        """
+        Return the last closed room.
+        Filtered by the project or sector and user permission.
+        This is used on the history endpoint
+        """
 
-    @property
-    def tags(self):
+        project = request.query_params.get("project")
+        sector = request.query_params.get("sector")
+        user = request.user
+        filters = {
+            "queue__sector__project__permissions__user": user,
+            "queue__sector__project__uuid": project,
+            "queue__sector__uuid": sector,
+        }
+        valid_filters = dict((k, v) for k, v in filters.items() if v is not None)
+
+        return self.rooms.filter(is_active=False, **valid_filters).last()
+
+    def tags_list(self, request):
+        """
+        Return the tags from the last closed room.
+        Filtered by the project or sector and user permission.
+        This is used on the history endpoint
+        """
+
         try:
-            return self.last_room.tags
+            return self.last_room(request).tags
         except AttributeError:
             return None
 

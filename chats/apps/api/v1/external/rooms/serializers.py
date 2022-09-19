@@ -72,9 +72,6 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             queue = sector.queues.first()
         work_start = sector.work_start
         work_end = sector.work_end
-        import pdb
-
-        pdb.set_trace()
         created_on = validated_data.get("created_on", timezone.now().time())
         if (work_start < created_on < work_end) is False:
             raise ValidationError(

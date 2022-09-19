@@ -20,7 +20,7 @@ class RoomSerializer(serializers.ModelSerializer):
         model = Room
         fields = "__all__"
         read_only_fields = [
-            "started_at",
+            "created_on",
             "ended_at",
         ]
 
@@ -63,3 +63,19 @@ class TransferRoomSerializer(serializers.ModelSerializer):
             "contact": {"required": False, "read_only": True, "allow_null": False},
             "user": {"required": False, "read_only": True, "allow_null": False},
         }
+
+
+class RoomContactSerializer(serializers.ModelSerializer):
+    user = UserSerializer(many=False, read_only=True)
+    queue = QueueSerializer(many=False, read_only=True)
+    tags = DetailSectorTagSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Room
+        fields = [
+            "user",
+            "queue",
+            "tags",
+            "created_on",
+            "ended_at",
+        ]

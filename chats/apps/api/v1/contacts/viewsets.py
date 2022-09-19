@@ -8,11 +8,7 @@ from chats.apps.contacts.models import Contact
 from chats.apps.api.v1.contacts.permissions import ContactRelatedRetrievePermission
 
 
-class ContactViewset(
-    viewsets.GenericViewSet,
-    viewsets.mixins.ListModelMixin,
-    viewsets.mixins.RetrieveModelMixin,
-):
+class ContactViewset(viewsets.ReadOnlyModelViewSet):  #
 
     queryset = Contact.objects.all()
     serializer_class = ContactSerializer
@@ -36,17 +32,14 @@ class ContactViewset(
 
         is_user_assigned_to_room = Q(rooms__user=user)
 
-        is_room_inactive = Q(rooms__is_active=False)
-
         check_admin_manager_agent_role_filter = (
             is_queue_agent
             | is_sector_manager
             | is_project_admin
             | is_user_assigned_to_room
-            | is_room_inactive
         )
         user_role_related_contacts = qs.filter(
-            check_admin_manager_agent_role_filter
+            check_admin_manager_agent_role_filter, rooms__is_active=False
         ).distinct()
         # user_role_related_contacts = qs.filter(
         #     rooms__queue__sector__project__permissions__user=user,
