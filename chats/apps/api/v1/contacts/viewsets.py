@@ -5,7 +5,6 @@ from rest_framework import permissions, viewsets
 from chats.apps.api.v1.contacts.filters import ContactFilter
 from chats.apps.api.v1.contacts.serializers import ContactSerializer
 from chats.apps.contacts.models import Contact
-from chats.apps.api.v1.contacts.permissions import ContactRelatedRetrievePermission
 
 
 class ContactViewset(viewsets.ReadOnlyModelViewSet):  #

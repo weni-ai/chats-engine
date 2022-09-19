@@ -31,3 +31,9 @@ class ContactFilter(filters.FilterSet):
 
     def filter_sector(self, queryset, name, value):
         return queryset.filter(rooms__queue__sector__uuid=value)
+
+    # TODO: FILTER BY ROOM CLOSED DATE
+    # room__created_on = filters.DateRangeFilter()
+    # room_ended_at = filters.DateRangeFilter()
+    # def filter_room_created_on(self, queryset, name, value):
+    #     return queryset.filter(rooms__created_on=value)
