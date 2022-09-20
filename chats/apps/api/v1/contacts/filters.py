@@ -23,8 +23,23 @@ class ContactFilter(filters.FilterSet):
         help_text=_("Sector's UUID"),
     )
 
-    tags = filters.MultipleChoiceFilter(conjoined=True)
+    tag = filters.CharFilter(
+        # field_name="rooms__tags__name",
+        required=False,
+        method="filter_tags",
+        help_text=_("Room Tags"),
+    )
     created_on = filters.DateRangeFilter()
+    r_created_on = filters.DateRangeFilter(
+        field_name="rooms__created_on",
+        required=False,
+        help_text=_("Room created on"),
+    )
+    r_ended_at = filters.DateRangeFilter(
+        field_name="rooms__ended_at",
+        required=False,
+        help_text=_("Room ended at"),
+    )
 
     def filter_project(self, queryset, name, value):
         return queryset.filter(rooms__queue__sector__project__uuid=value)
@@ -32,8 +47,6 @@ class ContactFilter(filters.FilterSet):
     def filter_sector(self, queryset, name, value):
         return queryset.filter(rooms__queue__sector__uuid=value)
 
-    # TODO: FILTER BY ROOM CLOSED DATE
-    # room__created_on = filters.DateRangeFilter()
-    # room_ended_at = filters.DateRangeFilter()
-    # def filter_room_created_on(self, queryset, name, value):
-    #     return queryset.filter(rooms__created_on=value)
+    def filter_tags(self, queryset, name, value):
+        values = value.split(",")
+        return queryset.filter(rooms__tags__name__in=values)
