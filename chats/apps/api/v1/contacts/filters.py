@@ -24,7 +24,6 @@ class ContactFilter(filters.FilterSet):
     )
 
     tag = filters.CharFilter(
-        # field_name="rooms__tags__name",
         required=False,
         method="filter_tags",
         help_text=_("Room Tags"),
