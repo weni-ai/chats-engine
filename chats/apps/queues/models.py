@@ -16,6 +16,12 @@ class Queue(BaseModel):
         verbose_name = _("Sector Queue")
         verbose_name_plural = _("Sector Queues")
 
+        constraints = [
+            models.UniqueConstraint(
+                fields=["sector", "name"], name="unique_queue_name"
+            )
+        ]
+
     def __str__(self):
         return self.name
 
@@ -93,6 +99,12 @@ class QueueAuthorization(BaseModel):
         verbose_name = _("Sector Queue Authorization")
         verbose_name_plural = _("Sector Queues Authorization")
 
+        constraints = [
+            models.UniqueConstraint(
+                fields=["queue", "permission"], name="unique_queue_auth"
+            )
+        ]
+        
     def __str__(self):
         return self.get_role_display()
 

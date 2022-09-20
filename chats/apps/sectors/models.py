@@ -3,6 +3,7 @@ from django.utils.translation import gettext_lazy as _
 
 from chats.core.models import BaseModel
 from chats.utils.websockets import send_channels_group
+from django.db.models import F, Q
 
 
 class Sector(BaseModel):
@@ -21,6 +22,22 @@ class Sector(BaseModel):
     class Meta:
         verbose_name = _("Sector")
         verbose_name_plural = _("Sectors")
+
+        constraints = [
+            models.CheckConstraint(
+                check=Q(work_end__gt=F('work_start')),
+                name="wordend_greater_than_workstart_check"
+            ),
+            
+            models.UniqueConstraint(
+                fields=["project", "name"], name="unique_sector_name"
+            ),
+
+            models.CheckConstraint(
+                check=Q(rooms_limit__gt=0),
+                name="rooms_limit_greater_than_zero"
+            ),
+        ]
 
     @property
     def sector(self):
@@ -199,6 +216,12 @@ class SectorTag(BaseModel):
     class Meta:
         verbose_name = _("Sector Tag")
         verbose_name_plural = _("Sector Tags")
+
+        constraints = [
+                models.UniqueConstraint(
+                    fields=["sector", "name"], name="unique_tag_name"
+                )
+            ]
 
     def __str__(self):
         return self.name
