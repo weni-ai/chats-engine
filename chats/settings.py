@@ -267,6 +267,7 @@ if OIDC_ENABLED:
 
 
 CONNECT_API_URL = env.str("CONNECT_API_URL", default="https://api.dev.cloud.weni.ai")
+FLOWS_API_URL = env.str("FLOWS_API_URL", default="https://flows.dev.cloud.weni.ai")
 
 # Swagger
 
