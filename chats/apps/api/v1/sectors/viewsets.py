@@ -29,7 +29,7 @@ class SectorViewset(viewsets.ModelViewSet):
     def get_permissions(self):
         permission_classes = self.permission_classes
         if self.action in ["list", "retrieve"]:
-            permission_classes = (IsAuthenticated, IsSectorManager)
+            permission_classes = [IsAuthenticated]
         else:
             permission_classes = (IsAuthenticated, IsProjectAdmin)
         return [permission() for permission in permission_classes]
