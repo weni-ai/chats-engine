@@ -47,7 +47,7 @@ class TokenAuthMiddleware(BaseMiddleware):
                 user = await get_keycloak_user(token_key)
             except HTTPError:
                 user = None
-                LOGGER.debug("[401] Login failed: unauthorized on userinfo")
+                LOGGER.debug("Keycloak Websocket Login failed")
 
             scope["user"] = AnonymousUser() if user is None else user
         else:
