@@ -45,14 +45,14 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
 
         return super().create(request, *args, **kwargs)
 
-    def update(
+    def put(
         self, request, *args, **kwargs
     ):  # TODO: GAMBIARRA ALERT! MOVE THIS LOGIC TO THE SERIALIZER
         qs = self.queryset
         try:
             user_email = request.data["user"]
             role = request.data["role"]
-            project = self.kwargs["uuid"]
+            project = request.data["project"]
 
             permission = qs.get(user__email=user_email, project__uuid=project)
             permission.role = role
