@@ -15,7 +15,7 @@ class QuickMessageViewset(viewsets.ModelViewSet):
     ]
 
     def perform_create(self, serializer):
-        return serializer.save(user=self.request.user.pk)
+        return serializer.save(user=self.request.user.email)
 
     def update(self, request, *args, **kwargs):
         if self.get_object().user == request.user:
