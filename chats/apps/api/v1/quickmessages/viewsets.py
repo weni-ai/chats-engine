@@ -15,7 +15,7 @@ class QuickMessageViewset(viewsets.ModelViewSet):
     ]
 
     def perform_create(self, serializer):
-        return serializer.save(user=self.request.user.email)
+        return serializer.save(user=self.request.user)
 
     def update(self, request, *args, **kwargs):
         if self.get_object().user == request.user:
@@ -33,4 +33,4 @@ class QuickMessageViewset(viewsets.ModelViewSet):
         raise PermissionDenied
 
     def get_queryset(self, *args, **kwargs):
-        return QuickMessage.objects.all().filter(user=self.request.user.pk)
+        return QuickMessage.objects.all().filter(user=self.request.user)
