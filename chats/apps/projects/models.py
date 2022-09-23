@@ -103,6 +103,11 @@ class ProjectPermission(
     class Meta:
         verbose_name = _("Project Permission")
         verbose_name_plural = _("Project Permissions")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "project"], name="unique_user_permission"
+            )
+        ]
 
     def __str__(self):
         return self.project.name

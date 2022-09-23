@@ -7,6 +7,8 @@ from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.api.v1.internal.projects import serializers
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.core.views import persist_keycloak_user_by_email
+from rest_framework import mixins, status
+from rest_framework.response import Response
 
 
 class ProjectViewset(viewsets.ModelViewSet):
@@ -26,6 +28,11 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
     ]
     lookup_field = "uuid"
 
+    def get_object(self):
+        if self.action in ["update", "partial_update"]:
+            return None
+        return super().get_object()
+
     def get_serializer_class(self):
         if self.action in ["list", "retrieve"]:
             return serializers.ProjectPermissionReadSerializer
@@ -37,3 +44,24 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
             persist_keycloak_user_by_email(user_email)
 
         return super().create(request, *args, **kwargs)
+
+    def update(
+        self, request, *args, **kwargs
+    ):  # TODO: GAMBIARRA ALERT! MOVE THIS LOGIC TO THE SERIALIZER
+        qs = self.queryset
+        try:
+            user_email = request.data["user"]
+            role = request.data["role"]
+            project = request.data["project"]
+
+            permission = qs.get(email=user_email, project=project)
+            permission.role = role
+            permission.save()
+        except (KeyError, ProjectPermission.DoesNotExist):
+            return Response(
+                {
+                    "Detail": "The correct required fields are: user(str), role(int) and project(str)"
+                },
+                status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({"Detail": "Updated"}, status.HTTP_200_OK)

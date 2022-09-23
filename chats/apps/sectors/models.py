@@ -25,17 +25,14 @@ class Sector(BaseModel):
 
         constraints = [
             models.CheckConstraint(
-                check=Q(work_end__gt=F('work_start')),
-                name="wordend_greater_than_workstart_check"
+                check=Q(work_end__gt=F("work_start")),
+                name="wordend_greater_than_workstart_check",
             ),
-            
             models.UniqueConstraint(
                 fields=["project", "name"], name="unique_sector_name"
             ),
-
             models.CheckConstraint(
-                check=Q(rooms_limit__gt=0),
-                name="rooms_limit_greater_than_zero"
+                check=Q(rooms_limit__gt=0), name="rooms_limit_greater_than_zero"
             ),
         ]
 
@@ -162,10 +159,11 @@ class SectorAuthorization(BaseModel):
     class Meta:
         verbose_name = _("Sector Authorization")
         verbose_name_plural = _("Sector Authorizations")
-        unique_together = [
-            "permission",
-            "sector",
-        ]  # only one permission on the sector per user
+        constraints = [
+            models.UniqueConstraint(
+                fields=["sector", "permission"], name="unique_sector_auth"
+            )
+        ]
 
     @property
     def serialized_ws_data(self):
@@ -218,10 +216,8 @@ class SectorTag(BaseModel):
         verbose_name_plural = _("Sector Tags")
 
         constraints = [
-                models.UniqueConstraint(
-                    fields=["sector", "name"], name="unique_tag_name"
-                )
-            ]
+            models.UniqueConstraint(fields=["sector", "name"], name="unique_tag_name")
+        ]
 
     def __str__(self):
         return self.name
