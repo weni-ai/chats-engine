@@ -52,9 +52,9 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
         try:
             user_email = request.data["user"]
             role = request.data["role"]
-            project = request.data["project"]
+            project = self.kwargs["uuid"]
 
-            permission = qs.get(email=user_email, project=project)
+            permission = qs.get(user__email=user_email, project__uuid=project)
             permission.role = role
             permission.save()
         except (KeyError, ProjectPermission.DoesNotExist):
