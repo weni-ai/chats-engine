@@ -12,6 +12,7 @@ class QuickMessage(BaseModel):
         to_field="email",
     )
     shortcut = models.CharField(_("shortcut"), max_length=50)
+    title = models.CharField(_("title"), max_length=50, blank=True, null=True)
     text = models.TextField(_("text"))
 
     class Meta:
