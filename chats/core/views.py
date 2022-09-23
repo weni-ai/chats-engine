@@ -26,7 +26,7 @@ def get_internal_headers() -> dict:
     }
 
 
-def persist_keycloak_user_by_email(user_email: str):
+def persist_keycloak_user_by_email(user_email: str):  # TODO: ERROR HANDLING
     if User.objects.filter(email=user_email).exists():
         return
     url = settings.OIDC_OP_USERS_DATA_ENDPOINT + f"?email={user_email}"

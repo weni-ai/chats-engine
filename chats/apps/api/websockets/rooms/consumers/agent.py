@@ -1,3 +1,4 @@
+from builtins import KeyError, TypeError
 import json
 
 from channels.db import database_sync_to_async
@@ -21,8 +22,11 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         Called when the websocket is handshaking as part of initial connection.
         """
         # Are they logged in?
-        self.user = self.scope["user"]
-        self.project = self.scope["query_params"].get("project")[0]
+        try:
+            self.user = self.scope["user"]
+            self.project = self.scope["query_params"].get("project")[0]
+        except (KeyError, TypeError):
+            await self.close()
         if self.user.is_anonymous or self.project is None:
             # Reject the connection
             await self.close()

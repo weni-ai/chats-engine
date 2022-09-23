@@ -30,10 +30,10 @@ class SectorViewset(viewsets.ModelViewSet):
         permission_classes = self.permission_classes
         if self.action == "list":
             permission_classes = [IsAuthenticated]
-        elif self.action == "retrieve":
-            permission_classes = [IsAuthenticated, IsSectorManager]
-        else:
+        elif self.action in ["create", "destroy"]:
             permission_classes = (IsAuthenticated, IsProjectAdmin)
+        else:
+            permission_classes = [IsAuthenticated, IsSectorManager]
         return [permission() for permission in permission_classes]
 
     def get_serializer_class(self):

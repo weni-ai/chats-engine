@@ -63,7 +63,7 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         instance = serializer.instance
         add_user_or_queue_to_room(instance, self.request)
 
-        serializer.instance.notify_queue("create")
+        instance.notify_queue("create")
 
     def perform_update(self, serializer):
         serializer.save()
