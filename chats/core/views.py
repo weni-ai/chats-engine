@@ -1,9 +1,11 @@
+import logging
 import re
 import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
+LOGGER = logging.getLogger(__name__)
 
 
 def get_auth_token() -> str:
@@ -32,8 +34,14 @@ def persist_keycloak_user_by_email(user_email: str):  # TODO: ERROR HANDLING
     url = settings.OIDC_OP_USERS_DATA_ENDPOINT + f"?email={user_email}"
     headers = get_internal_headers()
     response = requests.get(url, headers=headers)
-    user_data = response.json()[0]
+    data = response.json()
+    try:
+        user_data = data[0]
+    except KeyError:
+        error_str = f"[{response.status_code}] Error while searching the user {user_email} on keycloak"
+        LOGGER.debug(error_str)
 
+        return
     email = user_data.get("email")
     username = user_data.get("username")
     username = re.sub("[^A-Za-z0-9]+", "", username)

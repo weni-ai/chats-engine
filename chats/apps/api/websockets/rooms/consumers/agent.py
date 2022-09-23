@@ -1,9 +1,9 @@
-from builtins import KeyError, TypeError
 import json
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 
 from chats.apps.rooms.models import Room
@@ -32,7 +32,11 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             await self.close()
         else:
             # Accept the connection
-            self.permission = await self.get_permission()
+
+            try:
+                self.permission = await self.get_permission()
+            except ObjectDoesNotExist:
+                await self.close()
             await self.accept()
             await self.load_rooms()
             await self.load_user()

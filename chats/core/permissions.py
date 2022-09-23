@@ -1,4 +1,5 @@
 from django.db.models import Q
+from django.core.exceptions import ObjectDoesNotExist
 
 
 class GetPermission:
@@ -28,4 +29,7 @@ class GetPermission:
 
     @property
     def permission(self):
-        return self.user.project_permissions.get(self.queryset)
+        try:
+            return self.user.project_permissions.get(self.queryset)
+        except ObjectDoesNotExist:
+            return None
