@@ -79,14 +79,11 @@ class User(AbstractBaseUser, PermissionsMixin):
         except AttributeError:
             return ""
 
-    @property
-    def profile(self):
-        profile, created = self.profile.get_or_create(sound_new_room=True)
-        return profile
-
 
 class Profile(BaseModel):
-    user = models.OneToOneField(User, verbose_name=_("User"), on_delete=models.CASCADE)
+    user = models.OneToOneField(
+        User, related_name="profile", verbose_name=_("User"), on_delete=models.CASCADE
+    )
     sound_new_room = models.BooleanField(
         _("New room messages notification sound"), default=True
     )

@@ -1,23 +1,31 @@
-from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import status, viewsets
+from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from chats.apps.api.v1.users import serializers
-from chats.apps.api.v1.sectors.filters import (
-    SectorFilter,
-)
 from chats.apps.accounts.models import Profile
+from chats.apps.api.v1.users import serializers
 
 
-class ProfileViewset(viewsets.ModelViewSet):
+class ProfileViewset(viewsets.GenericViewSet):
     queryset = Profile.objects.all()
     serializer_class = serializers.ProfileSerializer
     permission_classes = [IsAuthenticated]
-    lookup_field = "uuid"
-
-    def get_queryset(self):
-        return super().get_queryset()
+    lookup_field = None
 
     def get_object(self):
         return self.request.user.profile
+
+    def update(self, request, **kwargs):
+        user = request.user
+        profile, created = Profile.objects.update_or_create(
+            user=user, defaults=request.data
+        )
+
+        serializer = self.serializer_class(profile)
+
+        return Response(serializer.data)
+
+    def retrieve(self, request, *args, **kwargs):
+        obj = self.get_object()
+        serializer = self.serializer_class(obj)
+        return Response(serializer.data)
