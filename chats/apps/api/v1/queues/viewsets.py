@@ -69,10 +69,10 @@ class QueueViewset(ModelViewSet):
 
     def perform_destroy(self, instance):
         if not settings.USE_WENI_FLOWS:
-            return super().perform_create(instance)
+            return super().perform_destroy(instance)
 
-        response = flow_client.update_queue(
-            str(instance.uuid), instance.name, str(instance.sector.uuid)
+        response = flow_client.destroy_queue(
+            str(instance.uuid), str(instance.sector.uuid)
         )
         if response.status_code not in [
             status.HTTP_200_OK,

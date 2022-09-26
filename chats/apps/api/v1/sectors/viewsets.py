@@ -60,11 +60,11 @@ class SectorViewset(viewsets.ModelViewSet):
         if settings.USE_WENI_FLOWS:
             connect = ConnectRESTClient()
             response = connect.create_ticketer(
-                project_uuid=instance.project.uuid,
+                project_uuid=str(instance.project.uuid),
                 name=instance.name,
                 config={
-                    "project_auth": instance.get_permission(self.request.user).pk,
-                    "sector_uuid": instance.uuid,
+                    "project_auth": str(instance.get_permission(self.request.user).pk),
+                    "sector_uuid": str(instance.uuid),
                 },
             )
             if response.status_code not in [

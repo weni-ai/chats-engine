@@ -31,6 +31,6 @@ class ConnectRESTClient:
         response = requests.post(
             url=f"{self.base_url}/v1/organization/project/create_ticketer/",
             headers=self.headers,
-            params={**kwargs, "ticketer_type": "chats"},
+            json={**kwargs, "ticketer_type": settings.FLOWS_TICKETER_TYPE},
         )
         return response

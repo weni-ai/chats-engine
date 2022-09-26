@@ -33,7 +33,7 @@ class FlowRESTClient:
         response = requests.post(
             url=f"{self.base_url}/api/v2/internals/{sector_uuid}/queues/",
             headers=self.headers,
-            params={"uuid": uuid, "name": name},
+            json={"uuid": uuid, "name": name},
         )
         if response.status_code not in [
             status.HTTP_200_OK,
@@ -49,7 +49,7 @@ class FlowRESTClient:
         response = requests.patch(
             url=f"{self.base_url}/api/v2/internals/{sector_uuid}/queues/{uuid}/",
             headers=self.headers,
-            params={"name": name},
+            json={"name": name},
         )
         if response.status_code not in [
             status.HTTP_200_OK,
