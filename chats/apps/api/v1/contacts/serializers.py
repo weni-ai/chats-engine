@@ -26,9 +26,12 @@ class ContactSerializer(serializers.ModelSerializer):
         # TODO: Needs refactoring, used to fix circular import as rooms serializers uses contact serializers
         from chats.apps.api.v1.rooms.serializers import RoomContactSerializer
 
-        return RoomContactSerializer(
-            contact.last_room(self.context.get("request")), many=False
-        ).data
+        try:
+            return RoomContactSerializer(
+                contact.last_room(self.context.get("request")), many=False
+            ).data
+        except AttributeError:
+            return None
 
 
 class ContactRelationsSerializer(serializers.ModelSerializer):

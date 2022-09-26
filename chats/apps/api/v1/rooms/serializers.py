@@ -2,7 +2,7 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from chats.apps.api.v1.accounts.serializers import UserSerializer
-from chats.apps.api.v1.contacts.serializers import ContactSerializer
+from chats.apps.api.v1.contacts.serializers import ContactRelationsSerializer
 from chats.apps.api.v1.queues.serializers import QueueSerializer
 from chats.apps.api.v1.sectors.serializers import DetailSectorTagSerializer
 from chats.apps.rooms.models import Room
@@ -12,7 +12,7 @@ from chats.apps.queues.models import Queue
 
 class RoomSerializer(serializers.ModelSerializer):
     user = UserSerializer(many=False, read_only=True)
-    contact = ContactSerializer(many=False, read_only=True)
+    contact = ContactRelationsSerializer(many=False, read_only=True)
     queue = QueueSerializer(many=False, read_only=True)
     tags = DetailSectorTagSerializer(many=True, read_only=True)
 
@@ -39,7 +39,7 @@ class TransferRoomSerializer(serializers.ModelSerializer):
         queryset=Queue.objects.all(), required=False, source="queue", write_only=True
     )
     queue = QueueSerializer(many=False, required=False, read_only=True)
-    contact = ContactSerializer(many=False, required=False, read_only=True)
+    contact = ContactRelationsSerializer(many=False, required=False, read_only=True)
     tags = DetailSectorTagSerializer(many=True, required=False, read_only=True)
 
     class Meta:

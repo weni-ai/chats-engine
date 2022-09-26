@@ -64,12 +64,24 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         try:
-            queue = validated_data.pop("queue")
-            sector = queue.sector
-        except KeyError:
-            sector = validated_data.pop("sector_uuid")
-            sector = Sector.objects.get(pk=sector)
-            queue = sector.queues.first()
+            queue = (
+                None if not validated_data.get("queue") else validated_data.pop("queue")
+            )
+            sector = (
+                queue.sector
+                if not validated_data.get("sector_uuid")
+                else validated_data.pop("sector_uuid")
+            )
+        except AttributeError:
+            raise ValidationError(
+                {"detail": _("Cannot create room without queue_uuid or sector_uuid")}
+            )
+
+        if queue is None and sector is not None:
+            queue = Queue.objects.filter(sector__uuid=sector).first()
+
+        sector = queue.sector
+
         work_start = sector.work_start
         work_end = sector.work_end
         created_on = validated_data.get("created_on", timezone.now().time())
