@@ -13,7 +13,7 @@ class ProfileViewset(viewsets.GenericViewSet):
     lookup_field = None
 
     def get_object(self):
-        return self.request.user.profile
+        return Profile.objects.get_or_create(user=self.request.user)[0]
 
     def update(self, request, **kwargs):
         user = request.user
