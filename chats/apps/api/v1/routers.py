@@ -19,6 +19,20 @@ from chats.apps.api.v1.sectors.viewsets import (
     SectorTagsViewset,
     SectorViewset,
 )
+
+from chats.apps.api.v1.internal.users import viewsets as user_internal_views
+from chats.apps.api.v1.internal.projects import viewsets as project_internal_views
+from chats.apps.api.v1.internal.queues.viewsets import (
+    QueueInternalViewset,
+    QueueAuthInternalViewset,
+)
+
+from chats.apps.api.v1.external.flows.viewsets import FlowViewSet
+from chats.apps.api.v1.external.msgs.viewsets import MessageFlowViewset
+from chats.apps.api.v1.external.rooms.viewsets import RoomFlowViewSet
+from chats.apps.api.v1.external.sectors.viewsets import SectorFlowViewset
+from chats.apps.api.v1.external.queues.viewsets import QueueFlowViewset
+from chats.apps.api.v1.external.agents.viewsets import AgentFlowViewset
 from chats.apps.api.v1.users.viewsets import ProfileViewset
 
 
@@ -113,8 +127,9 @@ router.register(
 )
 
 # External
-router.register("external/msgs", MessageFlowViewset)
-router.register("external/rooms", RoomFlowViewSet)
-router.register("external/sectors", SectorFlowViewset)
-router.register("external/queues", QueueFlowViewset)
-router.register("external/agents", AgentFlowViewset)
+router.register("external/flows", FlowViewSet, basename='flow')
+router.register("external/msgs", MessageFlowViewset, basename='external_message')
+router.register("external/rooms", RoomFlowViewSet, basename='external_rooms')
+router.register("external/sectors", SectorFlowViewset, basename='external_sector')
+router.register("external/queues", QueueFlowViewset, basename='external_queue')
+router.register("external/agents", AgentFlowViewset, basename='external_agent')
