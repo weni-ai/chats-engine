@@ -31,7 +31,7 @@ class FlowRESTClient:
 
     def create_queue(self, uuid: str, name: str, sector_uuid: str):
         response = requests.post(
-            url=f"{self.base_url}/api/v2/internals/{sector_uuid}/queues/",
+            url=f"{self.base_url}/api/v2/internals/ticketers/{sector_uuid}/queues/",
             headers=self.headers,
             json={"uuid": uuid, "name": name},
         )
@@ -47,7 +47,7 @@ class FlowRESTClient:
 
     def update_queue(self, uuid: str, name: str, sector_uuid: str):
         response = requests.patch(
-            url=f"{self.base_url}/api/v2/internals/{sector_uuid}/queues/{uuid}/",
+            url=f"{self.base_url}/api/v2/internals/ticketers/{sector_uuid}/queues/{uuid}/",
             headers=self.headers,
             json={"name": name},
         )
@@ -63,7 +63,7 @@ class FlowRESTClient:
 
     def destroy_queue(self, uuid: str, sector_uuid: str):
         response = requests.delete(
-            url=f"{self.base_url}/api/v2/internals/{sector_uuid}/queues/{uuid}/",
+            url=f"{self.base_url}/api/v2/internals/ticketers/{sector_uuid}/queues/{uuid}/",
             headers=self.headers,
         )
         if response.status_code not in [
