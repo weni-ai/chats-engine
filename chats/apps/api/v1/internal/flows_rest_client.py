@@ -41,7 +41,7 @@ class FlowRESTClient:
             status.HTTP_204_NO_CONTENT,
         ]:
             LOGGER.debug(
-                f"[{response.status_code}] Failed to create the queue. \nresponse: {response.json()}"
+                f"[{response.status_code}] Failed to create the queue.  response: {response.content}"
             )
         return response
 
@@ -57,7 +57,7 @@ class FlowRESTClient:
             status.HTTP_204_NO_CONTENT,
         ]:
             LOGGER.debug(
-                f"[{response.status_code}] Failed to update the queue. \nresponse: {response.json()}"
+                f"[{response.status_code}] Failed to update the queue. response: {response.content}"
             )
         return response
 
@@ -72,6 +72,6 @@ class FlowRESTClient:
             status.HTTP_204_NO_CONTENT,
         ]:
             LOGGER.debug(
-                f"[{response.status_code}] Failed to delete the queue. \nresponse: {response.json()}"
+                f"[{response.status_code}] Failed to delete the queue. response: {response.content}"
             )
         return response
