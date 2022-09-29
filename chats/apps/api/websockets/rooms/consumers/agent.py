@@ -39,6 +39,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 await self.close()
             await self.accept()
             await self.load_rooms()
+            await self.load_queues()
             await self.load_user()
             await self.set_user_status("online")
 

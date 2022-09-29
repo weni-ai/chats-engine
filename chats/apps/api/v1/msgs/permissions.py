@@ -11,7 +11,7 @@ class MessagePermission(permissions.BasePermission):
             room_uuid = request.data.get("room") or request.query_params.get("room")
             try:
                 room = Room.objects.get(uuid=room_uuid)
-                return room.user == user
+                return (room.user == user) or (room.user is None)
             except Room.DoesNotExist:
                 project_uuid = request.query_params.get("project")
                 permission = user.project_permissions.get(project__uuid=project_uuid)
