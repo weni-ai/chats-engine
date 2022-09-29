@@ -6,9 +6,54 @@ from chats.apps.accounts.models import User
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.sectors.models import Sector, SectorAuthorization
+from chats.apps.rooms.models import Room
 from rest_framework.authtoken.models import Token
 
 
+class ActionsTests(APITestCase):
+    fixtures = ['chats/fixtures/fixture_app.json']
+
+    def setUp(self) -> None:
+        self.project = Project.objects.get(pk="34a93b52-231e-11ed-861d-0242ac120002")
+        self.project_2 = Project.objects.get(pk="32e74fec-0dd7-413d-8062-9659f2e213d2")
+        manager_user = User.objects.get(pk=9)
+        self.login_token =  Token.objects.get_or_create(user=manager_user)[0]
+
+    def test_get_first_access_status(self):
+        url = reverse("project_permission-list")
+        url_action = f"{url}verify_access/"
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = client.get(url_action, data={"project": self.project.pk})
+        self.assertEqual(response.data.get("first_access"), True)
+
+    def test_get_first_access_status_without_permission(self):
+        url = reverse("project_permission-list")
+        url_action = f"{url}verify_access/"
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = client.get(url_action, data={"project": self.project_2.pk})
+        self.assertEqual(response.data.get("first_access"), None)
+        self.assertEqual(response.data["Detail"], "You dont have permission in this project.")
+
+    def test_update_first_access_status(self):
+        url = reverse("project_permission-list")
+        url_action = f"{url}update_access/?project=34a93b52-231e-11ed-861d-0242ac120002"
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = client.patch(url_action)
+        self.assertEqual(response.data.get("first_access"), True)
+
+    def test_patch_first_access_status_without_permission(self):
+        url = reverse("project_permission-list")
+        url_action = f"{url}update_access/?project=32e74fec-0dd7-413d-8062-9659f2e213d2"
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = client.patch(url_action)
+        self.assertEqual(response.data.get("first_access"), None)
+        self.assertEqual(response.data["Detail"], "You dont have permission in this project.")
+
+    
 class SectorTests(APITestCase):
     fixtures = ['chats/fixtures/fixture_sector.json']
 
@@ -322,4 +367,198 @@ class QueueAuthTests(APITestCase):
         client = self.client
         client.credentials(HTTP_AUTHORIZATION="Token " + self.manager_token.key)
         response = client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["is_deleted"], True)
+
+
+class SectorInternalTests(APITestCase):
+    def setUp(self):
+        self.owner, self.owner_token = create_user_and_token("owner")
+        self.manager, self.manager_token = create_user_and_token("manager")
+        self.agent, self.agent_token = create_user_and_token("agent")
+
+        self.project = Project.objects.create(
+            name="testeprojectinternal", connect_pk="asdasdas-dad-as-sda-d-ddd"
+        )
+        self.project_02 = Project.objects.create(
+            name="testeprojectinternal_02", connect_pk="asdasdas-dad-as-sda-d-ddd"
+        )
+        self.sector_1 = Sector.objects.create(
+            name="Test Sector 01",
+            project=self.project,
+            rooms_limit=5,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.sector_2 = Sector.objects.create(
+            name="Test Sector 02",
+            project=self.project,
+            rooms_limit=5,
+            work_start="07:00",
+            work_end="17:00",
+        )
+
+        self.owner_auth = self.project.authorizations.create(user=self.owner, role=1)
+        self.manager_auth = self.sector_1.set_user_authorization(self.manager, role=2)
+        self.agent_auth = self.sector_1.set_user_authorization(self.agent, role=2)
+
+    def test_list_internal_sector_with_admin_token(self):
+        url = reverse("sector_internal-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.owner_token.key)
+        response = client.get(url, data={"project": self.project.uuid})
+        results = response.json().get("results")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get("count"), 2)
+        self.assertEqual(results[0].get("uuid"), str(self.sector_1.uuid))
+        self.assertEqual(results[1].get("uuid"), str(self.sector_2.uuid))
+
+    def test_retrieve_internal_sector_with_admin_token(self):
+        url = reverse("sector_internal-detail", args=[self.sector_1.uuid])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.manager_token.key)
+        response = client.get(url, data={"project": self.project.uuid})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_list_internal_sector_with_wrong_project_token(self):
+        url = reverse("sector_internal-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.agent_token.key)
+        response = client.get(url, data={"project": self.project_02.uuid})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("count"), 0)
+
+        response = self.client.get(url, data={"project": self.project_02.uuid})
+
+    def test_create_internal_sector_with_admin_token(self):
+        url = reverse("sector_internal-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.owner_token.key)
+        data = {
+            "name": "sector test",
+            "rooms_limit": 3,
+            "work_start": "09:00",
+            "work_end": "19:00",
+            "project": str(self.project.uuid),
+        }
+        response = client.post(url, data=data)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_update_internal_sector_with_admin_token(self):
+        url = reverse("sector_internal-detail", args=[self.sector_1.uuid])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.owner_token.key)
+        response = client.patch(url, data={"name": "sector updated"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        sector = Sector.objects.get(uuid=self.sector_1.uuid)
+
+        self.assertEqual("sector updated", sector.name)
+
+    def test_delete_internal_sector_with_right_project_token(self):
+        url = reverse("sector_internal-detail", args=[self.sector_1.uuid])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.owner_token.key)
+        response = client.delete(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["is_deleted"], True)
+
+
+
+class RoomsExternalTests(APITestCase):
+    fixtures = ['chats/fixtures/fixture_app.json']
+
+    def setUp(self) -> None:
+        self.queue_1 = Queue.objects.get(uuid="f2519480-7e58-4fc4-9894-9ab1769e29cf")
+
+    def test_create_external_room(self):
+        url = reverse("external_rooms-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380")
+        data = {
+            "queue_uuid": str(self.queue_1.uuid),
+            "contact": {
+                "external_id": "e3955fd5-5705-40cd-b480-b45594b70282",
+                "name": "Foo Bar",
+                "email": "FooBar@weni.ai",
+                "phone": "+250788123123",
+                "custom_fields": {}
+            }
+        }
+        response = client.post(url, data=data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+
+    def test_create_external_room_with_external_uuid(self):
+        url = reverse("external_rooms-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380")
+        data = {
+            "queue_uuid": str(self.queue_1.uuid),
+            "contact": {
+                "external_id": "aec9f84e-3dcd-11ed-b878-0242ac120002",
+                "name": "external generator",
+                "email": "generator@weni.ai",
+                "phone": "+558498984312",
+                "custom_fields": {
+                    "age": "35"
+                }
+            }
+        }
+        response = client.post(url, data=data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["contact"]["name"], "external generator")
+        self.assertEqual(response.data["contact"]["external_id"], "aec9f84e-3dcd-11ed-b878-0242ac120002")
+
+    
+    def test_create_external_room_editing_contact(self):
+        url = reverse("external_rooms-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380")
+        data = {
+            "queue_uuid": str(self.queue_1.uuid),
+            "contact": {
+                "external_id": "e3955fd5-5705-40cd-b480-b45594b70282",
+                "name": "gaules",
+                "email": "gaulesr@weni.ai",
+                "phone": "+5511985543332",
+                "custom_fields": {
+                    "age": "40",
+                    "prefered_game": "cs-go",
+                    "job": "streamer"
+                }
+            }
+        }
+        response = client.post(url, data=data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["contact"]["name"], "gaules")
+        self.assertEqual(response.data["contact"]["custom_fields"]["age"], "40")
+        self.assertEqual(response.data["contact"]["custom_fields"]["prefered_game"], "cs-go")
+        self.assertEqual(response.data["contact"]["custom_fields"]["job"], "streamer")
+
+
+class MsgsExternalTests(APITestCase):
+    fixtures = ['chats/fixtures/fixture_app.json']
+
+    def setUp(self) -> None:
+        self.room = Room.objects.get(uuid="090da6d1-959e-4dea-994a-41bf0d38ba26")
+
+    def test_create_external_msgs(self):
+        url = reverse("external_msgs-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380")
+        data = {
+            "room": self.room.uuid,
+            "text": "olá.",
+            "direction": "incoming",
+            "attachments": [
+            {
+                "content_type": "string",
+                "url": "http://example.com"
+            }
+            ],
+        }
+        response = client.post(url, data=data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)

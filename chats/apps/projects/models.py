@@ -100,6 +100,9 @@ class ProjectPermission(
         _("User Status"), max_length=10, choices=ROLE_CHOICES, default=STATUS_OFFLINE
     )
 
+    first_access = models.BooleanField(_("Its the first access of user?"), default=True)
+
+
     class Meta:
         verbose_name = _("Project Permission")
         verbose_name_plural = _("Project Permissions")

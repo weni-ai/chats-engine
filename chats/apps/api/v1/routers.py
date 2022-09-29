@@ -92,7 +92,7 @@ router.register("contact", ContactViewset)
 router.register("sector", SectorViewset)
 router.register("tag", SectorTagsViewset)
 router.register("project", ProjectViewset)
-router.register("permission/project", ProjectPermissionViewset)
+router.register("permission/project", ProjectPermissionViewset, basename="project_permission")
 router.register("queue", QueueViewset, basename="queue")
 router.register(
     "authorization/sector", SectorAuthorizationViewset, basename="sector_auth"
