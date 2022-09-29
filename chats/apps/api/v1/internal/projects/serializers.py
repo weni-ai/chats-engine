@@ -68,3 +68,11 @@ class ProjectPermissionReadSerializer(serializers.ModelSerializer):
             "project",
             "user",
         ]
+
+class CheckAccessReadSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectPermission
+        fields = [
+           "first_access"
+        ]
+
