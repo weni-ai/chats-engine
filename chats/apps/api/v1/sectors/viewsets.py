@@ -74,7 +74,7 @@ class SectorViewset(viewsets.ModelViewSet):
                 instance.delete()
 
                 raise exceptions.APIException(
-                    detail=f"Error posting the sector/ticketer on flows. Exception: {response.content}"
+                    detail=f"[{response.status_code}] Error posting the sector/ticketer on flows. Exception: {response.content}"
                 )
         instance.notify_sector("create")
 

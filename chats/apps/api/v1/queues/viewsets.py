@@ -40,15 +40,14 @@ class QueueViewset(ModelViewSet):
     def perform_create(self, serializer):
         if not settings.USE_WENI_FLOWS:
             return super().perform_create(serializer)
-        serializer.save()
-        instance = serializer.instance
+        instance = serializer.save()
         response = flow_client.create_queue(
             str(instance.uuid), instance.name, str(instance.sector.uuid)
         )
         if response.status_code not in [status.HTTP_200_OK, status.HTTP_201_CREATED]:
             instance.delete()
             raise exceptions.APIException(
-                detail=f"Error posting the queue on flows. Exception: {response.content}"
+                detail=f"[{response.status_code}] Error posting the queue on flows. Exception: {response.content}"
             )
         return instance
 
@@ -56,14 +55,13 @@ class QueueViewset(ModelViewSet):
         if not settings.USE_WENI_FLOWS:
             return super().perform_create(serializer)
 
-        serializer.save()
-        instance = serializer.instance
+        instance = serializer.save()
         response = flow_client.update_queue(
             str(instance.uuid), instance.name, str(instance.sector.uuid)
         )
         if response.status_code not in [status.HTTP_200_OK, status.HTTP_201_CREATED]:
             raise exceptions.APIException(
-                detail=f"Error updating the queue on flows. Exception: {response.content}"
+                detail=f"[{response.status_code}] Error updating the queue on flows. Exception: {response.content}"
             )
         return instance
 
@@ -80,7 +78,7 @@ class QueueViewset(ModelViewSet):
             status.HTTP_204_NO_CONTENT,
         ]:
             raise exceptions.APIException(
-                detail=f"Error deleting the queue on flows. Exception: {response.content}"
+                detail=f"[{response.status_code}] Error deleting the queue on flows. Exception: {response.content}"
             )
         return super().perform_destroy(instance)
 
