@@ -1,4 +1,6 @@
+import logging
 from urllib.parse import parse_qs
+from urllib.error import HTTPError
 
 from channels.db import database_sync_to_async
 from channels.middleware import BaseMiddleware
@@ -9,6 +11,8 @@ from rest_framework.authtoken.models import Token
 from chats.apps.accounts.authentication.drf.backends import (
     WeniOIDCAuthenticationBackend,
 )
+
+LOGGER = logging.getLogger(__name__)
 
 
 @database_sync_to_async
@@ -39,7 +43,12 @@ class TokenAuthMiddleware(BaseMiddleware):
             token_key = None
 
         if settings.OIDC_ENABLED:
-            user = await get_keycloak_user(token_key)
+            try:
+                user = await get_keycloak_user(token_key)
+            except HTTPError:
+                user = None
+                LOGGER.debug("Keycloak Websocket Login failed")
+
             scope["user"] = AnonymousUser() if user is None else user
         else:
             scope["user"] = (

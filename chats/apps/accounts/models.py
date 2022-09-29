@@ -78,3 +78,25 @@ class User(AbstractBaseUser, PermissionsMixin):
             return self.messages.last().created_on
         except AttributeError:
             return ""
+
+
+class Profile(BaseModel):
+    user = models.OneToOneField(
+        User, related_name="profile", verbose_name=_("User"), on_delete=models.CASCADE
+    )
+    sound_new_room = models.BooleanField(
+        _("New room messages notification sound"), default=True
+    )
+    sound_chat_msg = models.BooleanField(
+        _("Chat messages notification sound"), default=True
+    )
+    sound_action = models.BooleanField(_("Action sound"), default=True)
+    config = models.JSONField(
+        _("config"),
+        blank=True,
+        null=True,
+    )
+
+    class Meta:
+        verbose_name = _("Profile")
+        verbose_name_plural = _("Profiles")

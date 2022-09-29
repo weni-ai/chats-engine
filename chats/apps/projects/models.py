@@ -50,7 +50,9 @@ class Project(BaseModel):
             )  # If the user have any permission on the sectors
 
 
-class ProjectPermission(BaseModel):
+class ProjectPermission(
+    BaseModel
+):  # TODO: ADD CONSTRAINT NOT TO SAVE THE SAME USER 2 TIME IN THE PROJECT
     ROLE_NOT_SETTED = 0
     ROLE_ADMIN = 1
     ROLE_AGENT = 2
@@ -101,6 +103,11 @@ class ProjectPermission(BaseModel):
     class Meta:
         verbose_name = _("Project Permission")
         verbose_name_plural = _("Project Permissions")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "project"], name="unique_user_permission"
+            )
+        ]
 
     def __str__(self):
         return self.project.name

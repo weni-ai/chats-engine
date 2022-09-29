@@ -1,8 +1,8 @@
+from django.conf import settings
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import status, viewsets
+from rest_framework import status, viewsets, exceptions
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-
 from chats.apps.api.v1.permissions import IsProjectAdmin, IsQueueAgent, IsSectorManager
 from chats.apps.api.v1.sectors import serializers as sector_serializers
 from chats.apps.api.v1.sectors.filters import (
@@ -28,10 +28,12 @@ class SectorViewset(viewsets.ModelViewSet):
 
     def get_permissions(self):
         permission_classes = self.permission_classes
-        if self.action in ["list", "retrieve"]:
-            permission_classes = (IsAuthenticated, IsSectorManager)
-        else:
+        if self.action == "list":
+            permission_classes = [IsAuthenticated]
+        elif self.action in ["create", "destroy"]:
             permission_classes = (IsAuthenticated, IsProjectAdmin)
+        else:
+            permission_classes = [IsAuthenticated, IsSectorManager]
         return [permission() for permission in permission_classes]
 
     def get_serializer_class(self):
@@ -55,15 +57,25 @@ class SectorViewset(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         instance = serializer.save()
 
-        # connect = ConnectRESTClient()
-        # connect.create_ticketer(
-        #     project_uuid=instance.project.uuid,
-        #     name=instance.name,
-        #     config={
-        #         "project_auth": instance.get_permission(self.request.user).pk,
-        #         "sector_uuid": instance.uuid,
-        #     },
-        # )
+        if settings.USE_WENI_FLOWS:
+            connect = ConnectRESTClient()
+            response = connect.create_ticketer(
+                project_uuid=str(instance.project.uuid),
+                name=instance.name,
+                config={
+                    "project_auth": str(instance.get_permission(self.request.user).pk),
+                    "sector_uuid": str(instance.uuid),
+                },
+            )
+            if response.status_code not in [
+                status.HTTP_200_OK,
+                status.HTTP_201_CREATED,
+            ]:
+                instance.delete()
+
+                raise exceptions.APIException(
+                    detail=f"Error posting the sector/ticketer on flows. Exception: {response.content}"
+                )
         instance.notify_sector("create")
 
     def perform_update(self, serializer):

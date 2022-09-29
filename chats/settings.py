@@ -257,6 +257,7 @@ if OIDC_ENABLED:
     OIDC_OP_AUTHORIZATION_ENDPOINT = env.str("OIDC_OP_AUTHORIZATION_ENDPOINT")
     OIDC_OP_TOKEN_ENDPOINT = env.str("OIDC_OP_TOKEN_ENDPOINT")
     OIDC_OP_USER_ENDPOINT = env.str("OIDC_OP_USER_ENDPOINT")
+    OIDC_OP_USERS_DATA_ENDPOINT = env.str("OIDC_OP_USERS_DATA_ENDPOINT")
     OIDC_OP_JWKS_ENDPOINT = env.str("OIDC_OP_JWKS_ENDPOINT")
     OIDC_RP_SIGN_ALGO = env.str("OIDC_RP_SIGN_ALGO", default="RS256")
     OIDC_DRF_AUTH_BACKEND = env.str(
@@ -266,7 +267,11 @@ if OIDC_ENABLED:
     OIDC_RP_SCOPES = env.str("OIDC_RP_SCOPES", default="openid email")
 
 
-CONNECT_API_URL = env.str("CONNECT_API_URL", default="https://api.dev.cloud.weni.ai")
+CONNECT_API_URL = env.str("CONNECT_API_URL", default="")
+FLOWS_API_URL = env.str("FLOWS_API_URL", default="")
+USE_WENI_FLOWS = env.bool("USE_WENI_FLOWS", default=False)
+FLOWS_TICKETER_TYPE = env.bool("FLOWS_TICKETER_TYPE", default="chats")
+
 
 # Swagger
 

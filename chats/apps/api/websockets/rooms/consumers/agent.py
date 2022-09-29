@@ -3,6 +3,7 @@ import json
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 
 from chats.apps.rooms.models import Room
@@ -21,16 +22,24 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         Called when the websocket is handshaking as part of initial connection.
         """
         # Are they logged in?
-        self.user = self.scope["user"]
-        self.project = self.scope["query_params"].get("project")[0]
+        try:
+            self.user = self.scope["user"]
+            self.project = self.scope["query_params"].get("project")[0]
+        except (KeyError, TypeError):
+            await self.close()
         if self.user.is_anonymous or self.project is None:
             # Reject the connection
             await self.close()
         else:
             # Accept the connection
-            self.permission = await self.get_permission()
+
+            try:
+                self.permission = await self.get_permission()
+            except ObjectDoesNotExist:
+                await self.close()
             await self.accept()
             await self.load_rooms()
+            await self.load_queues()
             await self.load_user()
             await self.set_user_status("online")
 
