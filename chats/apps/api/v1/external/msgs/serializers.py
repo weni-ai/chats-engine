@@ -60,13 +60,6 @@ class MsgFlowSerializer(serializers.ModelSerializer):
             "contact",
             "media",
         ]
-        # extra_kwargs = {
-        #     "text": {
-        #         "required": False,
-        #         "allow_null": True,
-        #         "allow_blank": True,
-        #     }
-        # }
 
     def create(self, validated_data):
         direction = validated_data.pop("direction")

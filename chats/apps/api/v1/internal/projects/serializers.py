@@ -8,6 +8,9 @@ from chats.apps.api.v1.internal.users.serializers import UserSerializer
 
 from chats.apps.api.v1.internal.connect_rest_client import ConnectRESTClient
 from chats.apps.api.v1.internal.flows_rest_client import FlowRESTClient
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 
 class ProjectInternalSerializer(serializers.ModelSerializer):
@@ -15,6 +18,7 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
     is_template = serializers.BooleanField(
         write_only=True, required=False, allow_null=True
     )
+    user = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = Project
@@ -31,22 +35,26 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         try:
             is_template = validated_data.pop("is_template")
+            user_email = validated_data.pop("user_email")
         except KeyError:
             is_template = False
 
         instance = super().create(validated_data)
         if is_template is True:
+            user = User.objects.get(email=user_email)
+            permission, created = instance.permissions.get_or_create(user=user, role=1)
+
             sector = instance.sectors.create(
                 name="Setor Padrão", rooms_limit=5, work_start="08:00", work_end="18:00"
             )
             queue = sector.queues.create(name="Fila 1")
             connect_client = ConnectRESTClient()
             response_sector = connect_client.create_ticketer(
-                project_uuid=str(instance.project.uuid),
-                name=instance.name,
+                project_uuid=str(instance.uuid),
+                name=sector.name,
                 config={
-                    "project_auth": str(instance.get_permission(self.request.user).pk),
-                    "sector_uuid": str(instance.uuid),
+                    "project_auth": str(permission.pk),
+                    "sector_uuid": str(sector.uuid),
                 },
             )
 

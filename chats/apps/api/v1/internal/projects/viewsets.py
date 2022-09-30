@@ -17,6 +17,13 @@ class ProjectViewset(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, ModuleHasPermission]
     lookup_field = "uuid"
 
+    def create(self, request, *args, **kwargs):
+        if settings.OIDC_ENABLED:
+            user_email = request.data.get("user__email")
+            persist_keycloak_user_by_email(user_email)
+
+        return super().create(request, *args, **kwargs)
+
 
 class ProjectPermissionViewset(viewsets.ModelViewSet):
     queryset = ProjectPermission.objects.all()
