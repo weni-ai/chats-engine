@@ -1,10 +1,13 @@
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
-from rest_framework import serializers
+from rest_framework import serializers, exceptions, status
 from timezone_field.rest_framework import TimeZoneSerializerField
 
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.api.v1.internal.users.serializers import UserSerializer
+
+from chats.apps.api.v1.internal.connect_rest_client import ConnectRESTClient
+from chats.apps.api.v1.internal.flows_rest_client import FlowRESTClient
 
 
 class ProjectInternalSerializer(serializers.ModelSerializer):
@@ -36,7 +39,32 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
             sector = instance.sectors.create(
                 name="Setor Padrão", rooms_limit=5, work_start="08:00", work_end="18:00"
             )
-            sector.queues.create(name="Fila 1")
+            queue = sector.queues.create(name="Fila 1")
+            connect_client = ConnectRESTClient()
+            response_sector = connect_client.create_ticketer(
+                project_uuid=str(instance.project.uuid),
+                name=instance.name,
+                config={
+                    "project_auth": str(instance.get_permission(self.request.user).pk),
+                    "sector_uuid": str(instance.uuid),
+                },
+            )
+
+            flow_client = FlowRESTClient()
+            response_flows = flow_client.create_queue(
+                str(queue.uuid), queue.name, str(queue.sector.uuid)
+            )
+            status_list = [
+                status.HTTP_200_OK,
+                status.HTTP_201_CREATED,
+            ]
+
+            if (response_sector.status_code not in status_list) or (
+                response_flows.status_code not in status_list
+            ):
+                instance.delete()
+                error_message = f"[{response_sector.status_code}] Sector response: {response_sector.content}.  [{response_flows.status_code}] Queue response: {response_flows.content}."
+                raise exceptions.APIException(detail=error_message)
 
         return instance
 
@@ -69,10 +97,8 @@ class ProjectPermissionReadSerializer(serializers.ModelSerializer):
             "user",
         ]
 
+
 class CheckAccessReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectPermission
-        fields = [
-           "first_access"
-        ]
-
+        fields = ["first_access"]
