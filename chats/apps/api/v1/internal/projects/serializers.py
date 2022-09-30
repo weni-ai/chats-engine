@@ -18,7 +18,7 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
     is_template = serializers.BooleanField(
         write_only=True, required=False, allow_null=True
     )
-    user = serializers.CharField(write_only=True, required=False)
+    user_email = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = Project
@@ -28,6 +28,7 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
             "date_format",
             "timezone",
             "is_template",
+            "user_email",
         ]
 
         extra_kwargs = {field: {"required": False} for field in fields}

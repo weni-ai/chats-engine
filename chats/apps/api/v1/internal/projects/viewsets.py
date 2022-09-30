@@ -19,7 +19,7 @@ class ProjectViewset(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         if settings.OIDC_ENABLED:
-            user_email = request.data.get("user__email")
+            user_email = request.data.get("user_email")
             persist_keycloak_user_by_email(user_email)
 
         return super().create(request, *args, **kwargs)
