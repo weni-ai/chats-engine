@@ -30,9 +30,9 @@ class MessageFlowViewset(
         return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
-        serializer.save()
-        serializer.instance.notify_room("create")
+        instance = serializer.save()
+        instance.notify_room("create")
 
     def perform_update(self, serializer):
-        serializer.save()
-        serializer.instance.notify_room("update")
+        instance = serializer.save()
+        instance.notify_room("update")
