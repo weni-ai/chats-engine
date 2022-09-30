@@ -35,6 +35,11 @@ class RoomViewset(
             )
         return [permission() for permission in permission_classes]
 
+    def get_queryset(self):
+        if self.action != "list":
+            self.filterset_class = None
+        return super().get_queryset()
+
     def get_serializer_class(self):
         if self.action == "update":
             return TransferRoomSerializer
