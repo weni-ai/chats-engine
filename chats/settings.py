@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 
 import environ
+
 import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
 
@@ -48,7 +49,6 @@ INSTALLED_APPS = [
     # django
     "django.contrib.admin",
     "django.contrib.auth",
-    "mozilla_django_oidc",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
@@ -60,12 +60,15 @@ INSTALLED_APPS = [
     "chats.apps.msgs",
     "chats.apps.rooms",
     "chats.apps.sectors",
+    "chats.apps.queues",
     "chats.apps.projects",
     "chats.apps.api",
     "chats.core",
     # third party apps
     "channels",
     "drf_yasg",
+    "django_filters",
+    "storages",
     "rest_framework",
     "rest_framework.authtoken",
     "corsheaders",
@@ -118,6 +121,7 @@ CHANNEL_LAYERS = {
 
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
+
 
 DATABASES = dict(default=env.db(var="DATABASE_URL"))
 
@@ -193,6 +197,10 @@ else:
     MEDIA_URL = "/media/"
 
 
+ENGINE_BASE_URL = env.str(
+    "ENGINE_BASE_URL", default="http://localhost:8000"
+)  # without '/'
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.0/ref/settings/#default-auto-field
 
@@ -210,7 +218,6 @@ REST_FRAMEWORK = {
     "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
     "DEFAULT_METADATA_CLASS": "chats.apps.api.v1.metadata.Metadata",
 }
-
 
 # Logging
 
@@ -250,6 +257,7 @@ if OIDC_ENABLED:
     OIDC_OP_AUTHORIZATION_ENDPOINT = env.str("OIDC_OP_AUTHORIZATION_ENDPOINT")
     OIDC_OP_TOKEN_ENDPOINT = env.str("OIDC_OP_TOKEN_ENDPOINT")
     OIDC_OP_USER_ENDPOINT = env.str("OIDC_OP_USER_ENDPOINT")
+    OIDC_OP_USERS_DATA_ENDPOINT = env.str("OIDC_OP_USERS_DATA_ENDPOINT")
     OIDC_OP_JWKS_ENDPOINT = env.str("OIDC_OP_JWKS_ENDPOINT")
     OIDC_RP_SIGN_ALGO = env.str("OIDC_RP_SIGN_ALGO", default="RS256")
     OIDC_DRF_AUTH_BACKEND = env.str(
@@ -258,11 +266,17 @@ if OIDC_ENABLED:
     )
     OIDC_RP_SCOPES = env.str("OIDC_RP_SCOPES", default="openid email")
 
+
+CONNECT_API_URL = env.str("CONNECT_API_URL", default="")
+FLOWS_API_URL = env.str("FLOWS_API_URL", default="")
+USE_WENI_FLOWS = env.bool("USE_WENI_FLOWS", default=False)
+FLOWS_TICKETER_TYPE = env.str("FLOWS_TICKETER_TYPE", default="wenichats")
+
+
 # Swagger
 
 SWAGGER_SETTINGS = {
     "USE_SESSION_AUTH": False,
-    "APIS_SORTER": "alpha",
     "SECURITY_DEFINITIONS": {
         "api_key": {"type": "apiKey", "name": "Authorization", "in": "header"}
     },
@@ -285,4 +299,6 @@ if USE_SENTRY:
 
 # Query Limiters
 
-OLD_MESSAGES_LIMIT = env.int("OLD_MESSAGES_LIMIT", default=10)
+OLD_MESSAGES_LIMIT = env.int(
+    "OLD_MESSAGES_LIMIT", default=10
+)  # Limits the messages shown when accessing an active chat

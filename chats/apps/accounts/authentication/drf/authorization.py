@@ -1,11 +1,10 @@
 from django.utils.translation import gettext_lazy as _
 from rest_framework import exceptions
-from rest_framework.authentication import (TokenAuthentication,
-                                           get_authorization_header)
+from rest_framework.authentication import TokenAuthentication, get_authorization_header
 from chats.apps.projects.models import ProjectPermission
 
 
-class ProjectAuthentication(TokenAuthentication):
+class ProjectAdminAuthentication(TokenAuthentication):
     keyword = "Bearer"
     model = ProjectPermission
 
@@ -36,7 +35,7 @@ class ProjectAuthentication(TokenAuthentication):
         model = self.get_model()
         try:
             authorization = model.objects.get(uuid=key)
-            if not authorization.can_translate:
+            if not authorization.is_admin:
                 raise exceptions.PermissionDenied()
 
             return (authorization.user, authorization)

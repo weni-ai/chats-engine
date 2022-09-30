@@ -1,3 +1,7 @@
+import logging
+from urllib.parse import parse_qs
+from urllib.error import HTTPError
+
 from channels.db import database_sync_to_async
 from channels.middleware import BaseMiddleware
 from django.conf import settings
@@ -7,6 +11,8 @@ from rest_framework.authtoken.models import Token
 from chats.apps.accounts.authentication.drf.backends import (
     WeniOIDCAuthenticationBackend,
 )
+
+LOGGER = logging.getLogger(__name__)
 
 
 @database_sync_to_async
@@ -30,11 +36,19 @@ class TokenAuthMiddleware(BaseMiddleware):
 
     async def __call__(self, scope, receive, send):
         try:
-            _, token_key = scope["query_string"].decode().split("=")
-        except ValueError:
+            query_params = parse_qs(scope["query_string"].decode())
+            scope["query_params"] = query_params
+            token_key = query_params.get("Token")[0]
+        except (ValueError, TypeError):
             token_key = None
+
         if settings.OIDC_ENABLED:
-            user = await get_keycloak_user(token_key)
+            try:
+                user = await get_keycloak_user(token_key)
+            except HTTPError:
+                user = None
+                LOGGER.debug("Keycloak Websocket Login failed")
+
             scope["user"] = AnonymousUser() if user is None else user
         else:
             scope["user"] = (

@@ -1,14 +1,18 @@
 import json
 
 from django.utils.translation import gettext_lazy as _
-from django.db.models import Q
 from rest_framework import mixins, permissions, status
 from rest_framework.decorators import action
+from django_filters.rest_framework import DjangoFilterBackend
+
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
+from rest_framework.exceptions import ValidationError
 
 from chats.apps.api.v1.rooms.serializers import RoomSerializer, TransferRoomSerializer
 from chats.apps.rooms.models import Room
+from chats.apps.api.v1.rooms import filters as room_filters
+from chats.apps.api.v1 import permissions as api_permissions
 
 
 class RoomViewset(
@@ -19,32 +23,24 @@ class RoomViewset(
 ):
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
-    permission_classes = [
-        permissions.IsAuthenticated,
-    ]
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = room_filters.RoomFilter
 
-    def list(self, request, *args, **kwargs):
-        """
-        Return user related rooms and rooms related to the sectors the user is in what are empty of a user
-        """
-        rooms = Room.objects.filter(
-            Q(user=request.user) | Q(user__isnull=True),
-            sector__id__in=request.user.sector_ids,
-            is_active=True,
-        )
+    def get_permissions(self):
+        permission_classes = [permissions.IsAuthenticated]
+        if self.action != "list":
+            permission_classes = (
+                permissions.IsAuthenticated,
+                api_permissions.IsQueueAgent,
+            )
+        return [permission() for permission in permission_classes]
 
-        return rooms
+    def get_serializer_class(self):
+        if self.action == "update":
+            return TransferRoomSerializer
+        return super().get_serializer_class()
 
-    def update(
-        self, request, *args, **kwargs
-    ):  # TODO: Config swagger to show the fields related the serializer below
-        """
-        Update the user and/or the sector of the room, but only if the user is the agent related to the room
-        """
-        self.serializer_class = TransferRoomSerializer
-        return super().update(request, *args, **kwargs)
-
-    @action(detail=True, methods=["PUT"], url_name="close")
+    @action(detail=True, methods=["PUT", "PATCH"], url_name="close")
     def close(
         self, request, *args, **kwargs
     ):  # TODO: Remove the body options on swagger as it won't use any
@@ -54,32 +50,47 @@ class RoomViewset(
         # Add send room notification to the channels group
         instance = self.get_object()
         tags = request.data.get("tags", None)
-        instance.close(tags)
+        if tags is None:
+            raise ValidationError(
+                {"detail": _("You cannot close a room without giving tags to it")}
+            )
+        instance.close(tags, "agent")
         serialized_data = RoomSerializer(instance=instance)
+        instance.notify_queue("close", callback=True)
         return Response(serialized_data.data, status=status.HTTP_200_OK)
 
     def perform_create(self, serializer):
         serializer.save()
-        serializer.instance.notify_sector("create")
+        serializer.instance.notify_queue("create")
 
     def perform_update(self, serializer):
-        transfer_history = self.get_object().transfer_history
-        transfer_history = (
-            [] if transfer_history is None else json.loads(transfer_history)
-        )
-        user = serializer.data.get("user")
-        sector = serializer.data.get("sector")
+        # TODO Separate this into smaller methods
+        transfer_history = self.get_object().transfer_history or []
+        user = self.request.data.get("user_email")
+        queue = self.request.data.get("queue_uuid")
+        serializer.save()
+        instance = serializer.instance
+
+        # Create transfer object based on whether it's a user or a queue transfer and add it to the history
         if user:
-            _content = {"type": "user", "id": user}
+            _content = {"type": "user", "name": instance.user.first_name}
             transfer_history.append(_content)
-        if sector:
-            _content = {"type": "sector", "id": sector}
+        if queue:
+            _content = {"type": "queue", "name": instance.queue.name}
             transfer_history.append(_content)
 
-        serializer.save(transfer_history=json.dumps(transfer_history))
+        instance.transfer_history = transfer_history
+        instance.save()
 
-        serializer.instance.notify_room("update")
+        # Create a message with the transfer data and Send to the room group
+        msg = instance.messages.create(text=json.dumps(_content))
+        msg.notify_room("create")
+
+        # Send Updated data to the room group
+        instance.notify_room(
+            "update", callback=True
+        )  # TODO FIX: wont trigger this on newer rooms than the ws connection
 
     def perform_destroy(self, instance):
-        instance.notify_room("destroy")
+        instance.notify_room("destroy", callback=True)
         super().perform_destroy(instance)

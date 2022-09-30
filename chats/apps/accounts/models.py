@@ -50,8 +50,12 @@ class User(AbstractBaseUser, PermissionsMixin):
     last_name = models.CharField(_("last name"), max_length=150, blank=True)
     email = models.EmailField(_("email"), unique=True, help_text=_("User email"))
 
+    photo_url = models.URLField(blank=True, max_length=255)
+
     is_staff = models.BooleanField(_("staff status"), default=False)
     is_active = models.BooleanField(_("active"), default=True)
+
+    language = models.CharField(max_length=5, null=True, blank=True)
 
     date_joined = models.DateTimeField(_("date joined"), default=timezone.now)
 
@@ -67,3 +71,32 @@ class User(AbstractBaseUser, PermissionsMixin):
     @property
     def sector_ids(self):
         return self.sector_authorizations.values_list("sector__id", flat=True)
+
+    @property
+    def last_interaction(self):
+        try:
+            return self.messages.last().created_on
+        except AttributeError:
+            return ""
+
+
+class Profile(BaseModel):
+    user = models.OneToOneField(
+        User, related_name="profile", verbose_name=_("User"), on_delete=models.CASCADE
+    )
+    sound_new_room = models.BooleanField(
+        _("New room messages notification sound"), default=True
+    )
+    sound_chat_msg = models.BooleanField(
+        _("Chat messages notification sound"), default=True
+    )
+    sound_action = models.BooleanField(_("Action sound"), default=True)
+    config = models.JSONField(
+        _("config"),
+        blank=True,
+        null=True,
+    )
+
+    class Meta:
+        verbose_name = _("Profile")
+        verbose_name_plural = _("Profiles")
