@@ -35,7 +35,7 @@ class Message(BaseModel):
         null=True,
         blank=True,
     )
-    text = models.TextField(_("Text"))
+    text = models.TextField(_("Text"), blank=True, null=True)
     seen = models.BooleanField(_("Was it seen?"), default=False)
 
     class Meta:

@@ -21,12 +21,10 @@ class MessageFlowViewset(
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = MessageFilter
     permission_classes = [IsAdminPermission]
-    # pagination_class = pagination.PageNumberPagination  # Removed temporarily
     authentication_classes = [ProjectAdminAuthentication]
     lookup_field = "uuid"
 
     def create(self, request, *args, **kwargs):
-        # TODO USE THE REQUEST.USER TO SET THE USER IN THE MESSAGE
         return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):

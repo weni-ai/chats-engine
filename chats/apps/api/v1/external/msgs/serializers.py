@@ -1,5 +1,5 @@
 from django.utils.translation import gettext_lazy as _
-from rest_framework import serializers
+from rest_framework import serializers, exceptions
 
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactRelationsSerializer
@@ -29,7 +29,9 @@ class MsgFlowSerializer(serializers.ModelSerializer):
         write_only=True,
     )
     attachments = AttachmentSerializer(many=True, required=False, write_only=True)
-
+    text = serializers.CharField(
+        required=False, allow_null=True, allow_blank=True, default=""
+    )
     # Read
     media = MessageMediaSerializer(required=False, many=True, read_only=True)
     contact = ContactRelationsSerializer(many=False, required=False, read_only=True)
@@ -58,11 +60,23 @@ class MsgFlowSerializer(serializers.ModelSerializer):
             "contact",
             "media",
         ]
+        # extra_kwargs = {
+        #     "text": {
+        #         "required": False,
+        #         "allow_null": True,
+        #         "allow_blank": True,
+        #     }
+        # }
 
     def create(self, validated_data):
         direction = validated_data.pop("direction")
         medias = validated_data.pop("attachments")
         room = validated_data.get("room")
+        text = validated_data.get("text")
+        if text is None and medias == []:
+            raise exceptions.APIException(
+                detail="Cannot create message without text or media"
+            )
         if direction == "incoming":
             validated_data["contact"] = room.contact
 

@@ -43,6 +43,9 @@ class MessageSerializer(serializers.ModelSerializer):
         write_only=True,
         allow_null=True,
     )
+    text = serializers.CharField(
+        required=False, allow_null=True, allow_blank=True, default=""
+    )
 
     class Meta:
         model = ChatMessage
