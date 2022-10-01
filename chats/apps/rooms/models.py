@@ -72,6 +72,13 @@ class Room(BaseModel):
     class Meta:
         verbose_name = _("Room")
         verbose_name_plural = _("Rooms")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["contact", "queue"],
+                condition=models.Q(is_active=True),
+                name="unique_contact_queue_is_activetrue_room",
+            )
+        ]
 
     def save(self, *args, **kwargs) -> None:
         if self.__original_is_active is False:
