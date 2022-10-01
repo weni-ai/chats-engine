@@ -45,8 +45,8 @@ class WeniOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         user = self.UserModel.objects.create_user(email, username)
 
         user.name = claims.get("name", "")
-        user.first_name = claims.get("first_name", "")
-        user.last_name = claims.get("last_name", "")
+        user.first_name = claims.get("given_name", "")
+        user.last_name = claims.get("family_name", "")
         user.save()
 
         check_module_permission(claims, user)
