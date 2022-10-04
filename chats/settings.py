@@ -286,6 +286,10 @@ SWAGGER_SETTINGS = {
 
 CORS_ORIGIN_ALLOW_ALL = True
 
+CORS_ORIGIN_WHITELIST = (
+  'http: // localhost:8080',
+)
+
 # Sentry configuration
 
 USE_SENTRY = env.bool("USE_SENTRY", default=False)
