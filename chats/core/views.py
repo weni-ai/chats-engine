@@ -12,8 +12,8 @@ def get_auth_token() -> str:
     request = requests.post(
         url=settings.OIDC_OP_TOKEN_ENDPOINT,
         data={
-            "client_id": settings.OIDC_RP_CLIENT_ID,
-            "client_secret": settings.OIDC_RP_CLIENT_SECRET,
+            "client_id": settings.OIDC_ADMIN_CLIENT_ID,
+            "client_secret": settings.OIDC_ADMIN_CLIENT_SECRET,
             "grant_type": "client_credentials",
         },
     )

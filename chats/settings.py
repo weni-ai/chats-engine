@@ -266,6 +266,10 @@ if OIDC_ENABLED:
     )
     OIDC_RP_SCOPES = env.str("OIDC_RP_SCOPES", default="openid email")
 
+    # TODO: Set admin permission to Chats client and remove the follow variables
+    OIDC_ADMIN_CLIENT_ID = env.str("OIDC_ADMIN_CLIENT_ID")
+    OIDC_ADMIN_CLIENT_SECRET = env.str("OIDC_ADMIN_CLIENT_SECRET")
+
 
 CONNECT_API_URL = env.str("CONNECT_API_URL", default="")
 FLOWS_API_URL = env.str("FLOWS_API_URL", default="")
