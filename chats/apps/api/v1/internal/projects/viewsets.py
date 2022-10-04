@@ -2,6 +2,7 @@ from django.conf import settings
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import ValidationError
 
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.api.v1.internal.projects import serializers
@@ -20,6 +21,8 @@ class ProjectViewset(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         if settings.OIDC_ENABLED:
             user_email = request.data.get("user_email")
+            if user_email is None:
+                raise ValidationError("user_email is a required field!")
             persist_keycloak_user_by_email(user_email)
 
         return super().create(request, *args, **kwargs)
