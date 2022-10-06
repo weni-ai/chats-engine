@@ -60,7 +60,7 @@ class QueueAgentsTestCase(QueueSetUpMixin, TestCase):
 class QueueAvailableAgentsTestCase(QueueSetUpMixin, TestCase):
 
     def test_available_agents_returns_online_agents(self):
-        self.agent_permission.status = ProjectPermission.STATUS_ONLINE
+        self.agent_permission.status = "online"
         self.agent_permission.save()
 
         self.assertIn(self.agent, self.queue.available_agents)
@@ -70,7 +70,7 @@ class QueueAvailableAgentsTestCase(QueueSetUpMixin, TestCase):
         self.room.user = self.agent
         self.room.save()
 
-        self.agent_permission.status = ProjectPermission.STATUS_ONLINE
+        self.agent_permission.status = "online"
         self.agent_permission.save()
 
         self.assertNotIn(self.agent, self.queue.available_agents)
@@ -81,15 +81,15 @@ class QueueAvailableAgentsTestCase(QueueSetUpMixin, TestCase):
         self.room.is_active = False
         self.room.save()
 
-        self.agent_permission.status = ProjectPermission.STATUS_ONLINE
+        self.agent_permission.status = "online"
         self.agent_permission.save()
 
         self.assertIn(self.agent, self.queue.available_agents)
 
     def test_if_2_online_agents_are_returned_in_available_agents(self):
-        self.agent_permission.status = ProjectPermission.STATUS_ONLINE
+        self.agent_permission.status = "online"
         self.agent_permission.save()
-        self.agent_2_permission.status = ProjectPermission.STATUS_ONLINE
+        self.agent_2_permission.status = "online"
         self.agent_2_permission.save()
 
         self.assertEqual(self.queue.available_agents.count(), 2)

@@ -48,8 +48,7 @@ class Queue(BaseModel):
 
     @property
     def online_agents(self):
-        from chats.apps.projects.models import ProjectPermission
-        return self.agents.filter(project_permissions__status=ProjectPermission.STATUS_ONLINE)
+        return self.agents.filter(project_permissions__status="online") # TODO: Set this variable to ProjectPermission.STATUS_ONLINE
 
     def get_or_create_user_authorization(self, user):
         sector_auth, created = self.authorizations.get_or_create(user=user)
