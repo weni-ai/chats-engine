@@ -92,9 +92,7 @@ class RoomViewset(
         msg.notify_room("create")
 
         # Send Updated data to the room group
-        instance.notify_room(
-            "update", callback=True
-        )  # TODO FIX: wont trigger this on newer rooms than the ws connection
+        instance.notify_room("update")  # TODO FIX: wont trigger this on newer rooms than the ws connection
 
     def perform_destroy(self, instance):
         instance.notify_room("destroy", callback=True)
