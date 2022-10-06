@@ -38,6 +38,7 @@ django-filter = "^22.1"
 django-storages = "^1.12.3"
 django-timezone-field = "^5.0"
 tzdata = "^2022.2"
+pendulum = "^2.1.2"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"

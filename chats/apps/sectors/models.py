@@ -4,6 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from chats.core.models import BaseModel
 from chats.utils.websockets import send_channels_group
 from django.db.models import F, Q
+import pendulum
 
 
 class Sector(BaseModel):
@@ -103,6 +104,15 @@ class Sector(BaseModel):
         #     .count()
         # )
         return 0
+
+    def is_attending(self, created_on:str):
+        print("veio pro pendulum")
+        tz = pendulum.timezone(str(self.project.timezone))
+        created_on = pendulum.parser(str(created_on)).in_timezone(tz)
+        work_start = pendulum.parser(str(work_start)).in_timezone(tz)
+        work_end = pendulum.parser(str(work_end)).in_timezone(tz)
+
+        return work_start < created_on < work_end
 
     def get_or_create_user_authorization(self, user):
         sector_auth, created = self.authorizations.get_or_create(user=user)

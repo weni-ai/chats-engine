@@ -83,9 +83,9 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         sector = queue.sector
 
         work_start = sector.work_start
-        work_end = sector.work_end
+        work_end = sector.work_end  
         created_on = validated_data.get("created_on", timezone.now().time())
-        if (work_start < created_on < work_end) is False:
+        if sector.is_attending(created_on) is False:
             raise ValidationError(
                 {"detail": _("Contact cannot be done outside working hours")}
             )
