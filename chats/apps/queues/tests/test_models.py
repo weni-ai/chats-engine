@@ -46,8 +46,7 @@ class QueueSetUpMixin(TestCase):
         self.queue.authorizations.create(permission=self.agent_2_permission)
 
         self.contact = Contact.objects.create(name="Contact test 123", email="test@user.com")
-        self.room = Room.objects.create(contact=self.contact, is_active=True)
-        self.room2 = Room.objects.create(contact=self.contact, is_active=True)
+        self.room = Room.objects.create(contact=self.contact, is_active=True, queue=self.queue)
 
 
 class QueueOnlineAgentsTestCase(QueueSetUpMixin, TestCase):

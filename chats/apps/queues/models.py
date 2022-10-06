@@ -64,7 +64,7 @@ class Queue(BaseModel):
         online_agents = self.online_agents.annotate(
             active_rooms_count=models.Count(
                 "rooms",
-                filter=models.Q(rooms__is_active=True)
+                filter=models.Q(rooms__is_active=True, rooms__queue=self)
             )
         )
         return online_agents.filter(active_rooms_count__lt=self.limit)
