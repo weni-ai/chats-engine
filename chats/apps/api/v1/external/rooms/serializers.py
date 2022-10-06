@@ -98,7 +98,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         room = Room.objects.create(**validated_data, contact=contact, queue=queue)
         if room.user is None:
-            new_agent = queue.available_agents.first()
-            room.user = None if new_agent is None else new_agent.user
+            available_agent = queue.available_agents.first()
+            room.user = available_agent or None
             room.save()
         return room
