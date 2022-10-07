@@ -1,6 +1,10 @@
 from django.db import models
 from chats.core.models import BaseModel
 from django.utils.translation import gettext_lazy as _
+from django.contrib.auth import get_user_model
+
+
+User = get_user_model()
 
 
 class Queue(BaseModel):
@@ -29,7 +33,7 @@ class Queue(BaseModel):
 
     @property
     def limit(self):
-        return self.sector.limit
+        return self.sector.rooms_limit
 
     def get_permission(self, user):
         return self.sector.get_permission(user=user)
@@ -37,6 +41,27 @@ class Queue(BaseModel):
     @property
     def agent_count(self):
         return self.authorizations.filter(role=QueueAuthorization.ROLE_AGENT).count()
+
+    @property
+    def agents(self):
+        return User.objects.filter(project_permissions__queue_authorizations__queue=self)
+
+    @property
+    def online_agents(self):
+        return self.agents.filter(
+            project_permissions__status="online",
+            project_permissions__project=self.sector.project
+        ) # TODO: Set this variable to ProjectPermission.STATUS_ONLINE
+
+    @property
+    def available_agents(self):
+        online_agents = self.online_agents.annotate(
+            active_rooms_count=models.Count(
+                "rooms",
+                filter=models.Q(rooms__is_active=True, rooms__queue=self)
+            )
+        )
+        return online_agents.filter(active_rooms_count__lt=self.limit).order_by("active_rooms_count")
 
     def get_or_create_user_authorization(self, user):
         sector_auth, created = self.authorizations.get_or_create(user=user)
@@ -46,25 +71,6 @@ class Queue(BaseModel):
         sector_auth, created = self.authorizations.get_or_create(user=user, role=role)
         return sector_auth
 
-    @property
-    def available_agents(self):
-        project = self.sector.project
-        qauth = self.authorizations.annotate(
-            limit=models.Max(
-                "permission__queue_authorizations__queue__sector__rooms_limit"
-            )
-        )
-        qauth = qauth.annotate(
-            rooms=models.Count(
-                "permission__user__rooms",
-                filter=models.Q(
-                    permission__user__rooms__queue__sector__project=project
-                ),
-                distinct=True,
-            )
-        )  # TODO: CHECK IF IT WILL RETURN ROOMS FROM OTHER PROJECTS THAT THE USER HAS PERMISSION TO
-
-        return qauth.filter(permission__status="online", limit__gt=models.F("rooms"))
 
 
 class QueueAuthorization(BaseModel):
