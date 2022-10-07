@@ -1,9 +1,10 @@
+import queue
 from django.conf import settings
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets, exceptions
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from chats.apps.api.v1.permissions import IsProjectAdmin, IsQueueAgent, IsSectorManager
+from chats.apps.api.v1.permissions import IsProjectAdmin, IsQueueAgent, IsSectorManager, HasAgentPermissionAnyQueueSector
 from chats.apps.api.v1.sectors import serializers as sector_serializers
 from chats.apps.api.v1.sectors.filters import (
     SectorAuthorizationFilter,
@@ -12,6 +13,7 @@ from chats.apps.api.v1.sectors.filters import (
 )
 from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 from chats.apps.api.v1.internal.connect_rest_client import ConnectRESTClient
+from rest_framework.decorators import action
 
 
 class SectorViewset(viewsets.ModelViewSet):
@@ -32,6 +34,8 @@ class SectorViewset(viewsets.ModelViewSet):
             permission_classes = [IsAuthenticated]
         elif self.action in ["create", "destroy"]:
             permission_classes = (IsAuthenticated, IsProjectAdmin)
+        elif self.action == "agents":
+            permission_classes = [HasAgentPermissionAnyQueueSector]
         else:
             permission_classes = [IsAuthenticated, IsSectorManager]
         return [permission() for permission in permission_classes]
@@ -90,7 +94,14 @@ class SectorViewset(viewsets.ModelViewSet):
             {"is_deleted": True},
             status.HTTP_200_OK,
         )
+        
+    @action(detail=True, methods=["GET"])
+    def agents(self, *args, **kwargs):
+        instance = self.get_object()
+        queue_agents = instance.queue_agents
+        serializer = sector_serializers.SectorAgentsSerializer(queue_agents, many=True)
 
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 class SectorTagsViewset(viewsets.ModelViewSet):
     queryset = SectorTag.objects.all()

@@ -1,9 +1,15 @@
+import email
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from django.contrib.auth import get_user_model
+from chats.apps.queues.models import QueueAuthorization
 
 from chats.core.models import BaseModel
 from chats.utils.websockets import send_channels_group
 from django.db.models import F, Q
+
+
+User = get_user_model()
 
 
 class Sector(BaseModel):
@@ -93,6 +99,13 @@ class Sector(BaseModel):
         )
         agents_count = sum(agents_count)
         return agents_count
+
+    @property
+    def queue_agents(self):
+        return User.objects.filter(
+            project_permissions__queue_authorizations__queue__pk__in=self.queues.values_list("pk", flat=True),
+            project_permissions__queue_authorizations__role=QueueAuthorization.ROLE_AGENT
+        ).distinct()
 
     @property
     def contact_count(self):
