@@ -1,0 +1,100 @@
+import json
+
+from django.urls import reverse
+from rest_framework import status
+from rest_framework.test import APITestCase
+
+from chats.apps.api.v1.contacts.serializers import ContactSerializer
+from chats.apps.api.v1.tests.base import BaseAPIChatsTestCase
+from chats.apps.contacts.models import Contact
+
+
+class TestContactsViewsets(BaseAPIChatsTestCase):
+    def _list_request(self, token, data):
+        url = reverse("contact-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + token.key)
+
+        response = client.get(url, data=data)
+        results = response.json().get("results")
+        return response, results
+
+    def test_admin_list_within_its_project(self):
+        payload = json.dumps({"project": self.project.uuid})
+        response, results = self._list_request(token=self.admin_token, data=payload)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get("count"), self.count_project_1_contact)
+
+    def test_manager_list_within_its_sectors(self):
+        payload = json.dumps({"project": self.project.uuid})
+        response, results = self._list_request(token=self.manager_token, data=payload)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get("count"), self.count_manager_contact)
+
+    def test_agent_list_within_its_rooms(self):
+        payload = json.dumps({"project": self.project.uuid})
+        response, results = self._list_request(token=self.agent_token, data=payload)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get("count"), self.count_agent_contact)
+
+    def test_retrieve_contact_ok(self):
+        """
+        Ensure we can retrieve a contact
+        """
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.admin_token.key)
+        url = reverse("contact-detail", kwargs={"pk": self.contact.id})
+        response = self.client.get(url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_retrieve_contact_unauthorized(self):
+        """
+        Ensure we can retrieve a contact
+        """
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.agent_token.key)
+        url = reverse("contact-detail", kwargs={"pk": self.contact_2.id})
+        response = self.client.get(url, format="json")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_handling_not_allowed_http_methods(self):
+        url = reverse("contact-detail", kwargs={"pk": 1})
+        post = self.client.post(url, format="json")
+        put = self.client.put(url, format="json")
+        delete = self.client.delete(url, format="json")
+        actions = [post, put, delete]
+
+        for action in actions:
+            self.assertEqual(action.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+
+class TestContactSerializer(APITestCase):
+    def test_correct_contact_serialization(self):
+        """
+        Ensure we can serialize a contact when passed correct data
+        """
+        data = {"email": "test@email.com", "name": "Test Contact"}
+        serializer = ContactSerializer(data=data)
+        is_valid = serializer.is_valid()
+        contact = serializer.validated_data
+
+        self.assertTrue(is_valid)
+        self.assertEqual(contact["email"], data["email"])
+        self.assertEqual(contact["name"], data["name"])
+
+    def test_detect_invalid_data(self):
+        """
+        Ensure we can detect invalid data on serialize
+        """
+        data = [
+            {"name": "", "email": ""},
+            {"name": None, "email": None},
+            {},
+        ]
+
+        for d in data:
+            serializer = ContactSerializer(data=d)
+            self.assertFalse(serializer.is_valid())
