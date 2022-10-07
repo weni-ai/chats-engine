@@ -136,4 +136,3 @@ media/
 
 # Gunicorn access
 gunicorn.access
-

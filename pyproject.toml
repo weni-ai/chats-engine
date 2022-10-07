@@ -15,7 +15,6 @@ authors = ["helllllllder <heldergsds@gmail.com>"]
 python = "^3.8"
 Django = "^4.0.4"
 Pillow = "^9.1.1"
-django-rest-framework = "^0.1.0"
 channels = "^3.0.4"
 django-environ = "^0.8.1"
 pymongo = "3.12.1"
@@ -38,6 +37,7 @@ django-filter = "^22.1"
 django-storages = "^1.12.3"
 django-timezone-field = "^5.0"
 tzdata = "^2022.2"
+djangorestframework = "3.13.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"

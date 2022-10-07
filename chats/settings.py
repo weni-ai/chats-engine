@@ -14,7 +14,6 @@ import os
 from pathlib import Path
 
 import environ
-
 import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
 
@@ -122,7 +121,6 @@ CHANNEL_LAYERS = {
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
-
 DATABASES = dict(default=env.db(var="DATABASE_URL"))
 
 # User
@@ -200,6 +198,7 @@ else:
 ENGINE_BASE_URL = env.str(
     "ENGINE_BASE_URL", default="http://localhost:8000"
 )  # without '/'
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.0/ref/settings/#default-auto-field
@@ -286,9 +285,6 @@ SWAGGER_SETTINGS = {
 
 CORS_ORIGIN_ALLOW_ALL = True
 
-CORS_ORIGIN_WHITELIST = (
-  'http: // localhost:8080',
-)
 
 # Sentry configuration
 

@@ -70,14 +70,12 @@ You can set environment variables in your OS or write on .env file.
 | OIDC_RP_SIGN_ALGO | string | False | RS256 | Sets the algorithm the IdP uses to sign ID tokens.
 | OIDC_DRF_AUTH_BACKEND | string | False | chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend | Define the authentication middleware for the django rest framework.
 | OIDC_RP_SCOPES | string | False | openid email | The OpenID Connect scopes to request during login.
-
 | USE_S3 | Bool | False | False | Boolean that defines if S3 should be used.
 | AWS_ACCESS_KEY_ID | String | False | None | Amazon S3 bucket Access Key.
 | AWS_SECRET_ACCESS_KEY | String | False | None | Amazon S3 bucket Secret Key.
 | AWS_STORAGE_BUCKET_NAME | String | False | None | Amazon S3 bucket name.
 | USE_SENTRY | Bool | False | False | Boolean that defines if Sentry should be initialized.
 | USE_SENTRY | String | False | None | Sentry's DSN URL.
-
 
 # CONTRIBUTING
 ## Contributing
