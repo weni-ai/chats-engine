@@ -96,3 +96,18 @@ class QueueAvailableAgentsTestCase(QueueSetUpMixin, TestCase):
 
     def test_if_available_agents_returns_0_agents_if_no_one_is_online(self):
         self.assertEqual(self.queue.available_agents.count(), 0)
+
+
+    def tests_if_when_there_are_2_agents_it_returns_sorted_by_active_rooms_count(self):
+        self.sector.rooms_limit = 5
+        self.sector.save()
+
+        self.room.user = self.agent
+        self.room.save()
+
+        self.agent_permission.status = "online"
+        self.agent_permission.save()
+        self.agent_2_permission.status = "online"
+        self.agent_2_permission.save()
+
+        self.assertEqual(self.agent_2, self.queue.available_agents.first())
