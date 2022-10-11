@@ -1,9 +1,12 @@
 from django.utils.translation import gettext_lazy as _
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
 from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
-
 from chats.apps.api.v1.accounts.serializers import UserSerializer
+
+
+User = get_user_model()
 
 
 class SectorSerializer(serializers.ModelSerializer):
@@ -161,3 +164,9 @@ class DetailSectorTagSerializer(serializers.ModelSerializer):
         exclude = [
             "sector",
         ]
+
+
+class SectorAgentsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = "__all__"
