@@ -5,6 +5,7 @@ from chats.core.models import BaseModel
 from chats.utils.websockets import send_channels_group
 from django.db.models import F, Q
 
+import pendulum
 
 class Sector(BaseModel):
     name = models.CharField(_("name"), max_length=120)
@@ -128,6 +129,14 @@ class Sector(BaseModel):
     def add_users_group(self):
         for auth in self.authorizations.filter(role__gte=1):
             auth.notify_user("created")
+
+    def is_attending(self):
+        tz = pendulum.timezone(str(self.project.timezone))
+        created_on = pendulum.parse(str(self.created_on)).in_timezone(tz)
+        work_start = pendulum.parse(str(self.work_start)).in_timezone(tz)
+        work_end = pendulum.parse(str(self.work_end)).in_timezone(tz)
+        
+        return work_start < created_on < work_end
 
 
 class SectorAuthorization(BaseModel):
