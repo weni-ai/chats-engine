@@ -133,8 +133,8 @@ class Sector(BaseModel):
     def is_attending(self):
         tz = pendulum.timezone(str(self.project.timezone))
         created_on = pendulum.parse(str(self.created_on)).in_timezone(tz)
-        work_start = pendulum.parse(str(self.work_start)).in_timezone(tz)
-        work_end = pendulum.parse(str(self.work_end)).in_timezone(tz)
+        work_start = self.work_start
+        work_end = self.work_end
         
         return work_start < created_on < work_end
 
