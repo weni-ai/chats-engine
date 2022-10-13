@@ -7,6 +7,10 @@ from django.db.models import F, Q
 
 import pendulum
 
+
+User = get_user_model()
+
+
 class Sector(BaseModel):
     name = models.CharField(_("name"), max_length=120)
     project = models.ForeignKey(
