@@ -10,6 +10,7 @@ from django.db.models import F, Q
 
 import pendulum
 
+
 User = get_user_model()
 
 
@@ -121,8 +122,10 @@ class Sector(BaseModel):
     def is_attending(self, created_on):
         tz = pendulum.timezone(str(self.project.timezone))
         created_on = pendulum.parse(str(created_on)).in_timezone(tz)
-    
-        return self.work_start < created_on < self.work_end   
+        start = pendulum.parse(str(self.work_start))
+        end = pendulum.parse(str(self.work_end))
+
+        return start.time() < created_on.time() < end.time() 
 
     def get_or_create_user_authorization(self, user):
         sector_auth, created = self.authorizations.get_or_create(user=user)
