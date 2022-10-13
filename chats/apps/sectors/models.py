@@ -111,7 +111,7 @@ class Sector(BaseModel):
         start = pendulum.parse(str(self.work_start))
         end = pendulum.parse(str(self.work_end))
 
-        return start < created_on < end 
+        return start.time() < created_on.time() < end.time() 
 
     def get_or_create_user_authorization(self, user):
         sector_auth, created = self.authorizations.get_or_create(user=user)
