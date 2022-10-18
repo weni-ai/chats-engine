@@ -86,7 +86,7 @@ class SectorAnyPermission(permissions.BasePermission):
             authorization = obj.get_permission(request.user)
         except SectorAuthorization.DoesNotExist:
             return False
-        return authorization.is_authorized
+        return True
 
 
 class ProjectExternalPermission(permissions.BasePermission):

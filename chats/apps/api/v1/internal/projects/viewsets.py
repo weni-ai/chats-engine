@@ -6,10 +6,13 @@ from rest_framework.exceptions import ValidationError
 
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.api.v1.internal.projects import serializers
+from chats.apps.api.v1.permissions import IsQueueAgent, SectorAnyPermission
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.core.views import persist_keycloak_user_by_email
 from rest_framework import mixins, status
 from rest_framework.response import Response
+from rest_framework.decorators import action
+
 
 
 class ProjectViewset(viewsets.ModelViewSet):
@@ -75,3 +78,18 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
                 status.HTTP_400_BAD_REQUEST,
             )
         return Response({"Detail": "Updated"}, status.HTTP_200_OK)
+
+    @action(detail=True, methods=["GET"], permission_classes=[IsAuthenticated, SectorAnyPermission])
+    def online_status(self, *args, **kwargs):
+        instance = self.get_object()
+
+        if instance.status == "ONLINE":
+            instance.status = ProjectPermission.STATUS_OFFLINE
+            instance.save()
+        else:
+            instance.status = ProjectPermission.STATUS_ONLINE
+            instance.save()
+            
+        serializer = serializers.OnlineStatusReadSerializer(instance=instance)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
