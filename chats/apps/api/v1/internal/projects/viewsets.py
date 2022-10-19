@@ -10,6 +10,8 @@ from chats.apps.projects.models import Project, ProjectPermission
 from chats.core.views import persist_keycloak_user_by_email
 from rest_framework import mixins, status
 from rest_framework.response import Response
+from rest_framework.decorators import action
+
 
 
 class ProjectViewset(viewsets.ModelViewSet):
@@ -75,3 +77,17 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
                 status.HTTP_400_BAD_REQUEST,
             )
         return Response({"Detail": "Updated"}, status.HTTP_200_OK)
+
+    @action(detail=True, methods=["POST"], permission_classes=[IsAuthenticated])
+    def status(self, request, *args, **kwargs):
+        instance = self.get_object()
+        user_status = request.data.get("status")
+
+        if user_status == "online":
+            instance.status = "online"
+            instance.save()
+        else:
+            instance.status = "offline"
+            instance.save()
+            
+        return Response(dict(connection_status=instance.status), status=status.HTTP_200_OK)

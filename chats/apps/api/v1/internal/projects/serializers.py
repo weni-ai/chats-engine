@@ -111,3 +111,4 @@ class CheckAccessReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectPermission
         fields = ["first_access"]
+
