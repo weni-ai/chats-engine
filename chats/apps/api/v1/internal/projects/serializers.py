@@ -113,9 +113,3 @@ class CheckAccessReadSerializer(serializers.ModelSerializer):
         fields = ["first_access"]
 
 
-class OnlineStatusReadSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ProjectPermission
-        fields = [
-            "status",
-        ]

@@ -1,5 +1,7 @@
 from django.conf import settings
 from django_filters.rest_framework import DjangoFilterBackend
+from pendulum import instance
+from requests import request
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import ValidationError
@@ -79,17 +81,16 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
             )
         return Response({"Detail": "Updated"}, status.HTTP_200_OK)
 
-    @action(detail=True, methods=["GET"], permission_classes=[IsAuthenticated, SectorAnyPermission])
-    def online_status(self, *args, **kwargs):
+    @action(detail=True, methods=["POST"], permission_classes=[IsAuthenticated, SectorAnyPermission])
+    def status(self, request, *args, **kwargs):
         instance = self.get_object()
+        user_status = request.data.get("status")
 
-        if instance.status == "ONLINE":
-            instance.status = ProjectPermission.STATUS_OFFLINE
+        if user_status == "online":
+            instance.status = "online"
             instance.save()
         else:
-            instance.status = ProjectPermission.STATUS_ONLINE
+            instance.status = "offline"
             instance.save()
             
-        serializer = serializers.OnlineStatusReadSerializer(instance=instance)
-
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(dict(connection_status=instance.status), status=status.HTTP_200_OK)
