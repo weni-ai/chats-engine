@@ -1,7 +1,5 @@
 from django.conf import settings
 from django_filters.rest_framework import DjangoFilterBackend
-from pendulum import instance
-from requests import request
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import ValidationError
@@ -81,7 +79,7 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
             )
         return Response({"Detail": "Updated"}, status.HTTP_200_OK)
 
-    @action(detail=True, methods=["POST"], permission_classes=[IsAuthenticated, SectorAnyPermission])
+    @action(detail=True, methods=["POST"], permission_classes=[IsAuthenticated])
     def status(self, request, *args, **kwargs):
         instance = self.get_object()
         user_status = request.data.get("status")
