@@ -6,7 +6,6 @@ from rest_framework.exceptions import ValidationError
 
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.api.v1.internal.projects import serializers
-from chats.apps.api.v1.permissions import IsQueueAgent, SectorAnyPermission
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.core.views import persist_keycloak_user_by_email
 from rest_framework import mixins, status
