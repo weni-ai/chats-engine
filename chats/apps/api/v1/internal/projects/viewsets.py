@@ -11,7 +11,7 @@ from chats.core.views import persist_keycloak_user_by_email
 from rest_framework import mixins, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
-
+from rest_framework.generics import get_object_or_404
 
 
 class ProjectViewset(viewsets.ModelViewSet):
@@ -78,16 +78,25 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
             )
         return Response({"Detail": "Updated"}, status.HTTP_200_OK)
 
-    @action(detail=True, methods=["POST"], permission_classes=[IsAuthenticated])
+    @action(detail=False, methods=["POST", "GET"], permission_classes=[IsAuthenticated])
     def status(self, request, *args, **kwargs):
-        instance = self.get_object()
-        user_status = request.data.get("status")
 
-        if user_status == "online":
-            instance.status = "online"
-            instance.save()
-        else:
-            instance.status = "offline"
-            instance.save()
-            
+        instance: ProjectPermission = None
+
+        if request.method == "POST":
+            project_uuid = request.data.get("project")
+            instance = get_object_or_404(ProjectPermission, project__uuid=project_uuid, user=request.user)
+            user_status = request.data.get("status")
+
+            if user_status == "online":
+                instance.status = "online"
+                instance.save()
+            elif user_status == "offline":
+                instance.status = "offline"
+                instance.save()
+
+        elif request.method == "GET":
+            project_uuid = request.query_params.get("project")
+            instance = get_object_or_404(ProjectPermission, project__uuid=project_uuid, user=request.user)
+
         return Response(dict(connection_status=instance.status), status=status.HTTP_200_OK)
