@@ -10,7 +10,6 @@ from chats.apps.api.v1.internal.connect_rest_client import ConnectRESTClient
 from chats.apps.api.v1.internal.flows_rest_client import FlowRESTClient
 from django.contrib.auth import get_user_model
 from chats.apps.queues.models import QueueAuthorization
-
 from chats.apps.sectors.models import SectorAuthorization
 
 User = get_user_model()
