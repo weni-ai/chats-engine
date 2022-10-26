@@ -9,6 +9,8 @@ from chats.apps.api.v1.internal.users.serializers import UserSerializer
 from chats.apps.api.v1.internal.connect_rest_client import ConnectRESTClient
 from chats.apps.api.v1.internal.flows_rest_client import FlowRESTClient
 from django.contrib.auth import get_user_model
+from chats.apps.queues.models import QueueAuthorization
+from chats.apps.sectors.models import SectorAuthorization
 
 User = get_user_model()
 
@@ -49,6 +51,12 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
                 name="Setor Padrão", rooms_limit=5, work_start="08:00", work_end="18:00"
             )
             queue = sector.queues.create(name="Fila 1")
+            sector_permission = SectorAuthorization.objects.create(
+                role=1, permission=permission, sector=sector
+            )
+            queue_permission = QueueAuthorization.objects.create(
+                role=1, permission=permission, queue=queue
+            )
             connect_client = ConnectRESTClient()
             response_sector = connect_client.create_ticketer(
                 project_uuid=str(instance.uuid),
