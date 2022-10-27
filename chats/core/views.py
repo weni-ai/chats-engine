@@ -47,6 +47,6 @@ def persist_keycloak_user_by_email(user_email: str):  # TODO: ERROR HANDLING
     username = re.sub("[^A-Za-z0-9]+", "", username)
     user = User.objects.create_user(email, username)
 
-    user.first_name = user_data.get("first_name", "") or user_data.get("name", "")
-    user.last_name = user_data.get("last_name", "")
+    user.first_name = user_data.get("firstName", "") or user_data.get("username", "")
+    user.last_name = user_data.get("lastName", "")
     user.save()
