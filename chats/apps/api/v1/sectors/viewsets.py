@@ -1,4 +1,3 @@
-from curses.ascii import FS
 import queue
 from django.conf import settings
 from django_filters.rest_framework import DjangoFilterBackend
