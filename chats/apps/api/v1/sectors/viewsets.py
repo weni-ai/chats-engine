@@ -1,3 +1,4 @@
+from curses.ascii import FS
 import queue
 from django.conf import settings
 from django_filters.rest_framework import DjangoFilterBackend
@@ -11,6 +12,7 @@ from chats.apps.api.v1.sectors.filters import (
     SectorFilter,
     SectorTagFilter,
 )
+from chats.apps.projects.models import Project
 from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 from chats.apps.api.v1.internal.connect_rest_client import ConnectRESTClient
 from rest_framework.decorators import action
@@ -102,6 +104,13 @@ class SectorViewset(viewsets.ModelViewSet):
         serializer = sector_serializers.SectorAgentsSerializer(queue_agents, many=True)
 
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["GET"])
+    def count(self, request, *args, **kwargs):
+        project_uuid = request.query_params.get("project")
+        project = Project.objects.get(uuid=project_uuid)
+        sector_count = project.get_sectors(user=request.user).count()
+        return Response({"sector_count":sector_count}, status=status.HTTP_200_OK)
 
 class SectorTagsViewset(viewsets.ModelViewSet):
     queryset = SectorTag.objects.all()
