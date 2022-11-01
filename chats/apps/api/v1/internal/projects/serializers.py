@@ -10,7 +10,7 @@ from chats.apps.api.v1.internal.connect_rest_client import ConnectRESTClient
 from chats.apps.api.v1.internal.flows_rest_client import FlowRESTClient
 from django.contrib.auth import get_user_model
 from chats.apps.queues.models import QueueAuthorization
-from chats.apps.sectors.models import SectorAuthorization
+from chats.apps.sectors.models import SectorAuthorization, SectorTag
 
 User = get_user_model()
 
@@ -56,6 +56,9 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
             )
             queue_permission = QueueAuthorization.objects.create(
                 role=1, permission=permission, queue=queue
+            )
+            tag = SectorTag.objects.create(
+                name="Atendimento encerado", sector=sector
             )
             connect_client = ConnectRESTClient()
             response_sector = connect_client.create_ticketer(
