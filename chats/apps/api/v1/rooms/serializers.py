@@ -22,6 +22,7 @@ class RoomSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "created_on",
             "ended_at",
+            "custom_fields",
         ]
 
 
@@ -78,4 +79,5 @@ class RoomContactSerializer(serializers.ModelSerializer):
             "tags",
             "created_on",
             "ended_at",
+            "custom_fields",
         ]
