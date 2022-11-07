@@ -63,7 +63,7 @@ class MessageSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "uuid",
             "user",
-            "created_at",
+            "created_on",
             "contact",
         ]
 
