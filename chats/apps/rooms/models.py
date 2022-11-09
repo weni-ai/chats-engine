@@ -94,25 +94,6 @@ class Room(BaseModel):
 
         return RoomSerializer(self).data
 
-    def transfer_room(self, type: str, data: dict):
-        transfer_history = self.transfer_history
-        transfer_history = (
-            [] if transfer_history is None else json.loads(transfer_history)
-        )
-        user = data.get("user")
-        queue = data.get("queue")
-        if user:
-            _content = {"type": "user", "id": user, "transfered_at": timezone.now()}
-            transfer_history.append(_content)
-        if queue:
-            _content = {"type": "queue", "id": queue, "transfered_at": timezone.now()}
-            transfer_history.append(_content)
-        self.transfer_history = json.dumps(transfer_history)
-        self.save()
-        msg = self.messages.create(text=self.transfer_history)
-        msg.notify_room("create")
-        self.notify_room("update")
-
     def close(self, tags: list = [], end_by: str = ""):
         self.is_active = False
         self.ended_at = timezone.now()
@@ -134,7 +115,7 @@ class Room(BaseModel):
 
         send_channels_group(
             group_name=f"queue_{self.queue.pk}",
-            type="notify",
+            call_type="notify",
             content=self.serialized_ws_data,
             action=f"rooms.{action}",
         )
@@ -165,7 +146,7 @@ class Room(BaseModel):
 
         send_channels_group(
             group_name=f"room_{self.pk}",
-            type="notify",
+            call_type="notify",
             content=self.serialized_ws_data,
             action=f"rooms.{action}",
         )

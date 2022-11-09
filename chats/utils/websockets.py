@@ -6,7 +6,7 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
 
-def send_channels_group(group_name: str, type: str, content: str, action: str):
+def send_channels_group(group_name: str, call_type: str, content: str, action: str):
     """
     helper function that sends data to channels groups
     """
@@ -14,7 +14,7 @@ def send_channels_group(group_name: str, type: str, content: str, action: str):
     async_to_sync(channel_layer.group_send)(
         group_name,
         {
-            "type": type,
+            "type": call_type,
             "action": action,
             "content": json.dumps(content, cls=DjangoJSONEncoder),
         },
