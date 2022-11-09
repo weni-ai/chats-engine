@@ -73,9 +73,15 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         """
         Exit group by event
         """
+        if event.get("content"):
+            event = json.loads(event.get("content"))
+
         group_name = f"{event['name']}_{event['id']}"
-        await self.channel_layer.group_discard(group_name, self.channel_name)
-        self.groups.remove(group_name)
+        try:
+            await self.channel_layer.group_discard(group_name, self.channel_name)
+            self.groups.remove(group_name)
+        except (ValueError, AssertionError):
+            pass
         if settings.DEBUG:
             # for debugging
             await self.notify(
@@ -93,6 +99,8 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         Add group by event(dictionary) or group_name
         """
         # TODO TEST IF A EXTERNAL USER CAN JOIN GROUPS HE DOES NOT HAVE PERMISSION ON e.g: user x joins user y group
+        if event.get("content"):
+            event = json.loads(event.get("content"))
 
         group_name = f"{event['name']}_{event['id']}"
         await self.channel_layer.group_add(group_name, self.channel_name)

@@ -13,6 +13,7 @@ from chats.apps.api.v1.rooms.serializers import RoomSerializer, TransferRoomSeri
 from chats.apps.rooms.models import Room
 from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1 import permissions as api_permissions
+from chats.utils.websockets import send_channels_group
 
 
 class RoomViewset(
@@ -70,19 +71,33 @@ class RoomViewset(
 
     def perform_update(self, serializer):
         # TODO Separate this into smaller methods
-        transfer_history = self.get_object().transfer_history or []
+        instance = self.get_object()
+        transfer_history = instance.transfer_history or []
+
+        old_user = instance.user
+        old_queue = instance.queue
+
         user = self.request.data.get("user_email")
         queue = self.request.data.get("queue_uuid")
         serializer.save()
+
+        if not (user or queue):
+            return None
+
         instance = serializer.instance
 
         # Create transfer object based on whether it's a user or a queue transfer and add it to the history
         if user:
             _content = {"type": "user", "name": instance.user.first_name}
             transfer_history.append(_content)
+
         if queue:
             _content = {"type": "queue", "name": instance.queue.name}
             transfer_history.append(_content)
+            if (
+                not user
+            ):  # if it is only a queue transfer from a user, need to reset the user field
+                instance.user = None
 
         instance.transfer_history = transfer_history
         instance.save()
@@ -92,7 +107,35 @@ class RoomViewset(
         msg.notify_room("create")
 
         # Send Updated data to the room group
-        instance.notify_room("update")  # TODO FIX: wont trigger this on newer rooms than the ws connection
+        instance.notify_room("update")
+
+        # Force everyone on the queue group to exit the room Group
+        send_channels_group(
+            group_name=f"queue_{old_queue.pk}",
+            call_type="exit",
+            content={"name": "room", "id": str(instance.pk)},
+            action="group.exit",
+        )
+
+        # Add the room group for the user or the queue that received it
+        if user:
+            send_channels_group(
+                group_name=f"user_{instance.user.id}",
+                call_type="join",
+                content={"name": "room", "id": str(instance.pk)},
+                action="group.join",
+            )
+            instance.notify_room("update")
+            return None
+
+        if queue:
+            send_channels_group(
+                group_name=f"queue_{instance.queue.pk}",
+                call_type="join",
+                content={"name": "room", "id": str(instance.pk)},
+                action="group.join",
+            )
+            instance.notify_room("update")
 
     def perform_destroy(self, instance):
         instance.notify_room("destroy", callback=True)

@@ -109,7 +109,7 @@ ASGI_APPLICATION = "chats.asgi.application"
 
 CHANNEL_LAYERS = {
     "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "BACKEND": "channels_redis.pubsub.RedisPubSubChannelLayer",
         "CONFIG": {
             "hosts": [
                 env.str("CHANNEL_LAYERS_REDIS", default="redis://127.0.0.1:6379/1")
