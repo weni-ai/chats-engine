@@ -63,7 +63,7 @@ class Message(BaseModel):
         """ """
         send_channels_group(
             group_name=f"room_{self.room.pk}",
-            type="notify",
+            call_type="notify",
             content=self.serialized_ws_data,
             action=f"msg.{action}",
         )

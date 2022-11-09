@@ -108,8 +108,10 @@ class Sector(BaseModel):
     @property
     def queue_agents(self):
         return User.objects.filter(
-            project_permissions__queue_authorizations__queue__pk__in=self.queues.values_list("pk", flat=True),
-            project_permissions__queue_authorizations__role=QueueAuthorization.ROLE_AGENT
+            project_permissions__queue_authorizations__queue__pk__in=self.queues.values_list(
+                "pk", flat=True
+            ),
+            project_permissions__queue_authorizations__role=QueueAuthorization.ROLE_AGENT,
         ).distinct()
 
     @property
@@ -128,7 +130,7 @@ class Sector(BaseModel):
         start = pendulum.parse(str(self.work_start))
         end = pendulum.parse(str(self.work_end))
 
-        return start.time() < created_on.time() < end.time() 
+        return start.time() < created_on.time() < end.time()
 
     def get_or_create_user_authorization(self, user):
         sector_auth, created = self.authorizations.get_or_create(user=user)
@@ -146,7 +148,7 @@ class Sector(BaseModel):
         """ """
         send_channels_group(
             group_name=f"sector_{self.pk}",
-            type="notify",
+            call_type="notify",
             content=self.serialized_ws_data,
             action=f"sector.{action}",
         )
@@ -218,7 +220,7 @@ class SectorAuthorization(BaseModel):
         """ """
         send_channels_group(
             group_name=f"user_{self.permission.user.pk}",
-            type="notify",
+            call_type="notify",
             content=self.serialized_ws_data,
             action=f"sector_authorization.{action}",
         )
