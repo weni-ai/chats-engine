@@ -98,7 +98,8 @@ class Room(BaseModel):
         self.is_active = False
         self.ended_at = timezone.now()
         self.ended_by = end_by
-        self.tags.add(*tags)
+        if tags is not None:
+            self.tags.add(*tags)
         self.save()
 
     def notify_queue(self, action: str, callback: bool = False):
