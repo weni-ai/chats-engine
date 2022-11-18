@@ -34,3 +34,14 @@ class ConnectRESTClient:
             json={**kwargs, "ticketer_type": settings.FLOWS_TICKETER_TYPE},
         )
         return response
+
+    def get_user_project_token(self, project, user_email):
+        url = (f"{self.base_url}/v1/organization/project/{project.pk}/user_api_token/",)
+        params = {"user": user_email, "project_uuid": str(project.uuid)}
+        response = requests.get(
+            url=url,
+            headers=self.headers,
+            params=params,
+        )
+
+        return response
