@@ -1,4 +1,4 @@
-name: Build Chats-WebApp in Shared (Push Tag)
+name: Build Chats-Engine in Shared (Push Tag)
 
 on:
   push:
@@ -16,26 +16,26 @@ jobs:
             TAG="$( echo "${GITHUB_REF}" | cut -d'/' -f3 )"
             if grep -qs -e '^.*.*-develop' <<< "${TAG}" ; then
               echo "Found environment: DEVELOP - ${TAG}"
-              echo "MANIFESTS_ENVIRONMENT=develop" | tee >> "${GITHUB_ENV}"
+              echo "MANIFESTS_ENVIRONMENT=develop" | tee "${GITHUB_ENV}"
             elif grep -qs -e '^.*.*-staging' <<< "${TAG}" ; then
               echo "Found environment: STAGING - ${TAG}"
-              echo "MANIFESTS_ENVIRONMENT=staging" | tee >> "${GITHUB_ENV}"
+              echo "MANIFESTS_ENVIRONMENT=staging" | tee -a "${GITHUB_ENV}"
             elif grep -qs -e '^.^.^' <<< "${TAG}" ; then
               echo "No environment found, assuming: PRODUCTION - ${TAG}"
-              echo "MANIFESTS_ENVIRONMENT=production" | tee >> "${GITHUB_ENV}"
+              echo "MANIFESTS_ENVIRONMENT=production" | tee -a "${GITHUB_ENV}"
             else
               echo 'Not a valid tag. Skipping...'
               exit 1
             fi
-            echo "TAG=$TAG" | tee >> "${GITHUB_ENV}"
+            echo "TAG=$TAG" | tee -a "${GITHUB_ENV}"
             VERSION="${TAG}"
-            echo "VERSION=${VERSION" | tee >> "${GITHUB_ENV}"
-            echo "COMMIT_SHA=$GITHUB_SHA" | tee >> "${GITHUB_ENV}"
-            echo "IMAGE_TAG=${{ secrets.ECR }}/chats:webapp-${TAG}" | tee >> "${GITHUB_ENV}"
-            echo "IMAGE_SOURCE_URL=https://github.com/weni-ai/chats-webapp" | tee >> "${GITHUB_ENV}"
-            echo "MANIFESTS_REPOSITORY=weni-ai/kubernetes-manifests-chats" | tee >> "${GITHUB_ENV}"
-            echo "MANIFESTS_APPLICATION=chats-webapp" | tee >> "${GITHUB_ENV}"
-            echo "MANIFESTS_PATCH_TARGET=deployment.json" | tee >> "${GITHUB_ENV}"
+            echo "VERSION=${VERSION}" | tee -a "${GITHUB_ENV}"
+            echo "COMMIT_SHA=$GITHUB_SHA" | tee -a "${GITHUB_ENV}"
+            echo "IMAGE_TAG=${{ secrets.ECR }}/chats:engine-${TAG}" | tee -a "${GITHUB_ENV}"
+            echo "IMAGE_SOURCE_URL=https://github.com/weni-ai/chats-engine" | tee -a "${GITHUB_ENV}"
+            echo "MANIFESTS_REPOSITORY=weni-ai/kubernetes-manifests-chats" | tee -a "${GITHUB_ENV}"
+            echo "MANIFESTS_APPLICATION=chats-engine" | tee -a "${GITHUB_ENV}"
+            echo "MANIFESTS_PATCH_TARGET=deployment.json" | tee -a "${GITHUB_ENV}"
 
       - name: Check out the repo
         uses: actions/checkout@v3
@@ -57,7 +57,7 @@ jobs:
           username: ${{ secrets.AWS_ACCESS_KEY_ID_SHARED }}       # Credentials used to push image to ECR repository
           password: ${{ secrets.AWS_SECRET_ACCESS_KEY_SHARED }}
 
-      - name: Build and push - Chats-Webapp Image
+      - name: Build and push - Chats-Engine Image
         uses: docker/build-push-action@v3
         with:
           context: .
@@ -134,4 +134,5 @@ jobs:
           repository: "${{ env.MANIFESTS_REPOSITORY }}"
           directory: ./kubernetes-manifests/
           branch: main
-          message: "From Chats-Webapp Build (Push Tag ${{ env.MANIFESTS_ENVIRONMENT }})"
+          message: "From Chats-Engine Build (Push Tag ${{ env.MANIFESTS_ENVIRONMENT }})"
+          
