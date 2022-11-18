@@ -56,10 +56,6 @@ class RoomViewset(
         # Add send room notification to the channels group
         instance = self.get_object()
         tags = request.data.get("tags", None)
-        if tags is None:
-            raise ValidationError(
-                {"detail": _("You cannot close a room without giving tags to it")}
-            )
         instance.close(tags, "agent")
         serialized_data = RoomSerializer(instance=instance)
         instance.notify_queue("close", callback=True)

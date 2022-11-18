@@ -8,6 +8,8 @@ from django.db.models import Q
 
 from chats.apps.rooms.models import Room
 
+from chats.apps.api.websockets.rooms.validators import WSJoinValidator
+
 
 class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
     """
@@ -36,7 +38,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             try:
                 self.permission = await self.get_permission()
             except ObjectDoesNotExist:
-                await self.close()
+                await self.close()  # TODO validate if the code continues from this or if it stops here
             await self.accept()
             await self.load_rooms()
             await self.load_queues()
@@ -52,9 +54,12 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         await self.set_user_status(
             "offline"
         )  # What if the user has two or more channels connected?
-        await self.channel_layer.group_discard(
-            f"user_{self.user.pk}", self.channel_name
-        )
+        try:
+            await self.channel_layer.group_discard(
+                f"user_{self.user.pk}", self.channel_name
+            )
+        except AssertionError:
+            pass
 
     async def receive_json(self, payload):
         """
@@ -98,17 +103,32 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             )
 
     async def join(self, event):
-        """
-        Add group by event(dictionary) or group_name
-        """
-        # TODO TEST IF A EXTERNAL USER CAN JOIN GROUPS HE DOES NOT HAVE PERMISSION ON e.g: user x joins user y group
         if event.get("content"):
             event = json.loads(event.get("content"))
-
         group_name = f"{event['name']}_{event['id']}"
+
+        validator = WSJoinValidator(
+            group_name=event["name"],
+            group_id=event["id"],
+            project_uuid=self.project,
+            user_permission=self.permission,
+        )
+
+        if await validator.validate() is False:
+            await self.notify(
+                {
+                    "type": "notify",
+                    "action": "group.join",
+                    "content": json.dumps(
+                        {"msg": f"Access denied on the group: {group_name}"}
+                    ),
+                }
+            )
+            return None
+
         await self.channel_layer.group_add(group_name, self.channel_name)
         self.groups.append(group_name)
-        # for debugging
+
         if settings.DEBUG:
             await self.notify(
                 {
