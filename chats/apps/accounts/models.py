@@ -79,6 +79,10 @@ class User(AbstractBaseUser, PermissionsMixin):
         except AttributeError:
             return ""
 
+    @property
+    def name(self):
+        return f"{self.first_name} + {self.last_name}"
+
 
 class Profile(BaseModel):
     user = models.OneToOneField(
