@@ -11,7 +11,7 @@ from chats.apps.msgs.models import MessageMedia
 from chats.apps.accounts.models import User
 
 
-class MessageMediaSerializer(serializers.ModelSerializer):
+class MessageMediaSimpleSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
@@ -21,6 +21,7 @@ class MessageMediaSerializer(serializers.ModelSerializer):
             "message",
             "media_file",
             "url",
+            "created_on",
         ]
 
         extra_kwargs = {
@@ -30,9 +31,37 @@ class MessageMediaSerializer(serializers.ModelSerializer):
     def get_url(self, media: MessageMedia):
         return media.url
 
+    def get_sender(self, media: MessageMedia):
+        return media.message.get_sender().name
+
+
+class MessageMediaSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField(read_only=True)
+    sender = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = MessageMedia
+        fields = [
+            "content_type",
+            "message",
+            "media_file",
+            "url",
+            "created_on",
+        ]
+
+        extra_kwargs = {
+            "media_file": {"write_only": True},
+        }
+
+    def get_url(self, media: MessageMedia):
+        return media.url
+
+    def get_sender(self, media: MessageMedia):
+        return media.message.get_sender().name
+
 
 class MessageSerializer(serializers.ModelSerializer):
-    media = MessageMediaSerializer(many=True, required=False)
+    media = MessageMediaSimpleSerializer(many=True, required=False)
     contact = ContactSerializer(many=False, required=False, read_only=True)
     user = UserSerializer(many=False, required=False, read_only=True)
     user_email = serializers.SlugRelatedField(
