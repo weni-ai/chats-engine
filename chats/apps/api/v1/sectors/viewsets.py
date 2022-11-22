@@ -11,7 +11,8 @@ from chats.apps.api.v1.sectors.filters import (
     SectorFilter,
     SectorTagFilter,
 )
-from chats.apps.projects.models import Project
+from chats.apps.projects.models import Project, ProjectPermission
+from chats.apps.queues.models import QueueAuthorization
 from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 from chats.apps.api.v1.internal.connect_rest_client import ConnectRESTClient
 from rest_framework.decorators import action
@@ -109,6 +110,9 @@ class SectorViewset(viewsets.ModelViewSet):
         project_uuid = request.query_params.get("project")
         project = Project.objects.get(uuid=project_uuid)
         sector_count = project.get_sectors(user=request.user).count()
+        # TODO: CREATE A METHOD DO COUNT SECTORS OF USER
+        if sector_count == 0:
+            sector_count = Sector.objects.filter(project=project, queues__authorizations__permission__user=request.user).distinct().count()
         return Response({"sector_count":sector_count}, status=status.HTTP_200_OK)
 
 class SectorTagsViewset(viewsets.ModelViewSet):
