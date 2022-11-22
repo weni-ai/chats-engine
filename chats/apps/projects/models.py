@@ -42,7 +42,7 @@ class Project(BaseModel):
 
     def get_sectors(self, user):
         user_permission = self.get_permission(user)
-        if user_permission is not None and user_permission.role == 2:  # Admin role
+        if user_permission is not None and user_permission.role == 1:  # Admin role
             return self.sectors.all()
         else:
             return self.sectors.filter(
