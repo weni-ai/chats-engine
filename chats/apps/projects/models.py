@@ -58,13 +58,13 @@ class Project(BaseModel):
         self.save()
         return token
 
-    def get_sectors(self, user):
+    def get_sectors(self, user, custom_filters: dict = {}):
         user_permission = self.get_permission(user)
         if user_permission is not None and user_permission.role == 2:  # Admin role
             return self.sectors.all()
         else:
             return self.sectors.filter(
-                authorizations__permission=user_permission
+                authorizations__permission=user_permission, **custom_filters
             )  # If the user have any permission on the sectors
 
 

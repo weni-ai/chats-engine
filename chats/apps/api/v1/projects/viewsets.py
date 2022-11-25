@@ -7,23 +7,34 @@ from rest_framework.response import Response
 from chats.apps.api.v1.projects.serializers import ProjectSerializer
 from chats.apps.api.v1.internal.projects.serializers import (
     ProjectPermissionReadSerializer,
-    CheckAccessReadSerializer
+    CheckAccessReadSerializer,
 )
 from chats.apps.projects.models import Project, ProjectPermission
 
 from chats.apps.api.v1.permissions import (
     IsProjectAdmin,
     IsSectorManager,
+    ProjectAnyPermission,
 )
 
 
-class ProjectViewset(viewsets.ModelViewSet):
+class ProjectViewset(viewsets.ReadOnlyModelViewSet):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
     permission_classes = [
         IsAuthenticated,
+        ProjectAnyPermission,
     ]
     lookup_field = "uuid"
+
+    @action(detail=True, methods=["GET"], url_name="can_trigger_flows")
+    def can_trigger_flows(self, request, *args, **kwargs):
+        project = self.get_object()
+        can_trigger_flows = project.get_sectors(
+            user=request.user, custom_filters={"can_trigger_flows": True}
+        ).exists()
+
+        return Response({"can_trigger_flows": can_trigger_flows}, status.HTTP_200_OK)
 
 
 class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
@@ -44,37 +55,32 @@ class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
         return [permission() for permission in permission_classes]
 
     @action(detail=False, methods=["GET"], url_name="verify_access")
-    def verify_access(
-        self, request, *args, **kwargs
-    ):
+    def verify_access(self, request, *args, **kwargs):
         try:
-            instance = ProjectPermission.objects.get(user=request.user, project=request.query_params["project"])
+            instance = ProjectPermission.objects.get(
+                user=request.user, project=request.query_params["project"]
+            )
             serialized_data = CheckAccessReadSerializer(instance=instance)
         except (KeyError, ProjectPermission.DoesNotExist):
             return Response(
-                {
-                    "Detail": "You dont have permission in this project."
-                },
+                {"Detail": "You dont have permission in this project."},
                 status.HTTP_401_UNAUTHORIZED,
             )
         return Response(serialized_data.data, status.HTTP_200_OK)
-        
 
     @action(detail=False, methods=["PUT", "PATCH"], url_name="update_access")
-    def update_access(
-        self, request, *args, **kwargs
-    ):
+    def update_access(self, request, *args, **kwargs):
         try:
-            instance = ProjectPermission.objects.get(user=request.user, project=request.query_params["project"])
-            if instance.first_access == True:
+            instance = ProjectPermission.objects.get(
+                user=request.user, project=request.query_params["project"]
+            )
+            if instance.first_access is True:
                 instance.first_access = False
                 instance.save()
             serialized_data = CheckAccessReadSerializer(instance=instance)
         except (KeyError, ProjectPermission.DoesNotExist):
             return Response(
-                {
-                    "Detail": "You dont have permission in this project."
-                },
+                {"Detail": "You dont have permission in this project."},
                 status.HTTP_401_UNAUTHORIZED,
             )
         return Response(serialized_data.data, status=status.HTTP_200_OK)
