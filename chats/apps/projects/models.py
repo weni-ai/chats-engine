@@ -5,6 +5,8 @@ from chats.core.models import BaseModel
 
 from django.core.exceptions import ObjectDoesNotExist
 
+from chats.apps.api.v1.internal.connect_rest_client import ConnectRESTClient
+
 # Create your models here.
 
 
@@ -19,6 +21,9 @@ class Project(BaseModel):
 
     name = models.CharField(_("name"), max_length=50)
     timezone = TimeZoneField(verbose_name=_("Timezone"))
+    flows_authorization = models.CharField(
+        _("Flows Authorization Token"), max_length=36
+    )
     date_format = models.CharField(
         verbose_name=_("Date Format"),
         max_length=1,
@@ -39,6 +44,19 @@ class Project(BaseModel):
             return self.permissions.get(user=user)
         except ProjectPermission.DoesNotExist:
             return None
+
+    def set_project_flows_auth_token(self, user_email: str = ""):
+        email = (
+            user_email
+            or self.permissions.filter(role=ProjectPermission.ROLE_ADMIN)
+            .first()
+            .user.email
+        )
+        response = ConnectRESTClient().get_user_project_token(self.pk, email)
+        token = response.json().get("uuid")
+        self.flows_authorization = token
+        self.save()
+        return token
 
     def get_sectors(self, user):
         user_permission = self.get_permission(user)

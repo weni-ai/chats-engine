@@ -1,31 +1,13 @@
 import requests
 
 from django.conf import settings
+from chats.apps.api.v1.internal.internal_authorization import InternalAuthentication
 
 
-class ConnectRESTClient:
-    def __init__(self):
+class ConnectRESTClient(InternalAuthentication):
+    def __init__(self, *args, **kwargs):
         self.base_url = settings.CONNECT_API_URL
-        self.headers = {
-            "Content-Type": "application/json; charset: utf-8",
-            "Authorization": self.get_auth_token(),
-        }
-
-    def get_auth_token(self) -> str:
-        if settings.OIDC_ENABLED:
-
-            request = requests.post(
-                url=settings.OIDC_OP_TOKEN_ENDPOINT,
-                data={
-                    "client_id": settings.OIDC_RP_CLIENT_ID,
-                    "client_secret": settings.OIDC_RP_CLIENT_SECRET,
-                    "grant_type": "client_credentials",
-                },
-            )
-            token = request.json().get("access_token")
-        else:
-            token = ""
-        return f"Bearer {token}"
+        super(self.__class__, self).__init__(*args, **kwargs)
 
     def create_ticketer(self, **kwargs):
         response = requests.post(

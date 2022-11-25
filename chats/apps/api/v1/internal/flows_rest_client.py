@@ -2,32 +2,15 @@ import logging
 import requests
 from django.conf import settings
 from rest_framework import status
+from chats.apps.api.v1.internal.internal_authorization import InternalAuthentication
 
 LOGGER = logging.getLogger(__name__)
 
 
-class FlowRESTClient:
-    def __init__(self):
+class FlowRESTClient(InternalAuthentication):
+    def __init__(self, *args, **kwargs):
         self.base_url = settings.FLOWS_API_URL
-        self.headers = {
-            "Content-Type": "application/json; charset: utf-8",
-            "Authorization": self.get_auth_token(),
-        }
-
-    def get_auth_token(self) -> str:
-        if settings.OIDC_ENABLED:
-            request = requests.post(
-                url=settings.OIDC_OP_TOKEN_ENDPOINT,
-                data={
-                    "client_id": settings.OIDC_RP_CLIENT_ID,
-                    "client_secret": settings.OIDC_RP_CLIENT_SECRET,
-                    "grant_type": "client_credentials",
-                },
-            )
-            token = request.json().get("access_token")
-        else:
-            token = ""
-        return f"Bearer {token}"
+        super(self.__class__, self).__init__(*args, **kwargs)
 
     def create_queue(self, uuid: str, name: str, sector_uuid: str):
         response = requests.post(
