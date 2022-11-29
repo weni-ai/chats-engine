@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     "chats.apps.projects",
     "chats.apps.api",
     "chats.core",
+    "chats.apps.dashboard",
     # third party apps
     "channels",
     "drf_yasg",
