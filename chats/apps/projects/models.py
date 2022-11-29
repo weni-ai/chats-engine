@@ -97,7 +97,7 @@ class ProjectPermission(
     )
 
     status = models.CharField(
-        _("User Status"), max_length=10, choices=ROLE_CHOICES, default=STATUS_OFFLINE
+        _("User Status"), max_length=10, choices=STATUS_CHOICES, default=STATUS_OFFLINE
     )
 
     first_access = models.BooleanField(_("Its the first access of user?"), default=True)
