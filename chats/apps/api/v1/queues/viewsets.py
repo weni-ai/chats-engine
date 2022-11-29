@@ -11,9 +11,6 @@ from chats.apps.api.v1.queues.filters import QueueFilter, QueueAuthorizationFilt
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.api.v1.internal.flows_rest_client import FlowRESTClient
 
-if settings.USE_WENI_FLOWS:
-    flow_client = FlowRESTClient()
-
 
 class QueueViewset(ModelViewSet):
     queryset = Queue.objects.all()
@@ -41,7 +38,7 @@ class QueueViewset(ModelViewSet):
         if not settings.USE_WENI_FLOWS:
             return super().perform_create(serializer)
         instance = serializer.save()
-        response = flow_client.create_queue(
+        response = FlowRESTClient().create_queue(
             str(instance.uuid), instance.name, str(instance.sector.uuid)
         )
         if response.status_code not in [status.HTTP_200_OK, status.HTTP_201_CREATED]:
@@ -56,7 +53,7 @@ class QueueViewset(ModelViewSet):
             return super().perform_create(serializer)
 
         instance = serializer.save()
-        response = flow_client.update_queue(
+        response = FlowRESTClient().update_queue(
             str(instance.uuid), instance.name, str(instance.sector.uuid)
         )
         if response.status_code not in [status.HTTP_200_OK, status.HTTP_201_CREATED]:
@@ -69,7 +66,7 @@ class QueueViewset(ModelViewSet):
         if not settings.USE_WENI_FLOWS:
             return super().perform_destroy(instance)
 
-        response = flow_client.destroy_queue(
+        response = FlowRESTClient().destroy_queue(
             str(instance.uuid), str(instance.sector.uuid)
         )
         if response.status_code not in [
