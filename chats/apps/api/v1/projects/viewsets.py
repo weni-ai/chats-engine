@@ -17,6 +17,8 @@ from chats.apps.api.v1.permissions import (
     ProjectAnyPermission,
 )
 
+from chats.apps.api.v1.internal.flows_rest_client import FlowRESTClient
+
 
 class ProjectViewset(viewsets.ReadOnlyModelViewSet):
     queryset = Project.objects.all()
@@ -35,6 +37,27 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         ).exists()
 
         return Response({"can_trigger_flows": can_trigger_flows}, status.HTTP_200_OK)
+
+    @action(detail=True, methods=["GET"], url_name="contacts")
+    def list_contacts(self, request, *args, **kwargs):
+        project = self.get_object()
+        contact_list = FlowRESTClient().list_contacts(project)
+
+        return Response(contact_list, status.HTTP_200_OK)
+
+    @action(detail=True, methods=["POST"], url_name="create_contact")
+    def create_contacts(self, request, *args, **kwargs):
+        project = self.get_object()
+        contact = FlowRESTClient().create_contact(project, request.data)
+
+        return Response(contact, status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["GET"], url_name="groups")
+    def list_groups(self, request, *args, **kwargs):
+        project = self.get_object()
+        contact_list = FlowRESTClient().list_contact_groups(project)
+
+        return Response(contact_list, status.HTTP_200_OK)
 
 
 class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):

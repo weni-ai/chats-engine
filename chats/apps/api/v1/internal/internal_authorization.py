@@ -4,9 +4,6 @@ from django.conf import settings
 
 
 class InternalAuthentication:
-    def __init__(self, *args, **kwarg):
-        self.headers = self.headers
-
     def get_module_token(self):
         request = requests.post(
             url=settings.OIDC_OP_TOKEN_ENDPOINT,

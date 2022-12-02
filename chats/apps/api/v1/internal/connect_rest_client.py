@@ -7,7 +7,6 @@ from chats.apps.api.v1.internal.internal_authorization import InternalAuthentica
 class ConnectRESTClient(InternalAuthentication):
     def __init__(self, *args, **kwargs):
         self.base_url = settings.CONNECT_API_URL
-        super(self.__class__, self).__init__(*args, **kwargs)
 
     def create_ticketer(self, **kwargs):
         response = requests.post(
@@ -17,8 +16,8 @@ class ConnectRESTClient(InternalAuthentication):
         )
         return response
 
-    def get_user_project_token(self, project, user_email):
-        url = (f"{self.base_url}/v1/organization/project/{project.pk}/user_api_token/",)
+    def get_user_project_token(self, project, user_email: str):
+        url = (f"{self.base_url}/v1/organization/project/user_api_token/",)
         params = {"user": user_email, "project_uuid": str(project.uuid)}
         response = requests.get(
             url=url,
