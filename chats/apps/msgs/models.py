@@ -1,6 +1,7 @@
 import json
 import requests
 
+
 from django.db import models
 from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
@@ -45,6 +46,15 @@ class Message(BaseModel):
     def save(self, *args, **kwargs) -> None:
         if self.room.is_active is False:
             raise ValidationError({"detail": _("Closed rooms cannot receive messages")})
+        if self.room.is_24h_valid is False and self.user is not None:
+            raise ValidationError(
+                {
+                    "detail": _(
+                        "You cannot send messages after 24h from the last contact message"
+                    )
+                }
+            )
+
         return super().save(*args, **kwargs)
 
     @property
@@ -58,6 +68,9 @@ class Message(BaseModel):
 
     def media(self):
         return self.medias.all()
+
+    def get_sender(self):
+        return self.user or self.contact
 
     def notify_room(self, action: str, callback: bool = False):
         """ """
