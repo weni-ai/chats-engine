@@ -141,6 +141,8 @@ class ProjectPermission(
         return False
 
     def is_agent(self, queue: str):
+        if queue is None:
+            return False
         sector = self.project.sectors.get(queues__uuid=queue)
 
         if self.is_manager(sector=str(sector.uuid)):
@@ -151,14 +153,20 @@ class ProjectPermission(
     @property
     def queue_ids(self):
         if self.is_admin:
-            return list(self.project.sectors.values_list("queues__uuid", flat=True))
+            return list(
+                self.project.sectors.filter(queues__isnull=False)
+                .values_list("queues__uuid", flat=True)
+                .distinct()
+            )
         sector_manager_queues = list(
-            self.sector_authorizations.values_list("sector__queues__uuid", flat=True)
+            self.sector_authorizations.filter(sector__queues__isnull=False)
+            .values_list("sector__queues__uuid", flat=True)
+            .distinct()
         )
         queue_agent_queues = list(
-            self.queue_authorizations.exclude(
-                queue__uuid__in=sector_manager_queues
-            ).values_list("queue", flat=True)
+            self.queue_authorizations.exclude(queue__uuid__in=sector_manager_queues)
+            .values_list("queue", flat=True)
+            .distinct()
         )
         queues = set(sector_manager_queues + queue_agent_queues)
 
