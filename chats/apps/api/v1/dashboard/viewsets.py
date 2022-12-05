@@ -4,7 +4,8 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from chats.apps.msgs.models import Message
-from chats.apps.projects.models import Project
+from chats.apps.projects.models import Project, ProjectPermission
+from chats.apps.queues.models import QueueAuthorization
 from chats.apps.rooms.models import Room
 from chats.apps.api.v1.dashboard.serializers import DashboardRoomsSerializer, DashboardAgentsSerializer
 from django.db.models import Count, F, Avg, Sum
@@ -26,5 +27,5 @@ class DashboardViewset(viewsets.ReadOnlyModelViewSet):
         self, request, *args, **kwargs
     ):
         project = Project.objects.get(pk=request.query_params["project"])
-        serialized_data = DashboardAgentsSerializer(instance=project)
+        serialized_data = DashboardAgentsSerializer(instance=project.pk)
         return Response(serialized_data.data, status.HTTP_200_OK)

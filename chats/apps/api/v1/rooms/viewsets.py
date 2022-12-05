@@ -113,7 +113,7 @@ class RoomViewset(
         # Create transfer object based on whether it's a user or a queue transfer and add it to the history
         if user:
             if instance.user is None:
-                time = timezone.now()-instance.created_on
+                time = timezone.now() - instance.modified_on
                 room_metrics = RoomMetrics.objects.get_or_create(
                     room=instance, 
                     waiting_time = time.total_seconds()

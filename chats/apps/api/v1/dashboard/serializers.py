@@ -3,10 +3,11 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from chats.apps.dashboard.models import RoomMetrics
-from chats.apps.projects.models import Project
+from chats.apps.projects.models import Project, ProjectPermission
+from chats.apps.queues.models import QueueAuthorization
 
 from chats.apps.rooms.models import Room
-from django.db.models import F, Sum
+from django.db.models import F, Sum, Count, Q
 
 
 class DashboardRoomsSerializer(serializers.ModelSerializer):
@@ -39,36 +40,36 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
 
 
     def get_response_time(self, project):
-        metrics_rooms = RoomMetrics.objects.filter(room__queue__sector__project=project)
         metrics_rooms_count = RoomMetrics.objects.filter(room__queue__sector__project=project).count()
-        response_time_avg = 0
         
-        for i in metrics_rooms:
-            response_time_avg += i.message_response_time
-
-        response_time = response_time_avg/metrics_rooms_count
+        room_metric = RoomMetrics.objects.filter(room__queue__sector__project=project).aggregate(message_response_time=Sum('message_response_time'))["message_response_time"]
+        response_time = room_metric/metrics_rooms_count
 
         return response_time
         
     def get_waiting_time(self, project):
-        metrics_rooms = RoomMetrics.objects.filter(room__queue__sector__project=project)
         metrics_rooms_count = RoomMetrics.objects.filter(room__queue__sector__project=project).count()
-        waiting_time_avg = 0
         
-        for i in metrics_rooms:
-            waiting_time_avg += i.waiting_time
-
-        response_time = waiting_time_avg/metrics_rooms_count
+        room_metric = RoomMetrics.objects.filter(room__queue__sector__project=project).aggregate(waiting_time=Sum('waiting_time'))["waiting_time"]
+        response_time = room_metric/metrics_rooms_count
 
         return response_time
 
 
 class DashboardAgentsSerializer(serializers.ModelSerializer):
-    
-    online_agents = serializers.SerializerMethodField()
-    
+
+    project_agents = serializers.SerializerMethodField()
+
     class Meta:
         model = Project
         fields = [
-            "online_agents",
+            "project_agents",
         ]
+
+    def get_project_agents(self, project):
+        
+        queue_auth = QueueAuthorization.objects.filter(queue__sector__project=project, queue__sector__project__permissions__status="OFFLINE").values(
+            "permission__user__first_name").annotate(
+            count=Count("queue__rooms", filter=Q(queue__rooms__is_active=True), distinct=True))      
+
+        return queue_auth
