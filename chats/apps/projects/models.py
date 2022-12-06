@@ -55,14 +55,12 @@ class ProjectPermission(
 ):  # TODO: ADD CONSTRAINT NOT TO SAVE THE SAME USER 2 TIME IN THE PROJECT
     ROLE_NOT_SETTED = 0
     ROLE_ADMIN = 1
-    ROLE_AGENT = 2
-    ROLE_SERVICE_MANAGER = 3
+    ROLE_ATTENDANT = 2
 
     ROLE_CHOICES = [
         (ROLE_NOT_SETTED, _("not set")),
         (ROLE_ADMIN, _("admin")),
-        (ROLE_AGENT, _("agent")),
-        (ROLE_SERVICE_MANAGER, _("service manager")),
+        (ROLE_ATTENDANT, _("Attendant")),
     ]
 
     STATUS_ONLINE = "ONLINE"
@@ -100,7 +98,9 @@ class ProjectPermission(
         _("User Status"), max_length=10, choices=ROLE_CHOICES, default=STATUS_OFFLINE
     )
 
-    first_access = models.BooleanField(_("Its the first access of user?"), default=True)
+    first_access = models.BooleanField(
+        _("Is it the first access of user?"), default=True
+    )
 
     class Meta:
         verbose_name = _("Project Permission")
@@ -177,7 +177,7 @@ class ProjectPermission(
 
     @property
     def rooms_limit(self):
-        if self.role == self.ROLE_AGENT:
+        if self.role == self.ROLE_ATTENDANT:
             limits = (
                 self.queue_authorizations.all()
                 .distinct("queue__sector")

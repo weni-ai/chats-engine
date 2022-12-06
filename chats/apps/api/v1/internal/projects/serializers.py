@@ -51,15 +51,13 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
                 name="Setor Padrão", rooms_limit=5, work_start="08:00", work_end="18:00"
             )
             queue = sector.queues.create(name="Fila 1")
-            sector_permission = SectorAuthorization.objects.create(
+            SectorAuthorization.objects.create(
                 role=1, permission=permission, sector=sector
             )
-            queue_permission = QueueAuthorization.objects.create(
+            QueueAuthorization.objects.create(
                 role=1, permission=permission, queue=queue
             )
-            tag = SectorTag.objects.create(
-                name="Atendimento encerado", sector=sector
-            )
+            SectorTag.objects.create(name="Atendimento encerado", sector=sector)
             connect_client = ConnectRESTClient()
             response_sector = connect_client.create_ticketer(
                 project_uuid=str(instance.uuid),
@@ -122,4 +120,3 @@ class CheckAccessReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectPermission
         fields = ["first_access"]
-
