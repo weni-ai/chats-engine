@@ -17,7 +17,7 @@ from chats.apps.api.v1.permissions import (
     ProjectAnyPermission,
 )
 
-from chats.apps.api.v1.internal.flows_rest_client import FlowRESTClient
+from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 
 
 class ProjectViewset(viewsets.ReadOnlyModelViewSet):

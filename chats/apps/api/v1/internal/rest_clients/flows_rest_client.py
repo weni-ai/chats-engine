@@ -70,10 +70,7 @@ class FlowsContactsAndGroupsMixin:
         return response.json()
 
 
-class FlowRESTClient(InternalAuthentication, FlowsContactsAndGroupsMixin):
-    def __init__(self, *args, **kwargs):
-        self.base_url = settings.FLOWS_API_URL
-
+class FlowsQueueMixin:
     def create_queue(self, uuid: str, name: str, sector_uuid: str):
         response = requests.post(
             url=f"{self.base_url}/api/v2/internals/ticketers/{sector_uuid}/queues/",
@@ -121,3 +118,30 @@ class FlowRESTClient(InternalAuthentication, FlowsContactsAndGroupsMixin):
                 f"[{response.status_code}] Failed to delete the queue. response: {response.content}"
             )
         return response
+
+
+class FlowRESTClient(
+    InternalAuthentication, FlowsContactsAndGroupsMixin, FlowsQueueMixin
+):
+    def __init__(self, *args, **kwargs):
+        self.base_url = settings.FLOWS_API_URL
+
+    def list_flows(self, project):
+        response = retry_request_and_refresh_flows_auth_token(
+            project=project,
+            request_method=requests.get,
+            headers=self.project_headers(project.flows_authorization),
+            url=f"{self.base_url}/api/v2/flows.json",
+            user_email=project.random_admin.user.email,
+        )
+        return response.json()
+
+    def start_flow(self, project):
+        response = retry_request_and_refresh_flows_auth_token(
+            project=project,
+            request_method=requests.post,
+            headers=self.project_headers(project.flows_authorization),
+            url=f"{self.base_url}/api/v2/flows.json",
+            user_email=project.random_admin.user.email,
+        )
+        return response.json()
