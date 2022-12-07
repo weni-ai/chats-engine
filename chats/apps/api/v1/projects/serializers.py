@@ -27,3 +27,9 @@ class ProjectFlowContactSerializer(serializers.Serializer):
     urns = serializers.ListField(child=serializers.CharField(), max_length=100)
     groups = serializers.ListField(child=serializers.CharField(), max_length=100)
     fields = serializers.JSONField()
+
+
+class ProjectFlowSerializer(serializers.Serializer):
+    groups = serializers.ListField(child=serializers.CharField(), max_length=100)
+    contacts = serializers.ListField(child=serializers.CharField(), max_length=100)
+    flow = serializers.CharField()
