@@ -4,9 +4,16 @@ from typing import Callable
 
 from django.conf import settings
 from rest_framework import status
-from chats.apps.api.v1.internal.internal_authorization import InternalAuthentication
+from chats.apps.api.v1.internal.rest_clients.internal_authorization import (
+    InternalAuthentication,
+)
 
 LOGGER = logging.getLogger(__name__)
+
+
+def get_cursor(url):
+    cursor = url.split("cursor=")[-1]
+    return cursor
 
 
 def retry_request_and_refresh_flows_auth_token(
@@ -28,46 +35,6 @@ def retry_request_and_refresh_flows_auth_token(
         else:
             break
     return response
-
-
-class FlowsContactsAndGroupsMixin:
-    def project_headers(self, token):
-        headers = {
-            "Content-Type": "application/json; charset: utf-8",
-            "Authorization": f"Token {token}",
-        }
-        return headers
-
-    def list_contacts(self, project):
-        response = retry_request_and_refresh_flows_auth_token(
-            project=project,
-            request_method=requests.get,
-            headers=self.project_headers(project.flows_authorization),
-            url=f"{self.base_url}/api/v2/contacts.json",
-            user_email=project.random_admin.user.email,
-        )
-        return response.json()
-
-    def create_contact(self, project, data: dict):
-        response = retry_request_and_refresh_flows_auth_token(
-            project=project,
-            user_email=project.permissions.random_admin.user.email,
-            request_method=requests.post,
-            url=f"{self.base_url}/api/v2/contacts.json",
-            json=data,
-            headers=self.project_headers(project.flows_authorization),
-        )
-        return response.json()
-
-    def list_contact_groups(self, project):
-        response = retry_request_and_refresh_flows_auth_token(
-            project=project,
-            request_method=requests.get,
-            headers=self.project_headers(project.flows_authorization),
-            url=f"{self.base_url}/api/v2/groups.json",
-            user_email=project.permissions.random_admin.user.email,
-        )
-        return response.json()
 
 
 class FlowsQueueMixin:
@@ -120,28 +87,78 @@ class FlowsQueueMixin:
         return response
 
 
+class FlowsContactsAndGroupsMixin:
+    def project_headers(self, token):
+        headers = {
+            "Content-Type": "application/json; charset: utf-8",
+            "Authorization": f"Token {token}",
+        }
+        return headers
+
+    def list_contacts(self, project, cursor: str = ""):
+        response = retry_request_and_refresh_flows_auth_token(
+            project=project,
+            request_method=requests.get,
+            headers=self.project_headers(project.flows_authorization),
+            url=f"{self.base_url}/api/v2/contacts.json?cursor={cursor}",
+            user_email=project.random_admin.user.email,
+        )
+        contacts = response.json()
+        contacts["next"] = get_cursor(contacts.get("next") or "")
+        contacts["previous"] = get_cursor(contacts.get("previous") or "")
+        return contacts
+
+    def create_contact(self, project, data: dict):
+        response = retry_request_and_refresh_flows_auth_token(
+            project=project,
+            user_email=project.permissions.random_admin.user.email,
+            request_method=requests.post,
+            url=f"{self.base_url}/api/v2/contacts.json",
+            json=data,
+            headers=self.project_headers(project.flows_authorization),
+        )
+        return response.json()
+
+    def list_contact_groups(self, project, cursor: str = ""):
+        response = retry_request_and_refresh_flows_auth_token(
+            project=project,
+            request_method=requests.get,
+            headers=self.project_headers(project.flows_authorization),
+            url=f"{self.base_url}/api/v2/groups.json?cursor={cursor}",
+            user_email=project.permissions.random_admin.user.email,
+        )
+        groups = response.json()
+        groups["next"] = get_cursor(groups.get("next") or "")
+        groups["previous"] = get_cursor(groups.get("previous") or "")
+        return groups
+
+
 class FlowRESTClient(
     InternalAuthentication, FlowsContactsAndGroupsMixin, FlowsQueueMixin
 ):
     def __init__(self, *args, **kwargs):
         self.base_url = settings.FLOWS_API_URL
 
-    def list_flows(self, project):
+    def list_flows(self, project, cursor: str = ""):
         response = retry_request_and_refresh_flows_auth_token(
             project=project,
             request_method=requests.get,
             headers=self.project_headers(project.flows_authorization),
-            url=f"{self.base_url}/api/v2/flows.json",
+            url=f"{self.base_url}/api/v2/flows.json?cursor={cursor}",
             user_email=project.random_admin.user.email,
         )
-        return response.json()
+        flows = response.json()
+        flows["next"] = get_cursor(flows.get("next") or "")
+        flows["previous"] = get_cursor(flows.get("previous") or "")
+        return flows
 
-    def start_flow(self, project):
+    def start_flow(self, project, data):
         response = retry_request_and_refresh_flows_auth_token(
             project=project,
             request_method=requests.post,
-            headers=self.project_headers(project.flows_authorization),
             url=f"{self.base_url}/api/v2/flows.json",
+            json=data,
             user_email=project.random_admin.user.email,
+            headers=self.project_headers(project.flows_authorization),
         )
         return response.json()

@@ -1,7 +1,9 @@
 import requests
 
 from django.conf import settings
-from chats.apps.api.v1.internal.internal_authorization import InternalAuthentication
+from chats.apps.api.v1.internal.rest_clients.internal_authorization import (
+    InternalAuthentication,
+)
 
 
 class ConnectRESTClient(InternalAuthentication):
@@ -17,7 +19,7 @@ class ConnectRESTClient(InternalAuthentication):
         return response
 
     def get_user_project_token(self, project, user_email: str):
-        url = (f"{self.base_url}/v1/organization/project/user_api_token/",)
+        url = f"{self.base_url}/v1/organization/project/user_api_token/"
         params = {"user": user_email, "project_uuid": str(project.uuid)}
         response = requests.get(
             url=url,

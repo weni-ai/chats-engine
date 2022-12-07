@@ -4,7 +4,10 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from chats.apps.api.v1.projects.serializers import ProjectSerializer
+from chats.apps.api.v1.projects.serializers import (
+    ProjectSerializer,
+    ProjectFlowContactSerializer,
+)
 from chats.apps.api.v1.internal.projects.serializers import (
     ProjectPermissionReadSerializer,
     CheckAccessReadSerializer,
@@ -41,23 +44,50 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=["GET"], url_name="contacts")
     def list_contacts(self, request, *args, **kwargs):
         project = self.get_object()
-        contact_list = FlowRESTClient().list_contacts(project)
+        cursor = request.query_params.get("cursor")
+        contact_list = FlowRESTClient().list_contacts(project, cursor=cursor)
 
         return Response(contact_list, status.HTTP_200_OK)
 
     @action(detail=True, methods=["POST"], url_name="create_contact")
     def create_contacts(self, request, *args, **kwargs):
         project = self.get_object()
-        contact = FlowRESTClient().create_contact(project, request.data)
+        serializer = ProjectFlowContactSerializer(data=request.data)
+        if serializer.is_valid() is False:
+            return Response(
+                {"Detail": "Data not valid."},
+                status.HTTP_400_BAD_REQUEST,
+            )
+        data = serializer.validated_data
+        contact = FlowRESTClient().create_contact(project, data)
 
         return Response(contact, status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["GET"], url_name="groups")
     def list_groups(self, request, *args, **kwargs):
         project = self.get_object()
-        contact_list = FlowRESTClient().list_contact_groups(project)
+        cursor = request.query_params.get("cursor")
+
+        contact_list = FlowRESTClient().list_contact_groups(project, cursor=cursor)
 
         return Response(contact_list, status.HTTP_200_OK)
+
+    @action(detail=True, methods=["GET"], url_name="flows")
+    def list_flows(self, request, *args, **kwargs):
+        project = self.get_object()
+        cursor = request.query_params.get("cursor")
+
+        flow_list = FlowRESTClient().list_flows(project, cursor=cursor)
+
+        return Response(flow_list, status.HTTP_200_OK)
+
+    @action(detail=True, methods=["POST"], url_name="flows")
+    def start_flow(self, request, *args, **kwargs):
+        project = self.get_object()
+        data = request.data
+        flow_start = FlowRESTClient().start_flow(project, data)
+
+        return Response(flow_start, status.HTTP_200_OK)
 
 
 class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
