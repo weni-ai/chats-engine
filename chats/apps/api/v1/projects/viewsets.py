@@ -6,7 +6,7 @@ from rest_framework.response import Response
 
 from chats.apps.api.v1.projects.serializers import (
     ProjectSerializer,
-    ProjectFlowSerializer,
+    ProjectFlowStartSerializer,
     ProjectFlowContactSerializer,
 )
 from chats.apps.api.v1.internal.projects.serializers import (
@@ -85,7 +85,7 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=["POST"], url_name="flows")
     def start_flow(self, request, *args, **kwargs):
         project = self.get_object()
-        serializer = ProjectFlowSerializer(data=request.data)
+        serializer = ProjectFlowStartSerializer(data=request.data)
         if serializer.is_valid() is False:
             return Response(
                 {"Detail": "Data not valid."},

@@ -29,7 +29,7 @@ class ProjectFlowContactSerializer(serializers.Serializer):
     fields = serializers.JSONField()
 
 
-class ProjectFlowSerializer(serializers.Serializer):
+class ProjectFlowStartSerializer(serializers.Serializer):
     groups = serializers.ListField(child=serializers.CharField(), max_length=100)
     contacts = serializers.ListField(child=serializers.CharField(), max_length=100)
     flow = serializers.CharField()
