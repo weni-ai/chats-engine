@@ -9,6 +9,8 @@ from chats.apps.queues.models import QueueAuthorization
 from chats.apps.rooms.models import Room
 from django.db.models import F, Sum, Count, Q
 
+from chats.apps.sectors.models import Sector
+
 
 class DashboardRoomsSerializer(serializers.ModelSerializer):
 
@@ -30,15 +32,14 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
         return Room.objects.filter(queue__sector__project=project, is_active=True).count()
 
     def get_interact_time(self, project):
-        interation_time = Room.objects.filter(queue__sector__project=project, is_active=True, ended_at__isnull=False).aggregate(
-            avg_time=Sum(
-                F('ended_at') - F('created_on'),
-                )       
-            )
-        minutes = interation_time["avg_time"].total_seconds()
-        return round(minutes, 2)
+        metrics_rooms_count = RoomMetrics.objects.filter(room__queue__sector__project=project).count()
+        
+        interaction = RoomMetrics.objects.filter(room__queue__sector__project=project).aggregate(interaction_time=Sum('interaction_time'))["interaction_time"]
+        interaction_time = interaction/metrics_rooms_count
 
+        return interaction_time
 
+       
     def get_response_time(self, project):
         metrics_rooms_count = RoomMetrics.objects.filter(room__queue__sector__project=project).count()
         
@@ -73,3 +74,82 @@ class DashboardAgentsSerializer(serializers.ModelSerializer):
             count=Count("queue__rooms", filter=Q(queue__rooms__is_active=True), distinct=True))      
 
         return queue_auth
+
+
+class DashboardSectorSerializer(serializers.ModelSerializer):
+
+    sectors = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Project
+        fields = [
+            "sectors",
+        ]
+
+    def get_sectors(self, project):
+        sector = Sector.objects.filter(project=project).values(
+            "name").annotate(
+                waiting_time=Sum("queues__rooms__metric__waiting_time")/Count("queues__rooms__metric"), 
+                response_time=Sum("queues__rooms__metric__message_response_time")/Count("queues__rooms__metric"),
+                interact_time=Sum("queues__rooms__metric__interaction_time")/Count("queues__rooms__metric"),
+                online_agents=(Count("project__permissions__status", filter=Q(project__permissions__status="OFFLINE"), distinct=True))
+            )
+        return sector
+
+
+class DashboardRoomFilterTagSerializer(serializers.ModelSerializer):
+
+    total_rooms_tag = serializers.SerializerMethodField()
+    interact_time_rooms_tag = serializers.SerializerMethodField()
+    response_time_rooms_tag = serializers.SerializerMethodField()
+    waiting_time_rooms_tag = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Project
+        fields = [
+            "total_rooms_tag",
+            "interact_time_rooms_tag",
+            "response_time_rooms_tag",
+            "waiting_time_rooms_tag"
+        ]
+        
+    def get_total_rooms_tag(self, sector_tag):
+        tag_rooms = Room.objects.filter(queue__sector=sector_tag.sector).count()
+        return tag_rooms
+
+
+    def get_interact_time_rooms_tag(self, sector_tag):
+        metrics_rooms_count = RoomMetrics.objects.filter(room__queue__sector=sector_tag.sector).count()
+        interaction = RoomMetrics.objects.filter(room__queue__sector=sector_tag.sector).aggregate(interaction_time=Sum('interaction_time'))["interaction_time"]
+        
+        if interaction:
+            interaction_time = interaction/metrics_rooms_count
+        else:
+            interaction_time = 0
+
+        return interaction_time
+
+    
+    def get_response_time_rooms_tag(self, sector_tag):
+        metrics_rooms_count = RoomMetrics.objects.filter(room__queue__sector=sector_tag.sector).count()
+        room_metric = RoomMetrics.objects.filter(room__queue__sector=sector_tag.sector).aggregate(message_response_time=Sum('message_response_time'))["message_response_time"]
+
+        if room_metric:
+            response_time = room_metric/metrics_rooms_count
+        else:
+            response_time = 0
+
+        return response_time
+
+
+    def get_waiting_time_rooms_tag(self, sector_tag):
+        metrics_rooms_count = RoomMetrics.objects.filter(room__queue__sector=sector_tag.sector).count()
+        
+        room_metric = RoomMetrics.objects.filter(room__queue__sector=sector_tag.sector).aggregate(waiting_time=Sum('waiting_time'))["waiting_time"]
+
+        if room_metric:
+            response_time = room_metric/metrics_rooms_count
+        else:
+            response_time = 0
+
+        return response_time

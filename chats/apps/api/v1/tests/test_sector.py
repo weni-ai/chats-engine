@@ -465,7 +465,6 @@ class SectorInternalTests(APITestCase):
         self.assertEqual(response.data["is_deleted"], True)
 
 
-
 class RoomsExternalTests(APITestCase):
     fixtures = ['chats/fixtures/fixture_app.json']
 

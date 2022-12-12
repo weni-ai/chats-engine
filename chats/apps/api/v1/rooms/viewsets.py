@@ -74,9 +74,15 @@ class RoomViewset(
                 time_message_agent += i.created_on.timestamp()
 
             difference_time = time_message_contact - time_message_agent
+            interation_time = Room.objects.filter(pk=instance.pk).aggregate(
+                avg_time=Sum(
+                    F('ended_at') - F('created_on'),
+                    )       
+                )["avg_time"].total_seconds()
 
             metric_room = RoomMetrics.objects.get(room=instance)
             metric_room.message_response_time = difference_time
+            metric_room.interaction_time = interation_time
             metric_room.save()
 
         tags = request.data.get("tags", None)
