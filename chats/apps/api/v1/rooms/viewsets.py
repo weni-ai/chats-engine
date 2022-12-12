@@ -99,7 +99,7 @@ class RoomViewset(
         instance.save()
 
         # Create a message with the transfer data and Send to the room group
-        msg = instance.messages.create(text=json.dumps(_content))
+        msg = instance.messages.create(text=json.dumps(_content), seen=True)
         msg.notify_room("create")
 
         # Send Updated data to the room group
