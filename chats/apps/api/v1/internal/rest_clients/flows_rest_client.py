@@ -111,7 +111,7 @@ class FlowsContactsAndGroupsMixin:
     def create_contact(self, project, data: dict):
         response = retry_request_and_refresh_flows_auth_token(
             project=project,
-            user_email=project.permissions.random_admin.user.email,
+            user_email=project.random_admin.user.email,
             request_method=requests.post,
             url=f"{self.base_url}/api/v2/contacts.json",
             json=data,
@@ -125,7 +125,7 @@ class FlowsContactsAndGroupsMixin:
             request_method=requests.get,
             headers=self.project_headers(project.flows_authorization),
             url=f"{self.base_url}/api/v2/groups.json?cursor={cursor}",
-            user_email=project.permissions.random_admin.user.email,
+            user_email=project.random_admin.user.email,
         )
         groups = response.json()
         groups["next"] = get_cursor(groups.get("next") or "")

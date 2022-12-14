@@ -24,7 +24,7 @@ class Project(BaseModel):
     name = models.CharField(_("name"), max_length=50)
     timezone = TimeZoneField(verbose_name=_("Timezone"))
     flows_authorization = models.CharField(
-        _("Flows Authorization Token"), max_length=36, null=True, blank=True
+        _("Flows Authorization Token"), max_length=50, null=True, blank=True
     )
     date_format = models.CharField(
         verbose_name=_("Date Format"),
@@ -54,7 +54,7 @@ class Project(BaseModel):
             .first()
             .user.email
         )
-        response = ConnectRESTClient().get_user_project_token(self.pk, email)
+        response = ConnectRESTClient().get_user_project_token(self, email)
         token = response.json().get("api_token")
         self.flows_authorization = token
         self.save()
