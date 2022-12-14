@@ -1,6 +1,8 @@
 import json
 import requests
 
+from datetime import timedelta
+
 from django.db import models
 from django.core.serializers.json import DjangoJSONEncoder
 from django.utils import timezone
@@ -89,6 +91,15 @@ class Room(BaseModel):
         return self.queue.get_permission(user)
 
     @property
+    def is_24h_valid(self) -> bool:
+        """Validates is the last contact message was sent more than a day ago"""
+        day_validation = self.messages.filter(
+            created_on__gte=timezone.now() - timedelta(days=1),
+            contact=self.contact,
+        )
+        return day_validation.exists()
+
+    @property
     def serialized_ws_data(self):
         from chats.apps.api.v1.rooms.serializers import RoomSerializer  # noqa
 
@@ -98,7 +109,8 @@ class Room(BaseModel):
         self.is_active = False
         self.ended_at = timezone.now()
         self.ended_by = end_by
-        self.tags.add(*tags)
+        if tags is not None:
+            self.tags.add(*tags)
         self.save()
 
     def notify_queue(self, action: str, callback: bool = False):

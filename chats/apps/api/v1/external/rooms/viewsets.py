@@ -31,7 +31,7 @@ def add_user_or_queue_to_room(instance, request):
     instance.transfer_history = new_transfer_history
     instance.save()
     # Create a message with the transfer data and Send to the room group
-    msg = instance.messages.create(text=json.dumps(_content))
+    msg = instance.messages.create(text=json.dumps(_content), seen=True)
     msg.notify_room("create")
 
 
@@ -39,11 +39,11 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
     model = Room
     queryset = Room.objects.all()
     serializer_class = RoomFlowSerializer
-    # permission_classes = [
-    #     IsAdminPermission,
-    # ]
+    permission_classes = [
+        IsAdminPermission,
+    ]
     lookup_field = "uuid"
-    # authentication_classes = [ProjectAdminAuthentication]
+    authentication_classes = [ProjectAdminAuthentication]
 
     @action(detail=True, methods=["PUT", "PATCH"], url_name="close")
     def close(

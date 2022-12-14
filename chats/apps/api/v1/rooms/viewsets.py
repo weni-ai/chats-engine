@@ -28,18 +28,18 @@ class RoomViewset(
     GenericViewSet,
 ):
     queryset = Room.objects.all()
-    serializer_class = RoomSerializer
+    serializer_class = RoomSerializer   
     filter_backends = [DjangoFilterBackend]
     filterset_class = room_filters.RoomFilter
 
-    # def get_permissions(self):
-    #     permission_classes = [permissions.IsAuthenticated]
-    #     if self.action != "list":
-    #         permission_classes = (
-    #             permissions.IsAuthenticated,
-    #             api_permissions.IsQueueAgent,
-    #         )
-    #     return [permission() for permission in permission_classes]
+    def get_permissions(self):
+        permission_classes = [permissions.IsAuthenticated]
+        if self.action != "list":
+            permission_classes = (
+                permissions.IsAuthenticated,
+                api_permissions.IsQueueAgent,
+            )
+        return [permission() for permission in permission_classes]
 
     def get_queryset(self):
         if self.action != "list":
@@ -86,14 +86,10 @@ class RoomViewset(
             metric_room.save()
 
         tags = request.data.get("tags", None)
-        if tags is None:
-            raise ValidationError(
-                {"detail": _("You cannot close a room without giving tags to it")}
-            )
         instance.close(tags, "agent")
         serialized_data = RoomSerializer(instance=instance)
         instance.notify_queue("close", callback=True)
-        return Response('close', status=status.HTTP_200_OK)
+        return Response(serialized_data.data, status=status.HTTP_200_OK)
 
     def perform_create(self, serializer):
         serializer.save()
@@ -145,7 +141,7 @@ class RoomViewset(
         instance.save()
 
         # Create a message with the transfer data and Send to the room group
-        msg = instance.messages.create(text=json.dumps(_content))
+        msg = instance.messages.create(text=json.dumps(_content), seen=True)
         msg.notify_room("create")
 
         # Send Updated data to the room group
@@ -160,15 +156,15 @@ class RoomViewset(
         )
 
         # Add the room group for the user or the queue that received it
-        # if user:
-        #     send_channels_group(
-        #         group_name=f"user_{instance.user.id}",
-        #         call_type="join",
-        #         content={"name": "room", "id": str(instance.pk)},
-        #         action="group.join",
-        #     )
-        #     instance.notify_room("update")
-        #     return None
+        if user:
+            send_channels_group(
+                group_name=f"user_{instance.user.id}",
+                call_type="join",
+                content={"name": "room", "id": str(instance.pk)},
+                action="group.join",
+            )
+            instance.notify_room("update")
+            return None
 
         if queue:
             send_channels_group(
