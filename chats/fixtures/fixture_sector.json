@@ -26,6 +26,20 @@
 },
 {
     "model": "sectors.sector",
+    "pk": "4f88b656-194d-4a83-a166-5d84ba825b8d",
+    "fields": {
+        "created_on": "2022-08-24T20:58:36.420Z",
+        "modified_on": "2022-09-05T21:10:24.340Z",
+        "name": "Inteligencia",
+        "project": "34a93b52-231e-11ed-861d-0242ac120002",
+        "rooms_limit": 3,
+        "work_start": "09:00:00",
+        "work_end": "17:00:00",
+        "is_deleted": false
+    }
+},
+{
+    "model": "sectors.sector",
     "pk": "d3cae43d-cf25-4892-bfa6-0f24a856cfb8",
     "fields": {
         "created_on": "2022-08-24T21:00:16.351Z",
@@ -160,6 +174,16 @@
         "modified_on": "2022-08-24T21:40:15.274Z",
         "sector": "21aecf8c-0c73-4059-ba82-4343e0cc627c",
         "name": "ENGINE"
+    }
+},
+{
+    "model": "queues.queue",
+    "pk": "f341417b-5143-4469-a99d-f141a0676bd4",
+    "fields": {
+        "created_on": "2022-08-24T21:40:24.240Z",
+        "modified_on": "2022-08-24T21:40:24.240Z",
+        "sector": "4f88b656-194d-4a83-a166-5d84ba825b8d",
+        "name": "FRONTEND"
     }
 },
 {
