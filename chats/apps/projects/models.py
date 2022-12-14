@@ -48,12 +48,7 @@ class Project(BaseModel):
             return None
 
     def set_flows_project_auth_token(self, user_email: str = ""):
-        email = (
-            user_email
-            or self.permissions.filter(role=ProjectPermission.ROLE_ADMIN)
-            .first()
-            .user.email
-        )
+        email = user_email or self.random_admin.user.email
         response = ConnectRESTClient().get_user_project_token(self, email)
         token = response.json().get("api_token")
         self.flows_authorization = token
@@ -62,11 +57,14 @@ class Project(BaseModel):
 
     @property
     def random_admin(self):
-        return self.permissions.filter(role=1).first()
+        return self.permissions.filter(role=ProjectPermission.ROLE_ADMIN).first()
 
     def get_sectors(self, user, custom_filters: dict = {}):
         user_permission = self.get_permission(user)
-        if user_permission is not None and user_permission.role == 1:  # Admin role
+        if (
+            user_permission is not None
+            and user_permission.role == ProjectPermission.ROLE_ADMIN
+        ):  # Admin role
             return self.sectors.all()
         else:
             return self.sectors.filter(
