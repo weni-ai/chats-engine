@@ -275,7 +275,9 @@ CONNECT_API_URL = env.str("CONNECT_API_URL", default="")
 FLOWS_API_URL = env.str("FLOWS_API_URL", default="")
 USE_WENI_FLOWS = env.bool("USE_WENI_FLOWS", default=False)
 FLOWS_TICKETER_TYPE = env.str("FLOWS_TICKETER_TYPE", default="wenichats")
-
+FLOWS_AUTH_TOKEN_RETRIES = env.int(
+    "FLOWS_AUTH_TOKEN_RETRIES", default=2
+)  # How many times to refresh the flows project auth token and retry the request
 
 # Swagger
 
@@ -301,14 +303,4 @@ if USE_SENTRY:
         integrations=[DjangoIntegration()],
     )
 
-
-# Query Limiters
-
-OLD_MESSAGES_LIMIT = env.int(
-    "OLD_MESSAGES_LIMIT", default=10
-)  # Limits the messages shown when accessing an active chat
-
-
-PROMETHEUS_AUTH_TOKEN = env.str(
-    "PROMETHEUS_AUTH_TOKEN"
-)
+PROMETHEUS_AUTH_TOKEN = env.str("PROMETHEUS_AUTH_TOKEN")
