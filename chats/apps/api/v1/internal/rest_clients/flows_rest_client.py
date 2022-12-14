@@ -101,7 +101,6 @@ class FlowsContactsAndGroupsMixin:
             request_method=requests.get,
             headers=self.project_headers(project.flows_authorization),
             url=f"{self.base_url}/api/v2/contacts.json?cursor={cursor}",
-            user_email=project.random_admin.user.email,
         )
         contacts = response.json()
         contacts["next"] = get_cursor(contacts.get("next") or "")
@@ -111,7 +110,6 @@ class FlowsContactsAndGroupsMixin:
     def create_contact(self, project, data: dict):
         response = retry_request_and_refresh_flows_auth_token(
             project=project,
-            user_email=project.permissions.random_admin.user.email,
             request_method=requests.post,
             url=f"{self.base_url}/api/v2/contacts.json",
             json=data,
@@ -125,7 +123,6 @@ class FlowsContactsAndGroupsMixin:
             request_method=requests.get,
             headers=self.project_headers(project.flows_authorization),
             url=f"{self.base_url}/api/v2/groups.json?cursor={cursor}",
-            user_email=project.permissions.random_admin.user.email,
         )
         groups = response.json()
         groups["next"] = get_cursor(groups.get("next") or "")
@@ -145,7 +142,6 @@ class FlowRESTClient(
             request_method=requests.get,
             headers=self.project_headers(project.flows_authorization),
             url=f"{self.base_url}/api/v2/flows.json?cursor={cursor}",
-            user_email=project.random_admin.user.email,
         )
         flows = response.json()
         flows["next"] = get_cursor(flows.get("next") or "")
@@ -156,9 +152,8 @@ class FlowRESTClient(
         response = retry_request_and_refresh_flows_auth_token(
             project=project,
             request_method=requests.post,
-            url=f"{self.base_url}/api/v2/flows.json",
+            url=f"{self.base_url}/api/v2/flow_starts.json",
             json=data,
-            user_email=project.random_admin.user.email,
             headers=self.project_headers(project.flows_authorization),
         )
         return response.json()
