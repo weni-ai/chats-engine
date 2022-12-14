@@ -31,6 +31,10 @@ class Contact(BaseModel):
         return self.email
 
     @property
+    def full_name(self):
+        return self.name
+
+    @property
     def last_agent_name(self):
         try:
             return self.rooms.last().user.name

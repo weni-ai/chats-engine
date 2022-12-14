@@ -1,6 +1,8 @@
 import json
 import requests
 
+from datetime import timedelta
+
 from django.db import models
 from django.core.serializers.json import DjangoJSONEncoder
 from django.utils import timezone
@@ -88,6 +90,15 @@ class Room(BaseModel):
 
     def get_permission(self, user):
         return self.queue.get_permission(user)
+
+    @property
+    def is_24h_valid(self) -> bool:
+        """Validates is the last contact message was sent more than a day ago"""
+        day_validation = self.messages.filter(
+            created_on__gte=timezone.now() - timedelta(days=1),
+            contact=self.contact,
+        )
+        return day_validation.exists()
 
     @property
     def serialized_ws_data(self):

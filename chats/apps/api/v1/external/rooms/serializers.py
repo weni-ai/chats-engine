@@ -10,6 +10,7 @@ from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactRelationsSerializer
 from chats.apps.api.v1.queues.serializers import QueueSerializer
 from chats.apps.contacts.models import Contact
+from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
@@ -102,4 +103,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             available_agent = queue.available_agents.first()
             room.user = available_agent or None
             room.save()
+
+        metrics_room = RoomMetrics.objects.create(room=room)
+
         return room
