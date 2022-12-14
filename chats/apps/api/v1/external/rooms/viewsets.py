@@ -39,11 +39,11 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
     model = Room
     queryset = Room.objects.all()
     serializer_class = RoomFlowSerializer
-    # permission_classes = [
-    #     IsAdminPermission,
-    # ]
+    permission_classes = [
+        IsAdminPermission,
+    ]
     lookup_field = "uuid"
-    # authentication_classes = [ProjectAdminAuthentication]
+    authentication_classes = [ProjectAdminAuthentication]
 
     @action(detail=True, methods=["PUT", "PATCH"], url_name="close")
     def close(
