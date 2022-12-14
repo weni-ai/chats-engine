@@ -149,7 +149,7 @@ class RoomViewset(
             action="group.exit",
         )
 
-        Add the room group for the user or the queue that received it
+        # Add the room group for the user or the queue that received it
         if user:
             send_channels_group(
                 group_name=f"user_{instance.user.id}",
