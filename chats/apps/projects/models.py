@@ -42,7 +42,7 @@ class Project(BaseModel):
 
     def get_sectors(self, user):
         user_permission = self.get_permission(user)
-        if user_permission is not None and user_permission.role == 2:  # Admin role
+        if user_permission is not None and user_permission.role == 1:  # Admin role
             return self.sectors.all()
         else:
             return self.sectors.filter(
@@ -55,14 +55,12 @@ class ProjectPermission(
 ):  # TODO: ADD CONSTRAINT NOT TO SAVE THE SAME USER 2 TIME IN THE PROJECT
     ROLE_NOT_SETTED = 0
     ROLE_ADMIN = 1
-    ROLE_AGENT = 2
-    ROLE_SERVICE_MANAGER = 3
+    ROLE_ATTENDANT = 2
 
     ROLE_CHOICES = [
         (ROLE_NOT_SETTED, _("not set")),
         (ROLE_ADMIN, _("admin")),
-        (ROLE_AGENT, _("agent")),
-        (ROLE_SERVICE_MANAGER, _("service manager")),
+        (ROLE_ATTENDANT, _("Attendant")),
     ]
 
     STATUS_ONLINE = "ONLINE"
@@ -97,10 +95,12 @@ class ProjectPermission(
     )
 
     status = models.CharField(
-        _("User Status"), max_length=10, choices=ROLE_CHOICES, default=STATUS_OFFLINE
+        _("User Status"), max_length=10, choices=STATUS_CHOICES, default=STATUS_OFFLINE
     )
 
-    first_access = models.BooleanField(_("Its the first access of user?"), default=True)
+    first_access = models.BooleanField(
+        _("Is it the first access of user?"), default=True
+    )
 
     class Meta:
         verbose_name = _("Project Permission")
@@ -141,6 +141,8 @@ class ProjectPermission(
         return False
 
     def is_agent(self, queue: str):
+        if queue is None:
+            return False
         sector = self.project.sectors.get(queues__uuid=queue)
 
         if self.is_manager(sector=str(sector.uuid)):
@@ -151,14 +153,20 @@ class ProjectPermission(
     @property
     def queue_ids(self):
         if self.is_admin:
-            return list(self.project.sectors.values_list("queues__uuid", flat=True))
+            return list(
+                self.project.sectors.filter(queues__isnull=False)
+                .values_list("queues__uuid", flat=True)
+                .distinct()
+            )
         sector_manager_queues = list(
-            self.sector_authorizations.values_list("sector__queues__uuid", flat=True)
+            self.sector_authorizations.filter(sector__queues__isnull=False)
+            .values_list("sector__queues__uuid", flat=True)
+            .distinct()
         )
         queue_agent_queues = list(
-            self.queue_authorizations.exclude(
-                queue__uuid__in=sector_manager_queues
-            ).values_list("queue", flat=True)
+            self.queue_authorizations.exclude(queue__uuid__in=sector_manager_queues)
+            .values_list("queue", flat=True)
+            .distinct()
         )
         queues = set(sector_manager_queues + queue_agent_queues)
 
@@ -169,7 +177,7 @@ class ProjectPermission(
 
     @property
     def rooms_limit(self):
-        if self.role == self.ROLE_AGENT:
+        if self.role == self.ROLE_ATTENDANT:
             limits = (
                 self.queue_authorizations.all()
                 .distinct("queue__sector")

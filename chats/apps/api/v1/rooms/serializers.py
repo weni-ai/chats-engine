@@ -15,6 +15,8 @@ class RoomSerializer(serializers.ModelSerializer):
     contact = ContactRelationsSerializer(many=False, read_only=True)
     queue = QueueSerializer(many=False, read_only=True)
     tags = DetailSectorTagSerializer(many=True, read_only=True)
+    unread_msgs = serializers.SerializerMethodField()
+    last_message = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -24,6 +26,17 @@ class RoomSerializer(serializers.ModelSerializer):
             "ended_at",
             "custom_fields",
         ]
+
+    def get_unread_msgs(self, room: Room):
+        return room.messages.filter(seen=False).count()
+
+    def get_last_message(self, room: Room):
+        last_message = (
+            room.messages.order_by("-created_on")
+            .exclude(user__isnull=True, contact__isnull=True)
+            .first()
+        )
+        return "" if last_message is None else last_message.text
 
 
 class TransferRoomSerializer(serializers.ModelSerializer):

@@ -109,6 +109,9 @@ class SectorViewset(viewsets.ModelViewSet):
         project_uuid = request.query_params.get("project")
         project = Project.objects.get(uuid=project_uuid)
         sector_count = project.get_sectors(user=request.user).count()
+        # TODO: CREATE A METHOD DO COUNT SECTORS OF USER
+        if sector_count == 0:
+            sector_count = Sector.objects.filter(project=project, queues__authorizations__permission__user=request.user).distinct().count()
         return Response({"sector_count":sector_count}, status=status.HTTP_200_OK)
 
 class SectorTagsViewset(viewsets.ModelViewSet):
