@@ -45,7 +45,7 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=["GET"], url_name="contacts")
     def list_contacts(self, request, *args, **kwargs):
         project = self.get_object()
-        cursor = request.query_params.get("cursor")
+        cursor = request.query_params.get("cursor", "")
         contact_list = FlowRESTClient().list_contacts(project, cursor=cursor)
 
         return Response(contact_list, status.HTTP_200_OK)
@@ -67,7 +67,7 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=["GET"], url_name="groups")
     def list_groups(self, request, *args, **kwargs):
         project = self.get_object()
-        cursor = request.query_params.get("cursor")
+        cursor = request.query_params.get("cursor", "")
 
         contact_list = FlowRESTClient().list_contact_groups(project, cursor=cursor)
 
@@ -76,7 +76,7 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
     @action(detail=True, methods=["GET"], url_name="flows")
     def list_flows(self, request, *args, **kwargs):
         project = self.get_object()
-        cursor = request.query_params.get("cursor")
+        cursor = request.query_params.get("cursor", "")
 
         flow_list = FlowRESTClient().list_flows(project, cursor=cursor)
 
