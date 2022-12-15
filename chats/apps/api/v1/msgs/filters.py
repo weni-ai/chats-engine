@@ -79,6 +79,13 @@ class MessageMediaFilter(filters.FilterSet):
         help_text=_("Room's UUID"),
     )
 
+    project = filters.UUIDFilter(
+        field_name="project",
+        required=False,
+        method="filter_project",
+        help_text=_("Projects's UUID"),
+    )
+
     def filter_contact(self, queryset, name, value):
         """
         Return medias given a contact, using the contact rooms for the search
@@ -94,3 +101,6 @@ class MessageMediaFilter(filters.FilterSet):
         queryset = queryset.filter(message__room__uuid=value)
 
         return queryset
+
+    def filter_project(self, queryset, name, value):
+        return queryset.filter(message__room__queue__sector__project__uuid=value)
