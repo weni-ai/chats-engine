@@ -306,3 +306,8 @@ if USE_SENTRY:
 OLD_MESSAGES_LIMIT = env.int(
     "OLD_MESSAGES_LIMIT", default=10
 )  # Limits the messages shown when accessing an active chat
+
+
+PROMETHEUS_AUTH_TOKEN = env.str(
+    "PROMETHEUS_AUTH_TOKEN"
+)
