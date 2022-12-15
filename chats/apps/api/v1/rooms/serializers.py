@@ -93,4 +93,5 @@ class RoomContactSerializer(serializers.ModelSerializer):
             "created_on",
             "ended_at",
             "custom_fields",
+            "is_waiting",
         ]
