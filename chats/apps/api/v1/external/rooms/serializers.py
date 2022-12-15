@@ -73,7 +73,6 @@ class RoomFlowSerializer(serializers.ModelSerializer):
                 else validated_data.pop("sector_uuid")
             )
         except AttributeError:
-            print("a")
             raise ValidationError(
                 {"detail": _("Cannot create room without queue_uuid or sector_uuid")}
             )

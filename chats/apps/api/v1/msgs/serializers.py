@@ -47,7 +47,6 @@ class MessageMediaSerializer(serializers.ModelSerializer):
             "media_file",
             "url",
             "created_on",
-            "sender"
         ]
 
         extra_kwargs = {
