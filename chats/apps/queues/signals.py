@@ -1,25 +1,20 @@
-from chats.apps.queues.models import QueueAuthorization
-
 from django.db.models.signals import post_save, post_delete
 
 from django.dispatch import receiver
 
-from datetime import datetime
-from dateutil.relativedelta import *
+from django.utils import timezone
+
+from chats.apps.queues.models import QueueAuthorization
+
+from dateutil.relativedelta import relativedelta
 
 from chats.apps.api.v1.prometheus.metrics import(
-    total_agents,
-    total_agents_last_month,
-    total_agents_last_3_months,
-    total_agents_last_6_months,
-    total_agents_last_year
+    chats_total_agents,
+    chats_total_agents_last_month,
+    chats_total_agents_last_3_months,
+    chats_total_agents_last_6_months,
+    chats_total_agents_last_year
 )
-
-now = datetime.now()
-last_month = now + relativedelta(months=-1)
-last_3_months = now + relativedelta(months=-3)
-last_6_months = now + relativedelta(months=-6)
-last_year = now + relativedelta(years=-1)
 
 @receiver([post_save, post_delete], sender=QueueAuthorization)
 def queueauthorization_metrics_sender(sender, instance, **kwargs):
@@ -34,20 +29,32 @@ class Metrics():
 
     def metric_about_created_agents(self):
         agent_authorization_count = QueueAuthorization.objects.all().count()
-        total_agents.labels("total_agents").set(agent_authorization_count)
+        chats_total_agents.labels("total_agents").set(agent_authorization_count)
 
     def metric_total_agents_created_last_month(self):
-        last_month_agents_count = QueueAuthorization.objects.filter(created_on__range=[last_month,now]).count()
-        total_agents_last_month.labels("total_agents_last_month").set(last_month_agents_count)
+        now = timezone.now()
+        last_month = now + relativedelta(months=-1)
+
+        last_month_agents_count = QueueAuthorization.objects.filter(created_on__gte=last_month).count()
+        chats_total_agents_last_month.labels("total_agents_last_month").set(last_month_agents_count)
 
     def metric_total_agents_created_last_3_months(self):
-        last_3_months_agents_count = QueueAuthorization.objects.filter(created_on__range=[last_3_months,now]).count()
-        total_agents_last_3_months.labels("total_agents_last_3_months").set(last_3_months_agents_count)
+        now = timezone.now()
+        last_3_months = now + relativedelta(months=-3)
 
-    def metric_total_agents_created_last_3_months(self):
-        last_6_months_agents_count = QueueAuthorization.objects.filter(created_on__range=[last_6_months,now]).count()
-        total_agents_last_6_months.labels("total_agents_last_6_months").set(last_6_months_agents_count)
+        last_3_months_agents_count = QueueAuthorization.objects.filter(created_on__gte=last_3_months).count()
+        chats_total_agents_last_3_months.labels("total_agents_last_3_months").set(last_3_months_agents_count)
+
+    def metric_total_agents_created_last_6_months(self):
+        now = timezone.now()
+        last_6_months = now + relativedelta(months=-6)
+
+        last_6_months_agents_count = QueueAuthorization.objects.filter(created_on__gte=last_6_months).count()
+        chats_total_agents_last_6_months.labels("total_agents_last_6_months").set(last_6_months_agents_count)
 
     def metric_total_agents_created_last_year(self):
-        last_year_agents_count = QueueAuthorization.objects.filter(created_on__range=[last_year,now]).count()
-        total_agents_last_year.labels("total_agents_last_year").set(last_year_agents_count)
+        now = timezone.now()
+        last_year = now + relativedelta(years=-1)
+
+        last_year_agents_count = QueueAuthorization.objects.filter(created_on__gte=last_year).count()
+        chats_total_agents_last_year.labels("total_agents_last_year").set(last_year_agents_count)
