@@ -60,6 +60,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             "ended_at",
             "is_active",
             "transfer_history",
+            "urn",
         ]
         extra_kwargs = {"queue": {"required": False, "read_only": True}}
 
@@ -91,19 +92,17 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         contact_data = validated_data.pop("contact")
         contact_external_id = contact_data.pop("external_id")
-        contact_urn = contact_data.pop("urn")
+        if contact_data.get("urn"):
+            validated_data["urn"] = contact_data.pop("urn")
         contact, created = Contact.objects.update_or_create(
             external_id=contact_external_id, defaults=contact_data
         )
-
-        room = Room.objects.create(
-            **validated_data, contact=contact, queue=queue, urn=contact_urn
-        )
+        room = Room.objects.create(**validated_data, contact=contact, queue=queue)
         if room.user is None:
             available_agent = queue.available_agents.first()
             room.user = available_agent or None
             room.save()
 
-        metrics_room = RoomMetrics.objects.create(room=room)
+        RoomMetrics.objects.create(room=room)
 
         return room
