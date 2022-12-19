@@ -13,7 +13,6 @@ from chats.apps.contacts.models import Contact
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
-from chats.apps.sectors.models import Sector
 
 
 class RoomFlowSerializer(serializers.ModelSerializer):
@@ -84,8 +83,6 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         sector = queue.sector
 
-        work_start = sector.work_start
-        work_end = sector.work_end
         created_on = validated_data.get("created_on", timezone.now().time())
         if sector.is_attending(created_on) is False:
             raise ValidationError(
@@ -94,11 +91,14 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         contact_data = validated_data.pop("contact")
         contact_external_id = contact_data.pop("external_id")
+        contact_urn = contact_data.pop("urn")
         contact, created = Contact.objects.update_or_create(
             external_id=contact_external_id, defaults=contact_data
         )
 
-        room = Room.objects.create(**validated_data, contact=contact, queue=queue)
+        room = Room.objects.create(
+            **validated_data, contact=contact, queue=queue, urn=contact_urn
+        )
         if room.user is None:
             available_agent = queue.available_agents.first()
             room.user = available_agent or None
