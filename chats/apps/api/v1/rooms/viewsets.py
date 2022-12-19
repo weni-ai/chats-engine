@@ -8,7 +8,6 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
-from rest_framework.exceptions import ValidationError
 
 from chats.apps.api.v1.rooms.serializers import RoomSerializer, TransferRoomSerializer
 from chats.apps.dashboard.models import RoomMetrics
@@ -18,8 +17,6 @@ from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1 import permissions as api_permissions
 from chats.utils.websockets import send_channels_group
 
-from django.db.models import Count, Avg, F, Sum, DateTimeField
-
 
 class RoomViewset(
     mixins.ListModelMixin,
@@ -28,7 +25,7 @@ class RoomViewset(
     GenericViewSet,
 ):
     queryset = Room.objects.all()
-    serializer_class = RoomSerializer   
+    serializer_class = RoomSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = room_filters.RoomFilter
 
@@ -69,7 +66,7 @@ class RoomViewset(
         if messages_contact and messages_agent:
             for i in messages_contact:
                 time_message_contact += i.created_on.timestamp()
-            
+
             for i in messages_agent:
                 time_message_agent += i.created_on.timestamp()
 
@@ -94,7 +91,6 @@ class RoomViewset(
         instance = self.get_object()
         transfer_history = instance.transfer_history or []
 
-        old_user = instance.user
         old_queue = instance.queue
 
         user = self.request.data.get("user_email")
@@ -111,15 +107,14 @@ class RoomViewset(
             if instance.user is None:
                 time = timezone.now() - instance.modified_on
                 room_metrics = RoomMetrics.objects.get_or_create(
-                    room=instance, 
-                    waiting_time = time.total_seconds()
+                    room=instance, waiting_time=time.total_seconds()
                 )
             else:
                 _content = {"type": "user", "name": instance.user.first_name}
                 transfer_history.append(_content)
 
             if instance.metric:
-                instance.metric.queued_count+=1
+                instance.metric.queued_count += 1
                 instance.metric.save()
 
         if queue:
