@@ -16,10 +16,10 @@ from chats.apps.api.v1.prometheus.metrics import(
     chats_total_agents_last_year
 )
 
+
 @receiver([post_save, post_delete], sender=QueueAuthorization)
 def queueauthorization_metrics_sender(sender, instance, **kwargs):
    Metrics()
-
 
 class Metrics():
     def __init__(self):

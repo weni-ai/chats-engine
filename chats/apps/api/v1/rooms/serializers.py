@@ -25,6 +25,7 @@ class RoomSerializer(serializers.ModelSerializer):
             "created_on",
             "ended_at",
             "custom_fields",
+            "urn",
         ]
 
     def get_unread_msgs(self, room: Room):
@@ -70,6 +71,7 @@ class TransferRoomSerializer(serializers.ModelSerializer):
             "transfer_history",
             "tags",
             "ended_by",
+            "urn",
         ]
 
         extra_kwargs = {
@@ -93,4 +95,6 @@ class RoomContactSerializer(serializers.ModelSerializer):
             "created_on",
             "ended_at",
             "custom_fields",
+            "urn",
+            "is_waiting",
         ]

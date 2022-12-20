@@ -97,48 +97,56 @@ chats_total_rooms_last_year = Gauge(
 )
 
 chats_total_msgs_last_month = Gauge(
+
     name="total_msgs_last_month",
     documentation="The number of msgs created last month in chats",
     labelnames=["total_msgs_last_month"],
 )
 
 chats_total_msgs_last_3_months = Gauge(
+
     name="total_msgs_last_3_months",
     documentation="The number of msgs created last 3 months in chats",
     labelnames=["total_msgs_last_3_months"],
 )
 
 chats_total_msgs_last_6_months = Gauge(
+
     name="total_msgs_last_6_months",
     documentation="The number of msgs created last 6 months in chats",
     labelnames=["total_msgs_last_6_months"],
 )
 
 chats_total_msgs_last_year = Gauge(
+
     name="total_msgs_last_year",
     documentation="The number of msgs created last year in chats",
     labelnames=["total_msgs_last_year"],
 )
 
 chats_total_agents_last_month = Gauge(
+
     name="total_agents_last_month",
     documentation="The number of agents created last month in chats",
     labelnames=["total_msgs_last_month"],
 )
 
 chats_total_agents_last_3_months = Gauge(
+
     name="total_agents_last_3_months",
     documentation="The number of agents created last 3 months in chats",
     labelnames=["total_msgs_last_3_months"],
 )
 
 chats_total_agents_last_6_months = Gauge(
+
     name="total_agents_last_6_months",
     documentation="The number of agents created last 6 months in chats",
     labelnames=["total_msgs_last_6_months"],
 )
 
 chats_total_agents_last_year = Gauge(
+
     name="total_agents_last_year",
     documentation="The number of agents created last year in chats",
     labelnames=["total_msgs_last_year"],

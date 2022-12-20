@@ -9,7 +9,8 @@ from chats.apps.api.v1.permissions import IsSectorManager
 from chats.apps.api.v1.queues import serializers as queue_serializers
 from chats.apps.api.v1.queues.filters import QueueFilter, QueueAuthorizationFilter
 from chats.apps.queues.models import Queue, QueueAuthorization
-from chats.apps.api.v1.internal.flows_rest_client import FlowRESTClient
+from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
+
 
 
 class QueueViewset(ModelViewSet):
