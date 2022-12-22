@@ -44,24 +44,27 @@ class Queue(BaseModel):
 
     @property
     def agents(self):
-        return User.objects.filter(project_permissions__queue_authorizations__queue=self)
+        return User.objects.filter(
+            project_permissions__queue_authorizations__queue=self
+        )
 
     @property
     def online_agents(self):
         return self.agents.filter(
             project_permissions__status="online",
-            project_permissions__project=self.sector.project
-        ) # TODO: Set this variable to ProjectPermission.STATUS_ONLINE
+            project_permissions__project=self.sector.project,
+        )  # TODO: Set this variable to ProjectPermission.STATUS_ONLINE
 
     @property
     def available_agents(self):
         online_agents = self.online_agents.annotate(
             active_rooms_count=models.Count(
-                "rooms",
-                filter=models.Q(rooms__is_active=True, rooms__queue=self)
+                "rooms", filter=models.Q(rooms__is_active=True, rooms__queue=self)
             )
         )
-        return online_agents.filter(active_rooms_count__lt=self.limit).order_by("active_rooms_count")
+        return online_agents.filter(active_rooms_count__lt=self.limit).order_by(
+            "active_rooms_count"
+        )
 
     def get_or_create_user_authorization(self, user):
         sector_auth, created = self.authorizations.get_or_create(user=user)
@@ -70,7 +73,6 @@ class Queue(BaseModel):
     def set_queue_authorization(self, user, role: int):
         sector_auth, created = self.authorizations.get_or_create(user=user, role=role)
         return sector_auth
-
 
 
 class QueueAuthorization(BaseModel):

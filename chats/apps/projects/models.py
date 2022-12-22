@@ -5,6 +5,10 @@ from chats.core.models import BaseModel
 
 from django.core.exceptions import ObjectDoesNotExist
 
+from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
+    ConnectRESTClient,
+)
+
 # Create your models here.
 
 
@@ -19,6 +23,9 @@ class Project(BaseModel):
 
     name = models.CharField(_("name"), max_length=50)
     timezone = TimeZoneField(verbose_name=_("Timezone"))
+    flows_authorization = models.CharField(
+        _("Flows Authorization Token"), max_length=50, null=True, blank=True
+    )
     date_format = models.CharField(
         verbose_name=_("Date Format"),
         max_length=1,
@@ -40,13 +47,28 @@ class Project(BaseModel):
         except ProjectPermission.DoesNotExist:
             return None
 
-    def get_sectors(self, user):
+    def set_flows_project_auth_token(self, user_email: str = ""):
+        email = user_email or self.random_admin.user.email
+        response = ConnectRESTClient().get_user_project_token(self, email)
+        token = response.json().get("api_token")
+        self.flows_authorization = token
+        self.save()
+        return token
+
+    @property
+    def random_admin(self):
+        return self.permissions.filter(role=ProjectPermission.ROLE_ADMIN).first()
+
+    def get_sectors(self, user, custom_filters: dict = {}):
         user_permission = self.get_permission(user)
-        if user_permission is not None and user_permission.role == 2:  # Admin role
+        if (
+            user_permission is not None
+            and user_permission.role == ProjectPermission.ROLE_ADMIN
+        ):  # Admin role
             return self.sectors.all()
         else:
             return self.sectors.filter(
-                authorizations__permission=user_permission
+                authorizations__permission=user_permission, **custom_filters
             )  # If the user have any permission on the sectors
 
 
@@ -55,14 +77,12 @@ class ProjectPermission(
 ):  # TODO: ADD CONSTRAINT NOT TO SAVE THE SAME USER 2 TIME IN THE PROJECT
     ROLE_NOT_SETTED = 0
     ROLE_ADMIN = 1
-    ROLE_AGENT = 2
-    ROLE_SERVICE_MANAGER = 3
+    ROLE_ATTENDANT = 2
 
     ROLE_CHOICES = [
         (ROLE_NOT_SETTED, _("not set")),
         (ROLE_ADMIN, _("admin")),
-        (ROLE_AGENT, _("agent")),
-        (ROLE_SERVICE_MANAGER, _("service manager")),
+        (ROLE_ATTENDANT, _("Attendant")),
     ]
 
     STATUS_ONLINE = "ONLINE"
@@ -100,7 +120,9 @@ class ProjectPermission(
         _("User Status"), max_length=10, choices=STATUS_CHOICES, default=STATUS_OFFLINE
     )
 
-    first_access = models.BooleanField(_("Its the first access of user?"), default=True)
+    first_access = models.BooleanField(
+        _("Is it the first access of user?"), default=True
+    )
 
     class Meta:
         verbose_name = _("Project Permission")
@@ -177,7 +199,7 @@ class ProjectPermission(
 
     @property
     def rooms_limit(self):
-        if self.role == self.ROLE_AGENT:
+        if self.role == self.ROLE_ATTENDANT:
             limits = (
                 self.queue_authorizations.all()
                 .distinct("queue__sector")

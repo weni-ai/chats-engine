@@ -49,6 +49,7 @@ class Room(BaseModel):
         blank=True,
         null=True,
     )
+    urn = models.CharField(_("urn"), null=True, blank=True, max_length=100, default="")
 
     callback_url = models.URLField(
         _("Callback URL"), null=True, blank=True, max_length=200
@@ -61,6 +62,7 @@ class Room(BaseModel):
     ended_by = models.CharField(_("Ended by"), max_length=50, null=True, blank=True)
 
     is_active = models.BooleanField(_("is active?"), default=True)
+    is_waiting = models.BooleanField(_("is waiting for answer?"), default=False)
 
     transfer_history = models.JSONField(_("Transfer History"), null=True, blank=True)
 
