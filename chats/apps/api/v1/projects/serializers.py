@@ -23,10 +23,14 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 class ProjectFlowContactSerializer(serializers.Serializer):
     name = serializers.CharField()
-    language = serializers.CharField(max_length=3)
+    language = serializers.CharField(required=False, max_length=3)
     urns = serializers.ListField(child=serializers.CharField(), max_length=100)
-    groups = serializers.ListField(child=serializers.CharField(), max_length=100)
-    fields = serializers.JSONField()
+    groups = serializers.ListField(
+        required=False, child=serializers.CharField(), max_length=100
+    )
+    fields = serializers.JSONField(
+        required=False,
+    )
 
 
 class ProjectFlowStartSerializer(serializers.Serializer):
