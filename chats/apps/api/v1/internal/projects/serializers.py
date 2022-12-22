@@ -16,6 +16,8 @@ User = get_user_model()
 
 
 class ProjectInternalSerializer(serializers.ModelSerializer):
+    _ticketer_token = None
+    ticketer = serializers.SerializerMethodField()
     timezone = TimeZoneSerializerField(use_pytz=False)
     is_template = serializers.BooleanField(
         write_only=True, required=False, allow_null=True
@@ -31,9 +33,13 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
             "timezone",
             "is_template",
             "user_email",
+            "ticketer",
         ]
 
         extra_kwargs = {field: {"required": False} for field in fields}
+
+    def get_ticketer(self, *args, **kwargs):
+        return self._ticketer_token
 
     def create(self, validated_data):
         try:
@@ -57,9 +63,7 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
             queue_permission = QueueAuthorization.objects.create(
                 role=1, permission=permission, queue=queue
             )
-            tag = SectorTag.objects.create(
-                name="Atendimento encerado", sector=sector
-            )
+            tag = SectorTag.objects.create(name="Atendimento encerado", sector=sector)
             connect_client = ConnectRESTClient()
             response_sector = connect_client.create_ticketer(
                 project_uuid=str(instance.uuid),
@@ -69,7 +73,7 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
                     "sector_uuid": str(sector.uuid),
                 },
             )
-
+            self._ticketer_token = response_sector.json().get("uuid")
             flow_client = FlowRESTClient()
             response_flows = flow_client.create_queue(
                 str(queue.uuid), queue.name, str(queue.sector.uuid)
@@ -122,4 +126,3 @@ class CheckAccessReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectPermission
         fields = ["first_access"]
-
