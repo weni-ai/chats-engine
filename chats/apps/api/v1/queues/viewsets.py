@@ -12,7 +12,6 @@ from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 
 
-
 class QueueViewset(ModelViewSet):
     queryset = Queue.objects.all()
     serializer_class = queue_serializers.QueueSerializer

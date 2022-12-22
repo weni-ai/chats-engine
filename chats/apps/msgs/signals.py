@@ -66,4 +66,3 @@ class Metrics():
 
         last_year_msgs_count = ChatMessage.objects.filter(created_on__gte=last_year).count()
         chats_total_msgs_last_year.labels("total_msgs_last_year").set(last_year_msgs_count)
-

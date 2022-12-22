@@ -21,6 +21,7 @@ from chats.apps.api.v1.prometheus.metrics import(
 def queueauthorization_metrics_sender(sender, instance, **kwargs):
    Metrics()
 
+
 class Metrics():
     def __init__(self):
         metrics = [method for method in dir(self) if callable(getattr(self, method)) if not method.startswith('_') ]

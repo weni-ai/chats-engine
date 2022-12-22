@@ -18,6 +18,8 @@ User = get_user_model()
 
 
 class ProjectInternalSerializer(serializers.ModelSerializer):
+    _ticketer_token = None
+    ticketer = serializers.SerializerMethodField()
     timezone = TimeZoneSerializerField(use_pytz=False)
     is_template = serializers.BooleanField(
         write_only=True, required=False, allow_null=True
@@ -33,9 +35,13 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
             "timezone",
             "is_template",
             "user_email",
+            "ticketer",
         ]
 
         extra_kwargs = {field: {"required": False} for field in fields}
+
+    def get_ticketer(self, *args, **kwargs):
+        return self._ticketer_token
 
     def create(self, validated_data):
         try:
@@ -69,7 +75,7 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
                     "sector_uuid": str(sector.uuid),
                 },
             )
-
+            self._ticketer_token = response_sector.json().get("uuid")
             flow_client = FlowRESTClient()
             response_flows = flow_client.create_queue(
                 str(queue.uuid), queue.name, str(queue.sector.uuid)
