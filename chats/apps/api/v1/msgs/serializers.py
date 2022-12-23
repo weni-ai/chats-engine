@@ -10,6 +10,10 @@ from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
 from chats.apps.accounts.models import User
 
+"""
+TODO: Refactor these serializers into less classes
+"""
+
 
 class MessageMediaSimpleSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField(read_only=True)
@@ -26,6 +30,7 @@ class MessageMediaSimpleSerializer(serializers.ModelSerializer):
 
         extra_kwargs = {
             "media_file": {"write_only": True},
+            "message": {"read_only": True, "required": False},
         }
 
     def get_url(self, media: MessageMedia):
@@ -61,8 +66,7 @@ class MessageMediaSerializer(serializers.ModelSerializer):
         return media.message.get_sender().full_name
 
 
-class MessageSerializer(serializers.ModelSerializer):
-    media = MessageMediaSimpleSerializer(many=True, required=False)
+class BaseMessageSerializer(serializers.ModelSerializer):
     contact = ContactSerializer(many=False, required=False, read_only=True)
     user = UserSerializer(many=False, required=False, read_only=True)
     user_email = serializers.SlugRelatedField(
@@ -87,7 +91,6 @@ class MessageSerializer(serializers.ModelSerializer):
             "contact",
             "text",
             "seen",
-            "media",
             "created_on",
         ]
         read_only_fields = [
@@ -106,6 +109,68 @@ class MessageSerializer(serializers.ModelSerializer):
 
         msg = super().create(validated_data)
         return msg
+
+
+class MessageAndMediaSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField(read_only=True)
+    sender = serializers.SerializerMethodField(read_only=True)
+    message = BaseMessageSerializer(many=False)
+
+    class Meta:
+        model = MessageMedia
+        fields = [
+            "sender",
+            "content_type",
+            "message",
+            "media_file",
+            "url",
+            "created_on",
+        ]
+
+        extra_kwargs = {
+            "media_file": {"write_only": True},
+        }
+
+    def get_url(self, media: MessageMedia):
+        return media.url
+
+    def get_sender(self, media: MessageMedia):
+        return media.message.get_sender().full_name
+
+    def create(self, validated_data):
+        # import pdb
+
+        # pdb.set_trace()
+        message = validated_data.pop("message")
+        message = ChatMessage.objects.create(**message)
+        media = MessageMedia.objects.create(**validated_data, message=message)
+        return media
+
+
+class MessageSerializer(BaseMessageSerializer):
+    """Serializer for the messages endpoint"""
+
+    media = MessageMediaSimpleSerializer(many=True, required=False)
+
+    class Meta:
+        model = ChatMessage
+        fields = [
+            "uuid",
+            "user_email",
+            "user",
+            "room",
+            "contact",
+            "text",
+            "seen",
+            "media",
+            "created_on",
+        ]
+        read_only_fields = [
+            "uuid",
+            "user",
+            "created_on",
+            "contact",
+        ]
 
 
 class MessageWSSerializer(MessageSerializer):

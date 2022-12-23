@@ -1,12 +1,14 @@
 from django.db.models import Q
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import mixins, pagination, parsers, viewsets, filters
+from rest_framework import mixins, pagination, parsers, viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 from chats.apps.api.v1.msgs.filters import MessageFilter, MessageMediaFilter
 from chats.apps.api.v1.msgs.serializers import (
     MessageMediaSerializer,
+    MessageAndMediaSerializer,
     MessageSerializer,
 )
 from chats.apps.api.v1.msgs.permissions import MessagePermission, MessageMediaPermission
@@ -33,12 +35,39 @@ class MessageViewset(
         return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
+
         serializer.save()
         serializer.instance.notify_room("create", True)
 
     def perform_update(self, serializer):
         serializer.save()
         serializer.instance.notify_room("update", True)
+
+    @action(
+        methods=["POST"],
+        detail=False,
+        url_name="create_media",
+        parser_classes=[parsers.MultiPartParser],
+        serializer_class=MessageAndMediaSerializer,
+    )
+    def create_media(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(
+            serializer.data, status=status.HTTP_201_CREATED, headers=headers
+        )
+
+    def get_parsers(self):
+        """
+        OpenAPI cannot render nested serializer for MultiPartParser,
+        this removes the file field from the Request Body schema doc
+        """
+        if getattr(self, "swagger_fake_view", False):
+            return []
+
+        return super().get_parsers()
 
 
 class MessageMediaViewset(
