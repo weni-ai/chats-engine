@@ -40,6 +40,30 @@ class MessageMediaSimpleSerializer(serializers.ModelSerializer):
         return media.message.get_sender().full_name
 
 
+class MessageMediaSimpleSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = MessageMedia
+        fields = [
+            "content_type",
+            "message",
+            "media_file",
+            "url",
+            "created_on",
+        ]
+
+        extra_kwargs = {
+            "media_file": {"write_only": True},
+        }
+
+    def get_url(self, media: MessageMedia):
+        return media.url
+
+    def get_sender(self, media: MessageMedia):
+        return media.message.get_sender().full_name
+
+
 class MessageMediaSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField(read_only=True)
     sender = serializers.SerializerMethodField(read_only=True)
@@ -138,9 +162,6 @@ class MessageAndMediaSerializer(serializers.ModelSerializer):
         return media.message.get_sender().full_name
 
     def create(self, validated_data):
-        # import pdb
-
-        # pdb.set_trace()
         message = validated_data.pop("message")
         message = ChatMessage.objects.create(**message)
         media = MessageMedia.objects.create(**validated_data, message=message)
