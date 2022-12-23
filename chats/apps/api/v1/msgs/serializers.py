@@ -10,6 +10,10 @@ from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
 from chats.apps.accounts.models import User
 
+"""
+TODO: Refactor these serializers into less classes
+"""
+
 
 class MessageMediaSimpleSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField(read_only=True)
@@ -77,6 +81,25 @@ class BaseMessageSerializer(serializers.ModelSerializer):
         required=False, allow_null=True, allow_blank=True, default=""
     )
 
+    class Meta:
+        model = ChatMessage
+        fields = [
+            "uuid",
+            "user_email",
+            "user",
+            "room",
+            "contact",
+            "text",
+            "seen",
+            "created_on",
+        ]
+        read_only_fields = [
+            "uuid",
+            "user",
+            "created_on",
+            "contact",
+        ]
+
     def create(self, validated_data):
         room = validated_data.get("room")
         if room.is_waiting is True:
@@ -86,6 +109,42 @@ class BaseMessageSerializer(serializers.ModelSerializer):
 
         msg = super().create(validated_data)
         return msg
+
+
+class MessageAndMediaSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField(read_only=True)
+    sender = serializers.SerializerMethodField(read_only=True)
+    message = BaseMessageSerializer(many=False)
+
+    class Meta:
+        model = MessageMedia
+        fields = [
+            "sender",
+            "content_type",
+            "message",
+            "media_file",
+            "url",
+            "created_on",
+        ]
+
+        extra_kwargs = {
+            "media_file": {"write_only": True},
+        }
+
+    def get_url(self, media: MessageMedia):
+        return media.url
+
+    def get_sender(self, media: MessageMedia):
+        return media.message.get_sender().full_name
+
+    def create(self, validated_data):
+        # import pdb
+
+        # pdb.set_trace()
+        message = validated_data.pop("message")
+        message = ChatMessage.objects.create(**message)
+        media = MessageMedia.objects.create(**validated_data, message=message)
+        return media
 
 
 class MessageSerializer(BaseMessageSerializer):
@@ -112,16 +171,6 @@ class MessageSerializer(BaseMessageSerializer):
             "created_on",
             "contact",
         ]
-
-    def create(self, validated_data):
-        room = validated_data.get("room")
-        if room.is_waiting is True:
-            raise exceptions.APIException(
-                detail="Cannot create message when the room is waiting for contact's answer"
-            )
-
-        msg = super().create(validated_data)
-        return msg
 
 
 class MessageWSSerializer(MessageSerializer):
