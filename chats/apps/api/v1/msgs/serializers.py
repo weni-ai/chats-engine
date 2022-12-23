@@ -26,6 +26,7 @@ class MessageMediaSimpleSerializer(serializers.ModelSerializer):
 
         extra_kwargs = {
             "media_file": {"write_only": True},
+            "message": {"read_only": True, "required": False},
         }
 
     def get_url(self, media: MessageMedia):
@@ -61,8 +62,7 @@ class MessageMediaSerializer(serializers.ModelSerializer):
         return media.message.get_sender().full_name
 
 
-class MessageSerializer(serializers.ModelSerializer):
-    media = MessageMediaSimpleSerializer(many=True, required=False)
+class BaseMessageSerializer(serializers.ModelSerializer):
     contact = ContactSerializer(many=False, required=False, read_only=True)
     user = UserSerializer(many=False, required=False, read_only=True)
     user_email = serializers.SlugRelatedField(
@@ -76,6 +76,22 @@ class MessageSerializer(serializers.ModelSerializer):
     text = serializers.CharField(
         required=False, allow_null=True, allow_blank=True, default=""
     )
+
+    def create(self, validated_data):
+        room = validated_data.get("room")
+        if room.is_waiting is True:
+            raise exceptions.APIException(
+                detail="Cannot create message when the room is waiting for contact's answer"
+            )
+
+        msg = super().create(validated_data)
+        return msg
+
+
+class MessageSerializer(BaseMessageSerializer):
+    """Serializer for the messages endpoint"""
+
+    media = MessageMediaSimpleSerializer(many=True, required=False)
 
     class Meta:
         model = ChatMessage
