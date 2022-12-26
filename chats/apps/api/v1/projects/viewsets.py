@@ -82,6 +82,17 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
 
         return Response(flow_list, status.HTTP_200_OK)
 
+    @action(detail=True, methods=["GET"], url_name="flows")
+    def retrieve_flow_definitions(self, request, *args, **kwargs):
+        project = self.get_object()
+        flow_uuid = request.query_params.get("flow", "")
+
+        flow_definitions = FlowRESTClient().retrieve_flow_definitions(
+            project, flow_uuid=flow_uuid
+        )
+
+        return Response(flow_definitions, status.HTTP_200_OK)
+
     @action(detail=True, methods=["POST"], url_name="flows")
     def start_flow(self, request, *args, **kwargs):
         project = self.get_object()
