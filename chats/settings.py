@@ -301,6 +301,7 @@ if USE_SENTRY:
     sentry_sdk.init(
         dsn=env.str("SENTRY_DSN"),
         integrations=[DjangoIntegration()],
+        environment=env.str("ENVIRONMENT", default="develop"),
     )
 
 
@@ -311,6 +312,4 @@ OLD_MESSAGES_LIMIT = env.int(
 )  # Limits the messages shown when accessing an active chat
 
 
-PROMETHEUS_AUTH_TOKEN = env.str(
-    "PROMETHEUS_AUTH_TOKEN"
-)
+PROMETHEUS_AUTH_TOKEN = env.str("PROMETHEUS_AUTH_TOKEN")
