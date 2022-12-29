@@ -18,6 +18,8 @@ from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1 import permissions as api_permissions
 from chats.utils.websockets import send_channels_group
 
+from django.conf import settings 
+
 from django.db.models import Count, Avg, F, Sum, DateTimeField
 
 
@@ -60,6 +62,14 @@ class RoomViewset(
         """
         # Add send room notification to the channels group
         instance = self.get_object()
+        tags = request.data.get("tags", None)
+        instance.close(tags, "agent")
+        serialized_data = RoomSerializer(instance=instance)
+        instance.notify_queue("close", callback=True)
+
+        if not settings.ACTIVATE_CALC_METRICS:
+            return Response(serialized_data.data, status=status.HTTP_200_OK)
+
         messages_contact = Message.objects.filter(room=instance, contact__isnull=False)
         messages_agent = Message.objects.filter(room=instance, user__isnull=False)
 
@@ -79,10 +89,6 @@ class RoomViewset(
             metric_room.message_response_time = difference_time
             metric_room.save()
 
-        tags = request.data.get("tags", None)
-        instance.close(tags, "agent")
-        serialized_data = RoomSerializer(instance=instance)
-        instance.notify_queue("close", callback=True)
         return Response(serialized_data.data, status=status.HTTP_200_OK)
 
     def perform_create(self, serializer):
