@@ -19,7 +19,9 @@ ARG RUNTIME_DEPS="\
     curl \
     gosu \
     gettext \
-    postgresql-client"
+    postgresql-client \
+    ffmpeg \
+    libmagic1"
 
 ARG APP_PORT="8000"
 
