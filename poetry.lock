@@ -668,6 +668,14 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
 
 [[package]]
+name = "pydub"
+version = "0.25.1"
+description = "Manipulate audio with an simple and easy high level interface"
+category = "main"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "pyflakes"
 version = "2.4.0"
 description = "passive checker of Python programs"
@@ -762,6 +770,14 @@ python-versions = ">=3.7"
 
 [package.extras]
 cli = ["click (>=5.0)"]
+
+[[package]]
+name = "python-magic"
+version = "0.4.27"
+description = "File type identification using libmagic"
+category = "main"
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 
 [[package]]
 name = "pytz"
@@ -1023,7 +1039,7 @@ python-versions = ">=3.7"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "9dec0b22b97e890e379c02e6502bbf6fd27236729a98891cb3c915f552b15c86"
+content-hash = "0a0df864e86065ef2deb398b9e81edb3580b1ab71f32f9a5ca0ab6c1e8011d83"
 
 [metadata.files]
 anyio = []
@@ -1082,6 +1098,7 @@ psycopg2 = []
 py = []
 pycodestyle = []
 pycparser = []
+pydub = []
 pyflakes = []
 pymongo = []
 pyopenssl = []
@@ -1089,6 +1106,7 @@ pyparsing = []
 pytest = []
 python-dateutil = []
 python-dotenv = []
+python-magic = []
 pytz = []
 pytzdata = []
 pyyaml = []
