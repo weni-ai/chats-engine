@@ -1,4 +1,7 @@
-import json
+import magic
+import io
+
+from pydub import AudioSegment
 
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
@@ -59,6 +62,19 @@ class MessageMediaSerializer(serializers.ModelSerializer):
 
     def get_sender(self, media: MessageMedia):
         return media.message.get_sender().full_name
+
+    def create(self, validated_data):
+        media = validated_data["media_file"]
+        file_bytes = media.file.read()
+        file_type = magic.from_buffer(file_bytes)
+        if file_type in settings.UNPERMITTED_AUDIO_TYPES:
+            converted_bytes = io.BytesIO()
+            recording = AudioSegment.from_file(io.BytesIO(file_bytes), format=file_type)
+            recording.export(converted_bytes, format=settings.AUDIO_TYPE_TO_CONVERT)
+            media.file = converted_bytes
+
+        msg = super().create(validated_data)
+        return msg
 
 
 class MessageSerializer(serializers.ModelSerializer):

@@ -40,6 +40,8 @@ tzdata = "^2022.2"
 djangorestframework = "3.13.1"
 pendulum = "^2.1.2"
 prometheus-client = "^0.15.0"
+python-magic = "^0.4.27"
+pydub = "^0.25.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
