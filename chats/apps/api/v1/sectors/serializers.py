@@ -54,6 +54,7 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
             "work_start",
             "work_end",
             "is_deleted",
+            "can_trigger_flows",
         ]
         extra_kwargs = {field: {"required": False} for field in fields}
 
@@ -64,7 +65,7 @@ class SectorReadOnlyListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Sector
-        fields = ["uuid", "name", "agents", "contacts"]
+        fields = ["uuid", "name", "agents", "contacts", "can_trigger_flows"]
 
     def get_agents(self, sector: Sector):
         return sector.agent_count
@@ -83,6 +84,7 @@ class SectorReadOnlyRetrieveSerializer(serializers.ModelSerializer):
             "work_start",
             "work_end",
             "rooms_limit",
+            "can_trigger_flows",
         ]
 
 
