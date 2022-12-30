@@ -307,9 +307,11 @@ if USE_SENTRY:
 
 # Query Limiters
 
-OLD_MESSAGES_LIMIT = env.int(
-    "OLD_MESSAGES_LIMIT", default=10
-)  # Limits the messages shown when accessing an active chat
 
+PROMETHEUS_AUTH_TOKEN = env.str(
+    "PROMETHEUS_AUTH_TOKEN"
+)
 
-PROMETHEUS_AUTH_TOKEN = env.str("PROMETHEUS_AUTH_TOKEN")
+ACTIVATE_CALC_METRICS = env.bool(
+    "ACTIVATE_CALC_METRICS", default=True
+)
