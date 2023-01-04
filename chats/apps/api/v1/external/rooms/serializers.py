@@ -93,7 +93,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         contact_data = validated_data.pop("contact")
         contact_external_id = contact_data.pop("external_id")
         if contact_data.get("urn"):
-            validated_data["urn"] = contact_data.pop("urn")
+            validated_data["urn"] = contact_data.pop("urn").split("?")[0]
         contact, created = Contact.objects.update_or_create(
             external_id=contact_external_id, defaults=contact_data
         )
