@@ -85,18 +85,24 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
 
         if request.method == "POST":
             project_uuid = request.data.get("project")
-            instance = get_object_or_404(ProjectPermission, project__uuid=project_uuid, user=request.user)
+            instance = get_object_or_404(
+                ProjectPermission, project__uuid=project_uuid, user=request.user
+            )
             user_status = request.data.get("status")
 
             if user_status == "online":
-                instance.status = "online"
+                instance.status = "ONLINE"
                 instance.save()
             elif user_status == "offline":
-                instance.status = "offline"
+                instance.status = "OFFLINE"
                 instance.save()
 
         elif request.method == "GET":
             project_uuid = request.query_params.get("project")
-            instance = get_object_or_404(ProjectPermission, project__uuid=project_uuid, user=request.user)
+            instance = get_object_or_404(
+                ProjectPermission, project__uuid=project_uuid, user=request.user
+            )
 
-        return Response(dict(connection_status=instance.status), status=status.HTTP_200_OK)
+        return Response(
+            dict(connection_status=instance.status), status=status.HTTP_200_OK
+        )

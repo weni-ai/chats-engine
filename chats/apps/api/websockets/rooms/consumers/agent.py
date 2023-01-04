@@ -43,7 +43,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             await self.load_rooms()
             await self.load_queues()
             await self.load_user()
-            await self.set_user_status("online")
+            await self.set_user_status("ONLINE")
 
     async def disconnect(self, *args, **kwargs):
         try:
