@@ -61,6 +61,35 @@ class RoomViewset(
         """
         # Add send room notification to the channels group
         instance = self.get_object()
+        messages_contact = Message.objects.filter(room=instance, contact__isnull=False)
+        messages_agent = Message.objects.filter(room=instance, user__isnull=False)
+
+        time_message_contact = 0
+        time_message_agent = 0
+
+        if messages_contact and messages_agent:
+            for i in messages_contact:
+                time_message_contact += i.created_on.timestamp()
+
+            for i in messages_agent:
+                time_message_agent += i.created_on.timestamp()
+
+            difference_time = time_message_contact - time_message_agent
+            interation_time = (
+                Room.objects.filter(pk=instance.pk)
+                .aggregate(
+                    avg_time=Sum(
+                        F("ended_at") - F("created_on"),
+                    )
+                )["avg_time"]
+                .total_seconds()
+            )
+
+            metric_room = RoomMetrics.objects.get(room=instance)
+            metric_room.message_response_time = difference_time
+            metric_room.interaction_time = interation_time
+            metric_room.save()
+
         tags = request.data.get("tags", None)
         instance.close(tags, "agent")
         serialized_data = RoomSerializer(instance=instance)
@@ -114,7 +143,7 @@ class RoomViewset(
         if user:
             if instance.user is None:
                 time = timezone.now() - instance.modified_on
-                room_metrics = RoomMetrics.objects.get_or_create(
+                RoomMetrics.objects.get_or_create(
                     room=instance, waiting_time=time.total_seconds()
                 )
             else:
