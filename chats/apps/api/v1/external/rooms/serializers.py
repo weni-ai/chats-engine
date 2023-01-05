@@ -88,8 +88,8 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         created_on = validated_data.get("created_on", timezone.now().time())
         if sector.is_attending(created_on) is False:
             raise ValidationError(
-            {"detail": _("Contact cannot be done outside working hours")}
-        )
+                {"detail": _("Contact cannot be done outside working hours")}
+            )
 
         contact_data = validated_data.pop("contact")
         contact_external_id = contact_data.pop("external_id")

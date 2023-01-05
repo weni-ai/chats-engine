@@ -28,7 +28,7 @@ class RoomViewset(
     GenericViewSet,
 ):
     queryset = Room.objects.all()
-    serializer_class = RoomSerializer   
+    serializer_class = RoomSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = room_filters.RoomFilter
 
@@ -69,16 +69,20 @@ class RoomViewset(
         if messages_contact and messages_agent:
             for i in messages_contact:
                 time_message_contact += i.created_on.timestamp()
-            
+
             for i in messages_agent:
                 time_message_agent += i.created_on.timestamp()
 
             difference_time = time_message_contact - time_message_agent
-            interation_time = Room.objects.filter(pk=instance.pk).aggregate(
-                avg_time=Sum(
-                    F('ended_at') - F('created_on'),
-                    )       
-                )["avg_time"].total_seconds()
+            interation_time = (
+                Room.objects.filter(pk=instance.pk)
+                .aggregate(
+                    avg_time=Sum(
+                        F("ended_at") - F("created_on"),
+                    )
+                )["avg_time"]
+                .total_seconds()
+            )
 
             metric_room = RoomMetrics.objects.get(room=instance)
             metric_room.message_response_time = difference_time
@@ -116,16 +120,15 @@ class RoomViewset(
         if user:
             if instance.user is None:
                 time = timezone.now() - instance.modified_on
-                room_metrics = RoomMetrics.objects.get_or_create(
-                    room=instance, 
-                    waiting_time = time.total_seconds()
+                RoomMetrics.objects.get_or_create(
+                    room=instance, waiting_time=time.total_seconds()
                 )
             else:
                 _content = {"type": "user", "name": instance.user.first_name}
                 transfer_history.append(_content)
 
             if instance.metric:
-                instance.metric.queued_count+=1
+                instance.metric.queued_count += 1
                 instance.metric.save()
 
         if queue:

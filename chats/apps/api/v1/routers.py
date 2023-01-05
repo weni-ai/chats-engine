@@ -19,7 +19,12 @@ from chats.apps.api.v1.sectors.viewsets import (
     SectorTagsViewset,
     SectorViewset,
 )
-from chats.apps.api.v1.dashboard.viewsets import DashboardViewset
+from chats.apps.api.v1.dashboard.viewsets import (
+    DashboardLiveViewset,
+    DashboardTagViewset,
+    DashboardSectorViewset,
+    DashboardDateRangeViewset,
+)
 
 from chats.apps.api.v1.internal.queues.viewsets import (
     QueueInternalViewset,
@@ -93,13 +98,20 @@ router.register("contact", ContactViewset)
 router.register("sector", SectorViewset)
 router.register("tag", SectorTagsViewset)
 router.register("project", ProjectViewset)
-router.register("permission/project", ProjectPermissionViewset, basename="project_permission")
+router.register(
+    "permission/project", ProjectPermissionViewset, basename="project_permission"
+)
 router.register("queue", QueueViewset, basename="queue")
 router.register(
     "authorization/sector", SectorAuthorizationViewset, basename="sector_auth"
 )
 router.register("authorization/queue", QueueAuthorizationViewset, basename="queue_auth")
-router.register("dashboard", DashboardViewset, basename="dashboard")
+router.register("dashboard/live", DashboardLiveViewset, basename="dashboard_live")
+router.register("dashboard/tag", DashboardTagViewset, basename="dashboard_tag")
+router.register("dashboard/sector", DashboardSectorViewset, basename="dashboard_sector")
+router.register(
+    "dashboard/date_range", DashboardDateRangeViewset, basename="dashboard_date_range"
+)
 # Internal
 
 router.register(
