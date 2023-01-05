@@ -1,14 +1,14 @@
 from django.db.models import Q
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import mixins, pagination, parsers, viewsets, filters
+from rest_framework import mixins, pagination, parsers, viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 from chats.apps.api.v1.msgs.filters import MessageFilter, MessageMediaFilter
 from chats.apps.api.v1.msgs.serializers import (
     MessageMediaSerializer,
     MessageSerializer,
-    MessageWSSerializer,
 )
 from chats.apps.api.v1.msgs.permissions import MessagePermission, MessageMediaPermission
 from chats.apps.msgs.models import Message as ChatMessage
@@ -22,7 +22,7 @@ class MessageViewset(
     viewsets.GenericViewSet,
 ):
     queryset = ChatMessage.objects.all()
-    serializer_class = MessageWSSerializer
+    serializer_class = MessageSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = MessageFilter
     permission_classes = [IsAuthenticated, MessagePermission]
@@ -34,6 +34,7 @@ class MessageViewset(
         return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
+
         serializer.save()
         serializer.instance.notify_room("create", True)
 

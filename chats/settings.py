@@ -306,3 +306,14 @@ if USE_SENTRY:
 OLD_MESSAGES_LIMIT = env.int(
     "OLD_MESSAGES_LIMIT", default=10
 )  # Limits the messages shown when accessing an active chat
+
+
+PROMETHEUS_AUTH_TOKEN = env.str("PROMETHEUS_AUTH_TOKEN")
+
+AUDIO_TYPE_TO_CONVERT = env.str("AUDIO_TYPE_TO_CONVERT", default="mp3")
+UNPERMITTED_AUDIO_TYPES = env.list(
+    "UNPERMITTED_AUDIO_TYPES",
+    default=[
+        "WebM",
+    ],
+)
