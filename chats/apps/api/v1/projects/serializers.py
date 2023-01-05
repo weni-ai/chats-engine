@@ -19,3 +19,21 @@ class ProjectSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "timezone",
         ]
+
+
+class ProjectFlowContactSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    language = serializers.CharField(required=False, max_length=3)
+    urns = serializers.ListField(child=serializers.CharField(), max_length=100)
+    groups = serializers.ListField(
+        required=False, child=serializers.CharField(), max_length=100
+    )
+    fields = serializers.JSONField(
+        required=False,
+    )
+
+
+class ProjectFlowStartSerializer(serializers.Serializer):
+    groups = serializers.ListField(child=serializers.CharField(), max_length=100)
+    contacts = serializers.ListField(child=serializers.CharField(), max_length=100)
+    flow = serializers.CharField()

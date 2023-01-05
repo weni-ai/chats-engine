@@ -18,7 +18,9 @@ from chats.apps.api.v1.sectors.filters import (
 )
 from chats.apps.projects.models import Project
 from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
-from chats.apps.api.v1.internal.connect_rest_client import ConnectRESTClient
+from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
+    ConnectRESTClient,
+)
 from rest_framework.decorators import action
 
 

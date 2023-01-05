@@ -16,7 +16,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
     Agent side of the chat
     """
 
-    groups = []
+    added_groups = []
     user = None
 
     async def connect(self, *args, **kwargs):
@@ -47,7 +47,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
 
     async def disconnect(self, *args, **kwargs):
         try:
-            for group in set(self.groups):
+            for group in set(self.added_groups):
                 await self.channel_layer.group_discard(group, self.channel_name)
         except AssertionError:
             pass
@@ -86,7 +86,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
 
         group_name = f"{event['name']}_{event['id']}"
         try:
-            self.groups.remove(group_name)
+            self.added_groups.remove(group_name)
             await self.channel_layer.group_discard(group_name, self.channel_name)
         except (ValueError, AssertionError):
             pass
@@ -127,7 +127,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             return None
 
         await self.channel_layer.group_add(group_name, self.channel_name)
-        self.groups.append(group_name)
+        self.added_groups.append(group_name)
 
         if settings.DEBUG:
             await self.notify(
