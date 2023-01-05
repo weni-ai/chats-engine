@@ -17,7 +17,7 @@ from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1 import permissions as api_permissions
 from chats.utils.websockets import send_channels_group
 
-from django.conf import settings 
+from django.conf import settings
 
 from django.db.models import Count, Avg, F, Sum, DateTimeField
 
@@ -33,14 +33,14 @@ class RoomViewset(
     filter_backends = [DjangoFilterBackend]
     filterset_class = room_filters.RoomFilter
 
-    def get_permissions(self):
-        permission_classes = [permissions.IsAuthenticated]
-        if self.action != "list":
-            permission_classes = (
-                permissions.IsAuthenticated,
-                api_permissions.IsQueueAgent,
-            )
-        return [permission() for permission in permission_classes]
+    # def get_permissions(self):
+    #     permission_classes = [permissions.IsAuthenticated]
+    #     if self.action != "list":
+    #         permission_classes = (
+    #             permissions.IsAuthenticated,
+    #             api_permissions.IsQueueAgent,
+    #         )
+    #     return [permission() for permission in permission_classes]
 
     def get_queryset(self):
         if self.action != "list":
@@ -61,34 +61,6 @@ class RoomViewset(
         """
         # Add send room notification to the channels group
         instance = self.get_object()
-        messages_contact = Message.objects.filter(room=instance, contact__isnull=False)
-        messages_agent = Message.objects.filter(room=instance, user__isnull=False)
-
-        time_message_contact = 0
-        time_message_agent = 0
-
-        if messages_contact and messages_agent:
-            for i in messages_contact:
-                time_message_contact += i.created_on.timestamp()
-
-            for i in messages_agent:
-                time_message_agent += i.created_on.timestamp()
-
-            difference_time = time_message_contact - time_message_agent
-            interation_time = (
-                Room.objects.filter(pk=instance.pk)
-                .aggregate(
-                    avg_time=Sum(
-                        F("ended_at") - F("created_on"),
-                    )
-                )["avg_time"]
-                .total_seconds()
-            )
-
-            metric_room = RoomMetrics.objects.get(room=instance)
-            metric_room.message_response_time = difference_time
-            metric_room.interaction_time = interation_time
-            metric_room.save()
 
         tags = request.data.get("tags", None)
         instance.close(tags, "agent")
@@ -111,11 +83,21 @@ class RoomViewset(
             for i in messages_agent:
                 time_message_agent += i.created_on.timestamp()
 
-            difference_time = time_message_contact - time_message_agent
+        difference_time = time_message_contact - time_message_agent
+        interation_time = (
+            Room.objects.filter(pk=instance.pk)
+            .aggregate(
+                avg_time=Sum(
+                    F("ended_at") - F("created_on"),
+                )
+            )["avg_time"]
+            .total_seconds()
+        )
 
-            metric_room = RoomMetrics.objects.get(room=instance)
-            metric_room.message_response_time = difference_time
-            metric_room.save()
+        metric_room = RoomMetrics.objects.get(room=instance)
+        metric_room.message_response_time = difference_time
+        metric_room.interaction_time = interation_time
+        metric_room.save()
 
         return Response(serialized_data.data, status=status.HTTP_200_OK)
 
