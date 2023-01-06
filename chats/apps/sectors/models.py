@@ -1,4 +1,3 @@
-import email
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import get_user_model
@@ -9,9 +8,6 @@ from chats.utils.websockets import send_channels_group
 from django.db.models import F, Q
 
 import pendulum
-
-
-User = get_user_model()
 
 
 User = get_user_model()
