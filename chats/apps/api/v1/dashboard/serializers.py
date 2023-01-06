@@ -117,7 +117,6 @@ class DashboardAgentsSerializer(serializers.ModelSerializer):
             QueueAuthorization.objects.filter(
                 queue__sector__project=project,
                 queue__sector__project__permissions__status="ONLINE",
-                created_on__gte=initial_datetime,
             )
             .values("permission__user__first_name")
             .annotate(
@@ -150,16 +149,19 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
             Sector.objects.filter(project=project, created_on__gte=initial_datetime)
             .values("name")
             .annotate(
-                waiting_time=Sum("queues__rooms__metric__waiting_time"),
-                response_time=Sum("queues__rooms__metric__message_response_time"),
-                interact_time=Sum("queues__rooms__metric__interaction_time"),
-                # online_agents=(
-                #     Count(
-                #         "project__permissions__status",
-                #         filter=Q(project__permissions__status="ONLINE"),
-                #         distinct=True,
-                #     )
-                # ),
+                waiting_time=Sum("queues__rooms__metric__waiting_time")
+                / Count("queues__rooms__metric"),
+                response_time=Sum("queues__rooms__metric__message_response_time")
+                / Count("queues__rooms__metric"),
+                interact_time=Sum("queues__rooms__metric__interaction_time")
+                / Count("queues__rooms__metric"),
+                online_agents=(
+                    Count(
+                        "project__permissions__status",
+                        filter=Q(project__permissions__status="ONLINE"),
+                        distinct=True,
+                    )
+                ),
             )
         )
         return sector
