@@ -51,7 +51,7 @@ class Queue(BaseModel):
     @property
     def online_agents(self):
         return self.agents.filter(
-            project_permissions__status="online",
+            project_permissions__status="ONLINE",
             project_permissions__project=self.sector.project,
         )  # TODO: Set this variable to ProjectPermission.STATUS_ONLINE
 

@@ -90,11 +90,11 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
             )
             user_status = request.data.get("status")
 
-            if user_status == "online":
-                instance.status = "ONLINE"
+            if user_status.lower() == "online":
+                instance.status = ProjectPermission.STATUS_ONLINE
                 instance.save()
-            elif user_status == "offline":
-                instance.status = "OFFLINE"
+            elif user_status.lower() == "offline":
+                instance.status = ProjectPermission.STATUS_OFFLINE
                 instance.save()
 
         elif request.method == "GET":
