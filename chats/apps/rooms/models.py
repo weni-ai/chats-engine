@@ -97,6 +97,7 @@ class Room(BaseModel):
         """Validates is the last contact message was sent more than a day ago"""
         if not self.urn.startswith("whatsapp"):
             return True
+
         day_validation = self.messages.filter(
             created_on__gte=timezone.now() - timedelta(days=1),
             contact=self.contact,
