@@ -21,7 +21,7 @@ def check_flows_labels(labels: list) -> bool:
     Check if there is a label named like 'settings.CHATS_FLOWS_TAG' in the given list
     """
     for label in labels:
-        if {settings.CHATS_FLOWS_TAG} == label["name"]:
+        if settings.CHATS_FLOWS_TAG == label["name"]:
             return True
     return False
 
@@ -160,7 +160,7 @@ class FlowRESTClient(
         flows["results"] = [
             flow
             for flow in results
-            if flow["labels"] != [] and check_flows_labels(flows["labels"])
+            if flow["labels"] != [] and check_flows_labels(flow["labels"])
         ]
 
         return flows
