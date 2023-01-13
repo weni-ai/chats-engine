@@ -307,7 +307,6 @@ if USE_SENTRY:
 
 # Query Limiters
 
-
 PROMETHEUS_AUTH_TOKEN = env.str("PROMETHEUS_AUTH_TOKEN")
 
 ACTIVATE_CALC_METRICS = env.bool("ACTIVATE_CALC_METRICS", default=True)

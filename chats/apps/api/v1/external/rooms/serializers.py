@@ -97,6 +97,13 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         contact, created = Contact.objects.update_or_create(
             external_id=contact_external_id, defaults=contact_data
         )
+
+        if validated_data.get("custom_fields"):
+            custom_fields = validated_data.get("custom_fields")
+            if custom_fields.get("is_waiting"):
+                is_waiting = custom_fields.pop("is_waiting")
+                validated_data["is_waiting"] = is_waiting
+
         room = Room.objects.create(**validated_data, contact=contact, queue=queue)
         if room.user is None:
             available_agent = queue.available_agents.first()
