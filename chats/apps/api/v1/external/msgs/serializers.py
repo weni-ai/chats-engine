@@ -72,6 +72,9 @@ class MsgFlowSerializer(serializers.ModelSerializer):
             )
         if direction == "incoming":
             validated_data["contact"] = room.contact
+            if room.is_waiting:
+                room.is_waiting = False
+                room.save()
 
         msg = super().create(validated_data)
         media_list = [MessageMedia(**media_data, message=msg) for media_data in medias]
