@@ -75,6 +75,7 @@ class MsgFlowSerializer(serializers.ModelSerializer):
             if room.is_waiting:
                 room.is_waiting = False
                 room.save()
+                room.notify_room("update")
 
         msg = super().create(validated_data)
         media_list = [MessageMedia(**media_data, message=msg) for media_data in medias]
