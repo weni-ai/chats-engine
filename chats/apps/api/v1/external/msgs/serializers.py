@@ -72,7 +72,7 @@ class MsgFlowSerializer(serializers.ModelSerializer):
             )
         if direction == "incoming":
             validated_data["contact"] = room.contact
-            if room.is_waiting:
+            if room.get_is_waiting():
                 room.is_waiting = False
                 room.save()
                 room.notify_room("update")
