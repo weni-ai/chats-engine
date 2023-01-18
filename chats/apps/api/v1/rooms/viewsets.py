@@ -61,6 +61,7 @@ class RoomViewset(
         """
         # Add send room notification to the channels group
         instance = self.get_object()
+
         tags = request.data.get("tags", None)
         instance.close(tags, "agent")
         serialized_data = RoomSerializer(instance=instance)
@@ -87,6 +88,7 @@ class RoomViewset(
             time_message_contact = 0
 
         difference_time = time_message_agent - time_message_contact
+
         interation_time = (
             Room.objects.filter(pk=instance.pk)
             .aggregate(
