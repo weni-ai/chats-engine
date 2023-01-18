@@ -26,6 +26,7 @@ class RoomSerializer(serializers.ModelSerializer):
             "created_on",
             "ended_at",
             "custom_fields",
+            "get_is_waiting",
             "urn",
         ]
 
