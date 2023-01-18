@@ -20,10 +20,7 @@ from chats.apps.api.v1.sectors.viewsets import (
     SectorViewset,
 )
 from chats.apps.api.v1.dashboard.viewsets import (
-    DashboardLiveViewset,
-    DashboardTagViewset,
-    DashboardSectorViewset,
-    DashboardDateRangeViewset,
+    DashboardLiveViewset
 )
 
 from chats.apps.api.v1.internal.queues.viewsets import (
@@ -106,12 +103,8 @@ router.register(
     "authorization/sector", SectorAuthorizationViewset, basename="sector_auth"
 )
 router.register("authorization/queue", QueueAuthorizationViewset, basename="queue_auth")
-router.register("dashboard/live", DashboardLiveViewset, basename="dashboard_live")
-router.register("dashboard/tag", DashboardTagViewset, basename="dashboard_tag")
-router.register("dashboard/sector", DashboardSectorViewset, basename="dashboard_sector")
-router.register(
-    "dashboard/date_range", DashboardDateRangeViewset, basename="dashboard_date_range"
-)
+router.register("dashboard", DashboardLiveViewset, basename="dashboard")
+
 # Internal
 
 router.register(

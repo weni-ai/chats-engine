@@ -70,20 +70,25 @@ class RoomViewset(
         if not settings.ACTIVATE_CALC_METRICS:
             return Response(serialized_data.data, status=status.HTTP_200_OK)
 
-        messages_contact = Message.objects.filter(room=instance, contact__isnull=False)
-        messages_agent = Message.objects.filter(room=instance, user__isnull=False)
+        messages_contact = Message.objects.filter(
+            room=instance, contact__isnull=False
+        ).first()
+        messages_agent = Message.objects.filter(
+            room=instance, user__isnull=False
+        ).first()
 
         time_message_contact = 0
         time_message_agent = 0
 
-        if messages_contact and messages_agent:
-            for i in messages_contact:
-                time_message_contact += i.created_on.timestamp()
+        if messages_agent and messages_contact:
+            time_message_agent = messages_agent.created_on.timestamp()
+            time_message_contact = messages_contact.created_on.timestamp()
+        else:
+            time_message_agent = 0
+            time_message_contact = 0
 
-            for i in messages_agent:
-                time_message_agent += i.created_on.timestamp()
+        difference_time = time_message_agent - time_message_contact
 
-        difference_time = time_message_contact - time_message_agent
         interation_time = (
             Room.objects.filter(pk=instance.pk)
             .aggregate(
