@@ -19,9 +19,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
     lookup_field = "uuid"
     queryset = Project.objects.all()
 
-    # def get_permissions(self):
-    #     permission_classes = [permissions.IsAuthenticated, IsSectorManager]
-    #     return [permission() for permission in permission_classes]
+    def get_permissions(self):
+        permission_classes = [permissions.IsAuthenticated, IsSectorManager]
+        return [permission() for permission in permission_classes]
 
     @action(
         detail=True,
@@ -72,12 +72,3 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             context=filters,
         )
         return Response(serialized_data.data, status.HTTP_200_OK)
-        # try:
-        #     filters = request.query_params
-        #     project = Project.objects.get(pk=request.query_params["project"])
-        #     serialized_data = DashboardSectorSerializer(
-        #         instance=project.pk, context=filters
-        #     )
-        #     return Response(serialized_data.data, status.HTTP_200_OK)
-        # except AttributeError:
-        #     raise ValidationError({"detail": _("Project UUID not provided.")})

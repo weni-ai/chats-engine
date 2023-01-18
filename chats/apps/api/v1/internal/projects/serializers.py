@@ -71,7 +71,7 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
             QueueAuthorization.objects.create(
                 role=1, permission=permission, queue=queue
             )
-            SectorTag.objects.create(name="Atendimento encerado", sector=sector)
+            SectorTag.objects.create(name="Atendimento encerrado", sector=sector)
             connect_client = ConnectRESTClient()
             response_sector = connect_client.create_ticketer(
                 project_uuid=str(instance.uuid),
