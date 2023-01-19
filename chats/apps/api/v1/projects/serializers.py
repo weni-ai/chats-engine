@@ -2,7 +2,7 @@ from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
-from chats.apps.projects.models import Project
+from chats.apps.projects.models import Project, ContactUser
 from timezone_field.rest_framework import TimeZoneSerializerField
 
 
@@ -19,6 +19,12 @@ class ProjectSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "timezone",
         ]
+
+
+class ContactUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ContactUser
+        fields = "__all__"
 
 
 class ProjectFlowContactSerializer(serializers.Serializer):

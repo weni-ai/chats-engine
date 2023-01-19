@@ -12,8 +12,11 @@ from chats.apps.api.v1.projects.serializers import (
 from chats.apps.api.v1.internal.projects.serializers import (
     ProjectPermissionReadSerializer,
     CheckAccessReadSerializer,
+    ContactUserSerializer,
 )
 from chats.apps.projects.models import Project, ProjectPermission
+
+from chats.apps.contacts.models import Contact
 
 from chats.apps.api.v1.permissions import (
     IsProjectAdmin,
@@ -32,6 +35,26 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         ProjectAnyPermission,
     ]
     lookup_field = "uuid"
+
+    @action(detail=True, methods=["POST"], url_name="create_contactuser")
+    def create_contactuser(self, request, *args, **kwargs):
+        project = self.get_object()
+        contact = Contact.objects.get(pk=request.GET["contact"])
+        permission = project.permissions.get(user=request.user)
+        contactuser, created = project.contactusers.get_or_create(
+            user=permission, contact=contact
+        )
+        serializer = ContactUserSerializer(instance=contactuser)
+
+        return Response(serializer.data, status.HTTP_200_OK)
+
+    @action(detail=True, methods=["DELETE"], url_name="delete_contactuser")
+    def delete_contactuser(self, request, *args, **kwargs):
+        project = self.get_object()
+        contactuser = project.contactusers.get(pk=request.GET["contact_user"])
+        contactuser.delete()
+
+        return Response({"deleted": True}, status.HTTP_200_OK)
 
     @action(detail=True, methods=["GET"], url_name="can_trigger_flows")
     def can_trigger_flows(self, request, *args, **kwargs):
