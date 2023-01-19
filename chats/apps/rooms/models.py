@@ -92,6 +92,14 @@ class Room(BaseModel):
     def get_permission(self, user):
         return self.queue.get_permission(user)
 
+    def get_is_waiting(self):
+        """If the room does not have any contact message, then it is waiting"""
+        return (
+            self.is_waiting
+            if self.is_waiting
+            else not self.messages.filter(contact__isnull=False).exists()
+        )
+
     @property
     def is_24h_valid(self) -> bool:
         """Validates is the last contact message was sent more than a day ago"""
