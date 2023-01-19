@@ -6,8 +6,10 @@ from timezone_field.rest_framework import TimeZoneSerializerField
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.api.v1.internal.users.serializers import UserSerializer
 
-from chats.apps.api.v1.internal.connect_rest_client import ConnectRESTClient
-from chats.apps.api.v1.internal.flows_rest_client import FlowRESTClient
+from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
+    ConnectRESTClient,
+)
+from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from django.contrib.auth import get_user_model
 from chats.apps.queues.models import QueueAuthorization
 from chats.apps.sectors.models import SectorAuthorization, SectorTag
@@ -69,7 +71,7 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
             QueueAuthorization.objects.create(
                 role=1, permission=permission, queue=queue
             )
-            SectorTag.objects.create(name="Atendimento encerado", sector=sector)
+            SectorTag.objects.create(name="Atendimento encerrado", sector=sector)
             connect_client = ConnectRESTClient()
             response_sector = connect_client.create_ticketer(
                 project_uuid=str(instance.uuid),

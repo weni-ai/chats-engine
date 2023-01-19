@@ -147,3 +147,7 @@ class MessageMedia(BaseModel):
                 ),
                 headers={"content-type": "application/json"},
             )
+
+    def notify_room(self, *args, **kwargs):
+        """ """
+        self.message.notify_room(*args, **kwargs)

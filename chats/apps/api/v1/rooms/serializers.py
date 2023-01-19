@@ -17,6 +17,7 @@ class RoomSerializer(serializers.ModelSerializer):
     tags = DetailSectorTagSerializer(many=True, read_only=True)
     unread_msgs = serializers.SerializerMethodField()
     last_message = serializers.SerializerMethodField()
+    is_waiting = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -25,7 +26,11 @@ class RoomSerializer(serializers.ModelSerializer):
             "created_on",
             "ended_at",
             "custom_fields",
+            "urn",
         ]
+
+    def get_is_waiting(self, room: Room):
+        return room.get_is_waiting()
 
     def get_unread_msgs(self, room: Room):
         return room.messages.filter(seen=False).count()
@@ -70,6 +75,7 @@ class TransferRoomSerializer(serializers.ModelSerializer):
             "transfer_history",
             "tags",
             "ended_by",
+            "urn",
         ]
 
         extra_kwargs = {
@@ -83,6 +89,7 @@ class RoomContactSerializer(serializers.ModelSerializer):
     user = UserSerializer(many=False, read_only=True)
     queue = QueueSerializer(many=False, read_only=True)
     tags = DetailSectorTagSerializer(many=True, read_only=True)
+    is_waiting = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -93,4 +100,9 @@ class RoomContactSerializer(serializers.ModelSerializer):
             "created_on",
             "ended_at",
             "custom_fields",
+            "urn",
+            "is_waiting",
         ]
+
+    def get_is_waiting(self, room: Room):
+        return room.get_is_waiting()

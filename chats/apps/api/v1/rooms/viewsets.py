@@ -1,19 +1,25 @@
 import json
 
 from django.utils.translation import gettext_lazy as _
+from django.utils import timezone
 from rest_framework import mixins, permissions, status
 from rest_framework.decorators import action
 from django_filters.rest_framework import DjangoFilterBackend
 
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
-from rest_framework.exceptions import ValidationError
 
 from chats.apps.api.v1.rooms.serializers import RoomSerializer, TransferRoomSerializer
+from chats.apps.dashboard.models import RoomMetrics
+from chats.apps.msgs.models import Message
 from chats.apps.rooms.models import Room
 from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1 import permissions as api_permissions
 from chats.utils.websockets import send_channels_group
+
+from django.conf import settings 
+
+from django.db.models import Count, Avg, F, Sum, DateTimeField
 
 
 class RoomViewset(
@@ -59,6 +65,29 @@ class RoomViewset(
         instance.close(tags, "agent")
         serialized_data = RoomSerializer(instance=instance)
         instance.notify_queue("close", callback=True)
+
+        if not settings.ACTIVATE_CALC_METRICS:
+            return Response(serialized_data.data, status=status.HTTP_200_OK)
+
+        messages_contact = Message.objects.filter(room=instance, contact__isnull=False)
+        messages_agent = Message.objects.filter(room=instance, user__isnull=False)
+
+        time_message_contact = 0
+        time_message_agent = 0
+
+        if messages_contact and messages_agent:
+            for i in messages_contact:
+                time_message_contact += i.created_on.timestamp()
+
+            for i in messages_agent:
+                time_message_agent += i.created_on.timestamp()
+
+            difference_time = time_message_contact - time_message_agent
+
+            metric_room = RoomMetrics.objects.get(room=instance)
+            metric_room.message_response_time = difference_time
+            metric_room.save()
+
         return Response(serialized_data.data, status=status.HTTP_200_OK)
 
     def perform_create(self, serializer):
@@ -70,7 +99,6 @@ class RoomViewset(
         instance = self.get_object()
         transfer_history = instance.transfer_history or []
 
-        old_user = instance.user
         old_queue = instance.queue
 
         user = self.request.data.get("user_email")
@@ -84,10 +112,21 @@ class RoomViewset(
 
         # Create transfer object based on whether it's a user or a queue transfer and add it to the history
         if user:
-            _content = {"type": "user", "name": instance.user.first_name}
-            transfer_history.append(_content)
+            if instance.user is None:
+                time = timezone.now() - instance.modified_on
+                room_metrics = RoomMetrics.objects.get_or_create(
+                    room=instance, waiting_time=time.total_seconds()
+                )
+            else:
+                _content = {"type": "user", "name": instance.user.first_name}
+                transfer_history.append(_content)
+
+            if instance.metric:
+                instance.metric.queued_count += 1
+                instance.metric.save()
 
         if queue:
+            # Create constraint to make queue not none
             _content = {"type": "queue", "name": instance.queue.name}
             transfer_history.append(_content)
             if (

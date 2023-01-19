@@ -24,6 +24,13 @@ class Sector(BaseModel):
     rooms_limit = models.PositiveIntegerField(_("Rooms limit per employee"))
     work_start = models.TimeField(_("work start"), auto_now=False, auto_now_add=False)
     work_end = models.TimeField(_("work end"), auto_now=False, auto_now_add=False)
+    can_trigger_flows = models.BooleanField(
+        _("Can trigger flows?"),
+        help_text=_(
+            "Is it possible to trigger flows(weni flows integration) from this sector?"
+        ),
+        default=False,
+    )
     is_deleted = models.BooleanField(_("is deleted?"), default=False)
 
     class Meta:
