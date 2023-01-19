@@ -207,3 +207,31 @@ class ProjectPermission(
             )
             return max(limits)
         return 0  # If the user is not an agent, it won't be possible to receive rooms automatically
+
+
+class ContactUser(models.Model):
+    user = models.ForeignKey(
+        ProjectPermission,
+        verbose_name=_("User"),
+        related_name="contacts",
+        on_delete=models.CASCADE,
+    )
+    contact = models.ForeignKey(
+        "contact.Contact",
+        verbose_name=_("Contact"),
+        related_name="users",
+        on_delete=models.CASCADE,
+    )
+    project = models.ForeignKey(
+        Project,
+        verbose_name=_("project"),
+        related_name="contactusers",
+        on_delete=models.CASCADE,
+    )
+
+    class Meta:
+        verbose_name = _("Contact User")
+        verbose_name_plural = _("Contact Users")
+
+    def __str__(self):
+        return self.project.name
