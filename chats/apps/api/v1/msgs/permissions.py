@@ -11,11 +11,14 @@ class MessagePermission(permissions.BasePermission):
             room_uuid = request.data.get("room") or request.query_params.get("room")
             try:
                 room = Room.objects.get(uuid=room_uuid)
-                return (room.user == user) or (room.user is None)
+                if room.user == user:
+                    return True
+                project = room.queue.sector.project
+                permission = user.project_permissions.get(project=project)
             except Room.DoesNotExist:
                 project_uuid = request.query_params.get("project")
                 permission = user.project_permissions.get(project__uuid=project_uuid)
-                return permission.role > 0
+            return permission.role > 0
 
         return super().has_permission(request, view)
 

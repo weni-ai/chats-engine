@@ -102,6 +102,15 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 }
             )
 
+    async def list_groups(self, event):
+        await self.notify(
+            {
+                "type": "notify",
+                "action": "groups",
+                "content": {"groups": self.added_groups},
+            }
+        )
+
     async def join(self, event):
         if event.get("content"):
             event = json.loads(event.get("content"))
@@ -113,8 +122,19 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             project_uuid=self.project,
             user_permission=self.permission,
         )
-
-        if await validator.validate() is False:
+        try:
+            if await validator.validate() is False:
+                await self.notify(
+                    {
+                        "type": "notify",
+                        "action": "group.join",
+                        "content": json.dumps(
+                            {"msg": f"Access denied on the group: {group_name}"}
+                        ),
+                    }
+                )
+                return None
+        except ObjectDoesNotExist:
             await self.notify(
                 {
                     "type": "notify",
