@@ -37,7 +37,7 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
     ]
     lookup_field = "uuid"
 
-    @action(detail=True, methods=["POST"], url_name="retrieve_contactuser")
+    @action(detail=True, methods=["GET"], url_name="retrieve_contactuser")
     def get_contactuser(self, request, *args, **kwargs):
         project = self.get_object()
         contact = Contact.objects.get(pk=request.GET["contact"])
