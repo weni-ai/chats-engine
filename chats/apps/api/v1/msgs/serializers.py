@@ -39,7 +39,10 @@ class MessageMediaSimpleSerializer(serializers.ModelSerializer):
         return media.url
 
     def get_sender(self, media: MessageMedia):
-        return media.message.get_sender().full_name
+        try:
+            return media.message.get_sender().full_name
+        except AttributeError:
+            return ""
 
 
 class MessageMediaSerializer(serializers.ModelSerializer):
@@ -153,7 +156,10 @@ class MessageAndMediaSerializer(serializers.ModelSerializer):
         return media.url
 
     def get_sender(self, media: MessageMedia):
-        return media.message.get_sender().full_name
+        try:
+            return media.message.get_sender().full_name
+        except AttributeError:
+            return ""
 
     def create(self, validated_data):
         message = validated_data.pop("message")
