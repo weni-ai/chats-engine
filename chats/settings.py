@@ -318,3 +318,5 @@ UNPERMITTED_AUDIO_TYPES = env.list(
         "WebM",
     ],
 )
+
+CHATS_FLOWS_TAG = env.str("CHATS_FLOWS_TAG", default="chats")

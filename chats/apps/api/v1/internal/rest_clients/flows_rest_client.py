@@ -16,6 +16,16 @@ def get_cursor(url):
     return cursor
 
 
+def check_flows_labels(labels: list) -> bool:
+    """
+    Check if there is a label named like 'settings.CHATS_FLOWS_TAG' in the given list
+    """
+    for label in labels:
+        if settings.CHATS_FLOWS_TAG == label["name"]:
+            return True
+    return False
+
+
 def retry_request_and_refresh_flows_auth_token(
     project,
     request_method: Callable,
@@ -146,6 +156,12 @@ class FlowRESTClient(
         flows = response.json()
         flows["next"] = get_cursor(flows.get("next") or "")
         flows["previous"] = get_cursor(flows.get("previous") or "")
+        results = flows["results"]
+        flows["results"] = [
+            flow
+            for flow in results
+            if flow["labels"] != [] and check_flows_labels(flow["labels"])
+        ]
         return flows
 
     def retrieve_flow_definitions(self, project, flow_uuid):

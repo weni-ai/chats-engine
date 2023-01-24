@@ -65,11 +65,13 @@ class Project(BaseModel):
             user_permission is not None
             and user_permission.role == ProjectPermission.ROLE_ADMIN
         ):  # Admin role
-            return self.sectors.all()
+            sectors = self.sectors.all()
         else:
-            return self.sectors.filter(
-                authorizations__permission=user_permission, **custom_filters
-            )  # If the user have any permission on the sectors
+            custom_filters[
+                "authorizations__permission"
+            ] = user_permission  # If the user have any permission on the sectors
+
+        return sectors.filter(**custom_filters)
 
 
 class ProjectPermission(
