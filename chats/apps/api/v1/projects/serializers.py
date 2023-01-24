@@ -22,9 +22,14 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 
 class ContactUserSerializer(serializers.ModelSerializer):
+    user_email = serializers.SerializerMethodField()
+
     class Meta:
         model = ContactUser
         fields = "__all__"
+
+    def get_user(self, contactuser: ContactUser):
+        return contactuser.user.full_name
 
 
 class ProjectFlowContactSerializer(serializers.Serializer):

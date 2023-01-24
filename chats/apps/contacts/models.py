@@ -1,7 +1,9 @@
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from chats.core.models import BaseModel
+
 
 Q = models.Q
 
@@ -29,6 +31,13 @@ class Contact(BaseModel):
 
     def __str__(self):
         return self.email
+
+    def get_linked_user(self, project):
+        try:
+            linked_user = self.users.get(is_active=True, project=project)
+            return linked_user.user
+        except ObjectDoesNotExist:
+            return None
 
     @property
     def full_name(self):

@@ -217,7 +217,7 @@ class ContactUser(models.Model):
         on_delete=models.CASCADE,
     )
     contact = models.ForeignKey(
-        "contact.Contact",
+        "contacts.Contact",
         verbose_name=_("Contact"),
         related_name="users",
         on_delete=models.CASCADE,

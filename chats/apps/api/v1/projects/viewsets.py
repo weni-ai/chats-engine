@@ -1,5 +1,6 @@
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
+from django.core.exceptions import ObjectDoesNotExist
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -8,11 +9,11 @@ from chats.apps.api.v1.projects.serializers import (
     ProjectSerializer,
     ProjectFlowStartSerializer,
     ProjectFlowContactSerializer,
+    ContactUserSerializer,
 )
 from chats.apps.api.v1.internal.projects.serializers import (
     ProjectPermissionReadSerializer,
     CheckAccessReadSerializer,
-    ContactUserSerializer,
 )
 from chats.apps.projects.models import Project, ProjectPermission
 
@@ -36,14 +37,27 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
     ]
     lookup_field = "uuid"
 
+    @action(detail=True, methods=["POST"], url_name="retrieve_contactuser")
+    def get_contactuser(self, request, *args, **kwargs):
+        project = self.get_object()
+        contact = Contact.objects.get(pk=request.GET["contact"])
+        try:
+            contactuser = project.contactusers.get(contact=contact)
+        except ObjectDoesNotExist:
+            contactuser = project.contactusers.none()
+        serializer = ContactUserSerializer(instance=contactuser)
+
+        return Response(serializer.data, status.HTTP_200_OK)
+
     @action(detail=True, methods=["POST"], url_name="create_contactuser")
     def create_contactuser(self, request, *args, **kwargs):
         project = self.get_object()
         contact = Contact.objects.get(pk=request.GET["contact"])
         permission = project.permissions.get(user=request.user)
-        contactuser, created = project.contactusers.get_or_create(
+        contactuser, _created = project.contactusers.get_or_create(
             user=permission, contact=contact
-        )
+        )  # Add validation if the instance already exists, return error
+
         serializer = ContactUserSerializer(instance=contactuser)
 
         return Response(serializer.data, status.HTTP_200_OK)
