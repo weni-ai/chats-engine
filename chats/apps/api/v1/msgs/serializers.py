@@ -32,38 +32,16 @@ class MessageMediaSimpleSerializer(serializers.ModelSerializer):
 
         extra_kwargs = {
             "media_file": {"write_only": True},
-            "message": {"read_only": True, "required": False},
         }
 
     def get_url(self, media: MessageMedia):
         return media.url
 
     def get_sender(self, media: MessageMedia):
-        return media.message.get_sender().full_name
-
-
-class MessageMediaSimpleSerializer(serializers.ModelSerializer):
-    url = serializers.SerializerMethodField(read_only=True)
-
-    class Meta:
-        model = MessageMedia
-        fields = [
-            "content_type",
-            "message",
-            "media_file",
-            "url",
-            "created_on",
-        ]
-
-        extra_kwargs = {
-            "media_file": {"write_only": True},
-        }
-
-    def get_url(self, media: MessageMedia):
-        return media.url
-
-    def get_sender(self, media: MessageMedia):
-        return media.message.get_sender().full_name
+        try:
+            return media.message.get_sender().full_name
+        except AttributeError:
+            return ""
 
 
 class MessageMediaSerializer(serializers.ModelSerializer):
@@ -89,7 +67,10 @@ class MessageMediaSerializer(serializers.ModelSerializer):
         return media.url
 
     def get_sender(self, media: MessageMedia):
-        return media.message.get_sender().full_name
+        try:
+            return media.message.get_sender().full_name
+        except AttributeError:
+            return ""
 
     def create(self, validated_data):
         media = validated_data["media_file"]
@@ -174,7 +155,10 @@ class MessageAndMediaSerializer(serializers.ModelSerializer):
         return media.url
 
     def get_sender(self, media: MessageMedia):
-        return media.message.get_sender().full_name
+        try:
+            return media.message.get_sender().full_name
+        except AttributeError:
+            return ""
 
     def create(self, validated_data):
         message = validated_data.pop("message")
