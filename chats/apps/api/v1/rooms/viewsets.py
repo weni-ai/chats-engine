@@ -70,12 +70,16 @@ class RoomViewset(
         if not settings.ACTIVATE_CALC_METRICS:
             return Response(serialized_data.data, status=status.HTTP_200_OK)
 
-        messages_contact = Message.objects.filter(
-            room=instance, contact__isnull=False
-        ).first()
-        messages_agent = Message.objects.filter(
-            room=instance, user__isnull=False
-        ).first()
+        messages_contact = (
+            Message.objects.filter(room=instance, contact__isnull=False)
+            .order_by("created_on")
+            .first()
+        )
+        messages_agent = (
+            Message.objects.filter(room=instance, user__isnull=False)
+            .order_by("created_on")
+            .first()
+        )
 
         time_message_contact = 0
         time_message_agent = 0

@@ -173,7 +173,6 @@ class DashboardAgentsSerializer(serializers.Serializer):
             ]
         else:
             rooms_filter["user__rooms__created_on__gte"] = initial_datetime
-            rooms_filter["user__rooms__is_active"] = True
             permission_filter["status"] = "ONLINE"
         if self.context.get("sector"):
             rooms_filter["user__rooms__queue__sector"] = self.context.get("sector")

@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from chats.apps.api.v1.permissions import IsSectorManager
+from chats.apps.api.v1.permissions import HasDashboardAccess
 
 from chats.apps.projects.models import Project
 from rest_framework.exceptions import ValidationError
@@ -19,9 +19,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
     lookup_field = "uuid"
     queryset = Project.objects.all()
 
-    # def get_permissions(self):
-    #     permission_classes = [permissions.IsAuthenticated, IsSectorManager]
-    #     return [permission() for permission in permission_classes]
+    def get_permissions(self):
+        permission_classes = [permissions.IsAuthenticated, HasDashboardAccess]
+        return [permission() for permission in permission_classes]
 
     @action(
         detail=True,
