@@ -214,7 +214,9 @@ class LinkContact(models.Model):
         "accounts.User",
         verbose_name=_("User"),
         related_name="linked_contacts",
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
     )
     contact = models.ForeignKey(
         "contacts.Contact",
@@ -232,6 +234,11 @@ class LinkContact(models.Model):
     class Meta:
         verbose_name = _("Linked Contact")
         verbose_name_plural = _("Linked Contacts")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["contact", "project"], name="unique_link_contact_per_project"
+            )
+        ]
 
     def __str__(self):
         return self.project.name

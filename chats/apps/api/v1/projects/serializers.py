@@ -28,8 +28,11 @@ class LinkContactSerializer(serializers.ModelSerializer):
         model = LinkContact
         fields = "__all__"
 
-    def get_user_email(self, linked_contact: LinkContact):
-        return linked_contact.user.email
+    def get_user_email(self, linked_contact: LinkContact) -> str:
+        try:
+            return linked_contact.user.email
+        except AttributeError:
+            return ""
 
 
 class ProjectFlowContactSerializer(serializers.Serializer):
