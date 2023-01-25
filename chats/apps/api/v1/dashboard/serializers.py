@@ -249,7 +249,6 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
                 filter=Q(**online_agents_filter),
                 distinct=True,
             )
-        print(online_agents)
         results = (
             model.objects.filter(**model_filter)
             .values("name")
