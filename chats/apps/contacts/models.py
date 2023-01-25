@@ -34,7 +34,7 @@ class Contact(BaseModel):
 
     def get_linked_user(self, project):
         try:
-            linked_user = self.users.get(is_active=True, project=project)
+            linked_user = self.linked_users.get(is_active=True, project=project)
             return linked_user.user
         except ObjectDoesNotExist:
             return None

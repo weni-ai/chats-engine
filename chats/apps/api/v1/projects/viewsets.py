@@ -9,7 +9,7 @@ from chats.apps.api.v1.projects.serializers import (
     ProjectSerializer,
     ProjectFlowStartSerializer,
     ProjectFlowContactSerializer,
-    ContactUserSerializer,
+    LinkContactSerializer,
 )
 from chats.apps.api.v1.internal.projects.serializers import (
     ProjectPermissionReadSerializer,
@@ -42,10 +42,10 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         project = self.get_object()
         contact = Contact.objects.get(pk=request.GET["contact"])
         try:
-            contactuser = project.contactusers.get(contact=contact)
+            contactuser = project.linked_contacts.get(contact=contact)
         except ObjectDoesNotExist:
-            contactuser = project.contactusers.none()
-        serializer = ContactUserSerializer(instance=contactuser)
+            contactuser = project.linked_contacts.none()
+        serializer = LinkContactSerializer(instance=contactuser)
 
         return Response(serializer.data, status.HTTP_200_OK)
 
@@ -54,18 +54,18 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         project = self.get_object()
         contact = Contact.objects.get(pk=request.GET["contact"])
         permission = project.permissions.get(user=request.user)
-        contactuser, _created = project.contactusers.get_or_create(
+        contactuser, _created = project.linked_contacts.get_or_create(
             user=permission, contact=contact
         )  # Add validation if the instance already exists, return error
 
-        serializer = ContactUserSerializer(instance=contactuser)
+        serializer = LinkContactSerializer(instance=contactuser)
 
         return Response(serializer.data, status.HTTP_200_OK)
 
     @action(detail=True, methods=["DELETE"], url_name="delete_contactuser")
     def delete_contactuser(self, request, *args, **kwargs):
         project = self.get_object()
-        contactuser = project.contactusers.get(pk=request.GET["contact_user"])
+        contactuser = project.linked_contacts.get(pk=request.GET["contact_user"])
         contactuser.delete()
 
         return Response({"deleted": True}, status.HTTP_200_OK)

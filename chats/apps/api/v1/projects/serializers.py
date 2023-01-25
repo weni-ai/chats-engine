@@ -2,7 +2,7 @@ from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
-from chats.apps.projects.models import Project, ContactUser
+from chats.apps.projects.models import Project, LinkContact
 from timezone_field.rest_framework import TimeZoneSerializerField
 
 
@@ -21,15 +21,15 @@ class ProjectSerializer(serializers.ModelSerializer):
         ]
 
 
-class ContactUserSerializer(serializers.ModelSerializer):
+class LinkContactSerializer(serializers.ModelSerializer):
     user_email = serializers.SerializerMethodField()
 
     class Meta:
-        model = ContactUser
+        model = LinkContact
         fields = "__all__"
 
-    def get_user(self, contactuser: ContactUser):
-        return contactuser.user.full_name
+    def get_user_email(self, linked_contact: LinkContact):
+        return linked_contact.user.email
 
 
 class ProjectFlowContactSerializer(serializers.Serializer):
