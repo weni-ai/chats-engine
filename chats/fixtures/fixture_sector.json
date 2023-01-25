@@ -26,6 +26,20 @@
 },
 {
     "model": "sectors.sector",
+    "pk": "4f88b656-194d-4a83-a166-5d84ba825b8d",
+    "fields": {
+        "created_on": "2022-08-24T20:58:36.420Z",
+        "modified_on": "2022-09-05T21:10:24.340Z",
+        "name": "Inteligencia",
+        "project": "34a93b52-231e-11ed-861d-0242ac120002",
+        "rooms_limit": 3,
+        "work_start": "09:00:00",
+        "work_end": "17:00:00",
+        "is_deleted": false
+    }
+},
+{
+    "model": "sectors.sector",
     "pk": "d3cae43d-cf25-4892-bfa6-0f24a856cfb8",
     "fields": {
         "created_on": "2022-08-24T21:00:16.351Z",
@@ -163,6 +177,16 @@
     }
 },
 {
+    "model": "queues.queue",
+    "pk": "f341417b-5143-4469-a99d-f141a0676bd4",
+    "fields": {
+        "created_on": "2022-08-24T21:40:24.240Z",
+        "modified_on": "2022-08-24T21:40:24.240Z",
+        "sector": "4f88b656-194d-4a83-a166-5d84ba825b8d",
+        "name": "FRONTEND"
+    }
+},
+{
     "model": "queues.queueauthorization",
     "pk": "3717f056-7ea5-4d38-80f5-ba907132807c",
     "fields": {
@@ -171,6 +195,60 @@
         "queue": "f2519480-7e58-4fc4-9894-9ab1769e29cf",
         "role": 1,
         "permission": "e416fd45-2896-43a5-bd7a-5067f03c77fa"
+    }
+},
+{
+    "model": "contacts.contact",
+    "pk": "e0dd0853-8192-4ccd-808d-d4b0b32cdee3",
+    "fields": {
+        "created_on": "2022-09-02T20:59:37.159Z",
+        "modified_on": "2022-09-03T00:20:09.547Z",
+        "external_id": "e3955fd5-5705-40cd-b480-b45594b70282",
+        "name": "Foo Bar",
+        "email": "FooBar@weni.ai",
+        "status": "",
+        "phone": "+250788123123",
+        "custom_fields": {}
+    }
+},
+{
+    "model": "rooms.room",
+    "pk": "090da6d1-959e-4dea-994a-41bf0d38ba26",
+    "fields": {
+        "created_on": "2022-09-03T00:20:09.559Z",
+        "modified_on": "2022-09-04T18:16:00.031Z",
+        "user": "amywong@chats.weni.ai",
+        "contact": "e0dd0853-8192-4ccd-808d-d4b0b32cdee3",
+        "queue": "f2519480-7e58-4fc4-9894-9ab1769e29cf",
+        "custom_fields": {
+            "mood": "angry",
+            "country": "brazil"
+        },
+        "callback_url": "https://flows.weni.ai/callback/uuid",
+        "ended_at": null,
+        "ended_by": null,
+        "is_active": true,
+        "transfer_history": [
+            {
+                "name": "ENGINE",
+                "type": "queue"
+            },
+            {
+                "name": "",
+                "type": "user"
+            }
+        ],
+        "tags": []
+    }
+},
+{
+    "model": "sectors.sectortag",
+    "pk": "62d9e7c4-4f2d-40fc-acf7-9549bface0fb",
+    "fields": {
+        "created_on": "2022-08-24T21:21:08.628Z",
+        "modified_on": "2022-08-24T21:21:08.629Z",
+        "name": "suporte",
+        "sector": "4f88b656-194d-4a83-a166-5d84ba825b8d"
     }
 },
 {

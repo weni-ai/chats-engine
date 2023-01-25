@@ -17,6 +17,8 @@ class RoomSerializer(serializers.ModelSerializer):
     tags = DetailSectorTagSerializer(many=True, read_only=True)
     unread_msgs = serializers.SerializerMethodField()
     last_message = serializers.SerializerMethodField()
+    is_waiting = serializers.SerializerMethodField()
+    linked_user = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -26,7 +28,17 @@ class RoomSerializer(serializers.ModelSerializer):
             "ended_at",
             "custom_fields",
             "urn",
+            "linked_user",
         ]
+
+    def get_linked_user(self, room: Room):
+        try:
+            return room.contact.get_linked_user(room.queue.sector.project).full_name
+        except AttributeError:
+            return ""
+
+    def get_is_waiting(self, room: Room):
+        return room.get_is_waiting()
 
     def get_unread_msgs(self, room: Room):
         return room.messages.filter(seen=False).count()
@@ -56,6 +68,7 @@ class TransferRoomSerializer(serializers.ModelSerializer):
     queue = QueueSerializer(many=False, required=False, read_only=True)
     contact = ContactRelationsSerializer(many=False, required=False, read_only=True)
     tags = DetailSectorTagSerializer(many=True, required=False, read_only=True)
+    linked_user = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -72,6 +85,7 @@ class TransferRoomSerializer(serializers.ModelSerializer):
             "tags",
             "ended_by",
             "urn",
+            "linked_user",
         ]
 
         extra_kwargs = {
@@ -80,11 +94,19 @@ class TransferRoomSerializer(serializers.ModelSerializer):
             "user": {"required": False, "read_only": True, "allow_null": False},
         }
 
+    def get_linked_user(self, room: Room):
+        try:
+            return room.contact.get_linked_user(room.queue.sector.project).full_name
+        except AttributeError:
+            return ""
+
 
 class RoomContactSerializer(serializers.ModelSerializer):
     user = UserSerializer(many=False, read_only=True)
     queue = QueueSerializer(many=False, read_only=True)
     tags = DetailSectorTagSerializer(many=True, read_only=True)
+    is_waiting = serializers.SerializerMethodField()
+    linked_user = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -97,4 +119,14 @@ class RoomContactSerializer(serializers.ModelSerializer):
             "custom_fields",
             "urn",
             "is_waiting",
+            "linked_user",
         ]
+
+    def get_linked_user(self, room: Room):
+        try:
+            return room.contact.get_linked_user(room.queue.sector.project).full_name
+        except AttributeError:
+            return ""
+
+    def get_is_waiting(self, room: Room):
+        return room.get_is_waiting()

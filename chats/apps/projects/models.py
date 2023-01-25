@@ -207,3 +207,31 @@ class ProjectPermission(
             )
             return max(limits)
         return 0  # If the user is not an agent, it won't be possible to receive rooms automatically
+
+
+class LinkContact(models.Model):
+    user = models.ForeignKey(
+        "accounts.User",
+        verbose_name=_("User"),
+        related_name="linked_contacts",
+        on_delete=models.CASCADE,
+    )
+    contact = models.ForeignKey(
+        "contacts.Contact",
+        verbose_name=_("Contact"),
+        related_name="linked_users",
+        on_delete=models.CASCADE,
+    )
+    project = models.ForeignKey(
+        Project,
+        verbose_name=_("project"),
+        related_name="linked_contacts",
+        on_delete=models.CASCADE,
+    )
+
+    class Meta:
+        verbose_name = _("Linked Contact")
+        verbose_name_plural = _("Linked Contacts")
+
+    def __str__(self):
+        return self.project.name

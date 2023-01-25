@@ -19,9 +19,7 @@ from chats.apps.api.v1.sectors.viewsets import (
     SectorTagsViewset,
     SectorViewset,
 )
-from chats.apps.api.v1.dashboard.viewsets import (
-    DashboardLiveViewset
-)
+from chats.apps.api.v1.dashboard.viewsets import DashboardLiveViewset
 
 from chats.apps.api.v1.internal.queues.viewsets import (
     QueueInternalViewset,

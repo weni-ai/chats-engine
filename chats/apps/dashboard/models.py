@@ -13,7 +13,7 @@ class RoomMetrics(BaseModel):
     )
     waiting_time = models.IntegerField(_("Room Waiting time"), default=0)
     queued_count = models.IntegerField(_("Queued count"), default=0)
-    message_response_time =  models.IntegerField(_("Messages response time"), default=0)
+    message_response_time = models.IntegerField(_("Messages response time"), default=0)
     interaction_time = models.IntegerField(_("Room interaction time"), default=0)
 
     class Meta:

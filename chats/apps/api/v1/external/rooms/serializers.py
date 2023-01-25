@@ -98,11 +98,10 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             external_id=contact_external_id, defaults=contact_data
         )
 
-        if validated_data.get("custom_fields"):
-            custom_fields = validated_data.get("custom_fields")
-            if custom_fields.get("is_waiting"):
-                is_waiting = custom_fields.pop("is_waiting")
-                validated_data["is_waiting"] = is_waiting
+        if created is False:
+            linked_user = contact.get_linked_user(queue.sector.project)
+            if linked_user is not None:
+                validated_data["user"] = linked_user
 
         room = Room.objects.create(**validated_data, contact=contact, queue=queue)
         if room.user is None:
