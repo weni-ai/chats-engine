@@ -36,7 +36,7 @@ class Contact(BaseModel):
         try:
             linked_user = self.linked_users.get(is_active=True, project=project)
             return linked_user.user
-        except ObjectDoesNotExist:
+        except (ObjectDoesNotExist, AttributeError):
             return None
 
     @property

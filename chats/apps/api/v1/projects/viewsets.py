@@ -37,36 +37,45 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
     ]
     lookup_field = "uuid"
 
-    @action(detail=True, methods=["GET"], url_name="retrieve_contactuser")
-    def get_contactuser(self, request, *args, **kwargs):
+    @action(detail=True, methods=["GET"], url_name="retrieve_linked_contact")
+    def retrieve_linked_contact(self, request, *args, **kwargs):
         project = self.get_object()
-        contact = Contact.objects.get(pk=request.GET["contact"])
         try:
-            contactuser = project.linked_contacts.get(contact=contact)
-        except ObjectDoesNotExist:
+            contactuser = project.linked_contacts.get(contact=request.GET["contact"])
+        except (ObjectDoesNotExist, KeyError):
             contactuser = project.linked_contacts.none()
         serializer = LinkContactSerializer(instance=contactuser)
 
         return Response(serializer.data, status.HTTP_200_OK)
 
-    @action(detail=True, methods=["POST"], url_name="create_contactuser")
-    def create_contactuser(self, request, *args, **kwargs):
+    @action(detail=True, methods=["POST"], url_name="create_linked_contact")
+    def create_linked_contact(self, request, *args, **kwargs):
         project = self.get_object()
         contact = Contact.objects.get(pk=request.GET["contact"])
-        permission = project.permissions.get(user=request.user)
-        contactuser, _created = project.linked_contacts.get_or_create(
-            user=permission, contact=contact
+        contactuser, created = project.linked_contacts.get_or_create(
+            contact=contact
         )  # Add validation if the instance already exists, return error
-
+        if created:
+            contactuser.user = request.user
+            contactuser.save()
         serializer = LinkContactSerializer(instance=contactuser)
-
+        if created:
+            return Response(serializer.data, status.HTTP_201_CREATED)
         return Response(serializer.data, status.HTTP_200_OK)
 
-    @action(detail=True, methods=["DELETE"], url_name="delete_contactuser")
-    def delete_contactuser(self, request, *args, **kwargs):
+    @action(detail=True, methods=["DELETE"], url_name="delete_linked_contact")
+    def delete_linked_contact(self, request, *args, **kwargs):
         project = self.get_object()
-        contactuser = project.linked_contacts.get(pk=request.GET["contact_user"])
-        contactuser.delete()
+        try:
+            contactuser = project.linked_contacts.get(contact=request.GET["contact"])
+            contactuser.delete()
+        except (ObjectDoesNotExist, KeyError):
+            return Response(
+                {
+                    "Detail": "There's no agent linked to the contact or the contact does not exist"
+                },
+                status.HTTP_400_BAD_REQUEST,
+            )
 
         return Response({"deleted": True}, status.HTTP_200_OK)
 
