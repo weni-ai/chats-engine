@@ -209,7 +209,7 @@ class ProjectPermission(
         return 0  # If the user is not an agent, it won't be possible to receive rooms automatically
 
 
-class LinkContact(models.Model):
+class LinkContact(BaseModel):
     user = models.ForeignKey(
         "accounts.User",
         verbose_name=_("User"),

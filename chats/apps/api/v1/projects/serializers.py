@@ -26,7 +26,7 @@ class LinkContactSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = LinkContact
-        fields = "__all__"
+        fields = ["user_email", "contact", "project"]
 
     def get_user_email(self, linked_contact: LinkContact) -> str:
         try:
