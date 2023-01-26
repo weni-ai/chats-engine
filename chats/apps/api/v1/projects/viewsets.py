@@ -4,6 +4,9 @@ from django.core.exceptions import ObjectDoesNotExist
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from drf_yasg import openapi
+from drf_yasg.utils import swagger_auto_schema
+
 
 from chats.apps.api.v1.projects.serializers import (
     ProjectSerializer,
@@ -37,7 +40,23 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
     ]
     lookup_field = "uuid"
 
-    @action(detail=True, methods=["GET"], url_name="retrieve_linked_contact")
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter(
+                "contact",
+                openapi.IN_QUERY,
+                description="Contact's UUID",
+                type=openapi.TYPE_STRING,
+                format="uuid",
+            )
+        ]
+    )
+    @action(
+        detail=True,
+        methods=["GET"],
+        url_name="retrieve_linked_contact",
+        serializer_class=LinkContactSerializer,
+    )
     def retrieve_linked_contact(self, request, *args, **kwargs):
         project = self.get_object()
         try:
@@ -48,10 +67,26 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
 
         return Response(serializer.data, status.HTTP_200_OK)
 
-    @action(detail=True, methods=["POST"], url_name="create_linked_contact")
+    @swagger_auto_schema(
+        methods=["post"],
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            required=["contact"],
+            properties={
+                "contact": openapi.Schema(type=openapi.TYPE_STRING, format="uuid")
+            },
+        ),
+        operation_description="contact's uuid",
+    )
+    @action(
+        detail=True,
+        methods=["POST"],
+        url_name="create_linked_contact",
+        serializer_class=LinkContactSerializer,
+    )
     def create_linked_contact(self, request, *args, **kwargs):
         project = self.get_object()
-        contact = Contact.objects.get(pk=request.GET["contact"])
+        contact = Contact.objects.get(pk=request.POST["contact"])
         contactuser, created = project.linked_contacts.get_or_create(
             contact=contact
         )  # Add validation if the instance already exists, return error
@@ -63,6 +98,17 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
             return Response(serializer.data, status.HTTP_201_CREATED)
         return Response(serializer.data, status.HTTP_200_OK)
 
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter(
+                "contact",
+                openapi.IN_QUERY,
+                description="Contact's UUID",
+                type=openapi.TYPE_STRING,
+                format="uuid",
+            )
+        ]
+    )
     @action(detail=True, methods=["DELETE"], url_name="delete_linked_contact")
     def delete_linked_contact(self, request, *args, **kwargs):
         project = self.get_object()
