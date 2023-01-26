@@ -61,11 +61,14 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         project = self.get_object()
         try:
             contactuser = project.linked_contacts.get(contact=request.GET["contact"])
-        except (ObjectDoesNotExist, KeyError):
-            contactuser = project.linked_contacts.none()
-        serializer = LinkContactSerializer(instance=contactuser)
+            serializer = LinkContactSerializer(instance=contactuser)
+            data = serializer.data
+        except (ObjectDoesNotExist, KeyError, AttributeError):
+            data = {
+                "Detail": "There's no agent linked to the contact or the contact does not exist"
+            }
 
-        return Response(serializer.data, status.HTTP_200_OK)
+        return Response(data, status.HTTP_200_OK)
 
     @swagger_auto_schema(
         methods=["post"],
@@ -86,7 +89,8 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
     )
     def create_linked_contact(self, request, *args, **kwargs):
         project = self.get_object()
-        contact = Contact.objects.get(pk=request.POST["contact"])
+        contact = Contact.objects.get(pk=request.data["contact"])
+
         contactuser, created = project.linked_contacts.get_or_create(
             contact=contact
         )  # Add validation if the instance already exists, return error
