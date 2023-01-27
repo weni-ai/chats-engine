@@ -1,3 +1,4 @@
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import viewsets, status
 from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
@@ -8,12 +9,13 @@ from chats.apps.api.v1.projects.serializers import (
     ProjectSerializer,
     ProjectFlowStartSerializer,
     ProjectFlowContactSerializer,
+    ContactGroupFlowReference,
 )
 from chats.apps.api.v1.internal.projects.serializers import (
     ProjectPermissionReadSerializer,
     CheckAccessReadSerializer,
 )
-from chats.apps.projects.models import Project, ProjectPermission
+from chats.apps.projects.models import Project, ProjectPermission, 
 
 from chats.apps.api.v1.permissions import (
     IsProjectAdmin,
@@ -93,8 +95,19 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
 
         return Response(flow_definitions, status.HTTP_200_OK)
 
-    def _create_start_flow_instances(data, project, user):
-        pass
+    def _create_flow_start_instances(self, data, flow_start):
+        groups = data.get("groups", [])
+        contacts = data.get("contacts", [])
+        instances = []
+        for group in groups:
+            reference = ContactGroupFlowReference(receiver_type="group", external_id=group, flow_start=flow_start)
+            instances.append(reference)
+
+        for contact in contacts:
+            reference = ContactGroupFlowReference(receiver_type="contact", external_id=contact, flow_start=flow_start)
+            instances.append(reference)
+
+        flow_start.references.bulk_create(instances)
 
     @action(detail=True, methods=["POST"], url_name="flows")
     def start_flow(self, request, *args, **kwargs):
@@ -102,10 +115,23 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         serializer = ProjectFlowStartSerializer(data=request.data)
         if serializer.is_valid() is False:
             return Response(
-                {"Detail": "Data not valid."},
+                {"Detail": "Invalid data."},
                 status.HTTP_400_BAD_REQUEST,
             )
         data = serializer.validated_data
+        flow = data.get("flow", None)
+
+        try:
+            perm = project.permissions.get(user=request.user)
+        except ObjectDoesNotExist:
+            return Response(
+                {"Detail": "the user does not have permission in this project"},
+                status.HTTP_401_UNAUTHORIZED
+            )
+        chats_flow_start = project.flowstarts.create(permission=perm, flow=flow)
+
+        self._create_flow_start_instances(data, chats_flow_start)
+
         flow_start = FlowRESTClient().start_flow(project, data)
 
         return Response(flow_start, status.HTTP_200_OK)

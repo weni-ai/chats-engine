@@ -219,6 +219,12 @@ class FlowStart(BaseModel):
         related_name="flowstarts",
         on_delete=models.CASCADE,
     )
+    permission = models.ForeignKey(
+        ProjectPermission,
+        verbose_name=_("Permission"),
+        related_name="flowstarts",
+        on_delete=models.CASCADE,
+    )
 
     class Meta:
         verbose_name = _("Flow Start")
@@ -236,7 +242,7 @@ class ContactGroupFlowReference(BaseModel):
     flow_start = models.ForeignKey(
         FlowStart,
         verbose_name=_("Flow Start"),
-        related_name="reference",
+        related_name="references",
         on_delete=models.CASCADE,
     )
 

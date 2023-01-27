@@ -15,6 +15,33 @@ from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 
 
+def get_room_user(
+    project,
+    contact: Contact,
+    queue: Queue,
+    user: User,
+    groups: list,
+    is_created: bool,
+):
+    reference_filter = groups
+
+    reference_filter.append(contact.external_id)
+
+    last_flow_start = (
+        project.flowstarts.order_by("-created_on")
+        .filter(references__external_id__in=reference_filter)
+        .first()
+    )
+    if last_flow_start:
+        if is_created is True or not contact.rooms.filter(
+            queue__sector_project=project, created_on__gt=last_flow_start.created_on
+        ):
+            return last_flow_start.permission.user
+
+    if not user:
+        return queue.available_agents.first() or None
+
+
 class RoomFlowSerializer(serializers.ModelSerializer):
     user = UserSerializer(many=False, required=False, read_only=True)
     user_email = serializers.SlugRelatedField(
@@ -97,12 +124,15 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         contact, created = Contact.objects.update_or_create(
             external_id=contact_external_id, defaults=contact_data
         )
-        room = Room.objects.create(**validated_data, contact=contact, queue=queue)
-        if room.user is None:
-            available_agent = queue.available_agents.first()
-            room.user = available_agent or None
-            room.save()
+        project = sector.project
+        user = validated_data.get("user")
+        if contact_data.get("groups"):
+            groups = contact_data.pop("groups")
+        validated_data["user"] = get_room_user(
+            project, contact, queue, user, groups, created
+        )
 
+        room = Room.objects.create(**validated_data, contact=contact, queue=queue)
         RoomMetrics.objects.create(room=room)
 
         return room
