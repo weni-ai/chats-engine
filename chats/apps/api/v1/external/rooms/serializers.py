@@ -100,7 +100,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         if created is False:
             linked_user = contact.get_linked_user(queue.sector.project)
-            if linked_user is not None:
+            if linked_user is not None and linked_user.is_online:
                 validated_data["user"] = linked_user
 
         room = Room.objects.create(**validated_data, contact=contact, queue=queue)
