@@ -9,13 +9,16 @@ from chats.apps.api.v1.projects.serializers import (
     ProjectSerializer,
     ProjectFlowStartSerializer,
     ProjectFlowContactSerializer,
-    ContactGroupFlowReference,
 )
 from chats.apps.api.v1.internal.projects.serializers import (
     ProjectPermissionReadSerializer,
     CheckAccessReadSerializer,
 )
-from chats.apps.projects.models import Project, ProjectPermission, 
+from chats.apps.projects.models import (
+    Project,
+    ProjectPermission,
+    ContactGroupFlowReference,
+)
 
 from chats.apps.api.v1.permissions import (
     IsProjectAdmin,
@@ -100,11 +103,15 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         contacts = data.get("contacts", [])
         instances = []
         for group in groups:
-            reference = ContactGroupFlowReference(receiver_type="group", external_id=group, flow_start=flow_start)
+            reference = ContactGroupFlowReference(
+                receiver_type="group", external_id=group, flow_start=flow_start
+            )
             instances.append(reference)
 
         for contact in contacts:
-            reference = ContactGroupFlowReference(receiver_type="contact", external_id=contact, flow_start=flow_start)
+            reference = ContactGroupFlowReference(
+                receiver_type="contact", external_id=contact, flow_start=flow_start
+            )
             instances.append(reference)
 
         flow_start.references.bulk_create(instances)
@@ -126,7 +133,7 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         except ObjectDoesNotExist:
             return Response(
                 {"Detail": "the user does not have permission in this project"},
-                status.HTTP_401_UNAUTHORIZED
+                status.HTTP_401_UNAUTHORIZED,
             )
         chats_flow_start = project.flowstarts.create(permission=perm, flow=flow)
 
