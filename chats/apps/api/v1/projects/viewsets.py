@@ -93,6 +93,9 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
 
         return Response(flow_definitions, status.HTTP_200_OK)
 
+    def _create_start_flow_instances(data, project, user):
+        pass
+
     @action(detail=True, methods=["POST"], url_name="flows")
     def start_flow(self, request, *args, **kwargs):
         project = self.get_object()
