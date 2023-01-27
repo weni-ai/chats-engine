@@ -162,7 +162,6 @@ class FlowRESTClient(
             for flow in results
             if flow["labels"] != [] and check_flows_labels(flow["labels"])
         ]
-
         return flows
 
     def retrieve_flow_definitions(self, project, flow_uuid):

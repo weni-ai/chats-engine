@@ -65,11 +65,13 @@ class Project(BaseModel):
             user_permission is not None
             and user_permission.role == ProjectPermission.ROLE_ADMIN
         ):  # Admin role
-            return self.sectors.all()
+            sectors = self.sectors.all()
         else:
-            return self.sectors.filter(
-                authorizations__permission=user_permission, **custom_filters
-            )  # If the user have any permission on the sectors
+            custom_filters[
+                "authorizations__permission"
+            ] = user_permission  # If the user have any permission on the sectors
+
+        return sectors.filter(**custom_filters)
 
 
 class ProjectPermission(
@@ -250,3 +252,46 @@ class LinkContact(BaseModel):
             return perm.status.lower() == "online"
         except (AttributeError, ProjectPermission.DoesNotExist):
             return False
+
+
+class FlowStart(BaseModel):
+    flow = models.CharField(_("flow ID"), max_length=200, blank=True, null=True)
+    project = models.ForeignKey(
+        Project,
+        verbose_name=_("Project"),
+        related_name="flowstarts",
+        on_delete=models.CASCADE,
+    )
+    permission = models.ForeignKey(
+        ProjectPermission,
+        verbose_name=_("Permission"),
+        related_name="flowstarts",
+        on_delete=models.CASCADE,
+    )
+
+    class Meta:
+        verbose_name = _("Flow Start")
+        verbose_name_plural = _("Flow Starts")
+
+    def __str__(self):
+        return self.project.name
+
+
+class ContactGroupFlowReference(BaseModel):
+    receiver_type = models.CharField(_("Receiver Type"), max_length=50)
+    external_id = models.CharField(
+        _("External ID"), max_length=200, blank=True, null=True
+    )
+    flow_start = models.ForeignKey(
+        FlowStart,
+        verbose_name=_("Flow Start"),
+        related_name="references",
+        on_delete=models.CASCADE,
+    )
+
+    class Meta:
+        verbose_name = _("Flow Start")
+        verbose_name_plural = _("Flow Starts")
+
+    def __str__(self):
+        return self.project.name
