@@ -242,3 +242,11 @@ class LinkContact(BaseModel):
 
     def __str__(self):
         return self.project.name
+
+    @property
+    def is_online(self):
+        try:
+            perm = self.project.permissions.get(user=self.user)
+            return perm.status.lower() == "online"
+        except (AttributeError, ProjectPermission.DoesNotExist):
+            return False
