@@ -97,6 +97,12 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         contact, created = Contact.objects.update_or_create(
             external_id=contact_external_id, defaults=contact_data
         )
+
+        if created is False:
+            linked_user = contact.get_linked_user(queue.sector.project)
+            if linked_user is not None and linked_user.is_online:
+                validated_data["user"] = linked_user
+
         room = Room.objects.create(**validated_data, contact=contact, queue=queue)
         if room.user is None:
             available_agent = queue.available_agents.first()
