@@ -247,8 +247,8 @@ class ContactGroupFlowReference(BaseModel):
     )
 
     class Meta:
-        verbose_name = _("Flow Start")
-        verbose_name_plural = _("Flow Starts")
+        verbose_name = _("Flow contact/group Reference")
+        verbose_name_plural = _("Flow contact/group References")
 
     def __str__(self):
-        return self.project.name
+        return self.flow_start.project.name

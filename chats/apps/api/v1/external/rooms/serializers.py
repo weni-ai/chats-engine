@@ -16,12 +16,12 @@ from chats.apps.rooms.models import Room
 
 
 def get_room_user(
-    project,
     contact: Contact,
     queue: Queue,
     user: User,
     groups: list,
     is_created: bool,
+    project,
 ):
     reference_filter = groups
 
@@ -34,7 +34,7 @@ def get_room_user(
     )
     if last_flow_start:
         if is_created is True or not contact.rooms.filter(
-            queue__sector_project=project, created_on__gt=last_flow_start.created_on
+            queue__sector__project=project, created_on__gt=last_flow_start.created_on
         ):
             return last_flow_start.permission.user
 
@@ -126,10 +126,11 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         )
         project = sector.project
         user = validated_data.get("user")
+        groups = []
         if contact_data.get("groups"):
             groups = contact_data.pop("groups")
         validated_data["user"] = get_room_user(
-            project, contact, queue, user, groups, created
+            contact, queue, user, groups, created, project
         )
 
         room = Room.objects.create(**validated_data, contact=contact, queue=queue)
