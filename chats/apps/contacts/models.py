@@ -35,7 +35,7 @@ class Contact(BaseModel):
     def get_linked_user(self, project):
         try:
             linked_user = self.linked_users.get(project=project)
-            return linked_user.user
+            return linked_user
         except (ObjectDoesNotExist, AttributeError):
             return None
 

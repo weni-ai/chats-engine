@@ -244,6 +244,13 @@ class LinkContact(BaseModel):
         return self.project.name
 
     @property
+    def full_name(self):
+        if self.user:
+            return self.user.full_name
+        else:
+            return ""
+
+    @property
     def is_online(self):
         try:
             perm = self.project.permissions.get(user=self.user)
