@@ -60,6 +60,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
     )
     queue = QueueSerializer(many=False, required=False, read_only=True)
     contact = ContactRelationsSerializer(many=False, required=False, read_only=False)
+    flow_id = serializers.CharField(required=False, write_only=True, allow_null=True)
 
     class Meta:
         model = Room
@@ -127,10 +128,15 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         project = sector.project
         user = validated_data.get("user")
         groups = []
+        flow_id = None
         if contact_data.get("groups"):
             groups = contact_data.pop("groups")
+
+        if validated_data.get("flow_id"):
+            groups = validated_data.pop("flow_id")
+
         validated_data["user"] = get_room_user(
-            contact, queue, user, groups, created, project
+            contact, queue, user, groups, created, flow_id, project
         )
 
         room = Room.objects.create(**validated_data, contact=contact, queue=queue)

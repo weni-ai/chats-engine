@@ -38,6 +38,14 @@ class ContactRelationsSerializer(serializers.ModelSerializer):
     urn = serializers.CharField(
         required=False, allow_null=True, allow_blank=True, write_only=True
     )
+    groups = serializers.ListField(
+        child=serializers.CharField(),
+        allow_null=True,
+        allow_blank=True,
+        write_only=True,
+        required=False,
+        max_length=200,
+    )
 
     class Meta:
         model = Contact
@@ -51,6 +59,7 @@ class ContactRelationsSerializer(serializers.ModelSerializer):
             "custom_fields",
             "created_on",
             "urn",
+            "groups",
         ]
         read_only_fields = [
             "uuid",
