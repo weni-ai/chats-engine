@@ -51,9 +51,7 @@ class Room(BaseModel):
     )
     urn = models.CharField(_("urn"), null=True, blank=True, max_length=100, default="")
 
-    callback_url = models.URLField(
-        _("Callback URL"), null=True, blank=True, max_length=200
-    )
+    callback_url = models.TextField(_("Callback URL"), null=True, blank=True)
 
     ended_at = models.DateTimeField(
         _("Ended at"), auto_now_add=False, null=True, blank=True
