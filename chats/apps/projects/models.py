@@ -61,17 +61,14 @@ class Project(BaseModel):
 
     def get_sectors(self, user, custom_filters: dict = {}):
         user_permission = self.get_permission(user)
+        sectors = self.sectors.all()
         if (
             user_permission is not None
             and user_permission.role == ProjectPermission.ROLE_ADMIN
         ):  # Admin role
-            sectors = self.sectors.all()
-        else:
-            custom_filters[
-                "authorizations__permission"
-            ] = user_permission  # If the user have any permission on the sectors
+            return sectors
 
-        return sectors.filter(**custom_filters)
+        return sectors.filter(authorizations__permission=user_permission)
 
 
 class ProjectPermission(
