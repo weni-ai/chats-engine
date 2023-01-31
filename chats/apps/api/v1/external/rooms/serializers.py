@@ -154,6 +154,6 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         )
 
         room = Room.objects.create(**validated_data, contact=contact, queue=queue)
-        # RoomMetrics.objects.create(room=room)
+        RoomMetrics.objects.create(room=room)
 
         return room
