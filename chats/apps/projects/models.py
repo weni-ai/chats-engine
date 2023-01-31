@@ -256,3 +256,49 @@ class LinkContact(BaseModel):
             return perm.status.lower() == "online"
         except (AttributeError, ProjectPermission.DoesNotExist):
             return False
+
+
+class FlowStart(BaseModel):
+    external_id = models.CharField(
+        _("External ID"), max_length=200, blank=True, null=True
+    )
+    flow = models.CharField(_("flow ID"), max_length=200, blank=True, null=True)
+    project = models.ForeignKey(
+        Project,
+        verbose_name=_("Project"),
+        related_name="flowstarts",
+        on_delete=models.CASCADE,
+    )
+    permission = models.ForeignKey(
+        ProjectPermission,
+        verbose_name=_("Permission"),
+        related_name="flowstarts",
+        on_delete=models.CASCADE,
+    )
+
+    class Meta:
+        verbose_name = _("Flow Start")
+        verbose_name_plural = _("Flow Starts")
+
+    def __str__(self):
+        return self.project.name
+
+
+class ContactGroupFlowReference(BaseModel):
+    receiver_type = models.CharField(_("Receiver Type"), max_length=50)
+    external_id = models.CharField(
+        _("External ID"), max_length=200, blank=True, null=True
+    )
+    flow_start = models.ForeignKey(
+        FlowStart,
+        verbose_name=_("Flow Start"),
+        related_name="references",
+        on_delete=models.CASCADE,
+    )
+
+    class Meta:
+        verbose_name = _("Flow contact/group Reference")
+        verbose_name_plural = _("Flow contact/group References")
+
+    def __str__(self):
+        return self.flow_start.project.name
