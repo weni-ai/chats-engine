@@ -61,17 +61,14 @@ class Project(BaseModel):
 
     def get_sectors(self, user, custom_filters: dict = {}):
         user_permission = self.get_permission(user)
+        sectors = self.sectors.all()
         if (
             user_permission is not None
             and user_permission.role == ProjectPermission.ROLE_ADMIN
         ):  # Admin role
-            sectors = self.sectors.all()
-        else:
-            custom_filters[
-                "authorizations__permission"
-            ] = user_permission  # If the user have any permission on the sectors
+            return sectors
 
-        return sectors.filter(**custom_filters)
+        return sectors.filter(authorizations__permission=user_permission)
 
 
 class ProjectPermission(
@@ -209,6 +206,56 @@ class ProjectPermission(
             )
             return max(limits)
         return 0  # If the user is not an agent, it won't be possible to receive rooms automatically
+
+
+class LinkContact(BaseModel):
+    user = models.ForeignKey(
+        "accounts.User",
+        verbose_name=_("User"),
+        related_name="linked_contacts",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    contact = models.ForeignKey(
+        "contacts.Contact",
+        verbose_name=_("Contact"),
+        related_name="linked_users",
+        on_delete=models.CASCADE,
+    )
+    project = models.ForeignKey(
+        Project,
+        verbose_name=_("project"),
+        related_name="linked_contacts",
+        on_delete=models.CASCADE,
+    )
+
+    class Meta:
+        verbose_name = _("Linked Contact")
+        verbose_name_plural = _("Linked Contacts")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["contact", "project"], name="unique_link_contact_per_project"
+            )
+        ]
+
+    def __str__(self):
+        return self.project.name
+
+    @property
+    def full_name(self):
+        if self.user:
+            return self.user.full_name
+        else:
+            return ""
+
+    @property
+    def is_online(self):
+        try:
+            perm = self.project.permissions.get(user=self.user)
+            return perm.status.lower() == "online"
+        except (AttributeError, ProjectPermission.DoesNotExist):
+            return False
 
 
 class FlowStart(BaseModel):

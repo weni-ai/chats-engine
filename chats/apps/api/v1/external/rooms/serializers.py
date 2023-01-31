@@ -24,6 +24,7 @@ def get_room_user(
     flow_id,
     project,
 ):
+    # User that started the flow, if any
     reference_filter = groups
     reference_filter.append(contact.external_id)
     query_filters = {"references__external_id__in": reference_filter}
@@ -40,8 +41,17 @@ def get_room_user(
         ):
             return last_flow_start.permission.user
 
+    # User linked to the contact
+    if not is_created:
+        linked_user = contact.get_linked_user(project)
+        if linked_user is not None and linked_user.is_online:
+            return linked_user.user
+
+    # Online user on the queue
     if not user:
         return queue.available_agents.first() or None
+
+    return None
 
 
 class RoomFlowSerializer(serializers.ModelSerializer):
