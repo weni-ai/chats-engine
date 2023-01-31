@@ -212,6 +212,9 @@ class ProjectPermission(
 
 
 class FlowStart(BaseModel):
+    external_id = models.CharField(
+        _("External ID"), max_length=200, blank=True, null=True
+    )
     flow = models.CharField(_("flow ID"), max_length=200, blank=True, null=True)
     project = models.ForeignKey(
         Project,

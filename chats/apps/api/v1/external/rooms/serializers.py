@@ -21,17 +21,19 @@ def get_room_user(
     user: User,
     groups: list,
     is_created: bool,
+    flow_id,
     project,
 ):
     reference_filter = groups
-
     reference_filter.append(contact.external_id)
+    query_filters = {"references__external_id__in": reference_filter}
+    if flow_id:
+        query_filters["flow"] = flow_id
 
     last_flow_start = (
-        project.flowstarts.order_by("-created_on")
-        .filter(references__external_id__in=reference_filter)
-        .first()
+        project.flowstarts.order_by("-created_on").filter(**query_filters).first()
     )
+
     if last_flow_start:
         if is_created is True or not contact.rooms.filter(
             queue__sector__project=project, created_on__gt=last_flow_start.created_on
@@ -80,6 +82,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             "custom_fields",
             "callback_url",
             "is_waiting",
+            "flow_id",
         ]
         read_only_fields = [
             "uuid",
@@ -120,11 +123,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         contact_data = validated_data.pop("contact")
         contact_external_id = contact_data.pop("external_id")
-        if contact_data.get("urn"):
-            validated_data["urn"] = contact_data.pop("urn").split("?")[0]
-        contact, created = Contact.objects.update_or_create(
-            external_id=contact_external_id, defaults=contact_data
-        )
+
         project = sector.project
         user = validated_data.get("user")
         groups = []
@@ -133,7 +132,13 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             groups = contact_data.pop("groups")
 
         if validated_data.get("flow_id"):
-            groups = validated_data.pop("flow_id")
+            flow_id = validated_data.pop("flow_id")
+
+        if contact_data.get("urn"):
+            validated_data["urn"] = contact_data.pop("urn").split("?")[0]
+        contact, created = Contact.objects.update_or_create(
+            external_id=contact_external_id, defaults=contact_data
+        )
 
         validated_data["user"] = get_room_user(
             contact, queue, user, groups, created, flow_id, project

@@ -140,7 +140,8 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         self._create_flow_start_instances(data, chats_flow_start)
 
         flow_start = FlowRESTClient().start_flow(project, data)
-
+        chats_flow_start.external_id = flow_start.get("uuid")
+        chats_flow_start.save()
         return Response(flow_start, status.HTTP_200_OK)
 
 
