@@ -109,6 +109,6 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             room.user = available_agent or None
             room.save()
 
-        # RoomMetrics.objects.create(room=room)
+        RoomMetrics.objects.create(room=room)
 
         return room
