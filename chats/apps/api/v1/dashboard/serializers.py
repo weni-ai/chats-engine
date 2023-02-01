@@ -173,6 +173,7 @@ class DashboardAgentsSerializer(serializers.Serializer):
             ]
         else:
             rooms_filter["user__rooms__created_on__gte"] = initial_datetime
+            rooms_filter["user__rooms__is_active"] = True
             permission_filter["status"] = "ONLINE"
         if self.context.get("sector"):
             rooms_filter["user__rooms__queue__sector"] = self.context.get("sector")
@@ -240,7 +241,6 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
             rooms_filter[
                 f"{rooms_filter_prefix}rooms__created_on__gte"
             ] = initial_datetime
-            rooms_filter[f"{rooms_filter_prefix}rooms__is_active"] = True
             online_agents_filter = {
                 f"{rooms_filter_prefix}authorizations__permission__status": "ONLINE"
             }
@@ -262,7 +262,8 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
                     filter=Q(**rooms_filter),
                 ),
                 interact_time=Avg(
-                    f"{rooms_filter_prefix}rooms__metric__interaction_time"
+                    f"{rooms_filter_prefix}rooms__metric__interaction_time",
+                    filter=Q(**rooms_filter),
                 ),
                 online_agents=online_agents,
             )
