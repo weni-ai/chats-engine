@@ -52,7 +52,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         except AssertionError:
             pass
         await self.set_user_status(
-            "offline"
+            "OFFLINE"
         )  # What if the user has two or more channels connected?
         try:
             await self.channel_layer.group_discard(
@@ -171,6 +171,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
     def set_user_status(self, status: str):
         self.permission.status = status
         self.permission.save()
+        self.permission.notify_user("update", "system")
 
     @database_sync_to_async
     def get_permission(self):
@@ -214,3 +215,4 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         await self.join(
             {"name": "user", "id": self.user.id}
         )  # Group name must be a valid unicode string containing only ASCII alphanumerics, hyphens, or periods.
+        await self.join({"name": "permission", "id": str(self.permission.pk)})

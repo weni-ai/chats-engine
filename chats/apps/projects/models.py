@@ -5,6 +5,7 @@ from chats.core.models import BaseModel
 
 from django.core.exceptions import ObjectDoesNotExist
 
+from chats.utils.websockets import send_channels_group
 from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
     ConnectRESTClient,
 )
@@ -134,6 +135,15 @@ class ProjectPermission(
 
     def __str__(self):
         return self.project.name
+
+    def notify_user(self, action, sender="user"):
+        """ """
+        send_channels_group(
+            group_name=f"permission_{self.pk}",
+            call_type="notify",
+            content={"from": sender, "status": self.status},
+            action=f"status.{action}",
+        )
 
     @property
     def is_user(self):
