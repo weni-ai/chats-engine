@@ -5,6 +5,7 @@ from chats.core.models import BaseModel
 
 from django.core.exceptions import ObjectDoesNotExist
 
+from chats.utils.websockets import send_channels_group
 from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
     ConnectRESTClient,
 )
@@ -61,15 +62,14 @@ class Project(BaseModel):
 
     def get_sectors(self, user, custom_filters: dict = {}):
         user_permission = self.get_permission(user)
+        sectors = self.sectors.all()
         if (
             user_permission is not None
             and user_permission.role == ProjectPermission.ROLE_ADMIN
         ):  # Admin role
-            return self.sectors.all()
-        else:
-            return self.sectors.filter(
-                authorizations__permission=user_permission, **custom_filters
-            )  # If the user have any permission on the sectors
+            return sectors
+
+        return sectors.filter(authorizations__permission=user_permission)
 
 
 class ProjectPermission(
@@ -135,6 +135,15 @@ class ProjectPermission(
 
     def __str__(self):
         return self.project.name
+
+    def notify_user(self, action, sender="user"):
+        """ """
+        send_channels_group(
+            group_name=f"permission_{self.pk}",
+            call_type="notify",
+            content={"from": sender, "status": self.status},
+            action=f"status.{action}",
+        )
 
     @property
     def is_user(self):
@@ -244,9 +253,62 @@ class LinkContact(BaseModel):
         return self.project.name
 
     @property
+    def full_name(self):
+        if self.user:
+            return self.user.full_name
+        else:
+            return ""
+
+    @property
     def is_online(self):
         try:
             perm = self.project.permissions.get(user=self.user)
             return perm.status.lower() == "online"
         except (AttributeError, ProjectPermission.DoesNotExist):
             return False
+
+
+class FlowStart(BaseModel):
+    external_id = models.CharField(
+        _("External ID"), max_length=200, blank=True, null=True
+    )
+    flow = models.CharField(_("flow ID"), max_length=200, blank=True, null=True)
+    project = models.ForeignKey(
+        Project,
+        verbose_name=_("Project"),
+        related_name="flowstarts",
+        on_delete=models.CASCADE,
+    )
+    permission = models.ForeignKey(
+        ProjectPermission,
+        verbose_name=_("Permission"),
+        related_name="flowstarts",
+        on_delete=models.CASCADE,
+    )
+
+    class Meta:
+        verbose_name = _("Flow Start")
+        verbose_name_plural = _("Flow Starts")
+
+    def __str__(self):
+        return self.project.name
+
+
+class ContactGroupFlowReference(BaseModel):
+    receiver_type = models.CharField(_("Receiver Type"), max_length=50)
+    external_id = models.CharField(
+        _("External ID"), max_length=200, blank=True, null=True
+    )
+    flow_start = models.ForeignKey(
+        FlowStart,
+        verbose_name=_("Flow Start"),
+        related_name="references",
+        on_delete=models.CASCADE,
+    )
+
+    class Meta:
+        verbose_name = _("Flow contact/group Reference")
+        verbose_name_plural = _("Flow contact/group References")
+
+    def __str__(self):
+        return self.flow_start.project.name

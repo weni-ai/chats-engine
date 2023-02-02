@@ -15,6 +15,44 @@ from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 
 
+def get_room_user(
+    contact: Contact,
+    queue: Queue,
+    user: User,
+    groups: list,
+    is_created: bool,
+    flow_id,
+    project,
+):
+    # User that started the flow, if any
+    reference_filter = groups
+    reference_filter.append(contact.external_id)
+    query_filters = {"references__external_id__in": reference_filter}
+    if flow_id:
+        query_filters["flow"] = flow_id
+
+    last_flow_start = (
+        project.flowstarts.order_by("-created_on").filter(**query_filters).first()
+    )
+
+    if last_flow_start:
+        if is_created is True or not contact.rooms.filter(
+            queue__sector__project=project, created_on__gt=last_flow_start.created_on
+        ):
+            return last_flow_start.permission.user
+
+    # User linked to the contact
+    if not is_created:
+        linked_user = contact.get_linked_user(project)
+        if linked_user is not None and linked_user.is_online:
+            return linked_user.user
+
+    # Online user on the queue
+    if not user:
+        return queue.available_agents.first() or None
+    return user
+
+
 class RoomFlowSerializer(serializers.ModelSerializer):
     user = UserSerializer(many=False, required=False, read_only=True)
     user_email = serializers.SlugRelatedField(
@@ -33,6 +71,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
     )
     queue = QueueSerializer(many=False, required=False, read_only=True)
     contact = ContactRelationsSerializer(many=False, required=False, read_only=False)
+    flow_id = serializers.CharField(required=False, write_only=True, allow_null=True)
 
     class Meta:
         model = Room
@@ -52,6 +91,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             "custom_fields",
             "callback_url",
             "is_waiting",
+            "flow_id",
         ]
         read_only_fields = [
             "uuid",
@@ -92,23 +132,28 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         contact_data = validated_data.pop("contact")
         contact_external_id = contact_data.pop("external_id")
+
+        project = sector.project
+        user = validated_data.get("user")
+        groups = []
+        flow_id = None
+        if contact_data.get("groups"):
+            groups = contact_data.pop("groups")
+
+        if validated_data.get("flow_id"):
+            flow_id = validated_data.pop("flow_id")
+
         if contact_data.get("urn"):
             validated_data["urn"] = contact_data.pop("urn").split("?")[0]
         contact, created = Contact.objects.update_or_create(
             external_id=contact_external_id, defaults=contact_data
         )
 
-        if created is False:
-            linked_user = contact.get_linked_user(queue.sector.project)
-            if linked_user is not None and linked_user.is_online:
-                validated_data["user"] = linked_user
+        validated_data["user"] = get_room_user(
+            contact, queue, user, groups, created, flow_id, project
+        )
 
         room = Room.objects.create(**validated_data, contact=contact, queue=queue)
-        if room.user is None:
-            available_agent = queue.available_agents.first()
-            room.user = available_agent or None
-            room.save()
-
         RoomMetrics.objects.create(room=room)
 
         return room

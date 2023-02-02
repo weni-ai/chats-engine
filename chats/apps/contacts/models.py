@@ -12,7 +12,7 @@ class Contact(BaseModel):
     external_id = models.CharField(
         _("External ID"), max_length=200, blank=True, null=True
     )
-    name = models.CharField(_("first name"), max_length=30, blank=True)
+    name = models.CharField(_("first name"), max_length=200, blank=True)
     email = models.EmailField(
         _("email"), unique=False, help_text=_("Contact email"), blank=True, null=True
     )
@@ -35,7 +35,7 @@ class Contact(BaseModel):
     def get_linked_user(self, project):
         try:
             linked_user = self.linked_users.get(project=project)
-            return linked_user.user
+            return linked_user
         except (ObjectDoesNotExist, AttributeError):
             return None
 
