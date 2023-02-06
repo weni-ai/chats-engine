@@ -39,7 +39,6 @@ class ContactRelationsSerializer(serializers.ModelSerializer):
         required=False, allow_null=True, allow_blank=True, write_only=True
     )
     groups = serializers.ListField(
-        child=serializers.CharField(),
         write_only=True,
         required=False,
         max_length=200,

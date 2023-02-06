@@ -18,6 +18,7 @@ from chats.apps.api.v1.internal.projects.serializers import (
     ProjectPermissionReadSerializer,
     CheckAccessReadSerializer,
 )
+
 from chats.apps.projects.models import (
     Project,
     ProjectPermission,
