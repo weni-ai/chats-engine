@@ -48,7 +48,7 @@ class RoomViewset(
         return super().get_queryset()
 
     def get_serializer_class(self):
-        if self.action == "update":
+        if "update" in self.action:
             return TransferRoomSerializer
         return super().get_serializer_class()
 
@@ -116,10 +116,9 @@ class RoomViewset(
 
     def perform_update(self, serializer):
         # TODO Separate this into smaller methods
-        instance = self.get_object()
-        transfer_history = instance.transfer_history or []
-
-        old_queue = instance.queue
+        old_instance = self.get_object()
+        transfer_history = old_instance.transfer_history or []
+        old_queue = old_instance.queue
 
         user = self.request.data.get("user_email")
         queue = self.request.data.get("queue_uuid")
@@ -132,18 +131,18 @@ class RoomViewset(
 
         # Create transfer object based on whether it's a user or a queue transfer and add it to the history
         if user:
-            if instance.user is None:
-                time = timezone.now() - instance.modified_on
-                RoomMetrics.objects.get_or_create(
-                    room=instance, waiting_time=time.total_seconds()
-                )
-            else:
-                _content = {"type": "user", "name": instance.user.first_name}
-                transfer_history.append(_content)
+            if old_instance.user is None:
+                time = timezone.now() - old_instance.modified_on
+                room_metric = RoomMetrics.objects.get(room=instance)
+                room_metric.waiting_time += time.total_seconds()
+                room_metric.save()
 
             if instance.metric:
                 instance.metric.queued_count += 1
                 instance.metric.save()
+
+            _content = {"type": "user", "name": instance.user.first_name}
+            transfer_history.append(_content)
 
         if queue:
             # Create constraint to make queue not none
