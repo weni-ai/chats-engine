@@ -13,23 +13,24 @@ from chats.apps.contacts.models import Contact
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
+from typing import List, Dict
 
 
 def get_room_user(
     contact: Contact,
     queue: Queue,
     user: User,
-    groups: list,
+    groups: List[Dict[str, str]],
     is_created: bool,
-    flow_id,
+    flow_uuid,
     project,
 ):
     # User that started the flow, if any
-    reference_filter = groups
+    reference_filter = [group["uuid"] for group in groups]
     reference_filter.append(contact.external_id)
     query_filters = {"references__external_id__in": reference_filter}
-    if flow_id:
-        query_filters["flow"] = flow_id
+    if flow_uuid:
+        query_filters["flow"] = flow_uuid
 
     last_flow_start = (
         project.flowstarts.order_by("-created_on").filter(**query_filters).first()
@@ -71,7 +72,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
     )
     queue = QueueSerializer(many=False, required=False, read_only=True)
     contact = ContactRelationsSerializer(many=False, required=False, read_only=False)
-    flow_id = serializers.CharField(required=False, write_only=True, allow_null=True)
+    flow_uuid = serializers.CharField(required=False, write_only=True, allow_null=True)
 
     class Meta:
         model = Room
@@ -91,7 +92,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             "custom_fields",
             "callback_url",
             "is_waiting",
-            "flow_id",
+            "flow_uuid",
         ]
         read_only_fields = [
             "uuid",
@@ -136,12 +137,12 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         project = sector.project
         user = validated_data.get("user")
         groups = []
-        flow_id = None
+        flow_uuid = None
         if contact_data.get("groups"):
             groups = contact_data.pop("groups")
 
-        if validated_data.get("flow_id"):
-            flow_id = validated_data.pop("flow_id")
+        if validated_data.get("flow_uuid"):
+            flow_uuid = validated_data.pop("flow_uuid")
 
         if contact_data.get("urn"):
             validated_data["urn"] = contact_data.pop("urn").split("?")[0]
@@ -150,7 +151,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         )
 
         validated_data["user"] = get_room_user(
-            contact, queue, user, groups, created, flow_id, project
+            contact, queue, user, groups, created, flow_uuid, project
         )
 
         room = Room.objects.create(**validated_data, contact=contact, queue=queue)
