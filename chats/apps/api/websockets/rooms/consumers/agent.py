@@ -16,13 +16,12 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
     Agent side of the chat
     """
 
-    added_groups = []
-    user = None
-
     async def connect(self, *args, **kwargs):
         """
         Called when the websocket is handshaking as part of initial connection.
         """
+        self.added_groups = []
+        self.user = None
         # Are they logged in?
         close = False
         self.permission = None
