@@ -58,7 +58,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
 
         if self.permission:
             await self.set_user_status(
-                "offline"
+                "OFFLINE"
             )  # What if the user has two or more channels connected?
 
     async def receive_json(self, payload):
