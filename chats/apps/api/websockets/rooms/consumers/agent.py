@@ -16,50 +16,50 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
     Agent side of the chat
     """
 
-    added_groups = []
-    user = None
-
     async def connect(self, *args, **kwargs):
         """
         Called when the websocket is handshaking as part of initial connection.
         """
+        self.added_groups = []
+        self.user = None
         # Are they logged in?
+        close = False
+        self.permission = None
+
         try:
             self.user = self.scope["user"]
             self.project = self.scope["query_params"].get("project")[0]
         except (KeyError, TypeError):
-            await self.close()
-        if self.user.is_anonymous or self.project is None:
+            close = True
+        if self.user.is_anonymous or close is True or self.project is None:
             # Reject the connection
             await self.close()
         else:
             # Accept the connection
-
             try:
                 self.permission = await self.get_permission()
             except ObjectDoesNotExist:
+                close = True
+            if close:
                 await self.close()  # TODO validate if the code continues from this or if it stops here
-            await self.accept()
-            await self.load_rooms()
-            await self.load_queues()
-            await self.load_user()
-            await self.set_user_status("ONLINE")
+            else:
+                await self.accept()
+                await self.load_rooms()
+                await self.load_queues()
+                await self.load_user()
+                await self.set_user_status("ONLINE")
 
     async def disconnect(self, *args, **kwargs):
-        try:
-            for group in set(self.added_groups):
+        for group in set(self.added_groups):
+            try:
                 await self.channel_layer.group_discard(group, self.channel_name)
-        except AssertionError:
-            pass
-        await self.set_user_status(
-            "OFFLINE"
-        )  # What if the user has two or more channels connected?
-        try:
-            await self.channel_layer.group_discard(
-                f"user_{self.user.pk}", self.channel_name
-            )
-        except AssertionError:
-            pass
+            except AssertionError:
+                pass
+
+        if self.permission:
+            await self.set_user_status(
+                "OFFLINE"
+            )  # What if the user has two or more channels connected?
 
     async def receive_json(self, payload):
         """

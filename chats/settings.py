@@ -313,11 +313,13 @@ PROMETHEUS_AUTH_TOKEN = env.str("PROMETHEUS_AUTH_TOKEN")
 
 ACTIVATE_CALC_METRICS = env.bool("ACTIVATE_CALC_METRICS", default=True)
 
-AUDIO_TYPE_TO_CONVERT = env.str("AUDIO_TYPE_TO_CONVERT", default="mp3")
+AUDIO_TYPE_TO_CONVERT = env.str("AUDIO_TYPE_TO_CONVERT", default="ogg")
+AUDIO_EXTENSION_TO_CONVERT = env.str("AUDIO_EXTENSION_TO_CONVERT", default="ogg")
+AUDIO_CODEC_TO_CONVERT = env.str("AUDIO_EXTENSION_TO_CONVERT", default="libopus")
 UNPERMITTED_AUDIO_TYPES = env.list(
     "UNPERMITTED_AUDIO_TYPES",
     default=[
-        "WebM",
+        "webm",
     ],
 )
 
