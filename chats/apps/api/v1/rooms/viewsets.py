@@ -157,9 +157,6 @@ class RoomViewset(
         msg = instance.messages.create(text=json.dumps(transfer_content), seen=True)
         msg.notify_room("create")
 
-        # Send Updated data to the room group
-        # instance.notify_room("update")
-
         # Force everyone on the queue group to exit the room Group
         if old_instance.user:
             old_instance.user_connection("exit", old_instance.user)
@@ -168,8 +165,9 @@ class RoomViewset(
 
         # Add the room group for the user or the queue that received it
 
-        # Send Updated data to the room group, as send room is not sending after a join
+        # Send Updated data to the queue group, as send room is not sending after a join
         instance.notify_queue("update")
+
         if user:
             instance.user_connection(action="join")
 
