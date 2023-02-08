@@ -113,7 +113,7 @@ class RoomViewset(
         if user:
             if old_instance.user is None:
                 time = timezone.now() - old_instance.modified_on
-                room_metric = RoomMetrics.objects.get(room=instance)
+                room_metric = RoomMetrics.objects.get_or_create(room=instance)[0]
                 room_metric.waiting_time += time.total_seconds()
                 room_metric.queued_count += 1
                 room_metric.save()
@@ -137,9 +137,6 @@ class RoomViewset(
         msg = instance.messages.create(text=json.dumps(transfer_content), seen=True)
         msg.notify_room("create")
 
-        # Send Updated data to the room group
-        instance.notify_room("update")
-
         # Force everyone on the queue group to exit the room Group
         if old_instance.user:
             old_instance.user_connection("exit", old_instance.user)
@@ -147,12 +144,15 @@ class RoomViewset(
             old_instance.queue_connection("exit", old_queue)
 
         # Add the room group for the user or the queue that received it
+
+        # Send Updated data to the queue group, as send room is not sending after a join
+        instance.notify_queue("update")
+
         if user:
             instance.user_connection(action="join")
 
         if queue and user is None:
             instance.queue_connection(action="join")
-        instance.notify_room("update")
 
     def perform_destroy(self, instance):
         instance.notify_room("destroy", callback=True)
