@@ -185,3 +185,33 @@ class Room(BaseModel):
                 ),
                 headers={"content-type": "application/json"},
             )
+
+    def notify_user(self, action: str, user=None):
+        user = user if user else self.user
+        permission = self.get_permission(user)
+        send_channels_group(
+            group_name=f"permission_{permission.pk}",
+            call_type="notify",
+            content=self.serialized_ws_data,
+            action=f"rooms.{action}",
+        )
+
+    def user_connection(self, action: str, user=None):
+        user = user if user else self.user
+        permission = self.get_permission(user)
+        send_channels_group(
+            group_name=f"permission_{permission.pk}",
+            call_type=action,
+            content={"name": "room", "id": str(self.pk)},
+            action=f"groups.{action}",
+        )
+
+    def queue_connection(self, action: str, queue=None):
+        queue = queue if queue else self.queue
+
+        send_channels_group(
+            group_name=f"queue_{queue.pk}",
+            call_type=action,
+            content={"name": "room", "id": str(self.pk)},
+            action=f"group.{action}",
+        )
