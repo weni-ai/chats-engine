@@ -158,7 +158,7 @@ class RoomViewset(
         msg.notify_room("create")
 
         # Send Updated data to the room group
-        instance.notify_room("update")
+        # instance.notify_room("update")
 
         # Force everyone on the queue group to exit the room Group
         if old_instance.user:
@@ -168,12 +168,13 @@ class RoomViewset(
 
         # Add the room group for the user or the queue that received it
 
+        # Send Updated data to the room group, as send room is not sending after a join
+        instance.notify_queue("update")
         if user:
             instance.user_connection(action="join")
 
         if queue and user is None:
             instance.queue_connection(action="join")
-        instance.notify_room("update")
 
     def perform_destroy(self, instance):
         instance.notify_room("destroy", callback=True)
