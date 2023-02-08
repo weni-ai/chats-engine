@@ -133,7 +133,7 @@ class RoomViewset(
         if user:
             if old_instance.user is None:
                 time = timezone.now() - old_instance.modified_on
-                room_metric = RoomMetrics.objects.get(room=instance)
+                room_metric = RoomMetrics.objects.get_or_create(room=instance)[0]
                 room_metric.waiting_time += time.total_seconds()
                 room_metric.queued_count += 1
                 room_metric.save()
