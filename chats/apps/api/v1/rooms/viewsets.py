@@ -161,32 +161,19 @@ class RoomViewset(
         instance.notify_room("update")
 
         # Force everyone on the queue group to exit the room Group
-        send_channels_group(
-            group_name=f"queue_{old_queue.pk}",
-            call_type="exit",
-            content={"name": "room", "id": str(instance.pk)},
-            action="group.exit",
-        )
+        if old_instance.user:
+            old_instance.user_connection("exit", old_instance.user)
+        else:
+            old_instance.queue_connection("exit", old_queue)
 
         # Add the room group for the user or the queue that received it
-        if user:
-            send_channels_group(
-                group_name=f"user_{instance.user.id}",
-                call_type="join",
-                content={"name": "room", "id": str(instance.pk)},
-                action="group.join",
-            )
-            instance.notify_room("update")
-            return None
 
-        if queue:
-            send_channels_group(
-                group_name=f"queue_{instance.queue.pk}",
-                call_type="join",
-                content={"name": "room", "id": str(instance.pk)},
-                action="group.join",
-            )
-            instance.notify_room("update")
+        if user:
+            instance.user_connection(action="join")
+
+        if queue and user is None:
+            instance.queue_connection(action="join")
+        instance.notify_room("update")
 
     def perform_destroy(self, instance):
         instance.notify_room("destroy", callback=True)
