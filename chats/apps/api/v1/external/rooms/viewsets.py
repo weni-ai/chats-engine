@@ -3,6 +3,7 @@ import json
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.db import IntegrityError
 
 from chats.apps.rooms.models import Room
 from chats.apps.api.v1.external.rooms.serializers import RoomFlowSerializer
@@ -59,6 +60,17 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         serialized_data = RoomFlowSerializer(instance=instance)
         instance.notify_queue("close")
         return Response(serialized_data.data, status=status.HTTP_200_OK)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            return super().create(request, *args, **kwargs)
+        except IntegrityError:
+            return Response(
+                {
+                    "detail": "The contact already have an open room in the especified queue",
+                },
+                status.HTTP_400_BAD_REQUEST,
+            )
 
     def perform_create(self, serializer):
         serializer.save()

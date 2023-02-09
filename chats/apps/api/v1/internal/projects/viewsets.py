@@ -3,6 +3,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import ValidationError
+from django.db import IntegrityError
 
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.api.v1.internal.projects import serializers
@@ -54,8 +55,13 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
         if settings.OIDC_ENABLED:
             user_email = request.data.get("user")
             persist_keycloak_user_by_email(user_email)
-
-        return super().create(request, *args, **kwargs)
+        try:
+            return super().create(request, *args, **kwargs)
+        except IntegrityError:
+            return Response(
+                {"detail": "This user already have permission on the project"},
+                status.HTTP_400_BAD_REQUEST,
+            )
 
     def put(
         self, request, *args, **kwargs
