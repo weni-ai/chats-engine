@@ -103,7 +103,7 @@ class RoomViewset(
             .total_seconds()
         )
 
-        metric_room = RoomMetrics.objects.get(room=instance)
+        metric_room = RoomMetrics.objects.get_or_create(room=instance)[0]
         metric_room.message_response_time = difference_time
         metric_room.interaction_time = interation_time
         metric_room.save()
