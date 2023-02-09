@@ -211,3 +211,20 @@ class QueueAddAgentPermission(permissions.BasePermission):
 class HasAgentPermissionAnyQueueSector(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         return request.user in obj.queue_agents
+
+
+class HasDashboardAccess(permissions.BasePermission):
+    def has_object_permission(self, request, view, obj):
+        if isinstance(request.user, AnonymousUser):
+            return False
+        try:
+            project_permission = obj.permissions.get(user=request.user)
+            if (
+                project_permission.role == 1
+                or project_permission.sector_authorizations.exists()
+            ):
+                return True
+        except ProjectPermission.DoesNotExist:
+            return False
+
+        return False

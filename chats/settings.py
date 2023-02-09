@@ -272,6 +272,8 @@ if OIDC_ENABLED:
 
 
 CONNECT_API_URL = env.str("CONNECT_API_URL", default="")
+USE_CONNECT_V2 = env.bool("USE_CONNECT_V2", default=False)
+
 FLOWS_API_URL = env.str("FLOWS_API_URL", default="")
 USE_WENI_FLOWS = env.bool("USE_WENI_FLOWS", default=False)
 FLOWS_TICKETER_TYPE = env.str("FLOWS_TICKETER_TYPE", default="wenichats")
@@ -313,7 +315,7 @@ ACTIVATE_CALC_METRICS = env.bool("ACTIVATE_CALC_METRICS", default=True)
 
 AUDIO_TYPE_TO_CONVERT = env.str("AUDIO_TYPE_TO_CONVERT", default="ogg")
 AUDIO_EXTENSION_TO_CONVERT = env.str("AUDIO_EXTENSION_TO_CONVERT", default="ogg")
-AUDIO_CODEC_TO_CONVERT = env.str("AUDIO_EXTENSION_TO_CONVERT", default="libopus")
+AUDIO_CODEC_TO_CONVERT = env.str("AUDIO_CODEC_TO_CONVERT", default="libopus")
 UNPERMITTED_AUDIO_TYPES = env.list(
     "UNPERMITTED_AUDIO_TYPES",
     default=[

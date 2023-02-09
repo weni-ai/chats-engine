@@ -8,7 +8,6 @@ from rest_framework.response import Response
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 
-
 from chats.apps.api.v1.projects.serializers import (
     ProjectSerializer,
     ProjectFlowStartSerializer,
@@ -19,6 +18,7 @@ from chats.apps.api.v1.internal.projects.serializers import (
     ProjectPermissionReadSerializer,
     CheckAccessReadSerializer,
 )
+
 from chats.apps.projects.models import (
     Project,
     ProjectPermission,
