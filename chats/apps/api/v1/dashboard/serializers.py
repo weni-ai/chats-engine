@@ -184,7 +184,7 @@ class DashboardAgentsSerializer(serializers.Serializer):
 
         queue_auth = (
             ProjectPermission.objects.filter(**permission_filter)
-            .values("user__email")
+            .values("user__first_name")
             .annotate(
                 count=Count(
                     "user__rooms",
