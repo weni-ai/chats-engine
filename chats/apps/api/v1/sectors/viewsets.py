@@ -22,6 +22,7 @@ from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
     ConnectRESTClient,
 )
 from rest_framework.decorators import action
+from django.db import IntegrityError
 
 
 class SectorViewset(viewsets.ModelViewSet):
@@ -170,6 +171,15 @@ class SectorAuthorizationViewset(viewsets.ModelViewSet):
         if self.action in ["list", "retrieve"]:
             return sector_serializers.SectorAuthorizationReadOnlySerializer
         return super().get_serializer_class()
+
+    def create(self, request, *args, **kwargs):
+        try:
+            return super().create(request, *args, **kwargs)
+        except IntegrityError:
+            return Response(
+                {"detail": "The user already have authorization on this sector"},
+                status.HTTP_400_BAD_REQUEST,
+            )
 
     def perform_create(self, serializer):
         serializer.save()
