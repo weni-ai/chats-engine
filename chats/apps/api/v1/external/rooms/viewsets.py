@@ -22,7 +22,7 @@ def add_user_or_queue_to_room(instance, request):
     if (user or queue) is None:
         return None
 
-    if user:
+    if user and instance.user is not None:
         _content = {"type": "user", "name": instance.user.first_name}
         new_transfer_history.append(_content)
     if queue:
