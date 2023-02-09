@@ -27,8 +27,6 @@ from chats.apps.projects.models import (
 
 from chats.apps.contacts.models import Contact
 
-from chats.apps.contacts.models import Contact
-
 from chats.apps.api.v1.permissions import (
     IsProjectAdmin,
     IsSectorManager,

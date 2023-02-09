@@ -80,7 +80,6 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["POST", "GET"], permission_classes=[IsAuthenticated])
     def status(self, request, *args, **kwargs):
-
         instance: ProjectPermission = None
 
         if request.method == "POST":
@@ -96,6 +95,7 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
             elif user_status.lower() == "offline":
                 instance.status = ProjectPermission.STATUS_OFFLINE
                 instance.save()
+            instance.notify_user("update")
 
         elif request.method == "GET":
             project_uuid = request.query_params.get("project")
