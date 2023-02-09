@@ -272,6 +272,8 @@ if OIDC_ENABLED:
 
 
 CONNECT_API_URL = env.str("CONNECT_API_URL", default="")
+USE_CONNECT_V2 = env.bool("USE_CONNECT_V2", default=False)
+
 FLOWS_API_URL = env.str("FLOWS_API_URL", default="")
 USE_WENI_FLOWS = env.bool("USE_WENI_FLOWS", default=False)
 FLOWS_TICKETER_TYPE = env.str("FLOWS_TICKETER_TYPE", default="wenichats")

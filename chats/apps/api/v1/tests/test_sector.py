@@ -11,16 +11,16 @@ from rest_framework.authtoken.models import Token
 
 
 class SectorTests(APITestCase):
-    fixtures = ['chats/fixtures/fixture_sector.json']
+    fixtures = ["chats/fixtures/fixture_sector.json"]
 
     def setUp(self):
         self.manager_user = User.objects.get(pk=8)
-        self.login_token =  Token.objects.get(user=self.manager_user)
-        self.project = Project.objects.get(pk='34a93b52-231e-11ed-861d-0242ac120002')
-        self.sector = Sector.objects.get(pk='21aecf8c-0c73-4059-ba82-4343e0cc627c')
-        self.sector_2 = Sector.objects.get(pk='4f88b656-194d-4a83-a166-5d84ba825b8d')
+        self.login_token = Token.objects.get(user=self.manager_user)
+        self.project = Project.objects.get(pk="34a93b52-231e-11ed-861d-0242ac120002")
+        self.sector = Sector.objects.get(pk="21aecf8c-0c73-4059-ba82-4343e0cc627c")
+        self.sector_2 = Sector.objects.get(pk="4f88b656-194d-4a83-a166-5d84ba825b8d")
         self.wrong_user = User.objects.get(pk=1)
-        self.wrong_login_token =  Token.objects.get_or_create(user=self.wrong_user)[0]
+        self.wrong_login_token = Token.objects.get_or_create(user=self.wrong_user)[0]
 
     def test_retrieve_sector_with_right_project_token(self):
         """
@@ -85,7 +85,7 @@ class SectorTests(APITestCase):
         response = client.put(url, data={"name": "sector 2 updated"})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        sector = Sector.objects.get(pk='21aecf8c-0c73-4059-ba82-4343e0cc627c')
+        sector = Sector.objects.get(pk="21aecf8c-0c73-4059-ba82-4343e0cc627c")
         self.assertEqual("sector 2 updated", sector.name)
 
     def test_delete_sector_with_right_project_token(self):
@@ -98,3 +98,105 @@ class SectorTests(APITestCase):
         response = client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["is_deleted"], True)
+
+
+class RoomsExternalTests(APITestCase):
+    fixtures = ["chats/fixtures/fixture_app.json"]
+
+    def setUp(self) -> None:
+        self.queue_1 = Queue.objects.get(uuid="f2519480-7e58-4fc4-9894-9ab1769e29cf")
+
+    def test_create_external_room(self):
+        url = reverse("external_rooms-list")
+        client = self.client
+        client.credentials(
+            HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380"
+        )
+        data = {
+            "queue_uuid": str(self.queue_1.uuid),
+            "contact": {
+                "external_id": "e3955fd5-5705-40cd-b480-b45594b70282",
+                "name": "Foo Bar",
+                "email": "FooBar@weni.ai",
+                "phone": "+250788123123",
+                "custom_fields": {},
+            },
+        }
+        response = client.post(url, data=data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_create_external_room_with_external_uuid(self):
+        url = reverse("external_rooms-list")
+        client = self.client
+        client.credentials(
+            HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380"
+        )
+        data = {
+            "queue_uuid": str(self.queue_1.uuid),
+            "contact": {
+                "external_id": "aec9f84e-3dcd-11ed-b878-0242ac120002",
+                "name": "external generator",
+                "email": "generator@weni.ai",
+                "phone": "+558498984312",
+                "custom_fields": {"age": "35"},
+            },
+        }
+        response = client.post(url, data=data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["contact"]["name"], "external generator")
+        self.assertEqual(
+            response.data["contact"]["external_id"],
+            "aec9f84e-3dcd-11ed-b878-0242ac120002",
+        )
+
+    def test_create_external_room_editing_contact(self):
+        url = reverse("external_rooms-list")
+        client = self.client
+        client.credentials(
+            HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380"
+        )
+        data = {
+            "queue_uuid": str(self.queue_1.uuid),
+            "contact": {
+                "external_id": "e3955fd5-5705-40cd-b480-b45594b70282",
+                "name": "gaules",
+                "email": "gaulesr@weni.ai",
+                "phone": "+5511985543332",
+                "custom_fields": {
+                    "age": "40",
+                    "prefered_game": "cs-go",
+                    "job": "streamer",
+                },
+            },
+        }
+        response = client.post(url, data=data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["contact"]["name"], "gaules")
+        self.assertEqual(response.data["contact"]["custom_fields"]["age"], "40")
+        self.assertEqual(
+            response.data["contact"]["custom_fields"]["prefered_game"], "cs-go"
+        )
+        self.assertEqual(response.data["contact"]["custom_fields"]["job"], "streamer")
+
+
+class MsgsExternalTests(APITestCase):
+    fixtures = ["chats/fixtures/fixture_app.json"]
+
+    def setUp(self) -> None:
+        self.room = Room.objects.get(uuid="090da6d1-959e-4dea-994a-41bf0d38ba26")
+
+    def test_create_external_msgs(self):
+        url = reverse("external_msgs-list")
+        client = self.client
+        client.credentials(
+            HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380"
+        )
+        data = {
+            "room": self.room.uuid,
+            "text": "olá.",
+            "direction": "incoming",
+            "attachments": [{"content_type": "string", "url": "http://example.com"}],
+        }
+        response = client.post(url, data=data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)

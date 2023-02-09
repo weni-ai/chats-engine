@@ -48,7 +48,7 @@ class RoomViewset(
         return super().get_queryset()
 
     def get_serializer_class(self):
-        if self.action == "update":
+        if "update" in self.action:
             return TransferRoomSerializer
         return super().get_serializer_class()
 
@@ -61,6 +61,7 @@ class RoomViewset(
         """
         # Add send room notification to the channels group
         instance = self.get_object()
+
         tags = request.data.get("tags", None)
         instance.close(tags, "agent")
         serialized_data = RoomSerializer(instance=instance)
@@ -69,24 +70,43 @@ class RoomViewset(
         if not settings.ACTIVATE_CALC_METRICS:
             return Response(serialized_data.data, status=status.HTTP_200_OK)
 
-        messages_contact = Message.objects.filter(room=instance, contact__isnull=False)
-        messages_agent = Message.objects.filter(room=instance, user__isnull=False)
+        messages_contact = (
+            Message.objects.filter(room=instance, contact__isnull=False)
+            .order_by("created_on")
+            .first()
+        )
+        messages_agent = (
+            Message.objects.filter(room=instance, user__isnull=False)
+            .order_by("created_on")
+            .first()
+        )
 
         time_message_contact = 0
         time_message_agent = 0
 
-        if messages_contact and messages_agent:
-            for i in messages_contact:
-                time_message_contact += i.created_on.timestamp()
+        if messages_agent and messages_contact:
+            time_message_agent = messages_agent.created_on.timestamp()
+            time_message_contact = messages_contact.created_on.timestamp()
+        else:
+            time_message_agent = 0
+            time_message_contact = 0
 
-            for i in messages_agent:
-                time_message_agent += i.created_on.timestamp()
+        difference_time = time_message_agent - time_message_contact
 
-            difference_time = time_message_contact - time_message_agent
+        interation_time = (
+            Room.objects.filter(pk=instance.pk)
+            .aggregate(
+                avg_time=Sum(
+                    F("ended_at") - F("created_on"),
+                )
+            )["avg_time"]
+            .total_seconds()
+        )
 
-            metric_room = RoomMetrics.objects.get(room=instance)
-            metric_room.message_response_time = difference_time
-            metric_room.save()
+        metric_room = RoomMetrics.objects.get_or_create(room=instance)[0]
+        metric_room.message_response_time = difference_time
+        metric_room.interaction_time = interation_time
+        metric_room.save()
 
         return Response(serialized_data.data, status=status.HTTP_200_OK)
 
