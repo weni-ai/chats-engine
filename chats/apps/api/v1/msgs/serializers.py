@@ -76,13 +76,27 @@ class MessageMediaSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         media = validated_data["media_file"]
         file_bytes = media.file.read()
-        file_type = magic.from_buffer(file_bytes)
-        if file_type in settings.UNPERMITTED_AUDIO_TYPES:
-            converted_bytes = io.BytesIO()
-            recording = AudioSegment.from_file(io.BytesIO(file_bytes), format=file_type)
-            recording.export(converted_bytes, format=settings.AUDIO_TYPE_TO_CONVERT)
-            media.file = converted_bytes
+        file_type = magic.from_buffer(file_bytes, mime=True)
 
+        if (
+            file_type.startswith("audio")
+            or file_type.lower() in settings.UNPERMITTED_AUDIO_TYPES
+        ):
+
+            export_conf = {"format": settings.AUDIO_TYPE_TO_CONVERT}
+            if settings.AUDIO_CODEC_TO_CONVERT != "":
+                export_conf["codec"] = settings.AUDIO_CODEC_TO_CONVERT
+
+            converted_bytes = io.BytesIO()
+            AudioSegment.from_file(io.BytesIO(file_bytes)).export(
+                converted_bytes, **export_conf
+            )
+
+            media.file = converted_bytes
+            media.name = media.name[:-3] + settings.AUDIO_EXTENSION_TO_CONVERT
+            file_type = magic.from_buffer(converted_bytes.read(), mime=True)
+
+        validated_data["content_type"] = file_type
         msg = super().create(validated_data)
         return msg
 

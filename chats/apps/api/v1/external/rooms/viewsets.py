@@ -34,6 +34,8 @@ def add_user_or_queue_to_room(instance, request):
     msg = instance.messages.create(text=json.dumps(_content), seen=True)
     msg.notify_room("create")
 
+    return instance
+
 
 class RoomFlowViewSet(viewsets.ModelViewSet):
     model = Room
@@ -60,10 +62,14 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save()
-        instance = serializer.instance
-        add_user_or_queue_to_room(instance, self.request)
+        instance = add_user_or_queue_to_room(serializer.instance, self.request)
 
-        instance.notify_queue("create")
+        if instance.user:
+            instance.user_connection(action="join")
+            instance.notify_user("create")
+        else:
+            instance.queue_connection(action="join")
+            instance.notify_queue("create")
 
     def perform_update(self, serializer):
         serializer.save()
