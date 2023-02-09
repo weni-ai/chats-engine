@@ -40,7 +40,8 @@ def get_room_user(
         if is_created is True or not contact.rooms.filter(
             queue__sector__project=project, created_on__gt=last_flow_start.created_on
         ):
-            return last_flow_start.permission.user
+            if last_flow_start.permission.status == "ONLINE":
+                return last_flow_start.permission.user
 
     # User linked to the contact
     if not is_created:
@@ -51,7 +52,9 @@ def get_room_user(
     # Online user on the queue
     if not user:
         return queue.available_agents.first() or None
-    return user
+    permission = project.permissions.filter(user=user, status="ONLINE").exists()
+
+    return user if permission else None
 
 
 class RoomFlowSerializer(serializers.ModelSerializer):
@@ -155,6 +158,6 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         )
 
         room = Room.objects.create(**validated_data, contact=contact, queue=queue)
-        RoomMetrics.objects.create(room=room)
+        # RoomMetrics.objects.create(room=room)
 
         return room
