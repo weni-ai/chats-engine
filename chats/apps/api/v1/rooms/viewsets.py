@@ -19,7 +19,7 @@ from chats.utils.websockets import send_channels_group
 
 from django.conf import settings
 
-from django.db.models import Count, Avg, F, Sum, DateTimeField
+from django.db.models import F, Sum
 
 
 class RoomViewset(

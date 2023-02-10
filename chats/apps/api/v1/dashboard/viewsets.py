@@ -4,7 +4,6 @@ from rest_framework.response import Response
 from chats.apps.api.v1.permissions import HasDashboardAccess
 
 from chats.apps.projects.models import Project
-from rest_framework.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 
@@ -12,6 +11,7 @@ from chats.apps.api.v1.dashboard.serializers import (
     DashboardRoomsSerializer,
     DashboardAgentsSerializer,
     DashboardSectorSerializer,
+    DashboardDataSerializer,
 )
 
 
@@ -65,6 +65,31 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         """
         Can return data on project and sector level (list of sector or list of queues)
         """
+        project = self.get_object()
+        filters = request.query_params
+        serialized_data = self.get_serializer(
+            instance=project,
+            context=filters,
+        )
+        return Response(serialized_data.data, status.HTTP_200_OK)
+
+
+class DashboardCountDataViewset(viewsets.GenericViewSet):
+    lookup_field = "uuid"
+    queryset = Project.objects.all()
+
+    def get_permissions(self):
+        permission_classes = [permissions.IsAuthenticated, HasDashboardAccess]
+        return [permission() for permission in permission_classes]
+
+    @action(
+        detail=True,
+        methods=["GET"],
+        url_name="data",
+        serializer_class=DashboardDataSerializer,
+    )
+    def data(self, request, *args, **kwargs):
+        """Brute metrics for the project, sector, queue and agent."""
         project = self.get_object()
         filters = request.query_params
         serialized_data = self.get_serializer(
