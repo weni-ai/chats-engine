@@ -16,50 +16,50 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
     Agent side of the chat
     """
 
-    groups = []
-    user = None
-
     async def connect(self, *args, **kwargs):
         """
         Called when the websocket is handshaking as part of initial connection.
         """
+        self.added_groups = []
+        self.user = None
         # Are they logged in?
+        close = False
+        self.permission = None
+
         try:
             self.user = self.scope["user"]
             self.project = self.scope["query_params"].get("project")[0]
         except (KeyError, TypeError):
-            await self.close()
-        if self.user.is_anonymous or self.project is None:
+            close = True
+        if self.user.is_anonymous or close is True or self.project is None:
             # Reject the connection
             await self.close()
         else:
             # Accept the connection
-
             try:
                 self.permission = await self.get_permission()
             except ObjectDoesNotExist:
+                close = True
+            if close:
                 await self.close()  # TODO validate if the code continues from this or if it stops here
-            await self.accept()
-            await self.load_rooms()
-            await self.load_queues()
-            await self.load_user()
-            await self.set_user_status("online")
+            else:
+                await self.accept()
+                await self.load_rooms()
+                await self.load_queues()
+                await self.load_user()
+                await self.set_user_status("ONLINE")
 
     async def disconnect(self, *args, **kwargs):
-        try:
-            for group in set(self.groups):
+        for group in set(self.added_groups):
+            try:
                 await self.channel_layer.group_discard(group, self.channel_name)
-        except AssertionError:
-            pass
-        await self.set_user_status(
-            "offline"
-        )  # What if the user has two or more channels connected?
-        try:
-            await self.channel_layer.group_discard(
-                f"user_{self.user.pk}", self.channel_name
-            )
-        except AssertionError:
-            pass
+            except AssertionError:
+                pass
+
+        if self.permission:
+            await self.set_user_status(
+                "OFFLINE"
+            )  # What if the user has two or more channels connected?
 
     async def receive_json(self, payload):
         """
@@ -86,7 +86,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
 
         group_name = f"{event['name']}_{event['id']}"
         try:
-            self.groups.remove(group_name)
+            self.added_groups.remove(group_name)
             await self.channel_layer.group_discard(group_name, self.channel_name)
         except (ValueError, AssertionError):
             pass
@@ -102,6 +102,15 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 }
             )
 
+    async def list_groups(self, event):
+        await self.notify(
+            {
+                "type": "notify",
+                "action": "groups",
+                "content": {"groups": self.added_groups},
+            }
+        )
+
     async def join(self, event):
         if event.get("content"):
             event = json.loads(event.get("content"))
@@ -113,8 +122,19 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             project_uuid=self.project,
             user_permission=self.permission,
         )
-
-        if await validator.validate() is False:
+        try:
+            if await validator.validate() is False:
+                await self.notify(
+                    {
+                        "type": "notify",
+                        "action": "group.join",
+                        "content": json.dumps(
+                            {"msg": f"Access denied on the group: {group_name}"}
+                        ),
+                    }
+                )
+                return None
+        except ObjectDoesNotExist:
             await self.notify(
                 {
                     "type": "notify",
@@ -127,7 +147,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             return None
 
         await self.channel_layer.group_add(group_name, self.channel_name)
-        self.groups.append(group_name)
+        self.added_groups.append(group_name)
 
         if settings.DEBUG:
             await self.notify(
@@ -151,6 +171,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
     def set_user_status(self, status: str):
         self.permission.status = status
         self.permission.save()
+        self.permission.notify_user("update", "system")
 
     @database_sync_to_async
     def get_permission(self):
@@ -194,3 +215,4 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         await self.join(
             {"name": "user", "id": self.user.id}
         )  # Group name must be a valid unicode string containing only ASCII alphanumerics, hyphens, or periods.
+        await self.join({"name": "permission", "id": str(self.permission.pk)})

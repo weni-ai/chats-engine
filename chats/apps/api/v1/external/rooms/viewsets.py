@@ -3,6 +3,7 @@ import json
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.db import IntegrityError
 
 from chats.apps.rooms.models import Room
 from chats.apps.api.v1.external.rooms.serializers import RoomFlowSerializer
@@ -22,7 +23,7 @@ def add_user_or_queue_to_room(instance, request):
     if (user or queue) is None:
         return None
 
-    if user:
+    if user and instance.user is not None:
         _content = {"type": "user", "name": instance.user.first_name}
         new_transfer_history.append(_content)
     if queue:
@@ -33,6 +34,8 @@ def add_user_or_queue_to_room(instance, request):
     # Create a message with the transfer data and Send to the room group
     msg = instance.messages.create(text=json.dumps(_content), seen=True)
     msg.notify_room("create")
+
+    return instance
 
 
 class RoomFlowViewSet(viewsets.ModelViewSet):
@@ -58,12 +61,27 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         instance.notify_queue("close")
         return Response(serialized_data.data, status=status.HTTP_200_OK)
 
+    def create(self, request, *args, **kwargs):
+        try:
+            return super().create(request, *args, **kwargs)
+        except IntegrityError:
+            return Response(
+                {
+                    "detail": "The contact already have an open room in the especified queue",
+                },
+                status.HTTP_400_BAD_REQUEST,
+            )
+
     def perform_create(self, serializer):
         serializer.save()
-        instance = serializer.instance
-        add_user_or_queue_to_room(instance, self.request)
+        instance = add_user_or_queue_to_room(serializer.instance, self.request)
 
-        instance.notify_queue("create")
+        if instance.user:
+            instance.user_connection(action="join")
+            instance.notify_user("create")
+        else:
+            instance.queue_connection(action="join")
+            instance.notify_queue("create")
 
     def perform_update(self, serializer):
         serializer.save()

@@ -29,3 +29,7 @@ class WSJoinValidator:
     @database_sync_to_async
     def validate_user(self):
         return self.group_id == self.user_permission.user.id
+
+    @database_sync_to_async
+    def validate_permission(self):
+        return self.group_id == str(self.user_permission.pk)

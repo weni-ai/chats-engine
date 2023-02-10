@@ -3,6 +3,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import ValidationError
+from django.db import IntegrityError
 
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.api.v1.internal.projects import serializers
@@ -54,8 +55,13 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
         if settings.OIDC_ENABLED:
             user_email = request.data.get("user")
             persist_keycloak_user_by_email(user_email)
-
-        return super().create(request, *args, **kwargs)
+        try:
+            return super().create(request, *args, **kwargs)
+        except IntegrityError:
+            return Response(
+                {"detail": "This user already have permission on the project"},
+                status.HTTP_400_BAD_REQUEST,
+            )
 
     def put(
         self, request, *args, **kwargs
@@ -80,23 +86,29 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["POST", "GET"], permission_classes=[IsAuthenticated])
     def status(self, request, *args, **kwargs):
-
         instance: ProjectPermission = None
 
         if request.method == "POST":
             project_uuid = request.data.get("project")
-            instance = get_object_or_404(ProjectPermission, project__uuid=project_uuid, user=request.user)
+            instance = get_object_or_404(
+                ProjectPermission, project__uuid=project_uuid, user=request.user
+            )
             user_status = request.data.get("status")
 
-            if user_status == "online":
-                instance.status = "online"
+            if user_status.lower() == "online":
+                instance.status = ProjectPermission.STATUS_ONLINE
                 instance.save()
-            elif user_status == "offline":
-                instance.status = "offline"
+            elif user_status.lower() == "offline":
+                instance.status = ProjectPermission.STATUS_OFFLINE
                 instance.save()
+            instance.notify_user("update")
 
         elif request.method == "GET":
             project_uuid = request.query_params.get("project")
-            instance = get_object_or_404(ProjectPermission, project__uuid=project_uuid, user=request.user)
+            instance = get_object_or_404(
+                ProjectPermission, project__uuid=project_uuid, user=request.user
+            )
 
-        return Response(dict(connection_status=instance.status), status=status.HTTP_200_OK)
+        return Response(
+            dict(connection_status=instance.status), status=status.HTTP_200_OK
+        )

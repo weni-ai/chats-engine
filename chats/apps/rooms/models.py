@@ -49,10 +49,9 @@ class Room(BaseModel):
         blank=True,
         null=True,
     )
+    urn = models.CharField(_("urn"), null=True, blank=True, max_length=100, default="")
 
-    callback_url = models.URLField(
-        _("Callback URL"), null=True, blank=True, max_length=200
-    )
+    callback_url = models.TextField(_("Callback URL"), null=True, blank=True)
 
     ended_at = models.DateTimeField(
         _("Ended at"), auto_now_add=False, null=True, blank=True
@@ -61,6 +60,7 @@ class Room(BaseModel):
     ended_by = models.CharField(_("Ended by"), max_length=50, null=True, blank=True)
 
     is_active = models.BooleanField(_("is active?"), default=True)
+    is_waiting = models.BooleanField(_("is waiting for answer?"), default=False)
 
     transfer_history = models.JSONField(_("Transfer History"), null=True, blank=True)
 
@@ -90,9 +90,20 @@ class Room(BaseModel):
     def get_permission(self, user):
         return self.queue.get_permission(user)
 
+    def get_is_waiting(self):
+        """If the room does not have any contact message, then it is waiting"""
+        return (
+            self.is_waiting
+            if self.is_waiting
+            else not self.messages.filter(contact__isnull=False).exists()
+        )
+
     @property
     def is_24h_valid(self) -> bool:
         """Validates is the last contact message was sent more than a day ago"""
+        if not self.urn.startswith("whatsapp"):
+            return True
+
         day_validation = self.messages.filter(
             created_on__gte=timezone.now() - timedelta(days=1),
             contact=self.contact,
@@ -174,3 +185,33 @@ class Room(BaseModel):
                 ),
                 headers={"content-type": "application/json"},
             )
+
+    def notify_user(self, action: str, user=None):
+        user = user if user else self.user
+        permission = self.get_permission(user)
+        send_channels_group(
+            group_name=f"permission_{permission.pk}",
+            call_type="notify",
+            content=self.serialized_ws_data,
+            action=f"rooms.{action}",
+        )
+
+    def user_connection(self, action: str, user=None):
+        user = user if user else self.user
+        permission = self.get_permission(user)
+        send_channels_group(
+            group_name=f"permission_{permission.pk}",
+            call_type=action,
+            content={"name": "room", "id": str(self.pk)},
+            action=f"groups.{action}",
+        )
+
+    def queue_connection(self, action: str, queue=None):
+        queue = queue if queue else self.queue
+
+        send_channels_group(
+            group_name=f"queue_{queue.pk}",
+            call_type=action,
+            content={"name": "room", "id": str(self.pk)},
+            action=f"group.{action}",
+        )

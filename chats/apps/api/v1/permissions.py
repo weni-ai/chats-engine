@@ -48,6 +48,11 @@ class IsSectorManager(permissions.BasePermission):
         return perm.is_manager(sector=str(obj.sector.pk))
 
 
+class ProjectAnyPermission(permissions.BasePermission):
+    def has_object_permission(self, request, view, obj) -> bool:
+        return obj.permissions.filter(user=request.user).exists()
+
+
 class IsQueueAgent(permissions.BasePermission):
     def has_permission(self, request, view):
         data = request.data or request.query_params
@@ -204,6 +209,22 @@ class QueueAddAgentPermission(permissions.BasePermission):
 
 
 class HasAgentPermissionAnyQueueSector(permissions.BasePermission):
-    
     def has_object_permission(self, request, view, obj):
         return request.user in obj.queue_agents
+
+
+class HasDashboardAccess(permissions.BasePermission):
+    def has_object_permission(self, request, view, obj):
+        if isinstance(request.user, AnonymousUser):
+            return False
+        try:
+            project_permission = obj.permissions.get(user=request.user)
+            if (
+                project_permission.role == 1
+                or project_permission.sector_authorizations.exists()
+            ):
+                return True
+        except ProjectPermission.DoesNotExist:
+            return False
+
+        return False

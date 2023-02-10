@@ -50,6 +50,7 @@ services:
       - OIDC_OP_USER_ENDPOINT=${OIDC_OP_USER_ENDPOINT}
       - OIDC_OP_JWKS_ENDPOINT=${OIDC_OP_JWKS_ENDPOINT}
       - OIDC_RP_SIGN_ALGO=${OIDC_RP_SIGN_ALGO}
+      - PROMETHEUS_AUTH_TOKEN=${PROMETHEUS_AUTH_TOKEN}
     depends_on:
       - postgres
       - redis

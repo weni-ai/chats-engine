@@ -50,7 +50,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     last_name = models.CharField(_("last name"), max_length=150, blank=True)
     email = models.EmailField(_("email"), unique=True, help_text=_("User email"))
 
-    photo_url = models.URLField(blank=True, max_length=255)
+    photo_url = models.TextField(blank=True, null=True)
 
     is_staff = models.BooleanField(_("staff status"), default=False)
     is_active = models.BooleanField(_("active"), default=True)
@@ -81,7 +81,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     @property
     def full_name(self):
-        return f"{self.first_name} + {self.last_name}"
+        return f"{self.first_name} {self.last_name}"
 
 
 class Profile(BaseModel):

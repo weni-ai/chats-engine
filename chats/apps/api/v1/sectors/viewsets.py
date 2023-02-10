@@ -4,7 +4,12 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets, exceptions
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from chats.apps.api.v1.permissions import IsProjectAdmin, IsQueueAgent, IsSectorManager, HasAgentPermissionAnyQueueSector
+from chats.apps.api.v1.permissions import (
+    IsProjectAdmin,
+    IsQueueAgent,
+    IsSectorManager,
+    HasAgentPermissionAnyQueueSector,
+)
 from chats.apps.api.v1.sectors import serializers as sector_serializers
 from chats.apps.api.v1.sectors.filters import (
     SectorAuthorizationFilter,
@@ -13,8 +18,11 @@ from chats.apps.api.v1.sectors.filters import (
 )
 from chats.apps.projects.models import Project
 from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
-from chats.apps.api.v1.internal.connect_rest_client import ConnectRESTClient
+from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
+    ConnectRESTClient,
+)
 from rest_framework.decorators import action
+from django.db import IntegrityError
 
 
 class SectorViewset(viewsets.ModelViewSet):
@@ -95,7 +103,7 @@ class SectorViewset(viewsets.ModelViewSet):
             {"is_deleted": True},
             status.HTTP_200_OK,
         )
-        
+
     @action(detail=True, methods=["GET"])
     def agents(self, *args, **kwargs):
         instance = self.get_object()
@@ -109,7 +117,18 @@ class SectorViewset(viewsets.ModelViewSet):
         project_uuid = request.query_params.get("project")
         project = Project.objects.get(uuid=project_uuid)
         sector_count = project.get_sectors(user=request.user).count()
-        return Response({"sector_count":sector_count}, status=status.HTTP_200_OK)
+        # TODO: CREATE A METHOD DO COUNT SECTORS OF USER
+        if sector_count == 0:
+            sector_count = (
+                Sector.objects.filter(
+                    project=project,
+                    queues__authorizations__permission__user=request.user,
+                )
+                .distinct()
+                .count()
+            )
+        return Response({"sector_count": sector_count}, status=status.HTTP_200_OK)
+
 
 class SectorTagsViewset(viewsets.ModelViewSet):
     queryset = SectorTag.objects.all()
@@ -152,6 +171,15 @@ class SectorAuthorizationViewset(viewsets.ModelViewSet):
         if self.action in ["list", "retrieve"]:
             return sector_serializers.SectorAuthorizationReadOnlySerializer
         return super().get_serializer_class()
+
+    def create(self, request, *args, **kwargs):
+        try:
+            return super().create(request, *args, **kwargs)
+        except IntegrityError:
+            return Response(
+                {"detail": "The user already have authorization on this sector"},
+                status.HTTP_400_BAD_REQUEST,
+            )
 
     def perform_create(self, serializer):
         serializer.save()

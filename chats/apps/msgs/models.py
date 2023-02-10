@@ -104,7 +104,7 @@ class MessageMedia(BaseModel):
     media_file = models.FileField(
         _("Media File"), null=True, blank=True, max_length=100
     )
-    media_url = models.URLField(_("Media url"), null=True, blank=True, max_length=200)
+    media_url = models.TextField(_("Media url"), null=True, blank=True)
 
     class Meta:
         verbose_name = _("MessageMedia")
@@ -147,3 +147,7 @@ class MessageMedia(BaseModel):
                 ),
                 headers={"content-type": "application/json"},
             )
+
+    def notify_room(self, *args, **kwargs):
+        """ """
+        self.message.notify_room(*args, **kwargs)

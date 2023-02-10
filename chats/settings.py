@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     "chats.apps.projects",
     "chats.apps.api",
     "chats.core",
+    "chats.apps.dashboard",
     # third party apps
     "channels",
     "drf_yasg",
@@ -271,10 +272,14 @@ if OIDC_ENABLED:
 
 
 CONNECT_API_URL = env.str("CONNECT_API_URL", default="")
+USE_CONNECT_V2 = env.bool("USE_CONNECT_V2", default=False)
+
 FLOWS_API_URL = env.str("FLOWS_API_URL", default="")
 USE_WENI_FLOWS = env.bool("USE_WENI_FLOWS", default=False)
 FLOWS_TICKETER_TYPE = env.str("FLOWS_TICKETER_TYPE", default="wenichats")
-
+FLOWS_AUTH_TOKEN_RETRIES = env.int(
+    "FLOWS_AUTH_TOKEN_RETRIES", default=2
+)  # How many times to refresh the flows project auth token and retry the request
 
 # Swagger
 
@@ -298,16 +303,24 @@ if USE_SENTRY:
     sentry_sdk.init(
         dsn=env.str("SENTRY_DSN"),
         integrations=[DjangoIntegration()],
+        environment=env.str("ENVIRONMENT", default="develop"),
     )
 
 
 # Query Limiters
 
-OLD_MESSAGES_LIMIT = env.int(
-    "OLD_MESSAGES_LIMIT", default=10
-)  # Limits the messages shown when accessing an active chat
+PROMETHEUS_AUTH_TOKEN = env.str("PROMETHEUS_AUTH_TOKEN")
 
+ACTIVATE_CALC_METRICS = env.bool("ACTIVATE_CALC_METRICS", default=True)
 
-PROMETHEUS_AUTH_TOKEN = env.str(
-    "PROMETHEUS_AUTH_TOKEN"
+AUDIO_TYPE_TO_CONVERT = env.str("AUDIO_TYPE_TO_CONVERT", default="ogg")
+AUDIO_EXTENSION_TO_CONVERT = env.str("AUDIO_EXTENSION_TO_CONVERT", default="ogg")
+AUDIO_CODEC_TO_CONVERT = env.str("AUDIO_CODEC_TO_CONVERT", default="libopus")
+UNPERMITTED_AUDIO_TYPES = env.list(
+    "UNPERMITTED_AUDIO_TYPES",
+    default=[
+        "webm",
+    ],
 )
+
+CHATS_FLOWS_TAG = env.str("CHATS_FLOWS_TAG", default="chats")
