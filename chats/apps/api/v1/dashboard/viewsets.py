@@ -73,23 +73,14 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         )
         return Response(serialized_data.data, status.HTTP_200_OK)
 
-
-class DashboardCountDataViewset(viewsets.GenericViewSet):
-    lookup_field = "uuid"
-    queryset = Project.objects.all()
-
-    def get_permissions(self):
-        permission_classes = [permissions.IsAuthenticated, HasDashboardAccess]
-        return [permission() for permission in permission_classes]
-
     @action(
         detail=True,
         methods=["GET"],
-        url_name="data",
+        url_name="raw",
         serializer_class=DashboardDataSerializer,
     )
-    def data(self, request, *args, **kwargs):
-        """Brute metrics for the project, sector, queue and agent."""
+    def raw_data(self, request, *args, **kwargs):
+        """Raw data for the project, sector, queue and agent."""
         project = self.get_object()
         filters = request.query_params
         serialized_data = self.get_serializer(
