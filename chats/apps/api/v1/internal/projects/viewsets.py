@@ -13,6 +13,9 @@ from rest_framework import mixins, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.generics import get_object_or_404
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 
 class ProjectViewset(viewsets.ModelViewSet):
@@ -70,9 +73,11 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
         try:
             user_email = request.data["user"]
             role = request.data["role"]
-            project = request.data["project"]
+            project_uuid = request.data["project"]
+            user = User.objects.get(email=user_email)
+            project = Project.objects.get(pk=project_uuid)
 
-            permission = qs.get(user__email=user_email, project__uuid=project)
+            permission = qs.get_or_create(user=user, project=project)[0]
             permission.role = role
             permission.save()
         except (KeyError, ProjectPermission.DoesNotExist):
