@@ -74,6 +74,7 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
             user_email = request.data["user"]
             role = request.data["role"]
             project_uuid = request.data["project"]
+            persist_keycloak_user_by_email(user_email)
             user = User.objects.get(email=user_email)
             project = Project.objects.get(pk=project_uuid)
 
