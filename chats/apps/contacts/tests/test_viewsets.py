@@ -5,8 +5,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from chats.apps.api.v1.contacts.serializers import ContactSerializer
-from chats.apps.api.v1.tests.base import BaseAPIChatsTestCase
-from chats.apps.contacts.models import Contact
+from chats.core.tests.base import BaseAPIChatsTestCase
 
 
 class TestContactsViewsets(BaseAPIChatsTestCase):
