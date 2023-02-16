@@ -134,6 +134,7 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
 
         return Response({"deleted": True}, status.HTTP_200_OK)
 
+    @swagger_auto_schema(deprecated=True)
     @action(detail=True, methods=["GET"], url_name="can_trigger_flows")
     def can_trigger_flows(self, request, *args, **kwargs):
         project = self.get_object()
@@ -142,6 +143,20 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         ).exists()
 
         return Response({"can_trigger_flows": can_trigger_flows}, status.HTTP_200_OK)
+
+    @action(detail=True, methods=["GET"], url_name="list_access")
+    def list_access(self, request, *args, **kwargs):
+        project = self.get_object()
+        context = {}
+        context["can_trigger_flows"] = project.get_sectors(
+            user=request.user, custom_filters={"can_trigger_flows": True}
+        ).exists()
+
+        perm = project.permissions.get(user=self.request.user)
+        is_manager = perm.sector_authorizations.exists()
+        context["can_access_dashboard"] = perm.is_admin or is_manager
+
+        return Response(context, status.HTTP_200_OK)
 
     @action(detail=True, methods=["GET"], url_name="contacts")
     def list_contacts(self, request, *args, **kwargs):
