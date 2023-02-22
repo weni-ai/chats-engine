@@ -27,8 +27,13 @@ class MessageViewset(
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = MessageFilter
     permission_classes = [IsAuthenticated, MessagePermission]
-    # pagination_class = pagination.PageNumberPagination
     lookup_field = "uuid"
+
+    def get_paginated_response(self, data):
+        if self.request.query_params.get("reverse_results", False):
+            data.reverse()
+        qs = super().get_paginated_response(data)
+        return qs
 
     def create(self, request, *args, **kwargs):
         # TODO USE THE REQUEST.USER TO SET THE USER IN THE MESSAGE
