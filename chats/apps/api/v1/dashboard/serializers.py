@@ -5,13 +5,12 @@ from django.utils import timezone
 
 from rest_framework import serializers
 
-from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.projects.models import Project, ProjectPermission
-from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.queues.models import Queue
 
 from chats.apps.rooms.models import Room
 from django.db.models import Sum, Count, Q, Avg
-from chats.apps.sectors.models import Sector, SectorTag
+from chats.apps.sectors.models import Sector
 
 
 class DashboardRoomsSerializer(serializers.ModelSerializer):
@@ -269,3 +268,44 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
             )
         )
         return results
+
+
+class DashboardDataSerializer(serializers.ModelSerializer):
+
+    closed_rooms = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Room
+        fields = ["closed_rooms"]
+
+    def get_closed_rooms(self, project):
+        initial_datetime = timezone.now().replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+
+        rooms_filter = {}
+
+        if self.context.get("start_date") and self.context.get("end_date"):
+            rooms_filter["created_on__range"] = [
+                self.context.get("start_date"),
+                self.context.get("end_date"),
+            ]
+        else:
+            rooms_filter["is_active":False]
+            rooms_filter["created_on__gte"] = initial_datetime
+
+        if self.context.get("sector"):
+            rooms_filter["queue__sector"] = self.context.get("sector")
+            if self.context.get("tag"):
+                rooms_filter["tags__name"] = self.context.get("tag")
+            if self.context.get("queue"):
+                rooms_filter["queue"] = self.context.get("queue")
+        else:
+            rooms_filter["queue__sector__project"] = project
+
+        if self.context.get("agent"):
+            rooms_filter["user"] = self.context.get("agent")
+
+        closed_rooms = Room.objects.filter(**rooms_filter).count()
+
+        return closed_rooms
