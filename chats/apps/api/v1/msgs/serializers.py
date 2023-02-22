@@ -77,7 +77,8 @@ class MessageMediaSerializer(serializers.ModelSerializer):
         media = validated_data["media_file"]
         file_bytes = media.file.read()
         file_type = magic.from_buffer(file_bytes, mime=True)
-
+        if file_type in settings.FILE_CHECK_CONTENT_TYPE:
+            file_type = media.name[-3:]
         if (
             file_type.startswith("audio")
             or file_type.lower() in settings.UNPERMITTED_AUDIO_TYPES
