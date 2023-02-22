@@ -4,6 +4,8 @@ from rest_framework import mixins, pagination, parsers, viewsets, filters, statu
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from pydub.exceptions import CouldntDecodeError
+
 
 from chats.apps.api.v1.msgs.filters import MessageFilter, MessageMediaFilter
 from chats.apps.api.v1.msgs.serializers import (
@@ -88,6 +90,18 @@ class MessageMediaViewset(
         ):
             return super().get_queryset()
         return self.queryset.none()
+
+    def create(self, request, *args, **kwargs):
+        try:
+            return super().create(request, *args, **kwargs)
+        except CouldntDecodeError:
+            return Response(
+                {
+                    "detail": "Could not decode audio file, possibility of corrupted file",
+                    "status": "error",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
     def perform_create(self, serializer):
         serializer.save()
