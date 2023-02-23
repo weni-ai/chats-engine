@@ -175,11 +175,11 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
         else:
             rooms_filter["queue__sector__project"] = project
 
-        transfer_count = Room.objects.filter(**rooms_filter).aggregate(
-            waiting_time=Sum("metric__transfer_count")
+        transfer_metric = Room.objects.filter(**rooms_filter).aggregate(
+            count=Sum("metric__transfer_count")
         )
 
-        return transfer_count["transfer_count"]
+        return transfer_metric["count"]
 
 
 class DashboardAgentsSerializer(serializers.Serializer):
