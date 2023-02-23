@@ -33,14 +33,14 @@ class RoomViewset(
     filter_backends = [DjangoFilterBackend]
     filterset_class = room_filters.RoomFilter
 
-    # def get_permissions(self):
-    #     permission_classes = [permissions.IsAuthenticated]
-    #     if self.action != "list":
-    #         permission_classes = (
-    #             permissions.IsAuthenticated,
-    #             api_permissions.IsQueueAgent,
-    #         )
-    #     return [permission() for permission in permission_classes]
+    def get_permissions(self):
+        permission_classes = [permissions.IsAuthenticated]
+        if self.action != "list":
+            permission_classes = (
+                permissions.IsAuthenticated,
+                api_permissions.IsQueueAgent,
+            )
+        return [permission() for permission in permission_classes]
 
     def get_queryset(self):
         if self.action != "list":
