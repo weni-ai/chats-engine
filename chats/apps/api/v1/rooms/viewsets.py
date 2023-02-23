@@ -132,10 +132,16 @@ class RoomViewset(
         # Create transfer object based on whether it's a user or a queue transfer and add it to the history
         if user:
             if old_instance.user is None:
+                # Used when user comes from queue to calcule total_seconds em queue_count metric.
                 time = timezone.now() - old_instance.modified_on
                 room_metric = RoomMetrics.objects.get_or_create(room=instance)[0]
                 room_metric.waiting_time += time.total_seconds()
                 room_metric.queued_count += 1
+                room_metric.save()
+            else:
+                # Get the room metric from instance and update the transfer_count value.
+                room_metric = RoomMetrics.objects.get_or_create(room=instance)[0]
+                room_metric.transfer_count += 1
                 room_metric.save()
 
             transfer_content = {"type": "user", "name": instance.user.full_name}
