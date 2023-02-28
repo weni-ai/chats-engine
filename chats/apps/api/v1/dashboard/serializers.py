@@ -297,7 +297,7 @@ class DashboardDataSerializer(serializers.ModelSerializer):
                 self.context.get("end_date"),
             ]
         else:
-            rooms_filter["is_active":False]
+            rooms_filter["is_active"] = False
             rooms_filter["created_on__gte"] = initial_datetime
 
         if self.context.get("sector"):
