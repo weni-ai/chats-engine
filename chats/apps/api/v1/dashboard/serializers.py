@@ -19,7 +19,6 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
     interact_time = serializers.SerializerMethodField()
     response_time = serializers.SerializerMethodField()
     waiting_time = serializers.SerializerMethodField()
-    transfer_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -28,7 +27,6 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
             "interact_time",
             "response_time",
             "waiting_time",
-            "transfer_count",
         ]
 
     def get_active_chats(self, project):
@@ -154,33 +152,6 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
 
         return response_time
 
-    def get_transfer_count(self, project):
-        initial_datetime = timezone.now().replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
-        rooms_filter = {}
-
-        if self.context.get("start_date") and self.context.get("end_date"):
-            rooms_filter["created_on__range"] = [
-                self.context.get("start_date"),
-                self.context.get("end_date"),
-            ]
-        else:
-            rooms_filter["created_on__gte"] = initial_datetime
-
-        if self.context.get("sector"):
-            rooms_filter["queue__sector"] = self.context.get("sector")
-            if self.context.get("tag"):
-                rooms_filter["tags__name"] = self.context.get("tag")
-        else:
-            rooms_filter["queue__sector__project"] = project
-
-        transfer_metric = Room.objects.filter(**rooms_filter).aggregate(
-            count=Sum("metric__transfer_count")
-        )
-
-        return transfer_metric["count"]
-
 
 class DashboardAgentsSerializer(serializers.Serializer):
 
@@ -298,10 +269,6 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
                     f"{rooms_filter_prefix}rooms__metric__interaction_time",
                     filter=Q(**rooms_filter),
                 ),
-                transfer_count=Sum(
-                    f"{rooms_filter_prefix}rooms__metric__transfer_count",
-                    filter=Q(**rooms_filter),
-                ),
                 online_agents=online_agents,
             )
         )
@@ -311,10 +278,11 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
 class DashboardDataSerializer(serializers.ModelSerializer):
 
     closed_rooms = serializers.SerializerMethodField()
+    transfer_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
-        fields = ["closed_rooms"]
+        fields = ["closed_rooms", "transfer_count"]
 
     def get_closed_rooms(self, project):
         initial_datetime = timezone.now().replace(
@@ -347,3 +315,30 @@ class DashboardDataSerializer(serializers.ModelSerializer):
         closed_rooms = Room.objects.filter(**rooms_filter).count()
 
         return closed_rooms
+
+    def get_transfer_count(self, project):
+        initial_datetime = timezone.now().replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        rooms_filter = {}
+
+        if self.context.get("start_date") and self.context.get("end_date"):
+            rooms_filter["created_on__range"] = [
+                self.context.get("start_date"),
+                self.context.get("end_date"),
+            ]
+        else:
+            rooms_filter["created_on__gte"] = initial_datetime
+
+        if self.context.get("sector"):
+            rooms_filter["queue__sector"] = self.context.get("sector")
+            if self.context.get("tag"):
+                rooms_filter["tags__name"] = self.context.get("tag")
+        else:
+            rooms_filter["queue__sector__project"] = project
+
+        transfer_metric = Room.objects.filter(**rooms_filter).aggregate(
+            count=Sum("metric__transfer_count")
+        )
+
+        return transfer_metric["count"]

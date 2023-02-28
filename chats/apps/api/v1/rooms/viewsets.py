@@ -156,6 +156,10 @@ class RoomViewset(
             ):  # if it is only a queue transfer from a user, need to reset the user field
                 instance.user = None
 
+            room_metric = RoomMetrics.objects.get_or_create(room=instance)[0]
+            room_metric.transfer_count += 1
+            room_metric.save()
+
         instance.transfer_history = transfer_history
         instance.save()
 
