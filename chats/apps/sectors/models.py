@@ -138,8 +138,10 @@ class Sector(BaseModel):
 
         return sector_auth
 
-    def set_user_authorization(self, user, role: int):
-        sector_auth, created = self.authorizations.get_or_create(user=user, role=role)
+    def set_user_authorization(self, permission, role: int):
+        sector_auth, created = self.authorizations.get_or_create(
+            permission=permission, role=role
+        )
         return sector_auth
 
     def get_permission(self, user):

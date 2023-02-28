@@ -8,7 +8,7 @@ from chats.apps.contacts.models import Contact
 
 
 def create_user_and_token(nickname: str = "fake"):
-    user = User.objects.create_user("{}@user.com".format(nickname), nickname)
+    user = User.objects.get_or_create(email=f"{nickname}@user.com")[0]
     token, create = Token.objects.get_or_create(user=user)
     return (user, token)
 
@@ -19,7 +19,9 @@ def create_message(text, room, user=None, contact=None):
     return ChatMessage.objects.create(room=room, text=text, user=user, contact=contact)
 
 
-def create_contact(name: str, email: str, status: str, custom_fields: dict):
+def create_contact(
+    name: str, email: str, status: str = "OFFLINE", custom_fields: dict = {}
+):
     return Contact.objects.create(
         name=name, email=email, status=status, custom_fields=custom_fields
     )

@@ -22,21 +22,26 @@ class RoomTests(APITestCase):
         self.agent_2, self.agent_2_token = create_user_and_token("agent2")
 
         # CONTACTS
-        self.contact = create_contact("Contact", "contatc@mail.com")
-        self.contact_2 = create_contact("Contact2", "contatc2@mail.com")
-        self.contact_3 = create_contact("Contact3", "contatc3@mail.com")
+        self.contact = create_contact("Contact", "contatc@mail.com", "offline", {})
+        self.contact_2 = create_contact("Contact2", "contatc2@mail.com", "offline", {})
+        self.contact_3 = create_contact("Contact3", "contatc3@mail.com", "offline", {})
 
         # PROJECTS
-        self.project = Project.objects.create(
-            name="Test Project", connect_pk="asdasdas-dad-as-sda-d-ddd"
-        )
-        self.project_2 = Project.objects.create(
-            name="Test Project", connect_pk="asdasdas-dad-as-sda-d-ddd"
-        )
+        self.project = Project.objects.create(name="Test Project")
+        self.project_2 = Project.objects.create(name="Test Project")
 
         # PROJECT AUTHORIZATIONS
-        self.owner_auth = self.project.authorizations.create(
+        self.owner_auth = self.project.permissions.create(
             user=self.owner, role=ProjectPermission.ROLE_ADMIN
+        )
+
+        self.manager_perm = self.project.permissions.get(user=self.owner)
+        self.manager2_perm = self.project.permissions.get(user=self.owner)
+        self.agent_perm = self.project.permissions.create(
+            user=self.agent, role=ProjectPermission.ROLE_ATTENDANT
+        )
+        self.agent2_perm = self.project.permissions.create(
+            user=self.agent_2, role=ProjectPermission.ROLE_ATTENDANT
         )
 
         # SECTORS
@@ -47,12 +52,9 @@ class RoomTests(APITestCase):
             work_start="09:00",
             work_end="18:00",
         )
-        self.sector_2 = Sector.objects.create(
+        self.sector_2 = Sector.objects.get(
             name="Test Sector",
             project=self.project,
-            rooms_limit=5,
-            work_start="07:00",
-            work_end="17:00",
         )
         self.sector_3 = Sector.objects.create(
             name="Sector on project 2",
@@ -64,13 +66,13 @@ class RoomTests(APITestCase):
 
         # SECTOR AUTHORIZATIONS
         self.manager_auth = self.sector_1.set_user_authorization(
-            self.manager, role=SectorAuthorization.ROLE_MANAGER
+            self.manager_perm, role=SectorAuthorization.ROLE_MANAGER
         )
         self.manager_2_auth = self.sector_2.set_user_authorization(
-            self.manager_2, role=SectorAuthorization.ROLE_MANAGER
+            self.manager2_perm, role=SectorAuthorization.ROLE_MANAGER
         )
         self.manager_2_auth_1 = self.sector_3.set_user_authorization(
-            self.manager, role=SectorAuthorization.ROLE_MANAGER
+            self.manager_perm, role=SectorAuthorization.ROLE_MANAGER
         )
 
         # QUEUES
@@ -79,14 +81,14 @@ class RoomTests(APITestCase):
         self.queue_3 = Queue.objects.create(name="Q3", sector=self.sector_2)
 
         # QUEUE AUTHORIZATIONS
-        self.agent_1_auth = self.queue_1.authorization.create(
-            user=self.agent, role=QueueAuthorization.ROLE_AGENT
+        self.agent_1_auth = self.queue_1.authorizations.create(
+            permission=self.agent_perm, role=QueueAuthorization.ROLE_AGENT
         )
-        self.agent_2_auth = self.queue_2.authorization.create(
-            user=self.agent_2, role=QueueAuthorization.ROLE_AGENT
+        self.agent_2_auth = self.queue_2.authorizations.create(
+            permission=self.agent2_perm, role=QueueAuthorization.ROLE_AGENT
         )
-        self.agent_2_auth_2 = self.queue_3.authorization.create(
-            user=self.agent_2, role=QueueAuthorization.ROLE_AGENT
+        self.agent_2_auth_2 = self.queue_3.authorizations.create(
+            permission=self.agent2_perm, role=QueueAuthorization.ROLE_AGENT
         )
 
         # ROOMS
@@ -97,7 +99,7 @@ class RoomTests(APITestCase):
         self.room_3 = Room.objects.create(contact=self.contact_3, queue=self.queue_3)
 
     def _request_list_rooms(self, token, data: dict):
-        url = reverse("rooms-list")
+        url = reverse("room-list")
         client = self.client
         client.credentials(HTTP_AUTHORIZATION="Token " + token.key)
         response = client.get(url, data=data)

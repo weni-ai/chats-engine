@@ -9,6 +9,7 @@ class ConstraintTests(APITestCase):
 
     def setUp(self):
         self.sector = Sector.objects.get(uuid="21aecf8c-0c73-4059-ba82-4343e0cc627c")
+        self.project = self.sector.project
         self.sector_auth = SectorAuthorization.objects.get(
             uuid="e87a90ed-f217-4655-9116-5c0b51203851"
         )
@@ -16,11 +17,11 @@ class ConstraintTests(APITestCase):
             uuid="62d9e7c4-4f2d-40fc-acf7-9549bface0fb"
         )
 
-    def test_wordend_greater_than_workstart_check_constraint(self):
+    def test_work_end_greater_than_work_start_check_constraint(self):
         with self.assertRaises(IntegrityError) as context:
-            sector = Sector.objects.create(
+            Sector.objects.create(
                 name="sector test",
-                project=self.project_permission.project,
+                project=self.project,
                 work_start="12",
                 work_end="10",
                 rooms_limit=10,
@@ -48,7 +49,7 @@ class ConstraintTests(APITestCase):
         with self.assertRaises(IntegrityError) as context:
             Sector.objects.create(
                 name="sector test 01",
-                project=self.project_permission.project,
+                project=self.project,
                 work_start="12",
                 work_end="13",
                 rooms_limit=0,

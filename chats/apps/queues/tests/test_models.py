@@ -71,10 +71,10 @@ class QueueSetUpMixin(TestCase):
         self.agent_2 = create_user("agent2")
 
         self.agent_permission = self.agent.project_permissions.create(
-            project=self.project, role=ProjectPermission.ROLE_AGENT
+            project=self.project, role=ProjectPermission.ROLE_ATTENDANT
         )
         self.agent_2_permission = self.agent_2.project_permissions.create(
-            project=self.project, role=ProjectPermission.ROLE_AGENT
+            project=self.project, role=ProjectPermission.ROLE_ATTENDANT
         )
 
         self.queue = Queue.objects.create(name="Q1", sector=self.sector)
