@@ -48,17 +48,30 @@ class Project(BaseModel):
         except ProjectPermission.DoesNotExist:
             return None
 
-    def set_flows_project_auth_token(self, user_email: str = ""):
-        email = user_email or self.random_admin.user.email
+    def set_flows_project_auth_token(
+        self, user_email: str = "", permissions: list = []
+    ):
+        try:
+            email = user_email or permissions.pop(0).user.email
+        except (IndexError, AttributeError):
+            return None
         response = ConnectRESTClient().get_user_project_token(self, email)
+        if response.status_code != 200:
+            return self.set_flows_project_auth_token(
+                permissions=permissions, project=self
+            )
         token = response.json().get("api_token")
         self.flows_authorization = token
         self.save()
         return token
 
     @property
+    def admin_permissions(self):
+        return self.permissions.filter(role=ProjectPermission.ROLE_ADMIN)
+
+    @property
     def random_admin(self):
-        return self.permissions.filter(role=ProjectPermission.ROLE_ADMIN).first()
+        return self.admin_permissions.first()
 
     def get_sectors(self, user, custom_filters: dict = {}):
         user_permission = self.get_permission(user)
