@@ -313,6 +313,9 @@ PROMETHEUS_AUTH_TOKEN = env.str("PROMETHEUS_AUTH_TOKEN")
 
 ACTIVATE_CALC_METRICS = env.bool("ACTIVATE_CALC_METRICS", default=True)
 
+FILE_CHECK_CONTENT_TYPE = env.str(
+    "FILE_CHECK_CONTENT_TYPE", default="application/octet-stream"
+)
 AUDIO_TYPE_TO_CONVERT = env.str("AUDIO_TYPE_TO_CONVERT", default="ogg")
 AUDIO_EXTENSION_TO_CONVERT = env.str("AUDIO_EXTENSION_TO_CONVERT", default="ogg")
 AUDIO_CODEC_TO_CONVERT = env.str("AUDIO_CODEC_TO_CONVERT", default="libopus")
