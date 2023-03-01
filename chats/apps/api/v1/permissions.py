@@ -1,5 +1,6 @@
 from django.contrib.auth.models import AnonymousUser
 from rest_framework import permissions
+from django.core.exceptions import ObjectDoesNotExist
 
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.queues.models import Queue, QueueAuthorization
@@ -74,7 +75,10 @@ class IsQueueAgent(permissions.BasePermission):
             perm = obj.get_permission(request.user)
         except ProjectPermission.DoesNotExist:
             return False
-        return perm.is_agent(str(obj.queue.pk))
+        try:
+            return perm.is_agent(str(obj.queue.pk))
+        except ObjectDoesNotExist:
+            return False
 
 
 class SectorAnyPermission(permissions.BasePermission):
@@ -210,6 +214,12 @@ class QueueAddAgentPermission(permissions.BasePermission):
 
 class HasAgentPermissionAnyQueueSector(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
+        user = request.user
+        is_admin = obj.project.get_permission(user)
+
+        if is_admin and is_admin.is_manager(obj.pk):
+            return True
+
         return request.user in obj.queue_agents
 
 

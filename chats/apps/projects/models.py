@@ -187,7 +187,8 @@ class ProjectPermission(
     def is_agent(self, queue: str):
         if queue is None:
             return False
-        sector = self.project.sectors.get(queues__uuid=queue)
+
+        sector = self.project.sectors.get(queues=queue)
 
         if self.is_manager(sector=str(sector.uuid)):
             return True
