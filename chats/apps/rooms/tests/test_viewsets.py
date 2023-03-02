@@ -35,8 +35,8 @@ class RoomTests(APITestCase):
             user=self.owner, role=ProjectPermission.ROLE_ADMIN
         )
 
-        self.manager_perm = self.project.permissions.get(user=self.owner)
-        self.manager2_perm = self.project.permissions.get(user=self.owner)
+        self.manager_perm = self.project.permissions.create(user=self.manager, role=2)
+        self.manager2_perm = self.project.permissions.get(user=self.manager_2)
         self.agent_perm = self.project.permissions.create(
             user=self.agent, role=ProjectPermission.ROLE_ATTENDANT
         )
@@ -109,6 +109,7 @@ class RoomTests(APITestCase):
     def _ok_list_rooms(self, token, rooms: list, data: dict):
         response, results = self._request_list_rooms(token, data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
         self.assertEqual(response.json().get("count"), len(rooms))
         for result in results:
             self.assertIn(result.get("uuid"), rooms)
@@ -133,7 +134,7 @@ class RoomTests(APITestCase):
     def test_list_rooms_with_manager_and_admin_token(self):
         self._ok_list_rooms(
             self.manager_token,
-            [str(self.room_1.uuid), str(self.room_2.uuid)],
+            [str(self.room_2.uuid), str(self.room_3.uuid)],
             {"project": self.project.uuid},
         )
 
