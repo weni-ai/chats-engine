@@ -15,7 +15,6 @@ from chats.apps.msgs.models import Message
 from chats.apps.rooms.models import Room
 from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1 import permissions as api_permissions
-from chats.utils.websockets import send_channels_group
 
 from django.conf import settings
 

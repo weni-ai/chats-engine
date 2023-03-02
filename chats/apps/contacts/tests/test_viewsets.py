@@ -29,14 +29,14 @@ class TestContactsViewsets(BaseAPIChatsTestCase):
         self.deactivate_rooms()
         response = self._list_request(token=self.manager_token, data=payload)[0]
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.json().get("count"), self.count_manager_contact)
+        self.assertEqual(response.json().get("count"), 3)
 
     def test_agent_list_within_its_rooms(self):
         payload = {"project": str(self.project.uuid)}
         self.deactivate_rooms()
         response, results = self._list_request(token=self.agent_token, data=payload)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.json().get("count"), self.count_agent_contact)
+        self.assertEqual(response.json().get("count"), 2)
 
     def test_retrieve_contact_ok(self):
         """
