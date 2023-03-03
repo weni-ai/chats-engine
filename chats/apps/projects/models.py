@@ -58,7 +58,7 @@ class Project(BaseModel):
         response = ConnectRESTClient().get_user_project_token(self, email)
         if response.status_code != 200:
             return self.set_flows_project_auth_token(
-                permissions=permissions, project=self
+                permissions=permissions, user_email=email
             )
         token = response.json().get("api_token")
         self.flows_authorization = token
