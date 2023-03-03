@@ -40,9 +40,10 @@ def retry_request_and_refresh_flows_auth_token(
     for _ in range(0, retries):
         response = request_method(url=url, params=params, json=json, headers=headers)
         if response.status_code in [401, 403]:
-            headers["Authorization"] = project.set_flows_project_auth_token(
+            token = project.set_flows_project_auth_token(
                 user_email=user_email, permissions=permissions
             )
+            headers["Authorization"] = f"Token {token}"
         else:
             break
     return response
