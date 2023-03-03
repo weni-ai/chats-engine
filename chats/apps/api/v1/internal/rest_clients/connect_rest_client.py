@@ -26,7 +26,7 @@ class ConnectRESTClient(InternalAuthentication):
         params = {"user": user_email}
         project_uuid = str(project.uuid)
         if settings.USE_CONNECT_V2:
-            url = f"{self.base_url}/v2/projects/{project_uuid}/user_api_token"
+            url = f"{self.base_url}/v2/projects/{project_uuid}/user-api-token"
         else:
             url = f"{self.base_url}/v1/organization/project/user_api_token/"
             params["project_uuid"] = project_uuid
