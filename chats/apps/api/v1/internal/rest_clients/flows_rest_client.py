@@ -36,7 +36,7 @@ def retry_request_and_refresh_flows_auth_token(
     user_email: str = "",
     retries: int = settings.FLOWS_AUTH_TOKEN_RETRIES,
 ):
-    permissions = list(project.admin_permissions)
+    permissions = list(project.admin_permissions.values_list("user__email", flat=True))
     for _ in range(0, retries):
         response = request_method(url=url, params=params, json=json, headers=headers)
         if response.status_code in [401, 403]:

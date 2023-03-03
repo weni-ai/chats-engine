@@ -1,10 +1,11 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from timezone_field import TimeZoneField
-from chats.core.models import BaseModel
+from requests.exceptions import JSONDecodeError
 
 from django.core.exceptions import ObjectDoesNotExist
 
+from chats.core.models import BaseModel
 from chats.utils.websockets import send_channels_group
 from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
     ConnectRESTClient,
@@ -51,16 +52,17 @@ class Project(BaseModel):
     def set_flows_project_auth_token(
         self, user_email: str = "", permissions: list = []
     ):
+        if user_email != "":
+            permissions.insert(0, user_email)
+        while permissions != []:
+            email = permissions.pop(0)
+            response = ConnectRESTClient().get_user_project_token(self, email)
+            if response.status_code == 200:
+                break
         try:
-            email = user_email or permissions.pop(0).user.email
-        except (IndexError, AttributeError):
+            token = response.json().get("api_token")
+        except (UnboundLocalError, JSONDecodeError):
             return None
-        response = ConnectRESTClient().get_user_project_token(self, email)
-        if response.status_code != 200:
-            return self.set_flows_project_auth_token(
-                permissions=permissions, user_email=email
-            )
-        token = response.json().get("api_token")
         self.flows_authorization = token
         self.save()
         return token
