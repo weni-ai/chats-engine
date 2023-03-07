@@ -373,7 +373,7 @@ class DashboardDataSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Room
-        fields = ["closed_rooms"]
+        fields = ["closed_rooms", "transfer_count"]
 
     def get_closed_rooms(self, project):
         initial_datetime = timezone.now().replace(
