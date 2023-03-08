@@ -2,8 +2,10 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
-
 from chats.apps.rooms.models import Room
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 
 class RoomFilter(filters.FilterSet):
@@ -32,12 +34,18 @@ class RoomFilter(filters.FilterSet):
             )
         except ObjectDoesNotExist:
             return queryset.none()
+        user = self.request.query_params.get("email") or self.request.user
+
+        if type(user) == str:
+            user = User.objects.get(email=user)
+            project_permission = user.project_permissions.get(project__uuid=value)
+
         if project_permission.is_admin:
-            user_filter = Q(user=self.request.user) | Q(user__isnull=True)
+            user_filter = Q(user=user) | Q(user__isnull=True)
             return queryset.filter(
                 user_filter, is_active=True, queue__in=project_permission.queue_ids
             )
-        user_project = Q(user=self.request.user) & Q(queue__sector__project__uuid=value)
+        user_project = Q(user=user) & Q(queue__sector__project__uuid=value)
         queue_filter = Q(user__isnull=True) & Q(queue__in=project_permission.queue_ids)
         ff = user_project | queue_filter
         queryset = queryset.filter(
