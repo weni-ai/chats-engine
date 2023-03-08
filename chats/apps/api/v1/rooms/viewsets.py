@@ -19,7 +19,7 @@ from chats.utils.websockets import send_channels_group
 
 from django.conf import settings
 
-from django.db.models import Count, Avg, F, Sum, DateTimeField
+from django.db.models import F, Sum
 
 
 class RoomViewset(
@@ -137,6 +137,11 @@ class RoomViewset(
                 room_metric.waiting_time += time.total_seconds()
                 room_metric.queued_count += 1
                 room_metric.save()
+            else:
+                # Get the room metric from instance and update the transfer_count value.
+                room_metric = RoomMetrics.objects.get_or_create(room=instance)[0]
+                room_metric.transfer_count += 1
+                room_metric.save()
 
             transfer_content = {"type": "user", "name": instance.user.full_name}
             transfer_history.append(transfer_content)
@@ -149,6 +154,10 @@ class RoomViewset(
                 not user
             ):  # if it is only a queue transfer from a user, need to reset the user field
                 instance.user = None
+
+            room_metric = RoomMetrics.objects.get_or_create(room=instance)[0]
+            room_metric.transfer_count += 1
+            room_metric.save()
 
         instance.transfer_history = transfer_history
         instance.save()

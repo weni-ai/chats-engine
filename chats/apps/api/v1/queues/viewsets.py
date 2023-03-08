@@ -2,7 +2,7 @@ from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ModelViewSet
-from rest_framework import status, exceptions
+from rest_framework import status, exceptions, filters
 from django.conf import settings
 
 from chats.apps.api.v1.permissions import IsSectorManager
@@ -15,7 +15,7 @@ from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTCl
 class QueueViewset(ModelViewSet):
     queryset = Queue.objects.all()
     serializer_class = queue_serializers.QueueSerializer
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = QueueFilter
     permission_classes = [
         IsAuthenticated,
