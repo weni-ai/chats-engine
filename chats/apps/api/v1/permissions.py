@@ -55,6 +55,16 @@ class ProjectAnyPermission(permissions.BasePermission):
         return obj.permissions.filter(user=request.user).exists()
 
 
+class AnyQueueAgentPermission(permissions.BasePermission):
+    def has_permission(self, request, view):
+        try:
+            return GetPermission(request).permission.is_agent(
+                queue=None, any_queue=True
+            )
+        except AttributeError:
+            return False
+
+
 class IsQueueAgent(permissions.BasePermission):
     def has_permission(self, request, view):
         data = request.data or request.query_params

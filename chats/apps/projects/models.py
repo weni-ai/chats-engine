@@ -186,7 +186,11 @@ class ProjectPermission(
 
         return False
 
-    def is_agent(self, queue: str):
+    def is_agent(self, queue: str, any_queue: bool = False):
+        if self.is_admin:
+            return True
+        if any_queue:
+            return self.project.queue_authorizations.exists()
         if queue is None:
             return False
 
