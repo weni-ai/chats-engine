@@ -30,15 +30,18 @@ class RoomFilter(filters.FilterSet):
         project_permission = self.request.user.project_permissions.get(
             project__uuid=value
         )
-        user_filter = Q(Q(user=self.request.user) | Q(user__isnull=True))
         if project_permission.is_admin:
+            user_filter = Q(user=self.request.user) | Q(user__isnull=True)
             return queryset.filter(
                 user_filter, is_active=True, queue__sector__project__uuid=value
             )
-
+        user_project = Q(user=self.request.user) & Q(queue__sector__project__uuid=value)
+        queue_filter = Q(user__isnull=True) & Q(
+            queue__uuid__in=project_permission.queue_ids
+        )
+        ff = user_project | queue_filter
         queryset = queryset.filter(
-            user_filter,
-            queue__uuid__in=project_permission.queue_ids,
+            ff,
             is_active=True,
         )
         return queryset

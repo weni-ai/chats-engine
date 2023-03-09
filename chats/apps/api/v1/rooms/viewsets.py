@@ -66,6 +66,7 @@ class RoomViewset(
         instance.close(tags, "agent")
         serialized_data = RoomSerializer(instance=instance)
         instance.notify_queue("close", callback=True)
+        instance.notify_user("close")
 
         if not settings.ACTIVATE_CALC_METRICS:
             return Response(serialized_data.data, status=status.HTTP_200_OK)
@@ -167,6 +168,7 @@ class RoomViewset(
 
         # Send Updated data to the queue group, as send room is not sending after a join
         instance.notify_queue("update")
+        instance.notify_user("update")
 
         if user:
             instance.user_connection(action="join")
