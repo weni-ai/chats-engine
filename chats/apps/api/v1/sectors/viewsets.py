@@ -7,6 +7,7 @@ from rest_framework.response import Response
 from chats.apps.api.v1.permissions import (
     IsProjectAdmin,
     IsQueueAgent,
+    AnyQueueAgentPermission,
     IsSectorManager,
     HasAgentPermissionAnyQueueSector,
 )
@@ -145,7 +146,7 @@ class SectorTagsViewset(viewsets.ModelViewSet):
     def get_permissions(self):
         permission_classes = self.permission_classes
         if self.action == "list":
-            permission_classes = (IsAuthenticated, IsQueueAgent)
+            permission_classes = (IsAuthenticated, AnyQueueAgentPermission)
         else:
             permission_classes = (IsAuthenticated, IsSectorManager)
 
