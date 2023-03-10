@@ -1,19 +1,20 @@
 from django.db.models import Q
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import permissions, viewsets
+from rest_framework import permissions, viewsets, filters
 
 from chats.apps.api.v1.contacts.filters import ContactFilter
 from chats.apps.api.v1.contacts.serializers import ContactSerializer
 from chats.apps.contacts.models import Contact
 
 
-class ContactViewset(viewsets.ReadOnlyModelViewSet):  #
+class ContactViewset(viewsets.ReadOnlyModelViewSet):
 
     queryset = Contact.objects.all()
     serializer_class = ContactSerializer
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_class = ContactFilter
     permission_classes = [permissions.IsAuthenticated]
+    search_fields = ["name"]
 
     def get_queryset(self):
         qs = self.queryset

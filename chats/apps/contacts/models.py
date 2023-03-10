@@ -73,7 +73,11 @@ class Contact(BaseModel):
         }
         valid_filters = dict((k, v) for k, v in filters.items() if v is not None)
 
-        return self.rooms.filter(is_active=False, **valid_filters).last()
+        return (
+            self.rooms.order_by("created_on")
+            .filter(is_active=False, **valid_filters)
+            .last()
+        )
 
     def tags_list(self, request):
         """
