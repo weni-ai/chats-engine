@@ -97,7 +97,7 @@ class SectorTagFilter(filters.FilterSet):
 
             project_permission = sector.get_permission(self.request.user)
 
-            if not project_permission.is_agent(any_queue=True):
+            if not project_permission.is_agent(queue=None, any_queue=True):
                 return SectorTag.objects.none()
 
         except (Project.DoesNotExist, Sector.DoesNotExist, AttributeError):
