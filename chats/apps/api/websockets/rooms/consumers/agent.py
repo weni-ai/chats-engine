@@ -5,6 +5,7 @@ from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
+from django.utils import timezone
 
 from chats.apps.rooms.models import Room
 
@@ -48,6 +49,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 await self.load_queues()
                 await self.load_user()
                 await self.set_user_status("ONLINE")
+                self.last_ping = timezone.now()
 
     async def disconnect(self, *args, **kwargs):
         for group in set(self.added_groups):
@@ -74,6 +76,9 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         elif command_name == "method":
             command = getattr(self, payload["action"])
             await command(payload["content"])
+        elif command_name == "ping":
+            self.last_ping = timezone.now()
+            await self.send_json({"type": "pong"})
 
     # METHODS
 
