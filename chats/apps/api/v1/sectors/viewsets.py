@@ -146,7 +146,9 @@ class SectorTagsViewset(viewsets.ModelViewSet):
     def get_permissions(self):
         permission_classes = self.permission_classes
         if self.action == "list":
-            permission_classes = (IsAuthenticated, AnyQueueAgentPermission)
+            permission_classes = [
+                IsAuthenticated,
+            ]
         else:
             permission_classes = (IsAuthenticated, IsSectorManager)
 
