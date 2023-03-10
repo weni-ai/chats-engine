@@ -190,7 +190,7 @@ class ProjectPermission(
         if self.is_admin:
             return True
         if any_queue:
-            return self.project.queue_authorizations.exists()
+            return self.queue_authorizations.exists()
         if queue is None:
             return False
 
