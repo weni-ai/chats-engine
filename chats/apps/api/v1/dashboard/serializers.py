@@ -9,7 +9,17 @@ from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue
 
 from chats.apps.rooms.models import Room
-from django.db.models import Sum, Count, Q, F, Avg, ExpressionWrapper
+from django.db.models import (
+    Sum,
+    Count,
+    Q,
+    F,
+    Avg,
+    ExpressionWrapper,
+    IntegerField,
+    OuterRef,
+    Subquery,
+)
 from chats.apps.sectors.models import Sector
 from django.db.models import FloatField, Case, When
 from django.db.models.functions import Cast
@@ -296,9 +306,9 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
                 f"{rooms_filter_prefix}rooms__queue__sector__project"
             ] = project
             if self.context.get("agent"):
-                 rooms_filter[
-                    f"{rooms_filter_prefix}rooms__user"
-                ] = self.context.get("agent")
+                rooms_filter[f"{rooms_filter_prefix}rooms__user"] = self.context.get(
+                    "agent"
+                )
 
         if self.context.get("start_date") and self.context.get("end_date"):
             rooms_filter[f"{rooms_filter_prefix}rooms__created_on__range"] = [
@@ -323,6 +333,10 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
 
         percentage_filter = rooms_filter.copy()
         percentage_filter[f"{rooms_filter_prefix}rooms__metric__transfer_count__gt"] = 0
+        online_agents_subquery = model.objects.annotate(
+            online_agents=Count("queues__authorizations__permission", distinct=True),
+            filter=Q(**online_agents_filter),
+        ).filter(pk=OuterRef("pk"))
 
         results = (
             model.objects.filter(**model_filter)
@@ -360,7 +374,10 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
                     ),
                     output_field=FloatField(),
                 ),
-                online_agents=online_agents,
+                online_agents=Subquery(
+                    online_agents_subquery.values("online_agents"),
+                    output_field=IntegerField(),
+                ),
             )
         )
         return results
