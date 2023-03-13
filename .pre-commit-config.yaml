@@ -2,10 +2,43 @@ fail_fast: true
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v2.3.0
+    rev: v4.4.0
     hooks:
+      - id: debug-statements
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
       - id: check-merge-conflict
+      - id: check-ast
+      - id: fix-byte-order-marker
+      - id: check-json
+      - id: check-symlinks
+      - id: check-vcs-permalinks
+      - id: check-xml
+      - id: check-yaml
+      - id: detect-aws-credentials
+        args: ['--allow-missing-credentials']
+      - id: detect-private-key
+      - id: forbid-new-submodules
+      - id: no-commit-to-branch
+      - id: flake8
+        args: ['--exclude=docs/*,*migrations*', '--ignore=E501,W503, E203',]
       - id: end-of-file-fixer
+      - id: name-tests-test
+
+  - repo: local
+    hooks:
+      - id: check-datetime-now
+        name: check_datetime_now
+        description: Prefer datetime.utcnow() ou django.utils.timezone
+        language: pygrep
+        entry: 'datetime\.now\(\)'
+        types: [python]
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.12.0
+    hooks:
+      - id: isort
+        name: isort (python)
 
   - repo: local
     hooks:
@@ -17,11 +50,12 @@ repos:
         language: system
 
   - repo: https://github.com/psf/black
-    rev: 21.12b0
+    rev: 23.1.0
     hooks:
       - id: black
 
   - repo: https://github.com/pycqa/flake8
-    rev: 4.0.1
+    rev: 6.0.0
     hooks:
       - id: flake8
+      
