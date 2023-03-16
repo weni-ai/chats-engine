@@ -34,7 +34,7 @@ class RoomFilter(filters.FilterSet):
             user_filter = Q(user=self.request.user) | Q(user__isnull=True)
             return queryset.filter(
                 user_filter, is_active=True, queue__sector__project__uuid=value
-            )
+            ).order_by("user", "created_on")
         user_project = Q(user=self.request.user) & Q(queue__sector__project__uuid=value)
         queue_filter = Q(user__isnull=True) & Q(
             queue__uuid__in=project_permission.queue_ids
@@ -44,7 +44,9 @@ class RoomFilter(filters.FilterSet):
             ff,
             is_active=True,
         )
-        return queryset
+        return queryset.order_by(
+            "user", "created_on"
+        )  # TODO: THIS IS A HOTFIX, REMOVE THIS ORDER AND USE THE VIEW ORDERING
 
     def filter_is_active(self, queryset, name, value):
         return queryset.filter(is_active=value)
