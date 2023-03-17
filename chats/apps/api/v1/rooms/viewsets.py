@@ -2,7 +2,7 @@ import json
 
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
-from rest_framework import mixins, permissions, status
+from rest_framework import mixins, permissions, status, filters
 from rest_framework.decorators import action
 from django_filters.rest_framework import DjangoFilterBackend
 
@@ -30,7 +30,7 @@ class RoomViewset(
 ):
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
     filterset_class = room_filters.RoomFilter
 
     def get_permissions(self):
