@@ -44,7 +44,9 @@ class RoomFilter(filters.FilterSet):
             ff,
             is_active=True,
         )
-        return queryset
+        return queryset.order_by(
+            "user", "created_on"
+        )  # TODO: THIS IS A HOTFIX, REMOVE THIS ORDER AND USE THE VIEW ORDERING
 
     def filter_is_active(self, queryset, name, value):
         return queryset.filter(is_active=value)
