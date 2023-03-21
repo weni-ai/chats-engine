@@ -1,8 +1,10 @@
 import json
 
 from django.conf import settings
-from django.db.models import F, Sum
+from django.db.models import F, Sum, Max
 from django.utils import timezone
+from rest_framework import mixins, permissions, status, filters
+from rest_framework.decorators import action
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
@@ -27,10 +29,13 @@ class RoomViewset(
     serializer_class = RoomSerializer
     filter_backends = [
         DjangoFilterBackend,
+        filters.OrderingFilter,
         filters.SearchFilter,
     ]
     filterset_class = room_filters.RoomFilter
     search_fields = ["contact__name", "urn"]
+    ordering_fields = "__all__"
+    ordering = ["user", "-last_interaction"]
 
     def get_permissions(self):
         permission_classes = [permissions.IsAuthenticated]
@@ -44,7 +49,8 @@ class RoomViewset(
     def get_queryset(self):
         if self.action != "list":
             self.filterset_class = None
-        return super().get_queryset()
+        qs = super().get_queryset()
+        return qs.annotate(last_interaction=Max("messages__created_on"))
 
     def get_serializer_class(self):
         if "update" in self.action:
