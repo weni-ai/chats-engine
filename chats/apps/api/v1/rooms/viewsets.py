@@ -28,8 +28,8 @@ class RoomViewset(
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
     filter_backends = [
+        room_filters.CustomOrderingFilter,
         DjangoFilterBackend,
-        filters.OrderingFilter,
         filters.SearchFilter,
     ]
     filterset_class = room_filters.RoomFilter
