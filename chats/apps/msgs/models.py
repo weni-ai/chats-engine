@@ -42,6 +42,7 @@ class Message(BaseModel):
     class Meta:
         verbose_name = "Message"
         verbose_name_plural = "Messages"
+        ordering = ["created_on"]
 
     def save(self, *args, **kwargs) -> None:
         if self.room.is_active is False:
