@@ -19,6 +19,7 @@ class RoomSerializer(serializers.ModelSerializer):
     last_message = serializers.SerializerMethodField()
     is_waiting = serializers.SerializerMethodField()
     linked_user = serializers.SerializerMethodField()
+    is_24h_valid = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -29,7 +30,11 @@ class RoomSerializer(serializers.ModelSerializer):
             "custom_fields",
             "urn",
             "linked_user",
+            "is_24h_valid",
         ]
+
+    def get_is_24h_valid(self, room: Room) -> bool:
+        return room.is_24h_valid
 
     def get_linked_user(self, room: Room):
         try:
