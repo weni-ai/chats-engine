@@ -1,17 +1,14 @@
-from django.conf import settings
-
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 
 from rest_framework import serializers
 
-from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.projects.models import Project, ProjectPermission
-from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.queues.models import Queue
 
 from chats.apps.rooms.models import Room
 from django.db.models import Sum, Count, Q, Avg
-from chats.apps.sectors.models import Sector, SectorTag
+from chats.apps.sectors.models import Sector
 
 
 class DashboardRoomsSerializer(serializers.ModelSerializer):
@@ -255,10 +252,20 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
         if self.context.get("start_date") and self.context.get("end_date"):
             rooms_filter[f"{rooms_filter_prefix}rooms__created_on__range"] = [
                 self.context.get("start_date"),
-                self.context.get("end_date"),
+                self.context.get("end_date")
+                + " 23:59:59",  # TODO: USE DATETIME IN END DATE
             ]
-            # SE EU NAO ADD AQUI DENTRO, DA ERRO AO FILTRAR PASSANDO SETOR COM DATA
-            online_agents = Count(f"{rooms_filter_prefix}rooms")
+
+            online_agents_filter = {}
+            online_agents_filter[f"{rooms_filter_prefix}rooms__created_on__range"] = [
+                self.context.get("start_date"),
+                self.context.get("end_date")
+                + " 23:59:59",  # TODO: USE DATETIME IN END DATE
+            ]
+            online_agents = Count(
+                f"{rooms_filter_prefix}rooms",
+                filter=Q(**online_agents_filter),
+            )
 
         else:
             rooms_filter[
