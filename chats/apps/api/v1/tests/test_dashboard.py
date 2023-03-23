@@ -1,11 +1,11 @@
 from django.urls import reverse
-from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework.authtoken.models import Token
 
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
+from chats.apps.accounts.models import User
 
 import time
 
@@ -15,6 +15,8 @@ class DashboardTests(APITestCase):
 
     def setUp(self) -> None:
         self.queue_1 = Queue.objects.get(uuid="f341417b-5143-4469-a99d-f141a0676bd4")
+        self.manager_user = User.objects.get(pk=7)
+        self.login_token = Token.objects.get_or_create(user=self.manager_user)[0]
 
     def test_create_room_metrics(self):
         """
@@ -45,13 +47,13 @@ class DashboardTests(APITestCase):
         """
         Verify if the interaction_time of a room metric its calculated correctly.
         """
-        url = reverse("external_rooms-list")
-        print(url)
+        url = "/v1/external/rooms/"
         client = self.client
         client.credentials(
             HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380"
         )
         data = {
+            "user_email": str(self.manager_user),
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
                 "external_id": "e3955fd5-5705-40cd-b480-b45594b70282",
@@ -63,23 +65,23 @@ class DashboardTests(APITestCase):
         }
         client.post(url, data=data, format="json")
         room_created = Room.objects.get(queue_id=data["queue_uuid"])
+        room_created.user = self.manager_user
+        room_created.save()
+
         time.sleep(3)
-        # print(room_created.uuid)
-        url_close = f"/v1/external/rooms/{room_created.uuid}/close/"
-        client.patch(url_close, data="", format="json")
-        # print(url_close)
-        # print(room_created)
+
+        url_close = f"/v1/room/{room_created.uuid}/close/"
+        close_client = self.client
+        close_client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        data_close = {
+            "tags": [
+                "f4b8aa78-7735-4dd2-9999-941ebb8e4e35",
+                "1a84b46e-0f91-41da-ac9d-a68c0b9753ab",
+            ]
+        }
+        client.patch(url_close, data=data_close, format="json")
 
         room_closed = Room.objects.get(queue_id=data["queue_uuid"])
+        metric = RoomMetrics.objects.get(room=room_closed)
 
-        a = RoomMetrics.objects.filter(room=room_closed).values()
-        print(a)
-
-        difference = room_closed.ended_at - room_created.created_on
-
-        difference_metric_value = RoomMetrics.objects.filter(room=room_closed).values(
-            "interaction_time"
-        )
-        print("abertura", room_created.created_on)
-        print("fechamento", room_closed.ended_at)
-        print(difference)
+        self.assertEqual(metric.interaction_time, 3)
