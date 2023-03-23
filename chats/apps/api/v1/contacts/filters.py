@@ -1,6 +1,5 @@
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
-
 from chats.apps.contacts.models import Contact
 
 
@@ -28,13 +27,13 @@ class ContactFilter(filters.FilterSet):
         method="filter_tags",
         help_text=_("Room Tags"),
     )
-    created_on = filters.DateRangeFilter()
-    r_created_on = filters.DateRangeFilter(
+    created_on = filters.DateFromToRangeFilter()
+    r_created_on = filters.DateFromToRangeFilter(
         field_name="rooms__created_on",
         required=False,
         help_text=_("Room created on"),
     )
-    r_ended_at = filters.DateRangeFilter(
+    r_ended_at = filters.DateFromToRangeFilter(
         field_name="rooms__ended_at",
         required=False,
         help_text=_("Room ended at"),
