@@ -31,12 +31,13 @@ class RoomViewset(
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
     filter_backends = [
+        room_filters.CustomOrderingFilter,
         DjangoFilterBackend,
-        filters.OrderingFilter,
         filters.SearchFilter,
     ]
     filterset_class = room_filters.RoomFilter
     search_fields = ["contact__name"]
+    ordering_fields = "__all__"
 
     def get_permissions(self):
         permission_classes = [permissions.IsAuthenticated]

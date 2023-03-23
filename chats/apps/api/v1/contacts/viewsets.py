@@ -38,12 +38,10 @@ class ContactViewset(viewsets.ReadOnlyModelViewSet):
             | is_project_admin
             | is_user_assigned_to_room
         )
+
         user_role_related_contacts = qs.filter(
             check_admin_manager_agent_role_filter, rooms__is_active=False
         ).distinct()
-        # user_role_related_contacts = qs.filter(
-        #     rooms__queue__sector__project__permissions__user=user,
-        # )
 
         return user_role_related_contacts
 

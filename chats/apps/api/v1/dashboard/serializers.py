@@ -55,9 +55,9 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
                 self.context.get("start_date"),
                 self.context.get("end_date"),
             ]
+            rooms_filter["is_active"] = False
         else:
             rooms_filter["is_active"] = True
-            rooms_filter["created_on__gte"] = initial_datetime
 
         if self.context.get("agent"):
             rooms_filter["user"] = self.context.get("agent")
@@ -241,8 +241,8 @@ class DashboardAgentsSerializer(serializers.Serializer):
                 self.context.get("start_date"),
                 self.context.get("end_date"),
             ]
+            rooms_filter["user__rooms__is_active"] = False
         else:
-            rooms_filter["user__rooms__created_on__gte"] = initial_datetime
             rooms_filter["user__rooms__is_active"] = True
             permission_filter["status"] = "ONLINE"
 
