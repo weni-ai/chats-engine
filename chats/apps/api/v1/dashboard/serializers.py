@@ -31,7 +31,8 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
         if self.context.get("start_date") and self.context.get("end_date"):
             rooms_filter["created_on__range"] = [
                 self.context.get("start_date"),
-                self.context.get("end_date"),
+                self.context.get("end_date")
+                + " 23:59:59",  # TODO: USE DATETIME IN END DATE
             ]
             rooms_filter["is_active"] = False
         else:
@@ -60,7 +61,8 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
         if self.context.get("start_date") and self.context.get("end_date"):
             rooms_filter["created_on__range"] = [
                 self.context.get("start_date"),
-                self.context.get("end_date"),
+                self.context.get("end_date")
+                + " 23:59:59",  # TODO: USE DATETIME IN END DATE
             ]
         else:
             rooms_filter["created_on__gte"] = initial_datetime
@@ -96,7 +98,8 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
         if self.context.get("start_date") and self.context.get("end_date"):
             rooms_filter["created_on__range"] = [
                 self.context.get("start_date"),
-                self.context.get("end_date"),
+                self.context.get("end_date")
+                + " 23:59:59",  # TODO: USE DATETIME IN END DATE
             ]
         else:
             rooms_filter["created_on__gte"] = initial_datetime
@@ -131,7 +134,8 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
         if self.context.get("start_date") and self.context.get("end_date"):
             rooms_filter["created_on__range"] = [
                 self.context.get("start_date"),
-                self.context.get("end_date"),
+                self.context.get("end_date")
+                + " 23:59:59",  # TODO: USE DATETIME IN END DATE
             ]
         else:
             rooms_filter["created_on__gte"] = initial_datetime
@@ -179,7 +183,8 @@ class DashboardAgentsSerializer(serializers.Serializer):
         if self.context.get("start_date") and self.context.get("end_date"):
             rooms_filter["user__rooms__created_on__range"] = [
                 self.context.get("start_date"),
-                self.context.get("end_date"),
+                self.context.get("end_date")
+                + " 23:59:59",  # TODO: USE DATETIME IN END DATE
             ]
             rooms_filter["user__rooms__is_active"] = False
         else:
