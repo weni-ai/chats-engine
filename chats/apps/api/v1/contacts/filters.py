@@ -1,6 +1,7 @@
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 from chats.apps.contacts.models import Contact
+from django.db.models import Q
 
 
 class ContactFilter(filters.FilterSet):
@@ -40,7 +41,18 @@ class ContactFilter(filters.FilterSet):
     )
 
     def filter_project(self, queryset, name, value):
-        return queryset.filter(rooms__queue__sector__project__uuid=value)
+        qs = self.queryset
+        user = self.request.user
+        user_permission = user.project_permissions.get(project=value)
+        queue_ids = user_permission.queue_ids
+        room_queue = Q(rooms__queue__in=queue_ids)
+        is_user_assigned_to_room = Q(rooms__user=user)
+        check_queues_and_user_filter = room_queue | is_user_assigned_to_room
+
+        user_role_related_contacts = qs.filter(
+            check_queues_and_user_filter, rooms__is_active=False
+        ).distinct()
+        return user_role_related_contacts
 
     def filter_sector(self, queryset, name, value):
         return queryset.filter(rooms__queue__sector__uuid=value)

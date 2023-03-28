@@ -33,7 +33,7 @@ class RoomFilter(filters.FilterSet):
         if project_permission.is_admin:
             user_filter = Q(user=self.request.user) | Q(user__isnull=True)
             return queryset.filter(
-                user_filter, is_active=True, queue__sector__project__uuid=value
+                user_filter, is_active=True, queue__in=project_permission.queue_ids
             ).order_by(
                 "user", "created_on"
             )  # TODO: THIS IS A HOTFIX, REMOVE THIS ORDER AND USE THE VIEW ORDERING
