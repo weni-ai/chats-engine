@@ -217,9 +217,9 @@ class ProjectPermission(
             .distinct()
         )
         queue_agent_queues = list(
-            self.queue_authorizations.exclude(queue__uuid__in=sector_manager_queues)
-            .values_list("queue", flat=True)
-            .distinct()
+            self.queue_authorizations.exclude(
+                queue__uuid__in=sector_manager_queues
+            ).values_list("queue", flat=True)
         )
         queues = set(sector_manager_queues + queue_agent_queues)
 
