@@ -42,6 +42,8 @@ pendulum = "^2.1.2"
 prometheus-client = "^0.15.0"
 pydub = "^0.25.1"
 python-magic = "^0.4.27"
+pandas = "^1.5.3"
+openpyxl = "^3.1.2"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
