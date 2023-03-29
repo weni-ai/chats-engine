@@ -148,7 +148,9 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             flow_uuid = validated_data.pop("flow_uuid")
 
         if contact_data.get("urn"):
-            validated_data["urn"] = contact_data.pop("urn").split("?")[0]
+            urn = contact_data.pop("urn").split("?")[0]
+            if contact_data.get("name") is not None:
+                validated_data["urn"] = urn
         contact, created = Contact.objects.update_or_create(
             external_id=contact_external_id, defaults=contact_data
         )
