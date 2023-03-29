@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from django.db.models import Q
 from timezone_field import TimeZoneField
 from requests.exceptions import JSONDecodeError
 
@@ -83,8 +84,9 @@ class Project(BaseModel):
             and user_permission.role == ProjectPermission.ROLE_ADMIN
         ):  # Admin role
             return sectors
-
-        return sectors.filter(authorizations__permission=user_permission)
+        sector_auth_filter = Q(authorizations__permission=user_permission)
+        queue_auth_filter = Q(queues__authorizations__permission=user_permission)
+        return sectors.filter(sector_auth_filter | queue_auth_filter).distinct()
 
 
 class ProjectPermission(
@@ -186,7 +188,11 @@ class ProjectPermission(
 
         return False
 
-    def is_agent(self, queue: str):
+    def is_agent(self, queue: str, any_queue: bool = False):
+        if self.is_admin:
+            return True
+        if any_queue:
+            return self.queue_authorizations.exists()
         if queue is None:
             return False
 
@@ -211,9 +217,9 @@ class ProjectPermission(
             .distinct()
         )
         queue_agent_queues = list(
-            self.queue_authorizations.exclude(queue__uuid__in=sector_manager_queues)
-            .values_list("queue", flat=True)
-            .distinct()
+            self.queue_authorizations.exclude(
+                queue__uuid__in=sector_manager_queues
+            ).values_list("queue", flat=True)
         )
         queues = set(sector_manager_queues + queue_agent_queues)
 

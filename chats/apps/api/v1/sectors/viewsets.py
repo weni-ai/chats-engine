@@ -1,12 +1,13 @@
 import queue
 from django.conf import settings
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import status, viewsets, exceptions
+from rest_framework import status, viewsets, exceptions, filters
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from chats.apps.api.v1.permissions import (
     IsProjectAdmin,
     IsQueueAgent,
+    AnyQueueAgentPermission,
     IsSectorManager,
     HasAgentPermissionAnyQueueSector,
 )
@@ -28,7 +29,7 @@ from django.db import IntegrityError
 class SectorViewset(viewsets.ModelViewSet):
     queryset = Sector.objects.all()
     serializer_class = sector_serializers.SectorSerializer
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = SectorFilter
     lookup_field = "uuid"
 
@@ -145,7 +146,9 @@ class SectorTagsViewset(viewsets.ModelViewSet):
     def get_permissions(self):
         permission_classes = self.permission_classes
         if self.action == "list":
-            permission_classes = (IsAuthenticated, IsQueueAgent)
+            permission_classes = [
+                IsAuthenticated,
+            ]
         else:
             permission_classes = (IsAuthenticated, IsSectorManager)
 

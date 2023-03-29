@@ -6,6 +6,7 @@ from chats.apps.projects.models import ProjectPermission
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.sectors.models import SectorAuthorization
 from chats.core.permissions import GetPermission
+from chats.apps.rooms.models import Room
 
 WRITE_METHODS = ["POST"]
 OBJECT_METHODS = ["DELETE", "PATCH", "PUT", "GET"]
@@ -54,6 +55,16 @@ class ProjectAnyPermission(permissions.BasePermission):
         return obj.permissions.filter(user=request.user).exists()
 
 
+class AnyQueueAgentPermission(permissions.BasePermission):
+    def has_permission(self, request, view):
+        try:
+            return GetPermission(request).permission.is_agent(
+                queue=None, any_queue=True
+            )
+        except AttributeError:
+            return False
+
+
 class IsQueueAgent(permissions.BasePermission):
     def has_permission(self, request, view):
         data = request.data or request.query_params
@@ -71,6 +82,9 @@ class IsQueueAgent(permissions.BasePermission):
     def has_object_permission(self, request, view, obj) -> bool:
         if isinstance(request.user, AnonymousUser):
             return False
+        if isinstance(obj, Room):
+            if obj.user == request.user:
+                return True
         try:
             perm = obj.get_permission(request.user)
         except ProjectPermission.DoesNotExist:

@@ -1,7 +1,7 @@
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
-
 from chats.apps.contacts.models import Contact
+from django.db.models import Q
 
 
 class ContactFilter(filters.FilterSet):
@@ -28,20 +28,31 @@ class ContactFilter(filters.FilterSet):
         method="filter_tags",
         help_text=_("Room Tags"),
     )
-    created_on = filters.DateRangeFilter()
-    r_created_on = filters.DateRangeFilter(
+    created_on = filters.DateFromToRangeFilter()
+    r_created_on = filters.DateFromToRangeFilter(
         field_name="rooms__created_on",
         required=False,
         help_text=_("Room created on"),
     )
-    r_ended_at = filters.DateRangeFilter(
+    r_ended_at = filters.DateFromToRangeFilter(
         field_name="rooms__ended_at",
         required=False,
         help_text=_("Room ended at"),
     )
 
     def filter_project(self, queryset, name, value):
-        return queryset.filter(rooms__queue__sector__project__uuid=value)
+        qs = self.queryset
+        user = self.request.user
+        user_permission = user.project_permissions.get(project=value)
+        queue_ids = user_permission.queue_ids
+        room_queue = Q(rooms__queue__in=queue_ids)
+        is_user_assigned_to_room = Q(rooms__user=user)
+        check_queues_and_user_filter = room_queue | is_user_assigned_to_room
+
+        user_role_related_contacts = qs.filter(
+            check_queues_and_user_filter, rooms__is_active=False
+        ).distinct()
+        return user_role_related_contacts
 
     def filter_sector(self, queryset, name, value):
         return queryset.filter(rooms__queue__sector__uuid=value)

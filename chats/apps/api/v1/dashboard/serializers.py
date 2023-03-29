@@ -1,5 +1,3 @@
-from django.conf import settings
-
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 
@@ -53,11 +51,12 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
         if self.context.get("start_date") and self.context.get("end_date"):
             rooms_filter["created_on__range"] = [
                 self.context.get("start_date"),
-                self.context.get("end_date"),
+                self.context.get("end_date")
+                + " 23:59:59",  # TODO: USE DATETIME IN END DATE
             ]
+            rooms_filter["is_active"] = False
         else:
             rooms_filter["is_active"] = True
-            rooms_filter["created_on__gte"] = initial_datetime
 
         if self.context.get("agent"):
             rooms_filter["user"] = self.context.get("agent")
@@ -82,7 +81,8 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
         if self.context.get("start_date") and self.context.get("end_date"):
             rooms_filter["created_on__range"] = [
                 self.context.get("start_date"),
-                self.context.get("end_date"),
+                self.context.get("end_date")
+                + " 23:59:59",  # TODO: USE DATETIME IN END DATE
             ]
         else:
             rooms_filter["created_on__gte"] = initial_datetime
@@ -118,7 +118,8 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
         if self.context.get("start_date") and self.context.get("end_date"):
             rooms_filter["created_on__range"] = [
                 self.context.get("start_date"),
-                self.context.get("end_date"),
+                self.context.get("end_date")
+                + " 23:59:59",  # TODO: USE DATETIME IN END DATE
             ]
         else:
             rooms_filter["created_on__gte"] = initial_datetime
@@ -153,7 +154,8 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
         if self.context.get("start_date") and self.context.get("end_date"):
             rooms_filter["created_on__range"] = [
                 self.context.get("start_date"),
-                self.context.get("end_date"),
+                self.context.get("end_date")
+                + " 23:59:59",  # TODO: USE DATETIME IN END DATE
             ]
         else:
             rooms_filter["created_on__gte"] = initial_datetime
@@ -239,10 +241,11 @@ class DashboardAgentsSerializer(serializers.Serializer):
         if self.context.get("start_date") and self.context.get("end_date"):
             rooms_filter["user__rooms__created_on__range"] = [
                 self.context.get("start_date"),
-                self.context.get("end_date"),
+                self.context.get("end_date")
+                + " 23:59:59",  # TODO: USE DATETIME IN END DATE
             ]
+            rooms_filter["user__rooms__is_active"] = False
         else:
-            rooms_filter["user__rooms__created_on__gte"] = initial_datetime
             rooms_filter["user__rooms__is_active"] = True
             permission_filter["status"] = "ONLINE"
 
@@ -313,10 +316,20 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
         if self.context.get("start_date") and self.context.get("end_date"):
             rooms_filter[f"{rooms_filter_prefix}rooms__created_on__range"] = [
                 self.context.get("start_date"),
-                self.context.get("end_date"),
+                self.context.get("end_date")
+                + " 23:59:59",  # TODO: USE DATETIME IN END DATE
             ]
-            # SE EU NAO ADD AQUI DENTRO, DA ERRO AO FILTRAR PASSANDO SETOR COM DATA
-            online_agents = Count(f"{rooms_filter_prefix}rooms")
+
+            online_agents_filter = {}
+            online_agents_filter[f"{rooms_filter_prefix}rooms__created_on__range"] = [
+                self.context.get("start_date"),
+                self.context.get("end_date")
+                + " 23:59:59",  # TODO: USE DATETIME IN END DATE
+            ]
+            online_agents = Count(
+                f"{rooms_filter_prefix}rooms",
+                filter=Q(**online_agents_filter),
+            )
 
         else:
             rooms_filter[
