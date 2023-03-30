@@ -57,6 +57,7 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
             hour=0, minute=0, second=0, microsecond=0
         )
         rooms_filter = {}
+        rooms_filter["user__isnull"] = False
 
         if self.context.get("start_date") and self.context.get("end_date"):
             rooms_filter["created_on__range"] = [
@@ -94,6 +95,7 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
             hour=0, minute=0, second=0, microsecond=0
         )
         rooms_filter = {}
+        rooms_filter["user__isnull"] = False
 
         if self.context.get("start_date") and self.context.get("end_date"):
             rooms_filter["created_on__range"] = [
@@ -130,6 +132,7 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
             hour=0, minute=0, second=0, microsecond=0
         )
         rooms_filter = {}
+        rooms_filter["user__isnull"] = False
 
         if self.context.get("start_date") and self.context.get("end_date"):
             rooms_filter["created_on__range"] = [
@@ -235,6 +238,7 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
         model_filter = {"project": project}
         rooms_filter_prefix = "queues__"
         online_agents = Count(f"{rooms_filter_prefix}rooms")
+        rooms_filter["user__isnull"] = False
 
         if self.context.get("sector"):
             model = Queue
