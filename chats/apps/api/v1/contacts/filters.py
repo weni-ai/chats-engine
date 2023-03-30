@@ -46,7 +46,9 @@ class ContactFilter(filters.FilterSet):
         user_permission = user.project_permissions.get(project=value)
         queue_ids = user_permission.queue_ids
         room_queue = Q(rooms__queue__in=queue_ids)
-        is_user_assigned_to_room = Q(rooms__user=user)
+        is_user_assigned_to_room = Q(rooms__user=user) & Q(
+            rooms__queue__sector__project=value
+        )
         check_queues_and_user_filter = room_queue | is_user_assigned_to_room
 
         user_role_related_contacts = qs.filter(
