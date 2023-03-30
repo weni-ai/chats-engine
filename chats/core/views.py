@@ -29,25 +29,20 @@ def get_internal_headers() -> dict:
 
 
 def persist_keycloak_user_by_email(user_email: str):  # TODO: ERROR HANDLING
-    if User.objects.filter(email=user_email).exists():
-        return
     url = settings.OIDC_OP_USERS_DATA_ENDPOINT + f"?email={user_email}"
     headers = get_internal_headers()
     response = requests.get(url, headers=headers)
     data = response.json()
     try:
         user_data = data[0]
-    except KeyError:
+    except (IndexError, KeyError):
         error_str = f"[{response.status_code}] Error while searching the user {user_email} on keycloak"
         LOGGER.debug(error_str)
 
         return
     email = user_data.get("email")
-    username = user_data.get("username")
-    username = re.sub("[^A-Za-z0-9]+", "", username)
-    user = User.objects.create_user(email, username)
+    user = User.objects.get_or_create(email=email)[0]
     first_name = user_data.get("firstName", "") or user_data.get("username", "")
     user.first_name = first_name[:29]  # TODO: Maybe change this limit in the models
-
     user.last_name = user_data.get("lastName", "")
     user.save()

@@ -111,11 +111,9 @@ class Sector(BaseModel):
     @property
     def queue_agents(self):
         return User.objects.filter(
-            project_permissions__queue_authorizations__queue__pk__in=self.queues.values_list(
-                "pk", flat=True
-            ),
-            project_permissions__queue_authorizations__role=QueueAuthorization.ROLE_AGENT,
-        ).distinct()
+            project_permissions__project=self.project,
+            project_permissions__queue_authorizations__isnull=False,
+        )
 
     @property
     def contact_count(self):
