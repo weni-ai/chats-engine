@@ -6,6 +6,7 @@ from rest_framework.decorators import action
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.internal.users.serializers import (
+    BasicUserSerializer,
     UserSerializer,
     UserLanguageSerializer,
 )
@@ -13,13 +14,12 @@ from chats.apps.api.v1.internal.users.serializers import (
 
 class UserViewSet(ViewSet):
     def get_serializer(self, *args, **kwargs):
-        return UserSerializer()
+        return BasicUserSerializer()
 
     def create(self, request):
         if not request.user.has_perm("accounts.can_communicate_internally"):
             raise ValidationError({"detail": "Not Allowed!"})
-
-        serializer = UserSerializer(data=request.data)
+        serializer = BasicUserSerializer(data=request.data)
         if not serializer.is_valid():
             raise ValidationError({"detail": "invalid data!"})
 
