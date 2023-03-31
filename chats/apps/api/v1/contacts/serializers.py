@@ -34,6 +34,26 @@ class ContactSerializer(serializers.ModelSerializer):
             return None
 
 
+class ContactViewsetSerializer(ContactSerializer):
+    last_ended_at = serializers.DateTimeField()
+
+    class Meta:
+        model = Contact
+        fields = [
+            "uuid",
+            "name",
+            "email",
+            "status",
+            "custom_fields",
+            "room",
+            "created_on",
+            "last_ended_at",
+        ]
+        read_only_fields = [
+            "uuid",
+        ]
+
+
 class ContactRelationsSerializer(serializers.ModelSerializer):
     urn = serializers.CharField(
         required=False, allow_null=True, allow_blank=True, write_only=True
