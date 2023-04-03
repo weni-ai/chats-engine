@@ -297,13 +297,13 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
         rooms_filter_prefix = "queues__"
         online_agents = Count(f"{rooms_filter_prefix}rooms")
         percentage_filter = {}
-        rooms_filter["user__isnull"] = False
 
         if self.context.get("sector"):
             model = Queue
             rooms_filter_prefix = ""
             model_filter = {"sector": self.context.get("sector")}
             rooms_filter["rooms__queue__sector"] = self.context.get("sector")
+            rooms_filter["rooms__user__isnull"] = False
             if self.context.get("tag"):
                 rooms_filter["rooms__tags__name"] = self.context.get("tag")
             if self.context.get("agent"):
@@ -312,6 +312,7 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
             rooms_filter[
                 f"{rooms_filter_prefix}rooms__queue__sector__project"
             ] = project
+            rooms_filter[f"{rooms_filter_prefix}rooms__user__isnull"] = False
             if self.context.get("agent"):
                 rooms_filter[f"{rooms_filter_prefix}rooms__user"] = self.context.get(
                     "agent"
