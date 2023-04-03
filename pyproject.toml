@@ -5,6 +5,15 @@ exclude = '''
 )/
 '''
 
+[tool.isort]
+profile = "django"
+combine_as_imports = true
+include_trailing_comma = true
+line_length = 120
+
+[flake8]
+max-line-length=120
+
 [tool.poetry]
 name = "weni-chats"
 version = "0.1.0"
@@ -46,6 +55,10 @@ python-magic = "^0.4.27"
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
 flake8 = "^4.0.1"
+coverage = "^7.2.2"
+ipython = "^8.12.0"
+bandit = "^1.7.5"
+pre-commit = "^3.2.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
