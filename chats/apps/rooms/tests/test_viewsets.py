@@ -107,9 +107,7 @@ class RoomTests(APITestCase):
         return response, results
 
     def _ok_list_rooms(self, token, rooms: list, data: dict):
-        response, results = self._request_list_rooms(
-            self.owner_token, {"project": self.project.uuid}
-        )
+        response, results = self._request_list_rooms(token, data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         self.assertEqual(response.json().get("count"), len(rooms))
