@@ -319,18 +319,16 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
                 self.context.get("end_date")
                 + " 23:59:59",  # TODO: USE DATETIME IN END DATE
             ]
-
             online_agents_filter = {}
             online_agents_filter[f"{rooms_filter_prefix}rooms__created_on__range"] = [
                 self.context.get("start_date"),
                 self.context.get("end_date")
                 + " 23:59:59",  # TODO: USE DATETIME IN END DATE
             ]
-            online_agents = Count(
-                f"{rooms_filter_prefix}rooms",
-                filter=Q(**online_agents_filter),
-            )
-
+            online_agents_subquery = model.objects.annotate(
+                online_agents=Count(f"{rooms_filter_prefix}rooms"),
+                filter=Q(**online_agents_filter)
+            ).filter(pk=OuterRef("pk"))
         else:
             rooms_filter[
                 f"{rooms_filter_prefix}rooms__created_on__gte"
@@ -338,18 +336,14 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
             online_agents_filter = {
                 f"{rooms_filter_prefix}authorizations__permission__status": "ONLINE"
             }
-            online_agents = Count(
-                f"{rooms_filter_prefix}authorizations__permission",
+            online_agents_subquery = model.objects.annotate(
+                online_agents=Count(f"{rooms_filter_prefix}authorizations__permission", distinct=True),
                 filter=Q(**online_agents_filter),
-                distinct=True,
-            )
+            ).filter(pk=OuterRef("pk"))
 
         percentage_filter = rooms_filter.copy()
         percentage_filter[f"{rooms_filter_prefix}rooms__metric__transfer_count__gt"] = 0
-        online_agents_subquery = model.objects.annotate(
-            online_agents=Count("queues__authorizations__permission", distinct=True),
-            filter=Q(**online_agents_filter),
-        ).filter(pk=OuterRef("pk"))
+
 
         results = (
             model.objects.filter(**model_filter)
