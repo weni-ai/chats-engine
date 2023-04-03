@@ -65,7 +65,14 @@ class SectorReadOnlyListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Sector
-        fields = ["uuid", "name", "agents", "contacts", "can_trigger_flows"]
+        fields = [
+            "uuid",
+            "name",
+            "agents",
+            "contacts",
+            "can_trigger_flows",
+            "created_on",
+        ]
 
     def get_agents(self, sector: Sector):
         return sector.agent_count

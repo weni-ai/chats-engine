@@ -42,7 +42,7 @@ class QueueReadOnlyListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Queue
-        fields = ["uuid", "name", "agents"]
+        fields = ["uuid", "name", "agents", "created_on"]
 
     def get_agents(self, queue: Queue):
         return queue.agent_count
