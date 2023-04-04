@@ -331,8 +331,8 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
                 + " 23:59:59",  # TODO: USE DATETIME IN END DATE
             ]
             online_agents_subquery = model.objects.annotate(
-                online_agents=Count(f"{rooms_filter_prefix}rooms",
-                filter=Q(**online_agents_filter)
+                online_agents=Count(
+                    f"{rooms_filter_prefix}rooms", filter=Q(**online_agents_filter)
                 ),
             ).filter(pk=OuterRef("pk"))
         else:
@@ -352,7 +352,6 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
 
         percentage_filter = rooms_filter.copy()
         percentage_filter[f"{rooms_filter_prefix}rooms__metric__transfer_count__gt"] = 0
-
 
         results = (
             model.objects.filter(**model_filter)
@@ -403,10 +402,11 @@ class DashboardDataSerializer(serializers.ModelSerializer):
 
     closed_rooms = serializers.SerializerMethodField()
     transfer_count = serializers.SerializerMethodField()
+    queue_rooms = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
-        fields = ["closed_rooms", "transfer_count"]
+        fields = ["closed_rooms", "transfer_count", "queue_rooms"]
 
     def get_closed_rooms(self, project):
         initial_datetime = timezone.now().replace(
@@ -466,3 +466,27 @@ class DashboardDataSerializer(serializers.ModelSerializer):
         )
 
         return transfer_metric["count"]
+
+    def get_queue_rooms(self, project):
+        initial_datetime = timezone.now().replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        rooms_filter = {}
+        rooms_filter["user__isnull"] = True
+
+        if self.context.get("start_date") and self.context.get("end_date"):
+            rooms_filter["created_on__range"] = [
+                self.context.get("start_date"),
+                self.context.get("end_date"),
+            ]
+        else:
+            rooms_filter["created_on__gte"] = initial_datetime
+
+        if self.context.get("sector"):
+            rooms_filter["queue__sector"] = self.context.get("sector")
+        else:
+            rooms_filter["queue__sector__project"] = project
+
+        queue_rooms_metric = Room.objects.filter(**rooms_filter).count()
+
+        return queue_rooms_metric
