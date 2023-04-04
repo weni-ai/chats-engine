@@ -36,7 +36,7 @@ class ContactFilter(filters.FilterSet):
         help_text=_("Room created on"),
     )
     r_ended_at = filters.DateFromToRangeFilter(
-        field_name="rooms__ended_at",
+        field_name="last_ended_at",
         required=False,
         help_text=_("Room ended at"),
     )
@@ -53,9 +53,11 @@ class ContactFilter(filters.FilterSet):
             contact_id=OuterRef("uuid"),
         ).order_by("-ended_at")
 
-        queryset = qs.annotate(
-            last_ended_at=Subquery(subquery.values("ended_at")[:1])
-        ).filter(last_ended_at__isnull=False)
+        queryset = (
+            qs.annotate(last_ended_at=Subquery(subquery.values("ended_at")[:1]))
+            .filter(last_ended_at__isnull=False)
+            .distinct()
+        )
         return queryset
 
     def filter_sector(self, queryset, name, value):
