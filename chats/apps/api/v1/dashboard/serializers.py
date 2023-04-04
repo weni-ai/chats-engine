@@ -331,8 +331,9 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
                 + " 23:59:59",  # TODO: USE DATETIME IN END DATE
             ]
             online_agents_subquery = model.objects.annotate(
-                online_agents=Count(f"{rooms_filter_prefix}rooms"),
+                online_agents=Count(f"{rooms_filter_prefix}rooms",
                 filter=Q(**online_agents_filter)
+                ),
             ).filter(pk=OuterRef("pk"))
         else:
             rooms_filter[
@@ -342,8 +343,11 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
                 f"{rooms_filter_prefix}authorizations__permission__status": "ONLINE"
             }
             online_agents_subquery = model.objects.annotate(
-                online_agents=Count(f"{rooms_filter_prefix}authorizations__permission", distinct=True),
-                filter=Q(**online_agents_filter),
+                online_agents=Count(
+                    "queues__authorizations__permission",
+                    distinct=True,
+                    filter=Q(**online_agents_filter),
+                ),
             ).filter(pk=OuterRef("pk"))
 
         percentage_filter = rooms_filter.copy()
