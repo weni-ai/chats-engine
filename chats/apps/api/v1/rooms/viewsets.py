@@ -35,7 +35,7 @@ class RoomViewset(
         filters.SearchFilter,
     ]
     filterset_class = room_filters.RoomFilter
-    search_fields = ["@contact__name", "@urn"]
+    search_fields = ["contact__name", "urn"]
 
     def get_permissions(self):
         permission_classes = [permissions.IsAuthenticated]
