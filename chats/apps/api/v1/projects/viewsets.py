@@ -7,14 +7,28 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from chats.apps.api.v1.internal.projects.serializers import CheckAccessReadSerializer, ProjectPermissionReadSerializer
+from chats.apps.api.v1.internal.projects.serializers import (
+    CheckAccessReadSerializer,
+    ProjectPermissionReadSerializer,
+)
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
-from chats.apps.api.v1.permissions import IsProjectAdmin, IsSectorManager, ProjectAnyPermission
+from chats.apps.api.v1.permissions import (
+    IsProjectAdmin,
+    IsSectorManager,
+    ProjectAnyPermission,
+)
 from chats.apps.api.v1.projects.serializers import (
-    LinkContactSerializer, ProjectFlowContactSerializer, ProjectFlowStartSerializer, ProjectSerializer,
+    LinkContactSerializer,
+    ProjectFlowContactSerializer,
+    ProjectFlowStartSerializer,
+    ProjectSerializer,
 )
 from chats.apps.contacts.models import Contact
-from chats.apps.projects.models import ContactGroupFlowReference, Project, ProjectPermission
+from chats.apps.projects.models import (
+    ContactGroupFlowReference,
+    Project,
+    ProjectPermission,
+)
 
 
 class ProjectViewset(viewsets.ReadOnlyModelViewSet):

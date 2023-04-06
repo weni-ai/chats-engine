@@ -4,7 +4,10 @@ from django.dispatch import receiver
 from django.utils import timezone
 
 from chats.apps.api.v1.prometheus.metrics import (
-    chats_total_message, chats_total_msgs_last_3_months, chats_total_msgs_last_6_months, chats_total_msgs_last_month,
+    chats_total_message,
+    chats_total_msgs_last_3_months,
+    chats_total_msgs_last_6_months,
+    chats_total_msgs_last_month,
     chats_total_msgs_last_year,
 )
 from chats.apps.msgs.models import Message as ChatMessage

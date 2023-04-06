@@ -4,8 +4,13 @@ from django.dispatch import receiver
 from django.utils import timezone
 
 from chats.apps.api.v1.prometheus.metrics import (
-    chats_closed_rooms, chats_opened_rooms, chats_total_rooms, chats_total_rooms_last_3_months,
-    chats_total_rooms_last_6_months, chats_total_rooms_last_month, chats_total_rooms_last_year,
+    chats_closed_rooms,
+    chats_opened_rooms,
+    chats_total_rooms,
+    chats_total_rooms_last_3_months,
+    chats_total_rooms_last_6_months,
+    chats_total_rooms_last_month,
+    chats_total_rooms_last_year,
 )
 from chats.apps.rooms.models import Room
 

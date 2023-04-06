@@ -195,7 +195,9 @@ class SectorAuthorization(BaseModel):
 
     @property
     def serialized_ws_data(self):
-        from chats.apps.api.v1.sectors.serializers import SectorAuthorizationWSSerializer
+        from chats.apps.api.v1.sectors.serializers import (
+            SectorAuthorizationWSSerializer,
+        )
 
         return SectorAuthorizationWSSerializer(self).data
 

@@ -12,7 +12,8 @@ from chats.apps.api.v1.msgs.serializers import (
     MessageMediaSerializer,
     MessageSerializer,
 )
-from chats.apps.msgs.models import Message as ChatMessage, MessageMedia
+from chats.apps.msgs.models import Message as ChatMessage
+from chats.apps.msgs.models import MessageMedia
 
 
 class MessageViewset(

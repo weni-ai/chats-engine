@@ -8,7 +8,9 @@ from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from rest_framework.authtoken.models import Token
 
-from chats.apps.accounts.authentication.drf.backends import WeniOIDCAuthenticationBackend
+from chats.apps.accounts.authentication.drf.backends import (
+    WeniOIDCAuthenticationBackend,
+)
 
 LOGGER = logging.getLogger(__name__)
 

@@ -4,8 +4,11 @@ from django.dispatch import receiver
 from django.utils import timezone
 
 from chats.apps.api.v1.prometheus.metrics import (
-    chats_total_agents, chats_total_agents_last_3_months, chats_total_agents_last_6_months,
-    chats_total_agents_last_month, chats_total_agents_last_year,
+    chats_total_agents,
+    chats_total_agents_last_3_months,
+    chats_total_agents_last_6_months,
+    chats_total_agents_last_month,
+    chats_total_agents_last_year,
 )
 from chats.apps.queues.models import QueueAuthorization
 

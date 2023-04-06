@@ -5,7 +5,9 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from chats.apps.accounts.authentication.drf.authorization import ProjectAdminAuthentication
+from chats.apps.accounts.authentication.drf.authorization import (
+    ProjectAdminAuthentication,
+)
 from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.external.rooms.serializers import RoomFlowSerializer
 from chats.apps.rooms.models import Room

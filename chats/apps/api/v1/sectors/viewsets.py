@@ -6,10 +6,20 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from chats.apps.api.v1.internal.rest_clients.connect_rest_client import ConnectRESTClient
-from chats.apps.api.v1.permissions import HasAgentPermissionAnyQueueSector, IsProjectAdmin, IsSectorManager
+from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
+    ConnectRESTClient,
+)
+from chats.apps.api.v1.permissions import (
+    HasAgentPermissionAnyQueueSector,
+    IsProjectAdmin,
+    IsSectorManager,
+)
 from chats.apps.api.v1.sectors import serializers as sector_serializers
-from chats.apps.api.v1.sectors.filters import SectorAuthorizationFilter, SectorFilter, SectorTagFilter
+from chats.apps.api.v1.sectors.filters import (
+    SectorAuthorizationFilter,
+    SectorFilter,
+    SectorTagFilter,
+)
 from chats.apps.projects.models import Project
 from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 

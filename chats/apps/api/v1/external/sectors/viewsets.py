@@ -1,7 +1,9 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
 
-from chats.apps.accounts.authentication.drf.authorization import ProjectAdminAuthentication
+from chats.apps.accounts.authentication.drf.authorization import (
+    ProjectAdminAuthentication,
+)
 from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.external.sectors.serializers import SectorFlowSerializer
 from chats.apps.sectors.models import Sector

@@ -5,7 +5,9 @@ from django.utils.translation import gettext_lazy as _
 from requests.exceptions import JSONDecodeError
 from timezone_field import TimeZoneField
 
-from chats.apps.api.v1.internal.rest_clients.connect_rest_client import ConnectRESTClient
+from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
+    ConnectRESTClient,
+)
 from chats.core.models import BaseModel
 from chats.utils.websockets import send_channels_group
 
