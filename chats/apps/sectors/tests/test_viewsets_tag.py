@@ -10,15 +10,15 @@ from chats.apps.sectors.models import Sector
 
 
 class SectorTagTests(APITestCase):
-    fixtures = ['chats/fixtures/fixture_sector.json']
+    fixtures = ["chats/fixtures/fixture_sector.json"]
 
     def setUp(self):
-        self.project = Project.objects.get(pk='34a93b52-231e-11ed-861d-0242ac120002')
-        self.sector = Sector.objects.get(pk='21aecf8c-0c73-4059-ba82-4343e0cc627c')
+        self.project = Project.objects.get(pk="34a93b52-231e-11ed-861d-0242ac120002")
+        self.sector = Sector.objects.get(pk="21aecf8c-0c73-4059-ba82-4343e0cc627c")
         self.manager_user = User.objects.get(pk=8)
-        self.manager_token =  Token.objects.get(user=self.manager_user)
+        self.manager_token = Token.objects.get(user=self.manager_user)
         self.agent_user = User.objects.get(pk=6)
-        self.agent_token =  Token.objects.get(user=self.agent_user)
+        self.agent_token = Token.objects.get(user=self.agent_user)
 
         self.tag_1 = self.sector.tags.create(name="tag 1")
         self.tag_2 = self.sector.tags.create(name="tag 2")

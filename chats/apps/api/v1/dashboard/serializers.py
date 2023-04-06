@@ -331,8 +331,8 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
                 + " 23:59:59",  # TODO: USE DATETIME IN END DATE
             ]
             online_agents_subquery = model.objects.annotate(
-                online_agents=Count(f"{rooms_filter_prefix}rooms",
-                filter=Q(**online_agents_filter)
+                online_agents=Count(
+                    f"{rooms_filter_prefix}rooms", filter=Q(**online_agents_filter)
                 ),
             ).filter(pk=OuterRef("pk"))
         else:
@@ -352,7 +352,6 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
 
         percentage_filter = rooms_filter.copy()
         percentage_filter[f"{rooms_filter_prefix}rooms__metric__transfer_count__gt"] = 0
-
 
         results = (
             model.objects.filter(**model_filter)
