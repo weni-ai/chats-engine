@@ -45,7 +45,7 @@ repos:
         exclude: ^migrations/
 
   - repo: https://github.com/pycqa/flake8
-    rev: 6.0.0
+    rev: 4.0.1
     hooks:
       - id: flake8
         args: ['--exclude=docs/*,*migrations*', '--ignore=E501,W503',]
