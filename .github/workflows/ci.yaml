@@ -51,7 +51,7 @@ jobs:
 
     - name: Run migrations
       run: python manage.py migrate
-    
+
     - name: run pre-commit
       uses: pre-commit/action@v3.0.0
 
