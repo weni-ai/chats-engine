@@ -37,7 +37,7 @@ Weni Chats's developers are monitoring for pull requests. We will review your pu
 
 4.  Ensure the test suite passes.
 
-5.  Make sure your code lints. 
+5.  Make sure your code lints.
 
 6. Make sure your commits follows [conventional commits](https://github.com/conventional-commits/conventionalcommits.org)
 

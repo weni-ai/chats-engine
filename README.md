@@ -11,7 +11,7 @@
     ·
   </p>
 </p>
-    
+
 <br />
 
 
@@ -36,7 +36,7 @@ Define a ```.env``` file with the required enviroment variables bellow
 | Command | Description |
 |--|--|
 | poetry install | Install dependencies and create virtual enviroment
-| poetry shell | Enter virtual enviroment 
+| poetry shell | Enter virtual enviroment
 | make dev_up | Run docker compose
 | python manage.py makemigrations | Make migrations when changing models
 | python manage.py migrate | Run migrations when changing models
