@@ -1,4 +1,4 @@
-name: CI
+name: Python application.
 
 # Controls when the workflow will run
 on:
@@ -10,46 +10,53 @@ on:
     branches:
       - '**'
 env:
-  DEFAULT_DATABASE: "postgres://chats:chats@postgres:5432/chats"
   SECRET_KEY: "SK"
   DEBUG: true
   DATABASE_URL: "postgres://chats:chats@localhost:5432/chats"
   USE_WENI_FLOWS: false
   PROMETHEUS_AUTH_TOKEN: "aaaa"
+  UNPERMITTED_AUDIO_TYPES: "WebM,audio/mpeg3,audio/mpeg,mp3"
+
 jobs:
-  # Label of the container job
-  container-job:
-    # Containers must run in Linux based operating systems
-    runs-on: ubuntu-latest
-    # Docker Hub image that `container-job` executes in
-    container: python:3.8.10-bullseye
+  build:
 
-    # Service containers to run with `container-job`
+    runs-on: ubuntu-18.04
+
     services:
-      # Label used to access the service container
       postgres:
-        # Docker Hub image
         image: postgres:12
-        # Provide the password for postgres
         env:
-          POSTGRES_PASSWORD: postgres
-        # Set health checks to wait until postgres has started
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    steps:
-      # Downloads a copy of the code in your repository before running CI tests
-      - name: Check out repository code
-        uses: actions/checkout@v2
+          POSTGRES_USER: chats
+          POSTGRES_PASSWORD: chats
+          POSTGRES_DB: chats
+        ports:
+          - 5432:5432
+        # needed because the postgres container does not provide a healthcheck
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
 
-      - name: Setup Python
-        run: |
-          pip install poetry
-          poetry config virtualenvs.create false --local
-          poetry install
-      - name: Create database
-        run: python contrib/create_database.py
-      - name: Run Tests
-        run: python contrib/ciUtils.py
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python 3.8
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.8
+
+    - name: Install dependencies
+      run: |
+        pip install --upgrade pip poetry
+        poetry config virtualenvs.create false --local
+        poetry install
+
+    - name: Run migrations
+      run: python manage.py migrate
+
+    - name: Run flake8
+      run: flake8
+
+    - name: Run tests
+      run: coverage run manage.py test --verbosity=2 --noinput
+
+    - name: Coverage report
+      run: coverage report -m

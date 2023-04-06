@@ -1,5 +1,4 @@
 exclude: .*migrations\/.*
-fail_fast: true
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -54,11 +53,11 @@ repos:
     hooks:
     - id: bandit
 
-  - repo: https://github.com/PyCQA/coverage
-    rev: "6.0"
+  - repo: https://github.com/pycqa/pylint
+    rev: v2.8.3
     hooks:
-    - id: coverage
-      args: [--fail-under=80]
+      - id: pylint
+        types: [ python ]
 
   - repo: local
     hooks:
