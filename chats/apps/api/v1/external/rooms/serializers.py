@@ -1,4 +1,3 @@
-import json
 from typing import Dict, List
 
 from django.utils import timezone

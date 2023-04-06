@@ -1,5 +1,3 @@
-import json
-
 from rest_framework.authtoken.models import Token
 
 from chats.apps.accounts.models import User

@@ -2,9 +2,6 @@ from django.db import IntegrityError
 from rest_framework.test import APITestCase
 
 from chats.apps.projects.models import ProjectPermission
-from chats.apps.queues.models import Queue, QueueAuthorization
-from chats.apps.rooms.models import Room
-from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 
 
 class ConstraintTests(APITestCase):

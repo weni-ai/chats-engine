@@ -1,7 +1,9 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters, mixins, pagination, viewsets
+from rest_framework import filters, mixins, viewsets
 
-from chats.apps.accounts.authentication.drf.authorization import ProjectAdminAuthentication
+from chats.apps.accounts.authentication.drf.authorization import (
+    ProjectAdminAuthentication,
+)
 from chats.apps.api.v1.external.msgs.serializers import MsgFlowSerializer
 from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.msgs.filters import MessageFilter

@@ -9,14 +9,17 @@ from chats.apps.api.v1.external.queues.viewsets import QueueFlowViewset
 from chats.apps.api.v1.external.rooms.viewsets import RoomFlowViewSet
 from chats.apps.api.v1.external.sectors.viewsets import SectorFlowViewset
 from chats.apps.api.v1.internal.projects import viewsets as project_internal_views
-from chats.apps.api.v1.internal.queues.viewsets import QueueAuthInternalViewset, QueueInternalViewset
 from chats.apps.api.v1.internal.users import viewsets as user_internal_views
 from chats.apps.api.v1.msgs.viewsets import MessageMediaViewset, MessageViewset
 from chats.apps.api.v1.projects.viewsets import ProjectPermissionViewset, ProjectViewset
 from chats.apps.api.v1.queues.viewsets import QueueAuthorizationViewset, QueueViewset
 from chats.apps.api.v1.quickmessages.viewsets import QuickMessageViewset
 from chats.apps.api.v1.rooms.viewsets import RoomViewset
-from chats.apps.api.v1.sectors.viewsets import SectorAuthorizationViewset, SectorTagsViewset, SectorViewset
+from chats.apps.api.v1.sectors.viewsets import (
+    SectorAuthorizationViewset,
+    SectorTagsViewset,
+    SectorViewset,
+)
 from chats.apps.api.v1.users.viewsets import ProfileViewset
 
 

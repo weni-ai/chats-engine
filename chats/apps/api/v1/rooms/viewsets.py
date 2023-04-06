@@ -3,7 +3,6 @@ import json
 from django.conf import settings
 from django.db.models import F, Sum
 from django.utils import timezone
-from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action

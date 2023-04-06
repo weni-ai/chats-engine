@@ -1,10 +1,19 @@
 from django.db.models import (
-    Avg, Case, Count, ExpressionWrapper, F, FloatField, IntegerField, OuterRef, Q, Subquery, Sum, When,
+    Avg,
+    Case,
+    Count,
+    ExpressionWrapper,
+    F,
+    FloatField,
+    IntegerField,
+    OuterRef,
+    Q,
+    Subquery,
+    Sum,
+    When,
 )
 from django.db.models.functions import Cast
-from django.db.models.functions.comparison import NullIf
 from django.utils import timezone
-from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from chats.apps.projects.models import Project, ProjectPermission
@@ -32,9 +41,6 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
         ]
 
     def get_active_chats(self, project):
-        initial_datetime = timezone.now().replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
         rooms_filter = {}
 
         if self.context.get("start_date") and self.context.get("end_date"):
@@ -197,7 +203,7 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
             rooms_filter["queue__sector__project"] = project
 
         percentage_filter = rooms_filter.copy()
-        percentage_filter[f"metric__transfer_count__gt"] = 0
+        percentage_filter["metric__transfer_count__gt"] = 0
 
         metrics_rooms_count = Room.objects.filter(**rooms_filter).count()
         interaction = Room.objects.filter(**percentage_filter).aggregate(
@@ -224,9 +230,6 @@ class DashboardAgentsSerializer(serializers.Serializer):
         ]
 
     def get_project_agents(self, project):
-        initial_datetime = timezone.now().replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
         rooms_filter = {}
         permission_filter = {"project": project}
 
@@ -284,7 +287,6 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
         rooms_filter = {}
         model_filter = {"project": project}
         rooms_filter_prefix = "queues__"
-        online_agents = Count(f"{rooms_filter_prefix}rooms")
         percentage_filter = {}
 
         if self.context.get("sector"):

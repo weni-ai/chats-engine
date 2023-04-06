@@ -6,4 +6,4 @@ class QueuesConfig(AppConfig):
     name = "chats.apps.queues"
 
     def ready(self):
-        import chats.apps.queues.signals
+        import chats.apps.queues.signals  # NOQA

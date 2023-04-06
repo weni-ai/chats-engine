@@ -1,5 +1,3 @@
-from django.urls import reverse
-from rest_framework import status
 from rest_framework.test import APITestCase
 
 from chats.apps.api.utils import create_contact, create_user_and_token

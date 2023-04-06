@@ -28,7 +28,8 @@ class PermissionTests(APITestCase):
 
     def test_get_first_access_status_without_permission(self):
         """
-        Ensure that users who dont have permission in a determined project, cannot get the value off first_access field.
+        Ensure that users who dont have permission in a determined project,
+        cannot get the value off first_access field.
         """
         url = reverse("project_permission-list")
         url_action = f"{url}verify_access/"
