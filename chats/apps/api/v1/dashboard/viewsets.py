@@ -3,7 +3,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from chats.apps.api.v1.dashboard.serializers import (
-    DashboardAgentsSerializer, DashboardDataSerializer, DashboardRoomsSerializer, DashboardSectorSerializer,
+    DashboardAgentsSerializer,
+    DashboardDataSerializer,
+    DashboardRoomsSerializer,
+    DashboardSectorSerializer,
 )
 from chats.apps.api.v1.permissions import HasDashboardAccess
 from chats.apps.projects.models import Project

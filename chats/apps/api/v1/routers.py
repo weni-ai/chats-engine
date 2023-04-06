@@ -15,7 +15,11 @@ from chats.apps.api.v1.projects.viewsets import ProjectPermissionViewset, Projec
 from chats.apps.api.v1.queues.viewsets import QueueAuthorizationViewset, QueueViewset
 from chats.apps.api.v1.quickmessages.viewsets import QuickMessageViewset
 from chats.apps.api.v1.rooms.viewsets import RoomViewset
-from chats.apps.api.v1.sectors.viewsets import SectorAuthorizationViewset, SectorTagsViewset, SectorViewset
+from chats.apps.api.v1.sectors.viewsets import (
+    SectorAuthorizationViewset,
+    SectorTagsViewset,
+    SectorViewset,
+)
 from chats.apps.api.v1.users.viewsets import ProfileViewset
 
 
