@@ -1,16 +1,13 @@
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
-from rest_framework import serializers, exceptions, status
+from rest_framework import exceptions, serializers, status
 from timezone_field.rest_framework import TimeZoneSerializerField
 
-from chats.apps.projects.models import Project, ProjectPermission
-from chats.apps.api.v1.internal.users.serializers import UserSerializer
-
-from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
-    ConnectRESTClient,
-)
+from chats.apps.api.v1.internal.rest_clients.connect_rest_client import ConnectRESTClient
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
-from django.contrib.auth import get_user_model
+from chats.apps.api.v1.internal.users.serializers import UserSerializer
+from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.queues.models import QueueAuthorization
 from chats.apps.sectors.models import SectorAuthorization, SectorTag
 

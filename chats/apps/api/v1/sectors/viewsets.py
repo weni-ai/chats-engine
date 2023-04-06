@@ -1,29 +1,21 @@
 import queue
+
 from django.conf import settings
+from django.db import IntegrityError
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import status, viewsets, exceptions, filters
+from rest_framework import exceptions, filters, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+
+from chats.apps.api.v1.internal.rest_clients.connect_rest_client import ConnectRESTClient
 from chats.apps.api.v1.permissions import (
-    IsProjectAdmin,
-    IsQueueAgent,
-    AnyQueueAgentPermission,
-    IsSectorManager,
-    HasAgentPermissionAnyQueueSector,
+    AnyQueueAgentPermission, HasAgentPermissionAnyQueueSector, IsProjectAdmin, IsQueueAgent, IsSectorManager,
 )
 from chats.apps.api.v1.sectors import serializers as sector_serializers
-from chats.apps.api.v1.sectors.filters import (
-    SectorAuthorizationFilter,
-    SectorFilter,
-    SectorTagFilter,
-)
+from chats.apps.api.v1.sectors.filters import SectorAuthorizationFilter, SectorFilter, SectorTagFilter
 from chats.apps.projects.models import Project
 from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
-from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
-    ConnectRESTClient,
-)
-from rest_framework.decorators import action
-from django.db import IntegrityError
 
 
 class SectorViewset(viewsets.ModelViewSet):

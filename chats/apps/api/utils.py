@@ -3,8 +3,8 @@ import json
 from rest_framework.authtoken.models import Token
 
 from chats.apps.accounts.models import User
-from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.contacts.models import Contact
+from chats.apps.msgs.models import Message as ChatMessage
 
 
 def create_user_and_token(nickname: str = "fake"):

@@ -1,6 +1,6 @@
 from django.db.models import Q
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import permissions, viewsets, filters
+from rest_framework import filters, permissions, viewsets
 
 from chats.apps.api.v1.contacts.filters import ContactFilter
 from chats.apps.api.v1.contacts.serializers import ContactViewsetSerializer

@@ -1,16 +1,13 @@
-from django.db import models
-from django.utils.translation import gettext_lazy as _
-from django.db.models import Q
-from timezone_field import TimeZoneField
-from requests.exceptions import JSONDecodeError
-
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import models
+from django.db.models import Q
+from django.utils.translation import gettext_lazy as _
+from requests.exceptions import JSONDecodeError
+from timezone_field import TimeZoneField
 
+from chats.apps.api.v1.internal.rest_clients.connect_rest_client import ConnectRESTClient
 from chats.core.models import BaseModel
 from chats.utils.websockets import send_channels_group
-from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
-    ConnectRESTClient,
-)
 
 # Create your models here.
 

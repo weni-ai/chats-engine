@@ -1,38 +1,20 @@
 from django.core.exceptions import ObjectDoesNotExist
-from rest_framework import viewsets, status
-from rest_framework.permissions import IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.decorators import action
-from rest_framework.response import Response
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
-from chats.apps.api.v1.projects.serializers import (
-    ProjectSerializer,
-    ProjectFlowStartSerializer,
-    ProjectFlowContactSerializer,
-    LinkContactSerializer,
-)
-from chats.apps.api.v1.internal.projects.serializers import (
-    ProjectPermissionReadSerializer,
-    CheckAccessReadSerializer,
-)
-
-from chats.apps.projects.models import (
-    Project,
-    ProjectPermission,
-    ContactGroupFlowReference,
-)
-
-from chats.apps.contacts.models import Contact
-
-from chats.apps.api.v1.permissions import (
-    IsProjectAdmin,
-    IsSectorManager,
-    ProjectAnyPermission,
-)
-
+from chats.apps.api.v1.internal.projects.serializers import CheckAccessReadSerializer, ProjectPermissionReadSerializer
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
+from chats.apps.api.v1.permissions import IsProjectAdmin, IsSectorManager, ProjectAnyPermission
+from chats.apps.api.v1.projects.serializers import (
+    LinkContactSerializer, ProjectFlowContactSerializer, ProjectFlowStartSerializer, ProjectSerializer,
+)
+from chats.apps.contacts.models import Contact
+from chats.apps.projects.models import ContactGroupFlowReference, Project, ProjectPermission
 
 
 class ProjectViewset(viewsets.ReadOnlyModelViewSet):

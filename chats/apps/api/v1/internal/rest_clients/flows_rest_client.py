@@ -1,12 +1,11 @@
 import logging
-import requests
 from typing import Callable
 
+import requests
 from django.conf import settings
 from rest_framework import status
-from chats.apps.api.v1.internal.rest_clients.internal_authorization import (
-    InternalAuthentication,
-)
+
+from chats.apps.api.v1.internal.rest_clients.internal_authorization import InternalAuthentication
 
 LOGGER = logging.getLogger(__name__)
 

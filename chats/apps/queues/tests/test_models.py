@@ -1,16 +1,13 @@
-from django.test import TestCase
-
+from django.contrib.auth import get_user_model
 from django.db import IntegrityError
+from django.test import TestCase
 from rest_framework.test import APITestCase
 
-from django.contrib.auth import get_user_model
-
 from chats.apps.contacts.models import Contact
-from chats.apps.rooms.models import Room
-from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.projects.models import Project, ProjectPermission
+from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
-
 
 User = get_user_model()
 

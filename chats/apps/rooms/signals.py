@@ -1,18 +1,13 @@
-from django.dispatch import receiver
-from django.db.models.signals import post_save, post_delete
-from chats.apps.rooms.models import Room
 from dateutil.relativedelta import relativedelta
+from django.db.models.signals import post_delete, post_save
+from django.dispatch import receiver
 from django.utils import timezone
 
 from chats.apps.api.v1.prometheus.metrics import (
-    chats_total_rooms,
-    chats_opened_rooms,
-    chats_closed_rooms,
-    chats_total_rooms_last_month,
-    chats_total_rooms_last_3_months,
-    chats_total_rooms_last_6_months,
-    chats_total_rooms_last_year,
+    chats_closed_rooms, chats_opened_rooms, chats_total_rooms, chats_total_rooms_last_3_months,
+    chats_total_rooms_last_6_months, chats_total_rooms_last_month, chats_total_rooms_last_year,
 )
+from chats.apps.rooms.models import Room
 
 
 @receiver([post_save, post_delete], sender=Room)

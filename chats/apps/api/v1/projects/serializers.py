@@ -1,9 +1,9 @@
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
-
-from chats.apps.projects.models import Project, LinkContact
 from timezone_field.rest_framework import TimeZoneSerializerField
+
+from chats.apps.projects.models import LinkContact, Project
 
 
 class ProjectSerializer(serializers.ModelSerializer):

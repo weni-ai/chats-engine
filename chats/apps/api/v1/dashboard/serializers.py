@@ -1,27 +1,16 @@
-from django.utils.translation import gettext_lazy as _
+from django.db.models import (
+    Avg, Case, Count, ExpressionWrapper, F, FloatField, IntegerField, OuterRef, Q, Subquery, Sum, When,
+)
+from django.db.models.functions import Cast
+from django.db.models.functions.comparison import NullIf
 from django.utils import timezone
-
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue
-
 from chats.apps.rooms.models import Room
-from django.db.models import (
-    Sum,
-    Count,
-    Q,
-    F,
-    Avg,
-    ExpressionWrapper,
-    IntegerField,
-    OuterRef,
-    Subquery,
-)
 from chats.apps.sectors.models import Sector
-from django.db.models import FloatField, Case, When
-from django.db.models.functions import Cast
-from django.db.models.functions.comparison import NullIf
 
 
 class DashboardRoomsSerializer(serializers.ModelSerializer):

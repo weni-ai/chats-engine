@@ -1,8 +1,8 @@
-from rest_framework import serializers
-from chats.apps.queues.models import Queue, QueueAuthorization
 from django.utils.translation import gettext_lazy as _
+from rest_framework import serializers
 
 from chats.apps.api.v1.accounts.serializers import UserSerializer
+from chats.apps.queues.models import Queue, QueueAuthorization
 
 
 class QueueSerializer(serializers.ModelSerializer):

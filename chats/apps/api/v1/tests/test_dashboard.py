@@ -1,13 +1,13 @@
-from django.urls import reverse
-from rest_framework.test import APITestCase
-from rest_framework.authtoken.models import Token
+import time
 
+from django.urls import reverse
+from rest_framework.authtoken.models import Token
+from rest_framework.test import APITestCase
+
+from chats.apps.accounts.models import User
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
-from chats.apps.accounts.models import User
-
-import time
 
 
 class DashboardTests(APITestCase):

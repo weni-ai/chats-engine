@@ -1,7 +1,8 @@
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
-from chats.apps.msgs.models import MessageMedia, Message
-from django.db.models import Q
+
+from chats.apps.msgs.models import Message, MessageMedia
 
 
 class MessageFilter(filters.FilterSet):

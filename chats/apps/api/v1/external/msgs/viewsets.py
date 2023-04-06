@@ -1,13 +1,11 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import mixins, pagination, viewsets, filters
+from rest_framework import filters, mixins, pagination, viewsets
 
-from chats.apps.api.v1.msgs.filters import MessageFilter
+from chats.apps.accounts.authentication.drf.authorization import ProjectAdminAuthentication
 from chats.apps.api.v1.external.msgs.serializers import MsgFlowSerializer
-from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.api.v1.external.permissions import IsAdminPermission
-from chats.apps.accounts.authentication.drf.authorization import (
-    ProjectAdminAuthentication,
-)
+from chats.apps.api.v1.msgs.filters import MessageFilter
+from chats.apps.msgs.models import Message as ChatMessage
 
 
 class MessageFlowViewset(

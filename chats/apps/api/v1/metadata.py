@@ -1,8 +1,8 @@
 from collections import OrderedDict
 
 from django.utils.encoding import force_str
-from rest_framework.metadata import BaseMetadata
 from rest_framework import serializers
+from rest_framework.metadata import BaseMetadata
 from rest_framework.utils.field_mapping import ClassLookupDict
 
 

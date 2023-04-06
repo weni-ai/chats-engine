@@ -1,21 +1,15 @@
 from django.db.models import Q
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import mixins, pagination, parsers, viewsets, filters, status
+from pydub.exceptions import CouldntDecodeError
+from rest_framework import filters, mixins, pagination, parsers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from pydub.exceptions import CouldntDecodeError
-
 
 from chats.apps.api.v1.msgs.filters import MessageFilter, MessageMediaFilter
-from chats.apps.api.v1.msgs.serializers import (
-    MessageMediaSerializer,
-    MessageAndMediaSerializer,
-    MessageSerializer,
-)
-from chats.apps.api.v1.msgs.permissions import MessagePermission, MessageMediaPermission
-from chats.apps.msgs.models import Message as ChatMessage
-from chats.apps.msgs.models import MessageMedia
+from chats.apps.api.v1.msgs.permissions import MessageMediaPermission, MessagePermission
+from chats.apps.api.v1.msgs.serializers import MessageAndMediaSerializer, MessageMediaSerializer, MessageSerializer
+from chats.apps.msgs.models import Message as ChatMessage, MessageMedia
 
 
 class MessageViewset(

@@ -15,9 +15,8 @@ from pathlib import Path
 
 import environ
 import sentry_sdk
-from sentry_sdk.integrations.django import DjangoIntegration
-
 from django.utils.log import DEFAULT_LOGGING
+from sentry_sdk.integrations.django import DjangoIntegration
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent

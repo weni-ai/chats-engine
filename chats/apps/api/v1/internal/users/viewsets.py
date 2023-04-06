@@ -1,15 +1,12 @@
+from rest_framework import mixins
+from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet, ViewSet
-from rest_framework import mixins
-from rest_framework.exceptions import ValidationError
-from rest_framework.decorators import action
-from chats.apps.api.v1.internal.permissions import ModuleHasPermission
+
 from chats.apps.accounts.models import User
-from chats.apps.api.v1.internal.users.serializers import (
-    BasicUserSerializer,
-    UserSerializer,
-    UserLanguageSerializer,
-)
+from chats.apps.api.v1.internal.permissions import ModuleHasPermission
+from chats.apps.api.v1.internal.users.serializers import BasicUserSerializer, UserLanguageSerializer, UserSerializer
 
 
 class UserViewSet(ViewSet):

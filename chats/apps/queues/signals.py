@@ -1,20 +1,13 @@
-from django.db.models.signals import post_save, post_delete
-
+from dateutil.relativedelta import relativedelta
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
-
 from django.utils import timezone
 
-from chats.apps.queues.models import QueueAuthorization
-
-from dateutil.relativedelta import relativedelta
-
 from chats.apps.api.v1.prometheus.metrics import (
-    chats_total_agents,
-    chats_total_agents_last_month,
-    chats_total_agents_last_3_months,
-    chats_total_agents_last_6_months,
-    chats_total_agents_last_year,
+    chats_total_agents, chats_total_agents_last_3_months, chats_total_agents_last_6_months,
+    chats_total_agents_last_month, chats_total_agents_last_year,
 )
+from chats.apps.queues.models import QueueAuthorization
 
 
 @receiver([post_save, post_delete], sender=QueueAuthorization)

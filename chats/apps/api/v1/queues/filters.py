@@ -1,7 +1,7 @@
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
-from chats.apps.projects.models import ProjectPermission
 
+from chats.apps.projects.models import ProjectPermission
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.sectors.models import SectorAuthorization
 

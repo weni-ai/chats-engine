@@ -1,8 +1,9 @@
+from django.db.models import Max, OuterRef, Q, Subquery
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
+
 from chats.apps.contacts.models import Contact
 from chats.apps.rooms.models import Room
-from django.db.models import Q, Max, OuterRef, Subquery
 
 
 class ContactFilter(filters.FilterSet):

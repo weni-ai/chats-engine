@@ -1,11 +1,12 @@
-from django.utils.translation import gettext_lazy as _
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
+from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
+
 from chats.apps.projects.models import Project
+from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
-from chats.apps.queues.models import Queue
-from django.core.exceptions import ObjectDoesNotExist
 
 
 class RoomFilter(filters.FilterSet):

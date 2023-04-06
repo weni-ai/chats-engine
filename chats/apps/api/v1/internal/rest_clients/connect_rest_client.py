@@ -1,9 +1,7 @@
 import requests
-
 from django.conf import settings
-from chats.apps.api.v1.internal.rest_clients.internal_authorization import (
-    InternalAuthentication,
-)
+
+from chats.apps.api.v1.internal.rest_clients.internal_authorization import InternalAuthentication
 
 
 class ConnectRESTClient(InternalAuthentication):

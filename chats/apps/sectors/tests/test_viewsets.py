@@ -1,14 +1,14 @@
 from django.urls import reverse
 from rest_framework import status
+from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
-from chats.apps.accounts.models import User
 
+from chats.apps.accounts.models import User
+from chats.apps.contacts.models import Contact
 from chats.apps.projects.models import Project
 from chats.apps.queues.models import Queue
-from chats.apps.sectors.models import Sector
 from chats.apps.rooms.models import Room
-from chats.apps.contacts.models import Contact
-from rest_framework.authtoken.models import Token
+from chats.apps.sectors.models import Sector
 
 
 class SectorTests(APITestCase):

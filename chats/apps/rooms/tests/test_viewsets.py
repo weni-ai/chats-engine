@@ -4,9 +4,9 @@ from rest_framework.test import APITestCase
 
 from chats.apps.api.utils import create_contact, create_user_and_token
 from chats.apps.projects.models import Project, ProjectPermission
+from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorAuthorization
-from chats.apps.queues.models import Queue, QueueAuthorization
 
 
 class RoomTests(APITestCase):

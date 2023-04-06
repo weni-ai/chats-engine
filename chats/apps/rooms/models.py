@@ -1,10 +1,9 @@
 import json
-import requests
-
 from datetime import timedelta
 
-from django.db import models
+import requests
 from django.core.serializers.json import DjangoJSONEncoder
+from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError

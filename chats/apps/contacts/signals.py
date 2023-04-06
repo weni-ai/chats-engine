@@ -1,20 +1,13 @@
-from chats.apps.contacts.models import Contact
-from django.db.models.signals import post_save, post_delete
+from dateutil.relativedelta import relativedelta
+from django.db.models.signals import post_delete, post_save
+from django.dispatch import receiver
 from django.utils import timezone
 
-from django.dispatch import receiver
-
-from dateutil.relativedelta import relativedelta
-
 from chats.apps.api.v1.prometheus.metrics import (
-    chats_total_contacts,
-    chats_total_contacts_last_month,
-    chats_total_contacts_last_3_months,
-    chats_total_contacts_last_6_months,
-    chats_total_contacts_last_1_year,
-    chats_online_contacts,
-    chats_offline_contacts,
+    chats_offline_contacts, chats_online_contacts, chats_total_contacts, chats_total_contacts_last_1_year,
+    chats_total_contacts_last_3_months, chats_total_contacts_last_6_months, chats_total_contacts_last_month,
 )
+from chats.apps.contacts.models import Contact
 
 
 @receiver([post_save, post_delete], sender=Contact)

@@ -7,9 +7,8 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 from django.utils import timezone
 
-from chats.apps.rooms.models import Room
-
 from chats.apps.api.websockets.rooms.validators import WSJoinValidator
+from chats.apps.rooms.models import Room
 
 
 class AgentRoomConsumer(AsyncJsonWebsocketConsumer):

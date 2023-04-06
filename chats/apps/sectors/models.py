@@ -1,14 +1,12 @@
-from django.db import models
-from django.utils.translation import gettext_lazy as _
+import pendulum
 from django.contrib.auth import get_user_model
-from chats.apps.queues.models import QueueAuthorization
+from django.db import models
+from django.db.models import F, Q
+from django.utils.translation import gettext_lazy as _
 
+from chats.apps.queues.models import QueueAuthorization
 from chats.core.models import BaseModel
 from chats.utils.websockets import send_channels_group
-from django.db.models import F, Q
-
-import pendulum
-
 
 User = get_user_model()
 
@@ -198,9 +196,7 @@ class SectorAuthorization(BaseModel):
 
     @property
     def serialized_ws_data(self):
-        from chats.apps.api.v1.sectors.serializers import (
-            SectorAuthorizationWSSerializer,
-        )
+        from chats.apps.api.v1.sectors.serializers import SectorAuthorizationWSSerializer
 
         return SectorAuthorizationWSSerializer(self).data
 

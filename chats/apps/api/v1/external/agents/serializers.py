@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
-from chats.apps.projects.models import ProjectPermission
 from chats.apps.api.v1.internal.users.serializers import UserSerializer
+from chats.apps.projects.models import ProjectPermission
 
 
 class AgentFlowSerializer(serializers.ModelSerializer):
