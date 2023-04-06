@@ -7,11 +7,7 @@ from rest_framework.response import Response
 
 from chats.apps.api.v1.msgs.filters import MessageFilter, MessageMediaFilter
 from chats.apps.api.v1.msgs.permissions import MessageMediaPermission, MessagePermission
-from chats.apps.api.v1.msgs.serializers import (
-    MessageAndMediaSerializer,
-    MessageMediaSerializer,
-    MessageSerializer,
-)
+from chats.apps.api.v1.msgs.serializers import MessageAndMediaSerializer, MessageMediaSerializer, MessageSerializer
 from chats.apps.msgs.models import Message as ChatMessage, MessageMedia
 
 

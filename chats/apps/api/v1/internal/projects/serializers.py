@@ -2,9 +2,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import exceptions, serializers, status
 from timezone_field.rest_framework import TimeZoneSerializerField
 
-from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
-    ConnectRESTClient,
-)
+from chats.apps.api.v1.internal.rest_clients.connect_rest_client import ConnectRESTClient
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.api.v1.internal.users.serializers import UserSerializer
 from chats.apps.projects.models import Project, ProjectPermission

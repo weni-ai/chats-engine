@@ -1,16 +1,5 @@
 from django.db.models import (
-    Avg,
-    Case,
-    Count,
-    ExpressionWrapper,
-    F,
-    FloatField,
-    IntegerField,
-    OuterRef,
-    Q,
-    Subquery,
-    Sum,
-    When,
+    Avg, Case, Count, ExpressionWrapper, F, FloatField, IntegerField, OuterRef, Q, Subquery, Sum, When,
 )
 from django.db.models.functions import Cast
 from django.utils import timezone
