@@ -1,29 +1,28 @@
 from django.urls import reverse
 from rest_framework import status
-from rest_framework.test import APITestCase
 from rest_framework.authtoken.models import Token
+from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
 from chats.apps.projects.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.sectors.models import Sector
 
+
 class QueueTests(APITestCase):
-    fixtures = ['chats/fixtures/fixture_sector.json']
+    fixtures = ["chats/fixtures/fixture_sector.json"]
 
     def setUp(self):
-        self.project = Project.objects.get(pk='34a93b52-231e-11ed-861d-0242ac120002')
-        self.sector = Sector.objects.get(pk='21aecf8c-0c73-4059-ba82-4343e0cc627c')
+        self.project = Project.objects.get(pk="34a93b52-231e-11ed-861d-0242ac120002")
+        self.sector = Sector.objects.get(pk="21aecf8c-0c73-4059-ba82-4343e0cc627c")
         self.manager_user = User.objects.get(pk=8)
-        self.manager_token =  Token.objects.get(user=self.manager_user)
+        self.manager_token = Token.objects.get(user=self.manager_user)
         self.agent_user = User.objects.get(pk=6)
-        self.agent_token =  Token.objects.get(user=self.agent_user)
+        self.agent_token = Token.objects.get(user=self.agent_user)
         self.admin_user = User.objects.get(pk=1)
-        self.admin_token =  Token.objects.get(user=self.admin_user)
+        self.admin_token = Token.objects.get(user=self.admin_user)
 
-        self.queue_1 = Queue.objects.create(
-            name="suport queue", sector=self.sector
-        )
+        self.queue_1 = Queue.objects.create(name="suport queue", sector=self.sector)
 
     def list_queue_request(self, token):
         """

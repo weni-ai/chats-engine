@@ -1,15 +1,14 @@
+from channels.routing import URLRouter
 from channels.testing import WebsocketCommunicator
 from django.test import RequestFactory, TestCase
 
-from chats.apps.api.utils import create_message, create_user_and_token
-from chats.apps.api.websockets.rooms.consumers.agent import AgentRoomConsumer
+from chats.apps.accounts.authentication.channels.middleware import TokenAuthMiddleware
+from chats.apps.api.utils import create_user_and_token
+from chats.apps.api.websockets.rooms.routing import websocket_urlpatterns
 from chats.apps.contacts.models import Contact
 from chats.apps.projects.models import Project
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorAuthorization
-from channels.routing import URLRouter
-from chats.apps.api.websockets.rooms.routing import websocket_urlpatterns
-from chats.apps.accounts.authentication.channels.middleware import TokenAuthMiddleware
 
 
 class AgentConsumerTestCase(TestCase):

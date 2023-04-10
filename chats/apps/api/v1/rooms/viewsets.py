@@ -1,25 +1,20 @@
 import json
 
-from django.utils.translation import gettext_lazy as _
+from django.conf import settings
+from django.db.models import F, Sum
 from django.utils import timezone
-from rest_framework import mixins, permissions, status, filters
-from rest_framework.decorators import action
 from django_filters.rest_framework import DjangoFilterBackend
-
+from rest_framework import filters, mixins, permissions, status
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
+from chats.apps.api.v1 import permissions as api_permissions
+from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1.rooms.serializers import RoomSerializer, TransferRoomSerializer
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.msgs.models import Message
 from chats.apps.rooms.models import Room
-from chats.apps.api.v1.rooms import filters as room_filters
-from chats.apps.api.v1 import permissions as api_permissions
-from chats.utils.websockets import send_channels_group
-
-from django.conf import settings
-
-from django.db.models import F, Sum
 
 
 class RoomViewset(

@@ -1,16 +1,15 @@
-import magic
 import io
 
-from pydub import AudioSegment
-
+import magic
 from django.conf import settings
-from rest_framework import serializers, exceptions
+from pydub import AudioSegment
+from rest_framework import exceptions, serializers
 
+from chats.apps.accounts.models import User
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactSerializer
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
-from chats.apps.accounts.models import User
 
 """
 TODO: Refactor these serializers into less classes

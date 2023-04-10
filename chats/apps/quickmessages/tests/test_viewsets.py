@@ -18,9 +18,7 @@ class ViewsetTests(APITestCase):
     def create_quick_message(
         self, shortcut: str = "test", text: str = "This is a test quick message"
     ):
-        q = QuickMessage.objects.create(
-            shortcut=shortcut, text=text, user_id=self.user.id
-        )
+        q = QuickMessage.objects.create(shortcut=shortcut, text=text, user=self.user)
         return q
 
     def test_create_quick_message(self):
@@ -53,12 +51,12 @@ class ViewsetTests(APITestCase):
         Ensure we can retrieve a quick message.
         """
         q = self.create_quick_message()
-        url = reverse("quickmessage-detail", kwargs={"pk": q.id})
+        url = reverse("quickmessage-detail", kwargs={"pk": q.pk})
         response = self.client.get(url, format="json")
         data = response.data
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(data["id"], q.id)
+        self.assertEqual(data["uuid"], str(q.pk))
         self.assertEqual(data["shortcut"], q.shortcut)
         self.assertEqual(data["text"], q.text)
 
@@ -67,7 +65,7 @@ class ViewsetTests(APITestCase):
         Ensure we can update a quick message.
         """
         q = self.create_quick_message()
-        url = reverse("quickmessage-detail", kwargs={"pk": q.id})
+        url = reverse("quickmessage-detail", kwargs={"pk": q.pk})
         request_body = {
             "text": "another quick message text",
             "shortcut": "another-shortcut",
@@ -77,7 +75,7 @@ class ViewsetTests(APITestCase):
         data = response.data
         q.refresh_from_db()
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(data["id"], q.id)
+        self.assertEqual(data["uuid"], str(q.pk))
         self.assertEqual(request_body["shortcut"], q.shortcut)
         self.assertEqual(request_body["text"], q.text)
 
@@ -86,9 +84,9 @@ class ViewsetTests(APITestCase):
         Ensure we can delete a quick message.
         """
         q = self.create_quick_message()
-        url = reverse("quickmessage-detail", kwargs={"pk": q.id})
+        url = reverse("quickmessage-detail", kwargs={"pk": q.pk})
         response = self.client.delete(url)
-        q = QuickMessage.objects.filter(id=q.id).first()
+        q = QuickMessage.objects.filter(pk=q.pk).first()
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertTrue(q is None)
 

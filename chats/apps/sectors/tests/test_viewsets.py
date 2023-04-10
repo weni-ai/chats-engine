@@ -1,13 +1,14 @@
 from django.urls import reverse
 from rest_framework import status
-from rest_framework.test import APITestCase
-from chats.apps.accounts.models import User
-
-from chats.apps.projects.models import Project, ProjectPermission
-from chats.apps.queues.models import Queue, QueueAuthorization
-from chats.apps.sectors.models import Sector, SectorAuthorization
-from chats.apps.rooms.models import Room
 from rest_framework.authtoken.models import Token
+from rest_framework.test import APITestCase
+
+from chats.apps.accounts.models import User
+from chats.apps.contacts.models import Contact
+from chats.apps.projects.models import Project
+from chats.apps.queues.models import Queue
+from chats.apps.rooms.models import Room
+from chats.apps.sectors.models import Sector
 
 
 class SectorTests(APITestCase):
@@ -115,7 +116,7 @@ class RoomsExternalTests(APITestCase):
         data = {
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
-                "external_id": "e3955fd5-5705-40cd-b480-b45594b70282",
+                "external_id": "e3955fd5-5705-40cd-b480-b45594b70299",
                 "name": "Foo Bar",
                 "email": "FooBar@weni.ai",
                 "phone": "+250788123123",
@@ -134,7 +135,7 @@ class RoomsExternalTests(APITestCase):
         data = {
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
-                "external_id": "aec9f84e-3dcd-11ed-b878-0242ac120002",
+                "external_id": "aec9f84e-3dcd-11ed-b878-0242ac190012",
                 "name": "external generator",
                 "email": "generator@weni.ai",
                 "phone": "+558498984312",
@@ -142,11 +143,12 @@ class RoomsExternalTests(APITestCase):
             },
         }
         response = client.post(url, data=data, format="json")
+
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["contact"]["name"], "external generator")
         self.assertEqual(
             response.data["contact"]["external_id"],
-            "aec9f84e-3dcd-11ed-b878-0242ac120002",
+            "aec9f84e-3dcd-11ed-b878-0242ac190012",
         )
 
     def test_create_external_room_editing_contact(self):
@@ -155,10 +157,11 @@ class RoomsExternalTests(APITestCase):
         client.credentials(
             HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380"
         )
+        contact = Contact.objects.exclude(rooms__is_active=True).first()
         data = {
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
-                "external_id": "e3955fd5-5705-40cd-b480-b45594b70282",
+                "external_id": contact.external_id,
                 "name": "gaules",
                 "email": "gaulesr@weni.ai",
                 "phone": "+5511985543332",
@@ -170,13 +173,17 @@ class RoomsExternalTests(APITestCase):
             },
         }
         response = client.post(url, data=data, format="json")
+        contact.refresh_from_db()
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data["contact"]["name"], "gaules")
-        self.assertEqual(response.data["contact"]["custom_fields"]["age"], "40")
+        self.assertEqual(contact.name, "gaules")
         self.assertEqual(
-            response.data["contact"]["custom_fields"]["prefered_game"], "cs-go"
+            contact.custom_fields,
+            {
+                "age": "40",
+                "prefered_game": "cs-go",
+                "job": "streamer",
+            },
         )
-        self.assertEqual(response.data["contact"]["custom_fields"]["job"], "streamer")
 
 
 class MsgsExternalTests(APITestCase):
@@ -186,7 +193,7 @@ class MsgsExternalTests(APITestCase):
         self.room = Room.objects.get(uuid="090da6d1-959e-4dea-994a-41bf0d38ba26")
 
     def test_create_external_msgs(self):
-        url = reverse("external_msgs-list")
+        url = reverse("external_message-list")
         client = self.client
         client.credentials(
             HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380"
@@ -199,4 +206,3 @@ class MsgsExternalTests(APITestCase):
         }
         response = client.post(url, data=data, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)

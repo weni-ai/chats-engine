@@ -1,15 +1,18 @@
-import queue
 from django.conf import settings
+from django.db import IntegrityError
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import status, viewsets, exceptions, filters
+from rest_framework import exceptions, filters, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+
+from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
+    ConnectRESTClient,
+)
 from chats.apps.api.v1.permissions import (
-    IsProjectAdmin,
-    IsQueueAgent,
-    AnyQueueAgentPermission,
-    IsSectorManager,
     HasAgentPermissionAnyQueueSector,
+    IsProjectAdmin,
+    IsSectorManager,
 )
 from chats.apps.api.v1.sectors import serializers as sector_serializers
 from chats.apps.api.v1.sectors.filters import (
@@ -19,11 +22,6 @@ from chats.apps.api.v1.sectors.filters import (
 )
 from chats.apps.projects.models import Project
 from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
-from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
-    ConnectRESTClient,
-)
-from rest_framework.decorators import action
-from django.db import IntegrityError
 
 
 class SectorViewset(viewsets.ModelViewSet):
@@ -88,7 +86,7 @@ class SectorViewset(viewsets.ModelViewSet):
                 instance.delete()
 
                 raise exceptions.APIException(
-                    detail=f"[{response.status_code}] Error posting the sector/ticketer on flows. Exception: {response.content}"
+                    detail=f"[{response.status_code}] Error posting the sector/ticketer on flows. Exception: {response.content}"  # NOQA
                 )
         instance.notify_sector("create")
 

@@ -3,10 +3,10 @@ from rest_framework import status, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from chats.apps.api.v1.queues import serializers as queue_serializers
-from chats.apps.queues.models import Queue, QueueAuthorization
-from chats.apps.api.v1.queues.filters import QueueFilter
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
+from chats.apps.api.v1.queues import serializers as queue_serializers
+from chats.apps.api.v1.queues.filters import QueueFilter
+from chats.apps.queues.models import Queue, QueueAuthorization
 
 
 class QueueInternalViewset(viewsets.ModelViewSet):

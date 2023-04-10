@@ -1,4 +1,4 @@
-import json
+from typing import Dict, List
 
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -13,7 +13,6 @@ from chats.apps.contacts.models import Contact
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
-from typing import List, Dict
 
 
 def get_room_user(

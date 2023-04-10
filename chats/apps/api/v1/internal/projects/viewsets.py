@@ -1,19 +1,18 @@
 from django.conf import settings
-from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.exceptions import ValidationError
+from django.contrib.auth import get_user_model
 from django.db import IntegrityError
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
+from rest_framework.generics import get_object_or_404
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.api.v1.internal.projects import serializers
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.core.views import persist_keycloak_user_by_email
-from rest_framework import mixins, status
-from rest_framework.response import Response
-from rest_framework.decorators import action
-from rest_framework.generics import get_object_or_404
-from django.contrib.auth import get_user_model
 
 User = get_user_model()
 

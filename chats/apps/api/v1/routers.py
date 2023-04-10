@@ -2,6 +2,7 @@ from rest_framework import routers
 
 from chats.apps.api.v1.accounts.viewsets import LoginViewset
 from chats.apps.api.v1.contacts.viewsets import ContactViewset
+from chats.apps.api.v1.dashboard.viewsets import DashboardLiveViewset
 from chats.apps.api.v1.external.agents.viewsets import AgentFlowViewset
 from chats.apps.api.v1.external.msgs.viewsets import MessageFlowViewset
 from chats.apps.api.v1.external.queues.viewsets import QueueFlowViewset
@@ -19,15 +20,6 @@ from chats.apps.api.v1.sectors.viewsets import (
     SectorTagsViewset,
     SectorViewset,
 )
-from chats.apps.api.v1.dashboard.viewsets import (
-    DashboardLiveViewset,
-)
-
-from chats.apps.api.v1.internal.queues.viewsets import (
-    QueueInternalViewset,
-    QueueAuthInternalViewset,
-)
-
 from chats.apps.api.v1.users.viewsets import ProfileViewset
 
 

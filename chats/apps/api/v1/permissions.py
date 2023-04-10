@@ -1,12 +1,12 @@
 from django.contrib.auth.models import AnonymousUser
-from rest_framework import permissions
 from django.core.exceptions import ObjectDoesNotExist
+from rest_framework import permissions
 
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import SectorAuthorization
 from chats.core.permissions import GetPermission
-from chats.apps.rooms.models import Room
 
 WRITE_METHODS = ["POST"]
 OBJECT_METHODS = ["DELETE", "PATCH", "PUT", "GET"]

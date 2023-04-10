@@ -1,9 +1,8 @@
 import json
 
-from django.core.serializers.json import DjangoJSONEncoder
-
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+from django.core.serializers.json import DjangoJSONEncoder
 
 
 def send_channels_group(group_name: str, call_type: str, content: str, action: str):

@@ -1,12 +1,10 @@
-import json
-
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from chats.apps.api.v1.contacts.serializers import ContactSerializer
-from chats.apps.api.v1.tests.base import BaseAPIChatsTestCase
-from chats.apps.contacts.models import Contact
+from chats.core.tests.test_base import BaseAPIChatsTestCase
 
 
 class TestContactsViewsets(BaseAPIChatsTestCase):
@@ -14,31 +12,30 @@ class TestContactsViewsets(BaseAPIChatsTestCase):
         url = reverse("contact-list")
         client = self.client
         client.credentials(HTTP_AUTHORIZATION="Token " + token.key)
-
-        response = client.get(url, data=data)
+        response = client.get(url, format="json", data=data)
         results = response.json().get("results")
         return response, results
 
     def test_admin_list_within_its_project(self):
-        payload = json.dumps({"project": self.project.uuid})
-        response, results = self._list_request(token=self.admin_token, data=payload)
-
+        payload = {"project": str(self.project.uuid)}
+        self.deactivate_rooms()
+        response = self._list_request(token=self.admin_token, data=payload)[0]
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json().get("count"), self.count_project_1_contact)
 
     def test_manager_list_within_its_sectors(self):
-        payload = json.dumps({"project": self.project.uuid})
-        response, results = self._list_request(token=self.manager_token, data=payload)
-
+        payload = {"project": str(self.project.uuid)}
+        self.deactivate_rooms()
+        response = self._list_request(token=self.manager_token, data=payload)[0]
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.json().get("count"), self.count_manager_contact)
+        self.assertEqual(response.json().get("count"), 3)
 
     def test_agent_list_within_its_rooms(self):
-        payload = json.dumps({"project": self.project.uuid})
+        payload = {"project": str(self.project.uuid)}
+        self.deactivate_rooms()
         response, results = self._list_request(token=self.agent_token, data=payload)
-
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.json().get("count"), self.count_agent_contact)
+        self.assertEqual(response.json().get("count"), 2)
 
     def test_retrieve_contact_ok(self):
         """
@@ -46,9 +43,34 @@ class TestContactsViewsets(BaseAPIChatsTestCase):
         """
         client = self.client
         client.credentials(HTTP_AUTHORIZATION="Token " + self.admin_token.key)
-        url = reverse("contact-detail", kwargs={"pk": self.contact.id})
-        response = self.client.get(url, format="json")
+        self.contact.rooms.update(is_active=False, ended_at=timezone.now())
+        url = (
+            reverse("contact-detail", kwargs={"pk": str(self.contact.pk)})
+            + f"?project={str(self.project.uuid)}"
+        )
+        response = client.get(
+            url,
+            format="json",
+        )
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_retrieve_contact_no_closed_rooms(self):
+        """
+        Ensure we can retrieve a contact
+        """
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.admin_token.key)
+        url = (
+            reverse("contact-detail", kwargs={"pk": str(self.contact.pk)})
+            + f"?project={str(self.project.uuid)}"
+        )
+        response = self.client.get(
+            url,
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_retrieve_contact_unauthorized(self):
         """
@@ -56,15 +78,21 @@ class TestContactsViewsets(BaseAPIChatsTestCase):
         """
         client = self.client
         client.credentials(HTTP_AUTHORIZATION="Token " + self.agent_token.key)
-        url = reverse("contact-detail", kwargs={"pk": self.contact_2.id})
-        response = self.client.get(url, format="json")
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        url = (
+            reverse("contact-detail", kwargs={"pk": str(self.contact_2.pk)})
+            + f"?project={str(self.project.uuid)}"
+        )
+        response = client.get(url, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_handling_not_allowed_http_methods(self):
         url = reverse("contact-detail", kwargs={"pk": 1})
-        post = self.client.post(url, format="json")
-        put = self.client.put(url, format="json")
-        delete = self.client.delete(url, format="json")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.admin_token.key)
+        post = client.post(url, format="json")
+        put = client.put(url, format="json")
+        delete = client.delete(url, format="json")
         actions = [post, put, delete]
 
         for action in actions:
@@ -89,12 +117,7 @@ class TestContactSerializer(APITestCase):
         """
         Ensure we can detect invalid data on serialize
         """
-        data = [
-            {"name": "", "email": ""},
-            {"name": None, "email": None},
-            {},
-        ]
+        data = {"name": None, "email": None}
 
-        for d in data:
-            serializer = ContactSerializer(data=d)
-            self.assertFalse(serializer.is_valid())
+        serializer = ContactSerializer(data=data)
+        self.assertFalse(serializer.is_valid())

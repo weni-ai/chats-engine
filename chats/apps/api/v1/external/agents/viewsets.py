@@ -2,13 +2,12 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 
-
-from chats.apps.projects.models import ProjectPermission
-from chats.apps.api.v1.external.agents.serializers import AgentFlowSerializer
-from chats.apps.api.v1.external.agents.filters import AgentFlowFilter
 from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
 )
+from chats.apps.api.v1.external.agents.filters import AgentFlowFilter
+from chats.apps.api.v1.external.agents.serializers import AgentFlowSerializer
+from chats.apps.projects.models import ProjectPermission
 
 
 def get_permission_token_from_request(request):

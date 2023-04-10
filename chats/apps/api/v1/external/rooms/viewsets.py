@@ -1,16 +1,16 @@
 import json
 
-from rest_framework import viewsets, status
+from django.db import IntegrityError
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db import IntegrityError
 
-from chats.apps.rooms.models import Room
-from chats.apps.api.v1.external.rooms.serializers import RoomFlowSerializer
-from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
 )
+from chats.apps.api.v1.external.permissions import IsAdminPermission
+from chats.apps.api.v1.external.rooms.serializers import RoomFlowSerializer
+from chats.apps.rooms.models import Room
 
 
 def add_user_or_queue_to_room(instance, request):

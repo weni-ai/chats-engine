@@ -1,8 +1,7 @@
 from django.contrib import admin
 
-from chats.apps.rooms.models import Room
-
 from chats.apps.dashboard.models import RoomMetrics
+from chats.apps.rooms.models import Room
 
 # Register your models here.
 

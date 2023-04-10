@@ -1,21 +1,19 @@
 from django.urls import reverse
-
-from rest_framework.test import APITestCase
 from rest_framework.authtoken.models import Token
+from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
 from chats.apps.projects.models import Project
 
 
-
-class ActionsTests(APITestCase):
-    fixtures = ['chats/fixtures/fixture_app.json']
+class PermissionTests(APITestCase):
+    fixtures = ["chats/fixtures/fixture_app.json"]
 
     def setUp(self) -> None:
         self.project = Project.objects.get(pk="34a93b52-231e-11ed-861d-0242ac120002")
         self.project_2 = Project.objects.get(pk="32e74fec-0dd7-413d-8062-9659f2e213d2")
         self.manager_user = User.objects.get(pk=9)
-        self.login_token =  Token.objects.get_or_create(user=self.manager_user)[0]
+        self.login_token = Token.objects.get_or_create(user=self.manager_user)[0]
 
     def test_get_first_access_status(self):
         """
@@ -30,7 +28,8 @@ class ActionsTests(APITestCase):
 
     def test_get_first_access_status_without_permission(self):
         """
-        Ensure that users who dont have permission in a determined project, cannot get the value off first_access field.
+        Ensure that users who dont have permission in a determined project,
+        cannot get the value off first_access field.
         """
         url = reverse("project_permission-list")
         url_action = f"{url}verify_access/"
@@ -38,7 +37,9 @@ class ActionsTests(APITestCase):
         client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
         response = client.get(url_action, data={"project": self.project_2.pk})
         self.assertEqual(response.data.get("first_access"), None)
-        self.assertEqual(response.data["Detail"], "You dont have permission in this project.")
+        self.assertEqual(
+            response.data["Detail"], "You dont have permission in this project."
+        )
 
     def test_update_first_access_status(self):
         """
@@ -61,4 +62,6 @@ class ActionsTests(APITestCase):
         client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
         response = client.patch(url_action)
         self.assertEqual(response.data.get("first_access"), None)
-        self.assertEqual(response.data["Detail"], "You dont have permission in this project.")
+        self.assertEqual(
+            response.data["Detail"], "You dont have permission in this project."
+        )

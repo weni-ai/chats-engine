@@ -6,4 +6,4 @@ class ChatConfig(AppConfig):
     name = "chats.apps.rooms"
 
     def ready(self):
-        import chats.apps.rooms.signals
+        import chats.apps.rooms.signals  # NOQA

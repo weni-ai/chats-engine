@@ -1,16 +1,13 @@
-from django.conf import settings
-from django.utils.translation import gettext_lazy as _
-from rest_framework import serializers, exceptions, status
+from django.contrib.auth import get_user_model
+from rest_framework import exceptions, serializers, status
 from timezone_field.rest_framework import TimeZoneSerializerField
-
-from chats.apps.projects.models import Project, ProjectPermission
-from chats.apps.api.v1.internal.users.serializers import UserSerializer
 
 from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
     ConnectRESTClient,
 )
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
-from django.contrib.auth import get_user_model
+from chats.apps.api.v1.internal.users.serializers import UserSerializer
+from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.queues.models import QueueAuthorization
 from chats.apps.sectors.models import SectorAuthorization, SectorTag
 
@@ -100,7 +97,7 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
                 response_flows.status_code not in status_list
             ):
                 instance.delete()
-                error_message = f"[{response_sector.status_code}] Sector response: {response_sector.content}.  [{response_flows.status_code}] Queue response: {response_flows.content}."
+                error_message = f"[{response_sector.status_code}] Sector response: {response_sector.content}. [{response_flows.status_code}] Queue response: {response_flows.content}."  # NOQA
                 raise exceptions.APIException(detail=error_message)
 
         return instance

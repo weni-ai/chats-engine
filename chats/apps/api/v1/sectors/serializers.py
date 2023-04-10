@@ -1,10 +1,9 @@
-from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import get_user_model
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
-from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 from chats.apps.api.v1.accounts.serializers import UserSerializer
-
+from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 
 User = get_user_model()
 

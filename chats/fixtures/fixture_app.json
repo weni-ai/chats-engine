@@ -1097,7 +1097,7 @@
         "fields": {
             "created_on": "2022-08-24T21:59:57.775Z",
             "modified_on": "2022-08-24T21:59:57.775Z",
-            "external_id": null,
+            "external_id": "c21addbf-d9e0-46bc-aba4-40088e0fbc3b",
             "name": "Carlos Norton",
             "email": "c.norton@chats.weni.ai",
             "status": "online",
@@ -1113,7 +1113,7 @@
         "fields": {
             "created_on": "2022-08-24T21:59:19.655Z",
             "modified_on": "2022-08-24T21:59:19.655Z",
-            "external_id": null,
+            "external_id": "eb3ce76e-4871-40a4-8e2d-819064958f5b",
             "name": "Denise Thomas",
             "email": "denise@chats.weni.ai",
             "status": "online",
@@ -1129,7 +1129,7 @@
         "fields": {
             "created_on": "2022-08-24T21:58:57.986Z",
             "modified_on": "2022-08-24T21:58:57.986Z",
-            "external_id": null,
+            "external_id": "98776f62-f67f-4e73-865f-3228bfecdd56",
             "name": "Roy Mosley",
             "email": "roy@chats.weni.ai",
             "status": "online",
@@ -1145,7 +1145,7 @@
         "fields": {
             "created_on": "2022-08-24T22:00:35.619Z",
             "modified_on": "2022-08-24T22:00:35.619Z",
-            "external_id": null,
+            "external_id": "c9c60d7e-9807-4f2d-bb00-bdf9b189e258",
             "name": "Kelsy Paul",
             "email": "kelsyp@chats.weni.ai",
             "status": "online",
@@ -2285,7 +2285,7 @@
             "project": "34a93b52-231e-11ed-861d-0242ac120002",
             "rooms_limit": 3,
             "work_start": "09:00:00",
-            "work_end": "17:00:00",
+            "work_end": "19:00:00",
             "is_deleted": false
         }
     },

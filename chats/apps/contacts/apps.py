@@ -6,4 +6,4 @@ class ContactsConfig(AppConfig):
     name = "chats.apps.contacts"
 
     def ready(self):
-        import chats.apps.contacts.signals
+        import chats.apps.contacts.signals  # NOQA

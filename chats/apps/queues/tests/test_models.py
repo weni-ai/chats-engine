@@ -1,19 +1,50 @@
-from django.test import TestCase
-
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError
+from django.test import TestCase
+from rest_framework.test import APITestCase
 
 from chats.apps.contacts.models import Contact
-from chats.apps.rooms.models import Room
-from chats.apps.queues.models import Queue
 from chats.apps.projects.models import Project, ProjectPermission
+from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
-
 
 User = get_user_model()
 
 
 def create_user(nickname: str = "fake"):
     return User.objects.create_user("{}@user.com".format(nickname), nickname)
+
+
+class ConstraintTests(APITestCase):
+    fixtures = ["chats/fixtures/fixture_sector.json"]
+
+    def setUp(self):
+        self.project_permission = ProjectPermission.objects.get(
+            uuid="e416fd45-2896-43a5-bd7a-5067f03c77fa"
+        )
+        self.queue = Queue.objects.get(uuid="f2519480-7e58-4fc4-9894-9ab1769e29cf")
+        self.queue_auth = QueueAuthorization.objects.get(
+            uuid="3717f056-7ea5-4d38-80f5-ba907132807c"
+        )
+
+    def test_unique_queue_name_constraint(self):
+        with self.assertRaises(IntegrityError) as context:
+            Queue.objects.create(name=self.queue.name, sector=self.queue.sector)
+        self.assertTrue(
+            'duplicate key value violates unique constraint "unique_queue_name"'
+            in str(context.exception)
+        )
+
+    def test_unique_queue_auth_constraint(self):
+        with self.assertRaises(IntegrityError) as context:
+            QueueAuthorization.objects.create(
+                queue=self.queue_auth.queue, permission=self.queue_auth.permission
+            )
+        self.assertTrue(
+            'duplicate key value violates unique constraint "unique_queue_auth"'
+            in str(context.exception)
+        )
 
 
 class QueueSetUpMixin(TestCase):
@@ -37,10 +68,10 @@ class QueueSetUpMixin(TestCase):
         self.agent_2 = create_user("agent2")
 
         self.agent_permission = self.agent.project_permissions.create(
-            project=self.project, role=ProjectPermission.ROLE_AGENT
+            project=self.project, role=ProjectPermission.ROLE_ATTENDANT
         )
         self.agent_2_permission = self.agent_2.project_permissions.create(
-            project=self.project, role=ProjectPermission.ROLE_AGENT
+            project=self.project, role=ProjectPermission.ROLE_ATTENDANT
         )
 
         self.queue = Queue.objects.create(name="Q1", sector=self.sector)
@@ -54,14 +85,6 @@ class QueueSetUpMixin(TestCase):
         self.room = Room.objects.create(
             contact=self.contact, is_active=True, queue=self.queue
         )
-
-
-class QueueOnlineAgentsTestCase(QueueSetUpMixin, TestCase):
-    pass
-
-
-class QueueAgentsTestCase(QueueSetUpMixin, TestCase):
-    pass
 
 
 class QueueAvailableAgentsTestCase(QueueSetUpMixin, TestCase):
