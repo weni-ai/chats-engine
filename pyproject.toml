@@ -7,6 +7,7 @@ exclude = '''
 
 [tool.isort]
 profile = "black"
+skip_glob = ["*/migrations/*"]
 
 [flake8]
 max-line-length=120
