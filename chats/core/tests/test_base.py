@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from chats.apps.api.utils import create_contact, create_user_and_token
@@ -124,4 +125,4 @@ class BaseAPIChatsTestCase(APITestCase):
         return c
 
     def deactivate_rooms(self):
-        Room.objects.all().update(is_active=False)
+        Room.objects.all().update(is_active=False, ended_at=timezone.now())

@@ -1,4 +1,5 @@
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -42,12 +43,12 @@ class TestContactsViewsets(BaseAPIChatsTestCase):
         """
         client = self.client
         client.credentials(HTTP_AUTHORIZATION="Token " + self.admin_token.key)
-        self.contact.rooms.update(is_active=False)
+        self.contact.rooms.update(is_active=False, ended_at=timezone.now())
         url = (
             reverse("contact-detail", kwargs={"pk": str(self.contact.pk)})
             + f"?project={str(self.project.uuid)}"
         )
-        response = self.client.get(
+        response = client.get(
             url,
             format="json",
         )
