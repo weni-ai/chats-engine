@@ -35,6 +35,18 @@ python-versions = ">=3.7"
 tests = ["pytest", "pytest-asyncio", "mypy (>=0.800)"]
 
 [[package]]
+name = "astroid"
+version = "2.5.6"
+description = "An abstract syntax tree for Python with inference support."
+category = "main"
+optional = false
+python-versions = "~=3.6"
+
+[package.dependencies]
+lazy-object-proxy = ">=1.4.0"
+wrapt = ">=1.11,<1.13"
+
+[[package]]
 name = "asttokens"
 version = "2.2.1"
 description = "Annotate AST trees with source code positions"
@@ -698,6 +710,14 @@ docs = ["Sphinx (>=1.0)", "sphinx-rtd-theme (>=1.0)"]
 tests = ["coverage (>=4.0)", "flake8 (<4)", "isort", "mypy", "pytest-cov", "pytest-flake8 (>=0.5)", "pytest (>=2.8.0)", "types-pyopenssl", "types-pyrfc3339", "types-requests", "types-setuptools"]
 
 [[package]]
+name = "lazy-object-proxy"
+version = "1.9.0"
+description = "A fast and thorough lazy object proxy."
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[[package]]
 name = "markdown-it-py"
 version = "2.2.0"
 description = "Python port of markdown-it. Markdown parsing, done right!"
@@ -741,7 +761,7 @@ traitlets = "*"
 name = "mccabe"
 version = "0.6.1"
 description = "McCabe checker, plugin for flake8"
-category = "dev"
+category = "main"
 optional = false
 python-versions = "*"
 
@@ -1018,6 +1038,21 @@ python-versions = ">=3.6"
 
 [package.extras]
 plugins = ["importlib-metadata"]
+
+[[package]]
+name = "pylint"
+version = "2.8.3"
+description = "python code static checker"
+category = "main"
+optional = false
+python-versions = "~=3.6"
+
+[package.dependencies]
+astroid = "2.5.6"
+colorama = {version = "*", markers = "sys_platform == \"win32\""}
+isort = ">=4.2.5,<6"
+mccabe = ">=0.6,<0.7"
+toml = ">=0.7.1"
 
 [[package]]
 name = "pymongo"
@@ -1317,6 +1352,14 @@ python-versions = ">=3.8"
 pbr = ">=2.0.0,<2.1.0 || >2.1.0"
 
 [[package]]
+name = "toml"
+version = "0.10.2"
+description = "Python Library for Tom's Obvious, Minimal Language"
+category = "main"
+optional = false
+python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
+
+[[package]]
 name = "tomli"
 version = "2.0.1"
 description = "A lil' TOML parser"
@@ -1452,15 +1495,24 @@ category = "main"
 optional = false
 python-versions = ">=3.7"
 
+[[package]]
+name = "wrapt"
+version = "1.12.1"
+description = "Module for decorators, wrappers and monkey patching."
+category = "main"
+optional = false
+python-versions = "*"
+
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "f092e31af0cf1d0a40854457598ff3f4c36c0179d791be974238d44c4ea305dd"
+content-hash = "107f5630746f1b0dff54b6e2efb1cbec060dc6e0e13c691506350b55aab2c9dd"
 
 [metadata.files]
 anyio = []
 appnope = []
 asgiref = []
+astroid = []
 asttokens = []
 async-timeout = []
 atomicwrites = []
@@ -1512,6 +1564,7 @@ jedi = []
 jinja2 = []
 jmespath = []
 josepy = []
+lazy-object-proxy = []
 markdown-it-py = []
 markupsafe = []
 matplotlib-inline = []
@@ -1544,6 +1597,7 @@ pycparser = []
 pydub = []
 pyflakes = []
 pygments = []
+pylint = []
 pymongo = []
 pyopenssl = []
 pyparsing = []
@@ -1567,6 +1621,7 @@ sniffio = []
 sqlparse = []
 stack-data = []
 stevedore = []
+toml = []
 tomli = []
 traitlets = []
 typing-extensions = []
@@ -1579,3 +1634,4 @@ virtualenv = []
 watchfiles = []
 wcwidth = []
 websockets = []
+wrapt = []

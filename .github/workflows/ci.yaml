@@ -52,8 +52,14 @@ jobs:
     - name: Run migrations
       run: python manage.py migrate
 
-    - name: run pre-commit
-      uses: pre-commit/action@v3.0.0
+    - name: run flake8
+      run: flake8
+
+    - name: run black
+      run: black .
+
+    - name: run isort
+      run: isort .
 
     - name: Run tests
       run: coverage run manage.py test --verbosity=2 --noinput
