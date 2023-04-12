@@ -316,7 +316,9 @@ class FlowStart(BaseModel):
 
 
 class ContactGroupFlowReference(BaseModel):
-    receiver_type = models.CharField(_("Receiver Type"), max_length=50)
+    receiver_type = models.CharField(
+        _("Receiver Type"), max_length=50
+    )  # Contact or Group, may use choices in the future
     external_id = models.CharField(
         _("External ID"), max_length=200, blank=True, null=True
     )
