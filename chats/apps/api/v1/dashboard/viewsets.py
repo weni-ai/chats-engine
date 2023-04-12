@@ -6,7 +6,12 @@ from chats.apps.api.v1.permissions import HasDashboardAccess
 from chats.apps.projects.models import Project
 from django.utils.translation import gettext_lazy as _
 
-from chats.apps.api.v1.dashboard.presenter import get_export_data
+from chats.apps.api.v1.dashboard.presenter import (
+    get_export_data,
+    get_general_data,
+    get_agents_data,
+    get_sector_data,
+)
 
 import pandas
 
@@ -24,9 +29,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
     lookup_field = "uuid"
     queryset = Project.objects.all()
 
-    # def get_permissions(self):
-    #     permission_classes = [permissions.IsAuthenticated, HasDashboardAccess]
-    #     return [permission() for permission in permission_classes]
+    def get_permissions(self):
+        permission_classes = [permissions.IsAuthenticated, HasDashboardAccess]
+        return [permission() for permission in permission_classes]
 
     @action(
         detail=True,
@@ -119,3 +124,68 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         )
         table.to_csv(response, encoding="utf-8", index=False)
         return response
+
+    @action(
+        detail=True,
+        methods=["GET"],
+        url_name="export_dashboard",
+    )
+    def export_dashboard(self, request, *args, **kwargs):
+        """
+        Can return data from dashboard to be export in csv/xls on project and sector level (list of sector, list of queues and list of agents online)
+        """
+        project = self.get_object()
+        filter = request.query_params
+
+        general_dataset = get_general_data(project, filter)
+        userinfo_dataset = get_agents_data(project, filter)
+        sector_dataset = get_sector_data(project, filter)
+
+        filename = "dashboard_export_data"
+
+        data_frame = pandas.DataFrame([general_dataset])
+        data_frame_1 = pandas.read_json(userinfo_dataset)
+        data_frame_2 = pandas.read_json(sector_dataset)
+
+        if "xls" in filter:
+            response = HttpResponse(
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            response["Content-Disposition"] = (
+                'attachment; filename="' + filename + ".xls"
+            )
+            with pandas.ExcelWriter(response, engine="xlsxwriter") as writer:
+                data_frame.to_excel(
+                    writer,
+                    sheet_name="dashboard_infos",
+                    startrow=1,
+                    startcol=0,
+                    index=False,
+                )
+                data_frame_1.to_excel(
+                    writer,
+                    sheet_name="dashboard_infos",
+                    startrow=4 + len(data_frame.index),
+                    startcol=0,
+                    index=False,
+                )
+                data_frame_2.to_excel(
+                    writer,
+                    sheet_name="dashboard_infos",
+                    startrow=8 + len(data_frame_1.index),
+                    startcol=0,
+                    index=False,
+                )
+            return response
+
+        else:
+            response = HttpResponse(content_type="text/csv")
+            response["Content-Disposition"] = (
+                'attachment; filename="' + filename + ".csv"
+            )
+
+            data_frame.to_csv(response, index=False)
+            data_frame_1.to_csv(response, index=False, mode="a")
+            data_frame_2.to_csv(response, index=False, mode="a")
+
+            return response
