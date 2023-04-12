@@ -6,6 +6,9 @@ from chats.apps.queues.models import Queue, QueueAuthorization
 
 
 class QueueSerializer(serializers.ModelSerializer):
+
+    sector_name = serializers.CharField(source="sector.name", read_only=True)
+
     class Meta:
         model = Queue
         fields = "__all__"
@@ -39,10 +42,11 @@ class QueueUpdateSerializer(serializers.ModelSerializer):
 
 class QueueReadOnlyListSerializer(serializers.ModelSerializer):
     agents = serializers.SerializerMethodField()
+    sector_name = serializers.CharField(source="sector.name", read_only=True)
 
     class Meta:
         model = Queue
-        fields = ["uuid", "name", "agents", "created_on"]
+        fields = ["uuid", "name", "agents", "created_on", "sector_name"]
 
     def get_agents(self, queue: Queue):
         return queue.agent_count
