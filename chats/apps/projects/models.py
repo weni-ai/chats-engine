@@ -304,7 +304,16 @@ class FlowStart(BaseModel):
         ProjectPermission,
         verbose_name=_("Permission"),
         related_name="flowstarts",
+        on_delete=models.SET_NULL,
+        null=True,
+    )
+    room = models.ForeignKey(
+        "rooms.Room",
+        verbose_name=_("room"),
+        related_name="flowstarts",
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
     )
 
     class Meta:
@@ -334,4 +343,4 @@ class ContactGroupFlowReference(BaseModel):
         verbose_name_plural = _("Flow contact/group References")
 
     def __str__(self):
-        return self.flow_start.project.name
+        return self.receiver_type + ": " + self.external_id
