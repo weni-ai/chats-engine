@@ -98,6 +98,12 @@ class Room(BaseModel):
         )
 
     @property
+    def last_contact_message(self):
+        return (
+            self.messages.filter(contact__isnull=False).order_by("-created_on").first()
+        )
+
+    @property
     def is_24h_valid(self) -> bool:
         """Validates is the last contact message was sent more than a day ago"""
         if not self.urn.startswith("whatsapp"):
