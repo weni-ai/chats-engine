@@ -335,7 +335,7 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
             }
             online_agents_subquery = model.objects.annotate(
                 online_agents=Count(
-                    "queues__authorizations__permission",
+                    f"{rooms_filter_prefix}authorizations__permission",
                     distinct=True,
                     filter=Q(**online_agents_filter),
                 ),
