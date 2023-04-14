@@ -12,6 +12,8 @@ from chats.apps.api.v1.prometheus.metrics import (
 )
 from chats.apps.msgs.models import Message as ChatMessage
 
+from django.conf import settings
+
 
 @receiver(post_save, sender=ChatMessage)
 def send_websocket_message_notification(sender, instance, created, **kwargs):
@@ -24,9 +26,10 @@ def send_websocket_message_notification(sender, instance, created, **kwargs):
     #     )
 
 
-@receiver([post_save, post_delete], sender=ChatMessage)
-def msgs_metrics_sender(sender, instance, **kwargs):
-    Metrics()
+if settings.USE_PROMETHEUS_METRICS:
+    @receiver([post_save, post_delete], sender=ChatMessage)
+    def msgs_metrics_sender(sender, instance, **kwargs):
+        Metrics()
 
 
 class Metrics:

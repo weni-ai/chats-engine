@@ -313,6 +313,8 @@ PROMETHEUS_AUTH_TOKEN = env.str("PROMETHEUS_AUTH_TOKEN")
 
 ACTIVATE_CALC_METRICS = env.bool("ACTIVATE_CALC_METRICS", default=True)
 
+USE_PROMETHEUS_METRICS = env.bool("USE_PROMETHEUS_METRICS", default=False)
+
 FILE_CHECK_CONTENT_TYPE = env.str(
     "FILE_CHECK_CONTENT_TYPE", default="application/octet-stream"
 )

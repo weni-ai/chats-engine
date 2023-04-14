@@ -14,10 +14,13 @@ from chats.apps.api.v1.prometheus.metrics import (
 )
 from chats.apps.contacts.models import Contact
 
+from django.conf import settings
 
-@receiver([post_save, post_delete], sender=Contact)
-def contacts_metrics_sender(sender, instance, **kwargs):
-    Metrics()
+
+if settings.USE_PROMETHEUS_METRICS:
+    @receiver([post_save, post_delete], sender=Contact)
+    def contacts_metrics_sender(sender, instance, **kwargs):
+        Metrics()
 
 
 class Metrics:
