@@ -55,7 +55,9 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
                 + " 23:59:59",  # TODO: USE DATETIME IN END DATE
             ]
             rooms_filter["is_active"] = False
+            rooms_filter["user__isnull"] = False
         else:
+            rooms_filter["user__isnull"] = False
             rooms_filter["is_active"] = True
 
         if self.context.get("agent"):
