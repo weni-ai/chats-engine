@@ -176,7 +176,7 @@ class RoomViewset(
 
         # Send Updated data to the queue group, as send room is not sending after a join
         instance.notify_queue("update")
-        instance.notify_user("update")
+        instance.notify_user("update", user=self.request.user)
 
         if user:
             instance.user_connection(action="join")
