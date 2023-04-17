@@ -110,7 +110,7 @@ class Sector(BaseModel):
         return User.objects.filter(
             project_permissions__project=self.project,
             project_permissions__queue_authorizations__isnull=False,
-        )
+        ).distinct()
 
     @property
     def contact_count(self):
