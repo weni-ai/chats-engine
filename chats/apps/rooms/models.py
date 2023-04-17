@@ -129,6 +129,18 @@ class Room(BaseModel):
             self.tags.add(*tags)
         self.save()
 
+    def request_callback(self, room_data: dict):
+        requests.post(
+            self.callback_url,
+            data=json.dumps(
+                {"type": "room.update", "content": room_data},
+                sort_keys=True,
+                indent=1,
+                cls=DjangoJSONEncoder,
+            ),
+            headers={"content-type": "application/json"},
+        )
+
     def notify_queue(self, action: str, callback: bool = False):
         """
         Used to notify channels groups when something happens on the instance.
@@ -149,16 +161,7 @@ class Room(BaseModel):
         )
 
         if self.callback_url and callback and action in ["update", "destroy", "close"]:
-            requests.post(
-                self.callback_url,
-                data=json.dumps(
-                    {"type": "room.update", "content": self.serialized_ws_data},
-                    sort_keys=True,
-                    indent=1,
-                    cls=DjangoJSONEncoder,
-                ),
-                headers={"content-type": "application/json"},
-            )
+            self.request_callback(self.serialized_ws_data)
 
     def notify_room(self, action: str, callback: bool = False):
         """
@@ -180,16 +183,7 @@ class Room(BaseModel):
         )
 
         if self.callback_url and callback and action in ["update", "destroy", "close"]:
-            requests.post(
-                self.callback_url,
-                data=json.dumps(
-                    {"type": "room.update", "content": self.serialized_ws_data},
-                    sort_keys=True,
-                    indent=1,
-                    cls=DjangoJSONEncoder,
-                ),
-                headers={"content-type": "application/json"},
-            )
+            self.request_callback(self.serialized_ws_data)
 
     def notify_user(self, action: str, user=None):
         user = user if user else self.user
