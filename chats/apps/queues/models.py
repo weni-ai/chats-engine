@@ -15,6 +15,9 @@ class Queue(BaseModel):
         on_delete=models.CASCADE,
     )
     name = models.CharField(_("Name"), max_length=150, blank=True)
+    default_message = models.TextField(
+        _("Default queue message"), null=True, blank=True
+    )
 
     class Meta:
         verbose_name = _("Sector Queue")
