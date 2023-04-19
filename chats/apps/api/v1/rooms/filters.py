@@ -4,7 +4,6 @@ from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
 from chats.apps.rooms.models import Room
-from rest_framework.filters import OrderingFilter
 
 
 class RoomFilter(filters.FilterSet):
@@ -49,47 +48,3 @@ class RoomFilter(filters.FilterSet):
 
     def filter_is_active(self, queryset, name, value):
         return queryset.filter(is_active=value)
-
-
-class CustomOrderingFilter(OrderingFilter):
-    def get_valid_fields(self, queryset, view, context={}):
-        valid_fields = getattr(view, "ordering_fields", self.ordering_fields)
-
-        if valid_fields is None:
-            # Default to allowing filtering on serializer fields
-            return self.get_default_valid_fields(queryset, view, context)
-
-        elif valid_fields == "__all__":
-            # View explicitly allows filtering on any model field
-            valid_fields = [
-                (field.name, field.verbose_name)
-                for field in queryset.model._meta.fields
-            ]
-            valid_fields += [
-                (field.related_name, field.related_name)
-                for key, field in queryset.model._meta.fields_map.items()
-            ]
-            valid_fields += [
-                (key, key.title().split("__")) for key in queryset.query.annotations
-            ]
-        else:
-            valid_fields = [
-                (item, item) if isinstance(item, str) else item for item in valid_fields
-            ]
-        return valid_fields
-
-    def remove_invalid_fields(self, queryset, fields, view, request):
-        valid_fields = [
-            item[0]
-            for item in self.get_valid_fields(queryset, view, {"request": request})
-        ]
-
-        def term_valid(term):
-            if term.startswith("-"):
-                term = term[1:]
-                if "__" in term:
-                    term = term.split("__")[0]
-            return term in valid_fields
-
-        qs = [term for term in fields if term_valid(term)]
-        return qs

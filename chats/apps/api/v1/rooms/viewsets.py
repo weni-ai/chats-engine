@@ -5,6 +5,8 @@ from django.db.models import F, Sum, Max
 from django.utils import timezone
 from rest_framework import mixins, permissions, status, filters
 from rest_framework.decorators import action
+from rest_framework.filters import OrderingFilter
+
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
@@ -28,7 +30,7 @@ class RoomViewset(
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
     filter_backends = [
-        room_filters.CustomOrderingFilter,
+        OrderingFilter,
         DjangoFilterBackend,
         filters.SearchFilter,
     ]
