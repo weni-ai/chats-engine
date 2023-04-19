@@ -36,21 +36,15 @@ class RoomFilter(filters.FilterSet):
             user_filter = Q(user=self.request.user) | Q(user__isnull=True)
             return queryset.filter(
                 user_filter, is_active=True, queue__in=project_permission.queue_ids
-            ).order_by(
-                "user", "created_on"
-            )  # TODO: THIS IS A HOTFIX, REMOVE THIS ORDER AND USE THE VIEW ORDERING
+            )
         user_project = Q(user=self.request.user) & Q(queue__sector__project__uuid=value)
-        queue_filter = Q(user__isnull=True) & Q(
-            queue__uuid__in=project_permission.queue_ids
-        )
+        queue_filter = Q(user__isnull=True) & Q(queue__in=project_permission.queue_ids)
         ff = user_project | queue_filter
         queryset = queryset.filter(
             ff,
             is_active=True,
         )
-        return queryset.order_by(
-            "user", "created_on"
-        )  # TODO: THIS IS A HOTFIX, REMOVE THIS ORDER AND USE THE VIEW ORDERING
+        return queryset
 
     def filter_is_active(self, queryset, name, value):
         return queryset.filter(is_active=value)
