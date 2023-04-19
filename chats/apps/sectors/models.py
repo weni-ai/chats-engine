@@ -4,13 +4,13 @@ from django.db import models
 from django.db.models import F, Q
 from django.utils.translation import gettext_lazy as _
 
-from chats.core.models import BaseModel
+from chats.core.models import BaseModel, BaseSoftDeleteModel
 from chats.utils.websockets import send_channels_group
 
 User = get_user_model()
 
 
-class Sector(BaseModel):
+class Sector(BaseSoftDeleteModel, BaseModel):
     name = models.CharField(_("name"), max_length=120)
     project = models.ForeignKey(
         "projects.Project",
@@ -156,6 +156,12 @@ class Sector(BaseModel):
     def add_users_group(self):
         for auth in self.authorizations.filter(role__gte=1):
             auth.notify_user("created")
+
+    def delete(self):
+        super().delete()
+
+        for queue in self.queues.filter(is_deleted=False):
+            queue.delete()
 
 
 class SectorAuthorization(BaseModel):

@@ -67,7 +67,10 @@ class TransferRoomSerializer(serializers.ModelSerializer):
         allow_null=True,
     )
     queue_uuid = serializers.PrimaryKeyRelatedField(
-        queryset=Queue.objects.all(), required=False, source="queue", write_only=True
+        queryset=Queue.objects.exclude(is_deleted=True),
+        required=False,
+        source="queue",
+        write_only=True,
     )
     queue = QueueSerializer(many=False, required=False, read_only=True)
     contact = ContactRelationsSerializer(many=False, required=False, read_only=True)

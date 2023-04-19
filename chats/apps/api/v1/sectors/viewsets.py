@@ -58,14 +58,6 @@ class SectorViewset(viewsets.ModelViewSet):
 
         return super().get_serializer_class()
 
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        self.perform_destroy(instance)
-        return Response(
-            {"is_deleted": True},
-            status.HTTP_200_OK,
-        )
-
     def perform_create(self, serializer):
         instance = serializer.save()
 
@@ -93,15 +85,6 @@ class SectorViewset(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         serializer.save()
         serializer.instance.notify_sector("update")
-
-    def perform_destroy(self, instance):
-        instance.notify_sector("destroy")
-        instance.is_deleted = True
-        instance.save()
-        return Response(
-            {"is_deleted": True},
-            status.HTTP_200_OK,
-        )
 
     @action(detail=True, methods=["GET"])
     def agents(self, *args, **kwargs):

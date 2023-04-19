@@ -12,7 +12,7 @@ from chats.apps.queues.models import Queue, QueueAuthorization
 
 
 class QueueViewset(ModelViewSet):
-    queryset = Queue.objects.all()
+    queryset = Queue.objects.exclude(is_deleted=True)
     serializer_class = queue_serializers.QueueSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = QueueFilter
