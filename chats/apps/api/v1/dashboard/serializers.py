@@ -232,8 +232,16 @@ class DashboardAgentsSerializer(serializers.Serializer):
         ]
 
     def get_project_agents(self, project):
+        initial_datetime = timezone.now().replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+
         rooms_filter = {}
         permission_filter = {"project": project}
+        closed_rooms = {}
+
+        closed_rooms["user__rooms__is_active"] = False
+        rooms_filter["user__rooms__is_active"] = True
 
         if self.context.get("start_date") and self.context.get("end_date"):
             rooms_filter["user__rooms__created_on__range"] = [
@@ -241,10 +249,8 @@ class DashboardAgentsSerializer(serializers.Serializer):
                 self.context.get("end_date")
                 + " 23:59:59",  # TODO: USE DATETIME IN END DATE
             ]
-            rooms_filter["user__rooms__is_active"] = False
         else:
-            rooms_filter["user__rooms__is_active"] = True
-            permission_filter["status"] = "ONLINE"
+            closed_rooms["user__rooms__ended_at__gte"] = initial_datetime
 
         if self.context.get("agent"):
             rooms_filter["user"] = self.context.get("agent")
@@ -256,15 +262,23 @@ class DashboardAgentsSerializer(serializers.Serializer):
         else:
             rooms_filter["user__rooms__queue__sector__project"] = project
 
+        closed_rooms = rooms_filter.copy()
+        closed_rooms["user__rooms__is_active"] = False
+
         queue_auth = (
             ProjectPermission.objects.filter(**permission_filter)
             .values("user__first_name")
             .annotate(
-                count=Count(
+                opened_rooms=Count(
                     "user__rooms",
                     filter=Q(**rooms_filter),
                     distinct=True,
-                )
+                ),
+                closed_rooms=Count(
+                    "user__rooms",
+                    filter=Q(**closed_rooms),
+                    distinct=True,
+                ),
             )
         )
         return queue_auth
@@ -461,9 +475,6 @@ class DashboardDataSerializer(serializers.ModelSerializer):
         return transfer_metric["count"]
 
     def get_queue_rooms(self, project):
-        initial_datetime = timezone.now().replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
         rooms_filter = {}
         rooms_filter["user__isnull"] = True
 
@@ -472,8 +483,6 @@ class DashboardDataSerializer(serializers.ModelSerializer):
                 self.context.get("start_date"),
                 self.context.get("end_date"),
             ]
-        else:
-            rooms_filter["created_on__gte"] = initial_datetime
 
         if self.context.get("sector"):
             rooms_filter["queue__sector"] = self.context.get("sector")
