@@ -30,6 +30,9 @@ class MessageFlowViewset(
     def perform_create(self, serializer):
         instance = serializer.save()
         instance.notify_room("create")
+        room = instance.room
+        if room.user is None:
+            room.trigger_default_message()
 
     def perform_update(self, serializer):
         instance = serializer.save()

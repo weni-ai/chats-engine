@@ -97,6 +97,14 @@ class Room(BaseModel):
             else not self.messages.filter(contact__isnull=False).exists()
         )
 
+    def trigger_default_message(self):
+        default_message = self.queue.default_message
+        if default_message is not None:
+            sent_message = self.messages.create(
+                user=None, contact=None, text=default_message
+            )
+            sent_message.notify_room("create", True)
+
     @property
     def is_24h_valid(self) -> bool:
         """Validates is the last contact message was sent more than a day ago"""
