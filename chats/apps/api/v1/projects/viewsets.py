@@ -259,6 +259,7 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
             room = Room.objects.get(pk=room_id, is_active=True)
             if not room.is_24h_valid:
                 flow_start_data["room"] = room
+                room.request_callback(room.serialized_ws_data)
         except ObjectDoesNotExist:
             pass
 

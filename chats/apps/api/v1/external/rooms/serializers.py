@@ -20,15 +20,15 @@ def get_active_room_flow_start(contact, flow_uuid, project):
         "references__external_id": contact.external_id,
         "flow": flow_uuid,
         "room__isnull": False,
+        "is_deleted": False,
     }
     flow_start = (
         project.flowstarts.filter(**query_filters).order_by("-created_on").first()
     )
     try:
-        if (
-            flow_start.room.last_contact_message.created_on < flow_start.created_on
-            and flow_start.room.is_active is True
-        ):
+        if flow_start.room.is_active is True:
+            flow_start.is_deleted = True
+            flow_start.save()
             return flow_start.room
     except AttributeError:
         return None

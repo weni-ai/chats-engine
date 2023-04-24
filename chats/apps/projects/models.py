@@ -315,6 +315,7 @@ class FlowStart(BaseModel):
         null=True,
         blank=True,
     )
+    is_deleted = models.BooleanField(_("is deleted?"), default=False)
 
     class Meta:
         verbose_name = _("Flow Start")
