@@ -130,6 +130,9 @@ class Room(BaseModel):
         self.save()
 
     def request_callback(self, room_data: dict):
+        if self.callback_url is None:
+            return None
+
         requests.post(
             self.callback_url,
             data=json.dumps(
