@@ -3,9 +3,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import permissions
 
 from chats.apps.projects.models import ProjectPermission
-from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.rooms.models import Room
-from chats.apps.sectors.models import SectorAuthorization
 from chats.core.permissions import GetPermission
 
 WRITE_METHODS = ["POST"]
@@ -93,137 +91,6 @@ class IsQueueAgent(permissions.BasePermission):
             return perm.is_agent(str(obj.queue.pk))
         except ObjectDoesNotExist:
             return False
-
-
-class SectorAnyPermission(permissions.BasePermission):
-    """
-    Grant permission if the user has *any roles(manager or agent)* in the Sector
-    Each model that uses this permission, need to implement a `get_permission` method
-    to check the user roles within the sector.
-    """
-
-    def has_object_permission(self, request, view, obj) -> bool:
-        if isinstance(request.user, AnonymousUser):
-            return False
-        try:
-            authorization = obj.get_permission(request.user)
-        except SectorAuthorization.DoesNotExist:
-            return False
-        return authorization.is_authorized
-
-
-class ProjectExternalPermission(permissions.BasePermission):
-    def has_permission(self, request, view) -> bool:
-        if view.action in ["list", "create"]:
-            permission = GetPermission(request).permission
-            return permission.is_admin
-
-        return super().has_permission(request, view)
-
-    def has_object_permission(self, request, view, obj) -> bool:
-        if isinstance(request.user, AnonymousUser):
-            return False
-        try:
-            authorization = obj.get_permission(
-                request.user
-            )  # each and every model that users this permission have to implement this method
-        except ProjectPermission.DoesNotExist:
-            return False
-        return authorization.is_admin
-
-
-class SectorAgentReadOnlyListPermission(permissions.BasePermission):
-    """
-    Grant permission if the user has *agent_role* in the Sector Queue
-    Each model that uses this permission, need to implement a `get_permission` method
-    to check the user roles within the sector.
-    """
-
-    def has_permission(self, request, view) -> bool:
-        if isinstance(request.user, AnonymousUser):
-            return False
-        try:
-            sector_queue = Queue.objects.filter(
-                sector=request.query_params.get("sector")
-            ).first()
-            authorization = sector_queue.get_permission(request.user)
-        except Queue.DoesNotExist:
-            return False
-        return authorization
-
-
-class SectorAgentReadOnlyRetrievePermission(permissions.BasePermission):
-    """
-    Grant permission if the user has *agent_role* in the Sector Queue
-    Each model that uses this permission, need to implement a `get_permission` method
-    to check the user roles within the sector.
-    """
-
-    def has_object_permission(self, request, view, obj) -> bool:
-
-        if isinstance(request.user, AnonymousUser):
-            return False
-        try:
-            authorization = obj.get_permission(request.user)
-        except QueueAuthorization.DoesNotExist:
-            return False
-        return authorization
-
-
-class SectorAddQueuePermission(permissions.BasePermission):
-    """
-    Grant permission if the user has *manager role* or Sector or *admin role* on Project
-    Each model that uses this permission, need to implement a `get_permission` method
-    to check the user roles within the sector.
-    """
-
-    def has_permission(self, request, view) -> bool:
-        if isinstance(request.user, AnonymousUser):
-            return False
-        try:
-            sector_queue = Queue.objects.filter(sector=request.data["sector"]).first()
-            authorization = sector_queue.get_permission(request.user)
-        except Queue.DoesNotExist:
-            return False
-        return authorization
-
-
-class DeleteQueuePermission(permissions.BasePermission):
-    """
-    Grant permission if the user has *manager role* or Sector or *admin role* Sector of queue
-    Each model that uses this permission, need to implement a `get_permission` method
-    to check the user roles within the sector.
-    """
-
-    def has_object_permission(self, request, view, obj) -> bool:
-
-        if isinstance(request.user, AnonymousUser):
-            return False
-        try:
-            authorization = obj.get_permission(request.user)
-        except Queue.DoesNotExist:
-            return False
-        return authorization
-
-
-class QueueAddAgentPermission(permissions.BasePermission):
-    """
-    Grant permission to add agent in queue if the user has *manager role* or Sector or *admin role* on Project
-    Each model that uses this permission, need to implement a `get_permission` method
-    to check the user roles within the sector.
-    """
-
-    def has_permission(self, request, view) -> bool:
-        if isinstance(request.user, AnonymousUser):
-            return False
-        try:
-            user = SectorAuthorization.objects.filter(user=request.user).first()
-            if not user:
-                return False
-            authorization = user.get_permission(request.user)
-        except Queue.DoesNotExist:
-            return False
-        return authorization
 
 
 class HasAgentPermissionAnyQueueSector(permissions.BasePermission):
