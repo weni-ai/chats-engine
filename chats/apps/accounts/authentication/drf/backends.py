@@ -42,7 +42,7 @@ class WeniOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         email = claims.get("email")
         username = self.get_username(claims)[:16]
         username = re.sub("[^A-Za-z0-9]+", "", username)
-        user = self.UserModel.objects.create_user(email, username)
+        user = self.UserModel.objects.get_or_create(email=email)[0]
 
         user.name = claims.get("name", "")
         user.first_name = claims.get("given_name", "")
@@ -54,8 +54,9 @@ class WeniOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         return user
 
     def update_user(self, user, claims):
-        user.name = claims.get("name", "")
         user.email = claims.get("email", "")
+        user.first_name = claims.get("given_name", user.first_name)
+        user.last_name = claims.get("family_name", user.last_name)
         user.save()
         check_module_permission(claims, user)
 
