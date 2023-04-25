@@ -75,6 +75,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
     queue = QueueSerializer(many=False, required=False, read_only=True)
     contact = ContactRelationsSerializer(many=False, required=False, read_only=False)
     flow_uuid = serializers.CharField(required=False, write_only=True, allow_null=True)
+    is_anon = serializers.BooleanField(write_only=True, required=False, default=False)
 
     class Meta:
         model = Room
@@ -95,6 +96,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             "callback_url",
             "is_waiting",
             "flow_uuid",
+            "is_anon",
         ]
         read_only_fields = [
             "uuid",
@@ -108,6 +110,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         extra_kwargs = {"queue": {"required": False, "read_only": True}}
 
     def create(self, validated_data):
+        is_anon = validated_data.pop("is_anon")
         try:
             queue = (
                 None if not validated_data.get("queue") else validated_data.pop("queue")
@@ -148,7 +151,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         if contact_data.get("urn"):
             urn = contact_data.pop("urn").split("?")[0]
-            if contact_data.get("name") is not None:
+            if not is_anon:
                 validated_data["urn"] = urn
         contact, created = Contact.objects.update_or_create(
             external_id=contact_external_id, defaults=contact_data
