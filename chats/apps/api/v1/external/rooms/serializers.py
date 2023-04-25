@@ -20,15 +20,15 @@ def get_active_room_flow_start(contact, flow_uuid, project):
         "references__external_id": contact.external_id,
         "flow": flow_uuid,
         "room__isnull": False,
+        "is_deleted": False,
     }
     flow_start = (
         project.flowstarts.filter(**query_filters).order_by("-created_on").first()
     )
     try:
-        if (
-            flow_start.room.last_contact_message.created_on < flow_start.created_on
-            and flow_start.room.is_active is True
-        ):
+        if flow_start.room.is_active is True:
+            flow_start.is_deleted = True
+            flow_start.save()
             return flow_start.room
     except AttributeError:
         return None
@@ -95,6 +95,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
     queue = QueueSerializer(many=False, required=False, read_only=True)
     contact = ContactRelationsSerializer(many=False, required=False, read_only=False)
     flow_uuid = serializers.CharField(required=False, write_only=True, allow_null=True)
+    is_anon = serializers.BooleanField(write_only=True, required=False, default=False)
 
     class Meta:
         model = Room
@@ -115,6 +116,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             "callback_url",
             "is_waiting",
             "flow_uuid",
+            "is_anon",
         ]
         read_only_fields = [
             "uuid",
@@ -128,6 +130,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         extra_kwargs = {"queue": {"required": False, "read_only": True}}
 
     def create(self, validated_data):
+        is_anon = validated_data.pop("is_anon")
         try:
             queue = (
                 None if not validated_data.get("queue") else validated_data.pop("queue")
@@ -168,7 +171,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         if contact_data.get("urn"):
             urn = contact_data.pop("urn").split("?")[0]
-            if contact_data.get("name") is not None:
+            if not is_anon:
                 validated_data["urn"] = urn
         contact, created = Contact.objects.update_or_create(
             external_id=contact_external_id, defaults=contact_data
