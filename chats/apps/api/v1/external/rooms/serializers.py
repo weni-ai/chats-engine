@@ -96,6 +96,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             "callback_url",
             "is_waiting",
             "flow_uuid",
+            "urn",
             "is_anon",
         ]
         read_only_fields = [
@@ -105,7 +106,6 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             "ended_at",
             "is_active",
             "transfer_history",
-            "urn",
         ]
         extra_kwargs = {"queue": {"required": False, "read_only": True}}
 
