@@ -82,7 +82,6 @@ class RoomViewset(
         room.messages.filter(**message_filter).update(
             modified_on=timezone.now(), seen=serialized_data.get("seen")
         )
-
         return Response(
             {"detail": "All the given messages have been marked as read"},
             status=status.HTTP_200_OK,
