@@ -237,8 +237,12 @@ class DashboardAgentsSerializer(serializers.Serializer):
         )
 
         rooms_filter = {}
+        closed_rooms = {}
         permission_filter = {"project": project}
         closed_rooms = {}
+
+        closed_rooms["user__rooms__is_active"] = False
+        rooms_filter["user__rooms__is_active"] = True
 
         closed_rooms["user__rooms__is_active"] = False
         rooms_filter["user__rooms__is_active"] = True
@@ -249,18 +253,27 @@ class DashboardAgentsSerializer(serializers.Serializer):
                 self.context.get("end_date")
                 + " 23:59:59",  # TODO: USE DATETIME IN END DATE
             ]
+            closed_rooms["user__rooms__ended_at__range"] = [
+                self.context.get("start_date"),
+                self.context.get("end_date")
+                + " 23:59:59",  # TODO: USE DATETIME IN END DATE
+            ]
         else:
             closed_rooms["user__rooms__ended_at__gte"] = initial_datetime
 
         if self.context.get("agent"):
             rooms_filter["user"] = self.context.get("agent")
+            closed_rooms["user"] = self.context.get("agent")
 
         if self.context.get("sector"):
             rooms_filter["user__rooms__queue__sector"] = self.context.get("sector")
+            closed_rooms["user__rooms__queue__sector"] = self.context.get("sector")
             if self.context.get("tag"):
                 rooms_filter["user__rooms__tags__name"] = self.context.get("tag")
+                closed_rooms["user__rooms__tags__name"] = self.context.get("tag")
         else:
             rooms_filter["user__rooms__queue__sector__project"] = project
+            closed_rooms["user__rooms__queue__sector__project"] = project
 
         closed_rooms = rooms_filter.copy()
         closed_rooms["user__rooms__is_active"] = False
