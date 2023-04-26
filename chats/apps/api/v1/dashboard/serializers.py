@@ -427,15 +427,15 @@ class DashboardDataSerializer(serializers.ModelSerializer):
         )
 
         rooms_filter = {}
+        rooms_filter["is_active"] = False
 
         if self.context.get("start_date") and self.context.get("end_date"):
-            rooms_filter["created_on__range"] = [
+            rooms_filter["ended_at__range"] = [
                 self.context.get("start_date"),
                 self.context.get("end_date"),
             ]
         else:
-            rooms_filter["is_active"] = False
-            rooms_filter["created_on__gte"] = initial_datetime
+            rooms_filter["ended_at__gte"] = initial_datetime
 
         if self.context.get("sector"):
             rooms_filter["queue__sector"] = self.context.get("sector")
