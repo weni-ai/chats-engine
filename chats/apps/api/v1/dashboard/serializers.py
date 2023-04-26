@@ -239,10 +239,6 @@ class DashboardAgentsSerializer(serializers.Serializer):
         rooms_filter = {}
         closed_rooms = {}
         permission_filter = {"project": project}
-        closed_rooms = {}
-
-        closed_rooms["user__rooms__is_active"] = False
-        rooms_filter["user__rooms__is_active"] = True
 
         closed_rooms["user__rooms__is_active"] = False
         rooms_filter["user__rooms__is_active"] = True
@@ -274,9 +270,6 @@ class DashboardAgentsSerializer(serializers.Serializer):
         else:
             rooms_filter["user__rooms__queue__sector__project"] = project
             closed_rooms["user__rooms__queue__sector__project"] = project
-
-        closed_rooms = rooms_filter.copy()
-        closed_rooms["user__rooms__is_active"] = False
 
         queue_auth = (
             ProjectPermission.objects.filter(**permission_filter)
