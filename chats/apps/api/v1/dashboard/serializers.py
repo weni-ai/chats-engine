@@ -483,6 +483,7 @@ class DashboardDataSerializer(serializers.ModelSerializer):
     def get_queue_rooms(self, project):
         rooms_filter = {}
         rooms_filter["user__isnull"] = True
+        rooms_filter["is_active"] = True
 
         if self.context.get("start_date") and self.context.get("end_date"):
             rooms_filter["created_on__range"] = [
