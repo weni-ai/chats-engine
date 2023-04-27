@@ -31,23 +31,27 @@ This project provides REST and WEBSOCKETS APIs for the new customer service modu
 
 
 # DEVELOPMENT
-Define a ```.env``` file with the required enviroment variables bellow
+Define a ```.env``` file with the required environment variables bellow
 
 | Command | Description |
 |--|--|
-| poetry install | Install dependencies and create virtual enviroment
+| make install | Install all dependencies, enter the virtual environment, start databases, run migrations, add initial data to the database and run the project at localhost:8000. Use this if it's your first time cloning the project.
+| poetry install | Install dependencies and create virtual environment
 | poetry shell | Enter virtual enviroment
-| make dev_up | Run docker compose
+| pre-commit install | Install pre-commit to check the code before commiting any changes
+| make dev_up | Run postgres and redis on docker compose
 | python manage.py makemigrations | Make migrations when changing models
 | python manage.py migrate | Run migrations when changing models
 | python manage.py runserver | Run the project at localhost:8000
-
+| make test | Run tests and show the coverage report
+| make lint | Run all linters(black, flake8 and isort)
+| make help | Explains make commands
 
 We use swagger to document the REST api, access localhost:8000 to get the api documentation.
 The Websockets api still need to be documented.
 
 
-## ENVIROMENT VARIABLES
+## ENVIRONMENT VARIABLES
 You can set environment variables in your OS or write on .env file.
 
 | Name                           	|  Type  	| Required 	|         Default        	| Description                                                                                                                                                                          	|
