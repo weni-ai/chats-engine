@@ -50,6 +50,9 @@ prometheus-client = "^0.15.0"
 pydub = "^0.25.1"
 python-magic = "^0.4.27"
 pylint = "v2.8.3"
+pandas = "^2.0.1"
+openpyxl = "^3.1.2"
+XlsxWriter = "^3.1.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
