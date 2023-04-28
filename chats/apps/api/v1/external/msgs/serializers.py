@@ -70,6 +70,8 @@ class MsgFlowSerializer(serializers.ModelSerializer):
             raise exceptions.APIException(
                 detail="Cannot create message without text or media"
             )
+        if direction == "incoming":
+            validated_data["contact"] = room.contact
 
         is_waiting = room.get_is_waiting()
         was_24h_valid = room.is_24h_valid
