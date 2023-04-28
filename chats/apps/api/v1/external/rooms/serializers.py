@@ -15,6 +15,26 @@ from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 
 
+def get_active_room_flow_start(contact, flow_uuid, project):
+    query_filters = {
+        "references__external_id": contact.external_id,
+        "flow": flow_uuid,
+        "room__isnull": False,
+        "is_deleted": False,
+    }
+    flow_start = (
+        project.flowstarts.filter(**query_filters).order_by("-created_on").first()
+    )
+    try:
+        if flow_start.room.is_active is True:
+            flow_start.is_deleted = True
+            flow_start.save()
+            return flow_start.room
+    except AttributeError:
+        return None
+    return None
+
+
 def get_room_user(
     contact: Contact,
     queue: Queue,
@@ -157,6 +177,9 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             external_id=contact_external_id, defaults=contact_data
         )
 
+        room = get_active_room_flow_start(contact, flow_uuid, project)
+        if room is not None:
+            return room
         validated_data["user"] = get_room_user(
             contact, queue, user, groups, created, flow_uuid, project
         )

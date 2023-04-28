@@ -29,6 +29,7 @@ from chats.apps.projects.models import (
     Project,
     ProjectPermission,
 )
+from chats.apps.rooms.models import Room
 
 
 class ProjectViewset(viewsets.ReadOnlyModelViewSet):
@@ -226,7 +227,12 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
 
         flow_start.references.bulk_create(instances)
 
-    @action(detail=True, methods=["POST"], url_name="flows")
+    @action(
+        detail=True,
+        methods=["POST"],
+        url_name="flows",
+        serializer_class=ProjectFlowStartSerializer,
+    )
     def start_flow(self, request, *args, **kwargs):
         project = self.get_object()
         serializer = ProjectFlowStartSerializer(data=request.data)
@@ -245,13 +251,27 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
                 {"Detail": "the user does not have permission in this project"},
                 status.HTTP_401_UNAUTHORIZED,
             )
-        chats_flow_start = project.flowstarts.create(permission=perm, flow=flow)
+
+        flow_start_data = {"permission": perm, "flow": flow}
+        room_id = data.get("room", None)
+
+        try:
+            room = Room.objects.get(pk=room_id, is_active=True)
+            if not room.is_24h_valid:
+                flow_start_data["room"] = room
+                room.request_callback(room.serialized_ws_data)
+        except ObjectDoesNotExist:
+            pass
+
+        chats_flow_start = project.flowstarts.create(**flow_start_data)
 
         self._create_flow_start_instances(data, chats_flow_start)
 
         flow_start = FlowRESTClient().start_flow(project, data)
         chats_flow_start.external_id = flow_start.get("uuid")
         chats_flow_start.save()
+        if chats_flow_start.room:
+            room.notify_room("update")
         return Response(flow_start, status.HTTP_200_OK)
 
 

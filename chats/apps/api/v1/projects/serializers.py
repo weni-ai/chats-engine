@@ -46,6 +46,13 @@ class ProjectFlowContactSerializer(serializers.Serializer):
 
 
 class ProjectFlowStartSerializer(serializers.Serializer):
-    groups = serializers.ListField(child=serializers.CharField(), max_length=100)
-    contacts = serializers.ListField(child=serializers.CharField(), max_length=100)
+    groups = serializers.ListField(
+        required=False, child=serializers.CharField(), max_length=100
+    )
+    contacts = serializers.ListField(
+        required=False, child=serializers.CharField(), max_length=100
+    )
     flow = serializers.CharField()
+    room = serializers.CharField(
+        required=False,
+    )
