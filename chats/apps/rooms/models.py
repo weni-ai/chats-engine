@@ -91,10 +91,18 @@ class Room(BaseModel):
 
     def get_is_waiting(self):
         """If the room does not have any contact message, then it is waiting"""
-        return (
+        check_messages = (
             self.is_waiting
             if self.is_waiting
             else not self.messages.filter(contact__isnull=False).exists()
+        )
+        check_flowstarts = self.flowstarts.filter(is_deleted=False).exists()
+        return check_messages or check_flowstarts
+
+    @property
+    def last_contact_message(self):
+        return (
+            self.messages.filter(contact__isnull=False).order_by("-created_on").first()
         )
 
     def trigger_default_message(self):
@@ -131,6 +139,21 @@ class Room(BaseModel):
             self.tags.add(*tags)
         self.save()
 
+    def request_callback(self, room_data: dict):
+        if self.callback_url is None:
+            return None
+
+        requests.post(
+            self.callback_url,
+            data=json.dumps(
+                {"type": "room.update", "content": room_data},
+                sort_keys=True,
+                indent=1,
+                cls=DjangoJSONEncoder,
+            ),
+            headers={"content-type": "application/json"},
+        )
+
     def notify_queue(self, action: str, callback: bool = False):
         """
         Used to notify channels groups when something happens on the instance.
@@ -151,16 +174,7 @@ class Room(BaseModel):
         )
 
         if self.callback_url and callback and action in ["update", "destroy", "close"]:
-            requests.post(
-                self.callback_url,
-                data=json.dumps(
-                    {"type": "room.update", "content": self.serialized_ws_data},
-                    sort_keys=True,
-                    indent=1,
-                    cls=DjangoJSONEncoder,
-                ),
-                headers={"content-type": "application/json"},
-            )
+            self.request_callback(self.serialized_ws_data)
 
     def notify_room(self, action: str, callback: bool = False):
         """
@@ -182,16 +196,7 @@ class Room(BaseModel):
         )
 
         if self.callback_url and callback and action in ["update", "destroy", "close"]:
-            requests.post(
-                self.callback_url,
-                data=json.dumps(
-                    {"type": "room.update", "content": self.serialized_ws_data},
-                    sort_keys=True,
-                    indent=1,
-                    cls=DjangoJSONEncoder,
-                ),
-                headers={"content-type": "application/json"},
-            )
+            self.request_callback(self.serialized_ws_data)
 
     def notify_user(self, action: str, user=None):
         user = user if user else self.user
