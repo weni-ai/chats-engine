@@ -11,15 +11,17 @@ class RoomsExternalTests(APITestCase):
     def setUp(self) -> None:
         self.queue_1 = Queue.objects.get(uuid="f341417b-5143-4469-a99d-f141a0676bd4")
 
+    def _create_room(self, token: str, data: dict):
+        url = reverse("external_rooms-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+        return client.post(url, data=data, format="json")
+
     def test_create_external_room(self):
         """
         Verify if the endpoint for create external room it is working correctly.
         """
-        url = reverse("external_rooms-list")
-        client = self.client
-        client.credentials(
-            HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380"
-        )
         data = {
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
@@ -30,18 +32,13 @@ class RoomsExternalTests(APITestCase):
                 "custom_fields": {},
             },
         }
-        response = client.post(url, data=data, format="json")
+        response = self._create_room("f3ce543e-d77e-4508-9140-15c95752a380", data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_create_external_room_with_external_uuid(self):
         """
         Verify if the endpoint for create external room it is working correctly, passing custom fields.
         """
-        url = reverse("external_rooms-list")
-        client = self.client
-        client.credentials(
-            HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380"
-        )
         data = {
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
@@ -52,7 +49,7 @@ class RoomsExternalTests(APITestCase):
                 "custom_fields": {"age": "35"},
             },
         }
-        response = client.post(url, data=data, format="json")
+        response = self._create_room("f3ce543e-d77e-4508-9140-15c95752a380", data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["contact"]["name"], "external generator")
         self.assertEqual(
@@ -64,11 +61,6 @@ class RoomsExternalTests(APITestCase):
         """
         Verify if the endpoint for edit external room it is working correctly.
         """
-        url = reverse("external_rooms-list")
-        client = self.client
-        client.credentials(
-            HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380"
-        )
         data = {
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
@@ -76,6 +68,7 @@ class RoomsExternalTests(APITestCase):
                 "name": "gaules",
                 "email": "gaulesr@weni.ai",
                 "phone": "+5511985543332",
+                "urn": "whatsapp:5521917078266?auth=eyJhbGciOiAiSFM",
                 "custom_fields": {
                     "age": "40",
                     "prefered_game": "cs-go",
@@ -83,14 +76,36 @@ class RoomsExternalTests(APITestCase):
                 },
             },
         }
-        response = client.post(url, data=data, format="json")
+
+        response = self._create_room("f3ce543e-d77e-4508-9140-15c95752a380", data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["contact"]["name"], "gaules")
+        self.assertEqual(response.data["urn"], "whatsapp:5521917078266")
         self.assertEqual(response.data["contact"]["custom_fields"]["age"], "40")
         self.assertEqual(
             response.data["contact"]["custom_fields"]["prefered_game"], "cs-go"
         )
         self.assertEqual(response.data["contact"]["custom_fields"]["job"], "streamer")
+
+    def test_is_anon_true_wont_save_urn(self):
+        data = {
+            "queue_uuid": str(self.queue_1.uuid),
+            "contact": {
+                "external_id": "e3955fd5-5705-40cd-b480-b45594b70282",
+                "name": "gaules",
+                "email": "gaulesr@weni.ai",
+                "phone": "+5511985543332",
+                "urn": "whatsapp:5521917078266?auth=eyJhbGciOiAiSFM",
+                "custom_fields": {
+                    "age": "40",
+                    "prefered_game": "cs-go",
+                    "job": "streamer",
+                },
+            },
+        }
+        response = self._create_room("f3ce543e-d77e-4508-9140-15c95752a380", data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.get("urn"), None)
 
 
 class RoomsFlowStartExternalTests(APITestCase):
