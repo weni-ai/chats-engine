@@ -91,10 +91,18 @@ class Room(BaseModel):
 
     def get_is_waiting(self):
         """If the room does not have any contact message, then it is waiting"""
-        return (
+        check_messages = (
             self.is_waiting
             if self.is_waiting
             else not self.messages.filter(contact__isnull=False).exists()
+        )
+        check_flowstarts = self.flowstarts.filter(is_deleted=False).exists()
+        return check_messages or check_flowstarts
+
+    @property
+    def last_contact_message(self):
+        return (
+            self.messages.filter(contact__isnull=False).order_by("-created_on").first()
         )
 
     def trigger_default_message(self):
@@ -104,12 +112,6 @@ class Room(BaseModel):
                 user=None, contact=None, text=default_message
             )
             sent_message.notify_room("create", True)
-
-    @property
-    def last_contact_message(self):
-        return (
-            self.messages.filter(contact__isnull=False).order_by("-created_on").first()
-        )
 
     @property
     def is_24h_valid(self) -> bool:

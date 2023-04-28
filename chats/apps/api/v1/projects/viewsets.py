@@ -270,6 +270,8 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         flow_start = FlowRESTClient().start_flow(project, data)
         chats_flow_start.external_id = flow_start.get("uuid")
         chats_flow_start.save()
+        if chats_flow_start.room:
+            room.notify_room("update")
         return Response(flow_start, status.HTTP_200_OK)
 
 
