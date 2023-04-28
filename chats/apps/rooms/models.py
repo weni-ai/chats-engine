@@ -91,11 +91,13 @@ class Room(BaseModel):
 
     def get_is_waiting(self):
         """If the room does not have any contact message, then it is waiting"""
-        return (
+        check_messages = (
             self.is_waiting
             if self.is_waiting
             else not self.messages.filter(contact__isnull=False).exists()
         )
+        check_flowstarts = self.flowstarts.filter(is_deleted=False).exists()
+        return check_messages or check_flowstarts
 
     @property
     def last_contact_message(self):
