@@ -1,21 +1,22 @@
 import json
 
 from django.conf import settings
-from django.db.models import F, Sum, Max
+from django.db.models import F, Max, Sum
 from django.utils import timezone
-from rest_framework import mixins, permissions, status, filters
-from rest_framework.decorators import action
-from rest_framework.filters import OrderingFilter
-
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
+from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from chats.apps.api.v1 import permissions as api_permissions
 from chats.apps.api.v1.rooms import filters as room_filters
-from chats.apps.api.v1.rooms.serializers import RoomSerializer, TransferRoomSerializer
+from chats.apps.api.v1.rooms.serializers import (
+    RoomMessageStatusSerializer,
+    RoomSerializer,
+    TransferRoomSerializer,
+)
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.msgs.models import Message
 from chats.apps.rooms.models import Room
@@ -58,6 +59,34 @@ class RoomViewset(
         if "update" in self.action:
             return TransferRoomSerializer
         return super().get_serializer_class()
+
+    @action(
+        detail=True,
+        methods=[
+            "PATCH",
+        ],
+        url_name="bulk_update_msgs",
+        serializer_class=RoomMessageStatusSerializer,
+    )
+    def bulk_update_msgs(self, request, *args, **kwargs):
+        room = self.get_object()
+
+        serializer = RoomMessageStatusSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serialized_data = serializer.validated_data
+
+        message_filter = {"seen": not serialized_data.get("seen")}
+        if request.data.get("messages", []):
+            message_filter["pk__in"] = request.data.get("messages")
+
+        room.messages.filter(**message_filter).update(
+            modified_on=timezone.now(), seen=serialized_data.get("seen")
+        )
+        room.notify_user("update")
+        return Response(
+            {"detail": "All the given messages have been marked as read"},
+            status=status.HTTP_200_OK,
+        )
 
     @action(detail=True, methods=["PUT", "PATCH"], url_name="close")
     def close(

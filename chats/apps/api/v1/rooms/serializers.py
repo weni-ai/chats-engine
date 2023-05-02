@@ -10,6 +10,16 @@ from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 
 
+class RoomMessageStatusSerializer(serializers.Serializer):
+    seen = serializers.BooleanField(required=False, default=True)
+    messages = serializers.ListField(
+        child=serializers.CharField(required=False),
+        max_length=200,
+        allow_empty=True,
+        default=[],
+    )
+
+
 class RoomSerializer(serializers.ModelSerializer):
     user = UserSerializer(many=False, read_only=True)
     contact = ContactRelationsSerializer(many=False, read_only=True)
