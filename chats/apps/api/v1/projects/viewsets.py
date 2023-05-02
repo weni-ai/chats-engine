@@ -257,14 +257,14 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
 
         try:
             room = Room.objects.get(pk=room_id, is_active=True)
-            if not room.is_24h_valid:
-                flow_start_data["room"] = room
-                room.request_callback(room.serialized_ws_data)
             if room.flowstarts.filter(is_deleted=False).exists():
                 return Response(
                     {"Detail": "There already is an active flow start for this room"},
                     status.HTTP_400_BAD_REQUEST,
                 )
+            if not room.is_24h_valid:
+                flow_start_data["room"] = room
+                room.request_callback(room.serialized_ws_data)
         except ObjectDoesNotExist:
             pass
 
