@@ -21,6 +21,8 @@ from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
 
+import pendulum
+
 
 class DashboardRoomsSerializer(serializers.ModelSerializer):
 
@@ -70,9 +72,11 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
         return active_chats
 
     def get_interact_time(self, project):
-        initial_datetime = timezone.now().replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
+        project_timezone = pendulum.timezone(str(project.timezone))
+        initial_datetime = pendulum.parse(
+            str(timezone.now().replace(hour=0, minute=0, second=0, microsecond=0))
+        ).in_timezone(project_timezone)
+
         rooms_filter = {}
         rooms_filter["user__isnull"] = False
 
@@ -108,9 +112,11 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
         return interaction_time
 
     def get_response_time(self, project):
-        initial_datetime = timezone.now().replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
+        project_timezone = pendulum.timezone(str(project.timezone))
+        initial_datetime = pendulum.parse(
+            str(timezone.now().replace(hour=0, minute=0, second=0, microsecond=0))
+        ).in_timezone(project_timezone)
+
         rooms_filter = {}
         rooms_filter["user__isnull"] = False
 
@@ -145,9 +151,11 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
         return response_time
 
     def get_waiting_time(self, project):
-        initial_datetime = timezone.now().replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
+        project_timezone = pendulum.timezone(str(project.timezone))
+        initial_datetime = pendulum.parse(
+            str(timezone.now().replace(hour=0, minute=0, second=0, microsecond=0))
+        ).in_timezone(project_timezone)
+
         rooms_filter = {}
         rooms_filter["user__isnull"] = False
 
@@ -183,9 +191,11 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
         return response_time
 
     def get_transfer_percentage(self, project):
-        initial_datetime = timezone.now().replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
+        project_timezone = pendulum.timezone(str(project.timezone))
+        initial_datetime = pendulum.parse(
+            str(timezone.now().replace(hour=0, minute=0, second=0, microsecond=0))
+        ).in_timezone(project_timezone)
+
         rooms_filter = {}
         percentage_filter = {}
 
@@ -232,9 +242,10 @@ class DashboardAgentsSerializer(serializers.Serializer):
         ]
 
     def get_project_agents(self, project):
-        initial_datetime = timezone.now().replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
+        project_timezone = pendulum.timezone(str(project.timezone))
+        initial_datetime = pendulum.parse(
+            str(timezone.now().replace(hour=0, minute=0, second=0, microsecond=0))
+        ).in_timezone(project_timezone)
 
         rooms_filter = {}
         closed_rooms = {}
@@ -301,9 +312,10 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
         ]
 
     def get_sectors(self, project):
-        initial_datetime = timezone.now().replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
+        project_timezone = pendulum.timezone(str(project.timezone))
+        initial_datetime = pendulum.parse(
+            str(timezone.now().replace(hour=0, minute=0, second=0, microsecond=0))
+        ).in_timezone(project_timezone)
 
         model = Sector
         rooms_filter = {}
