@@ -294,6 +294,7 @@ class FlowStart(BaseModel):
         _("External ID"), max_length=200, blank=True, null=True
     )
     flow = models.CharField(_("flow ID"), max_length=200, blank=True, null=True)
+    name = models.TextField(_("flow name"), blank=True, null=True, default="")
     project = models.ForeignKey(
         Project,
         verbose_name=_("Project"),
