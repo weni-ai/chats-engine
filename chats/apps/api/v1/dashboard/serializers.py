@@ -21,8 +21,6 @@ from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
 
-from rest_framework.fields import CurrentUserDefault
-
 
 class DashboardRoomsSerializer(serializers.ModelSerializer):
 
