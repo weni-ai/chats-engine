@@ -229,3 +229,36 @@ class RoomMessagesTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(first_msg.seen and second_msg.seen)
+
+
+class RoomsManagerTests(APITestCase):
+    """
+
+    TODO Manager can access agents
+    [] Room List
+    [] Room Read
+    [] Room Transfer
+    """
+
+    fixtures = ["chats/fixtures/fixture_app.json"]
+
+    def setUp(self) -> None:
+        self.queue_1 = Queue.objects.get(uuid="f341417b-5143-4469-a99d-f141a0676bd4")
+
+    def _request_list_rooms(self, token, data: dict):
+        url = reverse("room-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + token.key)
+        response = client.get(url, data=data)
+        results = response.json().get("results")
+        return response, results
+
+    def test_list_agent_rooms(self):
+        """
+        [] Manager with X rooms
+        [] Agent with Y rooms
+        [] Given a agent, Manager should retrieve Y rooms
+        """
+        import pdb
+
+        pdb.set_trace()
