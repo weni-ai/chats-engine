@@ -79,6 +79,10 @@ class QueueSetUpMixin(TestCase):
         self.queue.authorizations.create(permission=self.agent_permission)
         self.queue.authorizations.create(permission=self.agent_2_permission)
 
+        self.agent_auth = QueueAuthorization.objects.get(
+            permission=self.agent_permission
+        )
+
         self.contact = Contact.objects.create(
             name="Contact test 123", email="test@user.com"
         )
@@ -139,3 +143,83 @@ class QueueAvailableAgentsTestCase(QueueSetUpMixin, TestCase):
         self.agent_2_permission.save()
 
         self.assertEqual(self.agent_2, self.queue.available_agents.first())
+
+
+class PropertyTests(QueueSetUpMixin, APITestCase):
+    def test_name_property(self):
+        """
+        Verify if the property for get queue name its returning the correct value.
+        """
+        self.assertEqual(self.queue.__str__(), "Q1")
+
+    def test_queue_object_property(self):
+        """
+        Verify if the property for get queue instance its returning the correct value.
+        """
+        self.assertEqual(self.queue.queue, self.queue)
+
+    def test_limit_property(self):
+        """
+        Verify if the property for get limit for attending its returning the correct value.
+        """
+        self.assertEqual(self.queue.limit, 1)
+
+    def test_get_permission_property(self):
+        """
+        Verify if the property for get permissions its returning the correct value.
+        """
+        permission_returned = self.queue.get_permission(self.agent)
+        self.assertEqual(permission_returned, self.agent_permission)
+
+    def test_get_agent_count_property(self):
+        """
+        Verify if the property for get agent count its returning the correct value.
+        """
+        self.assertEqual(self.queue.agent_count, 2)
+
+    def test_get_agent_property(self):
+        """
+        Verify if the property for get agents its returning the correct value.
+        """
+        self.assertTrue(self.agent and self.agent_2 in self.queue.agents)
+
+    def test_get_or_create_user_authorization_property(self):
+        """
+        Verify if the property for get or create user authorizations agents its working correctly.
+        """
+        get_or_create_property = self.queue.get_or_create_user_authorization(self.agent)
+        self.assertTrue(self.agent, get_or_create_property)
+
+    def test_set_queue_authorization_property(self):
+        """
+        Verify if the property for set authorization its working correctly.
+        """
+        get_or_create_property = self.queue.set_queue_authorization(self.agent, role=1)
+        self.assertTrue(self.agent, get_or_create_property)
+
+    def test_get_permission_queue_auth_property(self):
+        """
+        Verify if the property for get permission in queue auth its returning the correct value.
+        """
+        get_or_create_property = self.queue.set_queue_authorization(self.agent, role=1)
+        self.assertTrue(
+            get_or_create_property.get_permission(self.agent), self.agent_auth
+        )
+
+    def test_is_agent_property(self):
+        """
+        Verify if the property for get if user its agent its returning the correct value.
+        """
+        self.assertEqual(self.agent_auth.is_agent, True)
+
+    def test_user_property(self):
+        """
+        Verify if the property for get user its returning the correct value.
+        """
+        self.assertEqual(self.agent_auth.user, self.agent)
+
+    def test_can_list_property(self):
+        """
+        Verify if the property for get if user can list its returning the correct value.
+        """
+        self.assertEqual(self.agent_auth.can_list, True)
