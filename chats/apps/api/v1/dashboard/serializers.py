@@ -28,7 +28,6 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
     interact_time = serializers.SerializerMethodField()
     response_time = serializers.SerializerMethodField()
     waiting_time = serializers.SerializerMethodField()
-    transfer_percentage = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -37,7 +36,6 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
             "interact_time",
             "response_time",
             "waiting_time",
-            "transfer_percentage",
         ]
 
     def get_active_chats(self, project):
@@ -182,44 +180,6 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
 
         return response_time
 
-    def get_transfer_percentage(self, project):
-        initial_datetime = timezone.now().replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
-        rooms_filter = {}
-        percentage_filter = {}
-
-        if self.context.get("start_date") and self.context.get("end_date"):
-            rooms_filter["created_on__range"] = [
-                self.context.get("start_date"),
-                self.context.get("end_date"),
-            ]
-        else:
-            rooms_filter["created_on__gte"] = initial_datetime
-
-        if self.context.get("sector"):
-            rooms_filter["queue__sector"] = self.context.get("sector")
-            if self.context.get("tag"):
-                rooms_filter["tags__name"] = self.context.get("tag")
-        else:
-            rooms_filter["queue__sector__project"] = project
-
-        percentage_filter = rooms_filter.copy()
-        percentage_filter["metric__transfer_count__gt"] = 0
-
-        metrics_rooms_count = Room.objects.filter(**rooms_filter).count()
-        interaction = Room.objects.filter(**percentage_filter).aggregate(
-            waiting_time=Count("metric__waiting_time")
-        )
-
-        response_time = 0
-        if interaction and metrics_rooms_count > 0:
-            response_time = interaction["waiting_time"] / metrics_rooms_count * 100
-        else:
-            response_time = 0
-
-        return response_time
-
 
 class DashboardAgentsSerializer(serializers.Serializer):
 
@@ -309,7 +269,6 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
         rooms_filter = {}
         model_filter = {"project": project}
         rooms_filter_prefix = "queues__"
-        percentage_filter = {}
 
         if self.context.get("sector"):
             model = Queue
@@ -337,34 +296,10 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
                 self.context.get("end_date")
                 + " 23:59:59",  # TODO: USE DATETIME IN END DATE
             ]
-            online_agents_filter = {}
-            online_agents_filter[f"{rooms_filter_prefix}rooms__created_on__range"] = [
-                self.context.get("start_date"),
-                self.context.get("end_date")
-                + " 23:59:59",  # TODO: USE DATETIME IN END DATE
-            ]
-            online_agents_subquery = model.objects.annotate(
-                online_agents=Count(
-                    f"{rooms_filter_prefix}rooms", filter=Q(**online_agents_filter)
-                ),
-            ).filter(pk=OuterRef("pk"))
         else:
             rooms_filter[
                 f"{rooms_filter_prefix}rooms__created_on__gte"
             ] = initial_datetime
-            online_agents_filter = {
-                f"{rooms_filter_prefix}authorizations__permission__status": "ONLINE"
-            }
-            online_agents_subquery = model.objects.annotate(
-                online_agents=Count(
-                    f"{rooms_filter_prefix}authorizations__permission",
-                    distinct=True,
-                    filter=Q(**online_agents_filter),
-                ),
-            ).filter(pk=OuterRef("pk"))
-
-        percentage_filter = rooms_filter.copy()
-        percentage_filter[f"{rooms_filter_prefix}rooms__metric__transfer_count__gt"] = 0
 
         results = (
             model.objects.filter(**model_filter)
@@ -381,30 +316,6 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
                 interact_time=Avg(
                     f"{rooms_filter_prefix}rooms__metric__interaction_time",
                     filter=Q(**rooms_filter),
-                ),
-                rooms_count=Count(
-                    f"{rooms_filter_prefix}rooms__metric",
-                    filter=Q(**rooms_filter),
-                ),
-                transfer_percentage=Case(
-                    When(rooms_count=0, then=0),
-                    default=ExpressionWrapper(
-                        Count(
-                            f"{rooms_filter_prefix}rooms__metric",
-                            filter=Q(**percentage_filter),
-                        )
-                        / Cast(
-                            F("rooms_count"),
-                            output_field=FloatField(),
-                        )
-                        * 100,
-                        output_field=FloatField(),
-                    ),
-                    output_field=FloatField(),
-                ),
-                online_agents=Subquery(
-                    online_agents_subquery.values("online_agents"),
-                    output_field=IntegerField(),
                 ),
             )
         )
