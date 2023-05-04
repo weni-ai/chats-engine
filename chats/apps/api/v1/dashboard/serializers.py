@@ -21,6 +21,8 @@ from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
 
+from django_redis import get_redis_connection
+
 
 class DashboardRoomsSerializer(serializers.ModelSerializer):
 
@@ -106,6 +108,11 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
         return interaction_time
 
     def get_response_time(self, project):
+        from urllib import parse
+
+        redis_connection = get_redis_connection()
+        print("conexao redis", redis_connection)
+
         initial_datetime = timezone.now().replace(
             hour=0, minute=0, second=0, microsecond=0
         )
@@ -129,8 +136,22 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
             if self.context.get("tag"):
                 rooms_filter["tags__name"] = self.context.get("tag")
         else:
-            rooms_filter["queue__sector__project"] = project
+            rooms_filter["queue__sector__project__uuid"] = project.uuid
 
+        chave = parse.urlencode(rooms_filter)
+        print("rooms_filter cache", chave)
+
+        redis_response_time_value = redis_connection.get(chave)
+        print("redis response time", redis_response_time_value)
+
+        if redis_response_time_value:
+            print("veio pro redis response time")
+            return float(redis_response_time_value)
+
+        print("nao entrou no redis response time")
+        from time import sleep
+
+        sleep(10)
         metrics_rooms_count = Room.objects.filter(**rooms_filter).count()
         interaction = Room.objects.filter(**rooms_filter).aggregate(
             message_response_time=Sum("metric__message_response_time")
@@ -140,6 +161,7 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
         else:
             response_time = 0
 
+        redis_connection.set(chave, response_time, 60)
         return response_time
 
     def get_waiting_time(self, project):
