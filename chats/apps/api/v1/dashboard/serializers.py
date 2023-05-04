@@ -271,22 +271,42 @@ class DashboardAgentsSerializer(serializers.Serializer):
             rooms_filter["user__rooms__queue__sector__project"] = project
             closed_rooms["user__rooms__queue__sector__project"] = project
 
-        queue_auth = (
-            ProjectPermission.objects.filter(**permission_filter)
-            .values("user__first_name")
-            .annotate(
-                opened_rooms=Count(
-                    "user__rooms",
-                    filter=Q(**rooms_filter),
-                    distinct=True,
-                ),
-                closed_rooms=Count(
-                    "user__rooms",
-                    filter=Q(**closed_rooms),
-                    distinct=True,
-                ),
+        if "weni" in self.context.get("user_request"):
+            queue_auth = (
+                ProjectPermission.objects.filter(**permission_filter)
+                .values("user__first_name")
+                .annotate(
+                    opened_rooms=Count(
+                        "user__rooms",
+                        filter=Q(**rooms_filter),
+                        distinct=True,
+                    ),
+                    closed_rooms=Count(
+                        "user__rooms",
+                        filter=Q(**closed_rooms),
+                        distinct=True,
+                    ),
+                )
             )
-        )
+        else:
+            queue_auth = (
+                ProjectPermission.objects.filter(**permission_filter)
+                .exclude(user__email__icontains="weni")
+                .values("user__email")
+                .annotate(
+                    opened_rooms=Count(
+                        "user__rooms",
+                        filter=Q(**rooms_filter),
+                        distinct=True,
+                    ),
+                    closed_rooms=Count(
+                        "user__rooms",
+                        filter=Q(**closed_rooms),
+                        distinct=True,
+                    ),
+                )
+            )
+
         return queue_auth
 
 
