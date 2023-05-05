@@ -257,6 +257,11 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
 
         try:
             room = Room.objects.get(pk=room_id, is_active=True)
+            if room.flowstarts.filter(is_deleted=False).exists():
+                return Response(
+                    {"Detail": "There already is an active flow start for this room"},
+                    status.HTTP_400_BAD_REQUEST,
+                )
             if not room.is_24h_valid:
                 flow_start_data["room"] = room
                 room.request_callback(room.serialized_ws_data)
@@ -268,6 +273,7 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
 
         flow_start = FlowRESTClient().start_flow(project, data)
         chats_flow_start.external_id = flow_start.get("uuid")
+        chats_flow_start.name = flow_start.get("flow").get("name")
         chats_flow_start.save()
         if chats_flow_start.room:
             room.notify_room("update")

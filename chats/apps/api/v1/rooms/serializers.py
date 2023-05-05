@@ -1,3 +1,4 @@
+from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
 from rest_framework import serializers
 
 from chats.apps.accounts.models import User
@@ -29,6 +30,7 @@ class RoomSerializer(serializers.ModelSerializer):
     is_waiting = serializers.SerializerMethodField()
     linked_user = serializers.SerializerMethodField()
     is_24h_valid = serializers.SerializerMethodField()
+    flowstart_data = serializers.SerializerMethodField()
     last_interaction = serializers.DateTimeField(read_only=True)
 
     class Meta:
@@ -46,6 +48,17 @@ class RoomSerializer(serializers.ModelSerializer):
 
     def get_is_24h_valid(self, room: Room) -> bool:
         return room.is_24h_valid
+
+    def get_flowstart_data(self, room: Room) -> bool:
+        try:
+            flowstart = room.flowstarts.get(is_deleted=False)
+        except (ObjectDoesNotExist, MultipleObjectsReturned):
+            return {}
+        return {
+            "name": flowstart.name,
+            "is_deleted": flowstart.is_deleted,
+            "created_on": flowstart.created_on,
+        }
 
     def get_linked_user(self, room: Room):
         try:
