@@ -23,7 +23,6 @@ from chats.apps.sectors.models import Sector
 
 
 class DashboardRoomsSerializer(serializers.ModelSerializer):
-
     active_chats = serializers.SerializerMethodField()
     interact_time = serializers.SerializerMethodField()
     response_time = serializers.SerializerMethodField()
@@ -222,7 +221,6 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
 
 
 class DashboardAgentsSerializer(serializers.Serializer):
-
     project_agents = serializers.SerializerMethodField()
 
     class Meta:
@@ -292,7 +290,7 @@ class DashboardAgentsSerializer(serializers.Serializer):
             queue_auth = (
                 ProjectPermission.objects.filter(**permission_filter)
                 .exclude(user__email__icontains="weni")
-                .values("user__email")
+                .values("user__first_name")
                 .annotate(
                     opened_rooms=Count(
                         "user__rooms",
@@ -311,7 +309,6 @@ class DashboardAgentsSerializer(serializers.Serializer):
 
 
 class DashboardSectorSerializer(serializers.ModelSerializer):
-
     sectors = serializers.SerializerMethodField()
 
     class Meta:
@@ -432,7 +429,6 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
 
 
 class DashboardDataSerializer(serializers.ModelSerializer):
-
     closed_rooms = serializers.SerializerMethodField()
     transfer_count = serializers.SerializerMethodField()
     queue_rooms = serializers.SerializerMethodField()
