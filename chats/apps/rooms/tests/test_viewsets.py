@@ -149,3 +149,83 @@ class RoomTests(APITestCase):
             self.manager_3_token,
             {"project": self.project.uuid},
         )
+
+
+class RoomMessagesTests(APITestCase):
+    fixtures = ["chats/fixtures/fixture_app.json"]
+
+    def setUp(self) -> None:
+        self.room = Room.objects.filter(
+            is_active=True, messages__contact__isnull=False
+        ).first()
+        self.agent_token = self.room.user.auth_token.pk
+
+    def _update_message_status(self, token: str, data: dict):
+        url = reverse("room-bulk_update_msgs", args=[str(self.room.pk)])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION=f"Token {token}")
+
+        return client.patch(url, data=data, format="json")
+
+    def test_read_all_messages(self):
+        unread_messages_count_old = self.room.messages.filter(seen=False).count()
+
+        data = {"seen": True}
+        response = self._update_message_status(token=self.agent_token, data=data)
+
+        unread_messages_count_new = self.room.messages.filter(seen=False).count()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotEqual(unread_messages_count_new, unread_messages_count_old)
+        self.assertEqual(unread_messages_count_new, 0)
+
+    def test_read_list_messages(self):
+        first_msg, second_msg = self.room.messages.filter(seen=False)[:2]
+
+        data = {"seen": True, "messages": [str(first_msg.pk), str(second_msg.pk)]}
+        response = self._update_message_status(token=self.agent_token, data=data)
+        first_msg.refresh_from_db()
+        second_msg.refresh_from_db()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(first_msg.seen and second_msg.seen)
+
+    def test_read_empty_list_messages(self):
+        data = {"seen": True, "messages": ["", ""]}
+        response = self._update_message_status(token=self.agent_token, data=data)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_read_all_empty_body_messages(self):
+        unread_messages_count_old = self.room.messages.filter(seen=False).count()
+
+        response = self._update_message_status(token=self.agent_token, data={})
+
+        unread_messages_count_new = self.room.messages.filter(seen=False).count()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotEqual(unread_messages_count_new, unread_messages_count_old)
+        self.assertEqual(unread_messages_count_new, 0)
+
+    def test_unread_all_messages(self):
+        self.room.messages.update(seen=True)
+        read_messages_count_old = self.room.messages.count()
+
+        data = {"seen": False}
+        response = self._update_message_status(token=self.agent_token, data=data)
+
+        read_messages_count_new = self.room.messages.filter(seen=True).count()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotEqual(read_messages_count_new, read_messages_count_old)
+        self.assertEqual(read_messages_count_new, 0)
+
+    def test_unread_list_messages(self):
+        self.room.messages.update(seen=True)
+        first_msg, second_msg = self.room.messages.all()[:2]
+
+        data = {"seen": False, "messages": [str(first_msg.pk), str(second_msg.pk)]}
+        response = self._update_message_status(token=self.agent_token, data=data)
+        first_msg.refresh_from_db()
+        second_msg.refresh_from_db()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(first_msg.seen and second_msg.seen)
