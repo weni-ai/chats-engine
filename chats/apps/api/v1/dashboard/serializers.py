@@ -23,7 +23,6 @@ from chats.apps.sectors.models import Sector
 
 
 class DashboardRoomsSerializer(serializers.ModelSerializer):
-
     active_chats = serializers.SerializerMethodField()
     interact_time = serializers.SerializerMethodField()
     response_time = serializers.SerializerMethodField()
@@ -182,7 +181,6 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
 
 
 class DashboardAgentsSerializer(serializers.Serializer):
-
     project_agents = serializers.SerializerMethodField()
 
     class Meta:
@@ -231,27 +229,46 @@ class DashboardAgentsSerializer(serializers.Serializer):
             rooms_filter["user__rooms__queue__sector__project"] = project
             closed_rooms["user__rooms__queue__sector__project"] = project
 
-        queue_auth = (
-            ProjectPermission.objects.filter(**permission_filter)
-            .values("user__first_name")
-            .annotate(
-                opened_rooms=Count(
-                    "user__rooms",
-                    filter=Q(**rooms_filter),
-                    distinct=True,
-                ),
-                closed_rooms=Count(
-                    "user__rooms",
-                    filter=Q(**closed_rooms),
-                    distinct=True,
-                ),
+        if "weni" in self.context.get("user_request"):
+            queue_auth = (
+                ProjectPermission.objects.filter(**permission_filter)
+                .values("user__first_name")
+                .annotate(
+                    opened_rooms=Count(
+                        "user__rooms",
+                        filter=Q(**rooms_filter),
+                        distinct=True,
+                    ),
+                    closed_rooms=Count(
+                        "user__rooms",
+                        filter=Q(**closed_rooms),
+                        distinct=True,
+                    ),
+                )
             )
-        )
+        else:
+            queue_auth = (
+                ProjectPermission.objects.filter(**permission_filter)
+                .exclude(user__email__icontains="weni")
+                .values("user__first_name")
+                .annotate(
+                    opened_rooms=Count(
+                        "user__rooms",
+                        filter=Q(**rooms_filter),
+                        distinct=True,
+                    ),
+                    closed_rooms=Count(
+                        "user__rooms",
+                        filter=Q(**closed_rooms),
+                        distinct=True,
+                    ),
+                )
+            )
+
         return queue_auth
 
 
 class DashboardSectorSerializer(serializers.ModelSerializer):
-
     sectors = serializers.SerializerMethodField()
 
     class Meta:
@@ -323,7 +340,6 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
 
 
 class DashboardDataSerializer(serializers.ModelSerializer):
-
     closed_rooms = serializers.SerializerMethodField()
     transfer_count = serializers.SerializerMethodField()
     queue_rooms = serializers.SerializerMethodField()
