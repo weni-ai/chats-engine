@@ -15,7 +15,6 @@ from chats.utils.websockets import send_channels_group
 
 
 class Project(BaseModel):
-
     DATE_FORMAT_DAY_FIRST = "D"
     DATE_FORMAT_MONTH_FIRST = "M"
     DATE_FORMATS = (
