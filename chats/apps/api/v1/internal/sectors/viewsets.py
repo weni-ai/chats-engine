@@ -43,14 +43,14 @@ class SectorInternalViewset(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save()
-        serializer.instance.notify_sector("create")
+        # serializer.instance.notify_sector("create") TODO REMOVE THIS. DEPRECATED
 
     def perform_update(self, serializer):
         serializer.save()
-        serializer.instance.notify_sector("update")
+        # serializer.instance.notify_sector("update") TODO REMOVE THIS. DEPRECATED
 
     def perform_destroy(self, instance):
-        instance.notify_sector("destroy")
+        # instance.notify_sector("destroy") TODO REMOVE THIS. DEPRECATED
         instance.is_deleted = True
         instance.save()
         return Response(

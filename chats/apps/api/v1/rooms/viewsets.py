@@ -203,11 +203,12 @@ class RoomViewset(
         msg = instance.messages.create(text=json.dumps(transfer_content), seen=True)
         msg.notify_room("create")
 
+        # TODO REMOVE THIS. DEPRECATED (WONT USE ROOM GROUPS ANYMORE)
         # Force everyone on the queue group to exit the room Group
-        if old_instance.user:
-            old_instance.user_connection("exit", old_instance.user)
-        else:
-            old_instance.queue_connection("exit", old_queue)
+        # if old_instance.user:
+        #     old_instance.user_connection("exit", old_instance.user)
+        # else:
+        #     old_instance.queue_connection("exit", old_queue)
 
         # Add the room group for the user or the queue that received it
 
@@ -215,11 +216,12 @@ class RoomViewset(
         instance.notify_queue("update")
         instance.notify_user("update", user=self.request.user)
 
-        if user:
-            instance.user_connection(action="join")
+        # TODO REMOVE THIS. DEPRECATED (WONT USE ROOM GROUPS ANYMORE)
+        # if user:
+        #     instance.user_connection(action="join")
 
-        if queue and user is None:
-            instance.queue_connection(action="join")
+        # if queue and user is None:
+        #     instance.queue_connection(action="join")
 
     def perform_destroy(self, instance):
         instance.notify_room("destroy", callback=True)

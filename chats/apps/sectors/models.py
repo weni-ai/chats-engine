@@ -221,7 +221,7 @@ class SectorAuthorization(BaseModel):
     def notify_user(self, action):
         """ """
         send_channels_group(
-            group_name=f"user_{self.permission.user.pk}",
+            group_name=f"permission_{self.permission.user.pk}",
             call_type="notify",
             content=self.serialized_ws_data,
             action=f"sector_authorization.{action}",
