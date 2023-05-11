@@ -154,6 +154,20 @@ class Room(BaseModel):
             headers={"content-type": "application/json"},
         )
 
+    def base_notification(self, content, action):
+        if self.user:
+            permission = self.get_permission(self.user)
+            group_name = f"permission_{permission.pk}"
+        else:
+            group_name = f"queue_{self.queue.pk}"
+
+        send_channels_group(
+            group_name=group_name,
+            call_type="notify",
+            content=content,
+            action=action,
+        )
+
     def notify_queue(self, action: str, callback: bool = False):
         """
         Used to notify channels groups when something happens on the instance.
@@ -187,13 +201,10 @@ class Room(BaseModel):
         Agent enters room,
         Call the sector group(all agents) and send the 'update' action to remove them from the group
         """
-
-        send_channels_group(
-            group_name=f"room_{self.pk}",
-            call_type="notify",
-            content=self.serialized_ws_data,
-            action=f"rooms.{action}",
-        )
+        if self.user:
+            self.notify_user(action=action)
+        else:
+            self.notify_queue(action=action)
 
         if self.callback_url and callback and action in ["update", "destroy", "close"]:
             self.request_callback(self.serialized_ws_data)
