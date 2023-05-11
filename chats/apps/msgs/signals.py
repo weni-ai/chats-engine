@@ -1,4 +1,5 @@
 from dateutil.relativedelta import relativedelta
+from django.conf import settings
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django.utils import timezone
@@ -11,9 +12,6 @@ from chats.apps.api.v1.prometheus.metrics import (
     chats_total_msgs_last_year,
 )
 from chats.apps.msgs.models import Message as ChatMessage
-
-from django.conf import settings
-
 
 if settings.USE_PROMETHEUS_METRICS:
 

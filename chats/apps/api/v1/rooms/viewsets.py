@@ -155,7 +155,7 @@ class RoomViewset(
         # TODO Separate this into smaller methods
         old_instance = self.get_object()
         transfer_history = old_instance.transfer_history or []
-        old_queue = old_instance.queue
+        old_user = old_instance.user
 
         user = self.request.data.get("user_email")
         queue = self.request.data.get("queue_uuid")
@@ -203,25 +203,14 @@ class RoomViewset(
         msg = instance.messages.create(text=json.dumps(transfer_content), seen=True)
         msg.notify_room("create")
 
-        # TODO REMOVE THIS. DEPRECATED (WONT USE ROOM GROUPS ANYMORE)
-        # Force everyone on the queue group to exit the room Group
-        # if old_instance.user:
-        #     old_instance.user_connection("exit", old_instance.user)
-        # else:
-        #     old_instance.queue_connection("exit", old_queue)
-
-        # Add the room group for the user or the queue that received it
-
         # Send Updated data to the queue group, as send room is not sending after a join
-        instance.notify_queue("update")
-        instance.notify_user("update", user=self.request.user)
-
-        # TODO REMOVE THIS. DEPRECATED (WONT USE ROOM GROUPS ANYMORE)
-        # if user:
-        #     instance.user_connection(action="join")
-
-        # if queue and user is None:
-        #     instance.queue_connection(action="join")
+        if old_user is None or instance.user is None:
+            instance.notify_user("update", user=old_user)
+            instance.notify_queue("update")
+        else:
+            if instance.user != self.request.user:
+                instance.notify_user("update", user=self.request.user)
+            instance.notify_user("update")
 
     def perform_destroy(self, instance):
         instance.notify_room("destroy", callback=True)
