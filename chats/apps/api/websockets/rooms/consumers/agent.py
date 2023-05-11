@@ -44,7 +44,6 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 await self.close()
             else:
                 await self.accept()
-                # await self.load_rooms() # TODO REMOVE THIS, DEPRECATED
                 await self.load_queues()
                 await self.load_user()
                 self.last_ping = timezone.now()
@@ -215,7 +214,4 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
 
     async def load_user(self, *args, **kwargs):
         """Enter user notification group"""
-        # await self.join(
-        #     {"name": "user", "id": self.user.id}
-        # )  TODO REMOVE THIS. DEPRECATED
         await self.join({"name": "permission", "id": str(self.permission.pk)})

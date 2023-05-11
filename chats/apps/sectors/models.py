@@ -144,7 +144,6 @@ class Sector(BaseModel):
     def get_permission(self, user):
         return self.project.permissions.get(user=user)
 
-    # TODO: DEPRECATED, REMOVE THIS
     def notify_sector(self, action):
         """ """
         send_channels_group(
@@ -154,7 +153,6 @@ class Sector(BaseModel):
             action=f"sector.{action}",
         )
 
-    # TODO: DEPRECATED, REMOVE THIS
     def add_users_group(self):
         for auth in self.authorizations.filter(role__gte=1):
             auth.notify_user("created")

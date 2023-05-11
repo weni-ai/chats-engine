@@ -83,8 +83,6 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
             notification_type = "create"
 
         notify_level = "user" if instance.user else "queue"
-        # TODO REMOVE THIS. DEPRECATED (WONT USE ROOM GROUPS ANYMORE)
-        # getattr(instance, f"{notify_level}_connection")(action="join")
 
         notification_method = getattr(instance, f"notify_{notify_level}")
         notification_method(notification_type)

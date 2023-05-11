@@ -89,19 +89,10 @@ class SectorViewset(viewsets.ModelViewSet):
                     detail=f"[{response.status_code}] Error posting the sector/ticketer on flows. Exception: {response.content}"  # NOQA
                 )
 
-        # TODO NOT USED DEPRECATED
-        # instance.notify_sector("create")
-
     def perform_update(self, serializer):
         serializer.save()
 
-        # TODO NOT USED DEPRECATED
-        # serializer.instance.notify_sector("update")
-
     def perform_destroy(self, instance):
-
-        # TODO NOT USED DEPRECATED
-        # instance.notify_sector("destroy")
         instance.is_deleted = True
         instance.save()
         return Response(
