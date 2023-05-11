@@ -8,7 +8,6 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 
 from chats.core.models import BaseModel
-from chats.utils.websockets import send_channels_group
 
 
 class Message(BaseModel):
@@ -74,17 +73,13 @@ class Message(BaseModel):
 
     def notify_room(self, action: str, callback: bool = False):
         """ """
-        send_channels_group(
-            group_name=f"room_{self.room.pk}",
-            call_type="notify",
-            content=self.serialized_ws_data,
-            action=f"msg.{action}",
-        )
+        data = self.serialized_ws_data
+        self.room.base_notification(content=data, action=f"msg.{action}")
         if self.room.callback_url and callback:
             requests.post(
                 self.room.callback_url,
                 data=json.dumps(
-                    {"type": "msg.create", "content": self.serialized_ws_data},
+                    {"type": "msg.create", "content": data},
                     sort_keys=True,
                     indent=1,
                     cls=DjangoJSONEncoder,

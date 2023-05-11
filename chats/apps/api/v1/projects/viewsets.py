@@ -1,4 +1,4 @@
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
@@ -257,6 +257,11 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
 
         try:
             room = Room.objects.get(pk=room_id, is_active=True)
+            if room.flowstarts.filter(is_deleted=False).exists():
+                return Response(
+                    {"Detail": "There already is an active flow start for this room"},
+                    status.HTTP_400_BAD_REQUEST,
+                )
             if not room.is_24h_valid:
                 flow_start_data["room"] = room
                 room.request_callback(room.serialized_ws_data)
@@ -269,7 +274,6 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
             pass
 
         chats_flow_start = project.flowstarts.create(**flow_start_data)
-
         self._create_flow_start_instances(data, chats_flow_start)
 
         flow_start = FlowRESTClient().start_flow(project, data)

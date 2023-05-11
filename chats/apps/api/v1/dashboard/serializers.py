@@ -23,12 +23,10 @@ from chats.apps.sectors.models import Sector
 
 
 class DashboardRoomsSerializer(serializers.ModelSerializer):
-
     active_chats = serializers.SerializerMethodField()
     interact_time = serializers.SerializerMethodField()
     response_time = serializers.SerializerMethodField()
     waiting_time = serializers.SerializerMethodField()
-    transfer_percentage = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -37,7 +35,6 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
             "interact_time",
             "response_time",
             "waiting_time",
-            "transfer_percentage",
         ]
 
     def get_active_chats(self, project):
@@ -182,47 +179,8 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
 
         return response_time
 
-    def get_transfer_percentage(self, project):
-        initial_datetime = timezone.now().replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
-        rooms_filter = {}
-        percentage_filter = {}
-
-        if self.context.get("start_date") and self.context.get("end_date"):
-            rooms_filter["created_on__range"] = [
-                self.context.get("start_date"),
-                self.context.get("end_date"),
-            ]
-        else:
-            rooms_filter["created_on__gte"] = initial_datetime
-
-        if self.context.get("sector"):
-            rooms_filter["queue__sector"] = self.context.get("sector")
-            if self.context.get("tag"):
-                rooms_filter["tags__name"] = self.context.get("tag")
-        else:
-            rooms_filter["queue__sector__project"] = project
-
-        percentage_filter = rooms_filter.copy()
-        percentage_filter["metric__transfer_count__gt"] = 0
-
-        metrics_rooms_count = Room.objects.filter(**rooms_filter).count()
-        interaction = Room.objects.filter(**percentage_filter).aggregate(
-            waiting_time=Count("metric__waiting_time")
-        )
-
-        response_time = 0
-        if interaction and metrics_rooms_count > 0:
-            response_time = interaction["waiting_time"] / metrics_rooms_count * 100
-        else:
-            response_time = 0
-
-        return response_time
-
 
 class DashboardAgentsSerializer(serializers.Serializer):
-
     project_agents = serializers.SerializerMethodField()
 
     class Meta:
@@ -271,27 +229,46 @@ class DashboardAgentsSerializer(serializers.Serializer):
             rooms_filter["user__rooms__queue__sector__project"] = project
             closed_rooms["user__rooms__queue__sector__project"] = project
 
-        queue_auth = (
-            ProjectPermission.objects.filter(**permission_filter)
-            .values("user__first_name")
-            .annotate(
-                opened_rooms=Count(
-                    "user__rooms",
-                    filter=Q(**rooms_filter),
-                    distinct=True,
-                ),
-                closed_rooms=Count(
-                    "user__rooms",
-                    filter=Q(**closed_rooms),
-                    distinct=True,
-                ),
+        if "weni" in self.context.get("user_request"):
+            queue_auth = (
+                ProjectPermission.objects.filter(**permission_filter)
+                .values("user__first_name")
+                .annotate(
+                    opened_rooms=Count(
+                        "user__rooms",
+                        filter=Q(**rooms_filter),
+                        distinct=True,
+                    ),
+                    closed_rooms=Count(
+                        "user__rooms",
+                        filter=Q(**closed_rooms),
+                        distinct=True,
+                    ),
+                )
             )
-        )
+        else:
+            queue_auth = (
+                ProjectPermission.objects.filter(**permission_filter)
+                .exclude(user__email__icontains="weni")
+                .values("user__first_name")
+                .annotate(
+                    opened_rooms=Count(
+                        "user__rooms",
+                        filter=Q(**rooms_filter),
+                        distinct=True,
+                    ),
+                    closed_rooms=Count(
+                        "user__rooms",
+                        filter=Q(**closed_rooms),
+                        distinct=True,
+                    ),
+                )
+            )
+
         return queue_auth
 
 
 class DashboardSectorSerializer(serializers.ModelSerializer):
-
     sectors = serializers.SerializerMethodField()
 
     class Meta:
@@ -309,7 +286,6 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
         rooms_filter = {}
         model_filter = {"project": project}
         rooms_filter_prefix = "queues__"
-        percentage_filter = {}
 
         if self.context.get("sector"):
             model = Queue
@@ -337,34 +313,10 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
                 self.context.get("end_date")
                 + " 23:59:59",  # TODO: USE DATETIME IN END DATE
             ]
-            online_agents_filter = {}
-            online_agents_filter[f"{rooms_filter_prefix}rooms__created_on__range"] = [
-                self.context.get("start_date"),
-                self.context.get("end_date")
-                + " 23:59:59",  # TODO: USE DATETIME IN END DATE
-            ]
-            online_agents_subquery = model.objects.annotate(
-                online_agents=Count(
-                    f"{rooms_filter_prefix}rooms", filter=Q(**online_agents_filter)
-                ),
-            ).filter(pk=OuterRef("pk"))
         else:
             rooms_filter[
                 f"{rooms_filter_prefix}rooms__created_on__gte"
             ] = initial_datetime
-            online_agents_filter = {
-                f"{rooms_filter_prefix}authorizations__permission__status": "ONLINE"
-            }
-            online_agents_subquery = model.objects.annotate(
-                online_agents=Count(
-                    f"{rooms_filter_prefix}authorizations__permission",
-                    distinct=True,
-                    filter=Q(**online_agents_filter),
-                ),
-            ).filter(pk=OuterRef("pk"))
-
-        percentage_filter = rooms_filter.copy()
-        percentage_filter[f"{rooms_filter_prefix}rooms__metric__transfer_count__gt"] = 0
 
         results = (
             model.objects.filter(**model_filter)
@@ -382,37 +334,12 @@ class DashboardSectorSerializer(serializers.ModelSerializer):
                     f"{rooms_filter_prefix}rooms__metric__interaction_time",
                     filter=Q(**rooms_filter),
                 ),
-                rooms_count=Count(
-                    f"{rooms_filter_prefix}rooms__metric",
-                    filter=Q(**rooms_filter),
-                ),
-                transfer_percentage=Case(
-                    When(rooms_count=0, then=0),
-                    default=ExpressionWrapper(
-                        Count(
-                            f"{rooms_filter_prefix}rooms__metric",
-                            filter=Q(**percentage_filter),
-                        )
-                        / Cast(
-                            F("rooms_count"),
-                            output_field=FloatField(),
-                        )
-                        * 100,
-                        output_field=FloatField(),
-                    ),
-                    output_field=FloatField(),
-                ),
-                online_agents=Subquery(
-                    online_agents_subquery.values("online_agents"),
-                    output_field=IntegerField(),
-                ),
             )
         )
         return results
 
 
 class DashboardDataSerializer(serializers.ModelSerializer):
-
     closed_rooms = serializers.SerializerMethodField()
     transfer_count = serializers.SerializerMethodField()
     queue_rooms = serializers.SerializerMethodField()

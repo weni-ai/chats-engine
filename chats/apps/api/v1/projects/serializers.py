@@ -55,4 +55,8 @@ class ProjectFlowStartSerializer(serializers.Serializer):
     flow = serializers.CharField()
     room = serializers.CharField(
         required=False,
+        allow_blank=True,
+        allow_null=True,
+        default="",
+        trim_whitespace=True,
     )

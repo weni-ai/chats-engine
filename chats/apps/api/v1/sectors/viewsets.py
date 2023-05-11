@@ -88,14 +88,11 @@ class SectorViewset(viewsets.ModelViewSet):
                 raise exceptions.APIException(
                     detail=f"[{response.status_code}] Error posting the sector/ticketer on flows. Exception: {response.content}"  # NOQA
                 )
-        instance.notify_sector("create")
 
     def perform_update(self, serializer):
         serializer.save()
-        serializer.instance.notify_sector("update")
 
     def perform_destroy(self, instance):
-        instance.notify_sector("destroy")
         instance.is_deleted = True
         instance.save()
         return Response(

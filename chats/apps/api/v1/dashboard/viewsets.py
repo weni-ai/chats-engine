@@ -45,10 +45,13 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
     def agent(self, request, *args, **kwargs):
         """Agent metrics for the project or the sector"""
         project = self.get_object()
-        filters = request.query_params
+        context = {}
+        context["filters"] = request.query_params
+        if request.user:
+            context["user_request"] = request.user.email
         serialized_data = self.get_serializer(
             instance=project,
-            context=filters,
+            context=context,
         )
         return Response(serialized_data.data, status.HTTP_200_OK)
 
