@@ -154,6 +154,20 @@ class Room(BaseModel):
             headers={"content-type": "application/json"},
         )
 
+    def base_notification(self, content, action):
+        if self.user:
+            permission = self.get_permission(self.user)
+            group_name = f"permission_{permission.pk}"
+        else:
+            group_name = f"queue_{self.queue.pk}"
+
+        send_channels_group(
+            group_name=group_name,
+            call_type="notify",
+            content=content,
+            action=action,
+        )
+
     def notify_queue(self, action: str, callback: bool = False):
         """
         Used to notify channels groups when something happens on the instance.
