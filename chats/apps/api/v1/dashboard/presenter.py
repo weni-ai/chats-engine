@@ -25,7 +25,6 @@ def get_export_data(project, filter):
         rooms_filter["user"] = filter.get("agent")
 
     if filter.get("sector"):
-
         rooms_filter["queue__sector"] = filter.get("sector")
         if filter.get("tag"):
             rooms_filter["tags__name"] = filter.get("tag")
@@ -47,39 +46,72 @@ def get_general_data(project, filter):
     initial_datetime = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
     rooms_filter = {}
 
-    initial_datetime = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    rooms_filter = {}
-    rooms_filter_active_chats = {}
+    rooms_filter_in_progress_chats = {}
+    rooms_filter_in_progress_chats["user__isnull"] = False
+
+    rooms_filter_waiting_service = {}
+    rooms_filter_waiting_service["user__isnull"] = True
+    rooms_filter_waiting_service["is_active"] = True
+
+    rooms_filter_closed = {}
+    rooms_filter_closed["is_active"] = False
 
     if filter.get("start_date") and filter.get("end_date"):
         rooms_filter["created_on__range"] = [
             filter.get("start_date"),
             filter.get("end_date") + " 23:59:59",  # TODO: USE DATETIME IN END DATE
         ]
-        rooms_filter_active_chats["is_active"] = False
+        rooms_filter_in_progress_chats["created_on__range"] = [
+            filter.get("start_date"),
+            filter.get("end_date") + " 23:59:59",  # TODO: USE DATETIME IN END DATE
+        ]
+        rooms_filter_waiting_service["created_on__range"] = [
+            filter.get("start_date"),
+            filter.get("end_date") + " 23:59:59",  # TODO: USE DATETIME IN END DATE
+        ]
+        rooms_filter_closed["ended_at__range"] = [
+            filter.get("start_date"),
+            filter.get("end_date") + " 23:59:59",  # TODO: USE DATETIME IN END DATE
+        ]
+        rooms_filter_in_progress_chats["is_active"] = False
     else:
         rooms_filter["created_on__gte"] = initial_datetime
-        rooms_filter_active_chats["is_active"] = True
+        rooms_filter_in_progress_chats["is_active"] = True
+        rooms_filter_closed["ended_at__gte"] = initial_datetime
 
     if filter.get("agent"):
         rooms_filter["user"] = filter.get("agent")
+        rooms_filter_in_progress_chats["user"] = filter.get("agent")
+        rooms_filter_closed["user"] = filter.get("agent")
 
     if filter.get("sector"):
         rooms_filter["queue__sector"] = filter.get("sector")
+        rooms_filter_in_progress_chats["queue__sector"] = filter.get("sector")
+        rooms_filter_waiting_service["queue__sector"] = filter.get("sector")
+        rooms_filter_closed["queue__sector"] = filter.get("sector")
         if filter.get("tag"):
             rooms_filter["tags__name"] = filter.get("tag")
+            rooms_filter_in_progress_chats["tags__name"] = filter.get("tag")
+            rooms_filter_closed["tags__name"] = filter.get("tag")
     else:
         rooms_filter["queue__sector__project"] = project
-
-    rooms_filter_active_chats.update(rooms_filter)
-    rooms_filter_active_chats.pop("created_on__gte")
+        rooms_filter_in_progress_chats["queue__sector__project"] = project
+        rooms_filter_waiting_service["queue__sector__project"] = project
+        rooms_filter_closed["queue__sector__project"] = project
 
     data = {}
-
     metrics_rooms_count = Room.objects.filter(**rooms_filter).count()
 
-    active_chats = Room.objects.filter(**rooms_filter_active_chats).count()
+    # in_progress
+    active_chats = Room.objects.filter(**rooms_filter_in_progress_chats).count()
 
+    # waiting_service
+    queue_rooms = Room.objects.filter(**rooms_filter_waiting_service).count()
+
+    # closed_rooms
+    closed_rooms = Room.objects.filter(**rooms_filter_closed).count()
+
+    # interaction_time
     interaction_value = Room.objects.filter(**rooms_filter).aggregate(
         interaction_time=Sum("metric__interaction_time")
     )
@@ -88,6 +120,7 @@ def get_general_data(project, filter):
     else:
         interaction_time = 0
 
+    # response_time
     response_time_value = Room.objects.filter(**rooms_filter).aggregate(
         message_response_time=Sum("metric__message_response_time")
     )
@@ -98,6 +131,7 @@ def get_general_data(project, filter):
     else:
         response_time = 0
 
+    # waiting_time
     waiting_time_value = Room.objects.filter(**rooms_filter).aggregate(
         waiting_time=Sum("metric__waiting_time")
     )
@@ -108,6 +142,8 @@ def get_general_data(project, filter):
 
     data = {
         "active_chats": active_chats,
+        "queue_rooms": queue_rooms,
+        "closed_rooms": closed_rooms,
         "interaction_time": interaction_time,
         "response_time": response_time,
         "waiting_time": waiting_time,
@@ -117,40 +153,56 @@ def get_general_data(project, filter):
 
 
 def get_agents_data(project, filter):
+    initial_datetime = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
     rooms_filter = {}
+    closed_rooms = {}
     permission_filter = {"project": project}
+
+    rooms_filter["user__rooms__is_active"] = True
+    closed_rooms["user__rooms__is_active"] = False
 
     if filter.get("start_date") and filter.get("end_date"):
         rooms_filter["user__rooms__created_on__range"] = [
             filter.get("start_date"),
             filter.get("end_date") + " 23:59:59",  # TODO: USE DATETIME IN END DATE
         ]
-        rooms_filter["user__rooms__is_active"] = False
+        closed_rooms["user__rooms__ended_at__range"] = [
+            filter.get("start_date"),
+            filter.get("end_date") + " 23:59:59",  # TODO: USE DATETIME IN END DATE
+        ]
     else:
-        rooms_filter["user__rooms__is_active"] = True
-        permission_filter["status"] = "ONLINE"
+        closed_rooms["user__rooms__ended_at__gte"] = initial_datetime
 
     if filter.get("agent"):
         rooms_filter["user"] = filter.get("agent")
+        closed_rooms["user"] = filter.get("agent")
 
     if filter.get("sector"):
         rooms_filter["user__rooms__queue__sector"] = filter.get("sector")
+        closed_rooms["user__rooms__queue__sector"] = filter.get("sector")
         if filter.get("tag"):
             rooms_filter["user__rooms__tags__name"] = filter.get("tag")
+            closed_rooms["user__rooms__tags__name"] = filter.get("tag")
     else:
         rooms_filter["user__rooms__queue__sector__project"] = project
-
+        closed_rooms["user__rooms__queue__sector__project"] = project
     queue_auth = (
         ProjectPermission.objects.filter(**permission_filter)
-        .values(Agent_Name=F("user__first_name"))
+        .exclude(user__email__icontains="weni")
+        .values(Name=F("user__first_name"))
         .annotate(
-            count=Count(
+            opened_rooms=Count(
                 "user__rooms",
                 filter=Q(**rooms_filter),
                 distinct=True,
-            )
+            ),
+            closed_rooms=Count(
+                "user__rooms",
+                filter=Q(**closed_rooms),
+                distinct=True,
+            ),
         )
-    ).values("Agent_Name", "count")
+    )
 
     data = json.dumps(list(queue_auth))
     return data
@@ -163,7 +215,6 @@ def get_sector_data(project, filter):
     rooms_filter = {}
     model_filter = {"project": project}
     rooms_filter_prefix = "queues__"
-    online_agents = Count(f"{rooms_filter_prefix}rooms")
 
     if filter.get("sector"):
         model = Queue
@@ -184,30 +235,11 @@ def get_sector_data(project, filter):
             filter.get("start_date"),
             filter.get("end_date") + " 23:59:59",  # TODO: USE DATETIME IN END DATE
         ]
-
-        online_agents_filter = {}
-        online_agents_filter[f"{rooms_filter_prefix}rooms__created_on__range"] = [
-            filter.get("start_date"),
-            filter.get("end_date") + " 23:59:59",  # TODO: USE DATETIME IN END DATE
-        ]
-        online_agents = Count(
-            f"{rooms_filter_prefix}rooms",
-            filter=Q(**online_agents_filter),
-        )
-
     else:
         rooms_filter[f"{rooms_filter_prefix}rooms__created_on__gte"] = initial_datetime
-        online_agents_filter = {
-            f"{rooms_filter_prefix}authorizations__permission__status": "ONLINE"
-        }
-        online_agents = Count(
-            f"{rooms_filter_prefix}authorizations__permission",
-            filter=Q(**online_agents_filter),
-            distinct=True,
-        )
     results = (
         model.objects.filter(**model_filter)
-        .values("name")
+        .values(sector_name=F("name"))
         .annotate(
             waiting_time=Avg(
                 f"{rooms_filter_prefix}rooms__metric__waiting_time",
@@ -221,9 +253,8 @@ def get_sector_data(project, filter):
                 f"{rooms_filter_prefix}rooms__metric__interaction_time",
                 filter=Q(**rooms_filter),
             ),
-            online_agents=online_agents,
         )
-    ).values("name", "waiting_time", "response_time", "interact_time", "online_agents")
+    ).values("name", "waiting_time", "response_time", "interact_time")
 
     data = json.dumps(list(results))
     return data

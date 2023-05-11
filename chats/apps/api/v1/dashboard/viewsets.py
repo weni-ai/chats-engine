@@ -24,9 +24,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
     lookup_field = "uuid"
     queryset = Project.objects.all()
 
-    def get_permissions(self):
-        permission_classes = [permissions.IsAuthenticated, HasDashboardAccess]
-        return [permission() for permission in permission_classes]
+    # def get_permissions(self):
+    #     permission_classes = [permissions.IsAuthenticated, HasDashboardAccess]
+    #     return [permission() for permission in permission_classes]
 
     @action(
         detail=True,
@@ -143,7 +143,8 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
     )
     def export_dashboard(self, request, *args, **kwargs):
         """
-        Can return data from dashboard to be export in csv/xls on project and sector level (list of sector, list of queues and list of agents online)
+        Can return data from dashboard to be export in csv/xls on project
+        and sector level (list of sector, list of queues and list of agents online)
         """
         project = self.get_object()
         filter = request.query_params
@@ -163,7 +164,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
                 content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
             response["Content-Disposition"] = (
-                'attachment; filename="' + filename + ".xls"
+                'attachment; filename="' + filename + ".xlsx"
             )
             with pandas.ExcelWriter(response, engine="xlsxwriter") as writer:
                 data_frame.to_excel(
