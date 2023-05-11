@@ -187,13 +187,10 @@ class Room(BaseModel):
         Agent enters room,
         Call the sector group(all agents) and send the 'update' action to remove them from the group
         """
-
-        send_channels_group(
-            group_name=f"room_{self.pk}",
-            call_type="notify",
-            content=self.serialized_ws_data,
-            action=f"rooms.{action}",
-        )
+        if self.user:
+            self.notify_user(action=action)
+        else:
+            self.notify_queue(action=action)
 
         if self.callback_url and callback and action in ["update", "destroy", "close"]:
             self.request_callback(self.serialized_ws_data)
