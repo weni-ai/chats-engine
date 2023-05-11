@@ -144,19 +144,6 @@ class Sector(BaseModel):
     def get_permission(self, user):
         return self.project.permissions.get(user=user)
 
-    def notify_sector(self, action):
-        """ """
-        send_channels_group(
-            group_name=f"sector_{self.pk}",
-            call_type="notify",
-            content=self.serialized_ws_data,
-            action=f"sector.{action}",
-        )
-
-    def add_users_group(self):
-        for auth in self.authorizations.filter(role__gte=1):
-            auth.notify_user("created")
-
 
 class SectorAuthorization(BaseModel):
     ROLE_NOT_SETTED = 0
