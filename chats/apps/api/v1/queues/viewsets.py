@@ -17,22 +17,22 @@ class QueueViewset(ModelViewSet):
     serializer_class = queue_serializers.QueueSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = QueueFilter
-    # permission_classes = [
-    #     IsAuthenticated,
-    #     IsSectorManager,
-    # ]
+    permission_classes = [
+        IsAuthenticated,
+        IsSectorManager,
+    ]
 
     lookup_field = "uuid"
 
-    # def get_permissions(self):
-    #     permission_classes = self.permission_classes
-    #     if self.action == "list":
-    #         permission_classes = [
-    #             IsAuthenticated,
-    #             AnyQueueAgentPermission,
-    #         ]
+    def get_permissions(self):
+        permission_classes = self.permission_classes
+        if self.action == "list":
+            permission_classes = [
+                IsAuthenticated,
+                AnyQueueAgentPermission,
+            ]
 
-    #     return [permission() for permission in permission_classes]
+        return [permission() for permission in permission_classes]
 
     def get_queryset(self):
         if self.action != "list":
