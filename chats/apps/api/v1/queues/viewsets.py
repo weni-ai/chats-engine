@@ -1,5 +1,6 @@
 from django.conf import settings
 from django_filters.rest_framework import DjangoFilterBackend
+from requests import Response
 from rest_framework import exceptions, filters, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ModelViewSet
@@ -16,22 +17,22 @@ class QueueViewset(ModelViewSet):
     serializer_class = queue_serializers.QueueSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = QueueFilter
-    permission_classes = [
-        IsAuthenticated,
-        IsSectorManager,
-    ]
+    # permission_classes = [
+    #     IsAuthenticated,
+    #     IsSectorManager,
+    # ]
 
     lookup_field = "uuid"
 
-    def get_permissions(self):
-        permission_classes = self.permission_classes
-        if self.action == "list":
-            permission_classes = [
-                IsAuthenticated,
-                AnyQueueAgentPermission,
-            ]
+    # def get_permissions(self):
+    #     permission_classes = self.permission_classes
+    #     if self.action == "list":
+    #         permission_classes = [
+    #             IsAuthenticated,
+    #             AnyQueueAgentPermission,
+    #         ]
 
-        return [permission() for permission in permission_classes]
+    #     return [permission() for permission in permission_classes]
 
     def get_queryset(self):
         if self.action != "list":
@@ -73,7 +74,7 @@ class QueueViewset(ModelViewSet):
 
     def perform_destroy(self, instance):
         if not settings.USE_WENI_FLOWS:
-            return super().perform_destroy(instance)
+            raise exceptions.APIException(detail=f"you cannot delete queues")
 
         response = FlowRESTClient().destroy_queue(
             str(instance.uuid), str(instance.sector.uuid)
@@ -86,7 +87,7 @@ class QueueViewset(ModelViewSet):
             raise exceptions.APIException(
                 detail=f"[{response.status_code}] Error deleting the queue on flows. Exception: {response.content}"
             )
-        return super().perform_destroy(instance)
+        raise exceptions.APIException(detail=f"you cannot delete queues")
 
 
 class QueueAuthorizationViewset(ModelViewSet):
