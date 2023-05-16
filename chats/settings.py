@@ -72,6 +72,8 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "corsheaders",
+    "django_celery_beat",
+    "django_celery_results",
 ]
 
 MIDDLEWARE = [
@@ -105,24 +107,25 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "chats.wsgi.application"
 
-# channels
 ASGI_APPLICATION = "chats.asgi.application"
-
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.pubsub.RedisPubSubChannelLayer",
-        "CONFIG": {
-            "hosts": [
-                env.str("CHANNEL_LAYERS_REDIS", default="redis://127.0.0.1:6379/1")
-            ],
-        },
-    },
-}
 
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
 DATABASES = dict(default=env.db(var="DATABASE_URL"))
+
+REDIS_URL = env.str("CHANNEL_LAYERS_REDIS", default="redis://localhost:6379/1")
+
+# channels
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.pubsub.RedisPubSubChannelLayer",
+        "CONFIG": {
+            "hosts": [REDIS_URL],
+        },
+    },
+}
 
 # User
 
@@ -329,3 +332,12 @@ UNPERMITTED_AUDIO_TYPES = env.list(
 )
 
 CHATS_FLOWS_TAG = env.str("CHATS_FLOWS_TAG", default="chats")
+
+# Celery
+
+CELERY_BROKER_URL = env.str("CELERY_BROKER_URL", default=REDIS_URL)
+CELERY_RESULT_BACKEND = env.str("CELERY_RESULT_BACKEND", default="django-db")
+CELERY_ACCEPT_CONTENT = ["application/json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = TIME_ZONE

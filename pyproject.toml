@@ -53,6 +53,9 @@ pylint = "v2.8.3"
 pandas = "^2.0.1"
 openpyxl = "^3.1.2"
 XlsxWriter = "^3.1.0"
+celery = "^5.2.7"
+django-celery-results = "^2.5.1"
+django-celery-beat = "^2.5.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
