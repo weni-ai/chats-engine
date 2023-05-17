@@ -1,6 +1,5 @@
 from django.conf import settings
 from django_filters.rest_framework import DjangoFilterBackend
-from requests import Response
 from rest_framework import exceptions, filters, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ModelViewSet
@@ -73,8 +72,9 @@ class QueueViewset(ModelViewSet):
         return instance
 
     def perform_destroy(self, instance):
+        raise exceptions.APIException(detail=f"you cannot delete queues")
         if not settings.USE_WENI_FLOWS:
-            raise exceptions.APIException(detail=f"you cannot delete queues")
+            return super().perform_destroy(instance)
 
         response = FlowRESTClient().destroy_queue(
             str(instance.uuid), str(instance.sector.uuid)
@@ -87,7 +87,7 @@ class QueueViewset(ModelViewSet):
             raise exceptions.APIException(
                 detail=f"[{response.status_code}] Error deleting the queue on flows. Exception: {response.content}"
             )
-        raise exceptions.APIException(detail=f"you cannot delete queues")
+        return super().perform_destroy(instance)
 
 
 class QueueAuthorizationViewset(ModelViewSet):
