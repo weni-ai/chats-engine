@@ -16,13 +16,15 @@ class QueueSerializer(serializers.ModelSerializer):
         """
         if self.instance:
             if Queue.objects.filter(
-                sector=self.instance.sector, name=data["name"]
+                sector=self.instance.sector, is_deleted=False, name=data["name"]
             ).exists():
                 raise serializers.ValidationError(
                     {"detail": _("This queue already exists.")}
                 )
         else:
-            if Queue.objects.filter(sector=data["sector"], name=data["name"]).exists():
+            if Queue.objects.filter(
+                sector=data["sector"], name=data["name"], is_deleted=False
+            ).exists():
                 raise serializers.ValidationError(
                     {"detail": _("This queue already exists.")}
                 )

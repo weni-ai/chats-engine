@@ -126,7 +126,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             )
 
         if queue is None and sector is not None:
-            queue = Queue.objects.filter(sector__uuid=sector).first()
+            queue = Queue.objects.filter(sector__uuid=sector, is_deleted=False).first()
 
         sector = queue.sector
 

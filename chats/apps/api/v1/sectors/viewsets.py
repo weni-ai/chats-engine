@@ -25,7 +25,7 @@ from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 
 
 class SectorViewset(viewsets.ModelViewSet):
-    queryset = Sector.objects.all()
+    queryset = Sector.objects.exclude(is_deleted=True)
     serializer_class = sector_serializers.SectorSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = SectorFilter
@@ -105,6 +105,7 @@ class SectorViewset(viewsets.ModelViewSet):
                 Sector.objects.filter(
                     project=project,
                     queues__authorizations__permission__user=request.user,
+                    is_deleted=False,
                 )
                 .distinct()
                 .count()

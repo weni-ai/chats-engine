@@ -11,7 +11,7 @@ from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 
 
 class SectorInternalViewset(viewsets.ModelViewSet):
-    queryset = Sector.objects.all()
+    queryset = Sector.objects.exclude(is_deleted=True)
     serializer_class = sector_serializers.SectorSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = SectorFilter
