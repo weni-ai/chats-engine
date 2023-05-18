@@ -144,7 +144,7 @@ class SectorAgentReadOnlyListPermission(permissions.BasePermission):
             return False
         try:
             sector_queue = Queue.objects.filter(
-                sector=request.query_params.get("sector"), is_deleted=False
+                sector=request.query_params.get("sector")
             ).first()
             authorization = sector_queue.get_permission(request.user)
         except Queue.DoesNotExist:
@@ -180,9 +180,7 @@ class SectorAddQueuePermission(permissions.BasePermission):
         if isinstance(request.user, AnonymousUser):
             return False
         try:
-            sector_queue = Queue.objects.filter(
-                sector=request.data["sector"], is_deleted=False
-            ).first()
+            sector_queue = Queue.objects.filter(sector=request.data["sector"]).first()
             authorization = sector_queue.get_permission(request.user)
         except Queue.DoesNotExist:
             return False

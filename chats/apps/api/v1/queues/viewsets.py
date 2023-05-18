@@ -12,21 +12,27 @@ from chats.apps.queues.models import Queue, QueueAuthorization
 
 
 class QueueViewset(ModelViewSet):
-    queryset = Queue.objects.exclude(is_deleted=True)
+    queryset = Queue.objects.all()
     serializer_class = queue_serializers.QueueSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = QueueFilter
-    permission_classes = [
-        IsAuthenticated,
-        IsSectorManager,
-    ]
+    # permission_classes = [
+    #     IsAuthenticated,
+    #     IsSectorManager,
+    # ]
 
     lookup_field = "uuid"
 
     def get_queryset(self):
         if self.action != "list":
             self.filterset_class = None
-        return super().get_queryset()
+
+        qs = super().get_queryset()
+        if self.request.query_params.get("is_deleted", None) is not None:
+            qs = qs.filter(is_deleted=self.request.query_params.get("is_deleted", None))
+        else:
+            qs = qs.exclude(is_deleted=True)
+        return qs
 
     def get_serializer_class(self):
         if self.action == "list":

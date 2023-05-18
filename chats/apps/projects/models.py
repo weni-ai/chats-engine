@@ -15,7 +15,6 @@ from chats.utils.websockets import send_channels_group
 
 
 class Project(BaseModel):
-
     DATE_FORMAT_DAY_FIRST = "D"
     DATE_FORMAT_MONTH_FIRST = "M"
     DATE_FORMATS = (
@@ -202,6 +201,7 @@ class ProjectPermission(
         queue_authorization = self.queue_authorizations.get(queue__uuid=queue)
         return queue_authorization.role == 1  # 1 = agent role at QueueAuthorization
 
+    # TODO: remove soft deleted queues/sectors
     @property
     def queue_ids(self):
         if self.is_admin:

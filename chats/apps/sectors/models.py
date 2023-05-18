@@ -7,6 +7,10 @@ from django.utils.translation import gettext_lazy as _
 from chats.core.models import BaseModel, BaseSoftDeleteModel
 from chats.utils.websockets import send_channels_group
 
+from django.db.models import Value, F
+from django.db.models.functions import Concat
+
+
 User = get_user_model()
 
 
@@ -159,9 +163,9 @@ class Sector(BaseSoftDeleteModel, BaseModel):
 
     def delete(self):
         super().delete()
-
-        for queue in self.queues.filter(is_deleted=False):
-            queue.delete()
+        self.queues.filter(is_deleted=False).update(
+            is_deleted=True, name=Concat(F("name"), Value(self.deleted_sufix()))
+        )
 
 
 class SectorAuthorization(BaseModel):
@@ -233,7 +237,6 @@ class SectorAuthorization(BaseModel):
 
 
 class SectorTag(BaseModel):
-
     name = models.CharField(_("Name"), max_length=120)
     sector = models.ForeignKey(
         "sectors.Sector",

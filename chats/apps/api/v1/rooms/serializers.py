@@ -67,7 +67,7 @@ class TransferRoomSerializer(serializers.ModelSerializer):
         allow_null=True,
     )
     queue_uuid = serializers.PrimaryKeyRelatedField(
-        queryset=Queue.objects.exclude(is_deleted=True),
+        queryset=Queue.objects.all(),
         required=False,
         source="queue",
         write_only=True,

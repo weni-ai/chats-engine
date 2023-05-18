@@ -86,6 +86,13 @@ class SectorViewset(viewsets.ModelViewSet):
         serializer.save()
         serializer.instance.notify_sector("update")
 
+    def perform_destroy(self, instance):
+        instance.delete()
+        return Response(
+            {"is_deleted": True},
+            status.HTTP_200_OK,
+        )
+
     @action(detail=True, methods=["GET"])
     def agents(self, *args, **kwargs):
         instance = self.get_object()
