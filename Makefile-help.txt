@@ -1,0 +1,11 @@
+Make commands:
+    make help - Show make commands help
+    make check_environment - Check if all dependencies was installed
+    make install - Install all dependencies and start the application
+    make lint - Show lint warnings and errors
+    make test - Run unit tests and show coverage report
+    make migrate - Update DB shema, apply migrations
+    make migrations - Make the new migrations and run migrate
+    make add_initial_data - Populate the DB with fixture data
+    make dev_up - Run postgres and redis on docker-compose
+    make dev_down - Stop the docker-compose run

@@ -108,11 +108,12 @@ class FlowsContactsAndGroupsMixin:
         }
         return headers
 
-    def list_contacts(self, project, cursor: str = ""):
+    def list_contacts(self, project, cursor: str = "", query_filters: dict = {}):
         response = retry_request_and_refresh_flows_auth_token(
             project=project,
             request_method=requests.get,
             headers=self.project_headers(project.flows_authorization),
+            params=query_filters,
             url=f"{self.base_url}/api/v2/contacts.json?cursor={cursor}",
         )
         contacts = response.json()
@@ -130,11 +131,12 @@ class FlowsContactsAndGroupsMixin:
         )
         return response.json()
 
-    def list_contact_groups(self, project, cursor: str = ""):
+    def list_contact_groups(self, project, cursor: str = "", query_filters: dict = {}):
         response = retry_request_and_refresh_flows_auth_token(
             project=project,
             request_method=requests.get,
             headers=self.project_headers(project.flows_authorization),
+            params=query_filters,
             url=f"{self.base_url}/api/v2/groups.json?cursor={cursor}",
         )
         groups = response.json()

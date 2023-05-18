@@ -12,10 +12,13 @@ from chats.apps.api.v1.prometheus.metrics import (
 )
 from chats.apps.queues.models import QueueAuthorization
 
+from django.conf import settings
 
-@receiver([post_save, post_delete], sender=QueueAuthorization)
-def queueauthorization_metrics_sender(sender, instance, **kwargs):
-    Metrics()
+
+if settings.USE_PROMETHEUS_METRICS:
+    @receiver([post_save, post_delete], sender=QueueAuthorization)
+    def queueauthorization_metrics_sender(sender, instance, **kwargs):
+        Metrics()
 
 
 class Metrics:

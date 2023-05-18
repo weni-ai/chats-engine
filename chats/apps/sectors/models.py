@@ -114,7 +114,7 @@ class Sector(BaseSoftDeleteModel, BaseModel):
         return User.objects.filter(
             project_permissions__project=self.project,
             project_permissions__queue_authorizations__isnull=False,
-        )
+        ).distinct()
 
     @property
     def contact_count(self):
@@ -148,25 +148,11 @@ class Sector(BaseSoftDeleteModel, BaseModel):
     def get_permission(self, user):
         return self.project.permissions.get(user=user)
 
-    def notify_sector(self, action):
-        """ """
-        send_channels_group(
-            group_name=f"sector_{self.pk}",
-            call_type="notify",
-            content=self.serialized_ws_data,
-            action=f"sector.{action}",
-        )
-
-    def add_users_group(self):
-        for auth in self.authorizations.filter(role__gte=1):
-            auth.notify_user("created")
-
     def delete(self):
         super().delete()
         self.queues.filter(is_deleted=False).update(
             is_deleted=True, name=Concat(F("name"), Value(self.deleted_sufix()))
         )
-
 
 class SectorAuthorization(BaseModel):
     ROLE_NOT_SETTED = 0
@@ -229,7 +215,7 @@ class SectorAuthorization(BaseModel):
     def notify_user(self, action):
         """ """
         send_channels_group(
-            group_name=f"user_{self.permission.user.pk}",
+            group_name=f"permission_{self.permission.user.pk}",
             call_type="notify",
             content=self.serialized_ws_data,
             action=f"sector_authorization.{action}",

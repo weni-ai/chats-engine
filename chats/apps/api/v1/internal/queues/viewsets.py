@@ -40,14 +40,11 @@ class QueueInternalViewset(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save()
-        # serializer.instance.notify_sector("create")
 
     def perform_update(self, serializer):
         serializer.save()
-        # serializer.instance.notify_sector("update")
 
     def perform_destroy(self, instance):
-        # instance.notify_sector("destroy")
         instance.is_deleted = True
         instance.save()
         return Response(
@@ -84,14 +81,11 @@ class QueueAuthInternalViewset(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save()
-        # serializer.instance.notify_sector("create")
 
     def perform_update(self, serializer):
         serializer.save()
-        # serializer.instance.notify_sector("update")
 
     def perform_destroy(self, instance):
-        # instance.notify_sector("destroy")
         instance.is_deleted = True
         instance.save()
         return Response(

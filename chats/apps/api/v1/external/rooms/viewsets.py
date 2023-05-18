@@ -64,6 +64,7 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         try:
             return super().create(request, *args, **kwargs)
+
         except IntegrityError:
             return Response(
                 {
@@ -74,14 +75,17 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save()
-        instance = add_user_or_queue_to_room(serializer.instance, self.request)
-
-        if instance.user:
-            instance.user_connection(action="join")
-            instance.notify_user("create")
+        if serializer.instance.flowstarts.exists():
+            instance = serializer.instance
+            notification_type = "update"
         else:
-            instance.queue_connection(action="join")
-            instance.notify_queue("create")
+            instance = add_user_or_queue_to_room(serializer.instance, self.request)
+            notification_type = "create"
+
+        notify_level = "user" if instance.user else "queue"
+
+        notification_method = getattr(instance, f"notify_{notify_level}")
+        notification_method(notification_type)
 
     def perform_update(self, serializer):
         serializer.save()
