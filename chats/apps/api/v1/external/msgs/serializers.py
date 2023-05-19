@@ -65,25 +65,27 @@ class MsgFlowSerializer(serializers.ModelSerializer):
         medias = validated_data.pop("attachments")
         room = validated_data.get("room")
         text = validated_data.get("text")
+
         if text is None and medias == []:
             raise exceptions.APIException(
                 detail="Cannot create message without text or media"
             )
         if direction == "incoming":
             validated_data["contact"] = room.contact
-            if room.is_waiting:
-                room.is_waiting = False
-                room.save()
-                room.notify_room("update")
 
         is_waiting = room.get_is_waiting()
+        was_24h_valid = room.is_24h_valid
         msg = super().create(validated_data)
         media_list = [MessageMedia(**media_data, message=msg) for media_data in medias]
         medias = MessageMedia.objects.bulk_create(media_list)
-        if (
-            is_waiting and direction == "incoming"
-        ):  # This condition has to be executed after the message is created
-            room.is_waiting = False
-            room.save()
-            room.notify_room("update")
+
+        if direction == "incoming":
+            validated_data["contact"] = room.contact
+            if is_waiting:
+                room.is_waiting = False
+                room.save()
+                room.notify_room("update")
+            elif not was_24h_valid:
+                room.notify_room("update")
+
         return msg

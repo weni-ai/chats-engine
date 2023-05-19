@@ -1,4 +1,5 @@
 from dateutil.relativedelta import relativedelta
+from django.conf import settings
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django.utils import timezone
@@ -12,21 +13,11 @@ from chats.apps.api.v1.prometheus.metrics import (
 )
 from chats.apps.msgs.models import Message as ChatMessage
 
+if settings.USE_PROMETHEUS_METRICS:
 
-@receiver(post_save, sender=ChatMessage)
-def send_websocket_message_notification(sender, instance, created, **kwargs):
-    pass
-    # if created:
-    #     channel_layer = get_channel_layer()
-    #     async_to_sync(channel_layer.group_send)(
-    #         f"service_{instance.room.pk}",
-    #         {"type": "room_messages", "message": json.dumps(instance)},
-    #     )
-
-
-@receiver([post_save, post_delete], sender=ChatMessage)
-def msgs_metrics_sender(sender, instance, **kwargs):
-    Metrics()
+    @receiver([post_save, post_delete], sender=ChatMessage)
+    def msgs_metrics_sender(sender, instance, **kwargs):
+        Metrics()
 
 
 class Metrics:

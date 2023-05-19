@@ -6,6 +6,9 @@ from chats.apps.queues.models import Queue, QueueAuthorization
 
 
 class QueueSerializer(serializers.ModelSerializer):
+
+    sector_name = serializers.CharField(source="sector.name", read_only=True)
+
     class Meta:
         model = Queue
         fields = "__all__"
@@ -14,18 +17,24 @@ class QueueSerializer(serializers.ModelSerializer):
         """
         Check if queue already exist in sector.
         """
-        if self.instance:
-            if Queue.objects.filter(
-                sector=self.instance.sector, name=data["name"]
-            ).exists():
+        name = data.get("name")
+        if name:
+            if name == "":
                 raise serializers.ValidationError(
-                    {"detail": _("This queue already exists.")}
+                    {"detail": _("The name field can't be blank.")}
                 )
-        else:
-            if Queue.objects.filter(sector=data["sector"], name=data["name"]).exists():
-                raise serializers.ValidationError(
-                    {"detail": _("This queue already exists.")}
-                )
+            if self.instance:
+                if Queue.objects.filter(
+                    sector=self.instance.sector, name=name
+                ).exists():
+                    raise serializers.ValidationError(
+                        {"detail": _("This queue already exists.")}
+                    )
+            else:
+                if Queue.objects.filter(sector=data["sector"], name=name).exists():
+                    raise serializers.ValidationError(
+                        {"detail": _("This queue already exists.")}
+                    )
         return data
 
 
@@ -39,10 +48,11 @@ class QueueUpdateSerializer(serializers.ModelSerializer):
 
 class QueueReadOnlyListSerializer(serializers.ModelSerializer):
     agents = serializers.SerializerMethodField()
+    sector_name = serializers.CharField(source="sector.name", read_only=True)
 
     class Meta:
         model = Queue
-        fields = ["uuid", "name", "agents", "created_on"]
+        fields = ["uuid", "name", "agents", "created_on", "sector_name"]
 
     def get_agents(self, queue: Queue):
         return queue.agent_count

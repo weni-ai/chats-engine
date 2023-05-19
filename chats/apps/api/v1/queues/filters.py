@@ -9,6 +9,16 @@ class QueueFilter(filters.FilterSet):
         model = Queue
         fields = ["sector"]
 
+    project = filters.CharFilter(
+        field_name="project",
+        required=False,
+        method="filter_project",
+        help_text=_("Project's UUID"),
+    )
+
+    def filter_project(self, queryset, name, value):
+        return queryset.filter(sector__project=value)
+
 
 class QueueAuthorizationFilter(filters.FilterSet):
     class Meta:

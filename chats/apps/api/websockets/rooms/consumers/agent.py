@@ -41,10 +41,9 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             except ObjectDoesNotExist:
                 close = True
             if close:
-                await self.close()  # TODO validate if the code continues from this or if it stops here
+                await self.close()
             else:
                 await self.accept()
-                await self.load_rooms()
                 await self.load_queues()
                 await self.load_user()
                 self.last_ping = timezone.now()
@@ -215,7 +214,4 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
 
     async def load_user(self, *args, **kwargs):
         """Enter user notification group"""
-        await self.join(
-            {"name": "user", "id": self.user.id}
-        )  # Group name must be a valid unicode string containing only ASCII alphanumerics, hyphens, or periods.
         await self.join({"name": "permission", "id": str(self.permission.pk)})

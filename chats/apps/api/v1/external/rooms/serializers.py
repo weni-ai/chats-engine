@@ -15,6 +15,26 @@ from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 
 
+def get_active_room_flow_start(contact, flow_uuid, project):
+    query_filters = {
+        "references__external_id": contact.external_id,
+        "flow": flow_uuid,
+        "room__isnull": False,
+        "is_deleted": False,
+    }
+    flow_start = (
+        project.flowstarts.filter(**query_filters).order_by("-created_on").first()
+    )
+    try:
+        if flow_start.room.is_active is True:
+            flow_start.is_deleted = True
+            flow_start.save()
+            return flow_start.room
+    except AttributeError:
+        return None
+    return None
+
+
 def get_room_user(
     contact: Contact,
     queue: Queue,
@@ -78,6 +98,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
     queue = QueueSerializer(many=False, required=False, read_only=True)
     contact = ContactRelationsSerializer(many=False, required=False, read_only=False)
     flow_uuid = serializers.CharField(required=False, write_only=True, allow_null=True)
+    is_anon = serializers.BooleanField(write_only=True, required=False, default=False)
 
     class Meta:
         model = Room
@@ -98,6 +119,8 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             "callback_url",
             "is_waiting",
             "flow_uuid",
+            "urn",
+            "is_anon",
         ]
         read_only_fields = [
             "uuid",
@@ -106,11 +129,11 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             "ended_at",
             "is_active",
             "transfer_history",
-            "urn",
         ]
         extra_kwargs = {"queue": {"required": False, "read_only": True}}
 
     def create(self, validated_data):
+        is_anon = validated_data.pop("is_anon")
         try:
             queue = (
                 None if not validated_data.get("queue") else validated_data.pop("queue")
@@ -151,12 +174,15 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         if contact_data.get("urn"):
             urn = contact_data.pop("urn").split("?")[0]
-            if contact_data.get("name") is not None:
+            if not is_anon:
                 validated_data["urn"] = urn
         contact, created = Contact.objects.update_or_create(
             external_id=contact_external_id, defaults=contact_data
         )
 
+        room = get_active_room_flow_start(contact, flow_uuid, project)
+        if room is not None:
+            return room
         validated_data["user"] = get_room_user(
             contact, queue, user, groups, created, flow_uuid, project
         )

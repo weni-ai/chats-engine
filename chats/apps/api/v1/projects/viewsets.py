@@ -1,4 +1,4 @@
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
@@ -29,6 +29,7 @@ from chats.apps.projects.models import (
     Project,
     ProjectPermission,
 )
+from chats.apps.rooms.models import Room
 
 
 class ProjectViewset(viewsets.ReadOnlyModelViewSet):
@@ -157,7 +158,9 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
     def list_contacts(self, request, *args, **kwargs):
         project = self.get_object()
         cursor = request.query_params.get("cursor", "")
-        contact_list = FlowRESTClient().list_contacts(project, cursor=cursor)
+        contact_list = FlowRESTClient().list_contacts(
+            project, cursor=cursor, query_filters=request.query_params
+        )
 
         return Response(contact_list, status.HTTP_200_OK)
 
@@ -180,7 +183,9 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         project = self.get_object()
         cursor = request.query_params.get("cursor", "")
 
-        contact_list = FlowRESTClient().list_contact_groups(project, cursor=cursor)
+        contact_list = FlowRESTClient().list_contact_groups(
+            project, cursor=cursor, query_filters=request.query_params
+        )
 
         return Response(contact_list, status.HTTP_200_OK)
 
@@ -222,7 +227,12 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
 
         flow_start.references.bulk_create(instances)
 
-    @action(detail=True, methods=["POST"], url_name="flows")
+    @action(
+        detail=True,
+        methods=["POST"],
+        url_name="flows",
+        serializer_class=ProjectFlowStartSerializer,
+    )
     def start_flow(self, request, *args, **kwargs):
         project = self.get_object()
         serializer = ProjectFlowStartSerializer(data=request.data)
@@ -241,13 +251,32 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
                 {"Detail": "the user does not have permission in this project"},
                 status.HTTP_401_UNAUTHORIZED,
             )
-        chats_flow_start = project.flowstarts.create(permission=perm, flow=flow)
 
+        flow_start_data = {"permission": perm, "flow": flow}
+        room_id = data.get("room", None)
+
+        try:
+            room = Room.objects.get(pk=room_id, is_active=True)
+            if room.flowstarts.filter(is_deleted=False).exists():
+                return Response(
+                    {"Detail": "There already is an active flow start for this room"},
+                    status.HTTP_400_BAD_REQUEST,
+                )
+            if not room.is_24h_valid:
+                flow_start_data["room"] = room
+                room.request_callback(room.serialized_ws_data)
+        except (ObjectDoesNotExist, ValidationError):
+            pass
+
+        chats_flow_start = project.flowstarts.create(**flow_start_data)
         self._create_flow_start_instances(data, chats_flow_start)
 
         flow_start = FlowRESTClient().start_flow(project, data)
         chats_flow_start.external_id = flow_start.get("uuid")
+        chats_flow_start.name = flow_start.get("flow").get("name")
         chats_flow_start.save()
+        if chats_flow_start.room:
+            room.notify_room("update")
         return Response(flow_start, status.HTTP_200_OK)
 
 

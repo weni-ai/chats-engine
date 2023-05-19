@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ModelViewSet
 
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
-from chats.apps.api.v1.permissions import IsSectorManager
+from chats.apps.api.v1.permissions import AnyQueueAgentPermission, IsSectorManager
 from chats.apps.api.v1.queues import serializers as queue_serializers
 from chats.apps.api.v1.queues.filters import QueueAuthorizationFilter, QueueFilter
 from chats.apps.queues.models import Queue, QueueAuthorization
@@ -22,6 +22,16 @@ class QueueViewset(ModelViewSet):
     # ]
 
     lookup_field = "uuid"
+
+    def get_permissions(self):
+        permission_classes = self.permission_classes
+        if self.action == "list":
+            permission_classes = [
+                IsAuthenticated,
+                AnyQueueAgentPermission,
+            ]
+
+        return [permission() for permission in permission_classes]
 
     def get_queryset(self):
         if self.action != "list":
@@ -68,6 +78,7 @@ class QueueViewset(ModelViewSet):
         return instance
 
     def perform_destroy(self, instance):
+        raise exceptions.APIException(detail=f"you cannot delete queues")
         if not settings.USE_WENI_FLOWS:
             return super().perform_destroy(instance)
 

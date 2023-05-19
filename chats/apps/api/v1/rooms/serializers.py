@@ -1,3 +1,4 @@
+from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
 from rest_framework import serializers
 
 from chats.apps.accounts.models import User
@@ -7,6 +8,16 @@ from chats.apps.api.v1.queues.serializers import QueueSerializer
 from chats.apps.api.v1.sectors.serializers import DetailSectorTagSerializer
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
+
+
+class RoomMessageStatusSerializer(serializers.Serializer):
+    seen = serializers.BooleanField(required=False, default=True)
+    messages = serializers.ListField(
+        child=serializers.CharField(required=False),
+        max_length=200,
+        allow_empty=True,
+        default=[],
+    )
 
 
 class RoomSerializer(serializers.ModelSerializer):
@@ -19,6 +30,8 @@ class RoomSerializer(serializers.ModelSerializer):
     is_waiting = serializers.SerializerMethodField()
     linked_user = serializers.SerializerMethodField()
     is_24h_valid = serializers.SerializerMethodField()
+    flowstart_data = serializers.SerializerMethodField()
+    last_interaction = serializers.DateTimeField(read_only=True)
 
     class Meta:
         model = Room
@@ -30,10 +43,22 @@ class RoomSerializer(serializers.ModelSerializer):
             "urn",
             "linked_user",
             "is_24h_valid",
+            "last_interaction",
         ]
 
     def get_is_24h_valid(self, room: Room) -> bool:
         return room.is_24h_valid
+
+    def get_flowstart_data(self, room: Room) -> bool:
+        try:
+            flowstart = room.flowstarts.get(is_deleted=False)
+        except (ObjectDoesNotExist, MultipleObjectsReturned):
+            return {}
+        return {
+            "name": flowstart.name,
+            "is_deleted": flowstart.is_deleted,
+            "created_on": flowstart.created_on,
+        }
 
     def get_linked_user(self, room: Room):
         try:
