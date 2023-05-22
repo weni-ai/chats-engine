@@ -17,7 +17,7 @@ def get_permission_token_from_request(request):
 
 class QueueFlowViewset(viewsets.ReadOnlyModelViewSet):
     model = Queue
-    queryset = Queue.objects.all()
+    queryset = Queue.objects.exclude(is_deleted=True)
     serializer_class = QueueFlowSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = QueueFlowFilter
