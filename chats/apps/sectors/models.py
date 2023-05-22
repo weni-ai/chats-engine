@@ -4,13 +4,16 @@ from django.db import models
 from django.db.models import F, Q
 from django.utils.translation import gettext_lazy as _
 
-from chats.core.models import BaseModel
+from chats.core.models import BaseModel, BaseSoftDeleteModel
 from chats.utils.websockets import send_channels_group
+
+from django.db.models import Value, F
+from django.db.models.functions import Concat
 
 User = get_user_model()
 
 
-class Sector(BaseModel):
+class Sector(BaseSoftDeleteModel, BaseModel):
     name = models.CharField(_("name"), max_length=120)
     project = models.ForeignKey(
         "projects.Project",
@@ -144,6 +147,12 @@ class Sector(BaseModel):
     def get_permission(self, user):
         return self.project.permissions.get(user=user)
 
+    def delete(self):
+        super().delete()
+        self.queues.filter(is_deleted=False).update(
+            is_deleted=True, name=Concat(F("name"), Value(self.deleted_sufix()))
+        )
+
 
 class SectorAuthorization(BaseModel):
     ROLE_NOT_SETTED = 0
@@ -214,7 +223,6 @@ class SectorAuthorization(BaseModel):
 
 
 class SectorTag(BaseModel):
-
     name = models.CharField(_("Name"), max_length=120)
     sector = models.ForeignKey(
         "sectors.Sector",

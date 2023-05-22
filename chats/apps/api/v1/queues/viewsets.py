@@ -16,10 +16,10 @@ class QueueViewset(ModelViewSet):
     serializer_class = queue_serializers.QueueSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = QueueFilter
-    permission_classes = [
-        IsAuthenticated,
-        IsSectorManager,
-    ]
+    # permission_classes = [
+    #     IsAuthenticated,
+    #     IsSectorManager,
+    # ]
 
     lookup_field = "uuid"
 
@@ -36,7 +36,13 @@ class QueueViewset(ModelViewSet):
     def get_queryset(self):
         if self.action != "list":
             self.filterset_class = None
-        return super().get_queryset()
+
+        qs = super().get_queryset()
+        if self.request.query_params.get("is_deleted", None) is not None:
+            qs = qs.filter(is_deleted=self.request.query_params.get("is_deleted", None))
+        else:
+            qs = qs.exclude(is_deleted=True)
+        return qs
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -72,7 +78,6 @@ class QueueViewset(ModelViewSet):
         return instance
 
     def perform_destroy(self, instance):
-        raise exceptions.APIException(detail=f"you cannot delete queues")
         if not settings.USE_WENI_FLOWS:
             return super().perform_destroy(instance)
 

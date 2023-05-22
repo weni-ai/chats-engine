@@ -25,7 +25,7 @@ from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 
 
 class SectorViewset(viewsets.ModelViewSet):
-    queryset = Sector.objects.all()
+    queryset = Sector.objects.exclude(is_deleted=True)
     serializer_class = sector_serializers.SectorSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = SectorFilter
@@ -58,14 +58,6 @@ class SectorViewset(viewsets.ModelViewSet):
 
         return super().get_serializer_class()
 
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        self.perform_destroy(instance)
-        return Response(
-            {"is_deleted": True},
-            status.HTTP_200_OK,
-        )
-
     def perform_create(self, serializer):
         instance = serializer.save()
 
@@ -93,8 +85,7 @@ class SectorViewset(viewsets.ModelViewSet):
         serializer.save()
 
     def perform_destroy(self, instance):
-        instance.is_deleted = True
-        instance.save()
+        instance.delete()
         return Response(
             {"is_deleted": True},
             status.HTTP_200_OK,
@@ -119,6 +110,7 @@ class SectorViewset(viewsets.ModelViewSet):
                 Sector.objects.filter(
                     project=project,
                     queues__authorizations__permission__user=request.user,
+                    is_deleted=False,
                 )
                 .distinct()
                 .count()

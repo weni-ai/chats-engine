@@ -16,7 +16,7 @@ def get_permission_token_from_request(request):
 
 class SectorFlowViewset(viewsets.ReadOnlyModelViewSet):
     model = Sector
-    queryset = Sector.objects.all()
+    queryset = Sector.objects.exclude(is_deleted=True)
     serializer_class = SectorFlowSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = [
