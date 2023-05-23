@@ -91,8 +91,9 @@ class QueueAvailableAgentsTestCase(QueueSetUpMixin, TestCase):
     def test_available_agents_returns_online_agents(self):
         self.agent_permission.status = "ONLINE"
         self.agent_permission.save()
-
-        self.assertIn(self.agent, self.queue.available_agents)
+        self.assertTrue(
+            self.queue.available_agents.filter(permission__user=self.agent).exists()
+        )
         self.assertEqual(self.queue.available_agents.count(), 1)
 
     def test_when_exceeding_limit_of_active_rooms_the_agent_is_no_longer_returned(self):
@@ -102,7 +103,9 @@ class QueueAvailableAgentsTestCase(QueueSetUpMixin, TestCase):
         self.agent_permission.status = "ONLINE"
         self.agent_permission.save()
 
-        self.assertNotIn(self.agent, self.queue.available_agents)
+        self.assertFalse(
+            self.queue.available_agents.filter(permission__user=self.agent).exists()
+        )
         self.assertEqual(self.queue.available_agents.count(), 0)
 
     def tests_if_disable_a_room_the_agent_is_still_returned(self):
@@ -113,7 +116,9 @@ class QueueAvailableAgentsTestCase(QueueSetUpMixin, TestCase):
         self.agent_permission.status = "ONLINE"
         self.agent_permission.save()
 
-        self.assertIn(self.agent, self.queue.available_agents)
+        self.assertTrue(
+            self.queue.available_agents.filter(permission__user=self.agent).exists()
+        )
 
     def test_if_2_online_agents_are_returned_in_available_agents(self):
         self.agent_permission.status = "ONLINE"
@@ -138,4 +143,6 @@ class QueueAvailableAgentsTestCase(QueueSetUpMixin, TestCase):
         self.agent_2_permission.status = "ONLINE"
         self.agent_2_permission.save()
 
-        self.assertEqual(self.agent_2, self.queue.available_agents.first())
+        self.assertEqual(
+            self.agent_2, self.queue.available_agents.first().permission.user
+        )

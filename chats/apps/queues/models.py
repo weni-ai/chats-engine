@@ -1,10 +1,7 @@
-from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from chats.core.models import BaseModel
-
-User = get_user_model()
 
 
 class Queue(BaseModel):
@@ -47,27 +44,35 @@ class Queue(BaseModel):
 
     @property
     def agents(self):
-        return User.objects.filter(
-            project_permissions__queue_authorizations__queue=self
-        )
+        return self.authorizations.all()
 
     @property
     def online_agents(self):
         return self.agents.filter(
-            project_permissions__status="ONLINE",
-            project_permissions__project=self.sector.project,
+            permission__status="ONLINE",
         )  # TODO: Set this variable to ProjectPermission.STATUS_ONLINE
 
     @property
     def available_agents(self):
         online_agents = self.online_agents.annotate(
             active_rooms_count=models.Count(
-                "rooms", filter=models.Q(rooms__is_active=True, rooms__queue=self)
+                "permission__user__rooms",
+                filter=models.Q(
+                    permission__user__rooms__is_active=True,
+                    permission__user__rooms__queue=self,
+                ),
+                distinct=True,
             )
         )
         return online_agents.filter(active_rooms_count__lt=self.limit).order_by(
             "active_rooms_count"
         )
+
+    @property
+    def available_agent(self):
+        if self.available_agents.exists():
+            return self.available_agents.first().permission.user
+        return None
 
     def get_or_create_user_authorization(self, user):
         sector_auth, created = self.authorizations.get_or_create(user=user)
