@@ -18,6 +18,8 @@ from urllib import parse
 
 
 class DashboardRoomsSerializer(serializers.ModelSerializer):
+    DASHBOARD_ROOMS_CACHE_KEY = "dashboard:{filter}:{metric}"
+
     active_chats = serializers.SerializerMethodField()
     interact_time = serializers.SerializerMethodField()
     response_time = serializers.SerializerMethodField()
@@ -31,6 +33,10 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
             "response_time",
             "waiting_time",
         ]
+
+    def __init__(self, *args, **kwargs):
+        self.redis_connection = get_redis_connection()
+        super().__init__(*args, **kwargs)
 
     def get_active_chats(self, project):
         rooms_filter = {}
@@ -62,57 +68,6 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
         return active_chats
 
     def get_interact_time(self, project):
-        redis_connection = get_redis_connection()
-
-        initial_datetime = timezone.now().replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
-        rooms_filter = {}
-        rooms_filter["user__isnull"] = False
-
-        if self.context.get("start_date") and self.context.get("end_date"):
-            rooms_filter["created_on__range"] = [
-                self.context.get("start_date"),
-                self.context.get("end_date")
-                + " 23:59:59",  # TODO: USE DATETIME IN END DATE
-            ]
-        else:
-            rooms_filter["created_on__gte"] = initial_datetime
-
-        if self.context.get("agent"):
-            rooms_filter["user"] = self.context.get("agent")
-
-        if self.context.get("sector"):
-            rooms_filter["queue__sector"] = self.context.get("sector")
-            if self.context.get("tag"):
-                rooms_filter["tags__name"] = self.context.get("tag")
-        else:
-            rooms_filter["queue__sector__project"] = project
-
-        rooms_filter_interact_time_key = parse.urlencode(rooms_filter)
-
-        redis_interact_time_value = redis_connection.get(rooms_filter_interact_time_key)
-
-        print(rooms_filter_interact_time_key)
-        if redis_interact_time_value:
-            return float(redis_interact_time_value)
-
-        metrics_rooms_count = Room.objects.filter(**rooms_filter).count()
-        interaction = Room.objects.filter(**rooms_filter).aggregate(
-            interaction_time=Sum("metric__interaction_time")
-        )
-
-        if interaction and metrics_rooms_count > 0:
-            interaction_time = interaction["interaction_time"] / metrics_rooms_count
-        else:
-            interaction_time = 0
-
-        redis_connection.set(rooms_filter_interact_time_key, interaction_time, 10)
-        return interaction_time
-
-    def get_response_time(self, project):
-        redis_connection = get_redis_connection()
-
         initial_datetime = timezone.now().replace(
             hour=0, minute=0, second=0, microsecond=0
         )
@@ -138,29 +93,32 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
         else:
             rooms_filter["queue__sector__project__uuid"] = project.uuid
 
-        rooms_filter_response_time_key = parse.urlencode(rooms_filter)
+        rooms_filter_interact_time_key = self.DASHBOARD_ROOMS_CACHE_KEY.format(
+            filter=parse.urlencode(rooms_filter), metric="interact_time"
+        )
 
-        redis_response_time_value = redis_connection.get(rooms_filter_response_time_key)
-
-        print(rooms_filter_response_time_key)
-        if redis_response_time_value:
-            return float(redis_response_time_value)
+        redis_interact_time_value = self.redis_connection.get(
+            rooms_filter_interact_time_key
+        )
+        if redis_interact_time_value:
+            return float(redis_interact_time_value)
 
         metrics_rooms_count = Room.objects.filter(**rooms_filter).count()
         interaction = Room.objects.filter(**rooms_filter).aggregate(
-            message_response_time=Sum("metric__message_response_time")
+            interaction_time=Sum("metric__interaction_time")
         )
+
         if interaction and metrics_rooms_count > 0:
-            response_time = interaction["message_response_time"] / metrics_rooms_count
+            interaction_time = interaction["interaction_time"] / metrics_rooms_count
         else:
-            response_time = 0
+            interaction_time = 0
 
-        redis_connection.set(rooms_filter_response_time_key, response_time, 10)
-        return response_time
+        self.redis_connection.set(
+            rooms_filter_interact_time_key, interaction_time, 1 * 60 * 60
+        )
+        return interaction_time
 
-    def get_waiting_time(self, project):
-        redis_connection = get_redis_connection()
-
+    def get_response_time(self, project):
         initial_datetime = timezone.now().replace(
             hour=0, minute=0, second=0, microsecond=0
         )
@@ -184,13 +142,67 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
             if self.context.get("tag"):
                 rooms_filter["tags__name"] = self.context.get("tag")
         else:
-            rooms_filter["queue__sector__project"] = project
+            rooms_filter["queue__sector__project__uuid"] = project.uuid
 
-        rooms_filter_waiting_time_key = parse.urlencode(rooms_filter)
+        rooms_filter_response_time_key = self.DASHBOARD_ROOMS_CACHE_KEY.format(
+            filter=parse.urlencode(rooms_filter), metric="response_time"
+        )
 
-        redis_waiting_time_value = redis_connection.get(rooms_filter_waiting_time_key)
+        redis_response_time_value = self.redis_connection.get(
+            rooms_filter_response_time_key
+        )
 
-        print(rooms_filter_waiting_time_key)
+        if redis_response_time_value:
+            return float(redis_response_time_value)
+
+        metrics_rooms_count = Room.objects.filter(**rooms_filter).count()
+        interaction = Room.objects.filter(**rooms_filter).aggregate(
+            message_response_time=Sum("metric__message_response_time")
+        )
+        if interaction and metrics_rooms_count > 0:
+            response_time = interaction["message_response_time"] / metrics_rooms_count
+        else:
+            response_time = 0
+
+        self.redis_connection.set(
+            rooms_filter_response_time_key, response_time, 1 * 60 * 60
+        )
+        return response_time
+
+    def get_waiting_time(self, project):
+        initial_datetime = timezone.now().replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        rooms_filter = {}
+        rooms_filter["user__isnull"] = False
+
+        if self.context.get("start_date") and self.context.get("end_date"):
+            rooms_filter["created_on__range"] = [
+                self.context.get("start_date"),
+                self.context.get("end_date")
+                + " 23:59:59",  # TODO: USE DATETIME IN END DATE
+            ]
+        else:
+            rooms_filter["created_on__gte"] = initial_datetime
+
+        if self.context.get("agent"):
+            rooms_filter["user"] = self.context.get("agent")
+
+        if self.context.get("sector"):
+            rooms_filter["queue__sector"] = self.context.get("sector")
+            if self.context.get("tag"):
+                rooms_filter["tags__name"] = self.context.get("tag")
+        else:
+            rooms_filter["queue__sector__project__uuid"] = project.uuid
+
+        rooms_filter_waiting_time_key = self.DASHBOARD_ROOMS_CACHE_KEY.format(
+            filter=parse.urlencode(rooms_filter), metric="waiting_time"
+        )
+
+        redis_waiting_time_value = self.redis_connection.get(
+            rooms_filter_waiting_time_key
+        )
+
         if redis_waiting_time_value:
             return float(redis_waiting_time_value)
 
@@ -204,7 +216,9 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
         else:
             waiting_time = 0
 
-        redis_connection.set(rooms_filter_waiting_time_key, waiting_time, 10)
+        self.redis_connection.set(
+            rooms_filter_waiting_time_key, waiting_time, 1 * 60 * 60
+        )
         return waiting_time
 
 
