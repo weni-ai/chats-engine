@@ -188,3 +188,24 @@ class DashboardTests(APITestCase):
         metric = RoomMetrics.objects.get(room=room_closed)
 
         self.assertEqual(metric.waiting_time, 3)
+
+    def test_dashboard_model_name_property(self):
+        url = reverse("external_rooms-list")
+        client = self.client
+        client.credentials(
+            HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380"
+        )
+        data = {
+            "queue_uuid": str(self.queue_1.uuid),
+            "contact": {
+                "external_id": "e3955fd5-5705-40cd-b480-b45594b70282",
+                "name": "Foo Bar",
+                "email": "FooBar@weni.ai",
+                "phone": "+250788123123",
+                "custom_fields": {},
+            },
+        }
+        client.post(url, data=data, format="json")
+        room_metric = RoomMetrics.objects.get(room__queue__uuid=data["queue_uuid"])
+
+        self.assertEqual(room_metric.__str__(), "FRONTEND")
