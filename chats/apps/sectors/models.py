@@ -57,7 +57,9 @@ class Sector(BaseModel):
 
     @property
     def employee_pks(self):
-        return list(self.authorizations.all().values_list("user__pk", flat="True"))
+        return list(
+            self.authorizations.all().values_list("permission__user__pk", flat="True")
+        )
 
     @property
     def rooms(self):
@@ -214,7 +216,6 @@ class SectorAuthorization(BaseModel):
 
 
 class SectorTag(BaseModel):
-
     name = models.CharField(_("Name"), max_length=120)
     sector = models.ForeignKey(
         "sectors.Sector",
