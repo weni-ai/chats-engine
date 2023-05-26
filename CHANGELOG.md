@@ -1,4 +1,9 @@
 
+# 1.16.2
+## Change
+  - Compare rooms within the sector instead of the queues when validating the agent room limit on room creation.
+
+
 # 1.16.1
 ## Change
   - Remove Room, User and Sector notification groups.
