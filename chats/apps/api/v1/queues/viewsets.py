@@ -72,7 +72,7 @@ class QueueViewset(ModelViewSet):
         return instance
 
     def perform_destroy(self, instance):
-        raise exceptions.APIException(detail=f"you cannot delete queues")
+        raise exceptions.APIException(detail="you cannot delete queues")
         if not settings.USE_WENI_FLOWS:
             return super().perform_destroy(instance)
 
