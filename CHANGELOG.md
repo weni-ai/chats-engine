@@ -1,3 +1,7 @@
+# 1.16.4
+## Add
+  - Data exporter getting data from dashboard serializers.
+  - New abstract model for soft delete in core (BaseSoftDeleteModel) to Sectors and Queues
 
 # 1.16.2
 ## Change
