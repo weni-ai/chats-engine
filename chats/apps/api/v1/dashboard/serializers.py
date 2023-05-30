@@ -1,385 +1,167 @@
 from urllib import parse
 
 from django.conf import settings
-from django.db.models import Avg, Count, Q, Sum
+from django.db.models import (
+    Avg,
+    Count,
+    F,
+    Q,
+    Sum,
+)
 from django.utils import timezone
 from django_redis import get_redis_connection
 from rest_framework import serializers
 
-from chats.apps.projects.models import Project, ProjectPermission
-from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
-from chats.apps.sectors.models import Sector
+from chats.apps.dashboard.models import RoomMetrics
 
 
-class DashboardRoomsSerializer(serializers.ModelSerializer):
+def dashboard_general_data(context: dict, project):
     DASHBOARD_ROOMS_CACHE_KEY = "dashboard:{filter}:{metric}"
+    redis_connection = get_redis_connection()
 
-    active_chats = serializers.SerializerMethodField()
-    interact_time = serializers.SerializerMethodField()
-    response_time = serializers.SerializerMethodField()
-    waiting_time = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Room
-        fields = [
-            "active_chats",
-            "interact_time",
-            "response_time",
-            "waiting_time",
+    initial_datetime = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    rooms_filter = {}
+    active_chat_filter = {}
+    rooms_filter["user__isnull"] = False
+    if context.get("start_date") and context.get("end_date"):
+        rooms_filter["created_on__range"] = [
+            context.get("start_date"),
+            context.get("end_date") + " 23:59:59",  # TODO: USE DATETIME IN END DATE
         ]
+        active_chat_filter["is_active"] = False
+        active_chat_filter["user__isnull"] = False
+    else:
+        rooms_filter["created_on__gte"] = initial_datetime
+        # live active_chat_filter does not use the created on filter, as rooms can be delayed from older
+        active_chat_filter["user__isnull"] = False
+        active_chat_filter["is_active"] = True
 
-    def __init__(self, *args, **kwargs):
-        self.redis_connection = get_redis_connection()
-        super().__init__(*args, **kwargs)
+    if context.get("agent"):
+        rooms_filter["user"] = context.get("agent")
 
-    def get_active_chats(self, project):
-        rooms_filter = {}
+    if context.get("sector"):
+        rooms_filter["queue__sector"] = context.get("sector")
+        if context.get("tag"):
+            rooms_filter["tags__name"] = context.get("tag")
+    else:
+        rooms_filter["queue__sector__project"] = project
 
-        if self.context.get("start_date") and self.context.get("end_date"):
-            rooms_filter["created_on__range"] = [
-                self.context.get("start_date"),
-                self.context.get("end_date")
-                + " 23:59:59",  # TODO: USE DATETIME IN END DATE
-            ]
-            rooms_filter["is_active"] = False
-            rooms_filter["user__isnull"] = False
-        else:
-            rooms_filter["user__isnull"] = False
-            rooms_filter["is_active"] = True
+    interact_time_agg = Avg("metric__interaction_time")
+    message_response_time_agg = Avg("metric__message_response_time")
+    waiting_time_agg = Avg("metric__waiting_time")
 
-        if self.context.get("agent"):
-            rooms_filter["user"] = self.context.get("agent")
+    rooms_filter_general_time_key = DASHBOARD_ROOMS_CACHE_KEY.format(
+        filter=parse.urlencode(rooms_filter), metric="general_time"
+    )
+    redis_general_time_value = redis_connection.get(rooms_filter_general_time_key)
 
-        if self.context.get("sector"):
-            rooms_filter["queue__sector"] = self.context.get("sector")
-            if self.context.get("tag"):
-                rooms_filter["tags__name"] = self.context.get("tag")
-        else:
-            rooms_filter["queue__sector__project"] = project
+    if redis_general_time_value:
+        return float(redis_general_time_value)
 
-        active_chats = Room.objects.filter(**rooms_filter).count()
-
-        return active_chats
-
-    def get_interact_time(self, project):
-        initial_datetime = timezone.now().replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
-        rooms_filter = {}
-        rooms_filter["user__isnull"] = False
-
-        if self.context.get("start_date") and self.context.get("end_date"):
-            rooms_filter["created_on__range"] = [
-                self.context.get("start_date"),
-                self.context.get("end_date")
-                + " 23:59:59",  # TODO: USE DATETIME IN END DATE
-            ]
-        else:
-            rooms_filter["created_on__gte"] = initial_datetime
-
-        if self.context.get("agent"):
-            rooms_filter["user"] = self.context.get("agent")
-
-        if self.context.get("sector"):
-            rooms_filter["queue__sector"] = self.context.get("sector")
-            if self.context.get("tag"):
-                rooms_filter["tags__name"] = self.context.get("tag")
-        else:
-            rooms_filter["queue__sector__project"] = project.uuid
-
-        rooms_filter_interact_time_key = self.DASHBOARD_ROOMS_CACHE_KEY.format(
-            filter=parse.urlencode(rooms_filter), metric="interact_time"
-        )
-
-        redis_interact_time_value = self.redis_connection.get(
-            rooms_filter_interact_time_key
-        )
-        if redis_interact_time_value:
-            return float(redis_interact_time_value)
-
-        metrics_rooms_count = Room.objects.filter(**rooms_filter).count()
-        interaction = Room.objects.filter(**rooms_filter).aggregate(
-            interaction_time=Sum("metric__interaction_time")
-        )
-
-        if interaction and metrics_rooms_count > 0:
-            interaction_time = interaction["interaction_time"] / metrics_rooms_count
-        else:
-            interaction_time = 0
-
-        self.redis_connection.set(
-            rooms_filter_interact_time_key, interaction_time, settings.CHATS_CACHE_TIME
-        )
-
-        return interaction_time
-
-    def get_response_time(self, project):
-        initial_datetime = timezone.now().replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
-        rooms_filter = {}
-        rooms_filter["user__isnull"] = False
-
-        if self.context.get("start_date") and self.context.get("end_date"):
-            rooms_filter["created_on__range"] = [
-                self.context.get("start_date"),
-                self.context.get("end_date")
-                + " 23:59:59",  # TODO: USE DATETIME IN END DATE
-            ]
-        else:
-            rooms_filter["created_on__gte"] = initial_datetime
-
-        if self.context.get("agent"):
-            rooms_filter["user"] = self.context.get("agent")
-
-        if self.context.get("sector"):
-            rooms_filter["queue__sector"] = self.context.get("sector")
-            if self.context.get("tag"):
-                rooms_filter["tags__name"] = self.context.get("tag")
-        else:
-            rooms_filter["queue__sector__project__uuid"] = project.uuid
-
-        rooms_filter_response_time_key = self.DASHBOARD_ROOMS_CACHE_KEY.format(
-            filter=parse.urlencode(rooms_filter), metric="response_time"
-        )
-
-        redis_response_time_value = self.redis_connection.get(
-            rooms_filter_response_time_key
-        )
-
-        if redis_response_time_value:
-            return float(redis_response_time_value)
-
-        metrics_rooms_count = Room.objects.filter(**rooms_filter).count()
-        interaction = Room.objects.filter(**rooms_filter).aggregate(
-            message_response_time=Sum("metric__message_response_time")
-        )
-        if interaction and metrics_rooms_count > 0:
-            response_time = interaction["message_response_time"] / metrics_rooms_count
-        else:
-            response_time = 0
-
-        self.redis_connection.set(
-            rooms_filter_response_time_key, response_time, settings.CHATS_CACHE_TIME
-        )
-
-        return response_time
-
-    def get_waiting_time(self, project):
-        initial_datetime = timezone.now().replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
-        rooms_filter = {}
-        rooms_filter["user__isnull"] = False
-
-        if self.context.get("start_date") and self.context.get("end_date"):
-            rooms_filter["created_on__range"] = [
-                self.context.get("start_date"),
-                self.context.get("end_date")
-                + " 23:59:59",  # TODO: USE DATETIME IN END DATE
-            ]
-        else:
-            rooms_filter["created_on__gte"] = initial_datetime
-
-        if self.context.get("agent"):
-            rooms_filter["user"] = self.context.get("agent")
-
-        if self.context.get("sector"):
-            rooms_filter["queue__sector"] = self.context.get("sector")
-            if self.context.get("tag"):
-                rooms_filter["tags__name"] = self.context.get("tag")
-        else:
-            rooms_filter["queue__sector__project__uuid"] = project.uuid
-
-        rooms_filter_waiting_time_key = self.DASHBOARD_ROOMS_CACHE_KEY.format(
-            filter=parse.urlencode(rooms_filter), metric="waiting_time"
-        )
-
-        redis_waiting_time_value = self.redis_connection.get(
-            rooms_filter_waiting_time_key
-        )
-
-        if redis_waiting_time_value:
-            return float(redis_waiting_time_value)
-
-        metrics_rooms_count = Room.objects.filter(**rooms_filter).count()
-        interaction = Room.objects.filter(**rooms_filter).aggregate(
-            waiting_time=Sum("metric__waiting_time")
-        )
-
-        if interaction and metrics_rooms_count > 0:
-            waiting_time = interaction["waiting_time"] / metrics_rooms_count
-        else:
-            waiting_time = 0
-
-        self.redis_connection.set(
-            rooms_filter_waiting_time_key, waiting_time, settings.CHATS_CACHE_TIME
-        )
-
-        return waiting_time
+    general_data = Room.objects.filter(**rooms_filter).aggregate(
+        interact_time=interact_time_agg,
+        response_time=message_response_time_agg,
+        waiting_time=waiting_time_agg,
+    )
+    redis_connection.set(
+        rooms_filter_general_time_key, general_data, settings.CHATS_CACHE_TIME
+    )
+    if rooms_filter.get("created_on__gte"):
+        rooms_filter.pop("created_on__gte")
+    rooms_filter.update(active_chat_filter)
+    active_chats_count = Room.objects.filter(**rooms_filter).count()
+    # Maybe separate the active_chats_agg count into a subquery
+    general_data["active_chats"] = active_chats_count
+    return general_data
 
 
-class DashboardAgentsSerializer(serializers.Serializer):
-    project_agents = serializers.SerializerMethodField()
+# Maybe separate each serializer in it's own serializer module/file
 
-    class Meta:
-        model = Project
-        fields = [
-            "agents",
+
+def dashboard_agents_data(context, project):
+    initial_datetime = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+    rooms_filter = {}
+    closed_rooms = {}
+
+    if context.get("start_date") and context.get("end_date"):
+        rooms_filter["created_on__range"] = [
+            context.get("start_date"),
+            context.get("end_date") + " 23:59:59",  # TODO: USE DATETIME IN END DATE
         ]
+    else:
+        closed_rooms["ended_at__gte"] = initial_datetime
 
-    def get_project_agents(self, project):
-        initial_datetime = timezone.now().replace(
-            hour=0, minute=0, second=0, microsecond=0
+    if context.get("agent"):
+        rooms_filter["user"] = context.get("agent")
+
+    if context.get("sector"):
+        rooms_filter["queue__sector"] = context.get("sector")
+        if context.get("tag"):
+            rooms_filter["tags__name"] = context.get("tag")
+    else:
+        rooms_filter["queue__sector__project"] = project
+
+    agents_query = (
+        Room.objects.filter(**rooms_filter)
+        .values("user")
+        .annotate(
+            first_name=F("user__first_name"),
+            closed_room=Count("uuid", filter=Q(is_active=False, **closed_rooms)),
+            opened_rooms=Count("uuid", filter=Q(is_active=True)),
         )
+    )
 
-        rooms_filter = {}
-        closed_rooms = {}
-        permission_filter = {"project": project}
+    if not context.get("is_weni_admin"):
+        return agents_query.exclude(user__email__endswith="weni.ai")
 
-        closed_rooms["user__rooms__is_active"] = False
-        rooms_filter["user__rooms__is_active"] = True
-
-        if self.context.get("start_date") and self.context.get("end_date"):
-            rooms_filter["user__rooms__created_on__range"] = [
-                self.context.get("start_date"),
-                self.context.get("end_date")
-                + " 23:59:59",  # TODO: USE DATETIME IN END DATE
-            ]
-            closed_rooms["user__rooms__ended_at__range"] = [
-                self.context.get("start_date"),
-                self.context.get("end_date")
-                + " 23:59:59",  # TODO: USE DATETIME IN END DATE
-            ]
-        else:
-            closed_rooms["user__rooms__ended_at__gte"] = initial_datetime
-
-        if self.context.get("agent"):
-            rooms_filter["user"] = self.context.get("agent")
-            closed_rooms["user"] = self.context.get("agent")
-
-        if self.context.get("sector"):
-            rooms_filter["user__rooms__queue__sector"] = self.context.get("sector")
-            closed_rooms["user__rooms__queue__sector"] = self.context.get("sector")
-            if self.context.get("tag"):
-                rooms_filter["user__rooms__tags__name"] = self.context.get("tag")
-                closed_rooms["user__rooms__tags__name"] = self.context.get("tag")
-        else:
-            rooms_filter["user__rooms__queue__sector__project"] = project
-            closed_rooms["user__rooms__queue__sector__project"] = project
-
-        if "weni" in self.context.get("user_request"):
-            queue_auth = (
-                ProjectPermission.objects.filter(**permission_filter)
-                .values("user__first_name")
-                .annotate(
-                    opened_rooms=Count(
-                        "user__rooms",
-                        filter=Q(**rooms_filter),
-                        distinct=True,
-                    ),
-                    closed_rooms=Count(
-                        "user__rooms",
-                        filter=Q(**closed_rooms),
-                        distinct=True,
-                    ),
-                )
-            )
-        else:
-            queue_auth = (
-                ProjectPermission.objects.filter(**permission_filter)
-                .exclude(user__email__icontains="weni")
-                .values("user__first_name")
-                .annotate(
-                    opened_rooms=Count(
-                        "user__rooms",
-                        filter=Q(**rooms_filter),
-                        distinct=True,
-                    ),
-                    closed_rooms=Count(
-                        "user__rooms",
-                        filter=Q(**closed_rooms),
-                        distinct=True,
-                    ),
-                )
-            )
-
-        return queue_auth
+    return agents_query
 
 
-class DashboardSectorSerializer(serializers.ModelSerializer):
-    sectors = serializers.SerializerMethodField()
+# Maybe separate each serializer in it's own serializer module/file
 
-    class Meta:
-        model = Project
-        fields = [
-            "sectors",
+
+def dashboard_division_data(context, project=None):
+    initial_datetime = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+    rooms_filter = {}
+    division_level = "room__queue__sector"
+
+    if context.get("sector"):
+        division_level = "room__queue"
+        rooms_filter["room__queue__sector"] = context.get("sector")
+        if context.get("tag"):
+            rooms_filter["room__tags__name"] = context.get("tag")
+    else:
+        rooms_filter["room__queue__sector__project"] = project
+    rooms_filter["room__user__isnull"] = False
+
+    if context.get("agent"):
+        rooms_filter["room__user"] = context.get("agent")
+
+    if context.get("start_date") and context.get("end_date"):
+        rooms_filter["created_on__range"] = [
+            context.get("start_date"),
+            context.get("end_date") + " 23:59:59",  # TODO: USE DATETIME IN END DATE
         ]
+    else:
+        rooms_filter["created_on__gte"] = initial_datetime
 
-    def get_sectors(self, project):
-        initial_datetime = timezone.now().replace(
-            hour=0, minute=0, second=0, microsecond=0
+    return (
+        RoomMetrics.objects.filter(**rooms_filter)  # date, project or sector
+        .values(f"{division_level}__uuid")
+        .annotate(
+            name=F(f"{division_level}__name"),
+            waiting_time=Avg("waiting_time"),
+            response_time=Avg("message_response_time"),
+            interact_time=Avg("interaction_time"),
         )
-
-        model = Sector
-        rooms_filter = {}
-        model_filter = {"project": project}
-        rooms_filter_prefix = "queues__"
-
-        if self.context.get("sector"):
-            model = Queue
-            rooms_filter_prefix = ""
-            model_filter = {"sector": self.context.get("sector")}
-            rooms_filter["rooms__queue__sector"] = self.context.get("sector")
-            rooms_filter["rooms__user__isnull"] = False
-            if self.context.get("tag"):
-                rooms_filter["rooms__tags__name"] = self.context.get("tag")
-            if self.context.get("agent"):
-                rooms_filter["rooms__user"] = self.context.get("agent")
-        else:
-            rooms_filter[
-                f"{rooms_filter_prefix}rooms__queue__sector__project"
-            ] = project
-            rooms_filter[f"{rooms_filter_prefix}rooms__user__isnull"] = False
-            if self.context.get("agent"):
-                rooms_filter[f"{rooms_filter_prefix}rooms__user"] = self.context.get(
-                    "agent"
-                )
-
-        if self.context.get("start_date") and self.context.get("end_date"):
-            rooms_filter[f"{rooms_filter_prefix}rooms__created_on__range"] = [
-                self.context.get("start_date"),
-                self.context.get("end_date")
-                + " 23:59:59",  # TODO: USE DATETIME IN END DATE
-            ]
-        else:
-            rooms_filter[
-                f"{rooms_filter_prefix}rooms__created_on__gte"
-            ] = initial_datetime
-
-        results = (
-            model.objects.filter(**model_filter)
-            .values("name")
-            .annotate(
-                waiting_time=Avg(
-                    f"{rooms_filter_prefix}rooms__metric__waiting_time",
-                    filter=Q(**rooms_filter),
-                ),
-                response_time=Avg(
-                    f"{rooms_filter_prefix}rooms__metric__message_response_time",
-                    filter=Q(**rooms_filter),
-                ),
-                interact_time=Avg(
-                    f"{rooms_filter_prefix}rooms__metric__interaction_time",
-                    filter=Q(**rooms_filter),
-                ),
-            )
-        )
-        return results
+        .values("name", "waiting_time", "response_time", "interact_time")
+    )
 
 
-class DashboardDataSerializer(serializers.ModelSerializer):
+class DashboardRawDataSerializer(serializers.ModelSerializer):
     closed_rooms = serializers.SerializerMethodField()
     transfer_count = serializers.SerializerMethodField()
     queue_rooms = serializers.SerializerMethodField()
