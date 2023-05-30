@@ -2,12 +2,12 @@ from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from chats.core.models import BaseModel
+from chats.core.models import BaseModel, BaseSoftDeleteModel
 
 User = get_user_model()
 
 
-class Queue(BaseModel):
+class Queue(BaseSoftDeleteModel, BaseModel):
     sector = models.ForeignKey(
         "sectors.Sector",
         verbose_name=_("sector"),

@@ -84,7 +84,7 @@ class SectorTagFilter(filters.FilterSet):
 
     def filter_sector(self, queryset, name, value):
         try:
-            sector = Sector.objects.get(uuid=value)
+            sector = Sector.objects.get(uuid=value, is_deleted=False)
             auth = sector.get_permission(self.request.user)
             auth.is_manager(str(sector.pk))
         except (Project.DoesNotExist, Sector.DoesNotExist, AttributeError):
@@ -93,7 +93,7 @@ class SectorTagFilter(filters.FilterSet):
 
     def filter_queue(self, queryset, name, value):
         try:
-            sector = Sector.objects.get(queues__uuid=value)
+            sector = Sector.objects.get(queues__uuid=value, is_deleted=False)
 
             project_permission = sector.get_permission(self.request.user)
 
