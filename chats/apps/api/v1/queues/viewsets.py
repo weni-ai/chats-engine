@@ -16,10 +16,10 @@ class QueueViewset(ModelViewSet):
     serializer_class = queue_serializers.QueueSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = QueueFilter
-    # permission_classes = [
-    #     IsAuthenticated,
-    #     IsSectorManager,
-    # ]
+    permission_classes = [
+        IsAuthenticated,
+        IsSectorManager,
+    ]
 
     lookup_field = "uuid"
 
