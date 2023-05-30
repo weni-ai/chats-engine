@@ -1,3 +1,7 @@
+# 1.16.3
+## Add
+  - Data exporter getting data from dashboard serializers.
+
 
 # 1.16.2
 ## Change
