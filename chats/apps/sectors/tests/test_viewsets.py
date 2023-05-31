@@ -97,8 +97,7 @@ class SectorTests(APITestCase):
         client = self.client
         client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
         response = client.delete(url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["is_deleted"], True)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
 
 class RoomsExternalTests(APITestCase):
