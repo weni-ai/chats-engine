@@ -12,9 +12,9 @@ from chats.apps.api.v1.dashboard.presenter import (
 )
 from chats.apps.api.v1.dashboard.serializers import (
     DashboardRawDataSerializer,
-    dashboard_general_data,
     dashboard_agents_data,
     dashboard_division_data,
+    dashboard_general_data,
 )
 from chats.apps.api.v1.permissions import HasDashboardAccess
 from chats.apps.projects.models import Project
@@ -56,7 +56,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             True if request.user and "weni.ai" in request.user.email else False
         )
         serialized_data = dashboard_agents_data(
-            instance=project,
+            project=project,
             context=context,
         )
         return Response(serialized_data, status.HTTP_200_OK)
@@ -73,7 +73,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         project = self.get_object()
         filters = request.query_params
         serialized_data = dashboard_division_data(
-            instance=project,
+            project=project,
             context=filters,
         )
         return Response(serialized_data, status.HTTP_200_OK)
