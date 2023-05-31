@@ -1,9 +1,4 @@
-from django.db.models import (
-    Avg,
-    Count,
-    Q,
-    Sum,
-)
+from django.db.models import Avg, Count, Q, Sum
 from django.utils import timezone
 from rest_framework import serializers
 
