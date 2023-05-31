@@ -1,15 +1,9 @@
-from django.db.models import (
-    Avg,
-    Count,
-    F,
-    Q,
-    Sum,
-)
+from django.db.models import Avg, Count, F, Q, Sum
 from django.utils import timezone
 from rest_framework import serializers
 
-from chats.apps.rooms.models import Room
 from chats.apps.dashboard.models import RoomMetrics
+from chats.apps.rooms.models import Room
 
 
 def dashboard_general_data(context: dict, project):
@@ -64,7 +58,7 @@ def dashboard_general_data(context: dict, project):
 def dashboard_agents_data(context, project):
     initial_datetime = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
 
-    rooms_filter = {}
+    rooms_filter = {"user__isnull": False}
     closed_rooms = {}
 
     if context.get("start_date") and context.get("end_date"):
@@ -85,6 +79,10 @@ def dashboard_agents_data(context, project):
     else:
         rooms_filter["queue__sector__project"] = project
 
+    agents_query = Room.objects
+    if not context.get("is_weni_admin"):
+        agents_query = agents_query.exclude(user__email__endswith="weni.ai")
+
     agents_query = (
         Room.objects.filter(**rooms_filter)
         .values("user")
@@ -94,9 +92,6 @@ def dashboard_agents_data(context, project):
             opened_rooms=Count("uuid", filter=Q(is_active=True)),
         )
     )
-
-    if not context.get("is_weni_admin"):
-        return agents_query.exclude(user__email__endswith="weni.ai")
 
     return agents_query
 
