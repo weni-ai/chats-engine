@@ -76,7 +76,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             project=project,
             context=filters,
         )
-        return Response(serialized_data, status.HTTP_200_OK)
+        return Response({"sectors": serialized_data}, status.HTTP_200_OK)
 
     @action(
         detail=True,
