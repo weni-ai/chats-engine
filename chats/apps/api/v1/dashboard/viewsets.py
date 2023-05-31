@@ -59,7 +59,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             project=project,
             context=context,
         )
-        return Response(serialized_data, status.HTTP_200_OK)
+        return Response({"project_agents": serialized_data}, status.HTTP_200_OK)
 
     @action(
         detail=True,
