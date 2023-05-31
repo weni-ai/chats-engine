@@ -51,7 +51,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
     def agent(self, request, *args, **kwargs):
         """Agent metrics for the project or the sector"""
         project = self.get_object()
-        context = request.query_params
+        context = request.query_params.dict()
         context["is_weni_admin"] = (
             True if request.user and "weni.ai" in request.user.email else False
         )
