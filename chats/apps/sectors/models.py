@@ -1,14 +1,12 @@
 import pendulum
 from django.contrib.auth import get_user_model
 from django.db import models
-from django.db.models import F, Q
+from django.db.models import F, Q, Value
+from django.db.models.functions import Concat
 from django.utils.translation import gettext_lazy as _
 
 from chats.core.models import BaseModel, BaseSoftDeleteModel
 from chats.utils.websockets import send_channels_group
-
-from django.db.models import Value, F
-from django.db.models.functions import Concat
 
 User = get_user_model()
 
