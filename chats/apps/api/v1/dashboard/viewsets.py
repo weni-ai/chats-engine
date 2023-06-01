@@ -152,15 +152,32 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         project = self.get_object()
         filter = request.query_params
 
-        general_dataset = get_general_data(project, filter)
-        userinfo_dataset = get_agents_data(project, filter)
-        sector_dataset = get_sector_data(project, filter)
+        # General data
+        general_dataset = DashboardRoomsSerializer(instance=project, context=filter)
+        raw_dataset = DashboardDataSerializer(instance=project, context=filter)
+        combined_dataset = {**general_dataset.data, **raw_dataset.data}
+
+        # Agents Data
+        agents = DashboardAgentsSerializer(instance=project, context=filter)
+        userinfo_dataset = list(
+            agents.data.get("project_agents").values(
+                "user__first_name", "opened_rooms", "closed_rooms"
+            )
+        )
+
+        # Sectors Data
+        sectors = DashboardSectorSerializer(instance=project, context=filter)
+        sector_dataset = list(
+            sectors.data.get("sectors").values(
+                "name", "waiting_time", "response_time", "interact_time"
+            )
+        )
 
         filename = "dashboard_export_data"
 
-        data_frame = pandas.DataFrame([general_dataset])
-        data_frame_1 = pandas.read_json(userinfo_dataset)
-        data_frame_2 = pandas.read_json(sector_dataset)
+        data_frame = pandas.DataFrame([combined_dataset])
+        data_frame_1 = pandas.DataFrame(userinfo_dataset)
+        data_frame_2 = pandas.DataFrame(sector_dataset)
 
         if "xls" in filter:
             response = HttpResponse(
@@ -177,20 +194,20 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
                     startcol=0,
                     index=False,
                 )
-                data_frame_1.to_excel(
-                    writer,
-                    sheet_name="dashboard_infos",
-                    startrow=4 + len(data_frame.index),
-                    startcol=0,
-                    index=False,
-                )
-                data_frame_2.to_excel(
-                    writer,
-                    sheet_name="dashboard_infos",
-                    startrow=8 + len(data_frame_1.index),
-                    startcol=0,
-                    index=False,
-                )
+                # data_frame_1.to_excel(
+                #     writer,
+                #     sheet_name="dashboard_infos",
+                #     startrow=4 + len(data_frame.index),
+                #     startcol=0,
+                #     index=False,
+                # )
+                # data_frame_2.to_excel(
+                #     writer,
+                #     sheet_name="dashboard_infos",
+                #     startrow=8 + len(data_frame_1.index),
+                #     startcol=0,
+                #     index=False,
+                # )
             return response
 
         else:
