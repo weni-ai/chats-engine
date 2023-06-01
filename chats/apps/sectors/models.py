@@ -1,7 +1,8 @@
 import pendulum
 from django.contrib.auth import get_user_model
 from django.db import models
-from django.db.models import F, Q
+from django.db.models import F, Q, Value
+from django.db.models.functions import Concat
 from django.utils.translation import gettext_lazy as _
 
 from chats.core.models import BaseModel, BaseSoftDeleteModel
@@ -60,7 +61,9 @@ class Sector(BaseSoftDeleteModel, BaseModel):
 
     @property
     def employee_pks(self):
-        return list(self.authorizations.all().values_list("user__pk", flat="True"))
+        return list(
+            self.authorizations.all().values_list("permission__user__pk", flat="True")
+        )
 
     @property
     def rooms(self):
@@ -68,27 +71,27 @@ class Sector(BaseSoftDeleteModel, BaseModel):
 
     @property
     def active_rooms(self):
-        return self.rooms.filter(is_active=True)
+        return self.rooms.filter(rooms__is_active=True)
 
     @property
     def deactivated_rooms(self):
-        return self.rooms.filter(is_active=True)
+        return self.rooms.filter(rooms__is_active=False)
 
     @property
     def open_active_rooms(self):
-        return self.rooms.filter(user__isnull=True, is_active=True)
+        return self.rooms.filter(rooms__user__isnull=True, rooms__is_active=True)
 
     @property
     def closed_active_rooms(self):
-        return self.rooms.filter(user__isnull=False, is_active=True)
+        return self.rooms.filter(rooms__user__isnull=False, rooms__is_active=True)
 
     @property
     def open_deactivated_rooms(self):
-        return self.rooms.filter(user__isnull=True, is_active=False)
+        return self.rooms.filter(rooms__user__isnull=True, rooms__is_active=False)
 
     @property
     def vacant_deactivated_rooms(self):
-        return self.rooms.filter(user__isnull=False, is_active=False)
+        return self.rooms.filter(rooms__user__isnull=False, rooms__is_active=False)
 
     @property
     def serialized_ws_data(self):
@@ -203,7 +206,7 @@ class SectorAuthorization(BaseModel):
 
     @property
     def is_authorized(self):
-        return self.is_agent or self.is_manager
+        return self.is_manager
 
     @property
     def can_edit(self):

@@ -62,7 +62,10 @@ class Queue(BaseSoftDeleteModel, BaseModel):
     def available_agents(self):
         online_agents = self.online_agents.annotate(
             active_rooms_count=models.Count(
-                "rooms", filter=models.Q(rooms__is_active=True, rooms__queue=self)
+                "rooms",
+                filter=models.Q(
+                    rooms__is_active=True, rooms__queue__sector=self.sector
+                ),
             )
         )
         return online_agents.filter(active_rooms_count__lt=self.limit).order_by(
@@ -70,11 +73,13 @@ class Queue(BaseSoftDeleteModel, BaseModel):
         )
 
     def get_or_create_user_authorization(self, user):
-        sector_auth, created = self.authorizations.get_or_create(user=user)
+        sector_auth, created = self.authorizations.get_or_create(permission__user=user)
         return sector_auth
 
     def set_queue_authorization(self, user, role: int):
-        sector_auth, created = self.authorizations.get_or_create(user=user, role=role)
+        sector_auth, created = self.authorizations.get_or_create(
+            permission__user=user, role=role
+        )
         return sector_auth
 
 
@@ -112,9 +117,6 @@ class QueueAuthorization(BaseModel):
                 fields=["queue", "permission"], name="unique_queue_auth"
             )
         ]
-
-    def __str__(self):
-        return self.get_role_display()
 
     def get_permission(self, user):
         return self.queue.get_permission(user)

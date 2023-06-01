@@ -131,6 +131,8 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         is_anon = validated_data.pop("is_anon")
+
+        # Get Sector and Queue
         try:
             queue = (
                 None if not validated_data.get("queue") else validated_data.pop("queue")
@@ -142,49 +144,68 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             )
         except AttributeError:
             raise ValidationError(
-                {"detail": _("Cannot create room without queue_uuid or sector_uuid")}
+                {"detail": _("Cannot create a room without queue_uuid or sector_uuid")}
             )
 
         if queue is None and sector is not None:
             queue = Queue.objects.filter(sector__uuid=sector, is_deleted=False).first()
 
         sector = queue.sector
+        project = sector.project
 
+        # End Get Sector and Queue
+
+        # Check work time
         created_on = validated_data.get("created_on", timezone.now().time())
         if sector.is_attending(created_on) is False:
             raise ValidationError(
                 {"detail": _("Contact cannot be done outside working hours")}
             )
 
-        contact_data = validated_data.pop("contact")
-        contact_external_id = contact_data.pop("external_id")
+        # END Check work time
 
-        project = sector.project
-        user = validated_data.get("user")
+        # get flowstart data
         groups = []
         flow_uuid = None
-        if contact_data.get("groups"):
-            groups = contact_data.pop("groups")
+        if validated_data.get("contact").get("groups"):
+            groups = validated_data.get("contact").pop("groups")
 
         if validated_data.get("flow_uuid"):
             flow_uuid = validated_data.pop("flow_uuid")
+        # END get flowstart data
 
-        if contact_data.get("urn"):
-            urn = contact_data.pop("urn").split("?")[0]
+        # get room urn
+        if validated_data.get("contact").get("urn"):
+            urn = validated_data.get("contact").pop("urn").split("?")[0]
             if not is_anon:
                 validated_data["urn"] = urn
+        # END get room urn
+
+        # update or create contact
+        contact_data = validated_data.pop("contact")
+        contact_external_id = contact_data.pop("external_id")
+
         contact, created = Contact.objects.update_or_create(
             external_id=contact_external_id, defaults=contact_data
         )
+        # END update or create contact
 
+        # Check room flow start
         room = get_active_room_flow_start(contact, flow_uuid, project)
         if room is not None:
             return room
+        # END Check room flow start
+
+        # get room user
+        user = validated_data.get("user")
         validated_data["user"] = get_room_user(
             contact, queue, user, groups, created, flow_uuid, project
         )
+        # END get room user
 
+        # Create room and metrics
         room = Room.objects.create(**validated_data, contact=contact, queue=queue)
         RoomMetrics.objects.create(room=room)
+        # END Create room and metrics
 
         return room
