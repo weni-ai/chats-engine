@@ -112,7 +112,7 @@ def dashboard_agents_data(context, project):
         .values("user")
         .annotate(
             user__first_name=F("user__first_name"),
-            closed_room=Count("uuid", filter=Q(is_active=False, **closed_rooms)),
+            closed_rooms=Count("uuid", filter=Q(is_active=False, **closed_rooms)),
             opened_rooms=Count("uuid", filter=Q(is_active=True)),
         )
     )
