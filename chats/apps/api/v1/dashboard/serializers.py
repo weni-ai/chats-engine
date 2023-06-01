@@ -16,6 +16,8 @@ from django_redis import get_redis_connection
 
 from urllib import parse
 
+from django.conf import settings
+
 
 class DashboardRoomsSerializer(serializers.ModelSerializer):
     DASHBOARD_ROOMS_CACHE_KEY = "dashboard:{filter}:{metric}"
@@ -114,7 +116,7 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
             interaction_time = 0
 
         self.redis_connection.set(
-            rooms_filter_interact_time_key, interaction_time, 1 * 60 * 60
+            rooms_filter_interact_time_key, interaction_time, settings.CHATS_CACHE_TIME
         )
         return interaction_time
 
@@ -165,7 +167,7 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
             response_time = 0
 
         self.redis_connection.set(
-            rooms_filter_response_time_key, response_time, 1 * 60 * 60
+            rooms_filter_response_time_key, response_time, settings.CHATS_CACHE_TIME
         )
         return response_time
 
@@ -217,7 +219,7 @@ class DashboardRoomsSerializer(serializers.ModelSerializer):
             waiting_time = 0
 
         self.redis_connection.set(
-            rooms_filter_waiting_time_key, waiting_time, 1 * 60 * 60
+            rooms_filter_waiting_time_key, waiting_time, settings.CHATS_CACHE_TIME
         )
         return waiting_time
 
