@@ -119,6 +119,14 @@ CHANNEL_LAYERS = {
     },
 }
 
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": env.str("CHANNEL_LAYERS_REDIS", default="redis://127.0.0.1:6379/1"),
+        "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
+    }
+}
+
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
@@ -329,3 +337,4 @@ UNPERMITTED_AUDIO_TYPES = env.list(
 )
 
 CHATS_FLOWS_TAG = env.str("CHATS_FLOWS_TAG", default="chats")
+CHATS_CACHE_TIME = env.int("CHATS_CACHE_TIME", default=1 * 60 * 60)
