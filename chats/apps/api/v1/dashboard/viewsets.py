@@ -152,13 +152,18 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         project = self.get_object()
         filter = request.query_params
 
+        user_info_context = {}
+        user_info_context["filters"] = request.query_params
+        if request.user:
+            user_info_context["user_request"] = request.user.email
+
         # General data
         general_dataset = DashboardRoomsSerializer(instance=project, context=filter)
         raw_dataset = DashboardDataSerializer(instance=project, context=filter)
         combined_dataset = {**general_dataset.data, **raw_dataset.data}
 
         # Agents Data
-        agents = DashboardAgentsSerializer(instance=project, context=filter)
+        agents = DashboardAgentsSerializer(instance=project, context=user_info_context)
         userinfo_dataset = list(
             agents.data.get("project_agents").values(
                 "user__first_name", "opened_rooms", "closed_rooms"
