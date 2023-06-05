@@ -24,9 +24,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
     lookup_field = "uuid"
     queryset = Project.objects.all()
 
-    def get_permissions(self):
-        permission_classes = [permissions.IsAuthenticated, HasDashboardAccess]
-        return [permission() for permission in permission_classes]
+    # def get_permissions(self):
+    #     permission_classes = [permissions.IsAuthenticated, HasDashboardAccess]
+    #     return [permission() for permission in permission_classes]
 
     @action(
         detail=True,
@@ -152,13 +152,18 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         project = self.get_object()
         filter = request.query_params
 
+        user_info_context = {}
+        user_info_context["filters"] = request.query_params
+        if request.user:
+            user_info_context["user_request"] = request.user.email
+
         # General data
         general_dataset = DashboardRoomsSerializer(instance=project, context=filter)
         raw_dataset = DashboardDataSerializer(instance=project, context=filter)
         combined_dataset = {**general_dataset.data, **raw_dataset.data}
 
         # Agents Data
-        agents = DashboardAgentsSerializer(instance=project, context=filter)
+        agents = DashboardAgentsSerializer(instance=project, context=user_info_context)
         userinfo_dataset = list(
             agents.data.get("project_agents").values(
                 "user__first_name", "opened_rooms", "closed_rooms"
@@ -194,20 +199,20 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
                     startcol=0,
                     index=False,
                 )
-                # data_frame_1.to_excel(
-                #     writer,
-                #     sheet_name="dashboard_infos",
-                #     startrow=4 + len(data_frame.index),
-                #     startcol=0,
-                #     index=False,
-                # )
-                # data_frame_2.to_excel(
-                #     writer,
-                #     sheet_name="dashboard_infos",
-                #     startrow=8 + len(data_frame_1.index),
-                #     startcol=0,
-                #     index=False,
-                # )
+                data_frame_1.to_excel(
+                    writer,
+                    sheet_name="dashboard_infos",
+                    startrow=4 + len(data_frame.index),
+                    startcol=0,
+                    index=False,
+                )
+                data_frame_2.to_excel(
+                    writer,
+                    sheet_name="dashboard_infos",
+                    startrow=8 + len(data_frame_1.index),
+                    startcol=0,
+                    index=False,
+                )
             return response
 
         else:
