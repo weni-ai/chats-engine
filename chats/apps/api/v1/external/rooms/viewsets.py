@@ -2,6 +2,7 @@ import json
 
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import IntegrityError
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -11,6 +12,7 @@ from chats.apps.accounts.authentication.drf.authorization import (
 )
 from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.external.rooms.serializers import RoomFlowSerializer
+from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.rooms.models import Room
 
 
@@ -155,8 +157,27 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
                 },
                 status.HTTP_404_NOT_FOUND,
             )
+        modified_on = room.modified_on
         room.user = agent_permission.user
+
+        transfer_history = room.transfer_history or []
+
+        transfer_content = {"type": "user", "name": room.user.full_name}
+        transfer_history.append(transfer_content)
         room.save()
+
+        room.notify_user("update", user=None)
+        room.notify_queue("update")
+
+        msg = room.messages.create(text=json.dumps(transfer_content), seen=True)
+        msg.notify_room("create")
+
+        time = timezone.now() - modified_on
+        room_metric = RoomMetrics.objects.get_or_create(room=room)[0]
+        room_metric.waiting_time += time.total_seconds()
+        room_metric.queued_count += 1
+        room_metric.save()
+
         return Response(
             {"Detail": f"Agent {agent} successfully attributed to the ticket {pk}"},
             status.HTTP_200_OK,
