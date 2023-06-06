@@ -1,11 +1,12 @@
 import logging
-from urllib.error import HTTPError
+from urllib.error import HTTPError as UrllibHTTPError
 from urllib.parse import parse_qs
 
 from channels.db import database_sync_to_async
 from channels.middleware import BaseMiddleware
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
+from requests.exceptions import HTTPError as RequestsHTTPError
 from rest_framework.authtoken.models import Token
 
 from chats.apps.accounts.authentication.drf.backends import (
@@ -45,7 +46,7 @@ class TokenAuthMiddleware(BaseMiddleware):
         if settings.OIDC_ENABLED:
             try:
                 user = await get_keycloak_user(token_key)
-            except HTTPError:
+            except (UrllibHTTPError, RequestsHTTPError):
                 user = None
                 LOGGER.debug("Keycloak Websocket Login failed")
 
