@@ -4,11 +4,7 @@ from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Q
 from django.utils import timezone
-
-from chats.apps.api.websockets.rooms.validators import WSJoinValidator
-from chats.apps.rooms.models import Room
 
 
 class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
@@ -118,32 +114,12 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             event = json.loads(event.get("content"))
         group_name = f"{event['name']}_{event['id']}"
 
-        validator = WSJoinValidator(
-            group_name=event["name"],
-            group_id=event["id"],
-            project_uuid=self.project,
-            user_permission=self.permission,
-        )
-        try:
-            if await validator.validate() is False:
-                await self.notify(
-                    {
-                        "type": "notify",
-                        "action": "group.join",
-                        "content": json.dumps(
-                            {"msg": f"Access denied on the group: {group_name}"}
-                        ),
-                    }
-                )
-                return None
-        except ObjectDoesNotExist:
+        if event.get("name") not in ["permission", "queue"]:
             await self.notify(
                 {
                     "type": "notify",
                     "action": "group.join",
-                    "content": json.dumps(
-                        {"msg": f"Access denied on the group: {group_name}"}
-                    ),
+                    "content": json.dumps({"msg": f"Group {group_name} is deprecated"}),
                 }
             )
             return None
@@ -180,36 +156,15 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         return self.user.project_permissions.get(project__uuid=self.project)
 
     @database_sync_to_async
-    def get_user_rooms(self, *args, **kwargs):
-        """ """
-        # TODO Think in a new way to query this
-        queue_ids = self.permission.queue_ids
-        rooms = Room.objects.filter(
-            Q(user=self.user) | Q(user__isnull=True),
-            queue__uuid__in=queue_ids,
-            is_active=True,
-        ).values_list("pk", flat=True)
-
-        return list(rooms)
-
-    @database_sync_to_async
     def get_queues(self, *args, **kwargs):
         """ """
         self.queues = self.permission.queue_ids
         return self.queues
 
-    async def load_rooms(self, *args, **kwargs):
-        """Enter room notification groups"""
-        self.rooms = await self.get_user_rooms()
-        for room in self.rooms:
-
-            await self.join({"name": "room", "id": str(room)})
-
     async def load_queues(self, *args, **kwargs):
         """Enter queue notification groups"""
         queues = await self.get_queues()
         for queue in queues:
-
             await self.join({"name": "queue", "id": str(queue)})
 
     async def load_user(self, *args, **kwargs):
