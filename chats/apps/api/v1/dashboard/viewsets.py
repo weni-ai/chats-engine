@@ -11,10 +11,10 @@ from chats.apps.api.v1.dashboard.presenter import (
     get_sector_data,
 )
 from chats.apps.api.v1.dashboard.serializers import (
-    DashboardAgentsSerializer,
-    DashboardDataSerializer,
-    DashboardRoomsSerializer,
-    DashboardSectorSerializer,
+    DashboardRawDataSerializer,
+    dashboard_agents_data,
+    dashboard_division_data,
+    dashboard_general_data,
 )
 from chats.apps.api.v1.permissions import HasDashboardAccess
 from chats.apps.projects.models import Project
@@ -32,42 +32,39 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         detail=True,
         methods=["GET"],
         url_name="general",
-        serializer_class=DashboardRoomsSerializer,
     )
     def general(self, request, *args, **kwargs):
         """General metrics for the project or the sector"""
         project = self.get_object()
         filters = request.query_params
-        serialized_data = self.get_serializer(
-            instance=project,
+        serialized_data = dashboard_general_data(
+            project=project,
             context=filters,
         )
-        return Response(serialized_data.data, status.HTTP_200_OK)
+        return Response(serialized_data, status.HTTP_200_OK)
 
     @action(
         detail=True,
         methods=["GET"],
         url_name="agent",
-        serializer_class=DashboardAgentsSerializer,
     )
     def agent(self, request, *args, **kwargs):
         """Agent metrics for the project or the sector"""
         project = self.get_object()
-        context = {}
-        context["filters"] = request.query_params
-        if request.user:
-            context["user_request"] = request.user.email
-        serialized_data = self.get_serializer(
-            instance=project,
+        context = request.query_params.dict()
+        context["is_weni_admin"] = (
+            True if request.user and "weni.ai" in request.user.email else False
+        )
+        serialized_data = dashboard_agents_data(
+            project=project,
             context=context,
         )
-        return Response(serialized_data.data, status.HTTP_200_OK)
+        return Response({"project_agents": serialized_data}, status.HTTP_200_OK)
 
     @action(
         detail=True,
         methods=["GET"],
         url_name="division",
-        serializer_class=DashboardSectorSerializer,
     )
     def division(self, request, *args, **kwargs):
         """
@@ -75,17 +72,17 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         """
         project = self.get_object()
         filters = request.query_params
-        serialized_data = self.get_serializer(
-            instance=project,
+        serialized_data = dashboard_division_data(
+            project=project,
             context=filters,
         )
-        return Response(serialized_data.data, status.HTTP_200_OK)
+        return Response({"sectors": serialized_data}, status.HTTP_200_OK)
 
     @action(
         detail=True,
         methods=["GET"],
         url_name="raw",
-        serializer_class=DashboardDataSerializer,
+        serializer_class=DashboardRawDataSerializer,
     )
     def raw_data(self, request, *args, **kwargs):
         """Raw data for the project, sector, queue and agent."""
