@@ -47,20 +47,6 @@ class ConstraintTests(APITestCase):
             in str(context.exception)
         )
 
-    def test_rooms_limit_greater_than_zero_constraint(self):
-        with self.assertRaises(IntegrityError) as context:
-            Sector.objects.create(
-                name="sector test 01",
-                project=self.project,
-                work_start="12",
-                work_end="13",
-                rooms_limit=0,
-            )
-        self.assertTrue(
-            'new row for relation "sectors_sector" violates check constraint "rooms_limit_greater_than_zero"'
-            in str(context.exception)
-        )
-
     def test_unique_sector_auth_constraint(self):
         with self.assertRaises(IntegrityError) as context:
             SectorAuthorization.objects.create(

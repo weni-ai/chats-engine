@@ -252,7 +252,6 @@ class RoomsFlowStartExternalTests(APITestCase):
         )
 
     def test_create_room_with_group_flow_start_with_offline_user(self):
-
         data = {
             "queue_uuid": str(self.queue_1.pk),
             "contact": {
@@ -276,3 +275,96 @@ class RoomsFlowStartExternalTests(APITestCase):
         self.assertIsNone(
             response.json().get("user"),
         )
+
+
+class RoomsAgentExternalTests(APITestCase):
+    fixtures = ["chats/fixtures/fixture_app.json", "chats/fixtures/fixture_room.json"]
+
+    def _update_room(self, ticket_id: str, permission_token: str, data: dict):
+        url = reverse("external_roomagent-detail", kwargs={"pk": ticket_id})
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {permission_token}")
+
+        return client.patch(url, data=data, format="json")
+
+    def test_add_agent_to_queued_room(self):
+        data = {
+            "agent": "foobar@chats.weni.ai",  # agent on the project
+        }
+        response = self._update_room(
+            "66a47111-6e6f-43b3-9fdc-a92a18bc57d2",
+            "e416fd45-2896-43a5-bd7a-5067f03c77fa",
+            data,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_add_agent_outside_project_to_queued_room(self):
+        data = {
+            "agent": "agentqueue@chats.weni.ai",  # does not have permission on this project
+        }
+        response = self._update_room(
+            "66a47111-6e6f-43b3-9fdc-a92a18bc57d2",
+            "e416fd45-2896-43a5-bd7a-5067f03c77fa",
+            data,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_add_agent_to_queued_room_with_agent_token(self):
+        data = {
+            "agent": "foobar@chats.weni.ai",  # agent on the project
+        }
+        response = self._update_room(
+            "66a47111-6e6f-43b3-9fdc-a92a18bc57d2",
+            "25b32a73-c32a-4c38-85a7-f07dcb8389e5",
+            data,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_remove_agent_to_queued_room(self):
+        data = {}
+        response = self._update_room(
+            "66a47111-6e6f-43b3-9fdc-a92a18bc57d2",
+            "e416fd45-2896-43a5-bd7a-5067f03c77fa",
+            data,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_transfer_agent_to_queued_room(self):
+        data = {
+            "agent": "foobar@chats.weni.ai",  # agent on the project
+        }
+        response = self._update_room(
+            "1c830ac0-1ba7-49f9-b8c8-b96af41d4213",
+            "e416fd45-2896-43a5-bd7a-5067f03c77fa",
+            data,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_add_agent_to_closed_room(self):
+        data = {
+            "agent": "foobar@chats.weni.ai",  # agent on the project
+        }
+        response = self._update_room(
+            "ac6322ca-4a5b-4e5f-bb00-050c60e93b0b",
+            "e416fd45-2896-43a5-bd7a-5067f03c77fa",
+            data,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_add_agent_to_nonexistent_room(self):
+        data = {
+            "agent": "foobar@chats.weni.ai",  # agent on the project
+        }
+        response = self._update_room(
+            "ac6667ca-4a5b-4e5f-bb00-050c60e93b0b",
+            "e416fd45-2896-43a5-bd7a-5067f03c77fa",
+            data,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

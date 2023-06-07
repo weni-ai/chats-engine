@@ -43,9 +43,6 @@ class Sector(BaseSoftDeleteModel, BaseModel):
             models.UniqueConstraint(
                 fields=["project", "name"], name="unique_sector_name"
             ),
-            models.CheckConstraint(
-                check=Q(rooms_limit__gt=0), name="rooms_limit_greater_than_zero"
-            ),
         ]
 
     @property

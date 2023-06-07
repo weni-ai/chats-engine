@@ -2215,7 +2215,7 @@
                 "mood": "angry",
                 "country": "brazil"
             },
-            "callback_url": "https://flows.weni.ai/callback/uuid",
+            "callback_url": "http://localhost/test",
             "ended_at": null,
             "ended_by": null,
             "is_active": true,
@@ -2474,6 +2474,17 @@
             "name": "Weni Suporte",
             "timezone": "America/Sao_Paulo",
             "date_format": "D"
+        }
+    },
+    {
+        "model": "projects.projectpermission",
+        "pk": "4e11ac12-d7ca-4c18-9da1-54789dd95319",
+        "fields": {
+            "created_on": "2022-08-24T20:27:42.814Z",
+            "modified_on": "2022-08-24T20:27:42.815Z",
+            "project": "32e74fec-0dd7-413d-8062-9659f2e213d2",
+            "user": "agentqueue@chats.weni.ai",
+            "role": 1
         }
     },
     {
