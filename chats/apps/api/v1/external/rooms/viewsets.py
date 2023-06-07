@@ -1,6 +1,8 @@
 import json
 
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import IntegrityError
+from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -10,6 +12,7 @@ from chats.apps.accounts.authentication.drf.authorization import (
 )
 from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.external.rooms.serializers import RoomFlowSerializer
+from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.rooms.models import Room
 
 
@@ -98,3 +101,84 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         instance.notify_room("destroy")
 
         super().perform_destroy(instance)
+
+
+class RoomUserExternalViewSet(viewsets.ViewSet):
+    serializer_class = RoomFlowSerializer
+    permission_classes = [
+        IsAdminPermission,
+    ]
+    authentication_classes = [ProjectAdminAuthentication]
+
+    def partial_update(self, request, pk=None):
+        if pk is None:
+            return Response(
+                {"Detail": "No ticket id on the request"}, status.HTTP_400_BAD_REQUEST
+            )
+        request_permission = self.request.auth
+        project = request_permission.project
+        try:
+            room = Room.objects.get(
+                callback_url__endswith=pk,
+                queue__sector__project=project,
+                is_active=True,
+            )
+        except (Room.DoesNotExist, ValidationError):
+            return Response(
+                {
+                    "Detail": "Ticket with the given id was not found, it does not exist or it is closed"
+                },
+                status.HTTP_404_NOT_FOUND,
+            )
+
+        if room.user:
+            return Response(
+                {
+                    "Detail": "This ticket already has an agent, you can only add agents to queued rooms"
+                },
+                status.HTTP_400_BAD_REQUEST,
+            )
+        filters = self.request.data
+
+        if not filters or not filters.get("agent"):
+            return Response(
+                {
+                    "Detail": "Agent field can't be blank, the agent is needed to update the ticket"
+                },
+                status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            agent = filters.get("agent")
+            agent_permission = project.permissions.get(user__email=agent)
+        except ObjectDoesNotExist:
+            return Response(
+                {
+                    "Detail": "Given agent not found on this project. Make sure it's an admin on the ticket's project"
+                },
+                status.HTTP_404_NOT_FOUND,
+            )
+        modified_on = room.modified_on
+        room.user = agent_permission.user
+
+        transfer_history = room.transfer_history or []
+
+        transfer_content = {"type": "user", "name": room.user.full_name}
+        transfer_history.append(transfer_content)
+        room.save()
+
+        room.notify_user("update", user=None)
+        room.notify_queue("update")
+
+        msg = room.messages.create(text=json.dumps(transfer_content), seen=True)
+        msg.notify_room("create")
+
+        time = timezone.now() - modified_on
+        room_metric = RoomMetrics.objects.get_or_create(room=room)[0]
+        room_metric.waiting_time += time.total_seconds()
+        room_metric.queued_count += 1
+        room_metric.save()
+
+        return Response(
+            {"Detail": f"Agent {agent} successfully attributed to the ticket {pk}"},
+            status.HTTP_200_OK,
+        )

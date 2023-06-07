@@ -29,20 +29,6 @@ class SectorSerializer(serializers.ModelSerializer):
                 )
         return data
 
-    def validate_rooms_limit(self, data):
-        """
-        Check if the rooms_limit its greater than 0.
-        """
-        if data <= 0:
-            raise serializers.ValidationError(
-                {
-                    "detail": _(
-                        "Cannot create a sector with rooms_limit lower or equal 0."
-                    )
-                }
-            )
-        return data
-
 
 class SectorUpdateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -82,7 +68,6 @@ class SectorReadOnlyListSerializer(serializers.ModelSerializer):
 
 class SectorReadOnlyRetrieveSerializer(serializers.ModelSerializer):
     class Meta:
-
         model = Sector
         fields = [
             "uuid",
