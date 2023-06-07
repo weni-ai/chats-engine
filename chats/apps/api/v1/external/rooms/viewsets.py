@@ -153,7 +153,7 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
         except ObjectDoesNotExist:
             return Response(
                 {
-                    "Detail": "Given agent not found on this project. Make sure the agent has permission on the ticket's project"
+                    "Detail": "Given agent not found on this project. Make sure it's an admin on the ticket's project"
                 },
                 status.HTTP_404_NOT_FOUND,
             )
