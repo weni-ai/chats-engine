@@ -52,7 +52,14 @@ def dashboard_general_data(context: dict, project):
     redis_general_time_value = redis_connection.get(rooms_filter_general_time_key)
 
     if redis_general_time_value:
-        return json.loads(redis_general_time_value)
+        if rooms_filter.get("created_on__gte"):
+            rooms_filter.pop("created_on__gte")
+        rooms_filter.update(active_chat_filter)
+        active_chats_count = Room.objects.filter(**rooms_filter).count()
+        # Maybe separate the active_chats_agg count into a subquery
+        general_data = json.loads(redis_general_time_value)
+        general_data["active_chats"] = active_chats_count
+        return general_data
 
     general_data = Room.objects.filter(**rooms_filter).aggregate(
         interact_time=interact_time_agg,
@@ -60,17 +67,17 @@ def dashboard_general_data(context: dict, project):
         waiting_time=waiting_time_agg,
     )
 
+    redis_connection.set(
+        rooms_filter_general_time_key,
+        json.dumps(general_data),
+        settings.CHATS_CACHE_TIME,
+    )
     if rooms_filter.get("created_on__gte"):
         rooms_filter.pop("created_on__gte")
     rooms_filter.update(active_chat_filter)
     active_chats_count = Room.objects.filter(**rooms_filter).count()
     # Maybe separate the active_chats_agg count into a subquery
     general_data["active_chats"] = active_chats_count
-    redis_connection.set(
-        rooms_filter_general_time_key,
-        json.dumps(general_data),
-        settings.CHATS_CACHE_TIME,
-    )
     return general_data
 
 
