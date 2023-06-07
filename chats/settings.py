@@ -336,5 +336,21 @@ UNPERMITTED_AUDIO_TYPES = env.list(
     ],
 )
 
+# Elastic APM
+
+USE_APM = env.bool("USE_APM", default=False)
+
+if USE_APM:
+    INSTALLED_APPS.append("elasticapm.contrib.django")
+
+    ELASTIC_APM = {
+        "SERVICE_NAME": env("APM_SERVICE_NAME", default="chats-production"),
+        "SECRET_TOKEN": env("APM_SECRET_TOKEN"),
+        "SERVER_URL": env("APM_SERVER_URL"),
+        "ENVIRONMENT": env("APM_SERVICE_ENVIRONMENT", default="production"),
+        "DEBUG": env.bool("APM_SERVICE_DEBUG", default=False),
+    }
+
+
 CHATS_FLOWS_TAG = env.str("CHATS_FLOWS_TAG", default="chats")
 CHATS_CACHE_TIME = env.int("CHATS_CACHE_TIME", default=1 * 60 * 60)
