@@ -54,6 +54,7 @@ pandas = "^2.0.1"
 openpyxl = "^3.1.2"
 XlsxWriter = "^3.1.0"
 django-redis = "^5.2.0"
+elastic-apm = "^6.10.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
