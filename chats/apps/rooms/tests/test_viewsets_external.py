@@ -356,3 +356,15 @@ class RoomsAgentExternalTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_add_agent_to_nonexistent_room(self):
+        data = {
+            "agent": "foobar@chats.weni.ai",  # agent on the project
+        }
+        response = self._update_room(
+            "ac6667ca-4a5b-4e5f-bb00-050c60e93b0b",
+            "e416fd45-2896-43a5-bd7a-5067f03c77fa",
+            data,
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
