@@ -2215,7 +2215,6 @@
                 "mood": "angry",
                 "country": "brazil"
             },
-            "callback_url": "http://localhost:8000/callback/uuid",
             "ended_at": null,
             "ended_by": null,
             "is_active": true,

@@ -1,10 +1,8 @@
-import json
-
+from channels.db import database_sync_to_async
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 
 from chats.apps.api.websockets.rooms.consumers.agent import AgentRoomConsumer
-from channels.db import database_sync_to_async
 
 
 class ManagerAgentRoomConsumer(AgentRoomConsumer):
@@ -52,7 +50,6 @@ class ManagerAgentRoomConsumer(AgentRoomConsumer):
                 await self.close()  # TODO validate if the code continues from this or if it stops here
             else:
                 await self.accept()
-                await self.load_rooms()
                 await self.load_queues()
                 await self.load_user()
                 self.last_ping = timezone.now()
