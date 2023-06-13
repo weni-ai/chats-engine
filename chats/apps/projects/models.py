@@ -45,7 +45,7 @@ class Project(BaseModel):
     def get_permission(self, user):
         try:
             return self.permissions.get(user=user)
-        except ProjectPermission.DoesNotExist:
+        except ObjectDoesNotExist:
             return None
 
     def set_flows_project_auth_token(
@@ -229,7 +229,10 @@ class ProjectPermission(
         return queues
 
     def get_permission(self, user):
-        return self.project.get_permission(user=user)
+        try:
+            return self.project.get_permission(user=user)
+        except ObjectDoesNotExist:
+            return None
 
     @property
     def rooms_limit(self):
