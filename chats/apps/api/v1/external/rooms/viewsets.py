@@ -182,3 +182,36 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
             {"Detail": f"Agent {agent} successfully attributed to the ticket {pk}"},
             status.HTTP_200_OK,
         )
+
+    @action(
+        detail=True,
+        methods=["PATCH"],
+        url_name="custom_field",
+    )
+    def custom_field(self, request, pk=None):
+        custom_fields_update = request.data
+        if pk is None:
+            return Response(
+                {"Detail": "No ticket id on the request"}, status.HTTP_400_BAD_REQUEST
+            )
+        request_permission = self.request.auth
+        project = request_permission.project
+        try:
+            room = Room.objects.get(
+                callback_url__endswith=pk,
+                queue__sector__project=project,
+                is_active=True,
+            )
+        except (Room.DoesNotExist, ValidationError):
+            return Response(
+                {
+                    "Detail": "Ticket with the given id was not found, it does not exist or it is closed"
+                },
+                status.HTTP_404_NOT_FOUND,
+            )
+        room.custom_fields.update(custom_fields_update)
+        room.save()
+        return Response(
+            {"custom field edited"},
+            status.HTTP_200_OK,
+        )
