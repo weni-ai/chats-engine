@@ -17,8 +17,8 @@ def dashboard_general_data(context: dict, project):
     redis_connection = get_redis_connection()
 
     tz = project.timezone
-    initial_datetime = timezone.now().replace(
-        hour=0, minute=0, second=0, microsecond=0, tzinfo=tz
+    initial_datetime = (
+        timezone.now().astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
     )
     rooms_filter = {}
     active_chat_filter = {}
@@ -95,8 +95,8 @@ def dashboard_general_data(context: dict, project):
 
 def dashboard_agents_data(context, project):
     tz = project.timezone
-    initial_datetime = timezone.now().replace(
-        hour=0, minute=0, second=0, microsecond=0, tzinfo=tz
+    initial_datetime = (
+        timezone.now().astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
     )
 
     rooms_filter = {"user__isnull": False}
@@ -146,8 +146,8 @@ def dashboard_agents_data(context, project):
 
 def dashboard_division_data(context, project=None):
     tz = project.timezone
-    initial_datetime = timezone.now().replace(
-        hour=0, minute=0, second=0, microsecond=0, tzinfo=tz
+    initial_datetime = (
+        timezone.now().astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
     )
     rooms_filter = {}
     division_level = "room__queue__sector"
@@ -197,8 +197,10 @@ class DashboardRawDataSerializer(serializers.ModelSerializer):
 
     def get_closed_rooms(self, project):
         tz = project.timezone
-        initial_datetime = timezone.now().replace(
-            hour=0, minute=0, second=0, microsecond=0, tzinfo=tz
+        initial_datetime = (
+            timezone.now()
+            .astimezone(tz)
+            .replace(hour=0, minute=0, second=0, microsecond=0)
         )
 
         rooms_filter = {}
@@ -233,8 +235,12 @@ class DashboardRawDataSerializer(serializers.ModelSerializer):
 
     def get_transfer_count(self, project):
         tz = project.timezone
-        initial_datetime = timezone.now().replace(
-            hour=0, minute=0, second=0, microsecond=0, tzinfo=tz
+
+        tz = project.timezone
+        initial_datetime = (
+            timezone.now()
+            .astimezone(tz)
+            .replace(hour=0, minute=0, second=0, microsecond=0)
         )
         rooms_filter = {}
 
