@@ -1,6 +1,8 @@
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import OuterRef, Q, Subquery
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
+from rest_framework import exceptions
 
 from chats.apps.contacts.models import Contact
 from chats.apps.rooms.models import Room
@@ -45,7 +47,12 @@ class ContactFilter(filters.FilterSet):
     def filter_project(self, queryset, name, value):
         qs = self.queryset
         user = self.request.user
-        user_permission = user.project_permissions.get(project=value)
+        try:
+            user_permission = user.project_permissions.get(project=value)
+        except ObjectDoesNotExist:
+            raise exceptions.APIException(
+                detail="Access denied! Make sure you have the right permission to access this project"
+            )
         queue_ids = user_permission.queue_ids
 
         subquery = Room.objects.filter(
