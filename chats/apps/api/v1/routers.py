@@ -9,6 +9,7 @@ from chats.apps.api.v1.external.queues.viewsets import QueueFlowViewset
 from chats.apps.api.v1.external.rooms.viewsets import (
     RoomFlowViewSet,
     RoomUserExternalViewSet,
+    CustomFieldsUserExternalViewSet,
 )
 from chats.apps.api.v1.external.sectors.viewsets import SectorFlowViewset
 from chats.apps.api.v1.internal.projects import viewsets as project_internal_views
@@ -123,6 +124,11 @@ router.register("external/msgs", MessageFlowViewset, basename="external_message"
 router.register("external/rooms", RoomFlowViewSet, basename="external_rooms")
 router.register(
     "external/room_agent", RoomUserExternalViewSet, basename="external_roomagent"
+)
+router.register(
+    "external/custom_field",
+    CustomFieldsUserExternalViewSet,
+    basename="external_custom_field",
 )
 router.register("external/sectors", SectorFlowViewset, basename="external_sector")
 router.register("external/queues", QueueFlowViewset, basename="external_queue")
