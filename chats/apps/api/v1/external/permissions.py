@@ -11,5 +11,5 @@ class IsAdminPermission(permissions.BasePermission):
             return (
                 True if ProjectPermission.objects.get(pk=auth_token, role=1) else False
             )
-        except (AttributeError, ProjectPermission.DoesNotExist):
-            return False
+        except (AttributeError, IndexError, ProjectPermission.DoesNotExist):
+            return

@@ -1,3 +1,4 @@
+from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -7,6 +8,8 @@ from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorAuthorization
+
+User = get_user_model()
 
 
 class RoomTests(APITestCase):
@@ -229,3 +232,91 @@ class RoomMessagesTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(first_msg.seen and second_msg.seen)
+
+
+class RoomsManagerTests(APITestCase):
+    """
+
+    TODO Manager can access agents
+    [] Room List
+    [] Room Read
+    [] Room Transfer
+
+    [] Manager/Admin with X rooms
+    [] Agent with Y rooms
+    [] Given a agent, Manager/Admin should retrieve Y rooms
+
+    Project: 34a93b52-231e-11ed-861d-0242ac120002
+    Queue: f2519480-7e58-4fc4-9894-9ab1769e29cf
+    Admin: amazoninhaweni@chats.weni.ai <d116bca8757372f3b5936096473929ed1465915e> [0 rooms]
+    Manager(in other sector): linalawson@chats.weni.ai <d7fddba0b1dfaad72aa9e21876cbc93caa9ce3fa> [0 rooms]
+    Agent_1: amywong@chats.weni.ai <4215e6d6666e54f7db9f98100533aa68909fd855> [2 rooms]
+    Agent_2: johndoe@chats.weni.ai <59e5b85e2f0134c4ee9f72037e379c94390697ce> [0 rooms]
+
+    """
+
+    fixtures = ["chats/fixtures/fixture_app.json"]
+
+    def setUp(self) -> None:
+        self.project = Project.objects.get(pk="34a93b52-231e-11ed-861d-0242ac120002")
+        self.admin = User.objects.get(email="amazoninhaweni@chats.weni.ai")
+        self.manager = User.objects.get(email="linalawson@chats.weni.ai")
+        self.agent_1 = User.objects.get(email="amywong@chats.weni.ai")
+        self.agent_2 = User.objects.get(email="johndoe@chats.weni.ai")
+        self.room = Room.objects.get(pk="090da6d1-959e-4dea-994a-41bf0d38ba26")
+
+    def _request_list_rooms(self, token, data: dict):
+        url = reverse("room-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + token)
+        response = client.get(url, data=data)
+        results = response.json().get("results")
+        return response, results
+
+    def _request_transfer_room(self, token, data: dict):
+        url = reverse("room-detail", kwargs={"pk": str(self.room.pk)})
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + token)
+        response = client.patch(url, data=data)
+        results = response.json().get("results")
+        return response, results
+
+    def test_admin_list_agent_rooms(self):
+        data = {"project": str(self.project.pk)}
+        admin_data = {**data, **{"email": self.agent_1.email}}
+        admin_response = self._request_list_rooms(
+            self.admin.auth_token.key, admin_data
+        )[0]
+        agent_response = self._request_list_rooms(self.agent_1.auth_token.key, data)[0]
+        admin_content = admin_response.json()
+        agent_content = agent_response.json()
+        self.assertEquals(admin_response.status_code, status.HTTP_200_OK)
+        self.assertEquals(admin_content.get("count"), agent_content.get("count"))
+
+    def test_manager_list_agent_rooms(self):
+        data = {"project": str(self.project.pk)}
+        manager_data = {**data, **{"email": self.agent_1.email}}
+        manager_response = self._request_list_rooms(
+            self.manager.auth_token.key, manager_data
+        )[0]
+        agent_response = self._request_list_rooms(self.agent_1.auth_token.key, data)[0]
+        manager_content = manager_response.json()
+        agent_content = agent_response.json()
+        self.assertEquals(manager_response.status_code, status.HTTP_200_OK)
+        self.assertEquals(manager_content.get("count"), agent_content.get("count"))
+
+    def test_admin_transfer_agent_rooms(self):
+        data = {"user_email": self.agent_2.email}
+        response = self._request_transfer_room(self.admin.auth_token.key, data)[0]
+        room = self.room
+        room.refresh_from_db()
+        self.assertEquals(response.status_code, status.HTTP_200_OK)
+        self.assertEquals(room.user, self.agent_2)
+
+    def test_manager_transfer_agent_rooms(self):
+        data = {"user_email": self.agent_2.email}
+        response = self._request_transfer_room(self.manager.auth_token.key, data)[0]
+        room = self.room
+        room.refresh_from_db()
+        self.assertEquals(response.status_code, status.HTTP_200_OK)
+        self.assertEquals(room.user, self.agent_2)
