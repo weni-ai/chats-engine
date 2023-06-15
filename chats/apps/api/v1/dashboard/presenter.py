@@ -1,5 +1,6 @@
 import json
 
+import pendulum
 from django.db.models import Avg, Count, F, Q, Sum
 from django.utils import timezone
 
@@ -10,13 +11,20 @@ from chats.apps.sectors.models import Sector
 
 
 def get_export_data(project, filter):
-    initial_datetime = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    tz = project.timezone
+    initial_datetime = (
+        timezone.now().astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+    )
     rooms_filter = {}
 
     if filter.get("start_date") and filter.get("end_date"):
+        start_time = pendulum.parse(filter.get("start_date")).replace(tzinfo=tz)
+        end_time = pendulum.parse(filter.get("end_date") + " 23:59:59").replace(
+            tzinfo=tz
+        )
         rooms_filter["created_on__range"] = [
-            filter.get("start_date"),
-            filter.get("end_date") + " 23:59:59",  # TODO: USE DATETIME IN END DATE
+            start_time,
+            end_time,  # TODO: USE DATETIME IN END DATE
         ]
     else:
         rooms_filter["created_on__gte"] = initial_datetime
@@ -43,7 +51,10 @@ def get_export_data(project, filter):
 
 
 def get_general_data(project, filter):
-    initial_datetime = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    tz = project.timezone
+    initial_datetime = (
+        timezone.now().astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+    )
     rooms_filter = {}
 
     rooms_filter_in_progress_chats = {}
@@ -57,21 +68,25 @@ def get_general_data(project, filter):
     rooms_filter_closed["is_active"] = False
 
     if filter.get("start_date") and filter.get("end_date"):
+        start_time = pendulum.parse(filter.get("start_date")).replace(tzinfo=tz)
+        end_time = pendulum.parse(filter.get("end_date") + " 23:59:59").replace(
+            tzinfo=tz
+        )
         rooms_filter["created_on__range"] = [
-            filter.get("start_date"),
-            filter.get("end_date") + " 23:59:59",  # TODO: USE DATETIME IN END DATE
+            start_time,
+            end_time,  # TODO: USE DATETIME IN END DATE
         ]
         rooms_filter_in_progress_chats["created_on__range"] = [
-            filter.get("start_date"),
-            filter.get("end_date") + " 23:59:59",  # TODO: USE DATETIME IN END DATE
+            start_time,
+            end_time,  # TODO: USE DATETIME IN END DATE
         ]
         rooms_filter_waiting_service["created_on__range"] = [
-            filter.get("start_date"),
-            filter.get("end_date") + " 23:59:59",  # TODO: USE DATETIME IN END DATE
+            start_time,
+            end_time,  # TODO: USE DATETIME IN END DATE
         ]
         rooms_filter_closed["ended_at__range"] = [
-            filter.get("start_date"),
-            filter.get("end_date") + " 23:59:59",  # TODO: USE DATETIME IN END DATE
+            start_time,
+            end_time,  # TODO: USE DATETIME IN END DATE
         ]
         rooms_filter_in_progress_chats["is_active"] = False
     else:
@@ -153,7 +168,10 @@ def get_general_data(project, filter):
 
 
 def get_agents_data(project, filter):
-    initial_datetime = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    tz = project.timezone
+    initial_datetime = (
+        timezone.now().astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+    )
     rooms_filter = {}
     closed_rooms = {}
     permission_filter = {"project": project}
@@ -162,13 +180,17 @@ def get_agents_data(project, filter):
     closed_rooms["user__rooms__is_active"] = False
 
     if filter.get("start_date") and filter.get("end_date"):
+        start_time = pendulum.parse(filter.get("start_date")).replace(tzinfo=tz)
+        end_time = pendulum.parse(filter.get("end_date") + " 23:59:59").replace(
+            tzinfo=tz
+        )
         rooms_filter["user__rooms__created_on__range"] = [
-            filter.get("start_date"),
-            filter.get("end_date") + " 23:59:59",  # TODO: USE DATETIME IN END DATE
+            start_time,
+            end_time,  # TODO: USE DATETIME IN END DATE
         ]
         closed_rooms["user__rooms__ended_at__range"] = [
-            filter.get("start_date"),
-            filter.get("end_date") + " 23:59:59",  # TODO: USE DATETIME IN END DATE
+            start_time,
+            end_time,  # TODO: USE DATETIME IN END DATE
         ]
     else:
         closed_rooms["user__rooms__ended_at__gte"] = initial_datetime
@@ -209,7 +231,10 @@ def get_agents_data(project, filter):
 
 
 def get_sector_data(project, filter):
-    initial_datetime = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    tz = project.timezone
+    initial_datetime = (
+        timezone.now().astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+    )
 
     model = Sector
     rooms_filter = {}
@@ -231,9 +256,13 @@ def get_sector_data(project, filter):
             rooms_filter[f"{rooms_filter_prefix}rooms__user"] = filter.get("agent")
 
     if filter.get("start_date") and filter.get("end_date"):
+        start_time = pendulum.parse(filter.get("start_date")).replace(tzinfo=tz)
+        end_time = pendulum.parse(filter.get("end_date") + " 23:59:59").replace(
+            tzinfo=tz
+        )
         rooms_filter[f"{rooms_filter_prefix}rooms__created_on__range"] = [
-            filter.get("start_date"),
-            filter.get("end_date") + " 23:59:59",  # TODO: USE DATETIME IN END DATE
+            start_time,
+            end_time,  # TODO: USE DATETIME IN END DATE
         ]
     else:
         rooms_filter[f"{rooms_filter_prefix}rooms__created_on__gte"] = initial_datetime
