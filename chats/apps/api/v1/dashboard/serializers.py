@@ -1,6 +1,7 @@
 import json
 from urllib import parse
 
+import pendulum
 from django.conf import settings
 from django.db.models import Avg, Count, F, Q, Sum
 from django.utils import timezone
@@ -85,18 +86,25 @@ def dashboard_general_data(context: dict, project):
 
 
 def dashboard_agents_data(context, project):
-    initial_datetime = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    tz = project.timezone
+    initial_datetime = timezone.now().replace(
+        hour=0, minute=0, second=0, microsecond=0, tzinfo=tz
+    )
 
     rooms_filter = {"user__isnull": False}
     closed_rooms = {}
-
+    opened_rooms = {}
     if context.get("start_date") and context.get("end_date"):
-        rooms_filter["created_on__range"] = [
-            context.get("start_date"),
-            context.get("end_date") + " 23:59:59",  # TODO: USE DATETIME IN END DATE
-        ]
+        start_time = pendulum.parse(context.get("start_date")).replace(tzinfo=tz)
+        end_time = pendulum.parse(context.get("end_date") + " 23:59:59").replace(
+            tzinfo=tz
+        )
+
+        rooms_filter["created_on__range"] = [start_time, end_time]
+        closed_rooms["created_on__range"] = [start_time, end_time]
     else:
         closed_rooms["ended_at__gte"] = initial_datetime
+        opened_rooms["is_active"] = True
 
     if context.get("agent"):
         rooms_filter["user"] = context.get("agent")
@@ -118,7 +126,7 @@ def dashboard_agents_data(context, project):
         .annotate(
             user__first_name=F("user__first_name"),
             closed_rooms=Count("uuid", filter=Q(is_active=False, **closed_rooms)),
-            opened_rooms=Count("uuid", filter=Q(is_active=True)),
+            opened_rooms=Count("uuid", filter=Q(**opened_rooms)),
         )
     )
 
