@@ -119,6 +119,7 @@ def dashboard_agents_data(context, project):
             user__first_name=F("user__first_name"),
             closed_rooms=Count("uuid", filter=Q(is_active=False, **closed_rooms)),
             opened_rooms=Count("uuid", filter=Q(is_active=True)),
+            user_status=F("user__project_permissions__status"),
         )
     )
 
