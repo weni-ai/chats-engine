@@ -1,6 +1,7 @@
 import json
 from urllib import parse
 
+import pendulum
 from django.conf import settings
 from django.db.models import Avg, Count, F, Q, Sum
 from django.utils import timezone
@@ -15,14 +16,22 @@ def dashboard_general_data(context: dict, project):
     DASHBOARD_ROOMS_CACHE_KEY = "dashboard:{filter}:{metric}"
     redis_connection = get_redis_connection()
 
-    initial_datetime = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    tz = project.timezone
+    initial_datetime = (
+        timezone.now().astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+    )
     rooms_filter = {}
     active_chat_filter = {}
     rooms_filter["user__isnull"] = False
     if context.get("start_date") and context.get("end_date"):
+        start_time = pendulum.parse(context.get("start_date")).replace(tzinfo=tz)
+        end_time = pendulum.parse(context.get("end_date") + " 23:59:59").replace(
+            tzinfo=tz
+        )
+
         rooms_filter["created_on__range"] = [
-            context.get("start_date"),
-            context.get("end_date") + " 23:59:59",  # TODO: USE DATETIME IN END DATE
+            start_time,
+            end_time,  # TODO: USE DATETIME IN END DATE
         ]
         active_chat_filter["is_active"] = False
         active_chat_filter["user__isnull"] = False
@@ -85,18 +94,25 @@ def dashboard_general_data(context: dict, project):
 
 
 def dashboard_agents_data(context, project):
-    initial_datetime = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    tz = project.timezone
+    initial_datetime = (
+        timezone.now().astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+    )
 
     rooms_filter = {"user__isnull": False}
     closed_rooms = {}
-
+    opened_rooms = {}
     if context.get("start_date") and context.get("end_date"):
-        rooms_filter["created_on__range"] = [
-            context.get("start_date"),
-            context.get("end_date") + " 23:59:59",  # TODO: USE DATETIME IN END DATE
-        ]
+        start_time = pendulum.parse(context.get("start_date")).replace(tzinfo=tz)
+        end_time = pendulum.parse(context.get("end_date") + " 23:59:59").replace(
+            tzinfo=tz
+        )
+
+        rooms_filter["created_on__range"] = [start_time, end_time]
+        closed_rooms["ended_at__range"] = [start_time, end_time]
     else:
         closed_rooms["ended_at__gte"] = initial_datetime
+        opened_rooms["is_active"] = True
 
     if context.get("agent"):
         rooms_filter["user"] = context.get("agent")
@@ -118,8 +134,7 @@ def dashboard_agents_data(context, project):
         .annotate(
             user__first_name=F("user__first_name"),
             closed_rooms=Count("uuid", filter=Q(is_active=False, **closed_rooms)),
-            opened_rooms=Count("uuid", filter=Q(is_active=True)),
-            user_status=F("user__project_permissions__status"),
+            opened_rooms=Count("uuid", filter=Q(**opened_rooms)),
         )
     )
 
@@ -130,8 +145,10 @@ def dashboard_agents_data(context, project):
 
 
 def dashboard_division_data(context, project=None):
-    initial_datetime = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
-
+    tz = project.timezone
+    initial_datetime = (
+        timezone.now().astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
+    )
     rooms_filter = {}
     division_level = "room__queue__sector"
 
@@ -148,10 +165,11 @@ def dashboard_division_data(context, project=None):
         rooms_filter["room__user"] = context.get("agent")
 
     if context.get("start_date") and context.get("end_date"):
-        rooms_filter["created_on__range"] = [
-            context.get("start_date"),
-            context.get("end_date") + " 23:59:59",  # TODO: USE DATETIME IN END DATE
-        ]
+        start_time = pendulum.parse(context.get("start_date")).replace(tzinfo=tz)
+        end_time = pendulum.parse(context.get("end_date") + " 23:59:59").replace(
+            tzinfo=tz
+        )
+        rooms_filter["created_on__range"] = [start_time, end_time]
     else:
         rooms_filter["created_on__gte"] = initial_datetime
 
@@ -178,18 +196,24 @@ class DashboardRawDataSerializer(serializers.ModelSerializer):
         fields = ["closed_rooms", "transfer_count", "queue_rooms"]
 
     def get_closed_rooms(self, project):
-        initial_datetime = timezone.now().replace(
-            hour=0, minute=0, second=0, microsecond=0
+        tz = project.timezone
+        initial_datetime = (
+            timezone.now()
+            .astimezone(tz)
+            .replace(hour=0, minute=0, second=0, microsecond=0)
         )
 
         rooms_filter = {}
         rooms_filter["is_active"] = False
 
         if self.context.get("start_date") and self.context.get("end_date"):
-            rooms_filter["ended_at__range"] = [
-                self.context.get("start_date"),
-                self.context.get("end_date"),
-            ]
+            start_time = pendulum.parse(self.context.get("start_date")).replace(
+                tzinfo=tz
+            )
+            end_time = pendulum.parse(
+                self.context.get("end_date") + " 23:59:59"
+            ).replace(tzinfo=tz)
+            rooms_filter["ended_at__range"] = [start_time, end_time]
         else:
             rooms_filter["ended_at__gte"] = initial_datetime
 
@@ -210,15 +234,26 @@ class DashboardRawDataSerializer(serializers.ModelSerializer):
         return closed_rooms
 
     def get_transfer_count(self, project):
-        initial_datetime = timezone.now().replace(
-            hour=0, minute=0, second=0, microsecond=0
+        tz = project.timezone
+
+        tz = project.timezone
+        initial_datetime = (
+            timezone.now()
+            .astimezone(tz)
+            .replace(hour=0, minute=0, second=0, microsecond=0)
         )
         rooms_filter = {}
 
         if self.context.get("start_date") and self.context.get("end_date"):
+            start_time = pendulum.parse(self.context.get("start_date")).replace(
+                tzinfo=tz
+            )
+            end_time = pendulum.parse(
+                self.context.get("end_date") + " 23:59:59"
+            ).replace(tzinfo=tz)
             rooms_filter["created_on__range"] = [
-                self.context.get("start_date"),
-                self.context.get("end_date"),
+                start_time,
+                end_time,
             ]
         else:
             rooms_filter["created_on__gte"] = initial_datetime
@@ -237,14 +272,21 @@ class DashboardRawDataSerializer(serializers.ModelSerializer):
         return transfer_metric["count"]
 
     def get_queue_rooms(self, project):
+        tz = project.timezone
         rooms_filter = {}
         rooms_filter["user__isnull"] = True
         rooms_filter["is_active"] = True
 
         if self.context.get("start_date") and self.context.get("end_date"):
+            start_time = pendulum.parse(self.context.get("start_date")).replace(
+                tzinfo=tz
+            )
+            end_time = pendulum.parse(
+                self.context.get("end_date") + " 23:59:59"
+            ).replace(tzinfo=tz)
             rooms_filter["created_on__range"] = [
-                self.context.get("start_date"),
-                self.context.get("end_date"),
+                start_time,
+                end_time,
             ]
 
         if self.context.get("sector"):
