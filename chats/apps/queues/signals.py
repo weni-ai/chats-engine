@@ -1,4 +1,5 @@
 from dateutil.relativedelta import relativedelta
+from django.conf import settings
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django.utils import timezone
@@ -12,10 +13,8 @@ from chats.apps.api.v1.prometheus.metrics import (
 )
 from chats.apps.queues.models import QueueAuthorization
 
-from django.conf import settings
-
-
 if settings.USE_PROMETHEUS_METRICS:
+
     @receiver([post_save, post_delete], sender=QueueAuthorization)
     def queueauthorization_metrics_sender(sender, instance, **kwargs):
         Metrics()
