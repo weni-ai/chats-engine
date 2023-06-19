@@ -14,6 +14,7 @@ from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.external.rooms.serializers import RoomFlowSerializer
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.rooms.models import Room
+from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 
 
 def add_user_or_queue_to_room(instance, request):
@@ -180,5 +181,53 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
 
         return Response(
             {"Detail": f"Agent {agent} successfully attributed to the ticket {pk}"},
+            status.HTTP_200_OK,
+        )
+
+
+class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
+    serializer_class = RoomFlowSerializer
+    permission_classes = [
+        IsAdminPermission,
+    ]
+    authentication_classes = [ProjectAdminAuthentication]
+
+    def partial_update(self, request, pk=None):
+        custom_fields_update = request.data
+        data = {"fields": custom_fields_update}
+
+        if pk is None:
+            return Response(
+                {"Detail": "No contact id on the request"}, status.HTTP_400_BAD_REQUEST
+            )
+        request_permission = self.request.auth
+        project = request_permission.project
+
+        room = Room.objects.filter(
+            contact__external_id=pk,
+            queue__sector__project=project,
+            is_active=True,
+        ).update(custom_fields=custom_fields_update)
+
+        response = FlowRESTClient().create_contact(
+            project=project, data=data, contact_id=pk
+        )
+        if response.status_code not in [status.HTTP_200_OK]:
+            return Response(
+                {
+                    "Detail": f"[{response.status_code}] Error updating custom fields on flows. Exception: {response.content}"
+                },
+                status.HTTP_404_NOT_FOUND,
+            )
+        if not room:
+            return Response(
+                {
+                    "Detail": "Contact with the given id was not found, it does not exist or it is deleted"
+                },
+                status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(
+            {"Detail": "Custom Field edited with success"},
             status.HTTP_200_OK,
         )

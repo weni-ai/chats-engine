@@ -121,12 +121,17 @@ class FlowsContactsAndGroupsMixin:
         contacts["previous"] = get_cursor(contacts.get("previous") or "")
         return contacts
 
-    def create_contact(self, project, data: dict):
+    def create_contact(self, project, data: dict, contact_id: str = ""):
+        url = (
+            f"{self.base_url}/api/v2/contacts.json"
+            if contact_id == ""
+            else f"{self.base_url}/api/v2/contacts.json?uuid={contact_id}"
+        )
         response = retry_request_and_refresh_flows_auth_token(
             project=project,
             request_method=requests.post,
-            url=f"{self.base_url}/api/v2/contacts.json",
             json=data,
+            url=url,
             headers=self.project_headers(project.flows_authorization),
         )
         return response.json()
