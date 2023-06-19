@@ -47,6 +47,12 @@ class RoomViewset(
                 permissions.IsAuthenticated,
                 api_permissions.IsQueueAgent,
             )
+        elif self.action == "list" and self.request.query_params.get("email"):
+            permission_classes = (
+                permissions.IsAuthenticated,
+                api_permissions.AnySectorManagerPermission,
+            )
+
         return [permission() for permission in permission_classes]
 
     def get_queryset(self):
@@ -203,14 +209,14 @@ class RoomViewset(
         msg = instance.messages.create(text=json.dumps(transfer_content), seen=True)
         msg.notify_room("create")
 
-        # Send Updated data to the queue group, as send room is not sending after a join
-        if old_user is None or instance.user is None:
-            instance.notify_user("update", user=old_user)
+        if old_user is None and user:  # queued > agent
             instance.notify_queue("update")
-        else:
-            if instance.user != self.request.user:
-                instance.notify_user("update", user=self.request.user)
-            instance.notify_user("update")
+        elif old_user is not None:
+            instance.notify_user("update", user=old_user)
+            if queue:  # agent > queue
+                instance.notify_queue("update")
+            else:  # agent > agent
+                instance.notify_user("update")
 
     def perform_destroy(self, instance):
         instance.notify_room("destroy", callback=True)

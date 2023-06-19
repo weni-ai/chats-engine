@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -39,7 +40,10 @@ class Queue(BaseSoftDeleteModel, BaseModel):
         return self.sector.rooms_limit
 
     def get_permission(self, user):
-        return self.sector.get_permission(user=user)
+        try:
+            return self.sector.get_permission(user=user)
+        except ObjectDoesNotExist:
+            return None
 
     @property
     def agent_count(self):
@@ -119,7 +123,10 @@ class QueueAuthorization(BaseModel):
         ]
 
     def get_permission(self, user):
-        return self.queue.get_permission(user)
+        try:
+            return self.queue.get_permission(user)
+        except ObjectDoesNotExist:
+            return None
 
     @property
     def sector(self):

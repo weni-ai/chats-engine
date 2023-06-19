@@ -45,7 +45,7 @@ class Project(BaseModel):
     def get_permission(self, user):
         try:
             return self.permissions.get(user=user)
-        except ProjectPermission.DoesNotExist:
+        except ObjectDoesNotExist:
             return None
 
     def set_flows_project_auth_token(
@@ -168,9 +168,13 @@ class ProjectPermission(
     def is_admin(self):
         return self.role == self.ROLE_ADMIN
 
-    def is_manager(self, sector: str = None, queue: str = None):
+    def is_manager(
+        self, sector: str = None, queue: str = None, any_sector: bool = False
+    ):
         if self.is_admin:
             return True
+        if any_sector is True:
+            return self.sector_authorizations.exists()
         qs = (
             models.Q(sector__uuid=sector)
             if sector is not None
@@ -225,7 +229,10 @@ class ProjectPermission(
         return queues
 
     def get_permission(self, user):
-        return self.project.get_permission(user=user)
+        try:
+            return self.project.get_permission(user=user)
+        except ObjectDoesNotExist:
+            return None
 
     @property
     def rooms_limit(self):

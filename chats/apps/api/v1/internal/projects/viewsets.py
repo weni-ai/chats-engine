@@ -99,6 +99,10 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
                 ProjectPermission, project__uuid=project_uuid, user=request.user
             )
             user_status = request.data.get("status")
+            if user_status is None:
+                return Response(
+                    dict(connection_status=instance.status), status=status.HTTP_200_OK
+                )
 
             if user_status.lower() == "online":
                 instance.status = ProjectPermission.STATUS_ONLINE
