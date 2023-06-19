@@ -59,7 +59,12 @@ class SectorViewset(viewsets.ModelViewSet):
         return super().get_serializer_class()
 
     def perform_create(self, serializer):
-        instance = serializer.save()
+        try:
+            instance = serializer.save()
+        except IntegrityError as e:
+            raise exceptions.APIException(
+                detail=f"Error when saving the sector. Exception: {str(e)}"  # NOQA
+            )
 
         if settings.USE_WENI_FLOWS:
             connect = ConnectRESTClient()
