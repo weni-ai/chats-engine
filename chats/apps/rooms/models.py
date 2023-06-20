@@ -2,7 +2,6 @@ import json
 from datetime import timedelta
 
 import requests
-
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
