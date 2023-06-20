@@ -2,6 +2,8 @@ import json
 from datetime import timedelta
 
 import requests
+
+from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.utils import timezone
@@ -87,7 +89,10 @@ class Room(BaseModel):
         return super().save(*args, **kwargs)
 
     def get_permission(self, user):
-        return self.queue.get_permission(user)
+        try:
+            return self.queue.get_permission(user)
+        except ObjectDoesNotExist:
+            return None
 
     def get_is_waiting(self):
         """If the room does not have any contact message, then it is waiting"""
