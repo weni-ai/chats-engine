@@ -12,9 +12,9 @@ from chats.apps.accounts.authentication.drf.authorization import (
 )
 from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.external.rooms.serializers import RoomFlowSerializer
+from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.rooms.models import Room
-from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 
 
 def add_user_or_queue_to_room(instance, request):
@@ -203,12 +203,6 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
         request_permission = self.request.auth
         project = request_permission.project
 
-        room = Room.objects.filter(
-            contact__external_id=pk,
-            queue__sector__project=project,
-            is_active=True,
-        ).update(custom_fields=custom_fields_update)
-
         response = FlowRESTClient().create_contact(
             project=project, data=data, contact_id=pk
         )
@@ -219,6 +213,13 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
                 },
                 status.HTTP_404_NOT_FOUND,
             )
+
+        room = Room.objects.filter(
+            contact__external_id=pk,
+            queue__sector__project=project,
+            is_active=True,
+        ).update(custom_fields=custom_fields_update)
+
         if not room:
             return Response(
                 {

@@ -134,7 +134,7 @@ class FlowsContactsAndGroupsMixin:
             url=url,
             headers=self.project_headers(project.flows_authorization),
         )
-        return response.json()
+        return response
 
     def list_contact_groups(self, project, cursor: str = "", query_filters: dict = {}):
         response = retry_request_and_refresh_flows_auth_token(
