@@ -4,7 +4,7 @@ from django.conf import settings
 from django.db.models import F, Max, Sum
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import exceptions, filters, mixins, permissions, status
+from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
