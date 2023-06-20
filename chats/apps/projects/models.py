@@ -225,7 +225,10 @@ class ProjectPermission(
         return queues
 
     def get_permission(self, user):
-        return self.project.get_permission(user=user)
+        try:
+            return self.project.get_permission(user=user)
+        except ObjectDoesNotExist:
+            return None
 
     @property
     def rooms_limit(self):
