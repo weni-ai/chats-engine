@@ -1,6 +1,6 @@
 import pendulum
-from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.db.models import F, Q, Value
 from django.db.models.functions import Concat
