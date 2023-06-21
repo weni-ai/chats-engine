@@ -174,7 +174,7 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
                 status.HTTP_400_BAD_REQUEST,
             )
         data = serializer.validated_data
-        contact = FlowRESTClient().create_contact(project, data)
+        contact = FlowRESTClient().create_contact(project, data).json()
 
         return Response(contact, status.HTTP_201_CREATED)
 
