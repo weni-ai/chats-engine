@@ -25,7 +25,7 @@ class RoomSerializer(serializers.ModelSerializer):
     contact = ContactRelationsSerializer(many=False, read_only=True)
     queue = QueueSerializer(many=False, read_only=True)
     tags = DetailSectorTagSerializer(many=True, read_only=True)
-    unread_msgs = serializers.SerializerMethodField()
+    unread_msgs = serializers.IntegerField(required=False, default=0)
     last_message = serializers.SerializerMethodField()
     is_waiting = serializers.SerializerMethodField()
     linked_user = serializers.SerializerMethodField()
@@ -68,9 +68,6 @@ class RoomSerializer(serializers.ModelSerializer):
 
     def get_is_waiting(self, room: Room):
         return room.get_is_waiting()
-
-    def get_unread_msgs(self, room: Room):
-        return room.messages.filter(seen=False).count()
 
     def get_last_message(self, room: Room):
         last_message = (
