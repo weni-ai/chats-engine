@@ -109,10 +109,13 @@ def dashboard_agents_data(context, project):
         )
 
         rooms_filter["created_on__range"] = [start_time, end_time]
+        rooms_filter["is_active"] = False
         closed_rooms["ended_at__range"] = [start_time, end_time]
+
     else:
         closed_rooms["ended_at__gte"] = initial_datetime
         opened_rooms["is_active"] = True
+        closed_rooms["is_active"] = False
 
     if context.get("agent"):
         rooms_filter["user"] = context.get("agent")
@@ -133,7 +136,7 @@ def dashboard_agents_data(context, project):
         .values("user")
         .annotate(
             user__first_name=F("user__first_name"),
-            closed_rooms=Count("uuid", filter=Q(is_active=False, **closed_rooms)),
+            closed_rooms=Count("uuid", filter=Q(**closed_rooms)),
             opened_rooms=Count("uuid", filter=Q(**opened_rooms)),
         )
     )
