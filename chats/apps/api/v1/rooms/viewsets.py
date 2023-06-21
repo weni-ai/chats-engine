@@ -1,5 +1,6 @@
 from django.conf import settings
-from django.db.models import Max
+from django.db import connection, reset_queries
+from django.db.models import Count, F, Max, Q, Sum
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
@@ -29,13 +30,38 @@ from chats.apps.rooms.views import (
 )
 
 
+def database_debug(func, *args, **kwargs):
+    def inner_func(*args, **kwargs):
+        reset_queries()
+        results = func(*args, **kwargs)
+        query_info = connection.queries
+        print("function_name: {}".format(func.__name__))
+        print("query_count: {}".format(len(query_info)))
+        # queries = ["\n{}\n".format(query["sql"]) for query in query_info]
+        # print("queries: \n{}\n".format("".join(queries)))
+        return results
+
+    return inner_func
+
+
 class RoomViewset(
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin,
     GenericViewSet,
 ):
-    queryset = Room.objects.all()
+    queryset = (
+        Room.objects.all()
+        .select_related(
+            "user",
+            "contact",
+            "queue",
+            "metric",
+            "queue__sector",
+            "queue__sector__project",
+        )
+        .prefetch_related("messages", "flowstarts")
+    )
     serializer_class = RoomSerializer
     filter_backends = [
         OrderingFilter,
@@ -46,6 +72,10 @@ class RoomViewset(
     search_fields = ["contact__name", "urn", "protocol"]
     ordering_fields = "__all__"
     ordering = ["user", "-last_interaction"]
+
+    @database_debug
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
 
     def get_permissions(self):
         permission_classes = [permissions.IsAuthenticated]
@@ -60,7 +90,10 @@ class RoomViewset(
         if self.action != "list":
             self.filterset_class = None
         qs = super().get_queryset()
-        return qs.annotate(last_interaction=Max("messages__created_on"))
+        return qs.annotate(
+            last_interaction=Max("messages__created_on"),
+            unread_msgs=Count("messages", filter=Q(messages__seen=False)),
+        )
 
     def get_serializer_class(self):
         if "update" in self.action:
