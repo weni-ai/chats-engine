@@ -161,11 +161,10 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             raise ValidationError(
                 {"detail": _("Contact cannot be done outside working hours")}
             )
-        elif sector.validate_agent_status is False:
+        elif sector.validate_agent_status() is False:
             raise ValidationError(
                 {"detail": _("Contact cannot be done when agents are offline")}
             )
-
         # END Check work time
 
         # get flowstart data
