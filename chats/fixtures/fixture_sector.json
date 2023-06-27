@@ -11,6 +11,47 @@
         }
     },
     {
+        "model": "projects.project",
+        "pk": "e7e5163d-4ee2-42da-a804-c252fda989b0",
+        "fields": {
+            "created_on": "2022-08-23T20:08:48.462Z",
+            "modified_on": "2022-08-23T20:08:48.462Z",
+            "name": "Weni routing",
+            "timezone": "America/Sao_Paulo",
+            "date_format": "D"
+        }
+    },
+    {
+        "model": "sectors.sector",
+        "pk": "ae4b17b4-6ff1-44f4-b77b-182b65f0098a",
+        "fields": {
+            "created_on": "2022-08-24T20:59:49.115Z",
+            "modified_on": "2022-08-24T20:59:49.115Z",
+            "name": "Don't open offline",
+            "project": "e7e5163d-4ee2-42da-a804-c252fda989b0",
+            "rooms_limit": 5,
+            "open_offline": false,
+            "work_start": "08:00:00",
+            "work_end": "17:00:00",
+            "is_deleted": false
+        }
+    },
+    {
+        "model": "sectors.sector",
+        "pk": "ab6e9380-a384-4f9f-ac21-c1131029c59b",
+        "fields": {
+            "created_on": "2022-08-24T20:59:49.115Z",
+            "modified_on": "2022-08-24T20:59:49.115Z",
+            "name": "Open offline",
+            "project": "e7e5163d-4ee2-42da-a804-c252fda989b0",
+            "rooms_limit": 5,
+            "open_offline": true,
+            "work_start": "08:00:00",
+            "work_end": "17:00:00",
+            "is_deleted": false
+        }
+    },
+    {
         "model": "sectors.sector",
         "pk": "21aecf8c-0c73-4059-ba82-4343e0cc627c",
         "fields": {
@@ -113,6 +154,17 @@
     },
     {
         "model": "projects.projectpermission",
+        "pk": "b5fab78a-4836-468c-96c4-f5b0bba3303a",
+        "fields": {
+            "created_on": "2022-08-24T20:28:05.281Z",
+            "modified_on": "2022-08-24T20:28:05.281Z",
+            "project": "e7e5163d-4ee2-42da-a804-c252fda989b0",
+            "user": "amywong@chats.weni.ai",
+            "role": 1
+        }
+    },
+    {
+        "model": "projects.projectpermission",
         "pk": "ce3f052c-e71d-402c-b02e-1dfaca8b3d45",
         "fields": {
             "created_on": "2022-08-24T20:28:05.281Z",
@@ -146,6 +198,28 @@
     },
     {
         "model": "sectors.sectorauthorization",
+        "pk": "c5378e06-ee3b-4cd4-a9c7-62410f6a45d4",
+        "fields": {
+            "created_on": "2022-08-24T21:13:48.359Z",
+            "modified_on": "2022-08-24T21:13:48.359Z",
+            "permission": "b5fab78a-4836-468c-96c4-f5b0bba3303a",
+            "sector": "ae4b17b4-6ff1-44f4-b77b-182b65f0098a",
+            "role": 1
+        }
+    },
+    {
+        "model": "sectors.sectorauthorization",
+        "pk": "2a2571be-294e-4bd7-ba3a-8db6b182de82",
+        "fields": {
+            "created_on": "2022-08-24T21:13:48.359Z",
+            "modified_on": "2022-08-24T21:13:48.359Z",
+            "permission": "b5fab78a-4836-468c-96c4-f5b0bba3303a",
+            "sector": "ab6e9380-a384-4f9f-ac21-c1131029c59b",
+            "role": 1
+        }
+    },
+    {
+        "model": "sectors.sectorauthorization",
         "pk": "00185928-ef97-47b8-9295-5462ff797a4e",
         "fields": {
             "created_on": "2022-08-24T21:13:48.359Z",
@@ -168,6 +242,26 @@
     },
     {
         "model": "queues.queue",
+        "pk": "605e21b0-4177-4eae-9cfb-529d9972a192",
+        "fields": {
+            "created_on": "2022-08-24T21:40:15.274Z",
+            "modified_on": "2022-08-24T21:40:15.274Z",
+            "sector": "ae4b17b4-6ff1-44f4-b77b-182b65f0098a",
+            "name": "DON'T OPEN OFFLINE"
+        }
+    },
+    {
+        "model": "queues.queue",
+        "pk": "8590ad29-5629-448c-bfb6-1bfd5219b8ec",
+        "fields": {
+            "created_on": "2022-08-24T21:40:15.274Z",
+            "modified_on": "2022-08-24T21:40:15.274Z",
+            "sector": "ab6e9380-a384-4f9f-ac21-c1131029c59b",
+            "name": "OPEN OFFLINE"
+        }
+    },
+    {
+        "model": "queues.queue",
         "pk": "f2519480-7e58-4fc4-9894-9ab1769e29cf",
         "fields": {
             "created_on": "2022-08-24T21:40:15.274Z",
@@ -184,6 +278,28 @@
             "modified_on": "2022-08-24T21:40:24.240Z",
             "sector": "4f88b656-194d-4a83-a166-5d84ba825b8d",
             "name": "FRONTEND"
+        }
+    },
+    {
+        "model": "queues.queueauthorization",
+        "pk": "355297c1-448f-4357-b4b1-97df80c240b4",
+        "fields": {
+            "created_on": "2022-08-25T04:55:18.502Z",
+            "modified_on": "2022-08-25T04:55:18.502Z",
+            "queue": "605e21b0-4177-4eae-9cfb-529d9972a192",
+            "role": 1,
+            "permission": "b5fab78a-4836-468c-96c4-f5b0bba3303a"
+        }
+    },
+    {
+        "model": "queues.queueauthorization",
+        "pk": "45c6658e-966d-4222-b865-56710922335a",
+        "fields": {
+            "created_on": "2022-08-25T04:55:18.502Z",
+            "modified_on": "2022-08-25T04:55:18.502Z",
+            "queue": "8590ad29-5629-448c-bfb6-1bfd5219b8ec",
+            "role": 1,
+            "permission": "b5fab78a-4836-468c-96c4-f5b0bba3303a"
         }
     },
     {
@@ -224,7 +340,7 @@
                 "mood": "angry",
                 "country": "brazil"
             },
-            "callback_url": "http://localhost:8000/callback/uuid",
+            "callback_url": "https://flows.weni.ai/callback/uuid",
             "ended_at": null,
             "ended_by": null,
             "is_active": true,
