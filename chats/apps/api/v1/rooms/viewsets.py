@@ -1,7 +1,7 @@
 import json
 
 from django.conf import settings
-from django.db.models import F, Max, Sum
+from django.db.models import Max
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
@@ -18,8 +18,8 @@ from chats.apps.api.v1.rooms.serializers import (
     TransferRoomSerializer,
 )
 from chats.apps.dashboard.models import RoomMetrics
-from chats.apps.msgs.models import Message
 from chats.apps.rooms.models import Room
+from chats.celery import app as celery_app
 
 
 class RoomViewset(
@@ -111,44 +111,8 @@ class RoomViewset(
         if not settings.ACTIVATE_CALC_METRICS:
             return Response(serialized_data.data, status=status.HTTP_200_OK)
 
-        messages_contact = (
-            Message.objects.filter(room=instance, contact__isnull=False)
-            .order_by("created_on")
-            .first()
-        )
-        messages_agent = (
-            Message.objects.filter(room=instance, user__isnull=False)
-            .order_by("created_on")
-            .first()
-        )
-
-        time_message_contact = 0
-        time_message_agent = 0
-
-        if messages_agent and messages_contact:
-            time_message_agent = messages_agent.created_on.timestamp()
-            time_message_contact = messages_contact.created_on.timestamp()
-        else:
-            time_message_agent = 0
-            time_message_contact = 0
-
-        difference_time = time_message_agent - time_message_contact
-
-        interation_time = (
-            Room.objects.filter(pk=instance.pk)
-            .aggregate(
-                avg_time=Sum(
-                    F("ended_at") - F("created_on"),
-                )
-            )["avg_time"]
-            .total_seconds()
-        )
-
-        metric_room = RoomMetrics.objects.get_or_create(room=instance)[0]
-        metric_room.message_response_time = difference_time
-        metric_room.interaction_time = interation_time
-        metric_room.save()
-
+        close_metrics = celery_app.send_task("close_metrics", args=[str(instance.pk)])
+        close_metrics.wait()
         return Response(serialized_data.data, status=status.HTTP_200_OK)
 
     def perform_create(self, serializer):
