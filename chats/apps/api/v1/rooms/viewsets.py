@@ -208,15 +208,15 @@ class RoomViewset(
         msg.notify_room("create")
 
         if old_user is None and user:  # queued > agent
-            instance.notify_queue("update", transfered_by=self.request.user.email)
+            instance.notify_queue("update", transferred_by=self.request.user.email)
         elif old_user is not None:
             instance.notify_user(
-                "update", user=old_user, transfered_by=self.request.user.email
+                "update", user=old_user, transferred_by=self.request.user.email
             )
             if queue:  # agent > queue
-                instance.notify_queue("update", transfered_by=self.request.user.email)
+                instance.notify_queue("update", transferred_by=self.request.user.email)
             else:  # agent > agent
-                instance.notify_user("update", transfered_by=self.request.user.email)
+                instance.notify_user("update", transferred_by=self.request.user.email)
 
     def perform_destroy(self, instance):
         instance.notify_room("destroy", callback=True)
