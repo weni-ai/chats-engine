@@ -44,13 +44,16 @@ class MessageMediaPermission(permissions.BasePermission):
                 room = Room.objects.get(uuid=request.query_params.get("room"))
                 if room.user == request.user:
                     return True
+                else:
+                    permission = user.project_permissions.get(
+                        project=room.queue.sector.project
+                    )
+                    return permission.role > 0
             except Room.DoesNotExist:
-                pass
-
-            permission = user.project_permissions.get(
-                project__uuid=request.query_params.get("project")
-            )
-            return permission.role > 0
+                permission = user.project_permissions.get(
+                    project__uuid=request.query_params.get("project")
+                )
+                return permission.role > 0
         return super().has_permission(request, view)
 
     def has_object_permission(self, request, view, obj) -> bool:
