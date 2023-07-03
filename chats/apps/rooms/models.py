@@ -185,11 +185,13 @@ class Room(BaseModel):
         Contact create new room,
         Call the sector group(all agents) and send the 'create' action to add them in the room group
         """
-
+        content = self.serialized_ws_data
+        if transfered_by != "":
+            content["transfered_by"] = transfered_by
         send_channels_group(
             group_name=f"queue_{self.queue.pk}",
             call_type="notify",
-            content=self.serialized_ws_data,
+            content=content,
             action=f"rooms.{action}",
         )
         content = self.serialized_ws_data
