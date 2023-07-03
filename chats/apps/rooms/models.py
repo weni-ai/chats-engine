@@ -172,7 +172,9 @@ class Room(BaseModel):
             action=action,
         )
 
-    def notify_queue(self, action: str, callback: bool = False):
+    def notify_queue(
+        self, action: str, callback: bool = False, transfered_by: str = ""
+    ):
         """
         Used to notify channels groups when something happens on the instance.
 
@@ -190,7 +192,9 @@ class Room(BaseModel):
             content=self.serialized_ws_data,
             action=f"rooms.{action}",
         )
-
+        content = self.serialized_ws_data
+        if transfered_by != "":
+            content["transfered_by"] = transfered_by
         if self.callback_url and callback and action in ["update", "destroy", "close"]:
             self.request_callback(self.serialized_ws_data)
 
@@ -213,13 +217,17 @@ class Room(BaseModel):
         if self.callback_url and callback and action in ["update", "destroy", "close"]:
             self.request_callback(self.serialized_ws_data)
 
-    def notify_user(self, action: str, user=None):
+    def notify_user(self, action: str, user=None, transfered_by: str = ""):
         user = user if user else self.user
         permission = self.get_permission(user)
+        content = self.serialized_ws_data
+        if transfered_by != "":
+            content["transfered_by"] = transfered_by
+
         send_channels_group(
             group_name=f"permission_{permission.pk}",
             call_type="notify",
-            content=self.serialized_ws_data,
+            content=content,
             action=f"rooms.{action}",
         )
 
