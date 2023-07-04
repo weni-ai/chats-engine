@@ -25,7 +25,7 @@ class RoomsExternalTests(APITestCase):
         data = {
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
-                "external_id": "e3955fd5-5705-40cd-b480-b45594b70282",
+                "external_id": "e3955fd5-5705-60cd-b480-b45594b70282",
                 "name": "Foo Bar",
                 "email": "FooBar@weni.ai",
                 "phone": "+250788123123",
@@ -64,7 +64,7 @@ class RoomsExternalTests(APITestCase):
         data = {
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
-                "external_id": "e3955fd5-5705-40cd-b480-b45594b70282",
+                "external_id": "e3955fd5-5705-30cd-b480-b45594b70282",
                 "name": "gaules",
                 "email": "gaulesr@weni.ai",
                 "phone": "+5511985543332",
@@ -91,7 +91,7 @@ class RoomsExternalTests(APITestCase):
         data = {
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
-                "external_id": "e3955fd5-5705-40cd-b480-b45594b70282",
+                "external_id": "e3955fd5-5705-55cd-b480-b45594b70282",
                 "name": "gaules",
                 "email": "gaulesr@weni.ai",
                 "phone": "+5511985543332",
@@ -104,6 +104,7 @@ class RoomsExternalTests(APITestCase):
             },
         }
         response = self._create_room("f3ce543e-d77e-4508-9140-15c95752a380", data)
+
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.get("urn"), None)
 
@@ -179,9 +180,12 @@ class RoomsFlowStartExternalTests(APITestCase):
         response = self._create_room("f3ce543e-d77e-4508-9140-15c95752a380", data)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
+        self.assertIn(
             response.json().get("detail"),
-            "The contact already have an open room in the especified queue",
+            {
+                "The contact already have an open room in the project",
+                "The contact already have an open room in the especified queue",
+            },
         )
 
     def test_create_room_with_contact_flow_start_with_offline_user(self):

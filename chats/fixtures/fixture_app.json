@@ -2283,7 +2283,7 @@
             "name": "Inteligencia",
             "project": "34a93b52-231e-11ed-861d-0242ac120002",
             "rooms_limit": 3,
-            "work_start": "09:00:00",
+            "work_start": "01:00:00",
             "work_end": "19:00:00",
             "is_deleted": false
         }
