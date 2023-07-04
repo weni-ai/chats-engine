@@ -21,6 +21,8 @@ from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.msgs.models import Message
 from chats.apps.rooms.models import Room
 
+from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
+
 
 class RoomViewset(
     mixins.ListModelMixin,
@@ -227,3 +229,49 @@ class RoomViewset(
     def perform_destroy(self, instance):
         instance.notify_room("destroy", callback=True)
         super().perform_destroy(instance)
+
+    @action(
+        detail=True,
+        methods=["PATCH"],
+    )
+    def update_custom_fields(self, request, pk=None):
+        custom_fields_update = request.data
+        data = {"fields": custom_fields_update}
+
+        if pk is None:
+            return Response(
+                {"Detail": "No room on the request"}, status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            room = Room.objects.get(uuid=pk, is_active=True)
+        except:
+            return Response(
+                {
+                    "Detail": "Room with the given id was not found, it does not exist or it is deleted"
+                },
+                status.HTTP_404_NOT_FOUND,
+            )
+
+        response = FlowRESTClient().create_contact(
+            project=room.queue.sector.project,
+            data=data,
+            contact_id=room.contact.external_id,
+        )
+        if response.status_code not in [status.HTTP_200_OK]:
+            return Response(
+                {
+                    "Detail": f"[{response.status_code}]\n"
+                    + f"Error updating custom fields on flows. Exception: {response.content}"
+                },
+                status.HTTP_404_NOT_FOUND,
+            )
+
+        old_custom_fields = room.custom_fields
+        room.custom_fields = {**old_custom_fields, **custom_fields_update}
+        room.save()
+
+        return Response(
+            {"Detail": "Custom Field edited with success"},
+            status.HTTP_200_OK,
+        )
