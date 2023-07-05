@@ -156,6 +156,15 @@ class FlowRESTClient(
     def __init__(self, *args, **kwargs):
         self.base_url = settings.FLOWS_API_URL
 
+    def get_user_api_token(self, project_uuid: str, user_email: str):
+        params = dict(project=project_uuid, user=user_email)
+        response = requests.get(
+            url=f"{self.base_url}/api/v2/internals/users/api-token",
+            params=params,
+            headers=self.headers,
+        )
+        return response
+
     def list_flows(self, project, cursor: str = ""):
         response = retry_request_and_refresh_flows_auth_token(
             project=project,
