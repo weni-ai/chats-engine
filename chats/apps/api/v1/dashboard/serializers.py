@@ -101,9 +101,9 @@ def dashboard_agents_data(context, project):
         timezone.now().astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
     )
 
-    rooms_filter = {"rooms__user__isnull": False}
-    closed_rooms = {}
-    opened_rooms = {}
+    rooms_filter = {}
+    closed_rooms = {"rooms__queue__sector__project": project}
+    opened_rooms = {"rooms__queue__sector__project": project}
     if context.get("start_date") and context.get("end_date"):
         start_time = pendulum.parse(context.get("start_date")).replace(tzinfo=tz)
         end_time = pendulum.parse(context.get("end_date") + " 23:59:59").replace(
@@ -126,20 +126,22 @@ def dashboard_agents_data(context, project):
         rooms_filter["rooms__queue__sector"] = context.get("sector")
         if context.get("tag"):
             rooms_filter["rooms__tags__name"] = context.get("tag")
-    else:
-        rooms_filter["rooms__queue__sector__project"] = project
 
     project_permission_subquery = ProjectPermission.objects.filter(
-        project_id=OuterRef("rooms__queue__sector__project_id"),
+        project_id=project,
         user_id=OuterRef("email"),
     ).values("status")[:1]
 
+    agents_query = User.objects
+    if not context.get("is_weni_admin"):
+        agents_query = agents_query.exclude(email__endswith="weni.ai")
+
     agents_query = (
-        User.objects.filter(**rooms_filter)
+        agents_query.filter(project_permissions__project=project)
         .annotate(
             agent_status=Subquery(project_permission_subquery),
-            closed_rooms=Count("rooms", filter=Q(**closed_rooms)),
-            opened_rooms=Count("rooms", filter=Q(**opened_rooms)),
+            closed_rooms=Count("rooms", filter=Q(**closed_rooms, **rooms_filter)),
+            opened_rooms=Count("rooms", filter=Q(**opened_rooms, **rooms_filter)),
         )
         .values("first_name", "email", "agent_status", "closed_rooms", "opened_rooms")
     )
