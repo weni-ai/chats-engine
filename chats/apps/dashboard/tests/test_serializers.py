@@ -1,8 +1,6 @@
-from unittest.mock import patch
-
 from django.test import TestCase
 
-from chats.apps.api.v1.dashboard.serializers import DashboardRoomsSerializer
+from chats.apps.api.v1.dashboard.serializers import dashboard_agents_data
 from chats.apps.projects.models import Project
 
 
@@ -22,29 +20,27 @@ class SerializerTests(TestCase):
     def setUp(self):
         self.project = Project.objects.get(pk="34a93b52-231e-11ed-861d-0242ac120002")
 
-    @patch("chats.apps.api.v1.dashboard.serializers.get_redis_connection")
-    def test_init_function(self, mock):
-        """
-        Verify if the init function its working properly.
-        """
-        mock.return_value = RedisMock()
-        serializer = DashboardRoomsSerializer()
-        self.assertTrue(isinstance(serializer.redis_connection, RedisMock))
-
-    def test_active_chats_function_passing_sector(self):
-        serializer = DashboardRoomsSerializer.get_active_chats(
-            self=DashboardRoomsSerializer(
-                context={
-                    "sector": "d49049f0-c601-4e05-a293-98c1dea5fe4f",
-                }
-            ),
-            project=self.project,
+    def test_returned_fields_from_dashboard_agent_serializer(self):
+        project = Project.objects.get(uuid="34a93b52-231e-11ed-861d-0242ac120002")
+        instance = dashboard_agents_data(
+            project=project,
+            context={"is_weni_admin": True},
         )
-        self.assertEqual(serializer, 0)
+        self.assertEqual(list(instance[0].keys())[0], "first_name")
+        self.assertEqual(list(instance[0].keys())[1], "email")
+        self.assertEqual(list(instance[0].keys())[2], "agent_status")
+        self.assertEqual(list(instance[0].keys())[3], "closed_rooms")
+        self.assertEqual(list(instance[0].keys())[4], "opened_rooms")
 
-    def test_active_chats_function_without_filter(self):
-        serializer = DashboardRoomsSerializer.get_active_chats(
-            self=DashboardRoomsSerializer(context={}),
-            project=self.project,
+    def test_field_value_from_dashboard_agent_serializer(self):
+        project = Project.objects.get(uuid="34a93b52-231e-11ed-861d-0242ac120002")
+        instance = dashboard_agents_data(
+            project=project,
+            context={"is_weni_admin": True},
         )
-        self.assertEqual(serializer, 1)
+
+        self.assertEqual(instance[0]["first_name"], "")
+        self.assertEqual(instance[0]["email"], "amywong@chats.weni.ai")
+        self.assertEqual(instance[0]["agent_status"], "OFFLINE")
+        self.assertEqual(instance[0]["closed_rooms"], 0)
+        self.assertEqual(instance[0]["opened_rooms"], 1)
