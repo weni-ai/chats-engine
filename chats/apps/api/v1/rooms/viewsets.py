@@ -47,6 +47,12 @@ class RoomViewset(
                 permissions.IsAuthenticated,
                 api_permissions.IsQueueAgent,
             )
+        elif self.action == "list" and self.request.query_params.get("email"):
+            permission_classes = (
+                permissions.IsAuthenticated,
+                api_permissions.AnySectorManagerPermission,
+            )
+
         return [permission() for permission in permission_classes]
 
     def get_queryset(self):

@@ -2318,6 +2318,17 @@
     },
     {
         "model": "sectors.sectorauthorization",
+        "pk": "ef86ecb5-790e-42cf-8f0a-036c1e2e9723",
+        "fields": {
+            "created_on": "2022-08-24T21:13:48.359Z",
+            "modified_on": "2022-08-24T21:13:48.359Z",
+            "permission": "de60dc04-5633-426e-8f3e-2249fcce1bcd",
+            "sector": "d3cae43d-cf25-4892-bfa6-0f24a856cfb8",
+            "role": 1
+        }
+    },
+    {
+        "model": "sectors.sectorauthorization",
         "pk": "00185928-ef97-47b8-9295-5462ff797a4e",
         "fields": {
             "created_on": "2022-08-24T21:13:48.359Z",
@@ -2494,7 +2505,7 @@
             "modified_on": "2022-08-24T20:25:54.375Z",
             "project": "34a93b52-231e-11ed-861d-0242ac120002",
             "user": "johndoe@chats.weni.ai",
-            "role": 3
+            "role": 2
         }
     },
     {
@@ -2505,7 +2516,7 @@
             "modified_on": "2022-08-24T20:25:36.278Z",
             "project": "34a93b52-231e-11ed-861d-0242ac120002",
             "user": "foobar@chats.weni.ai",
-            "role": 3
+            "role": 2
         }
     },
     {

@@ -168,9 +168,13 @@ class ProjectPermission(
     def is_admin(self):
         return self.role == self.ROLE_ADMIN
 
-    def is_manager(self, sector: str = None, queue: str = None):
+    def is_manager(
+        self, sector: str = None, queue: str = None, any_sector: bool = False
+    ):
         if self.is_admin:
             return True
+        if any_sector is True:
+            return self.sector_authorizations.exists()
         qs = (
             models.Q(sector__uuid=sector)
             if sector is not None

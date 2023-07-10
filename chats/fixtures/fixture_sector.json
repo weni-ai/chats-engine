@@ -1,278 +1,278 @@
 [
-{
-    "model": "projects.project",
-    "pk": "34a93b52-231e-11ed-861d-0242ac120002",
-    "fields": {
-        "created_on": "2022-08-23T20:08:48.462Z",
-        "modified_on": "2022-08-23T20:08:48.462Z",
-        "name": "Weni Suporte",
-        "timezone": "America/Sao_Paulo",
-        "date_format": "D"
-    }
-},
-{
-    "model": "sectors.sector",
-    "pk": "21aecf8c-0c73-4059-ba82-4343e0cc627c",
-    "fields": {
-        "created_on": "2022-08-24T20:59:49.115Z",
-        "modified_on": "2022-08-24T20:59:49.115Z",
-        "name": "Fluxos",
-        "project": "34a93b52-231e-11ed-861d-0242ac120002",
-        "rooms_limit": 5,
-        "work_start": "08:00:00",
-        "work_end": "17:00:00",
-        "is_deleted": false
-    }
-},
-{
-    "model": "sectors.sector",
-    "pk": "4f88b656-194d-4a83-a166-5d84ba825b8d",
-    "fields": {
-        "created_on": "2022-08-24T20:58:36.420Z",
-        "modified_on": "2022-09-05T21:10:24.340Z",
-        "name": "Inteligencia",
-        "project": "34a93b52-231e-11ed-861d-0242ac120002",
-        "rooms_limit": 3,
-        "work_start": "09:00:00",
-        "work_end": "17:00:00",
-        "is_deleted": false
-    }
-},
-{
-    "model": "sectors.sector",
-    "pk": "d3cae43d-cf25-4892-bfa6-0f24a856cfb8",
-    "fields": {
-        "created_on": "2022-08-24T21:00:16.351Z",
-        "modified_on": "2022-08-24T21:00:16.351Z",
-        "name": "Contas",
-        "project": "34a93b52-231e-11ed-861d-0242ac120002",
-        "rooms_limit": 2,
-        "work_start": "09:00:00",
-        "work_end": "16:00:00",
-        "is_deleted": false
-    }
-},
-{
-    "model": "accounts.user",
-    "pk": 8,
-    "fields": {
-        "password": "",
-        "last_login": null,
-        "is_superuser": false,
-        "first_name": "",
-        "last_name": "",
-        "email": "amywong@chats.weni.ai",
-        "photo_url": "",
-        "is_staff": false,
-        "is_active": true,
-        "language": "en",
-        "date_joined": "2022-08-24T20:11:31.019Z",
-        "groups": [],
-        "user_permissions": []
-    }
-},
-{
-    "model": "accounts.user",
-    "pk": 1,
-    "fields": {
-        "password": "pbkdf2_sha256$320000$av4Ggg8lpsTFIJoscCzLZW$K4O0izVGmndTuDFzTQyU8wY3a8uvBCtgASvbBN1KNZM=",
-        "last_login": null,
-        "is_superuser": false,
-        "first_name": "",
-        "last_name": "",
-        "email": "internal@weni.ai",
-        "photo_url": "",
-        "is_staff": false,
-        "is_active": true,
-        "language": null,
-        "date_joined": "2022-08-23T20:02:49.228Z",
-        "groups": [],
-        "user_permissions": [
-            81
-        ]
-    }
-},
-{
-    "model": "accounts.user",
-    "pk": 6,
-    "fields": {
-        "password": "",
-        "last_login": null,
-        "is_superuser": false,
-        "first_name": "",
-        "last_name": "",
-        "email": "brucebanner@chats.weni.ai",
-        "photo_url": "",
-        "is_staff": false,
-        "is_active": true,
-        "language": "en",
-        "date_joined": "2022-08-24T20:09:25.943Z",
-        "groups": [],
-        "user_permissions": []
-    }
-},
-{
-    "model": "projects.projectpermission",
-    "pk": "ce3f052c-e71d-402c-b02e-1dfaca8b3d45",
-    "fields": {
-        "created_on": "2022-08-24T20:28:05.281Z",
-        "modified_on": "2022-08-24T20:28:05.281Z",
-        "project": "34a93b52-231e-11ed-861d-0242ac120002",
-        "user": "amywong@chats.weni.ai",
-        "role": 1
-    }
-},
-{
-    "model": "projects.projectpermission",
-    "pk": "101cb6b3-9de3-4b04-8e60-8a7f42ccba54",
-    "fields": {
-        "created_on": "2022-08-24T20:25:54.375Z",
-        "modified_on": "2022-08-24T20:25:54.375Z",
-        "project": "34a93b52-231e-11ed-861d-0242ac120002",
-        "user": "internal@weni.ai",
-        "role": 1
-    }
-},
-{
-    "model": "projects.projectpermission",
-    "pk": "e416fd45-2896-43a5-bd7a-5067f03c77fa",
-    "fields": {
-        "created_on": "2022-08-24T20:27:23.748Z",
-        "modified_on": "2022-08-24T20:27:23.748Z",
-        "project": "34a93b52-231e-11ed-861d-0242ac120002",
-        "user": "brucebanner@chats.weni.ai",
-        "role": 1
-    }
-},
-{
-    "model": "sectors.sectorauthorization",
-    "pk": "00185928-ef97-47b8-9295-5462ff797a4e",
-    "fields": {
-        "created_on": "2022-08-24T21:13:48.359Z",
-        "modified_on": "2022-08-24T21:13:48.359Z",
-        "permission": "ce3f052c-e71d-402c-b02e-1dfaca8b3d45",
-        "sector": "21aecf8c-0c73-4059-ba82-4343e0cc627c",
-        "role": 1
-    }
-},
-{
-    "model": "sectors.sectorauthorization",
-    "pk": "e87a90ed-f217-4655-9116-5c0b51203851",
-    "fields": {
-        "created_on": "2022-08-24T21:11:20.647Z",
-        "modified_on": "2022-08-24T21:11:20.647Z",
-        "permission": "ce3f052c-e71d-402c-b02e-1dfaca8b3d45",
-        "sector": "d3cae43d-cf25-4892-bfa6-0f24a856cfb8",
-        "role": 1
-    }
-},
-{
-    "model": "queues.queue",
-    "pk": "f2519480-7e58-4fc4-9894-9ab1769e29cf",
-    "fields": {
-        "created_on": "2022-08-24T21:40:15.274Z",
-        "modified_on": "2022-08-24T21:40:15.274Z",
-        "sector": "21aecf8c-0c73-4059-ba82-4343e0cc627c",
-        "name": "ENGINE"
-    }
-},
-{
-    "model": "queues.queue",
-    "pk": "f341417b-5143-4469-a99d-f141a0676bd4",
-    "fields": {
-        "created_on": "2022-08-24T21:40:24.240Z",
-        "modified_on": "2022-08-24T21:40:24.240Z",
-        "sector": "4f88b656-194d-4a83-a166-5d84ba825b8d",
-        "name": "FRONTEND"
-    }
-},
-{
-    "model": "queues.queueauthorization",
-    "pk": "3717f056-7ea5-4d38-80f5-ba907132807c",
-    "fields": {
-        "created_on": "2022-08-25T04:55:18.502Z",
-        "modified_on": "2022-08-25T04:55:18.502Z",
-        "queue": "f2519480-7e58-4fc4-9894-9ab1769e29cf",
-        "role": 1,
-        "permission": "e416fd45-2896-43a5-bd7a-5067f03c77fa"
-    }
-},
-{
-    "model": "contacts.contact",
-    "pk": "e0dd0853-8192-4ccd-808d-d4b0b32cdee3",
-    "fields": {
-        "created_on": "2022-09-02T20:59:37.159Z",
-        "modified_on": "2022-09-03T00:20:09.547Z",
-        "external_id": "e3955fd5-5705-40cd-b480-b45594b70282",
-        "name": "Foo Bar",
-        "email": "FooBar@weni.ai",
-        "status": "",
-        "phone": "+250788123123",
-        "custom_fields": {}
-    }
-},
-{
-    "model": "rooms.room",
-    "pk": "090da6d1-959e-4dea-994a-41bf0d38ba26",
-    "fields": {
-        "created_on": "2022-09-03T00:20:09.559Z",
-        "modified_on": "2022-09-04T18:16:00.031Z",
-        "user": "amywong@chats.weni.ai",
-        "contact": "e0dd0853-8192-4ccd-808d-d4b0b32cdee3",
-        "queue": "f2519480-7e58-4fc4-9894-9ab1769e29cf",
-        "custom_fields": {
-            "mood": "angry",
-            "country": "brazil"
-        },
-        "callback_url": "https://flows.weni.ai/callback/uuid",
-        "ended_at": null,
-        "ended_by": null,
-        "is_active": true,
-        "transfer_history": [
-            {
-                "name": "ENGINE",
-                "type": "queue"
+    {
+        "model": "projects.project",
+        "pk": "34a93b52-231e-11ed-861d-0242ac120002",
+        "fields": {
+            "created_on": "2022-08-23T20:08:48.462Z",
+            "modified_on": "2022-08-23T20:08:48.462Z",
+            "name": "Weni Suporte",
+            "timezone": "America/Sao_Paulo",
+            "date_format": "D"
+        }
+    },
+    {
+        "model": "sectors.sector",
+        "pk": "21aecf8c-0c73-4059-ba82-4343e0cc627c",
+        "fields": {
+            "created_on": "2022-08-24T20:59:49.115Z",
+            "modified_on": "2022-08-24T20:59:49.115Z",
+            "name": "Fluxos",
+            "project": "34a93b52-231e-11ed-861d-0242ac120002",
+            "rooms_limit": 5,
+            "work_start": "08:00:00",
+            "work_end": "17:00:00",
+            "is_deleted": false
+        }
+    },
+    {
+        "model": "sectors.sector",
+        "pk": "4f88b656-194d-4a83-a166-5d84ba825b8d",
+        "fields": {
+            "created_on": "2022-08-24T20:58:36.420Z",
+            "modified_on": "2022-09-05T21:10:24.340Z",
+            "name": "Inteligencia",
+            "project": "34a93b52-231e-11ed-861d-0242ac120002",
+            "rooms_limit": 3,
+            "work_start": "09:00:00",
+            "work_end": "17:00:00",
+            "is_deleted": false
+        }
+    },
+    {
+        "model": "sectors.sector",
+        "pk": "d3cae43d-cf25-4892-bfa6-0f24a856cfb8",
+        "fields": {
+            "created_on": "2022-08-24T21:00:16.351Z",
+            "modified_on": "2022-08-24T21:00:16.351Z",
+            "name": "Contas",
+            "project": "34a93b52-231e-11ed-861d-0242ac120002",
+            "rooms_limit": 2,
+            "work_start": "09:00:00",
+            "work_end": "16:00:00",
+            "is_deleted": false
+        }
+    },
+    {
+        "model": "accounts.user",
+        "pk": 8,
+        "fields": {
+            "password": "",
+            "last_login": null,
+            "is_superuser": false,
+            "first_name": "",
+            "last_name": "",
+            "email": "amywong@chats.weni.ai",
+            "photo_url": "",
+            "is_staff": false,
+            "is_active": true,
+            "language": "en",
+            "date_joined": "2022-08-24T20:11:31.019Z",
+            "groups": [],
+            "user_permissions": []
+        }
+    },
+    {
+        "model": "accounts.user",
+        "pk": 1,
+        "fields": {
+            "password": "pbkdf2_sha256$320000$av4Ggg8lpsTFIJoscCzLZW$K4O0izVGmndTuDFzTQyU8wY3a8uvBCtgASvbBN1KNZM=",
+            "last_login": null,
+            "is_superuser": false,
+            "first_name": "",
+            "last_name": "",
+            "email": "internal@weni.ai",
+            "photo_url": "",
+            "is_staff": false,
+            "is_active": true,
+            "language": null,
+            "date_joined": "2022-08-23T20:02:49.228Z",
+            "groups": [],
+            "user_permissions": [
+                81
+            ]
+        }
+    },
+    {
+        "model": "accounts.user",
+        "pk": 6,
+        "fields": {
+            "password": "",
+            "last_login": null,
+            "is_superuser": false,
+            "first_name": "",
+            "last_name": "",
+            "email": "brucebanner@chats.weni.ai",
+            "photo_url": "",
+            "is_staff": false,
+            "is_active": true,
+            "language": "en",
+            "date_joined": "2022-08-24T20:09:25.943Z",
+            "groups": [],
+            "user_permissions": []
+        }
+    },
+    {
+        "model": "projects.projectpermission",
+        "pk": "ce3f052c-e71d-402c-b02e-1dfaca8b3d45",
+        "fields": {
+            "created_on": "2022-08-24T20:28:05.281Z",
+            "modified_on": "2022-08-24T20:28:05.281Z",
+            "project": "34a93b52-231e-11ed-861d-0242ac120002",
+            "user": "amywong@chats.weni.ai",
+            "role": 1
+        }
+    },
+    {
+        "model": "projects.projectpermission",
+        "pk": "101cb6b3-9de3-4b04-8e60-8a7f42ccba54",
+        "fields": {
+            "created_on": "2022-08-24T20:25:54.375Z",
+            "modified_on": "2022-08-24T20:25:54.375Z",
+            "project": "34a93b52-231e-11ed-861d-0242ac120002",
+            "user": "internal@weni.ai",
+            "role": 1
+        }
+    },
+    {
+        "model": "projects.projectpermission",
+        "pk": "e416fd45-2896-43a5-bd7a-5067f03c77fa",
+        "fields": {
+            "created_on": "2022-08-24T20:27:23.748Z",
+            "modified_on": "2022-08-24T20:27:23.748Z",
+            "project": "34a93b52-231e-11ed-861d-0242ac120002",
+            "user": "brucebanner@chats.weni.ai",
+            "role": 1
+        }
+    },
+    {
+        "model": "sectors.sectorauthorization",
+        "pk": "00185928-ef97-47b8-9295-5462ff797a4e",
+        "fields": {
+            "created_on": "2022-08-24T21:13:48.359Z",
+            "modified_on": "2022-08-24T21:13:48.359Z",
+            "permission": "ce3f052c-e71d-402c-b02e-1dfaca8b3d45",
+            "sector": "21aecf8c-0c73-4059-ba82-4343e0cc627c",
+            "role": 1
+        }
+    },
+    {
+        "model": "sectors.sectorauthorization",
+        "pk": "e87a90ed-f217-4655-9116-5c0b51203851",
+        "fields": {
+            "created_on": "2022-08-24T21:11:20.647Z",
+            "modified_on": "2022-08-24T21:11:20.647Z",
+            "permission": "ce3f052c-e71d-402c-b02e-1dfaca8b3d45",
+            "sector": "d3cae43d-cf25-4892-bfa6-0f24a856cfb8",
+            "role": 1
+        }
+    },
+    {
+        "model": "queues.queue",
+        "pk": "f2519480-7e58-4fc4-9894-9ab1769e29cf",
+        "fields": {
+            "created_on": "2022-08-24T21:40:15.274Z",
+            "modified_on": "2022-08-24T21:40:15.274Z",
+            "sector": "21aecf8c-0c73-4059-ba82-4343e0cc627c",
+            "name": "ENGINE"
+        }
+    },
+    {
+        "model": "queues.queue",
+        "pk": "f341417b-5143-4469-a99d-f141a0676bd4",
+        "fields": {
+            "created_on": "2022-08-24T21:40:24.240Z",
+            "modified_on": "2022-08-24T21:40:24.240Z",
+            "sector": "4f88b656-194d-4a83-a166-5d84ba825b8d",
+            "name": "FRONTEND"
+        }
+    },
+    {
+        "model": "queues.queueauthorization",
+        "pk": "3717f056-7ea5-4d38-80f5-ba907132807c",
+        "fields": {
+            "created_on": "2022-08-25T04:55:18.502Z",
+            "modified_on": "2022-08-25T04:55:18.502Z",
+            "queue": "f2519480-7e58-4fc4-9894-9ab1769e29cf",
+            "role": 1,
+            "permission": "e416fd45-2896-43a5-bd7a-5067f03c77fa"
+        }
+    },
+    {
+        "model": "contacts.contact",
+        "pk": "e0dd0853-8192-4ccd-808d-d4b0b32cdee3",
+        "fields": {
+            "created_on": "2022-09-02T20:59:37.159Z",
+            "modified_on": "2022-09-03T00:20:09.547Z",
+            "external_id": "e3955fd5-5705-40cd-b480-b45594b70282",
+            "name": "Foo Bar",
+            "email": "FooBar@weni.ai",
+            "status": "",
+            "phone": "+250788123123",
+            "custom_fields": {}
+        }
+    },
+    {
+        "model": "rooms.room",
+        "pk": "090da6d1-959e-4dea-994a-41bf0d38ba26",
+        "fields": {
+            "created_on": "2022-09-03T00:20:09.559Z",
+            "modified_on": "2022-09-04T18:16:00.031Z",
+            "user": "amywong@chats.weni.ai",
+            "contact": "e0dd0853-8192-4ccd-808d-d4b0b32cdee3",
+            "queue": "f2519480-7e58-4fc4-9894-9ab1769e29cf",
+            "custom_fields": {
+                "mood": "angry",
+                "country": "brazil"
             },
-            {
-                "name": "",
-                "type": "user"
-            }
-        ],
-        "tags": []
+            "callback_url": "http://localhost:8000/callback/uuid",
+            "ended_at": null,
+            "ended_by": null,
+            "is_active": true,
+            "transfer_history": [
+                {
+                    "name": "ENGINE",
+                    "type": "queue"
+                },
+                {
+                    "name": "",
+                    "type": "user"
+                }
+            ],
+            "tags": []
+        }
+    },
+    {
+        "model": "sectors.sectortag",
+        "pk": "62d9e7c4-4f2d-40fc-acf7-9549bface0fb",
+        "fields": {
+            "created_on": "2022-08-24T21:21:08.628Z",
+            "modified_on": "2022-08-24T21:21:08.629Z",
+            "name": "suporte",
+            "sector": "4f88b656-194d-4a83-a166-5d84ba825b8d"
+        }
+    },
+    {
+        "model": "authtoken.token",
+        "pk": "8c60c164-32bc-11ed-a261-0242ac120002",
+        "fields": {
+            "user": 8,
+            "created": "2022-08-25T04:56:37.823Z"
+        }
+    },
+    {
+        "model": "authtoken.token",
+        "pk": "ced55c2c-3365-11ed-a261-0242ac120002",
+        "fields": {
+            "user": 6,
+            "created": "2022-08-25T04:56:37.823Z"
+        }
+    },
+    {
+        "model": "authtoken.token",
+        "pk": "91b11264-3388-11ed-a261-0242ac120002",
+        "fields": {
+            "user": 1,
+            "created": "2022-08-25T04:56:37.823Z"
+        }
     }
-},
-{
-    "model": "sectors.sectortag",
-    "pk": "62d9e7c4-4f2d-40fc-acf7-9549bface0fb",
-    "fields": {
-        "created_on": "2022-08-24T21:21:08.628Z",
-        "modified_on": "2022-08-24T21:21:08.629Z",
-        "name": "suporte",
-        "sector": "4f88b656-194d-4a83-a166-5d84ba825b8d"
-    }
-},
-{
-    "model": "authtoken.token",
-    "pk": "8c60c164-32bc-11ed-a261-0242ac120002",
-    "fields": {
-        "user": 8,
-        "created": "2022-08-25T04:56:37.823Z"
-    }
-},
-{
-    "model": "authtoken.token",
-    "pk": "ced55c2c-3365-11ed-a261-0242ac120002",
-    "fields": {
-        "user": 6,
-        "created": "2022-08-25T04:56:37.823Z"
-    }
-},
-{
-    "model": "authtoken.token",
-    "pk": "91b11264-3388-11ed-a261-0242ac120002",
-    "fields": {
-        "user": 1,
-        "created": "2022-08-25T04:56:37.823Z"
-    }
-}
 ]
