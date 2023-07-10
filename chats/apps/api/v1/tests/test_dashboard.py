@@ -30,7 +30,7 @@ class DashboardTests(APITestCase):
         data = {
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
-                "external_id": "e3955fd5-5705-40cd-b480-b45594b70282",
+                "external_id": "e3955fd5-5705-70cd-b480-b45594b70282",
                 "name": "Foo Bar",
                 "email": "FooBar@weni.ai",
                 "phone": "+250788123123",
@@ -56,7 +56,7 @@ class DashboardTests(APITestCase):
             "user_email": str(self.manager_user),
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
-                "external_id": "e3955fd5-5705-40cd-b480-b45594b70282",
+                "external_id": "e3955fd5-5705-55cd-b480-b45594b70282",
                 "name": "Foo Bar",
                 "email": "FooBar@weni.ai",
                 "phone": "+250788123123",
@@ -99,7 +99,7 @@ class DashboardTests(APITestCase):
             "user_email": str(self.manager_user),
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
-                "external_id": "e3955fd5-5705-40cd-b480-b45594b70282",
+                "external_id": "e3955fd5-5705-90cd-b480-b45594b70282",
                 "name": "Foo Bar",
                 "email": "FooBar@weni.ai",
                 "phone": "+250788123123",
@@ -166,7 +166,7 @@ class DashboardTests(APITestCase):
         data = {
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
-                "external_id": "e3955fd5-5705-40cd-b480-b45594b70282",
+                "external_id": "e3955fd5-5705-77cd-b480-b45594b70282",
                 "name": "Foo Bar",
                 "email": "FooBar@weni.ai",
                 "phone": "+250788123123",
@@ -198,7 +198,7 @@ class DashboardTests(APITestCase):
         data = {
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
-                "external_id": "e3955fd5-5705-40cd-b480-b45594b70282",
+                "external_id": "e3955fd5-5705-80cd-b480-b45594b70282",
                 "name": "Foo Bar",
                 "email": "FooBar@weni.ai",
                 "phone": "+250788123123",
