@@ -1,6 +1,6 @@
 from rest_framework import routers
 
-from chats.apps.api.v1.accounts.viewsets import LoginViewset
+from chats.apps.api.v1.accounts.viewsets import LoginViewset, UserDataViewset
 from chats.apps.api.v1.contacts.viewsets import ContactViewset
 from chats.apps.api.v1.dashboard.viewsets import DashboardLiveViewset
 from chats.apps.api.v1.external.agents.viewsets import AgentFlowViewset
@@ -83,6 +83,7 @@ class Router(routers.SimpleRouter):
 router = Router()
 router.register("accounts/login", LoginViewset)
 router.register("accounts/profile", ProfileViewset)
+router.register("accounts/userdata", UserDataViewset, basename="user_data")
 router.register("room", RoomViewset)
 router.register("msg", MessageViewset)
 router.register("quick_messages", QuickMessageViewset)
