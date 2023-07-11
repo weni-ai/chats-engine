@@ -18,6 +18,7 @@ from chats.apps.api.v1.dashboard.serializers import (
 )
 from chats.apps.api.v1.permissions import HasDashboardAccess
 from chats.apps.projects.models import Project
+from io import BytesIO
 
 
 class DashboardLiveViewset(viewsets.GenericViewSet):
@@ -149,24 +150,29 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         project = self.get_object()
         filter = request.query_params
 
-        general_dataset = get_general_data(project, filter)
-        userinfo_dataset = get_agents_data(project, filter)
-        sector_dataset = get_sector_data(project, filter)
+        user_info_context = {}
+        user_info_context["filters"] = request.query_params
+
+        # General data
+        general_dataset = dashboard_general_data(context=filter, project=project)
+        raw_dataset = DashboardRawDataSerializer(instance=project, context=filter)
+        combined_dataset = {**general_dataset, **raw_dataset.data}
+
+        # Agents Data
+        userinfo_dataset = dashboard_agents_data(context=filter, project=project)
+        # # Sectors Data
+        sector_dataset = dashboard_division_data(context=filter, project=project)
 
         filename = "dashboard_export_data"
 
-        data_frame = pandas.DataFrame([general_dataset])
-        data_frame_1 = pandas.read_json(userinfo_dataset)
-        data_frame_2 = pandas.read_json(sector_dataset)
+        data_frame = pandas.DataFrame([combined_dataset])
+        data_frame_1 = pandas.DataFrame(userinfo_dataset)
+        data_frame_2 = pandas.DataFrame(sector_dataset)
+
+        excel_file = BytesIO()
 
         if "xls" in filter:
-            response = HttpResponse(
-                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-            response["Content-Disposition"] = (
-                'attachment; filename="' + filename + ".xlsx"
-            )
-            with pandas.ExcelWriter(response, engine="xlsxwriter") as writer:
+            with pandas.ExcelWriter(excel_file, engine="xlsxwriter") as writer:
                 data_frame.to_excel(
                     writer,
                     sheet_name="dashboard_infos",
@@ -188,6 +194,12 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
                     startcol=0,
                     index=False,
                 )
+            response = HttpResponse(content_type="application/vnd.ms-excel")
+            response["Content-Disposition"] = (
+                'attachment; filename="' + filename + ".xlsx"
+            )
+            excel_file.seek(0)
+            response.write(excel_file.read())
             return response
 
         else:
