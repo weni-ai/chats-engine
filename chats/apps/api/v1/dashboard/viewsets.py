@@ -194,7 +194,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
                     startcol=0,
                     index=False,
                 )
-            response = HttpResponse(content_type="application/vnd.ms-excel")
+            response = HttpResponse(
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
             response["Content-Disposition"] = (
                 'attachment; filename="' + filename + ".xlsx"
             )
