@@ -25,9 +25,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
     lookup_field = "uuid"
     queryset = Project.objects.all()
 
-    # def get_permissions(self):
-    #     permission_classes = [permissions.IsAuthenticated, HasDashboardAccess]
-    #     return [permission() for permission in permission_classes]
+    def get_permissions(self):
+        permission_classes = [permissions.IsAuthenticated, HasDashboardAccess]
+        return [permission() for permission in permission_classes]
 
     @action(
         detail=True,
