@@ -6,9 +6,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from chats.apps.api.v1.internal.rest_clients.flows_rest_client import (
-    FlowRESTClient,
-)
+from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.api.v1.permissions import (
     HasAgentPermissionAnyQueueSector,
     IsProjectAdmin,
