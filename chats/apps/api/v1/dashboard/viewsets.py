@@ -25,9 +25,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
     lookup_field = "uuid"
     queryset = Project.objects.all()
 
-    def get_permissions(self):
-        permission_classes = [permissions.IsAuthenticated, HasDashboardAccess]
-        return [permission() for permission in permission_classes]
+    # def get_permissions(self):
+    #     permission_classes = [permissions.IsAuthenticated, HasDashboardAccess]
+    #     return [permission() for permission in permission_classes]
 
     @action(
         detail=True,
@@ -210,8 +210,8 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
                 'attachment; filename="' + filename + ".csv"
             )
 
-            data_frame.to_csv(response, index=False)
-            data_frame_1.to_csv(response, index=False, mode="a")
-            data_frame_2.to_csv(response, index=False, mode="a")
+            data_frame.to_csv(response, index=False, sep=";")
+            data_frame_1.to_csv(response, index=False, mode="a", sep=";")
+            data_frame_2.to_csv(response, index=False, mode="a", sep=";")
 
             return response
