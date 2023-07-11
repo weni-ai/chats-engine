@@ -6,8 +6,8 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
-    ConnectRESTClient,
+from chats.apps.api.v1.internal.rest_clients.flows_rest_client import (
+    FlowRESTClient,
 )
 from chats.apps.api.v1.permissions import (
     HasAgentPermissionAnyQueueSector,
@@ -67,8 +67,8 @@ class SectorViewset(viewsets.ModelViewSet):
             )
 
         if settings.USE_WENI_FLOWS:
-            connect = ConnectRESTClient()
-            response = connect.create_ticketer(
+            flows_client = FlowRESTClient()
+            response = flows_client.create_ticketer(
                 project_uuid=str(instance.project.uuid),
                 name=instance.name,
                 config={

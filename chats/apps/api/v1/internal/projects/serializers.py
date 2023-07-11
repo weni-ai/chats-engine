@@ -2,10 +2,9 @@ from django.contrib.auth import get_user_model
 from rest_framework import exceptions, serializers, status
 from timezone_field.rest_framework import TimeZoneSerializerField
 
-from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
-    ConnectRESTClient,
+from chats.apps.api.v1.internal.rest_clients.flows_rest_client import (
+    FlowRESTClient,
 )
-from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.api.v1.internal.users.serializers import UserSerializer
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.queues.models import QueueAuthorization
@@ -69,8 +68,8 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
                 role=1, permission=permission, queue=queue
             )
             SectorTag.objects.create(name="Atendimento encerrado", sector=sector)
-            connect_client = ConnectRESTClient()
-            response_sector = connect_client.create_ticketer(
+            flow_client = FlowRESTClient()
+            response_sector = flow_client.create_ticketer(
                 project_uuid=str(instance.uuid),
                 name=sector.name,
                 config={
@@ -84,7 +83,6 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
             }
             self._queue_data = {"uuid": str(queue.pk), "name": queue.name}
 
-            flow_client = FlowRESTClient()
             response_flows = flow_client.create_queue(
                 str(queue.uuid), queue.name, str(queue.sector.uuid)
             )
