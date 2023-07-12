@@ -220,3 +220,14 @@ class RoomViewset(
             {"Detail": "Custom Field edited with success"},
             status.HTTP_200_OK,
         )
+
+    @action(
+        detail=True,
+        methods=[
+            "POST",
+        ],
+        url_name="chat_completion",
+    )
+    def chat_completion(self, request, *args, **kwargs):
+        room = self.get_object()
+        pass
