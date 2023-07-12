@@ -1,7 +1,8 @@
 import json
 
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -14,6 +15,7 @@ from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.external.rooms.serializers import RoomFlowSerializer
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.dashboard.models import RoomMetrics
+from chats.apps.dashboard.tasks import close_metrics
 from chats.apps.rooms.models import Room
 
 
@@ -63,6 +65,14 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         instance.close(None, "agent")
         serialized_data = RoomFlowSerializer(instance=instance)
         instance.notify_queue("close")
+        if not settings.ACTIVATE_CALC_METRICS:
+            return Response(serialized_data.data, status=status.HTTP_200_OK)
+
+        transaction.on_commit(
+            lambda: close_metrics.apply_async(
+                args=[str(instance.pk)], queue=settings.METRICS_CUSTOM_QUEUE
+            )
+        )
         return Response(serialized_data.data, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs):
