@@ -11,6 +11,8 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from chats.apps.api.v1 import permissions as api_permissions
+from chats.apps.api.v1.internal.rest_clients.openai_rest_client import OpenAIClient
+from chats.apps.api.v1.msgs.serializers import ChatCompletionSerializer
 from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1.rooms.serializers import (
     RoomMessageStatusSerializer,
@@ -230,4 +232,24 @@ class RoomViewset(
     )
     def chat_completion(self, request, *args, **kwargs):
         room = self.get_object()
-        pass
+        token = room.queue.sector.project.openai_token
+        if not token:
+            return Response(
+                status=status.HTTP_400_BAD_REQUEST,
+                data={"detail": "OpenAI token not found"},
+            )
+        messages = room.last_5_messages()
+        serialized_data = ChatCompletionSerializer(messages).data
+        sector = room.queue.sector
+        if sector.completion_context:
+            serialized_data.append(
+                {"role": "system", "content": sector.completion_context}
+            )
+
+        openai_client = OpenAIClient()
+        completion_response = openai_client.chat_completion(
+            token=token, messages=serialized_data
+        )
+        return Response(
+            status=completion_response.status_code, data=completion_response.json()
+        )

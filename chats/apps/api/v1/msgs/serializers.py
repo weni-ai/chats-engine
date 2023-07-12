@@ -82,7 +82,6 @@ class MessageMediaSerializer(serializers.ModelSerializer):
             file_type.startswith("audio")
             or file_type.lower() in settings.UNPERMITTED_AUDIO_TYPES
         ):
-
             export_conf = {"format": settings.AUDIO_TYPE_TO_CONVERT}
             if settings.AUDIO_CODEC_TO_CONVERT != "":
                 export_conf["codec"] = settings.AUDIO_CODEC_TO_CONVERT
@@ -210,3 +209,25 @@ class MessageSerializer(BaseMessageSerializer):
 
 class MessageWSSerializer(MessageSerializer):
     pass
+
+
+class ChatCompletionSerializer(serializers.ModelSerializer):
+    role = serializers.SerializerMethodField(read_only=True)
+    content = serializers.CharField(read_only=True, source="text")
+
+    class Meta:
+        model = ChatMessage
+        fields = [
+            "role",
+            "content",
+        ]
+
+        extra_kwargs = {
+            "media_file": {"write_only": True},
+        }
+
+    def get_role(self, message: ChatMessage):
+        if message.contact:
+            return "user"
+        else:
+            return "assistant"
