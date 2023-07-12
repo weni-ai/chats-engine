@@ -19,6 +19,7 @@ from chats.apps.api.v1.dashboard.serializers import (
 from chats.apps.api.v1.permissions import HasDashboardAccess
 from chats.apps.projects.models import Project
 from io import BytesIO
+import io
 
 
 class DashboardLiveViewset(viewsets.GenericViewSet):
@@ -172,7 +173,8 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         excel_file = BytesIO()
 
         if "xls" in filter:
-            with pandas.ExcelWriter(excel_file, engine="xlsxwriter") as writer:
+            excel_buffer = io.BytesIO()
+            with pandas.ExcelWriter(excel_buffer, engine="xlsxwriter") as writer:
                 data_frame.to_excel(
                     writer,
                     sheet_name="dashboard_infos",
@@ -194,14 +196,15 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
                     startcol=0,
                     index=False,
                 )
+            excel_buffer.seek(0)  # Move o cursor para o início do buffer
+
             response = HttpResponse(
-                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                excel_buffer.read(),
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
             response["Content-Disposition"] = (
-                'attachment; filename="' + filename + ".xlsx"
+                'attachment; filename="' + filename + '.xlsx"'
             )
-            excel_file.seek(0)
-            response.write(excel_file.read())
             return response
 
         else:
