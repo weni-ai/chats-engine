@@ -196,7 +196,18 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
                     startcol=0,
                     index=False,
                 )
+            print("antes do seek\n", excel_buffer.getvalue())
+            print(
+                "------------------------------------------------------------------------------------------------------"
+            )
+            print(
+                "------------------------------------------------------------------------------------------------------"
+            )
+            print(
+                "------------------------------------------------------------------------------------------------------"
+            )
             excel_buffer.seek(0)  # Move o cursor para o início do buffer
+            print("depois do seek:\n", excel_buffer.getvalue())
 
             response = HttpResponse(
                 excel_buffer.read(),
