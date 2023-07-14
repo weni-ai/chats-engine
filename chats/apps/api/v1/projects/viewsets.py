@@ -292,6 +292,10 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         chats_flow_start.name = flow_start.get("flow").get("name")
         chats_flow_start.save()
         feedback = {"name": chats_flow_start.name}
+
+        room.is_waiting = True
+        room.save()
+
         if chats_flow_start.room:
             create_room_feedback_message(room, feedback, method="fs")
             room.notify_room("update")
