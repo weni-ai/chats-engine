@@ -204,7 +204,9 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         # END get room user
 
         # Create room and metrics
-        room = Room.objects.create(**validated_data, contact=contact, queue=queue)
+        room = Room.objects.create(
+            **validated_data, contact=contact, queue=queue, is_waiting=True
+        )
         RoomMetrics.objects.create(room=room)
         # END Create room and metrics
 
