@@ -45,7 +45,7 @@ class Message(BaseModel):
     def save(self, *args, **kwargs) -> None:
         if self.room.is_active is False:
             raise ValidationError({"detail": _("Closed rooms cannot receive messages")})
-        if self.room.is_24h_valid is False and self.user is not None:
+        if self.room.validate_24h is False and self.user is not None:
             raise ValidationError(
                 {
                     "detail": _(

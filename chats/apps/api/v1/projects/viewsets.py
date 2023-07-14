@@ -262,7 +262,7 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
                     {"Detail": "There already is an active flow start for this room"},
                     status.HTTP_400_BAD_REQUEST,
                 )
-            if not room.is_24h_valid:
+            if not room.validate_24h:
                 flow_start_data["room"] = room
                 room.request_callback(room.serialized_ws_data)
         except (ObjectDoesNotExist, ValidationError):

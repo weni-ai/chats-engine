@@ -2,7 +2,18 @@ import json
 
 from django.conf import settings
 from django.db import connection, reset_queries
-from django.db.models import Count, F, Max, Q, Sum
+from django.db.models import (
+    Count,
+    F,
+    Max,
+    Q,
+    Sum,
+    CharField,
+    Value,
+    Case,
+    When,
+    BooleanField,
+)
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
@@ -21,6 +32,12 @@ from chats.apps.api.v1.rooms.serializers import (
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.msgs.models import Message
 from chats.apps.rooms.models import Room
+
+from rest_framework.pagination import CursorPagination
+
+from django.db.models.functions import Concat
+
+from datetime import timedelta
 
 
 def database_debug(func, *args, **kwargs):
@@ -43,18 +60,7 @@ class RoomViewset(
     mixins.UpdateModelMixin,
     GenericViewSet,
 ):
-    queryset = (
-        Room.objects.all()
-        .select_related(
-            "user",
-            "contact",
-            "queue",
-            "metric",
-            "queue__sector",
-            "queue__sector__project",
-        )
-        .prefetch_related("messages", "flowstarts")
-    )
+    queryset = Room.objects.all()
     serializer_class = RoomSerializer
     filter_backends = [
         OrderingFilter,
@@ -65,6 +71,8 @@ class RoomViewset(
     search_fields = ["contact__name", "urn"]
     ordering_fields = "__all__"
     ordering = ["user", "-last_interaction"]
+    pagination_class = CursorPagination
+    pagination_class.page_size_query_param = "limit"
 
     @database_debug
     def list(self, request, *args, **kwargs):
@@ -83,10 +91,32 @@ class RoomViewset(
         if self.action != "list":
             self.filterset_class = None
         qs = super().get_queryset()
-        return qs.annotate(
+
+        last_24h = timezone.now() - timedelta(days=1)
+
+        qs = qs.annotate(
             last_interaction=Max("messages__created_on"),
             unread_msgs=Count("messages", filter=Q(messages__seen=False)),
+            linked_user=Concat(
+                "contact__linked_users__user__first_name",
+                Value(" "),
+                "contact__linked_users__user__last_name",
+                filter=Q(contact__linked_users__project=F("queue__sector__project")),
+                output_field=CharField(),
+            ),
+            last_contact_interaction=Max(
+                "messages__created_on", filter=Q(messages__contact__isnull=False)
+            ),
+            is_24h_valid=Case(
+                When(last_contact_interaction__lt=last_24h, then=True),
+                default=False,
+                output_field=BooleanField(),
+            ),
         )
+        # import pdb
+
+        # pdb.set_trace()
+        return qs
 
     def get_serializer_class(self):
         if "update" in self.action:
