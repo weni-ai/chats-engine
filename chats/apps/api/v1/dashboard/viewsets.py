@@ -167,7 +167,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         # # Sectors Data
         sector_dataset = dashboard_division_data(context=filter, project=project)
 
-        filename = "dashboard_export_data"
+        filename = "dashboard_export_data.xlsx"
 
         data_frame = pandas.DataFrame([combined_dataset])
         data_frame_1 = pandas.DataFrame(userinfo_dataset)
