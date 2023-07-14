@@ -20,6 +20,9 @@ from chats.apps.api.v1.permissions import HasDashboardAccess
 from chats.apps.projects.models import Project
 from io import BytesIO
 import io
+from chats.core.excel_storage import ExcelStorage
+import json
+
 
 
 class DashboardLiveViewset(viewsets.GenericViewSet):
@@ -170,8 +173,6 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         data_frame_1 = pandas.DataFrame(userinfo_dataset)
         data_frame_2 = pandas.DataFrame(sector_dataset)
 
-        excel_file = BytesIO()
-
         if "xls" in filter:
             excel_buffer = io.BytesIO()
             with pandas.ExcelWriter(excel_buffer, engine="xlsxwriter") as writer:
@@ -196,27 +197,21 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
                     startcol=0,
                     index=False,
                 )
-            print("antes do seek\n", excel_buffer.getvalue())
-            print(
-                "------------------------------------------------------------------------------------------------------"
-            )
-            print(
-                "------------------------------------------------------------------------------------------------------"
-            )
-            print(
-                "------------------------------------------------------------------------------------------------------"
-            )
             excel_buffer.seek(0)  # Move o cursor para o início do buffer
-            print("depois do seek:\n", excel_buffer.getvalue())
+            storage = ExcelStorage()
 
-            response = HttpResponse(
-                excel_buffer.read(),
-                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            bytes_archive = excel_buffer.getvalue()
+
+            with storage.open(filename, "wb") as up_file:
+                up_file.write(bytes_archive)
+                file_url = storage.url(up_file.name)
+            
+            data = {"path_file": file_url}
+
+            return HttpResponse(
+                json.dumps(data),
+                content_type="application/javascript; charset=utf8",
             )
-            response["Content-Disposition"] = (
-                'attachment; filename="' + filename + '.xlsx"'
-            )
-            return response
 
         else:
             response = HttpResponse(content_type="text/csv")
