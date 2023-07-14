@@ -74,7 +74,7 @@ class MsgFlowSerializer(serializers.ModelSerializer):
             validated_data["contact"] = room.contact
 
         is_waiting = room.get_is_waiting()
-        was_24h_valid = room.is_24h_valid
+        was_24h_valid = room.validate_24h
         msg = super().create(validated_data)
         media_list = [MessageMedia(**media_data, message=msg) for media_data in medias]
         medias = MessageMedia.objects.bulk_create(media_list)
