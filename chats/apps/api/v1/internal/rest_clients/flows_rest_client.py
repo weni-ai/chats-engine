@@ -50,6 +50,17 @@ def retry_request_and_refresh_flows_auth_token(
     return response
 
 
+class FlowsTicketerMixin:
+    def create_ticketer(self, **kwargs):
+        url = f"{self.base_url}/api/v2/internals/ticketers/"
+        response = requests.post(
+            url=url,
+            headers=self.headers,
+            json={**kwargs, "ticketer_type": settings.FLOWS_TICKETER_TYPE},
+        )
+        return response
+
+
 class FlowsQueueMixin:
     def create_queue(self, uuid: str, name: str, sector_uuid: str):
         response = requests.post(
@@ -151,7 +162,10 @@ class FlowsContactsAndGroupsMixin:
 
 
 class FlowRESTClient(
-    InternalAuthentication, FlowsContactsAndGroupsMixin, FlowsQueueMixin
+    InternalAuthentication,
+    FlowsContactsAndGroupsMixin,
+    FlowsQueueMixin,
+    FlowsTicketerMixin,
 ):
     def __init__(self, *args, **kwargs):
         self.base_url = settings.FLOWS_API_URL
