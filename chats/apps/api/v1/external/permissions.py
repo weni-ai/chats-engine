@@ -46,6 +46,8 @@ LEVEL_NAME_MAPPING = {
     "sector": "pk",
     "queue_uuid": "queues",
     "queue": "queues",
+    "room__uuid": "queues__rooms",
+    "room": "queues__rooms",
 }
 
 
@@ -63,6 +65,8 @@ class ValidatePermissionRequest:
             "project_uuid",
             "sector_uuid",
             "queue_uuid",
+            "room__uuid",
+            "room",
         ]:
             self.level_name = LEVEL_NAME_MAPPING[key]
             self.level_id = self.data.get(key, None)
