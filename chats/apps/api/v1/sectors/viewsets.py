@@ -67,7 +67,7 @@ class SectorViewset(viewsets.ModelViewSet):
         if settings.USE_WENI_FLOWS:
             flows_client = FlowRESTClient()
             response = flows_client.create_ticketer(
-                project_uuid=str(instance.project.uuid),
+                org=str(instance.project.uuid),
                 name=instance.name,
                 config={
                     "project_auth": str(instance.get_permission(self.request.user).pk),
