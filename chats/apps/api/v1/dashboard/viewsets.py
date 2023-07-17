@@ -5,10 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from chats.apps.api.v1.dashboard.presenter import (
-    get_agents_data,
     get_export_data,
-    get_general_data,
-    get_sector_data,
 )
 from chats.apps.api.v1.dashboard.serializers import (
     DashboardRawDataSerializer,
