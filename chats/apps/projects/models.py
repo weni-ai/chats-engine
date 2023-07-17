@@ -351,3 +351,7 @@ class ContactGroupFlowReference(BaseModel):
 
     def __str__(self):
         return self.receiver_type + ": " + self.external_id
+
+    @property
+    def project(self):
+        return self.flow_start.project

@@ -86,6 +86,10 @@ class Queue(BaseSoftDeleteModel, BaseModel):
         )
         return sector_auth
 
+    @property
+    def project(self):
+        return self.sector.project
+
 
 class QueueAuthorization(BaseModel):
     ROLE_NOT_SETTED = 0
@@ -131,6 +135,10 @@ class QueueAuthorization(BaseModel):
     @property
     def sector(self):
         return self.queue.sector
+
+    @property
+    def project(self):
+        return self.queue.project
 
     @property
     def is_agent(self):
