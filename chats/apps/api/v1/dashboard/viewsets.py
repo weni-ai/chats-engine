@@ -129,7 +129,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             with storage.open(filename + ".xlsx", "wb") as up_file:
                 up_file.write(bytes_archive)
                 file_url = storage.url(up_file.name)
-            
+
             data = {"path_file": file_url}
 
             return HttpResponse(
@@ -220,7 +220,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             with storage.open(filename + ".xlsx", "wb") as up_file:
                 up_file.write(bytes_archive)
                 file_url = storage.url(up_file.name)
-            
+
             data = {"path_file": file_url}
 
             return HttpResponse(
