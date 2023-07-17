@@ -68,7 +68,7 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
             SectorTag.objects.create(name="Atendimento encerrado", sector=sector)
             flow_client = FlowRESTClient()
             response_sector = flow_client.create_ticketer(
-                project_uuid=str(instance.uuid),
+                org=str(instance.uuid),
                 name=sector.name,
                 config={
                     "project_auth": str(permission.pk),
