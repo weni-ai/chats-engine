@@ -1,12 +1,26 @@
 import json
+from datetime import timedelta
 
 from django.conf import settings
-from django.db.models import Max
+from django.db.models import (
+    BooleanField,
+    Case,
+    CharField,
+    Count,
+    F,
+    Max,
+    Q,
+    Sum,
+    Value,
+    When,
+)
+from django.db.models.functions import Concat
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter
+from rest_framework.pagination import CursorPagination
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
@@ -39,6 +53,8 @@ class RoomViewset(
     search_fields = ["contact__name", "urn"]
     ordering_fields = "__all__"
     ordering = ["user", "-last_interaction"]
+    pagination_class = CursorPagination
+    pagination_class.page_size_query_param = "limit"
 
     def get_permissions(self):
         permission_classes = [permissions.IsAuthenticated]
@@ -59,7 +75,30 @@ class RoomViewset(
         if self.action != "list":
             self.filterset_class = None
         qs = super().get_queryset()
-        return qs.annotate(last_interaction=Max("messages__created_on"))
+
+        last_24h = timezone.now() - timedelta(days=1)
+
+        qs = qs.annotate(
+            last_interaction=Max("messages__created_on"),
+            unread_msgs=Count("messages", filter=Q(messages__seen=False)),
+            linked_user=Concat(
+                "contact__linked_users__user__first_name",
+                Value(" "),
+                "contact__linked_users__user__last_name",
+                filter=Q(contact__linked_users__project=F("queue__sector__project")),
+                output_field=CharField(),
+            ),
+            last_contact_interaction=Max(
+                "messages__created_on", filter=Q(messages__contact__isnull=False)
+            ),
+            is_24h_valid=Case(
+                When(last_contact_interaction__lt=last_24h, then=True),
+                default=False,
+                output_field=BooleanField(),
+            ),
+        )
+
+        return qs
 
     def get_serializer_class(self):
         if "update" in self.action:
