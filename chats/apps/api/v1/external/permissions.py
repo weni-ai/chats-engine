@@ -5,16 +5,10 @@ from chats.apps.projects.models import ProjectPermission
 
 
 class IsAdminPermission(permissions.BasePermission):
-    def get_auth_permission(self, request):
-        auth_header = request.META.get("HTTP_AUTHORIZATION")
-        auth_token = auth_header.split()[1]
-        permission = ProjectPermission.objects.get(pk=auth_token, role=1)
-        return permission
-
     def has_permission(self, request, view):  # pragma: no cover
         if view.action in ["list", "create"]:
             try:
-                permission = self.get_auth_permission(request)
+                permission = request.auth
                 project = permission.project
 
                 validation = ValidatePermissionRequest(
@@ -32,7 +26,7 @@ class IsAdminPermission(permissions.BasePermission):
         Return `True` if permission is granted, `False` otherwise.
         """
         try:
-            permission = self.get_auth_permission(request)
+            permission = request.auth
             project = obj.project
         except ProjectPermission.DoesNotExist:
             return False
