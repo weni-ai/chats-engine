@@ -2,7 +2,6 @@ import json
 from datetime import timedelta
 
 from django.conf import settings
-from django.db import connection, reset_queries
 from django.db.models import (
     BooleanField,
     Case,
@@ -37,20 +36,6 @@ from chats.apps.msgs.models import Message
 from chats.apps.rooms.models import Room
 
 
-def database_debug(func, *args, **kwargs):
-    def inner_func(*args, **kwargs):
-        reset_queries()
-        results = func(*args, **kwargs)
-        query_info = connection.queries
-        print("function_name: {}".format(func.__name__))
-        print("query_count: {}".format(len(query_info)))
-        # queries = ["\n{}\n".format(query["sql"]) for query in query_info]
-        # print("queries: \n{}\n".format("".join(queries)))
-        return results
-
-    return inner_func
-
-
 class RoomViewset(
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
@@ -70,10 +55,6 @@ class RoomViewset(
     ordering = ["user", "-last_interaction"]
     pagination_class = CursorPagination
     pagination_class.page_size_query_param = "limit"
-
-    @database_debug
-    def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
 
     def get_permissions(self):
         permission_classes = [permissions.IsAuthenticated]
@@ -110,9 +91,7 @@ class RoomViewset(
                 output_field=BooleanField(),
             ),
         )
-        # import pdb
 
-        # pdb.set_trace()
         return qs
 
     def get_serializer_class(self):
