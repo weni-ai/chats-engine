@@ -250,6 +250,10 @@ class SectorAuthorization(BaseModel):
             action=f"sector_authorization.{action}",
         )
 
+    @property
+    def project(self):
+        return self.sector.project
+
 
 class SectorTag(BaseModel):
     name = models.CharField(_("Name"), max_length=120)
@@ -276,3 +280,7 @@ class SectorTag(BaseModel):
 
     def __str__(self):
         return self.name
+
+    @property
+    def project(self):
+        return self.sector.project
