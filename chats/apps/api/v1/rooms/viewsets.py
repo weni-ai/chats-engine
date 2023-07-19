@@ -95,8 +95,14 @@ class RoomViewset(
                 "messages__created_on", filter=Q(messages__contact__isnull=False)
             ),
             is_24h_valid=Case(
-                When(last_contact_interaction__lt=last_24h, then=True),
-                default=False,
+                When(
+                    Q(
+                        urn__startswith="whatsapp",
+                        last_contact_interaction__lt=last_24h,
+                    ),
+                    then=False,
+                ),
+                default=True,
                 output_field=BooleanField(),
             ),
         )
