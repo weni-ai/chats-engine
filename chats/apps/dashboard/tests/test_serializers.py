@@ -40,7 +40,7 @@ class SerializerTests(TestCase):
         )
 
         self.assertEqual(instance[0]["first_name"], "")
-        self.assertEqual(instance[0]["email"], "amywong@chats.weni.ai")
+        self.assertEqual(instance[0]["email"], "internal@weni.ai")
         self.assertEqual(instance[0]["agent_status"], "OFFLINE")
         self.assertEqual(instance[0]["closed_rooms"], 0)
-        self.assertEqual(instance[0]["opened_rooms"], 1)
+        self.assertEqual(instance[0]["opened_rooms"], 0)

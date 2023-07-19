@@ -17,7 +17,10 @@ from chats.apps.api.v1.internal.users import viewsets as user_internal_views
 from chats.apps.api.v1.msgs.viewsets import MessageMediaViewset, MessageViewset
 from chats.apps.api.v1.projects.viewsets import ProjectPermissionViewset, ProjectViewset
 from chats.apps.api.v1.queues.viewsets import QueueAuthorizationViewset, QueueViewset
-from chats.apps.api.v1.quickmessages.viewsets import QuickMessageViewset
+from chats.apps.api.v1.quickmessages.viewsets import (
+    QuickMessageViewset,
+    SectorQuickMessageViewset,
+)
 from chats.apps.api.v1.rooms.viewsets import RoomViewset
 from chats.apps.api.v1.sectors.viewsets import (
     SectorAuthorizationViewset,
@@ -87,6 +90,9 @@ router.register("accounts/userdata", UserDataViewset, basename="user_data")
 router.register("room", RoomViewset)
 router.register("msg", MessageViewset)
 router.register("quick_messages", QuickMessageViewset)
+router.register(
+    "sector_quick_messages", SectorQuickMessageViewset, basename="sector_quick_message"
+)
 router.register("media", MessageMediaViewset)
 router.register("contact", ContactViewset)
 router.register("sector", SectorViewset)
