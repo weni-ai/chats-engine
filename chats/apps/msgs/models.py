@@ -76,7 +76,7 @@ class Message(BaseModel):
         return self.user or self.contact
 
     def update_msg_text_with_signature(self, msg_data: dict):
-        if self.user and self.room.queue.sector.sign_message and self.text:
+        if self.user and self.room.queue.sector.sign_messages and self.text:
             msg_data["text"] = self.signed_text
         return msg_data
 
