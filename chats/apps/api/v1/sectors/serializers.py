@@ -40,6 +40,7 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
             "work_end",
             "is_deleted",
             "can_trigger_flows",
+            "sign_messages",
         ]
         extra_kwargs = {field: {"required": False} for field in fields}
 

@@ -30,6 +30,7 @@ class Sector(BaseSoftDeleteModel, BaseModel):
         ),
         default=False,
     )
+    sign_messages = models.BooleanField(_("Sign messages?"), default=False)
     is_deleted = models.BooleanField(_("is deleted?"), default=False)
     open_offline = models.BooleanField(
         _("Open room when all agents are offline?"), default=True

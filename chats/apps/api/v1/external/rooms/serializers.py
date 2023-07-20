@@ -190,6 +190,10 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             raise ValidationError(
                 {"detail": _("Contact cannot be done outside working hours")}
             )
+        elif sector.validate_agent_status() is False:
+            raise ValidationError(
+                {"detail": _("Contact cannot be done when agents are offline")}
+            )
 
     def handle_urn(self, validated_data):
         is_anon = validated_data.pop("is_anon", False)
