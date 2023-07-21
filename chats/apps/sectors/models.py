@@ -38,6 +38,7 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
     can_edit_custom_fields = models.BooleanField(
         _("Can edit custom fields?"), default=False
     )
+    completion_context = models.TextField(blank=True, null=True)
 
     class Meta:
         verbose_name = _("Sector")

@@ -1,8 +1,9 @@
 import requests
+from django.conf import settings
 
 
 class OpenAIClient:
-    BASE_URL = "https://api.openai.com/v1/"
+    BASE_URL = settings.OPEN_AI_BASE_URL
 
     def headers(self, token):
         return {"Content-Type": "application/json", "Authorization": f"Bearer {token}"}
@@ -12,6 +13,9 @@ class OpenAIClient:
         response = requests.post(
             url=url,
             headers=self.headers(token),
-            json={"model": "gpt-3.5-turbo", "messages": messages},
+            json={
+                "model": settings.OPEN_AI_GPT_VERSION,
+                "messages": messages,
+            },
         )
         return response

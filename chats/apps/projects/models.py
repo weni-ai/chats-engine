@@ -25,6 +25,10 @@ class Project(BaseConfigurableModel, BaseModel):
     flows_authorization = models.CharField(
         _("Flows Authorization Token"), max_length=50, null=True, blank=True
     )
+    openai_token = models.CharField(
+        _("OpenAI Token"), max_length=100, null=True, blank=True
+    )
+
     date_format = models.CharField(
         verbose_name=_("Date Format"),
         max_length=1,

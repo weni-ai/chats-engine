@@ -141,7 +141,11 @@ class Room(BaseModel):
 
     @property
     def last_5_messages(self):
-        return self.messages.exclude(text="").order_by("-created_on")[:5]
+        return (
+            self.messages.exclude(text="")
+            .exclude(user__isnull=True, contact__isnull=True)
+            .order_by("-created_on")[:5]
+        )
 
     def close(self, tags: list = [], end_by: str = ""):
         self.is_active = False

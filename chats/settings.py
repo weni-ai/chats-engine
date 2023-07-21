@@ -307,6 +307,9 @@ FLOWS_AUTH_TOKEN_RETRIES = env.int(
     "FLOWS_AUTH_TOKEN_RETRIES", default=2
 )  # How many times to refresh the flows project auth token and retry the request
 
+OPEN_AI_BASE_URL = env.str("OPEN_AI_BASE_URL", default="https://api.openai.com/v1/")
+OPEN_AI_GPT_VERSION = env.str("OPEN_AI_GPT_VERSION", default="gpt-4")
+
 # Swagger
 
 SWAGGER_SETTINGS = {

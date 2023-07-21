@@ -238,8 +238,9 @@ class RoomViewset(
                 status=status.HTTP_400_BAD_REQUEST,
                 data={"detail": "OpenAI token not found"},
             )
-        messages = room.last_5_messages()
-        serialized_data = ChatCompletionSerializer(messages).data
+        messages = room.last_5_messages
+        serialized_data = ChatCompletionSerializer(messages, many=True).data
+
         sector = room.queue.sector
         if sector.completion_context:
             serialized_data.append(
