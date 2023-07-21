@@ -77,6 +77,7 @@ class SectorReadOnlyRetrieveSerializer(serializers.ModelSerializer):
             "work_end",
             "rooms_limit",
             "can_trigger_flows",
+            "sign_messages",
         ]
 
 
