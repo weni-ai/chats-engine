@@ -62,6 +62,10 @@ class Message(BaseModel):
 
         return dict(MessageWSSerializer(self).data)
 
+    @property
+    def signed_text(self):
+        return f"{self.user.first_name}:\n\n{self.text}"
+
     def get_authorization(self, user):
         return self.room.get_authorization(user)
 
@@ -71,11 +75,18 @@ class Message(BaseModel):
     def get_sender(self):
         return self.user or self.contact
 
+    def update_msg_text_with_signature(self, msg_data: dict):
+        if self.user and self.room.queue.sector.sign_messages and self.text:
+            msg_data["text"] = self.signed_text
+        return msg_data
+
     def notify_room(self, action: str, callback: bool = False):
         """ """
         data = self.serialized_ws_data
         self.room.base_notification(content=data, action=f"msg.{action}")
         if self.room.callback_url and callback:
+            data = self.update_msg_text_with_signature(data)
+
             requests.post(
                 self.room.callback_url,
                 data=json.dumps(
