@@ -64,7 +64,7 @@ class Message(BaseModel):
 
     @property
     def signed_text(self):
-        return f"{self.user.full_name}:\n{self.text}"
+        return f"{self.user.first_name}:\n{self.text}"
 
     def get_authorization(self, user):
         return self.room.get_authorization(user)

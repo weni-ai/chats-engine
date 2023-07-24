@@ -39,8 +39,8 @@ class SerializerTests(TestCase):
             context={"is_weni_admin": True},
         )
 
-        self.assertEqual(instance[0]["first_name"], "")
-        self.assertEqual(instance[0]["email"], "internal@weni.ai")
-        self.assertEqual(instance[0]["agent_status"], "OFFLINE")
-        self.assertEqual(instance[0]["closed_rooms"], 0)
-        self.assertEqual(instance[0]["opened_rooms"], 0)
+        self.assertEqual(instance[2]["first_name"], "")
+        self.assertEqual(instance[2]["email"], "amywong@chats.weni.ai")
+        self.assertEqual(instance[2]["agent_status"], "OFFLINE")
+        self.assertEqual(instance[2]["closed_rooms"], 0)
+        self.assertEqual(instance[2]["opened_rooms"], 1)
