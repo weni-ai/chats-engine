@@ -20,6 +20,11 @@ from chats.apps.api.v1.rooms.serializers import (
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.msgs.models import Message
 from chats.apps.rooms.models import Room
+from chats.apps.rooms.views import (
+    get_editable_custom_fields_room,
+    update_custom_fields,
+    update_flows_custom_fields,
+)
 
 
 class RoomViewset(
@@ -47,12 +52,6 @@ class RoomViewset(
                 permissions.IsAuthenticated,
                 api_permissions.IsQueueAgent,
             )
-        elif self.action == "list" and self.request.query_params.get("email"):
-            permission_classes = (
-                permissions.IsAuthenticated,
-                api_permissions.AnySectorManagerPermission,
-            )
-
         return [permission() for permission in permission_classes]
 
     def get_queryset(self):
@@ -214,16 +213,47 @@ class RoomViewset(
         msg.notify_room("create")
 
         if old_user is None and user:  # queued > agent
-            instance.notify_queue("update", transferred_by=self.request.user.email)
+            instance.notify_queue("update")
         elif old_user is not None:
-            instance.notify_user(
-                "update", user=old_user, transferred_by=self.request.user.email
-            )
+            instance.notify_user("update", user=old_user)
             if queue:  # agent > queue
-                instance.notify_queue("update", transferred_by=self.request.user.email)
+                instance.notify_queue("update")
             else:  # agent > agent
-                instance.notify_user("update", transferred_by=self.request.user.email)
+                instance.notify_user("update")
 
     def perform_destroy(self, instance):
         instance.notify_room("destroy", callback=True)
         super().perform_destroy(instance)
+
+    @action(
+        detail=True,
+        methods=["PATCH"],
+    )
+    def update_custom_fields(self, request, pk=None):
+        custom_fields_update = request.data
+        data = {"fields": custom_fields_update}
+
+        if pk is None:
+            return Response(
+                {"Detail": "No room on the request"}, status.HTTP_400_BAD_REQUEST
+            )
+        elif not custom_fields_update:
+            return Response(
+                {"Detail": "No custom fields on the request"},
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        room = get_editable_custom_fields_room({"uuid": pk, "is_active": "True"})
+
+        update_flows_custom_fields(
+            project=room.queue.sector.project,
+            data=data,
+            contact_id=room.contact.external_id,
+        )
+
+        update_custom_fields(room, custom_fields_update)
+
+        return Response(
+            {"Detail": "Custom Field edited with success"},
+            status.HTTP_200_OK,
+        )
