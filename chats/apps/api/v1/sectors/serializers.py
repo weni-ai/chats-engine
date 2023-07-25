@@ -40,6 +40,7 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
             "work_end",
             "is_deleted",
             "can_trigger_flows",
+            "can_edit_custom_fields",
         ]
         extra_kwargs = {field: {"required": False} for field in fields}
 
@@ -76,6 +77,7 @@ class SectorReadOnlyRetrieveSerializer(serializers.ModelSerializer):
             "work_end",
             "rooms_limit",
             "can_trigger_flows",
+            "can_edit_custom_fields",
         ]
 
 

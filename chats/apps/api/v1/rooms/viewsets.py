@@ -20,8 +20,11 @@ from chats.apps.api.v1.rooms.serializers import (
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.msgs.models import Message
 from chats.apps.rooms.models import Room
-
-from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
+from chats.apps.rooms.views import (
+    get_editable_custom_fields_room,
+    update_custom_fields,
+    update_flows_custom_fields,
+)
 
 
 class RoomViewset(
@@ -234,34 +237,21 @@ class RoomViewset(
             return Response(
                 {"Detail": "No room on the request"}, status.HTTP_400_BAD_REQUEST
             )
-
-        try:
-            room = Room.objects.get(uuid=pk, is_active=True)
-        except:
+        elif not custom_fields_update:
             return Response(
-                {
-                    "Detail": "Room with the given id was not found, it does not exist or it is deleted"
-                },
-                status.HTTP_404_NOT_FOUND,
+                {"Detail": "No custom fields on the request"},
+                status.HTTP_400_BAD_REQUEST,
             )
 
-        response = FlowRESTClient().create_contact(
+        room = get_editable_custom_fields_room({"uuid": pk, "is_active": "True"})
+
+        update_flows_custom_fields(
             project=room.queue.sector.project,
             data=data,
             contact_id=room.contact.external_id,
         )
-        if response.status_code not in [status.HTTP_200_OK]:
-            return Response(
-                {
-                    "Detail": f"[{response.status_code}]\n"
-                    + f"Error updating custom fields on flows. Exception: {response.content}"
-                },
-                status.HTTP_404_NOT_FOUND,
-            )
 
-        old_custom_fields = room.custom_fields
-        room.custom_fields = {**old_custom_fields, **custom_fields_update}
-        room.save()
+        update_custom_fields(room, custom_fields_update)
 
         return Response(
             {"Detail": "Custom Field edited with success"},

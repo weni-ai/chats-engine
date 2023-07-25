@@ -31,6 +31,9 @@ class Sector(BaseSoftDeleteModel, BaseModel):
         default=False,
     )
     is_deleted = models.BooleanField(_("is deleted?"), default=False)
+    can_edit_custom_fields = models.BooleanField(
+        _("Can edit custom fields?"), default=False
+    )
 
     class Meta:
         verbose_name = _("Sector")
