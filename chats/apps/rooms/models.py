@@ -104,6 +104,10 @@ class Room(BaseModel):
         return check_messages or check_flowstarts
 
     @property
+    def project(self):
+        return self.queue.project
+
+    @property
     def last_contact_message(self):
         return (
             self.messages.filter(contact__isnull=False).order_by("-created_on").first()

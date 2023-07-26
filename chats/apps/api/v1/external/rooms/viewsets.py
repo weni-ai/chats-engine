@@ -187,9 +187,6 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
 
 class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
     serializer_class = RoomFlowSerializer
-    permission_classes = [
-        IsAdminPermission,
-    ]
     authentication_classes = [ProjectAdminAuthentication]
 
     def partial_update(self, request, pk=None):
@@ -200,7 +197,7 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
             return Response(
                 {"Detail": "No contact id on the request"}, status.HTTP_400_BAD_REQUEST
             )
-        request_permission = self.request.auth
+        request_permission = request.auth
         project = request_permission.project
 
         response = FlowRESTClient().create_contact(
