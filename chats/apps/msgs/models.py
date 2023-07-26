@@ -98,6 +98,10 @@ class Message(BaseModel):
                 headers={"content-type": "application/json"},
             )
 
+    @property
+    def project(self):
+        return self.room.project
+
 
 class MessageMedia(BaseModel):
     message = models.ForeignKey(
@@ -157,3 +161,7 @@ class MessageMedia(BaseModel):
     def notify_room(self, *args, **kwargs):
         """ """
         self.message.notify_room(*args, **kwargs)
+
+    @property
+    def project(self):
+        return self.message.project

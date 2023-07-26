@@ -191,9 +191,6 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
 
 class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
     serializer_class = RoomFlowSerializer
-    permission_classes = [
-        IsAdminPermission,
-    ]
     authentication_classes = [ProjectAdminAuthentication]
 
     def partial_update(self, request, pk=None):
