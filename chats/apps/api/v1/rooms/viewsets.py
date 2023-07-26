@@ -19,7 +19,7 @@ from chats.apps.api.v1.rooms.serializers import (
 )
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.rooms.models import Room
-from chats.celery import app as celery_app
+from chats.apps.rooms.views import close_room
 
 
 class RoomViewset(
@@ -111,8 +111,7 @@ class RoomViewset(
         if not settings.ACTIVATE_CALC_METRICS:
             return Response(serialized_data.data, status=status.HTTP_200_OK)
 
-        close_metrics = celery_app.send_task("close_metrics", args=[str(instance.pk)])
-        close_metrics.wait()
+        close_room(str(instance.pk))
         return Response(serialized_data.data, status=status.HTTP_200_OK)
 
     def perform_create(self, serializer):

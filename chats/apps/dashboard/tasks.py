@@ -3,8 +3,7 @@ from chats.apps.rooms.models import Room
 from chats.celery import app
 
 
-@app.task(name="close_metrics")
-def close_metrics(room: str):
+def generate_metrics(room: str):
     room = Room.objects.get(pk=room)
     messages_contact = (
         room.messages.filter(contact__isnull=False).order_by("created_on").first()
@@ -30,3 +29,8 @@ def close_metrics(room: str):
     metric_room.message_response_time = difference_time
     metric_room.interaction_time = interaction_time.total_seconds()
     metric_room.save()
+
+
+@app.task(name="close_metrics")
+def close_metrics(room: str):
+    generate_metrics(room)
