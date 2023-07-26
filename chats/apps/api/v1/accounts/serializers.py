@@ -38,6 +38,16 @@ class UserSerializer(serializers.ModelSerializer):
         return user.last_interaction
 
 
+class UserSimpleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            "first_name",
+            "last_name",
+            "email",
+        ]
+
+
 class UserNameSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
