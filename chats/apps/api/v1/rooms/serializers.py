@@ -34,6 +34,7 @@ class RoomSerializer(serializers.ModelSerializer):
     last_message = serializers.SerializerMethodField()
     flowstart_data = serializers.SerializerMethodField()
     last_interaction = serializers.DateTimeField(read_only=True)
+    can_edit_custom_fields = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -46,6 +47,7 @@ class RoomSerializer(serializers.ModelSerializer):
             "linked_user",
             "is_24h_valid",
             "last_interaction",
+            "can_edit_custom_fields",
         ]
 
     def get_flowstart_data(self, room: Room) -> bool:
@@ -66,6 +68,9 @@ class RoomSerializer(serializers.ModelSerializer):
             .first()
         )
         return "" if last_message is None else last_message.text
+
+    def get_can_edit_custom_fields(self, room: Room):
+        return room.queue.sector.can_edit_custom_fields
 
 
 class TransferRoomSerializer(serializers.ModelSerializer):

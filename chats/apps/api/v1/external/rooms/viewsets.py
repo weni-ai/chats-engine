@@ -14,6 +14,11 @@ from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.external.rooms.serializers import RoomFlowSerializer
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.rooms.models import Room
+from chats.apps.rooms.views import (
+    get_editable_custom_fields_room,
+    update_custom_fields,
+    update_flows_custom_fields,
+)
 
 
 def add_user_or_queue_to_room(instance, request):
@@ -180,5 +185,45 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
 
         return Response(
             {"Detail": f"Agent {agent} successfully attributed to the ticket {pk}"},
+            status.HTTP_200_OK,
+        )
+
+
+class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
+    serializer_class = RoomFlowSerializer
+    authentication_classes = [ProjectAdminAuthentication]
+
+    def partial_update(self, request, pk=None):
+        custom_fields_update = request.data
+        data = {"fields": custom_fields_update}
+
+        if pk is None:
+            return Response(
+                {"Detail": "No contact id on the request"}, status.HTTP_400_BAD_REQUEST
+            )
+        elif not custom_fields_update:
+            return Response(
+                {"Detail": "No custom fields the request"}, status.HTTP_400_BAD_REQUEST
+            )
+        request_permission = self.request.auth
+        project = request_permission.project
+
+        room = get_editable_custom_fields_room(
+            {
+                "contact__external_id": pk,
+                "queue__sector__project": project,
+                "is_active": "True",
+            }
+        )
+        update_flows_custom_fields(
+            project=room.queue.sector.project,
+            data=data,
+            contact_id=room.contact.external_id,
+        )
+
+        update_custom_fields(room, custom_fields_update)
+
+        return Response(
+            {"Detail": "Custom Field edited with success"},
             status.HTTP_200_OK,
         )

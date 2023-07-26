@@ -8,7 +8,7 @@ from chats.apps.msgs.models import Message, MessageMedia
 
 
 class AttachmentSerializer(serializers.ModelSerializer):
-    url = serializers.URLField(source="media_url")
+    url = serializers.CharField(source="media_url")
 
     class Meta:
         model = MessageMedia

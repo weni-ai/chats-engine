@@ -1,12 +1,13 @@
 from rest_framework import routers
 
-from chats.apps.api.v1.accounts.viewsets import LoginViewset
+from chats.apps.api.v1.accounts.viewsets import LoginViewset, UserDataViewset
 from chats.apps.api.v1.contacts.viewsets import ContactViewset
 from chats.apps.api.v1.dashboard.viewsets import DashboardLiveViewset
 from chats.apps.api.v1.external.agents.viewsets import AgentFlowViewset
 from chats.apps.api.v1.external.msgs.viewsets import MessageFlowViewset
 from chats.apps.api.v1.external.queues.viewsets import QueueFlowViewset
 from chats.apps.api.v1.external.rooms.viewsets import (
+    CustomFieldsUserExternalViewSet,
     RoomFlowViewSet,
     RoomUserExternalViewSet,
 )
@@ -82,6 +83,7 @@ class Router(routers.SimpleRouter):
 router = Router()
 router.register("accounts/login", LoginViewset)
 router.register("accounts/profile", ProfileViewset)
+router.register("accounts/userdata", UserDataViewset, basename="user_data")
 router.register("room", RoomViewset)
 router.register("msg", MessageViewset)
 router.register("quick_messages", QuickMessageViewset)
@@ -123,6 +125,11 @@ router.register("external/msgs", MessageFlowViewset, basename="external_message"
 router.register("external/rooms", RoomFlowViewSet, basename="external_rooms")
 router.register(
     "external/room_agent", RoomUserExternalViewSet, basename="external_roomagent"
+)
+router.register(
+    "external/custom_field",
+    CustomFieldsUserExternalViewSet,
+    basename="external_custom_field",
 )
 router.register("external/sectors", SectorFlowViewset, basename="external_sector")
 router.register("external/queues", QueueFlowViewset, basename="external_queue")

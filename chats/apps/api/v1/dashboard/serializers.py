@@ -3,12 +3,14 @@ from urllib import parse
 
 import pendulum
 from django.conf import settings
-from django.db.models import Avg, Count, F, Q, Sum
+from django.db.models import Avg, Count, F, OuterRef, Q, Subquery, Sum
 from django.utils import timezone
 from django_redis import get_redis_connection
 from rest_framework import serializers
 
+from chats.apps.accounts.models import User
 from chats.apps.dashboard.models import RoomMetrics
+from chats.apps.projects.models import ProjectPermission
 from chats.apps.rooms.models import Room
 
 
@@ -99,43 +101,49 @@ def dashboard_agents_data(context, project):
         timezone.now().astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
     )
 
-    rooms_filter = {"user__isnull": False}
-    closed_rooms = {}
-    opened_rooms = {}
+    rooms_filter = {}
+    closed_rooms = {"rooms__queue__sector__project": project}
+    opened_rooms = {"rooms__queue__sector__project": project}
     if context.get("start_date") and context.get("end_date"):
         start_time = pendulum.parse(context.get("start_date")).replace(tzinfo=tz)
         end_time = pendulum.parse(context.get("end_date") + " 23:59:59").replace(
             tzinfo=tz
         )
 
-        rooms_filter["created_on__range"] = [start_time, end_time]
-        closed_rooms["ended_at__range"] = [start_time, end_time]
+        rooms_filter["rooms__created_on__range"] = [start_time, end_time]
+        rooms_filter["rooms__is_active"] = False
+        closed_rooms["rooms__ended_at__range"] = [start_time, end_time]
+
     else:
-        closed_rooms["ended_at__gte"] = initial_datetime
-        opened_rooms["is_active"] = True
+        closed_rooms["rooms__ended_at__gte"] = initial_datetime
+        opened_rooms["rooms__is_active"] = True
+        closed_rooms["rooms__is_active"] = False
 
     if context.get("agent"):
-        rooms_filter["user"] = context.get("agent")
+        rooms_filter["rooms__user"] = context.get("agent")
 
     if context.get("sector"):
-        rooms_filter["queue__sector"] = context.get("sector")
+        rooms_filter["rooms__queue__sector"] = context.get("sector")
         if context.get("tag"):
-            rooms_filter["tags__name"] = context.get("tag")
-    else:
-        rooms_filter["queue__sector__project"] = project
+            rooms_filter["rooms__tags__name"] = context.get("tag")
 
-    agents_query = Room.objects
+    project_permission_subquery = ProjectPermission.objects.filter(
+        project_id=project,
+        user_id=OuterRef("email"),
+    ).values("status")[:1]
+
+    agents_query = User.objects
     if not context.get("is_weni_admin"):
-        agents_query = agents_query.exclude(user__email__endswith="weni.ai")
+        agents_query = agents_query.exclude(email__endswith="weni.ai")
 
     agents_query = (
-        Room.objects.filter(**rooms_filter)
-        .values("user")
+        agents_query.filter(project_permissions__project=project)
         .annotate(
-            user__first_name=F("user__first_name"),
-            closed_rooms=Count("uuid", filter=Q(is_active=False, **closed_rooms)),
-            opened_rooms=Count("uuid", filter=Q(**opened_rooms)),
+            agent_status=Subquery(project_permission_subquery),
+            closed_rooms=Count("rooms", filter=Q(**closed_rooms, **rooms_filter)),
+            opened_rooms=Count("rooms", filter=Q(**opened_rooms, **rooms_filter)),
         )
+        .values("first_name", "email", "agent_status", "closed_rooms", "opened_rooms")
     )
 
     return agents_query

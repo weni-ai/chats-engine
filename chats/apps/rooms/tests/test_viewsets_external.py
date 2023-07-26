@@ -25,7 +25,7 @@ class RoomsExternalTests(APITestCase):
         data = {
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
-                "external_id": "e3955fd5-5705-40cd-b480-b45594b70282",
+                "external_id": "e3955fd5-5705-60cd-b480-b45594b70282",
                 "name": "Foo Bar",
                 "email": "FooBar@weni.ai",
                 "phone": "+250788123123",
@@ -64,7 +64,7 @@ class RoomsExternalTests(APITestCase):
         data = {
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
-                "external_id": "e3955fd5-5705-40cd-b480-b45594b70282",
+                "external_id": "e3955fd5-5705-30cd-b480-b45594b70282",
                 "name": "gaules",
                 "email": "gaulesr@weni.ai",
                 "phone": "+5511985543332",
@@ -91,7 +91,7 @@ class RoomsExternalTests(APITestCase):
         data = {
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
-                "external_id": "e3955fd5-5705-40cd-b480-b45594b70282",
+                "external_id": "e3955fd5-5705-55cd-b480-b45594b70282",
                 "name": "gaules",
                 "email": "gaulesr@weni.ai",
                 "phone": "+5511985543332",
@@ -104,6 +104,7 @@ class RoomsExternalTests(APITestCase):
             },
         }
         response = self._create_room("f3ce543e-d77e-4508-9140-15c95752a380", data)
+
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.get("urn"), None)
 
@@ -179,9 +180,12 @@ class RoomsFlowStartExternalTests(APITestCase):
         response = self._create_room("f3ce543e-d77e-4508-9140-15c95752a380", data)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
+        self.assertIn(
             response.json().get("detail"),
-            "The contact already have an open room in the especified queue",
+            {
+                "The contact already have an open room in the project",
+                "The contact already have an open room in the especified queue",
+            },
         )
 
     def test_create_room_with_contact_flow_start_with_offline_user(self):
@@ -368,3 +372,44 @@ class RoomsAgentExternalTests(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class RoomsRoutingExternalTests(APITestCase):
+    fixtures = [
+        "chats/fixtures/fixture_sector.json",
+    ]
+
+    def _create_room(self, token: str, data: dict):
+        url = reverse("external_rooms-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+        return client.post(url, data=data, format="json")
+
+    def test_create_external_room_can_open_offline(self):
+        data = {
+            "queue_uuid": "8590ad29-5629-448c-bfb6-1bfd5219b8ec",
+            "contact": {
+                "external_id": "953fdcc9-1f6f-4abd-b90e-10a35c1cc825",
+                "name": "Foo Bar",
+                "email": "FooBar@weni.ai",
+                "phone": "+250788123123",
+                "custom_fields": {},
+            },
+        }
+        response = self._create_room("b5fab78a-4836-468c-96c4-f5b0bba3303a", data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_create_external_room_cannot_open_offline(self):
+        data = {
+            "queue_uuid": "605e21b0-4177-4eae-9cfb-529d9972a192",
+            "contact": {
+                "external_id": "a5ff0cd3-0bcd-4e91-8120-8718128cb1d9",
+                "name": "Foo Bar",
+                "email": "FooBar@weni.ai",
+                "phone": "+250788123123",
+                "custom_fields": {},
+            },
+        }
+        response = self._create_room("b5fab78a-4836-468c-96c4-f5b0bba3303a", data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

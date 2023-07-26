@@ -34,16 +34,25 @@ class MessageMediaPermission(permissions.BasePermission):
 
     def has_permission(self, request, view):
         user = request.user
-        if view.action == "create":
+        action = view.action
+
+        if action == "create":
             room = Room.objects.get(messages__uuid=request.data.get("message"))
             return room.user == request.user
-        elif view.action == "list":
+        elif action == "list":
             try:
                 room = Room.objects.get(uuid=request.query_params.get("room"))
-                return room.user == request.user
+                if room.user == request.user:
+                    return True
+                else:
+                    permission = user.project_permissions.get(
+                        project=room.queue.sector.project
+                    )
+                    return permission.role > 0
             except Room.DoesNotExist:
-                project_uuid = request.query_params.get("project")
-                permission = user.project_permissions.get(project__uuid=project_uuid)
+                permission = user.project_permissions.get(
+                    project__uuid=request.query_params.get("project")
+                )
                 return permission.role > 0
         return super().has_permission(request, view)
 

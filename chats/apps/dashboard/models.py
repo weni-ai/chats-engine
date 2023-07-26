@@ -23,3 +23,7 @@ class RoomMetrics(BaseModel):
 
     def __str__(self):
         return self.room.queue.name
+
+    @property
+    def project(self):
+        return self.room.project

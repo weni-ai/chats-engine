@@ -121,15 +121,20 @@ class FlowsContactsAndGroupsMixin:
         contacts["previous"] = get_cursor(contacts.get("previous") or "")
         return contacts
 
-    def create_contact(self, project, data: dict):
+    def create_contact(self, project, data: dict, contact_id: str = ""):
+        url = (
+            f"{self.base_url}/api/v2/contacts.json"
+            if contact_id == ""
+            else f"{self.base_url}/api/v2/contacts.json?uuid={contact_id}"
+        )
         response = retry_request_and_refresh_flows_auth_token(
             project=project,
             request_method=requests.post,
-            url=f"{self.base_url}/api/v2/contacts.json",
+            url=url,
             json=data,
             headers=self.project_headers(project.flows_authorization),
         )
-        return response.json()
+        return response
 
     def list_contact_groups(self, project, cursor: str = "", query_filters: dict = {}):
         response = retry_request_and_refresh_flows_auth_token(
@@ -150,6 +155,15 @@ class FlowRESTClient(
 ):
     def __init__(self, *args, **kwargs):
         self.base_url = settings.FLOWS_API_URL
+
+    def get_user_api_token(self, project_uuid: str, user_email: str):
+        params = dict(project=project_uuid, user=user_email)
+        response = requests.get(
+            url=f"{self.base_url}/api/v2/internals/users/api-token",
+            params=params,
+            headers=self.headers,
+        )
+        return response
 
     def list_flows(self, project, cursor: str = ""):
         response = retry_request_and_refresh_flows_auth_token(

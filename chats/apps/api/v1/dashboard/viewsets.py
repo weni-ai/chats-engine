@@ -5,10 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from chats.apps.api.v1.dashboard.presenter import (
-    get_agents_data,
     get_export_data,
-    get_general_data,
-    get_sector_data,
 )
 from chats.apps.api.v1.dashboard.serializers import (
     DashboardRawDataSerializer,
@@ -18,6 +15,10 @@ from chats.apps.api.v1.dashboard.serializers import (
 )
 from chats.apps.api.v1.permissions import HasDashboardAccess
 from chats.apps.projects.models import Project
+
+import io
+from chats.core.excel_storage import ExcelStorage
+import json
 
 
 class DashboardLiveViewset(viewsets.GenericViewSet):
@@ -106,15 +107,34 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         project = self.get_object()
         filter = request.query_params
         dataset = get_export_data(project, filter)
+        data_frame_rooms = pandas.DataFrame(dataset)
 
-        filename = "dashboard_export_data"
+        filename = "dashboard_rooms_export_data"
 
         if "xls" in filter:
-            response = HttpResponse(
-                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-            response["Content-Disposition"] = (
-                'attachment; filename="' + filename + ".xls"
+            excel_rooms_buffer = io.BytesIO()
+            with pandas.ExcelWriter(excel_rooms_buffer, engine="xlsxwriter") as writer:
+                data_frame_rooms.to_excel(
+                    writer,
+                    sheet_name="rooms_infos",
+                    startrow=1,
+                    startcol=0,
+                    index=False,
+                )
+            excel_rooms_buffer.seek(0)  # Move o cursor para o início do buffer
+            storage = ExcelStorage()
+
+            bytes_archive = excel_rooms_buffer.getvalue()
+
+            with storage.open(filename + ".xlsx", "wb") as up_file:
+                up_file.write(bytes_archive)
+                file_url = storage.url(up_file.name)
+
+            data = {"path_file": file_url}
+
+            return HttpResponse(
+                json.dumps(data),
+                content_type="application/javascript; charset=utf8",
             )
         else:
             response = HttpResponse(content_type="text/csv")
@@ -122,19 +142,19 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
                 'attachment; filename="' + filename + ".csv"
             )
 
-        table = pandas.DataFrame(dataset)
-        table.rename(
-            columns={
-                0: "Queue Name",
-                1: "Waiting Time",
-                2: "Response Time",
-                3: "Interaction Time",
-                4: "Open",
-            },
-            inplace=True,
-        )
-        table.to_csv(response, encoding="utf-8", index=False)
-        return response
+            table = pandas.DataFrame(dataset)
+            table.rename(
+                columns={
+                    0: "Queue Name",
+                    1: "Waiting Time",
+                    2: "Response Time",
+                    3: "Interaction Time",
+                    4: "Open",
+                },
+                inplace=True,
+            )
+            table.to_csv(response, encoding="utf-8", index=False)
+            return response
 
     @action(
         detail=True,
@@ -149,24 +169,28 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         project = self.get_object()
         filter = request.query_params
 
-        general_dataset = get_general_data(project, filter)
-        userinfo_dataset = get_agents_data(project, filter)
-        sector_dataset = get_sector_data(project, filter)
+        user_info_context = {}
+        user_info_context["filters"] = request.query_params
+
+        # General data
+        general_dataset = dashboard_general_data(context=filter, project=project)
+        raw_dataset = DashboardRawDataSerializer(instance=project, context=filter)
+        combined_dataset = {**general_dataset, **raw_dataset.data}
+
+        # Agents Data
+        userinfo_dataset = dashboard_agents_data(context=filter, project=project)
+        # # Sectors Data
+        sector_dataset = dashboard_division_data(context=filter, project=project)
 
         filename = "dashboard_export_data"
 
-        data_frame = pandas.DataFrame([general_dataset])
-        data_frame_1 = pandas.read_json(userinfo_dataset)
-        data_frame_2 = pandas.read_json(sector_dataset)
+        data_frame = pandas.DataFrame([combined_dataset])
+        data_frame_1 = pandas.DataFrame(userinfo_dataset)
+        data_frame_2 = pandas.DataFrame(sector_dataset)
 
         if "xls" in filter:
-            response = HttpResponse(
-                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-            response["Content-Disposition"] = (
-                'attachment; filename="' + filename + ".xlsx"
-            )
-            with pandas.ExcelWriter(response, engine="xlsxwriter") as writer:
+            excel_buffer = io.BytesIO()
+            with pandas.ExcelWriter(excel_buffer, engine="xlsxwriter") as writer:
                 data_frame.to_excel(
                     writer,
                     sheet_name="dashboard_infos",
@@ -188,7 +212,21 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
                     startcol=0,
                     index=False,
                 )
-            return response
+            excel_buffer.seek(0)  # Move o cursor para o início do buffer
+            storage = ExcelStorage()
+
+            bytes_archive = excel_buffer.getvalue()
+
+            with storage.open(filename + ".xlsx", "wb") as up_file:
+                up_file.write(bytes_archive)
+                file_url = storage.url(up_file.name)
+
+            data = {"path_file": file_url}
+
+            return HttpResponse(
+                json.dumps(data),
+                content_type="application/javascript; charset=utf8",
+            )
 
         else:
             response = HttpResponse(content_type="text/csv")
@@ -196,8 +234,8 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
                 'attachment; filename="' + filename + ".csv"
             )
 
-            data_frame.to_csv(response, index=False)
-            data_frame_1.to_csv(response, index=False, mode="a")
-            data_frame_2.to_csv(response, index=False, mode="a")
+            data_frame.to_csv(response, index=False, sep=";")
+            data_frame_1.to_csv(response, index=False, mode="a", sep=";")
+            data_frame_2.to_csv(response, index=False, mode="a", sep=";")
 
             return response
