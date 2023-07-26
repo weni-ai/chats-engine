@@ -109,11 +109,6 @@ WSGI_APPLICATION = "chats.wsgi.application"
 
 ASGI_APPLICATION = "chats.asgi.application"
 
-# Database
-# https://docs.djangoproject.com/en/4.0/ref/settings/#databases
-
-DATABASES = dict(default=env.db(var="DATABASE_URL"))
-
 REDIS_URL = env.str("CHANNEL_LAYERS_REDIS", default="redis://localhost:6379/1")
 
 # channels
