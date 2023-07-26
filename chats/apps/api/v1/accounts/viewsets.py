@@ -1,19 +1,19 @@
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from drf_yasg.utils import swagger_auto_schema
-from rest_framework import mixins, status
+from rest_framework import mixins, status, viewsets
 from rest_framework.authtoken.models import Token
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.viewsets import GenericViewSet
 
 from chats.apps.accounts.models import User
-from chats.apps.api.v1.accounts.serializers import LoginSerializer
+from chats.apps.api.v1.accounts.serializers import LoginSerializer, UserNameSerializer
 
 
 @method_decorator(
     name="create", decorator=swagger_auto_schema(responses={201: '{"token":"TOKEN"}'})
 )
-class LoginViewset(mixins.CreateModelMixin, GenericViewSet):
+class LoginViewset(mixins.CreateModelMixin, viewsets.GenericViewSet):
 
     """
     Login Users
@@ -39,3 +39,26 @@ class LoginViewset(mixins.CreateModelMixin, GenericViewSet):
             {"token": token.key},
             status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
+
+
+class UserDataViewset(viewsets.GenericViewSet):
+    queryset = User.objects.only("email", "first_name", "last_name").all()
+    serializer_class = UserNameSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = None
+
+    def get_object(self):
+        user_email = self.request.query_params.get("user_email")
+        return User.objects.get(email=user_email)
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+        except User.DoesNotExist:
+            return Response(
+                {"Detail": "Email not found"},
+                status.HTTP_404_NOT_FOUND,
+            )
+
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)

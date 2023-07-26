@@ -5,9 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from requests.exceptions import JSONDecodeError
 from timezone_field import TimeZoneField
 
-from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
-    ConnectRESTClient,
-)
+from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.core.models import BaseModel
 from chats.utils.websockets import send_channels_group
 
@@ -55,7 +53,7 @@ class Project(BaseModel):
             permissions.insert(0, user_email)
         while permissions != []:
             email = permissions.pop(0)
-            response = ConnectRESTClient().get_user_project_token(self, email)
+            response = FlowRESTClient().get_user_api_token(str(self.uuid), email)
             if response.status_code == 200:
                 break
         try:
@@ -168,9 +166,13 @@ class ProjectPermission(
     def is_admin(self):
         return self.role == self.ROLE_ADMIN
 
-    def is_manager(self, sector: str = None, queue: str = None):
+    def is_manager(
+        self, sector: str = None, queue: str = None, any_sector: bool = False
+    ):
         if self.is_admin:
             return True
+        if any_sector is True:
+            return self.sector_authorizations.exists()
         qs = (
             models.Q(sector__uuid=sector)
             if sector is not None
@@ -349,3 +351,7 @@ class ContactGroupFlowReference(BaseModel):
 
     def __str__(self):
         return self.receiver_type + ": " + self.external_id
+
+    @property
+    def project(self):
+        return self.flow_start.project

@@ -65,6 +65,14 @@ class AnyQueueAgentPermission(permissions.BasePermission):
             return False
 
 
+class AnySectorManagerPermission(permissions.BasePermission):
+    def has_permission(self, request, view):
+        try:
+            return GetPermission(request).permission.is_manager(any_sector=True)
+        except AttributeError:
+            return False
+
+
 class IsQueueAgent(permissions.BasePermission):
     def has_permission(self, request, view):
         data = request.data or request.query_params
@@ -92,7 +100,7 @@ class IsQueueAgent(permissions.BasePermission):
         try:
             return perm.is_agent(str(obj.queue.pk))
         except ObjectDoesNotExist:
-            return False
+            return perm.is_manager(any_sector=True)
 
 
 class SectorAnyPermission(permissions.BasePermission):
