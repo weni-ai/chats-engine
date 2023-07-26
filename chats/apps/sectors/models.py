@@ -2,7 +2,7 @@ import pendulum
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
-from django.db.models import F, Q, Value
+from django.db.models import Count, F, Q, Value
 from django.db.models.functions import Concat
 from django.utils.translation import gettext_lazy as _
 
@@ -30,7 +30,14 @@ class Sector(BaseSoftDeleteModel, BaseModel):
         ),
         default=False,
     )
+    sign_messages = models.BooleanField(_("Sign messages?"), default=False)
     is_deleted = models.BooleanField(_("is deleted?"), default=False)
+    open_offline = models.BooleanField(
+        _("Open room when all agents are offline?"), default=True
+    )
+    can_edit_custom_fields = models.BooleanField(
+        _("Can edit custom fields?"), default=False
+    )
 
     class Meta:
         verbose_name = _("Sector")
@@ -122,6 +129,28 @@ class Sector(BaseSoftDeleteModel, BaseModel):
         #     .count()
         # )
         return 0
+
+    def validate_agent_status(self, queue=None):
+        if self.open_offline:
+            return True
+        is_online = False
+        if queue:
+            is_online = queue.authorizations.filter(
+                permission__status="ONLINE"
+            ).exists()
+        else:
+            is_online = (
+                self.queues.annotate(
+                    online_count=Count(
+                        "authorizations",
+                        filter=Q(authorizations__permission__status="ONLINE"),
+                    )
+                )
+                .filter(online_count__gt=0)
+                .exists()
+            )
+
+        return is_online
 
     def is_attending(self, created_on):
         tz = pendulum.timezone(str(self.project.timezone))
@@ -225,6 +254,10 @@ class SectorAuthorization(BaseModel):
             action=f"sector_authorization.{action}",
         )
 
+    @property
+    def project(self):
+        return self.sector.project
+
 
 class SectorTag(BaseModel):
     name = models.CharField(_("Name"), max_length=120)
@@ -251,3 +284,7 @@ class SectorTag(BaseModel):
 
     def __str__(self):
         return self.name
+
+    @property
+    def project(self):
+        return self.sector.project

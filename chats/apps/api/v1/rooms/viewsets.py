@@ -1,12 +1,26 @@
 import json
+from datetime import timedelta
 
 from django.conf import settings
-from django.db.models import Max
+from django.db.models import (
+    BooleanField,
+    Case,
+    CharField,
+    Count,
+    F,
+    Max,
+    Q,
+    Sum,
+    Value,
+    When,
+)
+from django.db.models.functions import Concat
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter
+from rest_framework.pagination import CursorPagination
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
@@ -19,7 +33,12 @@ from chats.apps.api.v1.rooms.serializers import (
 )
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.rooms.models import Room
-from chats.apps.rooms.views import close_room
+from chats.apps.rooms.views import (
+    close_room,
+    get_editable_custom_fields_room,
+    update_custom_fields,
+    update_flows_custom_fields,
+)
 
 
 class RoomViewset(
@@ -39,6 +58,8 @@ class RoomViewset(
     search_fields = ["contact__name", "urn"]
     ordering_fields = "__all__"
     ordering = ["user", "-last_interaction"]
+    pagination_class = CursorPagination
+    pagination_class.page_size_query_param = "limit"
 
     def get_permissions(self):
         permission_classes = [permissions.IsAuthenticated]
@@ -53,7 +74,36 @@ class RoomViewset(
         if self.action != "list":
             self.filterset_class = None
         qs = super().get_queryset()
-        return qs.annotate(last_interaction=Max("messages__created_on"))
+
+        last_24h = timezone.now() - timedelta(days=1)
+
+        qs = qs.annotate(
+            last_interaction=Max("messages__created_on"),
+            unread_msgs=Count("messages", filter=Q(messages__seen=False)),
+            linked_user=Concat(
+                "contact__linked_users__user__first_name",
+                Value(" "),
+                "contact__linked_users__user__last_name",
+                filter=Q(contact__linked_users__project=F("queue__sector__project")),
+                output_field=CharField(),
+            ),
+            last_contact_interaction=Max(
+                "messages__created_on", filter=Q(messages__contact__isnull=False)
+            ),
+            is_24h_valid=Case(
+                When(
+                    Q(
+                        urn__startswith="whatsapp",
+                        last_contact_interaction__lt=last_24h,
+                    ),
+                    then=False,
+                ),
+                default=True,
+                output_field=BooleanField(),
+            ),
+        )
+
+        return qs
 
     def get_serializer_class(self):
         if "update" in self.action:
@@ -182,3 +232,36 @@ class RoomViewset(
     def perform_destroy(self, instance):
         instance.notify_room("destroy", callback=True)
         super().perform_destroy(instance)
+
+    @action(
+        detail=True,
+        methods=["PATCH"],
+    )
+    def update_custom_fields(self, request, pk=None):
+        custom_fields_update = request.data
+        data = {"fields": custom_fields_update}
+
+        if pk is None:
+            return Response(
+                {"Detail": "No room on the request"}, status.HTTP_400_BAD_REQUEST
+            )
+        elif not custom_fields_update:
+            return Response(
+                {"Detail": "No custom fields on the request"},
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        room = get_editable_custom_fields_room({"uuid": pk, "is_active": "True"})
+
+        update_flows_custom_fields(
+            project=room.queue.sector.project,
+            data=data,
+            contact_id=room.contact.external_id,
+        )
+
+        update_custom_fields(room, custom_fields_update)
+
+        return Response(
+            {"Detail": "Custom Field edited with success"},
+            status.HTTP_200_OK,
+        )

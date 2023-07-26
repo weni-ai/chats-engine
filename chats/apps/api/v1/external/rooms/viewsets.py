@@ -13,10 +13,14 @@ from chats.apps.accounts.authentication.drf.authorization import (
 )
 from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.external.rooms.serializers import RoomFlowSerializer
-from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.rooms.models import Room
-from chats.apps.rooms.views import close_room
+from chats.apps.rooms.views import (
+    close_room,
+    get_editable_custom_fields_room,
+    update_custom_fields,
+    update_flows_custom_fields,
+)
 
 
 def add_user_or_queue_to_room(instance, request):
@@ -193,9 +197,6 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
 
 class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
     serializer_class = RoomFlowSerializer
-    permission_classes = [
-        IsAdminPermission,
-    ]
     authentication_classes = [ProjectAdminAuthentication]
 
     def partial_update(self, request, pk=None):
@@ -206,34 +207,27 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
             return Response(
                 {"Detail": "No contact id on the request"}, status.HTTP_400_BAD_REQUEST
             )
+        elif not custom_fields_update:
+            return Response(
+                {"Detail": "No custom fields the request"}, status.HTTP_400_BAD_REQUEST
+            )
         request_permission = self.request.auth
         project = request_permission.project
 
-        response = FlowRESTClient().create_contact(
-            project=project, data=data, contact_id=pk
+        room = get_editable_custom_fields_room(
+            {
+                "contact__external_id": pk,
+                "queue__sector__project": project,
+                "is_active": "True",
+            }
         )
-        if response.status_code not in [status.HTTP_200_OK]:
-            return Response(
-                {
-                    "Detail": f"[{response.status_code}]\n"
-                    + f"Error updating custom fields on flows. Exception: {response.content}"
-                },
-                status.HTTP_404_NOT_FOUND,
-            )
+        update_flows_custom_fields(
+            project=room.queue.sector.project,
+            data=data,
+            contact_id=room.contact.external_id,
+        )
 
-        room = Room.objects.filter(
-            contact__external_id=pk,
-            queue__sector__project=project,
-            is_active=True,
-        ).update(custom_fields=custom_fields_update)
-
-        if not room:
-            return Response(
-                {
-                    "Detail": "Contact with the given id was not found, it does not exist or it is deleted"
-                },
-                status.HTTP_404_NOT_FOUND,
-            )
+        update_custom_fields(room, custom_fields_update)
 
         return Response(
             {"Detail": "Custom Field edited with success"},

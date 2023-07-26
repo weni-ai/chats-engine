@@ -104,6 +104,10 @@ class Room(BaseModel):
         return check_messages or check_flowstarts
 
     @property
+    def project(self):
+        return self.queue.project
+
+    @property
     def last_contact_message(self):
         return (
             self.messages.filter(contact__isnull=False).order_by("-created_on").first()
@@ -118,7 +122,7 @@ class Room(BaseModel):
             sent_message.notify_room("create", True)
 
     @property
-    def is_24h_valid(self) -> bool:
+    def validate_24h(self) -> bool:
         """Validates is the last contact message was sent more than a day ago"""
         if not self.urn.startswith("whatsapp"):
             return True
@@ -172,7 +176,9 @@ class Room(BaseModel):
             action=action,
         )
 
-    def notify_queue(self, action: str, callback: bool = False):
+    def notify_queue(
+        self, action: str, callback: bool = False, transferred_by: str = ""
+    ):
         """
         Used to notify channels groups when something happens on the instance.
 
@@ -183,11 +189,13 @@ class Room(BaseModel):
         Contact create new room,
         Call the sector group(all agents) and send the 'create' action to add them in the room group
         """
-
+        content = self.serialized_ws_data
+        if transferred_by != "":
+            content["transferred_by"] = transferred_by
         send_channels_group(
             group_name=f"queue_{self.queue.pk}",
             call_type="notify",
-            content=self.serialized_ws_data,
+            content=content,
             action=f"rooms.{action}",
         )
 
@@ -213,13 +221,17 @@ class Room(BaseModel):
         if self.callback_url and callback and action in ["update", "destroy", "close"]:
             self.request_callback(self.serialized_ws_data)
 
-    def notify_user(self, action: str, user=None):
+    def notify_user(self, action: str, user=None, transferred_by: str = ""):
         user = user if user else self.user
         permission = self.get_permission(user)
+        content = self.serialized_ws_data
+        if transferred_by != "":
+            content["transferred_by"] = transferred_by
+
         send_channels_group(
             group_name=f"permission_{permission.pk}",
             call_type="notify",
-            content=self.serialized_ws_data,
+            content=content,
             action=f"rooms.{action}",
         )
 

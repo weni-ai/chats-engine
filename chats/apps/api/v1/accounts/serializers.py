@@ -36,3 +36,22 @@ class UserSerializer(serializers.ModelSerializer):
 
     def get_last_interaction(self, user: User):
         return user.last_interaction
+
+
+class UserSimpleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            "first_name",
+            "last_name",
+            "email",
+        ]
+
+
+class UserNameSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            "first_name",
+            "last_name",
+        ]

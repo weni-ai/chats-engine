@@ -8,7 +8,7 @@ from chats.apps.msgs.models import Message, MessageMedia
 
 
 class AttachmentSerializer(serializers.ModelSerializer):
-    url = serializers.URLField(source="media_url")
+    url = serializers.CharField(source="media_url")
 
     class Meta:
         model = MessageMedia
@@ -73,15 +73,14 @@ class MsgFlowSerializer(serializers.ModelSerializer):
         if direction == "incoming":
             validated_data["contact"] = room.contact
 
-        is_waiting = room.get_is_waiting()
-        was_24h_valid = room.is_24h_valid
+        was_24h_valid = room.validate_24h
         msg = super().create(validated_data)
         media_list = [MessageMedia(**media_data, message=msg) for media_data in medias]
         medias = MessageMedia.objects.bulk_create(media_list)
 
         if direction == "incoming":
             validated_data["contact"] = room.contact
-            if is_waiting:
+            if room.is_waiting:
                 room.is_waiting = False
                 room.save()
                 room.notify_room("update")
