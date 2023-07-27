@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     "chats.apps.api",
     "chats.core",
     "chats.apps.dashboard",
+    "chats.event_driven",
     # third party apps
     "channels",
     "drf_yasg",
@@ -368,3 +369,16 @@ CELERY_ACCEPT_CONTENT = ["application/json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
+# Event Driven Architecture configurations
+
+USE_EDA = env.bool("USE_EDA", default=False)
+
+if USE_EDA:
+    EDA_CONNECTION_BACKEND = "chats.event_driven.backends.PyAMQPConnectionBackend"
+    EDA_CONSUMERS_HANDLE = "chats.event_driven.handle.handle_consumers"
+
+    EDA_BROKER_HOST = env("EDA_BROKER_HOST", default="localhost")
+    EDA_VIRTUAL_HOST = env("EDA_VIRTUAL_HOST", default="/")
+    EDA_BROKER_PORT = env.int("EDA_BROKER_PORT", default=5672)
+    EDA_BROKER_USER = env("EDA_BROKER_USER", default="guest")
+    EDA_BROKER_PASSWORD = env("EDA_BROKER_PASSWORD", default="guest")
