@@ -6,7 +6,6 @@ from chats.apps.queues.models import Queue, QueueAuthorization
 
 
 class QueueSerializer(serializers.ModelSerializer):
-
     sector_name = serializers.CharField(source="sector.name", read_only=True)
 
     class Meta:
@@ -99,3 +98,9 @@ class QueueAuthorizationReadOnlyListSerializer(serializers.ModelSerializer):
 
     def get_user(self, auth):
         return UserSerializer(auth.permission.user).data
+
+
+class QueueSimpleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Queue
+        fields = ["uuid", "name", "sector"]

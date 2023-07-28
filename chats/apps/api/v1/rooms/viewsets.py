@@ -1,12 +1,26 @@
 import json
+from datetime import timedelta
 
 from django.conf import settings
-from django.db.models import F, Max, Sum
+from django.db.models import (
+    BooleanField,
+    Case,
+    CharField,
+    Count,
+    F,
+    Max,
+    Q,
+    Sum,
+    Value,
+    When,
+)
+from django.db.models.functions import Concat
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter
+from rest_framework.pagination import CursorPagination
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
@@ -18,8 +32,13 @@ from chats.apps.api.v1.rooms.serializers import (
     TransferRoomSerializer,
 )
 from chats.apps.dashboard.models import RoomMetrics
-from chats.apps.msgs.models import Message
 from chats.apps.rooms.models import Room
+from chats.apps.rooms.views import (
+    close_room,
+    get_editable_custom_fields_room,
+    update_custom_fields,
+    update_flows_custom_fields,
+)
 
 
 class RoomViewset(
@@ -39,6 +58,8 @@ class RoomViewset(
     search_fields = ["contact__name", "urn"]
     ordering_fields = "__all__"
     ordering = ["user", "-last_interaction"]
+    pagination_class = CursorPagination
+    pagination_class.page_size_query_param = "limit"
 
     def get_permissions(self):
         permission_classes = [permissions.IsAuthenticated]
@@ -47,19 +68,42 @@ class RoomViewset(
                 permissions.IsAuthenticated,
                 api_permissions.IsQueueAgent,
             )
-        elif self.action == "list" and self.request.query_params.get("email"):
-            permission_classes = (
-                permissions.IsAuthenticated,
-                api_permissions.AnySectorManagerPermission,
-            )
-
         return [permission() for permission in permission_classes]
 
     def get_queryset(self):
         if self.action != "list":
             self.filterset_class = None
         qs = super().get_queryset()
-        return qs.annotate(last_interaction=Max("messages__created_on"))
+
+        last_24h = timezone.now() - timedelta(days=1)
+
+        qs = qs.annotate(
+            last_interaction=Max("messages__created_on"),
+            unread_msgs=Count("messages", filter=Q(messages__seen=False)),
+            linked_user=Concat(
+                "contact__linked_users__user__first_name",
+                Value(" "),
+                "contact__linked_users__user__last_name",
+                filter=Q(contact__linked_users__project=F("queue__sector__project")),
+                output_field=CharField(),
+            ),
+            last_contact_interaction=Max(
+                "messages__created_on", filter=Q(messages__contact__isnull=False)
+            ),
+            is_24h_valid=Case(
+                When(
+                    Q(
+                        urn__startswith="whatsapp",
+                        last_contact_interaction__lt=last_24h,
+                    ),
+                    then=False,
+                ),
+                default=True,
+                output_field=BooleanField(),
+            ),
+        )
+
+        return qs
 
     def get_serializer_class(self):
         if "update" in self.action:
@@ -117,44 +161,7 @@ class RoomViewset(
         if not settings.ACTIVATE_CALC_METRICS:
             return Response(serialized_data.data, status=status.HTTP_200_OK)
 
-        messages_contact = (
-            Message.objects.filter(room=instance, contact__isnull=False)
-            .order_by("created_on")
-            .first()
-        )
-        messages_agent = (
-            Message.objects.filter(room=instance, user__isnull=False)
-            .order_by("created_on")
-            .first()
-        )
-
-        time_message_contact = 0
-        time_message_agent = 0
-
-        if messages_agent and messages_contact:
-            time_message_agent = messages_agent.created_on.timestamp()
-            time_message_contact = messages_contact.created_on.timestamp()
-        else:
-            time_message_agent = 0
-            time_message_contact = 0
-
-        difference_time = time_message_agent - time_message_contact
-
-        interation_time = (
-            Room.objects.filter(pk=instance.pk)
-            .aggregate(
-                avg_time=Sum(
-                    F("ended_at") - F("created_on"),
-                )
-            )["avg_time"]
-            .total_seconds()
-        )
-
-        metric_room = RoomMetrics.objects.get_or_create(room=instance)[0]
-        metric_room.message_response_time = difference_time
-        metric_room.interaction_time = interation_time
-        metric_room.save()
-
+        close_room(str(instance.pk))
         return Response(serialized_data.data, status=status.HTTP_200_OK)
 
     def perform_create(self, serializer):
@@ -214,16 +221,47 @@ class RoomViewset(
         msg.notify_room("create")
 
         if old_user is None and user:  # queued > agent
-            instance.notify_queue("update", transferred_by=self.request.user.email)
+            instance.notify_queue("update")
         elif old_user is not None:
-            instance.notify_user(
-                "update", user=old_user, transferred_by=self.request.user.email
-            )
+            instance.notify_user("update", user=old_user)
             if queue:  # agent > queue
-                instance.notify_queue("update", transferred_by=self.request.user.email)
+                instance.notify_queue("update")
             else:  # agent > agent
-                instance.notify_user("update", transferred_by=self.request.user.email)
+                instance.notify_user("update")
 
     def perform_destroy(self, instance):
         instance.notify_room("destroy", callback=True)
         super().perform_destroy(instance)
+
+    @action(
+        detail=True,
+        methods=["PATCH"],
+    )
+    def update_custom_fields(self, request, pk=None):
+        custom_fields_update = request.data
+        data = {"fields": custom_fields_update}
+
+        if pk is None:
+            return Response(
+                {"Detail": "No room on the request"}, status.HTTP_400_BAD_REQUEST
+            )
+        elif not custom_fields_update:
+            return Response(
+                {"Detail": "No custom fields on the request"},
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        room = get_editable_custom_fields_room({"uuid": pk, "is_active": "True"})
+
+        update_flows_custom_fields(
+            project=room.queue.sector.project,
+            data=data,
+            contact_id=room.contact.external_id,
+        )
+
+        update_custom_fields(room, custom_fields_update)
+
+        return Response(
+            {"Detail": "Custom Field edited with success"},
+            status.HTTP_200_OK,
+        )

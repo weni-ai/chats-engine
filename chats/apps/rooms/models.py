@@ -104,6 +104,10 @@ class Room(BaseModel):
         return check_messages or check_flowstarts
 
     @property
+    def project(self):
+        return self.queue.project
+
+    @property
     def last_contact_message(self):
         return (
             self.messages.filter(contact__isnull=False).order_by("-created_on").first()
@@ -118,7 +122,7 @@ class Room(BaseModel):
             sent_message.notify_room("create", True)
 
     @property
-    def is_24h_valid(self) -> bool:
+    def validate_24h(self) -> bool:
         """Validates is the last contact message was sent more than a day ago"""
         if not self.urn.startswith("whatsapp"):
             return True

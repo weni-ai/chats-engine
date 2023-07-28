@@ -154,7 +154,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             contact, queue, user, groups, created, flow_uuid, project
         )
 
-        room = Room.objects.create(**validated_data, contact=contact, queue=queue)
+        room = Room.objects.create(**validated_data, contact=contact, queue=queue, is_waiting=True)
         RoomMetrics.objects.create(room=room)
 
         return room
@@ -187,6 +187,10 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         if not sector.is_attending(created_on):
             raise ValidationError(
                 {"detail": _("Contact cannot be done outside working hours")}
+            )
+        elif sector.validate_agent_status() is False:
+            raise ValidationError(
+                {"detail": _("Contact cannot be done when agents are offline")}
             )
 
     def handle_urn(self, validated_data):
