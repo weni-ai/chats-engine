@@ -103,4 +103,4 @@ class QueueAuthorizationReadOnlyListSerializer(serializers.ModelSerializer):
 class QueueSimpleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Queue
-        fields = ["uuid", "name", "sector"]
+        fields = ["uuid", "name"]
