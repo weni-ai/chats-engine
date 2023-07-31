@@ -11,7 +11,19 @@ class MsgsExternalTests(APITestCase):
     def setUp(self) -> None:
         self.room = Room.objects.get(uuid="090da6d1-959e-4dea-994a-41bf0d38ba26")
 
-    def _request_create_message(self):
+    def _remove_user(self):
+        room = self.room
+        room.user = None
+        room.save()
+        return room
+
+    def _update_default_message(self, default_message):
+        queue = self.room.queue
+        queue.default_message = default_message
+        queue.save()
+        return queue
+
+    def _request_create_message(self, direction: str = "incoming"):
         url = reverse("external_message-list")
         client = self.client
         client.credentials(
@@ -20,7 +32,7 @@ class MsgsExternalTests(APITestCase):
         data = {
             "room": self.room.uuid,
             "text": "olá.",
-            "direction": "incoming",
+            "direction": direction,
             "attachments": [{"content_type": "string", "url": "http://example.com"}],
         }
         return client.post(url, data=data, format="json")
@@ -34,13 +46,9 @@ class MsgsExternalTests(APITestCase):
         self.assertEqual(self.room.messages.count(), 3)
 
     def test_create_with_default_message_room_without_user(self):
-        room = self.room
-        room.user = None
-        room.save()
+        _ = self._remove_user()
 
-        queue = room.queue
-        queue.default_message = "DEFAULT MESSAGE"
-        queue.save()
+        queue = self._update_default_message(default_message="DEFAULT MESSAGE")
 
         response = self._request_create_message()
 
@@ -52,9 +60,7 @@ class MsgsExternalTests(APITestCase):
         )
 
     def test_create_with_default_message_room_with_user(self):
-        queue = self.room.queue
-        queue.default_message = "DEFAULT MESSAGE"
-        queue.save()
+        queue = self._update_default_message(default_message="DEFAULT MESSAGE")
 
         response = self._request_create_message()
 
@@ -66,10 +72,7 @@ class MsgsExternalTests(APITestCase):
         )
 
     def test_create_without_default_message_room_without_user(self):
-        room = self.room
-        room.user = None
-        room.save()
-
+        room = self._remove_user()
         response = self._request_create_message()
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -87,4 +90,32 @@ class MsgsExternalTests(APITestCase):
         self.assertNotEqual(
             self.room.messages.order_by("-created_on").first().text,
             self.room.queue.default_message,
+        )
+
+    def test_create_with_empty_default_message_room_without_user(self):
+        _ = self._remove_user()
+
+        queue = self._update_default_message(default_message="")
+
+        response = self._request_create_message()
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(self.room.messages.count(), 3)
+        self.assertNotEqual(
+            self.room.messages.order_by("-created_on").first().text,
+            queue.default_message,
+        )
+
+    def test_create_outgoing_with_default_message_room_without_user(self):
+        _ = self._remove_user()
+
+        queue = self._update_default_message(default_message="DEFAULT MESSAGE")
+
+        response = self._request_create_message(direction="outgoing")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(self.room.messages.count(), 3)
+        self.assertNotEqual(
+            self.room.messages.order_by("-created_on").first().text,
+            queue.default_message,
         )
