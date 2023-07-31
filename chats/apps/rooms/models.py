@@ -115,7 +115,7 @@ class Room(BaseModel):
 
     def trigger_default_message(self):
         default_message = self.queue.default_message
-        if default_message is not None:
+        if default_message:
             sent_message = self.messages.create(
                 user=None, contact=None, text=default_message
             )
