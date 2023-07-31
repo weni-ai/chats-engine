@@ -77,7 +77,8 @@ class RoomSerializer(serializers.ModelSerializer):
     def get_last_message(self, room: Room):
         last_message = (
             room.messages.order_by("-created_on")
-            .exclude(user__isnull=True, contact__isnull=True, text="")
+            .exclude(user__isnull=True, contact__isnull=True)
+            .exclude(text="")
             .first()
         )
         return "" if last_message is None else last_message.text
