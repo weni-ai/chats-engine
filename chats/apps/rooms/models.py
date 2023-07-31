@@ -122,7 +122,7 @@ class Room(BaseModel):
             sent_message.notify_room("create", True)
 
     @property
-    def validate_24h(self) -> bool:
+    def is_24h_valid(self) -> bool:
         """Validates is the last contact message was sent more than a day ago"""
         if not self.urn.startswith("whatsapp"):
             return True

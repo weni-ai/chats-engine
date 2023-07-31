@@ -4,6 +4,7 @@ from chats.apps.contacts.models import Contact
 
 
 class ContactSerializer(serializers.ModelSerializer):
+
     room = serializers.SerializerMethodField()
 
     class Meta:
@@ -86,13 +87,3 @@ class ContactWSSerializer(serializers.ModelSerializer):
     class Meta:
         model = Contact
         fields = "__all__"
-
-
-class ContactSimpleSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Contact
-        fields = [
-            "uuid",
-            "external_id",
-            "name",
-        ]
