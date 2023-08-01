@@ -374,8 +374,8 @@ CELERY_TIMEZONE = TIME_ZONE
 USE_EDA = env.bool("USE_EDA", default=False)
 
 if USE_EDA:
-    EDA_CONNECTION_BACKEND = "chats.event_driven.backends.PyAMQPConnectionBackend"
-    EDA_CONSUMERS_HANDLE = "chats.event_driven.handle.handle_consumers"
+    EDA_CONNECTION_BACKEND = "chats.apps.event_driven.backends.PyAMQPConnectionBackend"
+    EDA_CONSUMERS_HANDLE = "chats.apps.event_driven.handle.handle_consumers"
 
     EDA_BROKER_HOST = env("EDA_BROKER_HOST", default="localhost")
     EDA_VIRTUAL_HOST = env("EDA_VIRTUAL_HOST", default="/")
