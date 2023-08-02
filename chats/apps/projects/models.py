@@ -1,3 +1,4 @@
+#
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.db.models import Q
@@ -10,6 +11,18 @@ from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
 
 # Create your models here.
+
+
+class TemplateType(BaseModel):
+    name = models.CharField(max_length=255)
+    setup = models.JSONField(_("Template Setup"), default=dict)
+
+    def __str__(self) -> str:
+        return self.name  # pragma: no cover
+
+    class Meta:
+        verbose_name = "TemplateType"
+        verbose_name_plural = "TemplateTypes"
 
 
 class Project(BaseConfigurableModel, BaseModel):
@@ -31,6 +44,14 @@ class Project(BaseConfigurableModel, BaseModel):
         choices=DATE_FORMATS,
         default=DATE_FORMAT_DAY_FIRST,
         help_text=_("Whether day comes first or month comes first in dates"),
+    )
+    is_template = models.BooleanField(_("is template?"), default=False)
+    template_type = models.ForeignKey(
+        TemplateType,
+        verbose_name=_("template type"),
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
     )
 
     class Meta:
