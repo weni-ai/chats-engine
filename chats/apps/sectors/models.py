@@ -135,8 +135,8 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         return {
             "name": self.name,
             "rooms_limit": self.rooms_limit,
-            "work_start": self.work_start,
-            "work_end": self.work_end,
+            "work_start": str(self.work_start),
+            "work_end": str(self.work_end),
             "can_trigger_flows": self.can_trigger_flows,
             "sign_messages": self.sign_messages,
             "open_offline": self.open_offline,

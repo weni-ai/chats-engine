@@ -7,13 +7,13 @@ from requests.exceptions import JSONDecodeError
 from timezone_field import TimeZoneField
 
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
-from chats.core.models import BaseConfigurableModel, BaseModel
+from chats.core.models import BaseModel, BaseConfigurableModel, BaseSoftDeleteModel
 from chats.utils.websockets import send_channels_group
 
 # Create your models here.
 
 
-class TemplateType(BaseModel):
+class TemplateType(BaseSoftDeleteModel, BaseModel):
     name = models.CharField(max_length=255)
     setup = models.JSONField(_("Template Setup"), default=dict)
 
