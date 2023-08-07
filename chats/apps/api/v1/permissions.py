@@ -50,6 +50,26 @@ class IsSectorManager(permissions.BasePermission):
         return perm.is_manager(sector=str(obj.sector.pk))
 
 
+class IsSectorAgent(permissions.BasePermission):
+    def has_permission(self, request, view):
+        data = request.data or request.query_params
+        if view.action in ["list", "create"]:
+            permission = GetPermission(request).permission
+            kwargs = {"sector": data.get("sector"), "queue": data.get("queue")}
+            return permission.is_agent(**kwargs)
+
+        return super().has_permission(request, view)
+
+    def has_object_permission(self, request, view, obj) -> bool:
+        if isinstance(request.user, AnonymousUser):
+            return False
+        try:
+            perm = obj.get_permission(request.user)
+        except ProjectPermission.DoesNotExist:
+            return False
+        return perm.is_agent(sector=str(obj.sector.pk), queue=None)
+
+
 class ProjectAnyPermission(permissions.BasePermission):
     def has_object_permission(self, request, view, obj) -> bool:
         return obj.permissions.filter(user=request.user).exists()
@@ -168,7 +188,6 @@ class SectorAgentReadOnlyRetrievePermission(permissions.BasePermission):
     """
 
     def has_object_permission(self, request, view, obj) -> bool:
-
         if isinstance(request.user, AnonymousUser):
             return False
         try:
@@ -204,7 +223,6 @@ class DeleteQueuePermission(permissions.BasePermission):
     """
 
     def has_object_permission(self, request, view, obj) -> bool:
-
         if isinstance(request.user, AnonymousUser):
             return False
         try:
