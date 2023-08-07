@@ -170,6 +170,14 @@ class ProjectPermission(
     def __str__(self):
         return self.project.name
 
+    def get_sectors(self, custom_filters: dict = {}):
+        sectors = self.project.sectors.all()
+        if self.role == ProjectPermission.ROLE_ADMIN:  # Admin role
+            return sectors
+        sector_auth_filter = Q(authorizations__permission=self)
+        queue_auth_filter = Q(queues__authorizations__permission=self)
+        return sectors.filter(sector_auth_filter | queue_auth_filter).distinct()
+
     def notify_user(self, action, sender="user"):
         """ """
         send_channels_group(
