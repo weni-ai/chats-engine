@@ -33,7 +33,7 @@ class QuickMessageViewset(viewsets.ModelViewSet):
         raise PermissionDenied
 
     def get_queryset(self, *args, **kwargs):
-        return QuickMessage.objects.all().filter(user=self.request.user)
+        return self.queryset.filter(user=self.request.user)
 
 
 class SectorQuickMessageViewset(viewsets.ModelViewSet):
