@@ -149,6 +149,14 @@ class ProjectPermission(
     def __str__(self):
         return self.project.name
 
+    def get_sectors(self, custom_filters: dict = {}):
+        sectors = self.project.sectors.all()
+        if self.role == ProjectPermission.ROLE_ADMIN:  # Admin role
+            return sectors
+        sector_auth_filter = Q(authorizations__permission=self)
+        queue_auth_filter = Q(queues__authorizations__permission=self)
+        return sectors.filter(sector_auth_filter | queue_auth_filter).distinct()
+
     def notify_user(self, action, sender="user"):
         """ """
         send_channels_group(
@@ -188,11 +196,16 @@ class ProjectPermission(
 
         return False
 
-    def is_agent(self, queue: str, any_queue: bool = False):
+    def is_agent(self, queue: str, any_queue: bool = False, sector: str = None) -> bool:
         if self.is_admin:
             return True
         if any_queue:
             return self.queue_authorizations.exists()
+        if sector:
+            return (
+                self.sector_authorizations.filter(sector=sector).exists()
+                or self.queue_authorizations.filter(queue__sector=sector).exists()
+            )
         if queue is None:
             return False
 
@@ -202,6 +215,11 @@ class ProjectPermission(
             return True
         queue_authorization = self.queue_authorizations.get(queue__uuid=queue)
         return queue_authorization.role == 1  # 1 = agent role at QueueAuthorization
+
+    def is_agent_on_sector(self, sector: str) -> bool:
+        if self.is_admin:
+            return True
+        return self.sector_authorization
 
     # TODO: remove soft deleted queues/sectors
     @property
