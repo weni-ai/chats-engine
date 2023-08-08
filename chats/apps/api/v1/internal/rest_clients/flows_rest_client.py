@@ -8,6 +8,7 @@ from rest_framework import status
 from chats.apps.api.v1.internal.rest_clients.internal_authorization import (
     InternalAuthentication,
 )
+from chats.core.views import search_dict_list
 
 LOGGER = logging.getLogger(__name__)
 
@@ -150,8 +151,31 @@ class FlowsContactsAndGroupsMixin:
         return groups
 
 
+class FlowsChatGptData:
+    def chatgpt_headers(self, token):
+        headers = {
+            "Content-Type": "application/json; charset: utf-8",
+            "Authorization": f"Bearer {token}",
+        }
+        return headers
+
+    def get_chatgpt_token(self, project_uuid: str):
+        response = requests.get(
+            url=f"{self.base_url}/api/v1/my-apps/?configured=true&project_uuid={project_uuid}"
+        )
+        app_list = response.json()
+        chat_gpt_app = search_dict_list(app_list, "code", "chatgpt")
+        try:
+            return chat_gpt_app.get("config").get("api_key")
+        except AttributeError:
+            return None
+
+
 class FlowRESTClient(
-    InternalAuthentication, FlowsContactsAndGroupsMixin, FlowsQueueMixin
+    InternalAuthentication,
+    FlowsContactsAndGroupsMixin,
+    FlowsQueueMixin,
+    FlowsChatGptData,
 ):
     def __init__(self, *args, **kwargs):
         self.base_url = settings.FLOWS_API_URL
