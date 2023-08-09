@@ -64,7 +64,6 @@ class ProjectCreationUseCase:
                 is_template=project_dto.is_template,
                 date_format=project_dto.date_format,
                 timezone=project_dto.timezone,
-                created_by=user,
             )
             permission = project.permissions.create(user=user, role=1)
 

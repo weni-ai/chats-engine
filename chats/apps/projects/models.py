@@ -7,7 +7,7 @@ from requests.exceptions import JSONDecodeError
 from timezone_field import TimeZoneField
 
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
-from chats.core.models import BaseModel, BaseSoftDeleteModel
+from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
 from chats.utils.websockets import send_channels_group
 
 # Create your models here.
@@ -25,7 +25,7 @@ class TemplateType(BaseSoftDeleteModel, BaseModel):
         verbose_name_plural = "TemplateTypes"
 
 
-class Project(BaseModel):
+class Project(BaseConfigurableModel, BaseModel):
     DATE_FORMAT_DAY_FIRST = "D"
     DATE_FORMAT_MONTH_FIRST = "M"
     DATE_FORMATS = (

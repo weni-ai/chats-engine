@@ -25,12 +25,10 @@ class SectorSetupHandlerUseCase:
             setup_queues = setup_sector.pop("queues", None)
 
             if not setup_queues:
-                raise InvalidTemplateTypeData(
-                    f"The TemplateType {template_type.uuid} has an invalid setup!"
-                )
+                continue
 
             sector, created = project.sectors.get_or_create(
-                name=setup_sector.pop("name"), defaults=setup_queues
+                name=setup_sector.pop("name"), defaults=setup_sector
             )
             if not created:
                 continue
