@@ -3,12 +3,12 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from chats.core.models import BaseModel, BaseSoftDeleteModel
+from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
 
 User = get_user_model()
 
 
-class Queue(BaseSoftDeleteModel, BaseModel):
+class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
     sector = models.ForeignKey(
         "sectors.Sector",
         verbose_name=_("sector"),

@@ -34,3 +34,10 @@ class BaseSoftDeleteModel(models.Model):
         self.is_deleted = True
         self.name += self.deleted_sufix()
         self.save()
+
+
+class BaseConfigurableModel(models.Model):
+    config = models.JSONField(_("config"), blank=True, null=True)
+
+    class Meta:
+        abstract = True

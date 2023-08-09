@@ -6,13 +6,13 @@ from requests.exceptions import JSONDecodeError
 from timezone_field import TimeZoneField
 
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
-from chats.core.models import BaseModel
+from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
 
 # Create your models here.
 
 
-class Project(BaseModel):
+class Project(BaseConfigurableModel, BaseModel):
     DATE_FORMAT_DAY_FIRST = "D"
     DATE_FORMAT_MONTH_FIRST = "M"
     DATE_FORMATS = (
