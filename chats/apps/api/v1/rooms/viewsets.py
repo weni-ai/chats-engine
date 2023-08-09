@@ -10,7 +10,6 @@ from django.db.models import (
     F,
     Max,
     Q,
-    Sum,
     Value,
     When,
 )

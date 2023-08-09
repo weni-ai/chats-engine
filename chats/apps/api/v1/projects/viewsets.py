@@ -298,6 +298,8 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
 
         if chats_flow_start.room:
             create_room_feedback_message(room, feedback, method="fs")
+            room.is_waiting = True
+            room.save()
             room.notify_room("update")
         return Response(flow_start, status.HTTP_200_OK)
 
