@@ -10,12 +10,12 @@ class JSONParser(BaseParser):
         """
         Parses the incoming bytestream as JSON and returns the resulting data.
         """
-
         if not stream:
             ParseError("JSON parse error - stream cannot be empty")
 
         try:
             decoded_stream = stream.decode(encoding)
+
             return json.loads(decoded_stream)
         except ValueError as exc:
             raise ParseError("JSON parse error - %s" % str(exc))
