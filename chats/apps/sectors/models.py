@@ -39,6 +39,12 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         _("Can edit custom fields?"), default=False
     )
     completion_context = models.TextField(blank=True, null=True)
+    open_offline = models.BooleanField(
+        _("Open room when all agents are offline?"), default=True
+    )
+    can_edit_custom_fields = models.BooleanField(
+        _("Can edit custom fields?"), default=False
+    )
 
     class Meta:
         verbose_name = _("Sector")

@@ -68,6 +68,12 @@ class Project(BaseConfigurableModel, BaseModel):
         self.save()
         return token
 
+    def set_chat_gpt_auth_token(self, user_login_token: str = ""):
+        token = FlowRESTClient().get_chatgpt_token(user_login_token)
+        config = self.config or {}
+        config["chat_gpt_token"] = token
+        return token
+
     @property
     def admin_permissions(self):
         return self.permissions.filter(role=ProjectPermission.ROLE_ADMIN)

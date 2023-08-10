@@ -254,3 +254,36 @@ class RoomViewset(
         return Response(
             status=completion_response.status_code, data=completion_response.json()
         )
+
+    @action(
+        detail=True,
+        methods=["PATCH"],
+    )
+    def update_custom_fields(self, request, pk=None):
+        custom_fields_update = request.data
+        data = {"fields": custom_fields_update}
+
+        if pk is None:
+            return Response(
+                {"Detail": "No room on the request"}, status.HTTP_400_BAD_REQUEST
+            )
+        elif not custom_fields_update:
+            return Response(
+                {"Detail": "No custom fields on the request"},
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        room = get_editable_custom_fields_room({"uuid": pk, "is_active": "True"})
+
+        update_flows_custom_fields(
+            project=room.queue.sector.project,
+            data=data,
+            contact_id=room.contact.external_id,
+        )
+
+        update_custom_fields(room, custom_fields_update)
+
+        return Response(
+            {"Detail": "Custom Field edited with success"},
+            status.HTTP_200_OK,
+        )
