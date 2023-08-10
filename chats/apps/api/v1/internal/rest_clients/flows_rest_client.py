@@ -152,20 +152,21 @@ class FlowsContactsAndGroupsMixin:
 
 
 class FlowsChatGptData:
-    def chatgpt_headers(self, token):
+    def chatgpt_headers(self, token: str) -> dict:
         headers = {
             "Content-Type": "application/json; charset: utf-8",
-            "Authorization": f"Bearer {token}",
+            "Authorization": token,
         }
         return headers
 
-    def get_chatgpt_token(self, project_uuid: str):
+    def get_chatgpt_token(self, project_uuid: str, token: str):
         response = requests.get(
-            url=f"{self.base_url}/api/v1/my-apps/?configured=true&project_uuid={project_uuid}"
+            url=f"{self.base_url}/api/v1/my-apps/?configured=true&project_uuid={project_uuid}",
+            headers=self.chatgpt_headers(token),
         )
-        app_list = response.json()
-        chat_gpt_app = search_dict_list(app_list, "code", "chatgpt")
         try:
+            app_list = response.json()
+            chat_gpt_app = search_dict_list(app_list, "code", "chatgpt")
             return chat_gpt_app.get("config").get("api_key")
         except AttributeError:
             return None
