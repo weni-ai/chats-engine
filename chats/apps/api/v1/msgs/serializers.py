@@ -18,12 +18,12 @@ TODO: Refactor these serializers into less classes
 
 class MessageMediaSimpleSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField(read_only=True)
+    created_on = serializers.CharField()
 
     class Meta:
         model = MessageMedia
         fields = [
             "content_type",
-            "message",
             "media_file",
             "url",
             "created_on",
@@ -31,7 +31,6 @@ class MessageMediaSimpleSerializer(serializers.ModelSerializer):
 
         extra_kwargs = {
             "media_file": {"write_only": True},
-            "message": {"read_only": True, "required": False},
         }
 
     def get_url(self, media: MessageMedia):
@@ -82,7 +81,6 @@ class MessageMediaSerializer(serializers.ModelSerializer):
             file_type.startswith("audio")
             or file_type.lower() in settings.UNPERMITTED_AUDIO_TYPES
         ):
-
             export_conf = {"format": settings.AUDIO_TYPE_TO_CONVERT}
             if settings.AUDIO_CODEC_TO_CONVERT != "":
                 export_conf["codec"] = settings.AUDIO_CODEC_TO_CONVERT
@@ -208,5 +206,41 @@ class MessageSerializer(BaseMessageSerializer):
         ]
 
 
-class MessageWSSerializer(MessageSerializer):
-    pass
+class MessageWSSerializer(serializers.ModelSerializer):
+    contact = serializers.SerializerMethodField()
+    user = UserSerializer(many=False, required=False, read_only=True)
+    media = MessageMediaSimpleSerializer(many=True, required=False)
+    uuid = serializers.CharField()
+    room = serializers.CharField(source="room.uuid")
+    created_on = serializers.CharField()
+
+    class Meta:
+        model = ChatMessage
+        fields = [
+            "uuid",
+            "user",
+            "room",
+            "contact",
+            "text",
+            "seen",
+            "media",
+            "created_on",
+        ]
+        read_only_fields = [
+            "uuid",
+            "user",
+            "created_on",
+            "contact",
+        ]
+
+    def get_contact(self, message: ChatMessage):
+        if message.contact is None:
+            return None
+
+        contact = message.contact
+        return {
+            "uuid": str(contact.uuid),
+            "name": contact.name,
+            "custom_fields": contact.custom_fields,
+            "created_on": str(contact.created_on),
+        }

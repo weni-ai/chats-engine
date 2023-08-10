@@ -35,7 +35,7 @@ class UserSerializer(serializers.ModelSerializer):
         return ""
 
     def get_last_interaction(self, user: User):
-        return user.last_interaction
+        return str(user.last_interaction)
 
 
 class UserNameSerializer(serializers.ModelSerializer):
