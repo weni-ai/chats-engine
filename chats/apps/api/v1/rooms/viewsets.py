@@ -230,15 +230,29 @@ class RoomViewset(
         ],
         url_name="chat_completion",
     )
-    def chat_completion(self, request, *args, **kwargs):
+    def chat_completion(self, request, *args, **kwargs) -> Response:
+        user_token = request.META.get("HTTP_AUTHORIZATION")
         room = self.get_object()
-        token = room.queue.sector.project.openai_token
+        can_use_chat_completion = room.queue.sector.config.get(
+            "can_use_chat_completion", None
+        )
+        if not can_use_chat_completion:
+            return Response(
+                status=status.HTTP_400_BAD_REQUEST,
+                data={"detail": "Chat completion is not configured for this sector."},
+            )
+        token = room.queue.sector.project.get_openai_token(user_token)
         if not token:
             return Response(
                 status=status.HTTP_400_BAD_REQUEST,
                 data={"detail": "OpenAI token not found"},
             )
         messages = room.last_5_messages
+        if not messages:
+            return Response(
+                status=status.HTTP_400_BAD_REQUEST,
+                data={"detail": "The selected room does not have messages"},
+            )
         serialized_data = ChatCompletionSerializer(messages, many=True).data
 
         sector = room.queue.sector

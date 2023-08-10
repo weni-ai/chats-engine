@@ -74,6 +74,12 @@ class Project(BaseConfigurableModel, BaseModel):
         config["chat_gpt_token"] = token
         return token
 
+    def get_openai_token(self, user_login_token):
+        token = self.config.get("openai_token", None)
+        if token:
+            return token
+        return self.set_chat_gpt_auth_token(user_login_token)
+
     @property
     def admin_permissions(self):
         return self.permissions.filter(role=ProjectPermission.ROLE_ADMIN)
