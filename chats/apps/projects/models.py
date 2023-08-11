@@ -6,6 +6,9 @@ from requests.exceptions import JSONDecodeError
 from timezone_field import TimeZoneField
 
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
+from chats.apps.api.v1.internal.rest_clients.integrations_rest_client import (
+    IntegrationsRESTClient,
+)
 from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
 
@@ -72,9 +75,13 @@ class Project(BaseConfigurableModel, BaseModel):
         return token
 
     def set_chat_gpt_auth_token(self, user_login_token: str = ""):
-        token = FlowRESTClient().get_chatgpt_token(user_login_token)
+        token = IntegrationsRESTClient().get_chatgpt_token(
+            str(self.pk), user_login_token
+        )
         config = self.config or {}
         config["chat_gpt_token"] = token
+        self.config = config
+        self.save()
         return token
 
     def get_openai_token(self, user_login_token):
