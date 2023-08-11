@@ -54,6 +54,20 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         ]
 
     @property
+    def completion_context(self):
+        try:
+            return self.config.get("completion_context")
+        except AttributeError:
+            return None
+
+    @property
+    def can_use_chat_completion(self) -> bool:
+        try:
+            return self.config.get("can_use_chat_completion")
+        except AttributeError:
+            return False
+
+    @property
     def sector(self):
         return self
 

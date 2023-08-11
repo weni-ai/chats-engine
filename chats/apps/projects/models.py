@@ -61,6 +61,13 @@ class Project(BaseConfigurableModel, BaseModel):
     def __str__(self):
         return self.name
 
+    @property
+    def openai_token(self):
+        try:
+            return self.config.get("openai_token")
+        except AttributeError:
+            return None
+
     def get_permission(self, user):
         try:
             return self.permissions.get(user=user)
@@ -84,6 +91,18 @@ class Project(BaseConfigurableModel, BaseModel):
         self.flows_authorization = token
         self.save()
         return token
+
+    def set_chat_gpt_auth_token(self, user_login_token: str = ""):
+        token = FlowRESTClient().get_chatgpt_token(user_login_token)
+        config = self.config or {}
+        config["chat_gpt_token"] = token
+        return token
+
+    def get_openai_token(self, user_login_token):
+        token = self.openai_token
+        if token:
+            return token
+        return self.set_chat_gpt_auth_token(user_login_token)
 
     @property
     def admin_permissions(self):
