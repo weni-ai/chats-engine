@@ -233,10 +233,8 @@ class RoomViewset(
     def chat_completion(self, request, *args, **kwargs) -> Response:
         user_token = request.META.get("HTTP_AUTHORIZATION")
         room = self.get_object()
-        can_use_chat_completion = room.queue.sector.config.get(
-            "can_use_chat_completion", None
-        )
-        if not can_use_chat_completion:
+
+        if not room.queue.sector.can_use_chat_completion:
             return Response(
                 status=status.HTTP_400_BAD_REQUEST,
                 data={"detail": "Chat completion is not configured for this sector."},

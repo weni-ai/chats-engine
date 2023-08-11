@@ -25,10 +25,6 @@ class Project(BaseConfigurableModel, BaseModel):
     flows_authorization = models.CharField(
         _("Flows Authorization Token"), max_length=50, null=True, blank=True
     )
-    openai_token = models.CharField(
-        _("OpenAI Token"), max_length=100, null=True, blank=True
-    )
-
     date_format = models.CharField(
         verbose_name=_("Date Format"),
         max_length=1,
@@ -43,6 +39,13 @@ class Project(BaseConfigurableModel, BaseModel):
 
     def __str__(self):
         return self.name
+
+    @property
+    def openai_token(self):
+        try:
+            return self.config.get("openai_token")
+        except AttributeError:
+            return None
 
     def get_permission(self, user):
         try:
@@ -75,7 +78,7 @@ class Project(BaseConfigurableModel, BaseModel):
         return token
 
     def get_openai_token(self, user_login_token):
-        token = self.config.get("openai_token", None)
+        token = self.openai_token
         if token:
             return token
         return self.set_chat_gpt_auth_token(user_login_token)

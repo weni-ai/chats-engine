@@ -38,13 +38,6 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
     can_edit_custom_fields = models.BooleanField(
         _("Can edit custom fields?"), default=False
     )
-    completion_context = models.TextField(blank=True, null=True)
-    open_offline = models.BooleanField(
-        _("Open room when all agents are offline?"), default=True
-    )
-    can_edit_custom_fields = models.BooleanField(
-        _("Can edit custom fields?"), default=False
-    )
 
     class Meta:
         verbose_name = _("Sector")
@@ -59,6 +52,20 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
                 fields=["project", "name"], name="unique_sector_name"
             ),
         ]
+
+    @property
+    def completion_context(self):
+        try:
+            return self.config.get("completion_context")
+        except AttributeError:
+            return None
+
+    @property
+    def can_use_chat_completion(self) -> bool:
+        try:
+            return self.config.get("can_use_chat_completion")
+        except AttributeError:
+            return False
 
     @property
     def sector(self):
