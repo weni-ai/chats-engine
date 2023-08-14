@@ -1,6 +1,7 @@
 import time
 
 import amqp
+from django.conf import settings
 
 
 class PyAMQPConnectionBackend:
@@ -8,6 +9,13 @@ class PyAMQPConnectionBackend:
 
     def __init__(self, handle_consumers: callable):
         self._handle_consumers = handle_consumers
+        self.connection_params = dict(
+            host=settings.EDA_BROKER_HOST,
+            port=settings.EDA_BROKER_PORT,
+            userid=settings.EDA_BROKER_USER,
+            password=settings.EDA_BROKER_PASSWORD,
+            virtual_host=settings.EDA_VIRTUAL_HOST,
+        )
 
     def _drain_events(self, connection: amqp.connection.Connection):
         while True:
