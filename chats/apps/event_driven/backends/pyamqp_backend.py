@@ -21,10 +21,10 @@ class PyAMQPConnectionBackend:
         while True:
             connection.drain_events()
 
-    def start_consuming(self, connection_params: dict):
+    def start_consuming(self):
         while True:
             try:
-                with amqp.Connection(**connection_params) as connection:
+                with amqp.Connection(**self.connection_params) as connection:
                     channel = connection.channel()
 
                     self._handle_consumers(channel)
