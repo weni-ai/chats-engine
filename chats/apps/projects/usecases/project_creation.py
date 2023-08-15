@@ -19,6 +19,7 @@ class ProjectCreationDTO:
     template_type_uuid: str
 
 
+# TODO: USE THE RAISE WHEN THE ERROR HANDLING CODE IS FINISHED
 class ProjectCreationUseCase:
     def __init__(self, sector_setup_handler):
         self.__sector_setup_handler = sector_setup_handler
@@ -29,34 +30,31 @@ class ProjectCreationUseCase:
         user: User = None
 
         if project_dto.is_template and project_dto.template_type_uuid is None:
-            raise InvalidProjectData(
-                "'template_type_uuid' cannot be empty when 'is_template' is True!"
-            )
+            return
+            # raise InvalidProjectData(
+            #     "'template_type_uuid' cannot be empty when 'is_template' is True!"
+            # )
 
         try:
             template_type = TemplateType.objects.get(
                 uuid=project_dto.template_type_uuid
             )
         except TemplateType.DoesNotExist:
-            raise InvalidProjectData(
-                f"Template Type with uuid `{project_dto.template_type_uuid}` does not exists!"
-            )
+            return
+            # raise InvalidProjectData(
+            #     f"Template Type with uuid `{project_dto.template_type_uuid}` does not exists!"
+            # )
 
         try:
             user = User.objects.get(email=project_dto.user_email)
         except User.DoesNotExist:
-            raise InvalidProjectData(
-                f"User with email `{project_dto.user_email}` does not exist!"
-            )
-
-        project = Project.objects.filter(uuid=project_dto.uuid).first()
-
-        if project:
-            if project_dto.is_template and project.template_type is not None:
-                raise InvalidProjectData(
-                    f"The project `{project.uuid}` already has an integrated template!"
-                )
-
+            return
+            # raise InvalidProjectData(
+            #     f"User with email `{project_dto.user_email}` does not exist!"
+            # )
+        if Project.objects.filter(uuid=project_dto.uuid).exists():
+            return
+            # raise InvalidProjectData(f"The project `{project_dto.uuid}` already exist!")
         else:
             project = Project.objects.create(
                 uuid=project_dto.uuid,
