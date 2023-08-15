@@ -236,15 +236,19 @@ class RoomViewset(
 
     @action(
         detail=True,
-        methods=[
-            "POST",
-        ],
+        methods=["POST", "GET"],
         url_name="chat_completion",
     )
     def chat_completion(self, request, *args, **kwargs) -> Response:
         user_token = request.META.get("HTTP_AUTHORIZATION")
         room = self.get_object()
-
+        if request.method == "GET":
+            return Response(
+                status=status.HTTP_200_OK,
+                data={
+                    "can_use_chat_completion": room.queue.sector.can_use_chat_completion
+                },
+            )
         if not room.queue.sector.can_use_chat_completion:
             return Response(
                 status=status.HTTP_400_BAD_REQUEST,

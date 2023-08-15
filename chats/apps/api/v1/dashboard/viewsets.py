@@ -7,9 +7,7 @@ from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from chats.apps.api.v1.dashboard.presenter import (
-    get_export_data,
-)
+from chats.apps.api.v1.dashboard.presenter import get_export_data
 from chats.apps.api.v1.dashboard.serializers import (
     DashboardRawDataSerializer,
     dashboard_agents_data,
@@ -19,10 +17,6 @@ from chats.apps.api.v1.dashboard.serializers import (
 from chats.apps.api.v1.permissions import HasDashboardAccess
 from chats.apps.projects.models import Project
 from chats.core.excel_storage import ExcelStorage
-
-import io
-from chats.core.excel_storage import ExcelStorage
-import json
 
 
 class DashboardLiveViewset(viewsets.GenericViewSet):
