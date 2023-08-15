@@ -90,6 +90,7 @@ class SectorReadOnlyRetrieveSerializer(serializers.ModelSerializer):
             "can_trigger_flows",
             "sign_messages",
             "can_edit_custom_fields",
+            "config",
         ]
 
 
