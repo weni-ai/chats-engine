@@ -158,8 +158,11 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
             "sign_messages": self.sign_messages,
             "open_offline": self.open_offline,
             "can_edit_custom_fields": self.can_edit_custom_fields,
+            "config": self.config,
             "queues": list(
-                self.queues.filter(is_deleted=False).values("name", "default_message")
+                self.queues.filter(is_deleted=False).values(
+                    "name", "default_message", "config"
+                )
             ),
         }
 
