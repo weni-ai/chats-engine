@@ -1,12 +1,12 @@
+from chats.apps.api.v1.internal.eda_clients.flows_eda_client import FlowsEDAClient
 from chats.apps.projects.models import Project, ProjectPermission, TemplateType
 
 from .exceptions import InvalidTemplateTypeData
 
 
 class SectorSetupHandlerUseCase:
-    def __init__(self, connect_client, flows_client):
-        self.__connect_client = connect_client
-        self.__flows_client = flows_client
+    def __init__(self):
+        self._flows_client = FlowsEDAClient()
 
     def setup_sectors_in_project(
         self,
@@ -15,7 +15,7 @@ class SectorSetupHandlerUseCase:
         permission: ProjectPermission,
     ):
         setup = template_type.setup
-
+        action = "create"
         if setup == {}:
             raise InvalidTemplateTypeData(
                 f"The `setup` of TemplateType {template_type.uuid} is empty!"
@@ -32,12 +32,15 @@ class SectorSetupHandlerUseCase:
             )
             if not created:
                 continue
-            self.__connect_client().create_ticketer(
-                project_uuid=str(project.uuid),
-                name=sector.name,
-                config={
-                    "project_auth": str(permission.pk),
-                    "sector_uuid": str(sector.uuid),
+            self._flows_client.request_ticketer(
+                action=action,
+                content={
+                    "project_uuid": str(project.uuid),
+                    "name": sector.name,
+                    "config": {
+                        "project_auth": str(permission.pk),
+                        "sector_uuid": str(sector.uuid),
+                    },
                 },
             )
 
@@ -45,6 +48,11 @@ class SectorSetupHandlerUseCase:
                 queue = sector.queues.get_or_create(
                     name=setup_queue.pop("name"), defaults=setup_queue
                 )[0]
-                self.__flows_client().create_queue(
-                    str(queue.uuid), queue.name, str(queue.sector.uuid)
+                self._flows_client.request_queue(
+                    action=action,
+                    content={
+                        "sector_uuid": str(queue.sector.uuid),
+                        "uuid": str(queue.uuid),
+                        "name": queue.name,
+                    },
                 )
