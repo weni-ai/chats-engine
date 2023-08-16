@@ -41,7 +41,7 @@ class PyAMQPConnectionBackend:
                 time.sleep(settings.EDA_WAIT_TIME_RETRY)
 
             except KeyboardInterrupt:
-                print(f"[-] Connection closed: Keyboard Interrupt")
+                print("[-] Connection closed: Keyboard Interrupt")
                 break
 
             except Exception as error:
