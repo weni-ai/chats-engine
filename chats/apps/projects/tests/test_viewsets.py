@@ -3,7 +3,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
-from chats.apps.projects.models import Project
+from chats.apps.projects.models import Project, ProjectPermission
 
 
 class PermissionTests(APITestCase):
@@ -14,6 +14,9 @@ class PermissionTests(APITestCase):
         self.project_2 = Project.objects.get(pk="32e74fec-0dd7-413d-8062-9659f2e213d2")
         self.manager_user = User.objects.get(pk=9)
         self.login_token = Token.objects.get_or_create(user=self.manager_user)[0]
+        self.project_permission = ProjectPermission.objects.get(
+            uuid="ce3f052c-e71d-402c-b02e-1dfaca8b3d45"
+        )
 
     def test_get_first_access_status(self):
         """
@@ -65,3 +68,11 @@ class PermissionTests(APITestCase):
         self.assertEqual(
             response.data["Detail"], "You dont have permission in this project."
         )
+
+    def test_queue_ids_method(self):
+        """
+        Ensure that queue_ids method from ProjectPermission its working properly when the flag "can_see_historic" is true.
+        """
+        self.project_permission.queue_ids_increment
+        print(len(self.project_permission.queue_ids_increment))
+        self.assertEqual(len(self.project_permission.queue_ids_increment), 3)

@@ -8,6 +8,8 @@ from timezone_field import TimeZoneField
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
+import pdb
+
 
 # Create your models here.
 
@@ -243,6 +245,17 @@ class ProjectPermission(
         queues = set(sector_manager_queues + queue_agent_queues)
 
         return queues
+
+    @property
+    def queue_ids_increment(self):
+        increment_queue_ids = list(
+            self.project.sectors.filter(config__can_see_historic=True).values_list(
+                "queues__pk", flat=True
+            )
+        )
+        queue_ids_list = list(self.queue_ids)
+
+        return set(queue_ids_list + increment_queue_ids)
 
     def get_permission(self, user):
         try:

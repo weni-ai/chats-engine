@@ -99,6 +99,28 @@ class SectorTests(APITestCase):
         response = client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
+    def test_create_sector_with_can_see_all_history(self):
+        """
+        Verify if the Project Permission its returning the correct value from first_access field.
+        """
+        url = reverse("sector-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        data = {
+            "name": "Finances",
+            "rooms_limit": 3,
+            "work_start": "11:00",
+            "work_end": "19:30",
+            "project": str(self.project.pk),
+            "config": {"can_see_historic": "True"},
+        }
+        response = client.post(url, data=data, format="json")
+        created_sector = Sector.objects.get(
+            name="Finances", project=str(self.project.pk)
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(created_sector.config, {"can_see_historic": "True"})
+
 
 class RoomsExternalTests(APITestCase):
     fixtures = ["chats/fixtures/fixture_app.json"]

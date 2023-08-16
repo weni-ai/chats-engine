@@ -2285,7 +2285,10 @@
             "rooms_limit": 3,
             "work_start": "01:00:00",
             "work_end": "19:00:00",
-            "is_deleted": false
+            "is_deleted": false,
+            "config": {
+                "can_see_historic": true
+            }
         }
     },
     {
