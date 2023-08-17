@@ -112,14 +112,14 @@ class SectorTests(APITestCase):
             "work_start": "11:00",
             "work_end": "19:30",
             "project": str(self.project.pk),
-            "config": {"can_see_historic": "True"},
+            "config": {"can_see_historic": "true"},
         }
         response = client.post(url, data=data, format="json")
         created_sector = Sector.objects.get(
             name="Finances", project=str(self.project.pk)
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(created_sector.config, {"can_see_historic": "True"})
+        self.assertEqual(created_sector.config, {"can_see_historic": "true"})
 
 
 class RoomsExternalTests(APITestCase):

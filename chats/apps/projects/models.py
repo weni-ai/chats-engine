@@ -8,8 +8,6 @@ from timezone_field import TimeZoneField
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
-import pdb
-
 
 # Create your models here.
 

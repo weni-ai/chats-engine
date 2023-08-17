@@ -1,7 +1,7 @@
 import json
 
 from django.conf import settings
-from django.db.models import F, Max, Sum
+from django.db.models import Max
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status

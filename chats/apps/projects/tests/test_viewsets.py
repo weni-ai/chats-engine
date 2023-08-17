@@ -71,7 +71,8 @@ class PermissionTests(APITestCase):
 
     def test_queue_ids_method(self):
         """
-        Ensure that queue_ids method from ProjectPermission its working properly when the flag "can_see_historic" is true.
+        Ensure that queue_ids method from ProjectPermission its working properly when the flag
+        "can_see_historic" is true.
         """
         self.project_permission.queue_ids_increment
         print(len(self.project_permission.queue_ids_increment))
