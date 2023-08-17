@@ -75,5 +75,4 @@ class PermissionTests(APITestCase):
         "can_see_historic" is true.
         """
         self.project_permission.queue_ids_increment
-        print(len(self.project_permission.queue_ids_increment))
         self.assertEqual(len(self.project_permission.queue_ids_increment), 3)

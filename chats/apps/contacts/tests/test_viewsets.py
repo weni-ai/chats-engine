@@ -20,7 +20,6 @@ class TestContactsViewsets(BaseAPIChatsTestCase):
         payload = {"project": str(self.project.uuid)}
         self.deactivate_rooms()
         response = self._list_request(token=self.admin_token, data=payload)[0]
-        # print("response", response.json())
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json().get("count"), self.count_project_1_contact)
 
