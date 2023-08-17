@@ -384,3 +384,6 @@ if USE_EDA:
     EDA_BROKER_USER = env("EDA_BROKER_USER", default="guest")
     EDA_BROKER_PASSWORD = env("EDA_BROKER_PASSWORD", default="guest")
     EDA_WAIT_TIME_RETRY = env.int("EDA_WAIT_TIME_RETRY", default=5)
+
+    FLOWS_TICKETER_EXCHANGE = env("FLOWS_TICKETER_EXCHANGE", default="ticketers.topic")
+    FLOWS_QUEUE_EXCHANGE = env("FLOWS_QUEUE_EXCHANGE", default="queues.topic")

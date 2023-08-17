@@ -1,9 +1,5 @@
 import amqp
 
-from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
-    ConnectRESTClient,
-)
-from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.event_driven.parsers import JSONParser
 from chats.apps.projects.usecases import (
     ProjectCreationDTO,
@@ -28,10 +24,7 @@ class ProjectConsumer:
             timezone=body.get("timezone"),
         )
 
-        connect_client = ConnectRESTClient
-        flows_client = FlowRESTClient
-
-        sector_setup_handler = SectorSetupHandlerUseCase(connect_client, flows_client)
+        sector_setup_handler = SectorSetupHandlerUseCase()
 
         project_creation = ProjectCreationUseCase(sector_setup_handler)
         project_creation.create_project(project_dto)

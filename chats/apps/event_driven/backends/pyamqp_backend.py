@@ -59,17 +59,16 @@ class PyAMQPConnectionBackend:
         sent = False
         while not sent:
             try:
-                with self._conection(
-                    exchange=exchange,
-                    confirm_publish=True,
-                ) as c:
+                with self._conection(confirm_publish=True) as c:
                     ch = c.channel()
                     ch.basic_publish(
                         amqp.Message(
                             body=json.dumps(content),
                             content_type=content_type,
                             content_encoding="utf-8",
+                            properties={"delivery_mode": 2},
                         ),
+                        exchange=exchange,
                         routing_key=routing_key,
                     )
                     sent = True
