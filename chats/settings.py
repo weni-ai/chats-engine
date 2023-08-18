@@ -387,3 +387,13 @@ if USE_EDA:
 
     FLOWS_TICKETER_EXCHANGE = env("FLOWS_TICKETER_EXCHANGE", default="ticketers.topic")
     FLOWS_QUEUE_EXCHANGE = env("FLOWS_QUEUE_EXCHANGE", default="queues.topic")
+    FLOWS_DEFAULT_DEAD_LETTER_EXCHANGE = env(
+        "FLOWS_DEFAULT_DEAD_LETTER_EXCHANGE", default="flows.dlx.topic"
+    )
+    CONNECT_DEFAULT_DEAD_LETTER_EXCHANGE = env(
+        "CONNECT_DEFAULT_DEAD_LETTER_EXCHANGE", default="connect.dlx.topic"
+    )
+
+    DEFAULT_DEAD_LETTER_EXCHANGE = env(
+        "DEFAULT_DEAD_LETTER_EXCHANGE", default="chats.dlx.topic"
+    )

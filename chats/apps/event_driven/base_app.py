@@ -3,10 +3,6 @@ from django.utils.module_loading import import_string
 
 
 class EventDrivenAPP:
-    """Event Driven Application
-    Arguments:
-    """
-
     def __init__(self) -> None:
         handle_consumers_function = import_string(settings.EDA_CONSUMERS_HANDLE)
         connection_backend = import_string(settings.EDA_CONNECTION_BACKEND)
