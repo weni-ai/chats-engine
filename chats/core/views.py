@@ -46,3 +46,10 @@ def persist_keycloak_user_by_email(user_email: str):  # TODO: ERROR HANDLING
     user.first_name = first_name[:29]  # TODO: Maybe change this limit in the models
     user.last_name = user_data.get("lastName", "")
     user.save()
+
+
+def search_dict_list(dict_list, key, value):
+    for obj in dict_list:
+        if obj[key] == value:
+            return obj
+    return None

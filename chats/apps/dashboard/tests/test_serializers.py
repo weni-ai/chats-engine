@@ -1,7 +1,8 @@
 from django.test import TestCase
+
 from chats.apps.api.v1.dashboard.serializers import (
-    dashboard_general_data,
     dashboard_agents_data,
+    dashboard_general_data,
 )
 from chats.apps.projects.models import Project
 
