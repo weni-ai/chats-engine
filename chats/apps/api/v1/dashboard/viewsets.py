@@ -20,10 +20,6 @@ from chats.apps.api.v1.permissions import HasDashboardAccess
 from chats.apps.projects.models import Project
 from chats.core.excel_storage import ExcelStorage
 
-import io
-from chats.core.excel_storage import ExcelStorage
-import json
-
 
 class DashboardLiveViewset(viewsets.GenericViewSet):
     lookup_field = "uuid"
