@@ -88,7 +88,7 @@ class PyAMQPConnectionBackend:
                 with self._conection(confirm_publish=True) as c:
                     basic_publish(
                         channel=c.channel(),
-                        content=json.dumps(content),
+                        content=content,
                         content_type=content_type,
                         content_encoding="utf-8",
                         properties={"delivery_mode": 2},
