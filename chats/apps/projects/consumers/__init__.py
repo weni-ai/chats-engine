@@ -1,2 +1,3 @@
+from .dead_letter_consumer import DeadLetterConsumer
 from .project_consumer import ProjectConsumer
 from .template_type_consumer import TemplateTypeConsumer

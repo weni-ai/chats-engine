@@ -4,8 +4,33 @@ import amqp
 from django.conf import settings
 
 
+def basic_publish(
+    channel: amqp.Channel,
+    content: dict,
+    exchange: str,
+    routing_key: str,
+    content_type: str = "application/json",
+    properties: dict = {"delivery_mode": 2},
+    headers: dict = {},
+    content_encoding: str = "utf-8",
+) -> None:
+    channel.basic_publish(
+        amqp.Message(
+            body=json.dumps(content),
+            content_type=content_type,
+            content_encoding=content_encoding,
+            properties=properties,
+            application_headers=headers,
+        ),
+        exchange=exchange,
+        routing_key=routing_key,
+    )
+
+
 class PyAMQPConnectionBackend:
-    _start_message = "[+] Connection established. Waiting for events"
+    _start_message = (
+        "[+] Connection established. Waiting for events. To exit press CTRL+C"
+    )
 
     def __init__(self, handle_consumers: callable, connection_params: dict):
         self._handle_consumers = handle_consumers
