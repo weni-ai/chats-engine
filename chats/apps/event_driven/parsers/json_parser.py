@@ -11,7 +11,7 @@ class JSONParser(BaseParser):
         Parses the incoming bytestream as JSON and returns the resulting data.
         """
         if not stream:
-            ParseError("JSON parse error - stream cannot be empty")
+            raise ParseError("JSON parse error - stream cannot be empty")
 
         try:
             decoded_stream = (
