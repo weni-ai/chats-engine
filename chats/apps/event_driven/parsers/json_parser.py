@@ -14,7 +14,11 @@ class JSONParser(BaseParser):
             ParseError("JSON parse error - stream cannot be empty")
 
         try:
-            decoded_stream = stream.decode(encoding)
+            decoded_stream = (
+                stream.decode(encoding)
+                if type(encoding) == bytes
+                else stream  # the stream varible is a normal string sometimes
+            )
 
             return json.loads(decoded_stream)
         except ValueError as exc:

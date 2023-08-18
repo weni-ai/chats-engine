@@ -8,3 +8,7 @@ class InvalidTemplateTypeData(Exception):
 
 class InvalidDLQHeaders(Exception):
     pass
+
+
+class ReceivedErrorMessage(Exception):
+    pass

@@ -2,7 +2,10 @@ import logging
 
 from django.conf import settings
 
-from chats.apps.projects.usecases.exceptions import InvalidDLQHeaders
+from chats.apps.projects.usecases.exceptions import (
+    InvalidDLQHeaders,
+    ReceivedErrorMessage,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -11,20 +14,25 @@ REQUEUE_REASON = ["expired", "maxlen"]
 
 
 class DeadLetterHandler:
+    """
+    This handler is responsible for verifying if the message can be requeued.
+    """
+
     def __init__(self, message, dead_letter_content: dict) -> None:
         self.dead_letter_content = dead_letter_content
         self.message = message
 
     def execute(self):
         if self.dead_letter_content.get("error_type"):
-            LOGGER.error(
+            log_message = (
                 f"[{self.dead_letter_content.get('error_type')}] "
-                + f"{self.dead_letter_content.get('error_message')}. "
-                + f"response: {self.dead_letter_content.get('original_message')}"
+                + f"Error message: {self.dead_letter_content.get('error_message')}. "
+                + f"Body: {self.dead_letter_content.get('original_message')}"
             )
-            return
+            raise ReceivedErrorMessage(log_message)
         msg_headers = self.message.headers
-        x_death_header = msg_headers.get()
+        x_death_header = msg_headers.get("x-death")
+
         if not x_death_header:
             raise InvalidDLQHeaders("[X] no 'x-death' header on the message found!")
 
@@ -35,12 +43,5 @@ class DeadLetterHandler:
             )
         if msg_info_header.get("count") >= settings.EDA_REQUEUE_LIMIT:
             raise InvalidDLQHeaders(
-                f"[X] Dead messages cannot be requeued more than {settings.EDA_REQUEUE_LIMIT}!"
+                f"[X] Dead messages cannot be requeued more than {settings.EDA_REQUEUE_LIMIT} times!"
             )
-
-        pass
-
-    # TODO Requeue the messages and maintain the x-death headers(the count is very important,
-    # so it does not become an infinite loop).
-    # The requeueing can be done on RabbitMQ, but it need to be validated
-    # my initial idea is to configure the x-dead-letter-exchange and pass the queue as router_key.
