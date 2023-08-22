@@ -96,17 +96,22 @@ class Project(BaseConfigurableModel, BaseModel):
         return token
 
     def set_chat_gpt_auth_token(self, user_login_token: str = ""):
+        print("se nao tem token ele entraria aqui")
         token = IntegrationsRESTClient().get_chatgpt_token(
             str(self.pk), user_login_token
         )
+        print("chamaria o integrarions pra pegar o token", token)
         config = self.config or {}
         config["chat_gpt_token"] = token
         self.config = config
         self.save()
+        print("nesse momento aqui ele salva o token na config do projeto")
         return token
 
     def get_openai_token(self, user_login_token):
+        print("funcao responsavel por retornar o token, entrou aqui?")
         token = self.openai_token
+        print("tem token?????", token)
         if token:
             return token
         return self.set_chat_gpt_auth_token(user_login_token)

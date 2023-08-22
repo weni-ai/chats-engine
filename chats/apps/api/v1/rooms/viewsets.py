@@ -241,8 +241,11 @@ class RoomViewset(
     )
     def chat_completion(self, request, *args, **kwargs) -> Response:
         user_token = request.META.get("HTTP_AUTHORIZATION")
+        print("token do usuário", user_token)
         room = self.get_object()
+        print("sala", room)
         if request.method == "GET":
+            print("entrou no get da viewset")
             return Response(
                 status=status.HTTP_200_OK,
                 data={
@@ -255,6 +258,7 @@ class RoomViewset(
                 data={"detail": "Chat completion is not configured for this sector."},
             )
         token = room.queue.sector.project.get_openai_token(user_token)
+        print("token veio?", token)
         if not token:
             print("nao achou o tokeeeeeen")
             return Response(
