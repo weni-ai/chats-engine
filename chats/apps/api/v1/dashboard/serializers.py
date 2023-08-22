@@ -78,6 +78,14 @@ def dashboard_general_data(context: dict, project):
         waiting_time=waiting_time_agg,
     )
 
+    # o serializer deve me passar se o usuario que requesita
+    # eh um manager, caso seja, eu devo filtrar as salas
+    # apenas do setor que ele ta incluido
+
+    # rooms_query = Room.objects
+    # if not context.get("is_manager"):
+    #     rooms_query = rooms_query.filter(queue_sector__permission__user=context.get("manager_email"))
+
     redis_connection.set(
         rooms_filter_general_time_key,
         json.dumps(general_data),
