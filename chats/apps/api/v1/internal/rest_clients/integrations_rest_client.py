@@ -20,9 +20,13 @@ class IntegrationsRESTClient:
             url=f"{self.base_url}/api/v1/my-apps/?configured=true&project_uuid={project_uuid}",
             headers=self.chatgpt_headers(token),
         )
+        print("response da requisição do integrations", response)
+        print("token passado para os header", token)
+        print("project uuid passado pra montar a url", project_uuid)
         try:
             app_list = response.json()
             chat_gpt_app = search_dict_list(app_list, "code", "chatgpt")
             return chat_gpt_app.get("config").get("api_key")
         except AttributeError:
+            print("caiu no except")
             return None

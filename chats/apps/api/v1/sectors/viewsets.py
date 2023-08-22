@@ -90,9 +90,11 @@ class SectorViewset(viewsets.ModelViewSet):
         sector = self.get_object()
         config = request.data.get("config")
         if config and config.get("can_use_chat_completion"):
+            print("entrou no if que verifica o config", config)
             openai_token = sector.project.set_chat_gpt_auth_token(
                 request.META.get("HTTP_AUTHORIZATION")
             )
+            print("conseguiu pegar o token?", openai_token)
             if not openai_token:
                 return Response(
                     {

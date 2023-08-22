@@ -256,6 +256,7 @@ class RoomViewset(
             )
         token = room.queue.sector.project.get_openai_token(user_token)
         if not token:
+            print("nao achou o tokeeeeeen")
             return Response(
                 status=status.HTTP_400_BAD_REQUEST,
                 data={"detail": "OpenAI token not found"},
