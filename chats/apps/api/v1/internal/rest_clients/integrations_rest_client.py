@@ -21,6 +21,7 @@ class IntegrationsRESTClient:
             headers=self.chatgpt_headers(token),
         )
         print("response da requisição do integrations", response)
+        print("response em json", response.json())
         print("token passado para os header", token)
         print("project uuid passado pra montar a url", project_uuid)
         try:

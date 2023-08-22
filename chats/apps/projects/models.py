@@ -7,10 +7,10 @@ from requests.exceptions import JSONDecodeError
 from timezone_field import TimeZoneField
 
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
-from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
 from chats.apps.api.v1.internal.rest_clients.integrations_rest_client import (
     IntegrationsRESTClient,
 )
+from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
 from chats.utils.websockets import send_channels_group
 
 # Create your models here.
