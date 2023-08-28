@@ -30,6 +30,7 @@ def dashboard_general_data(context: dict, project):
     user_request = ProjectPermission.objects.get(
         user=context.get("user_request"), project=project
     )
+    sector_auth = user_request.filter()
     rooms_query = Room.objects
 
     if context.get("start_date") and context.get("end_date"):
@@ -62,7 +63,9 @@ def dashboard_general_data(context: dict, project):
         rooms_filter["queue__sector__project"] = project
 
     if user_request:
-        rooms_query = rooms_query.filter(queue__sector__in=user_request.get_sectors())
+        rooms_query = rooms_query.filter(
+            queue__sector__in=user_request.manager_sectors()
+        )
 
     interact_time_agg = Avg("metric__interaction_time")
     message_response_time_agg = Avg("metric__message_response_time")
@@ -199,7 +202,7 @@ def dashboard_division_data(context, project=None):
 
     if user_request:
         room_metric_query = room_metric_query.filter(
-            room__queue__sector__in=user_request.get_sectors()
+            room__queue__sector__in=user_request.manager_sectors()
         )
 
     return (
