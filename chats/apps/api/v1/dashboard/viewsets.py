@@ -1,12 +1,13 @@
+import io
+import json
+
 import pandas
 from django.http import HttpResponse
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from chats.apps.api.v1.dashboard.presenter import (
-    get_export_data,
-)
+from chats.apps.api.v1.dashboard.presenter import get_export_data
 from chats.apps.api.v1.dashboard.serializers import (
     DashboardRawDataSerializer,
     dashboard_agents_data,
@@ -15,10 +16,8 @@ from chats.apps.api.v1.dashboard.serializers import (
 )
 from chats.apps.api.v1.permissions import HasDashboardAccess
 from chats.apps.projects.models import Project
-
-import io
+from chats.apps.sectors.models import SectorAuthorization
 from chats.core.excel_storage import ExcelStorage
-import json
 
 
 class DashboardLiveViewset(viewsets.GenericViewSet):
@@ -37,10 +36,11 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
     def general(self, request, *args, **kwargs):
         """General metrics for the project or the sector"""
         project = self.get_object()
-        filters = request.query_params
+        context = request.query_params.dict()
+        context["user_request"] = request.user
         serialized_data = dashboard_general_data(
             project=project,
-            context=filters,
+            context=context,
         )
         return Response(serialized_data, status.HTTP_200_OK)
 
@@ -72,10 +72,11 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         Can return data on project and sector level (list of sector or list of queues)
         """
         project = self.get_object()
-        filters = request.query_params
+        context = request.query_params.dict()
+        context["user_request"] = request.user
         serialized_data = dashboard_division_data(
             project=project,
-            context=filters,
+            context=context,
         )
         return Response({"sectors": serialized_data}, status.HTTP_200_OK)
 

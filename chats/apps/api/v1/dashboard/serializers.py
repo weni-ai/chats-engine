@@ -12,6 +12,7 @@ from chats.apps.accounts.models import User
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.rooms.models import Room
+from chats.apps.sectors.models import SectorAuthorization
 
 
 def dashboard_general_data(context: dict, project):
@@ -25,6 +26,12 @@ def dashboard_general_data(context: dict, project):
     rooms_filter = {}
     active_chat_filter = {}
     rooms_filter["user__isnull"] = False
+
+    user_request = ProjectPermission.objects.get(
+        user=context.get("user_request"), project=project
+    )
+    rooms_query = Room.objects
+
     if context.get("start_date") and context.get("end_date"):
         start_time = pendulum.parse(context.get("start_date")).replace(tzinfo=tz)
         end_time = pendulum.parse(context.get("end_date") + " 23:59:59").replace(
@@ -48,10 +55,14 @@ def dashboard_general_data(context: dict, project):
 
     if context.get("sector"):
         rooms_filter["queue__sector"] = context.get("sector")
+        # rooms_query = Room.objects
         if context.get("tag"):
             rooms_filter["tags__name"] = context.get("tag")
     else:
         rooms_filter["queue__sector__project"] = project
+
+    if user_request:
+        rooms_query = rooms_query.filter(queue__sector__in=user_request.get_sectors())
 
     interact_time_agg = Avg("metric__interaction_time")
     message_response_time_agg = Avg("metric__message_response_time")
@@ -66,25 +77,17 @@ def dashboard_general_data(context: dict, project):
         if rooms_filter.get("created_on__gte"):
             rooms_filter.pop("created_on__gte")
         rooms_filter.update(active_chat_filter)
-        active_chats_count = Room.objects.filter(**rooms_filter).count()
+        active_chats_count = rooms_query.filter(**rooms_filter).count()
         # Maybe separate the active_chats_agg count into a subquery
         general_data = json.loads(redis_general_time_value)
         general_data["active_chats"] = active_chats_count
         return general_data
 
-    general_data = Room.objects.filter(**rooms_filter).aggregate(
+    general_data = rooms_query.filter(**rooms_filter).aggregate(
         interact_time=interact_time_agg,
         response_time=message_response_time_agg,
         waiting_time=waiting_time_agg,
     )
-
-    # o serializer deve me passar se o usuario que requesita
-    # eh um manager, caso seja, eu devo filtrar as salas
-    # apenas do setor que ele ta incluido
-
-    # rooms_query = Room.objects
-    # if not context.get("is_manager"):
-    #     rooms_query = rooms_query.filter(queue_sector__permission__user=context.get("manager_email"))
 
     redis_connection.set(
         rooms_filter_general_time_key,
@@ -94,7 +97,7 @@ def dashboard_general_data(context: dict, project):
     if rooms_filter.get("created_on__gte"):
         rooms_filter.pop("created_on__gte")
     rooms_filter.update(active_chat_filter)
-    active_chats_count = Room.objects.filter(**rooms_filter).count()
+    active_chats_count = rooms_query.filter(**rooms_filter).count()
     # Maybe separate the active_chats_agg count into a subquery
     general_data["active_chats"] = active_chats_count
     return general_data
@@ -168,6 +171,11 @@ def dashboard_division_data(context, project=None):
     rooms_filter = {}
     division_level = "room__queue__sector"
 
+    user_request = ProjectPermission.objects.get(
+        user=context.get("user_request"), project=project
+    )
+    room_metric_query = RoomMetrics.objects
+
     if context.get("sector"):
         division_level = "room__queue"
         rooms_filter["room__queue__sector"] = context.get("sector")
@@ -189,8 +197,13 @@ def dashboard_division_data(context, project=None):
     else:
         rooms_filter["created_on__gte"] = initial_datetime
 
+    if user_request:
+        room_metric_query = room_metric_query.filter(
+            room__queue__sector__in=user_request.get_sectors()
+        )
+
     return (
-        RoomMetrics.objects.filter(**rooms_filter)  # date, project or sector
+        room_metric_query.filter(**rooms_filter)  # date, project or sector
         .values(f"{division_level}__uuid")
         .annotate(
             name=F(f"{division_level}__name"),
