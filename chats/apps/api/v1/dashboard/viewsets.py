@@ -89,10 +89,11 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
     def raw_data(self, request, *args, **kwargs):
         """Raw data for the project, sector, queue and agent."""
         project = self.get_object()
-        filters = request.query_params
+        context = request.query_params.dict()
+        context["user_request"] = request.user
         serialized_data = self.get_serializer(
             instance=project,
-            context=filters,
+            context=context,
         )
         return Response(serialized_data.data, status.HTTP_200_OK)
 

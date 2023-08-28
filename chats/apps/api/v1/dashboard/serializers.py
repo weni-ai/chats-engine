@@ -30,7 +30,6 @@ def dashboard_general_data(context: dict, project):
     user_request = ProjectPermission.objects.get(
         user=context.get("user_request"), project=project
     )
-    sector_auth = user_request.filter()
     rooms_query = Room.objects
 
     if context.get("start_date") and context.get("end_date"):
@@ -235,6 +234,11 @@ class DashboardRawDataSerializer(serializers.ModelSerializer):
             .replace(hour=0, minute=0, second=0, microsecond=0)
         )
 
+        user_request = ProjectPermission.objects.get(
+            user=self.context.get("user_request"), project=project
+        )
+        rooms_query = Room.objects
+
         rooms_filter = {}
         rooms_filter["is_active"] = False
 
@@ -261,7 +265,12 @@ class DashboardRawDataSerializer(serializers.ModelSerializer):
         if self.context.get("agent"):
             rooms_filter["user"] = self.context.get("agent")
 
-        closed_rooms = Room.objects.filter(**rooms_filter).count()
+        if user_request:
+            rooms_query = rooms_query.filter(
+                queue__sector__in=user_request.manager_sectors()
+            )
+
+        closed_rooms = rooms_query.filter(**rooms_filter).count()
 
         return closed_rooms
 
@@ -275,6 +284,11 @@ class DashboardRawDataSerializer(serializers.ModelSerializer):
             .replace(hour=0, minute=0, second=0, microsecond=0)
         )
         rooms_filter = {}
+
+        user_request = ProjectPermission.objects.get(
+            user=self.context.get("user_request"), project=project
+        )
+        rooms_query = Room.objects
 
         if self.context.get("start_date") and self.context.get("end_date"):
             start_time = pendulum.parse(self.context.get("start_date")).replace(
@@ -297,6 +311,11 @@ class DashboardRawDataSerializer(serializers.ModelSerializer):
         else:
             rooms_filter["queue__sector__project"] = project
 
+        if user_request:
+            rooms_query = rooms_query.filter(
+                queue__sector__in=user_request.manager_sectors()
+            )
+
         transfer_metric = Room.objects.filter(**rooms_filter).aggregate(
             count=Sum("metric__transfer_count")
         )
@@ -308,6 +327,11 @@ class DashboardRawDataSerializer(serializers.ModelSerializer):
         rooms_filter = {}
         rooms_filter["user__isnull"] = True
         rooms_filter["is_active"] = True
+
+        user_request = ProjectPermission.objects.get(
+            user=self.context.get("user_request"), project=project
+        )
+        rooms_query = Room.objects
 
         if self.context.get("start_date") and self.context.get("end_date"):
             start_time = pendulum.parse(self.context.get("start_date")).replace(
@@ -325,6 +349,11 @@ class DashboardRawDataSerializer(serializers.ModelSerializer):
             rooms_filter["queue__sector"] = self.context.get("sector")
         else:
             rooms_filter["queue__sector__project"] = project
+
+        if user_request:
+            rooms_query = rooms_query.filter(
+                queue__sector__in=user_request.manager_sectors()
+            )
 
         queue_rooms_metric = Room.objects.filter(**rooms_filter).count()
 
