@@ -168,6 +168,8 @@ class ProjectPermission(
 
     def manager_sectors(self, custom_filters: dict = {}):
         sectors = self.project.sectors.all()
+        if self.role == ProjectPermission.ROLE_ADMIN:  # Admin role
+            return sectors
         sector_auth_filter = Q(authorizations__permission=self)
         return sectors.filter(sector_auth_filter).distinct()
 
