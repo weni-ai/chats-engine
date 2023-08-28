@@ -316,7 +316,7 @@ class DashboardRawDataSerializer(serializers.ModelSerializer):
                 queue__sector__in=user_request.manager_sectors()
             )
 
-        transfer_metric = Room.objects.filter(**rooms_filter).aggregate(
+        transfer_metric = rooms_query.filter(**rooms_filter).aggregate(
             count=Sum("metric__transfer_count")
         )
 
@@ -355,6 +355,6 @@ class DashboardRawDataSerializer(serializers.ModelSerializer):
                 queue__sector__in=user_request.manager_sectors()
             )
 
-        queue_rooms_metric = Room.objects.filter(**rooms_filter).count()
+        queue_rooms_metric = rooms_query.filter(**rooms_filter).count()
 
         return queue_rooms_metric
