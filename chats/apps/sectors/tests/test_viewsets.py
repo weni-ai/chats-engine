@@ -44,8 +44,8 @@ class SectorTests(APITestCase):
         results = response.json().get("results")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(results[0].get("uuid"), str(self.sector.pk))
-        self.assertEqual(results[1].get("uuid"), str(self.sector_2.pk))
+        self.assertEqual(results[0].get("uuid"), str(self.sector_2.pk))
+        self.assertEqual(results[2].get("uuid"), str(self.sector.pk))
 
     def test_get_sector_list_with_wrong_project_token(self):
         """
