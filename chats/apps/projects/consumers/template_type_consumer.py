@@ -1,20 +1,21 @@
 import amqp
 
 from chats.apps.event_driven.parsers import JSONParser
-from chats.apps.projects.usecases import create_template_type
+from chats.apps.projects.usecases import TemplateTypeHandler
 
 
+# TODO: use commented code, it's commented because we need to test only the create method and other modules don't follow this message structure
 class TemplateTypeConsumer:
     @staticmethod
     def consume(message: amqp.Message):
-        body = JSONParser.parse(message.body)
+        notification = JSONParser.parse(message.body)
 
-        print(f"[TemplateTypeConsumer] - Consuming a message. Body: {body}")
+        print(f"[TemplateTypeConsumer] - Consuming a message. Body: {notification}")
+        content = notification  # notification.get("content")
 
-        create_template_type(
-            uuid=body.get("uuid"),
-            project_uuid=body.get("project_uuid"),
-            name=body.get("name"),
-        )
+        TemplateTypeHandler(
+            "create",  # action=notification.get("action"),
+            config=content,
+        ).execute()
 
         message.channel.basic_ack(message.delivery_tag)
