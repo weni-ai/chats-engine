@@ -62,8 +62,9 @@ INSTALLED_APPS = [
     "chats.apps.queues",
     "chats.apps.projects",
     "chats.apps.api",
-    "chats.core",
     "chats.apps.dashboard",
+    "chats.apps.event_driven",
+    "chats.core",
     # third party apps
     "channels",
     "drf_yasg",
@@ -380,6 +381,7 @@ USE_EDA = env.bool("USE_EDA", default=False)
 if USE_EDA:
     EDA_CONNECTION_BACKEND = "chats.apps.event_driven.backends.PyAMQPConnectionBackend"
     EDA_CONSUMERS_HANDLE = "chats.apps.event_driven.handle.handle_consumers"
+
     EDA_BROKER_HOST = env("EDA_BROKER_HOST", default="localhost")
     EDA_VIRTUAL_HOST = env("EDA_VIRTUAL_HOST", default="/")
     EDA_BROKER_PORT = env.int("EDA_BROKER_PORT", default=5672)

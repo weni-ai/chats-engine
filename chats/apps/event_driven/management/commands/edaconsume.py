@@ -6,3 +6,4 @@ from ...base_app import EventDrivenAPP
 class Command(BaseCommand):
     def handle(self, *args, **options):
         EventDrivenAPP().backend.start_consuming()
+

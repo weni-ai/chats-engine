@@ -36,6 +36,7 @@ class PyAMQPConnectionBackend:
         self._handle_consumers = handle_consumers
         self.connection_params = connection_params
 
+
     def _drain_events(self, connection: amqp.connection.Connection):
         while True:
             connection.drain_events()
@@ -43,6 +44,7 @@ class PyAMQPConnectionBackend:
     def _conection(self, **kwargs) -> amqp.Connection:
         return amqp.Connection(**self.connection_params, **kwargs)
 
+      
     def start_consuming(self):
         while True:
             try:
@@ -68,7 +70,9 @@ class PyAMQPConnectionBackend:
                 print("[-] Connection closed: Keyboard Interrupt")
                 break
 
+
             except Exception as error:
                 # TODO: Handle exceptions with RabbitMQ
                 print("error on drain_events:", type(error), error)
                 time.sleep(5)
+
