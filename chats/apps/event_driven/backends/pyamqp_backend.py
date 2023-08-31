@@ -1,4 +1,3 @@
-import json
 import time
 
 import amqp
@@ -49,33 +48,4 @@ class PyAMQPConnectionBackend:
             except Exception as error:
                 # TODO: Handle exceptions with RabbitMQ
                 print("error on drain_events:", type(error), error)
-                time.sleep(settings.EDA_WAIT_TIME_RETRY)
-
-    def basic_publish(
-        self,
-        content: dict,
-        exchange: str,
-        routing_key: str,
-        content_type: str = "application/json",
-    ):
-        sent = False
-        while not sent:
-            try:
-                with self._conection(
-                    exchange=exchange,
-                    confirm_publish=True,
-                ) as c:
-                    ch = c.channel()
-                    ch.basic_publish(
-                        amqp.Message(
-                            body=json.dumps(content),
-                            content_type=content_type,
-                            content_encoding="utf-8",
-                        ),
-                        routing_key=routing_key,
-                    )
-                    sent = True
-            except Exception as err:
-                print(f"{type(err)}: {err}")
-
                 time.sleep(settings.EDA_WAIT_TIME_RETRY)
