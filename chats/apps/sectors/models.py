@@ -147,6 +147,22 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         # )
         return 0
 
+    @property
+    def template_type_setup(self):
+        return {
+            "name": self.name,
+            "rooms_limit": self.rooms_limit,
+            "work_start": self.work_start,
+            "work_end": self.work_end,
+            "can_trigger_flows": self.can_trigger_flows,
+            "sign_messages": self.sign_messages,
+            "open_offline": self.open_offline,
+            "can_edit_custom_fields": self.can_edit_custom_fields,
+            "queues": list(
+                self.queues.filter(is_deleted=False).values("name", "default_message")
+            ),
+        }
+
     def validate_agent_status(self, queue=None):
         if self.open_offline:
             return True
