@@ -4,6 +4,7 @@ from rest_framework import exceptions, filters, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ModelViewSet
 
+from chats.apps.api.v1.internal.eda_clients.flows_eda_client import FlowsEDAClient
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.api.v1.permissions import AnyQueueAgentPermission, IsSectorManager
 from chats.apps.api.v1.queues import serializers as queue_serializers
@@ -11,6 +12,7 @@ from chats.apps.api.v1.queues.filters import QueueAuthorizationFilter, QueueFilt
 from chats.apps.queues.models import Queue, QueueAuthorization
 
 
+# TODO OPTIMIZE THE CODE FOR THE ACTIONS, THE CODE REPEATS ON THE CREATE, UPDATE AND DELETE
 class QueueViewset(ModelViewSet):
     queryset = Queue.objects.all()
     serializer_class = queue_serializers.QueueSerializer
@@ -50,12 +52,18 @@ class QueueViewset(ModelViewSet):
         return super().get_serializer_class()
 
     def perform_create(self, serializer):
+        instance = serializer.save()
+        content = {
+            "uuid": str(instance.uuid),
+            "name": instance.name,
+            "sector_uuid": str(instance.sector.uuid),
+        }
+        if settings.USE_EDA:
+            FlowsEDAClient().request_queue(action="create", content=content)
+            return
         if not settings.USE_WENI_FLOWS:
             return super().perform_create(serializer)
-        instance = serializer.save()
-        response = FlowRESTClient().create_queue(
-            str(instance.uuid), instance.name, str(instance.sector.uuid)
-        )
+        response = FlowRESTClient().create_queue(**content)
         if response.status_code not in [status.HTTP_200_OK, status.HTTP_201_CREATED]:
             instance.delete()
             raise exceptions.APIException(
@@ -64,13 +72,20 @@ class QueueViewset(ModelViewSet):
         return instance
 
     def perform_update(self, serializer):
+        instance = serializer.save()
+        content = {
+            "uuid": str(instance.uuid),
+            "name": instance.name,
+            "sector_uuid": str(instance.sector.uuid),
+        }
+        if settings.USE_EDA:
+            FlowsEDAClient().request_queue(action="update", content=content)
+            return
+
         if not settings.USE_WENI_FLOWS:
             return super().perform_create(serializer)
 
-        instance = serializer.save()
-        response = FlowRESTClient().update_queue(
-            str(instance.uuid), instance.name, str(instance.sector.uuid)
-        )
+        response = FlowRESTClient().update_queue(**content)
         if response.status_code not in [status.HTTP_200_OK, status.HTTP_201_CREATED]:
             raise exceptions.APIException(
                 detail=f"[{response.status_code}] Error updating the queue on flows. Exception: {response.content}"
@@ -78,12 +93,18 @@ class QueueViewset(ModelViewSet):
         return instance
 
     def perform_destroy(self, instance):
+        content = {
+            "uuid": str(instance.uuid),
+            "sector_uuid": str(instance.sector.uuid),
+        }
+
+        if settings.USE_EDA:
+            FlowsEDAClient().request_queue(action="destroy", content=content)
+            return super().perform_destroy(instance)
         if not settings.USE_WENI_FLOWS:
             return super().perform_destroy(instance)
 
-        response = FlowRESTClient().destroy_queue(
-            str(instance.uuid), str(instance.sector.uuid)
-        )
+        response = FlowRESTClient().destroy_queue(**content)
         if response.status_code not in [
             status.HTTP_200_OK,
             status.HTTP_201_CREATED,
