@@ -4,29 +4,6 @@ import amqp
 from django.conf import settings
 
 
-def basic_publish(
-    channel: amqp.Channel,
-    content: dict,
-    exchange: str,
-    routing_key: str,
-    content_type: str = "application/json",
-    properties: dict = {"delivery_mode": 2},
-    headers: dict = {},
-    content_encoding: str = "utf-8",
-) -> None:
-    channel.basic_publish(
-        amqp.Message(
-            body=json.dumps(content),
-            content_type=content_type,
-            content_encoding=content_encoding,
-            properties=properties,
-            application_headers=headers,
-        ),
-        exchange=exchange,
-        routing_key=routing_key,
-    )
-
-
 class PyAMQPConnectionBackend:
     _start_message = (
         "[+] Connection established. Waiting for events. To exit press CTRL+C"
@@ -36,7 +13,6 @@ class PyAMQPConnectionBackend:
         self._handle_consumers = handle_consumers
         self.connection_params = connection_params
 
-
     def _drain_events(self, connection: amqp.connection.Connection):
         while True:
             connection.drain_events()
@@ -44,7 +20,6 @@ class PyAMQPConnectionBackend:
     def _conection(self, **kwargs) -> amqp.Connection:
         return amqp.Connection(**self.connection_params, **kwargs)
 
-      
     def start_consuming(self):
         while True:
             try:
@@ -70,9 +45,7 @@ class PyAMQPConnectionBackend:
                 print("[-] Connection closed: Keyboard Interrupt")
                 break
 
-
             except Exception as error:
                 # TODO: Handle exceptions with RabbitMQ
                 print("error on drain_events:", type(error), error)
                 time.sleep(5)
-
