@@ -2,7 +2,6 @@ import json
 
 import amqp
 
-from chats.apps.event_driven.backends.pyamqp_backend import basic_publish
 from chats.apps.event_driven.parsers.exceptions import ParseError
 from chats.apps.projects.usecases.exceptions import (
     InvalidProjectData,
