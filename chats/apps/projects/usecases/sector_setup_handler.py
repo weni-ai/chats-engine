@@ -1,5 +1,7 @@
 from chats.apps.api.v1.internal.eda_clients.flows_eda_client import FlowsEDAClient
 from chats.apps.projects.models import Project, ProjectPermission, TemplateType
+from chats.apps.queues.models import QueueAuthorization
+from chats.apps.sectors.models import SectorAuthorization
 
 from .exceptions import InvalidTemplateTypeData
 
@@ -30,8 +32,13 @@ class SectorSetupHandlerUseCase:
             sector, created = project.sectors.get_or_create(
                 name=setup_sector.pop("name"), defaults=setup_sector
             )
+            # crio a sector auth aqui
             if not created:
                 continue
+
+            SectorAuthorization.objects.create(
+                role=1, permission=permission, sector=sector
+            )
             self._flows_client.request_ticketer(
                 action=action,
                 content={
@@ -48,6 +55,10 @@ class SectorSetupHandlerUseCase:
                 queue = sector.queues.get_or_create(
                     name=setup_queue.pop("name"), defaults=setup_queue
                 )[0]
+                # crio a queue auth aqui
+                QueueAuthorization.objects.create(
+                    role=1, permission=permission, queue=queue
+                )
                 self._flows_client.request_queue(
                     action=action,
                     content={
