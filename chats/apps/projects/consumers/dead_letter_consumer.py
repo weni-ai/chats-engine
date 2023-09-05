@@ -3,7 +3,8 @@ import logging
 
 import amqp
 
-from chats.apps.event_driven.parsers.json_parser import JSONParser
+from chats.apps.event_driven.backends.pyamqp_backend import basic_publish
+from chats.apps.event_driven.parsers import JSONParser
 from chats.apps.projects.usecases import DeadLetterHandler
 
 LOGGER = logging.getLogger(__name__)
@@ -29,6 +30,16 @@ class DeadLetterConsumer:
             DeadLetterHandler(
                 message=message, dead_letter_content=notification
             ).execute()
+
+            # Will call to the default exchange
+            # then use the routing key to find the queue where queue name equals routing_key
+            basic_publish(
+                channel=message.channel,
+                content=notification,
+                exchange="",
+                routing_key=message.headers.get("x-first-death-queue"),
+                headers=message.headers,
+            )
 
             message.channel.basic_ack(message.delivery_tag)
         except Exception as err:
