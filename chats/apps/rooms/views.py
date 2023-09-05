@@ -1,10 +1,10 @@
-from rest_framework import status
-from rest_framework.exceptions import APIException
 from django.conf import settings
 from django.db import transaction
+from rest_framework import status
+from rest_framework.exceptions import APIException
 
-from chats.apps.dashboard.tasks import close_metrics, generate_metrics
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
+from chats.apps.dashboard.tasks import close_metrics, generate_metrics
 from chats.apps.rooms.models import Room
 
 
@@ -16,6 +16,7 @@ def close_room(room_pk: str):
             )
         )
     generate_metrics(room_pk)
+
 
 def update_custom_fields(room: Room, custom_fields_update: dict):
     room.custom_fields.update(custom_fields_update)

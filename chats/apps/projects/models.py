@@ -6,10 +6,25 @@ from requests.exceptions import JSONDecodeError
 from timezone_field import TimeZoneField
 
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
-from chats.core.models import BaseConfigurableModel, BaseModel
+from chats.apps.api.v1.internal.rest_clients.integrations_rest_client import (
+    IntegrationsRESTClient,
+)
+from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
 from chats.utils.websockets import send_channels_group
 
 # Create your models here.
+
+
+class TemplateType(BaseSoftDeleteModel, BaseModel):
+    name = models.CharField(max_length=255)
+    setup = models.JSONField(_("Template Setup"), default=dict)
+
+    def __str__(self) -> str:
+        return self.name  # pragma: no cover
+
+    class Meta:
+        verbose_name = "TemplateType"
+        verbose_name_plural = "TemplateTypes"
 
 
 class Project(BaseConfigurableModel, BaseModel):
@@ -32,6 +47,14 @@ class Project(BaseConfigurableModel, BaseModel):
         default=DATE_FORMAT_DAY_FIRST,
         help_text=_("Whether day comes first or month comes first in dates"),
     )
+    is_template = models.BooleanField(_("is template?"), default=False)
+    template_type = models.ForeignKey(
+        TemplateType,
+        verbose_name=_("template type"),
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         verbose_name = _("Project")
@@ -39,6 +62,13 @@ class Project(BaseConfigurableModel, BaseModel):
 
     def __str__(self):
         return self.name
+
+    @property
+    def openai_token(self):
+        try:
+            return self.config.get("openai_token")
+        except AttributeError:
+            return None
 
     def get_permission(self, user):
         try:
@@ -63,6 +93,22 @@ class Project(BaseConfigurableModel, BaseModel):
         self.flows_authorization = token
         self.save()
         return token
+
+    def set_chat_gpt_auth_token(self, user_login_token: str = ""):
+        token = IntegrationsRESTClient().get_chatgpt_token(
+            str(self.pk), user_login_token
+        )
+        config = self.config or {}
+        config["chat_gpt_token"] = token
+        self.config = config
+        self.save()
+        return token
+
+    def get_openai_token(self, user_login_token):
+        token = self.openai_token
+        if token:
+            return token
+        return self.set_chat_gpt_auth_token(user_login_token)
 
     @property
     def admin_permissions(self):

@@ -42,8 +42,18 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
             "can_trigger_flows",
             "sign_messages",
             "can_edit_custom_fields",
+            "config",
         ]
         extra_kwargs = {field: {"required": False} for field in fields}
+
+    def update(self, instance, validated_data):
+        config = validated_data.pop("config", None)
+        sector = super().update(instance, validated_data)
+        if config:
+            sector.config = sector.config or {}
+            sector.config.update(config)
+            sector.save()
+        return sector
 
 
 class SectorReadOnlyListSerializer(serializers.ModelSerializer):
@@ -80,6 +90,7 @@ class SectorReadOnlyRetrieveSerializer(serializers.ModelSerializer):
             "can_trigger_flows",
             "sign_messages",
             "can_edit_custom_fields",
+            "config",
         ]
 
 

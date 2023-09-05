@@ -151,7 +151,9 @@ class FlowsContactsAndGroupsMixin:
 
 
 class FlowRESTClient(
-    InternalAuthentication, FlowsContactsAndGroupsMixin, FlowsQueueMixin
+    InternalAuthentication,
+    FlowsContactsAndGroupsMixin,
+    FlowsQueueMixin,
 ):
     def __init__(self, *args, **kwargs):
         self.base_url = settings.FLOWS_API_URL

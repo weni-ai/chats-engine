@@ -62,8 +62,9 @@ INSTALLED_APPS = [
     "chats.apps.queues",
     "chats.apps.projects",
     "chats.apps.api",
-    "chats.core",
     "chats.apps.dashboard",
+    "chats.apps.event_driven",
+    "chats.core",
     # third party apps
     "channels",
     "drf_yasg",
@@ -300,12 +301,16 @@ if OIDC_ENABLED:
 CONNECT_API_URL = env.str("CONNECT_API_URL", default="")
 USE_CONNECT_V2 = env.bool("USE_CONNECT_V2", default=False)
 
+INTEGRATIONS_API_URL = env.str("INTEGRATIONS_API_URL", default="")
 FLOWS_API_URL = env.str("FLOWS_API_URL", default="")
 USE_WENI_FLOWS = env.bool("USE_WENI_FLOWS", default=False)
 FLOWS_TICKETER_TYPE = env.str("FLOWS_TICKETER_TYPE", default="wenichats")
 FLOWS_AUTH_TOKEN_RETRIES = env.int(
     "FLOWS_AUTH_TOKEN_RETRIES", default=2
 )  # How many times to refresh the flows project auth token and retry the request
+
+OPEN_AI_BASE_URL = env.str("OPEN_AI_BASE_URL", default="https://api.openai.com/v1/")
+OPEN_AI_GPT_VERSION = env.str("OPEN_AI_GPT_VERSION", default="gpt-4")
 
 # Swagger
 
@@ -368,3 +373,18 @@ CELERY_ACCEPT_CONTENT = ["application/json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
+
+# Event Driven Architecture configurations
+
+USE_EDA = env.bool("USE_EDA", default=False)
+
+if USE_EDA:
+    EDA_CONNECTION_BACKEND = "chats.apps.event_driven.backends.PyAMQPConnectionBackend"
+    EDA_CONSUMERS_HANDLE = "chats.apps.event_driven.handle.handle_consumers"
+
+    EDA_BROKER_HOST = env("EDA_BROKER_HOST", default="localhost")
+    EDA_VIRTUAL_HOST = env("EDA_VIRTUAL_HOST", default="/")
+    EDA_BROKER_PORT = env.int("EDA_BROKER_PORT", default=5672)
+    EDA_BROKER_USER = env("EDA_BROKER_USER", default="guest")
+    EDA_BROKER_PASSWORD = env("EDA_BROKER_PASSWORD", default="guest")
+    EDA_WAIT_TIME_RETRY = env.int("EDA_WAIT_TIME_RETRY", default=5)
