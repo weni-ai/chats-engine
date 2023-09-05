@@ -1,5 +1,7 @@
 from chats.apps.api.v1.internal.eda_clients.flows_eda_client import FlowsEDAClient
 from chats.apps.projects.models import Project, ProjectPermission, TemplateType
+from chats.apps.queues.models import QueueAuthorization
+from chats.apps.sectors.models import SectorAuthorization
 
 from .exceptions import InvalidTemplateTypeData
 
@@ -15,7 +17,6 @@ class SectorSetupHandlerUseCase:
         permission: ProjectPermission,
     ):
         setup = template_type.setup
-        action = "create"
         if setup == {}:
             raise InvalidTemplateTypeData(
                 f"The `setup` of TemplateType {template_type.uuid} is empty!"
@@ -32,27 +33,25 @@ class SectorSetupHandlerUseCase:
             )
             if not created:
                 continue
-            self._flows_client.request_ticketer(
-                action=action,
-                content={
-                    "project_uuid": str(project.uuid),
-                    "name": sector.name,
-                    "config": {
-                        "project_auth": str(permission.pk),
-                        "sector_uuid": str(sector.uuid),
-                    },
-                },
+
+            SectorAuthorization.objects.create(
+                role=1, permission=permission, sector=sector
             )
+            content = {
+                "project_uuid": str(project.uuid),
+                "name": sector.name,
+                "project_auth": str(permission.pk),
+                "uuid": str(sector.uuid),
+                "queues": [],
+            }
 
             for setup_queue in setup_queues:
                 queue = sector.queues.get_or_create(
                     name=setup_queue.pop("name"), defaults=setup_queue
                 )[0]
-                self._flows_client.request_queue(
-                    action=action,
-                    content={
-                        "sector_uuid": str(queue.sector.uuid),
-                        "uuid": str(queue.uuid),
-                        "name": queue.name,
-                    },
+                QueueAuthorization.objects.create(
+                    role=1, permission=permission, queue=queue
                 )
+                content["queues"].append({"uuid": str(queue.uuid), "name": queue.name})
+
+            self._flows_client.request_ticketer(content=content)

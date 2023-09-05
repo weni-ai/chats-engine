@@ -3,6 +3,7 @@ import logging
 
 import amqp
 
+from chats.apps.event_driven.backends.pyamqp_backend import basic_publish
 from chats.apps.event_driven.parsers.json_parser import JSONParser
 from chats.apps.projects.usecases import DeadLetterHandler
 
