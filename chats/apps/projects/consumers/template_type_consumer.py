@@ -2,7 +2,7 @@ import amqp
 from django.conf import settings
 
 from chats.apps.event_driven.consumers import pyamqp_call_dlx_when_error
-from chats.apps.event_driven.parsers import JSONParser
+from chats.apps.event_driven.parsers.json_parser import JSONParser
 from chats.apps.projects.usecases import TemplateTypeHandler
 
 

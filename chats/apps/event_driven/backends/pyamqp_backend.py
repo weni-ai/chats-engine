@@ -1,7 +1,31 @@
+import json
 import time
 
 import amqp
 from django.conf import settings
+
+
+def basic_publish(
+    channel: amqp.Channel,
+    content: dict,
+    exchange: str,
+    routing_key: str,
+    content_type: str = "application/json",
+    properties: dict = {"delivery_mode": 2},
+    headers: dict = {},
+    content_encoding: str = "utf-8",
+) -> None:
+    channel.basic_publish(
+        amqp.Message(
+            body=json.dumps(content),
+            content_type=content_type,
+            content_encoding=content_encoding,
+            properties=properties,
+            application_headers=headers,
+        ),
+        exchange=exchange,
+        routing_key=routing_key,
+    )
 
 
 class PyAMQPConnectionBackend:
@@ -23,7 +47,7 @@ class PyAMQPConnectionBackend:
     def start_consuming(self):
         while True:
             try:
-                with amqp.Connection(**self.connection_params) as connection:
+                with self._conection() as connection:
                     channel = connection.channel()
 
                     self._handle_consumers(channel)
@@ -39,7 +63,7 @@ class PyAMQPConnectionBackend:
             ) as error:
                 print(f"[-] Connection error: {error}")
                 print("    [+] Reconnecting in 5 seconds...")
-                time.sleep(5)
+                time.sleep(settings.EDA_WAIT_TIME_RETRY)
 
             except KeyboardInterrupt:
                 print("[-] Connection closed: Keyboard Interrupt")
@@ -48,4 +72,32 @@ class PyAMQPConnectionBackend:
             except Exception as error:
                 # TODO: Handle exceptions with RabbitMQ
                 print("error on drain_events:", type(error), error)
-                time.sleep(5)
+                time.sleep(settings.EDA_WAIT_TIME_RETRY)
+
+    def basic_publish(
+        self,
+        content: dict,
+        exchange: str,
+        routing_key: str,
+        content_type: str = "application/json",
+        headers: dict = {},
+    ):
+        sent = False
+        while not sent:
+            try:
+                with self._conection(confirm_publish=True) as c:
+                    basic_publish(
+                        channel=c.channel(),
+                        content=content,
+                        content_type=content_type,
+                        content_encoding="utf-8",
+                        properties={"delivery_mode": 2},
+                        exchange=exchange,
+                        routing_key=routing_key,
+                        headers=headers,
+                    )
+                    sent = True
+            except Exception as err:
+                print(f"{type(err)}: {err}")
+
+                time.sleep(settings.EDA_WAIT_TIME_RETRY)
