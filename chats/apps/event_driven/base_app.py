@@ -14,4 +14,6 @@ class EventDrivenAPP:
             password=settings.EDA_BROKER_PASSWORD,
             virtual_host=settings.EDA_VIRTUAL_HOST,
         )
-        self.backend = connection_backend(handle_consumers_function)
+        self.backend = connection_backend(
+            handle_consumers_function, self.connection_params
+        )
