@@ -1,5 +1,6 @@
 from django.test import TestCase
 
+from chats.apps.accounts.models import User
 from chats.apps.api.v1.dashboard.serializers import (
     dashboard_agents_data,
     dashboard_general_data,
@@ -22,17 +23,21 @@ class SerializerTests(TestCase):
 
     def setUp(self):
         self.project = Project.objects.get(pk="34a93b52-231e-11ed-861d-0242ac120002")
+        self.user = User.objects.get(pk="8")
 
     def test_active_chats_function_passing_sector(self):
         serializer = dashboard_general_data(
-            context={"sector": "d49049f0-c601-4e05-a293-98c1dea5fe4f"},
+            context={
+                "sector": "d49049f0-c601-4e05-a293-98c1dea5fe4f",
+                "user_request": self.user,
+            },
             project=self.project,
         )
         self.assertEqual(serializer["active_chats"], 0)
 
     def test_active_chats_function_without_filter(self):
         serializer = dashboard_general_data(
-            context={},
+            context={"user_request": self.user},
             project=self.project,
         )
         self.assertEqual(serializer["active_chats"], 1)

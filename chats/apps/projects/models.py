@@ -212,6 +212,13 @@ class ProjectPermission(
             action=f"status.{action}",
         )
 
+    def manager_sectors(self, custom_filters: dict = {}):
+        sectors = self.project.sectors.all()
+        if self.role == ProjectPermission.ROLE_ADMIN:  # Admin role
+            return sectors
+        sector_auth_filter = Q(authorizations__permission=self)
+        return sectors.filter(sector_auth_filter).distinct()
+
     @property
     def is_user(self):
         return self.role == self.ROLE_USER

@@ -25,6 +25,12 @@ def dashboard_general_data(context: dict, project):
     rooms_filter = {}
     active_chat_filter = {}
     rooms_filter["user__isnull"] = False
+
+    user_request = ProjectPermission.objects.get(
+        user=context.get("user_request"), project=project
+    )
+    rooms_query = Room.objects
+
     if context.get("start_date") and context.get("end_date"):
         start_time = pendulum.parse(context.get("start_date")).replace(tzinfo=tz)
         end_time = pendulum.parse(context.get("end_date") + " 23:59:59").replace(
@@ -48,10 +54,16 @@ def dashboard_general_data(context: dict, project):
 
     if context.get("sector"):
         rooms_filter["queue__sector"] = context.get("sector")
+        # rooms_query = Room.objects
         if context.get("tag"):
             rooms_filter["tags__name"] = context.get("tag")
     else:
         rooms_filter["queue__sector__project"] = project
+
+    if user_request:
+        rooms_query = rooms_query.filter(
+            queue__sector__in=user_request.manager_sectors()
+        )
 
     interact_time_agg = Avg("metric__interaction_time")
     message_response_time_agg = Avg("metric__message_response_time")
@@ -66,13 +78,13 @@ def dashboard_general_data(context: dict, project):
         if rooms_filter.get("created_on__gte"):
             rooms_filter.pop("created_on__gte")
         rooms_filter.update(active_chat_filter)
-        active_chats_count = Room.objects.filter(**rooms_filter).count()
+        active_chats_count = rooms_query.filter(**rooms_filter).count()
         # Maybe separate the active_chats_agg count into a subquery
         general_data = json.loads(redis_general_time_value)
         general_data["active_chats"] = active_chats_count
         return general_data
 
-    general_data = Room.objects.filter(**rooms_filter).aggregate(
+    general_data = rooms_query.filter(**rooms_filter).aggregate(
         interact_time=interact_time_agg,
         response_time=message_response_time_agg,
         waiting_time=waiting_time_agg,
@@ -86,7 +98,7 @@ def dashboard_general_data(context: dict, project):
     if rooms_filter.get("created_on__gte"):
         rooms_filter.pop("created_on__gte")
     rooms_filter.update(active_chat_filter)
-    active_chats_count = Room.objects.filter(**rooms_filter).count()
+    active_chats_count = rooms_query.filter(**rooms_filter).count()
     # Maybe separate the active_chats_agg count into a subquery
     general_data["active_chats"] = active_chats_count
     return general_data
@@ -160,6 +172,11 @@ def dashboard_division_data(context, project=None):
     rooms_filter = {}
     division_level = "room__queue__sector"
 
+    user_request = ProjectPermission.objects.get(
+        user=context.get("user_request"), project=project
+    )
+    room_metric_query = RoomMetrics.objects
+
     if context.get("sector"):
         division_level = "room__queue"
         rooms_filter["room__queue__sector"] = context.get("sector")
@@ -181,8 +198,13 @@ def dashboard_division_data(context, project=None):
     else:
         rooms_filter["created_on__gte"] = initial_datetime
 
+    if user_request:
+        room_metric_query = room_metric_query.filter(
+            room__queue__sector__in=user_request.manager_sectors()
+        )
+
     return (
-        RoomMetrics.objects.filter(**rooms_filter)  # date, project or sector
+        room_metric_query.filter(**rooms_filter)  # date, project or sector
         .values(f"{division_level}__uuid")
         .annotate(
             name=F(f"{division_level}__name"),
@@ -211,6 +233,11 @@ class DashboardRawDataSerializer(serializers.ModelSerializer):
             .replace(hour=0, minute=0, second=0, microsecond=0)
         )
 
+        user_request = ProjectPermission.objects.get(
+            user=self.context.get("user_request"), project=project
+        )
+        rooms_query = Room.objects
+
         rooms_filter = {}
         rooms_filter["is_active"] = False
 
@@ -237,7 +264,12 @@ class DashboardRawDataSerializer(serializers.ModelSerializer):
         if self.context.get("agent"):
             rooms_filter["user"] = self.context.get("agent")
 
-        closed_rooms = Room.objects.filter(**rooms_filter).count()
+        if user_request:
+            rooms_query = rooms_query.filter(
+                queue__sector__in=user_request.manager_sectors()
+            )
+
+        closed_rooms = rooms_query.filter(**rooms_filter).count()
 
         return closed_rooms
 
@@ -251,6 +283,11 @@ class DashboardRawDataSerializer(serializers.ModelSerializer):
             .replace(hour=0, minute=0, second=0, microsecond=0)
         )
         rooms_filter = {}
+
+        user_request = ProjectPermission.objects.get(
+            user=self.context.get("user_request"), project=project
+        )
+        rooms_query = Room.objects
 
         if self.context.get("start_date") and self.context.get("end_date"):
             start_time = pendulum.parse(self.context.get("start_date")).replace(
@@ -273,7 +310,12 @@ class DashboardRawDataSerializer(serializers.ModelSerializer):
         else:
             rooms_filter["queue__sector__project"] = project
 
-        transfer_metric = Room.objects.filter(**rooms_filter).aggregate(
+        if user_request:
+            rooms_query = rooms_query.filter(
+                queue__sector__in=user_request.manager_sectors()
+            )
+
+        transfer_metric = rooms_query.filter(**rooms_filter).aggregate(
             count=Sum("metric__transfer_count")
         )
 
@@ -284,6 +326,11 @@ class DashboardRawDataSerializer(serializers.ModelSerializer):
         rooms_filter = {}
         rooms_filter["user__isnull"] = True
         rooms_filter["is_active"] = True
+
+        user_request = ProjectPermission.objects.get(
+            user=self.context.get("user_request"), project=project
+        )
+        rooms_query = Room.objects
 
         if self.context.get("start_date") and self.context.get("end_date"):
             start_time = pendulum.parse(self.context.get("start_date")).replace(
@@ -302,6 +349,11 @@ class DashboardRawDataSerializer(serializers.ModelSerializer):
         else:
             rooms_filter["queue__sector__project"] = project
 
-        queue_rooms_metric = Room.objects.filter(**rooms_filter).count()
+        if user_request:
+            rooms_query = rooms_query.filter(
+                queue__sector__in=user_request.manager_sectors()
+            )
+
+        queue_rooms_metric = rooms_query.filter(**rooms_filter).count()
 
         return queue_rooms_metric

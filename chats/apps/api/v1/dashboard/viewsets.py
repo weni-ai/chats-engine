@@ -7,9 +7,7 @@ from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from chats.apps.api.v1.dashboard.presenter import (
-    get_export_data,
-)
+from chats.apps.api.v1.dashboard.presenter import get_export_data
 from chats.apps.api.v1.dashboard.serializers import (
     DashboardRawDataSerializer,
     dashboard_agents_data,
@@ -37,10 +35,11 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
     def general(self, request, *args, **kwargs):
         """General metrics for the project or the sector"""
         project = self.get_object()
-        filters = request.query_params
+        context = request.query_params.dict()
+        context["user_request"] = request.user
         serialized_data = dashboard_general_data(
             project=project,
-            context=filters,
+            context=context,
         )
         return Response(serialized_data, status.HTTP_200_OK)
 
@@ -72,10 +71,11 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         Can return data on project and sector level (list of sector or list of queues)
         """
         project = self.get_object()
-        filters = request.query_params
+        context = request.query_params.dict()
+        context["user_request"] = request.user
         serialized_data = dashboard_division_data(
             project=project,
-            context=filters,
+            context=context,
         )
         return Response({"sectors": serialized_data}, status.HTTP_200_OK)
 
@@ -88,10 +88,11 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
     def raw_data(self, request, *args, **kwargs):
         """Raw data for the project, sector, queue and agent."""
         project = self.get_object()
-        filters = request.query_params
+        context = request.query_params.dict()
+        context["user_request"] = request.user
         serialized_data = self.get_serializer(
             instance=project,
-            context=filters,
+            context=context,
         )
         return Response(serialized_data.data, status.HTTP_200_OK)
 
