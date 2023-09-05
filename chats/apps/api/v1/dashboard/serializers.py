@@ -12,7 +12,6 @@ from chats.apps.accounts.models import User
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.rooms.models import Room
-from chats.apps.sectors.models import SectorAuthorization
 
 
 def dashboard_general_data(context: dict, project):

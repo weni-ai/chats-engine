@@ -16,7 +16,6 @@ from chats.apps.api.v1.dashboard.serializers import (
 )
 from chats.apps.api.v1.permissions import HasDashboardAccess
 from chats.apps.projects.models import Project
-from chats.apps.sectors.models import SectorAuthorization
 from chats.core.excel_storage import ExcelStorage
 
 
