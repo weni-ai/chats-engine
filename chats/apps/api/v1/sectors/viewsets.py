@@ -86,6 +86,22 @@ class SectorViewset(viewsets.ModelViewSet):
                     detail=f"[{response.status_code}] Error posting the sector/ticketer on flows. Exception: {response.content}"  # NOQA
                 )
 
+    def update(self, request, *args, **kwargs):
+        sector = self.get_object()
+        config = request.data.get("config")
+        if config and config.get("can_use_chat_completion"):
+            openai_token = sector.project.set_chat_gpt_auth_token(
+                request.META.get("HTTP_AUTHORIZATION")
+            )
+            if not openai_token:
+                return Response(
+                    {
+                        "detail": "There is no chatgpt token configured on the integrations module"
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        return super().update(request, *args, **kwargs)
+
     def perform_update(self, serializer):
         serializer.save()
 
