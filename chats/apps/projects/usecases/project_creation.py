@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from django.contrib.auth import get_user_model
 
-from ..models import Project, TemplateType
+from ..models import Project, TemplateType, ProjectPermission
 from .exceptions import InvalidProjectData
 
 User = get_user_model()
@@ -65,9 +65,11 @@ class ProjectCreationUseCase:
                     user=user, role=1 if permission.get("role") == 1 else 2
                 )
 
+            creator_permission = ProjectPermission.objects.get(user=user)
+
         if project_dto.is_template:
             self.__sector_setup_handler.setup_sectors_in_project(
-                project, template_type, permission
+                project, template_type, creator_permission
             )
             project.template_type = template_type
             project.save()
