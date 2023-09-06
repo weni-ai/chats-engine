@@ -14,7 +14,7 @@ class SectorSetupHandlerUseCase:
         self,
         project: Project,
         template_type: TemplateType,
-        permission: ProjectPermission,
+        creator_permission: ProjectPermission,
     ):
         setup = template_type.setup
 
@@ -31,12 +31,12 @@ class SectorSetupHandlerUseCase:
                 continue
 
             SectorAuthorization.objects.create(
-                role=1, permission=permission, sector=sector
+                role=1, permission=creator_permission, sector=sector
             )
             content = {
                 "project_uuid": str(project.uuid),
                 "name": sector.name,
-                "project_auth": str(permission.pk),
+                "project_auth": str(creator_permission.pk),
                 "uuid": str(sector.uuid),
                 "queues": [],
             }
@@ -46,7 +46,7 @@ class SectorSetupHandlerUseCase:
                     name=setup_queue.pop("name"), defaults=setup_queue
                 )[0]
                 QueueAuthorization.objects.create(
-                    role=1, permission=permission, queue=queue
+                    role=1, permission=creator_permission, queue=queue
                 )
                 content["queues"].append({"uuid": str(queue.uuid), "name": queue.name})
 
