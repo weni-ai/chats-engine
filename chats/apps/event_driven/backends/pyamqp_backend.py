@@ -9,7 +9,6 @@ def basic_publish(
     channel: amqp.Channel,
     content: dict,
     exchange: str,
-    routing_key: str,
     content_type: str = "application/json",
     properties: dict = {"delivery_mode": 2},
     headers: dict = {},
@@ -24,7 +23,6 @@ def basic_publish(
             application_headers=headers,
         ),
         exchange=exchange,
-        routing_key=routing_key,
     )
 
 
@@ -78,7 +76,6 @@ class PyAMQPConnectionBackend:
         self,
         content: dict,
         exchange: str,
-        routing_key: str,
         content_type: str = "application/json",
         headers: dict = {},
     ):
@@ -93,7 +90,6 @@ class PyAMQPConnectionBackend:
                         content_encoding="utf-8",
                         properties={"delivery_mode": 2},
                         exchange=exchange,
-                        routing_key=routing_key,
                         headers=headers,
                     )
                     sent = True
