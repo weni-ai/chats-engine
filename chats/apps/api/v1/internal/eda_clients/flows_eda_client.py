@@ -21,20 +21,13 @@ class FlowsQueueMixin:
 class FlowsTicketerMixin:
     base_ticketer_exchange = settings.FLOWS_TICKETER_EXCHANGE
 
-    def create_ticketer(self, **kwargs):
-        body = {**kwargs, "ticketer_type": settings.FLOWS_TICKETER_TYPE}
-        EventDrivenAPP().backend.basic_publish(
-            content=body, exchange=self.base_queue_exchange, routing_key="create"
-        )
-
-    def request_ticketer(self, action, content):
+    def request_ticketer(self, content):
         """
         Generic function to handle Queue actions
         """
         EventDrivenAPP().backend.basic_publish(
             content=content,
             exchange=self.base_ticketer_exchange,
-            routing_key=action,
             headers={"callback_exchange": settings.DEFAULT_DEAD_LETTER_EXCHANGE},
         )
 
