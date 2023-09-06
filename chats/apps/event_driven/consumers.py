@@ -36,7 +36,6 @@ def pyamqp_call_dlx_when_error(routing_key: str, default_exchange: str):
                     content=callback_body,
                     properties={"delivery_mode": 2},
                     exchange=exchange,
-                    routing_key=routing_key,
                 )
 
         return consumer_wrapper

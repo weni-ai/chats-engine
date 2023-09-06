@@ -13,7 +13,6 @@ class FlowsQueueMixin:
         EventDrivenAPP().backend.basic_publish(
             content=content,
             exchange=self.base_queue_exchange,
-            routing_key=action,
             headers={"callback_exchange": settings.DEFAULT_DEAD_LETTER_EXCHANGE},
         )
 

@@ -59,7 +59,7 @@ class QueueViewset(ModelViewSet):
             "sector_uuid": str(instance.sector.uuid),
         }
         if settings.USE_EDA:
-            FlowsEDAClient().request_queue(action="create", content=content)
+            FlowsEDAClient().request_queue(action="", content=content)
             return
         if not settings.USE_WENI_FLOWS:
             return super().perform_create(serializer)
@@ -79,7 +79,7 @@ class QueueViewset(ModelViewSet):
             "sector_uuid": str(instance.sector.uuid),
         }
         if settings.USE_EDA:
-            FlowsEDAClient().request_queue(action="update", content=content)
+            FlowsEDAClient().request_queue(action="", content=content)
             return
 
         if not settings.USE_WENI_FLOWS:
@@ -99,7 +99,7 @@ class QueueViewset(ModelViewSet):
         }
 
         if settings.USE_EDA:
-            FlowsEDAClient().request_queue(action="destroy", content=content)
+            FlowsEDAClient().request_queue(action="", content=content)
             return super().perform_destroy(instance)
         if not settings.USE_WENI_FLOWS:
             return super().perform_destroy(instance)

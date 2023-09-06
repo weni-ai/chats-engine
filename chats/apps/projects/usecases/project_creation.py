@@ -17,6 +17,7 @@ class ProjectCreationDTO:
     date_format: str
     timezone: str
     template_type_uuid: str
+    authorizations: dict
 
 
 class ProjectCreationUseCase:
@@ -58,7 +59,11 @@ class ProjectCreationUseCase:
                 date_format=project_dto.date_format,
                 timezone=project_dto.timezone,
             )
-            permission = project.permissions.create(user=user, role=1)
+
+            for permission in project_dto.authorizations:
+                permission = project.permissions.create(
+                    user=user, role=1 if permission.get("role") == 1 else 2
+                )
 
         if project_dto.is_template:
             self.__sector_setup_handler.setup_sectors_in_project(

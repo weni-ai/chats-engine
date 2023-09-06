@@ -17,12 +17,8 @@ class SectorSetupHandlerUseCase:
         permission: ProjectPermission,
     ):
         setup = template_type.setup
-        if setup == {}:
-            raise InvalidTemplateTypeData(
-                f"The `setup` of TemplateType {template_type.uuid} is empty!"
-            )
 
-        for setup_sector in setup.get("sectors"):
+        for setup_sector in setup.get("sectors", {}):
             setup_queues = setup_sector.pop("queues", None)
 
             if not setup_queues:
