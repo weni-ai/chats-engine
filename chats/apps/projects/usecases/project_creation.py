@@ -67,7 +67,7 @@ class ProjectCreationUseCase:
                 )
 
             creator_permission = ProjectPermission.objects.get(
-                user=user, project=project
+                user=project_dto.user_email, project=project
             )
 
         if project_dto.is_template:
