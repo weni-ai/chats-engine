@@ -66,7 +66,9 @@ class ProjectCreationUseCase:
                     role=1 if permission.get("role") == 1 else 2,
                 )
 
-            creator_permission = ProjectPermission.objects.get(user=user)
+            creator_permission = ProjectPermission.objects.get(
+                user=user, project=project
+            )
 
         if project_dto.is_template:
             self.__sector_setup_handler.setup_sectors_in_project(
