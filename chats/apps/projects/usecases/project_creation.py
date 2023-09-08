@@ -62,13 +62,13 @@ class ProjectCreationUseCase:
 
             for permission in project_dto.authorizations:
                 permission = project.permissions.create(
-                    user=permission.get("user"),
+                    user=permission.get("user_email"),
                     role=1 if permission.get("role") == 1 else 2,
                 )
 
-            creator_permission = ProjectPermission.objects.get(
-                user=project_dto.user_email, project=project
-            )
+        creator_permission = ProjectPermission.objects.get(
+            user=project_dto.user_email, project=project
+        )
 
         if project_dto.is_template:
             self.__sector_setup_handler.setup_sectors_in_project(
