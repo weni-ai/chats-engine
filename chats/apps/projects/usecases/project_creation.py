@@ -61,8 +61,11 @@ class ProjectCreationUseCase:
             )
 
             for permission in project_dto.authorizations:
+                current_user = User.objects.get_or_create(
+                    email=permission.get("user_email")
+                )
                 permission = project.permissions.create(
-                    user=permission.get("user_email"),
+                    user=current_user,
                     role=1 if permission.get("role") == 3 else 2,
                 )
 
