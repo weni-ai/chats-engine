@@ -75,7 +75,7 @@ class SectorViewset(viewsets.ModelViewSet):
             },
         }
         if settings.USE_EDA:
-            FlowsEDAClient().request_ticketer(action="create", content=content)
+            FlowsEDAClient().request_ticketer(content=content)
             return
         if settings.USE_WENI_FLOWS:
             connect = ConnectRESTClient()
