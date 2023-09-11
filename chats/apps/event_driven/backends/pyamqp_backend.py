@@ -9,14 +9,14 @@ def basic_publish(
     channel: amqp.Channel,
     content: dict,
     exchange: str,
-    content_type: str = "application/json",
+    content_type: str = "application/octet-stream",
     properties: dict = {"delivery_mode": 2},
     headers: dict = {},
     content_encoding: str = "utf-8",
 ) -> None:
     channel.basic_publish(
         amqp.Message(
-            body=json.dumps(content),
+            body=bytes(json.dumps(content), "utf-8"),
             content_type=content_type,
             content_encoding=content_encoding,
             properties=properties,
