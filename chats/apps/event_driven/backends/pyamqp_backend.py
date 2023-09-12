@@ -12,7 +12,7 @@ def basic_publish(
     content_type: str = "application/octet-stream",
     properties: dict = {"delivery_mode": 2},
     headers: dict = {},
-    content_encoding: str = "utf-8",
+    content_encoding: str = None,
 ) -> None:
     channel.basic_publish(
         amqp.Message(
