@@ -6,7 +6,8 @@ from chats.apps.event_driven.parsers.json_parser import JSONParser
 from chats.apps.projects.usecases import TemplateTypeHandler
 
 
-# TODO: use commented code, it's commented because we need to test only the create method and other modules don't follow this message structure
+# TODO: use commented code, it's commented because we need to test only the
+# create method and other modules don't follow this message structure
 class TemplateTypeConsumer:
     @staticmethod
     @pyamqp_call_dlx_when_error(
