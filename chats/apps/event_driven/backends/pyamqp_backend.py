@@ -76,7 +76,7 @@ class PyAMQPConnectionBackend:
         self,
         content: dict,
         exchange: str,
-        content_type: str = "application/json",
+        content_type: str = "application/octet-stream",
         headers: dict = {},
     ):
         sent = False
@@ -87,7 +87,6 @@ class PyAMQPConnectionBackend:
                         channel=c.channel(),
                         content=content,
                         content_type=content_type,
-                        content_encoding="utf-8",
                         properties={"delivery_mode": 2},
                         exchange=exchange,
                         headers=headers,
