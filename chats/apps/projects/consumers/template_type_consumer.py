@@ -4,7 +4,7 @@ from django.conf import settings
 from chats.apps.event_driven.consumers import pyamqp_call_dlx_when_error
 from chats.apps.event_driven.consumers import EDAConsumer
 from chats.apps.event_driven.parsers.json_parser import JSONParser
-from chats.apps.projects.usecases import TemplateTypeHandler
+from chats.apps.projects.usecases import TemplateTypeCreation
 
 
 # TODO: use commented code, it's commented because we need to test only the
@@ -21,9 +21,7 @@ class TemplateTypeConsumer(EDAConsumer):
 
         content = notification  # notification.get("content")
 
-        TemplateTypeHandler(
-            "create",  # action=notification.get("action"),
-            config=content,
-        ).execute()
+        template_type_creation = TemplateTypeCreation(config=content)
+        template_type_creation.create()
 
         message.channel.basic_ack(message.delivery_tag)
