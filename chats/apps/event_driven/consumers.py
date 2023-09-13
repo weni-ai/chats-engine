@@ -4,6 +4,11 @@ from chats.apps.projects.usecases.exceptions import (
     InvalidProjectData,
     InvalidTemplateTypeData,
 )
+from abc import ABC, abstractmethod
+
+import amqp
+
+from .signals import message_started, message_finished
 
 
 def pyamqp_call_dlx_when_error(routing_key: str, default_exchange: str):
@@ -37,3 +42,16 @@ def pyamqp_call_dlx_when_error(routing_key: str, default_exchange: str):
         return consumer_wrapper
 
     return decorator
+
+
+class EDAConsumer(ABC):  # pragma: no cover
+    def handle(self, message: amqp.Message):
+        message_started.send(sender=self)
+        try:
+            self.consume(message)
+        finally:
+            message_finished.send(sender=self)
+
+    @abstractmethod
+    def consume(self, message: amqp.Message):
+        pass
