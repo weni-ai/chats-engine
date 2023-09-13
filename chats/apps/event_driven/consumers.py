@@ -1,14 +1,16 @@
+from abc import ABC, abstractmethod
+
+import amqp
+from sentry_sdk import capture_exception
+
 from chats.apps.event_driven.backends.pyamqp_backend import basic_publish
 from chats.apps.event_driven.parsers.exceptions import ParseError
 from chats.apps.projects.usecases.exceptions import (
     InvalidProjectData,
     InvalidTemplateTypeData,
 )
-from abc import ABC, abstractmethod
 
-import amqp
-
-from .signals import message_started, message_finished
+from .signals import message_finished, message_started
 
 
 def pyamqp_call_dlx_when_error(routing_key: str, default_exchange: str):
@@ -25,7 +27,9 @@ def pyamqp_call_dlx_when_error(routing_key: str, default_exchange: str):
                 TypeError,
                 AttributeError,
             ) as err:
+                capture_exception(err)
                 channel.basic_reject(message.delivery_tag, requeue=False)
+                print(f"[TemplateTypeConsumer] - Message rejected by: {err}")
                 callback_body = {
                     "original_message": message.body.decode("utf-8"),
                     "error_type": str(type(err)),
