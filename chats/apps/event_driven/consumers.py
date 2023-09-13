@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 
 import amqp
+from django.db import IntegrityError
 from sentry_sdk import capture_exception
 
 from chats.apps.event_driven.backends.pyamqp_backend import basic_publish
@@ -26,6 +27,7 @@ def pyamqp_call_dlx_when_error(routing_key: str, default_exchange: str):
                 InvalidProjectData,
                 TypeError,
                 AttributeError,
+                IntegrityError,
             ) as err:
                 capture_exception(err)
                 channel.basic_reject(message.delivery_tag, requeue=False)
