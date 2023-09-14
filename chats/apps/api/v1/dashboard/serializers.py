@@ -149,7 +149,7 @@ def dashboard_agents_data(context, project):
         agents_query = agents_query.exclude(email__endswith="weni.ai")
 
     agents_query = (
-        agents_query.filter(project_permissions__project=project)
+        agents_query.filter(project_permissions__project=project, is_active=True)
         .annotate(
             agent_status=Subquery(project_permission_subquery),
             closed_rooms=Count("rooms", filter=Q(**closed_rooms, **rooms_filter)),
