@@ -4,4 +4,4 @@ from .consumers import TemplateTypeConsumer
 
 
 def handle_consumers(channel: Channel) -> None:
-    channel.basic_consume("chats.template-types", callback=TemplateTypeConsumer.consume)
+    channel.basic_consume("chats.template-types", callback=TemplateTypeConsumer.handle)
