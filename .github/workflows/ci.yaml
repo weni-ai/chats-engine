@@ -16,6 +16,7 @@ env:
   USE_WENI_FLOWS: false
   PROMETHEUS_AUTH_TOKEN: "aaaa"
   UNPERMITTED_AUDIO_TYPES: "WebM,audio/mpeg3,audio/mpeg,mp3"
+  USE_EDA: true
 
 jobs:
   build:
