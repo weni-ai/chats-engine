@@ -1,3 +1,9 @@
+# 2.0.0
+> This CHANGELOG has not been updated since 05/16/2023 so some commits will not appear in this document between version 1.16.4 and 2.0.0. From this version onwards, it will be constantly updated again.
+## Add
+  - Creating template type using event driven.
+  - Filtering active agents in dashboard endpoint.
+
 # 1.16.4
 ## Add
   - Data exporter getting data from dashboard serializers.
