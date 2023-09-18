@@ -6,6 +6,9 @@ from chats.apps.event_driven.consumers import EDAConsumer
 from chats.apps.event_driven.parsers.json_parser import JSONParser
 from chats.apps.projects.usecases import TemplateTypeCreation
 
+from chats.apps.projects.models import Project
+from chats.apps.projects.usecases import InvalidProjectData
+
 
 class TemplateTypeConsumer(EDAConsumer):
     @staticmethod
@@ -16,6 +19,11 @@ class TemplateTypeConsumer(EDAConsumer):
     def consume(message: amqp.Message):
         print(f"[TemplateTypeConsumer] - Consuming a message. Body: {message.body}")
         body = JSONParser.parse(message.body)
+
+        try:
+            Project.objects.get(uuid=body.get("project_uuid"))
+        except Exception as err:
+            raise InvalidProjectData(err)
 
         template_type_creation = TemplateTypeCreation(config=body)
         template_type_creation.create()
