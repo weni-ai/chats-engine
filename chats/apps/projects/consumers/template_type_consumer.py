@@ -6,6 +6,8 @@ from chats.apps.event_driven.consumers import EDAConsumer
 from chats.apps.event_driven.parsers.json_parser import JSONParser
 from chats.apps.projects.usecases import TemplateTypeCreation
 
+from chats.apps.projects.models import Project
+
 
 class TemplateTypeConsumer(EDAConsumer):
     @staticmethod
@@ -17,7 +19,8 @@ class TemplateTypeConsumer(EDAConsumer):
         print(f"[TemplateTypeConsumer] - Consuming a message. Body: {message.body}")
         body = JSONParser.parse(message.body)
 
-        template_type_creation = TemplateTypeCreation(config=body)
-        template_type_creation.create()
+        if Project.objects.filter(uuid=body.get("project_uuid")).exists():
+            template_type_creation = TemplateTypeCreation(config=body)
+            template_type_creation.create()
 
-        message.channel.basic_ack(message.delivery_tag)
+            message.channel.basic_ack(message.delivery_tag)
