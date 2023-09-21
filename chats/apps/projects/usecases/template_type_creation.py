@@ -1,5 +1,7 @@
 from chats.apps.projects.models import TemplateType
 from chats.apps.sectors.models import Sector
+from chats.apps.projects.models import Project
+from chats.apps.projects.usecases import InvalidTemplateTypeData
 
 
 class TemplateTypeCreation:
@@ -7,6 +9,11 @@ class TemplateTypeCreation:
         self.config = config
 
     def create(self) -> TemplateType:
+        try:
+            Project.objects.get(uuid=self.config.get("project_uuid"))
+        except Exception as err:
+            raise InvalidTemplateTypeData(err)
+
         setup = {
             "sectors": [
                 sector.template_type_setup
