@@ -17,7 +17,7 @@ class ProjectCreationDTO:
     date_format: str
     timezone: str
     template_type_uuid: str
-    authorizations: dict
+    authorizations: list
 
 
 class ProjectCreationUseCase:
@@ -50,25 +50,27 @@ class ProjectCreationUseCase:
 
         if Project.objects.filter(uuid=project_dto.uuid).exists():
             raise InvalidProjectData(f"The project `{project_dto.uuid}` already exist!")
-        else:
-            project = Project.objects.create(
-                uuid=project_dto.uuid,
-                name=project_dto.name,
-                is_template=project_dto.is_template,
-                date_format=project_dto.date_format,
-                timezone=project_dto.timezone,
+
+        project = Project.objects.create(
+            uuid=project_dto.uuid,
+            name=project_dto.name,
+            is_template=project_dto.is_template,
+            date_format=project_dto.date_format,
+            timezone=project_dto.timezone,
+        )
+
+        creator_permission, _ = ProjectPermission.objects.get_or_create(
+            user=user, project=project, role=1
+        )
+
+        for permission in project_dto.authorizations:
+            permission_user = User.objects.get_or_create(
+                email=permission.get("user_email")
+            )[0]
+            project.permissions.get_or_create(
+                user=permission_user,
+                defaults={"role": 1 if permission.get("role") == 3 else 2},
             )
-
-            for permission in project_dto.authorizations:
-                permission_user = User.objects.get_or_create(
-                    email=permission.get("user_email")
-                )[0]
-                permission = project.permissions.create(
-                    user=permission_user,
-                    role=1 if permission.get("role") == 3 else 2,
-                )
-
-        creator_permission = ProjectPermission.objects.get(user=user, project=project)
 
         if project_dto.is_template:
             self.__sector_setup_handler.setup_sectors_in_project(
