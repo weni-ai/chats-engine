@@ -24,31 +24,30 @@ class ProjectCreationUseCase:
     def __init__(self, sector_setup_handler):
         self.__sector_setup_handler = sector_setup_handler
 
+    def get_or_create_user_by_email(self, email: str) -> tuple:
+        return User.objects.get_or_create(email=email)
+
     def create_project(self, project_dto: ProjectCreationDTO):
         project: Project = None
         template_type: TemplateType = None
-        user: User = None
 
         if project_dto.is_template and project_dto.template_type_uuid is None:
             raise InvalidProjectData(
                 "'template_type_uuid' cannot be empty when 'is_template' is True!"
             )
 
-        try:
-            template_type = TemplateType.objects.get(
-                uuid=project_dto.template_type_uuid
-            )
-        except TemplateType.DoesNotExist:
-            raise InvalidProjectData(
-                f"Template Type with uuid `{project_dto.template_type_uuid}` does not exists!"
-            )
+        if project_dto.is_template:
+            try:
+                template_type = TemplateType.objects.get(
+                    uuid=project_dto.template_type_uuid
+                )
+            except TemplateType.DoesNotExist:
+                raise InvalidProjectData(
+                    f"Template Type with uuid `{project_dto.template_type_uuid}` does not exists!"
+                )
 
-        try:
-            user = User.objects.get(email=project_dto.user_email)
-        except User.DoesNotExist:
-            raise InvalidProjectData(
-                f"User with email `{project_dto.user_email}` does not exist!"
-            )
+        user, _ = self.get_or_create_user_by_email(project_dto.user_email)
+
         if Project.objects.filter(uuid=project_dto.uuid).exists():
             raise InvalidProjectData(f"The project `{project_dto.uuid}` already exist!")
         else:
@@ -69,9 +68,7 @@ class ProjectCreationUseCase:
                     role=1 if permission.get("role") == 3 else 2,
                 )
 
-        creator_permission = ProjectPermission.objects.get(
-            user=project_dto.user_email, project=project
-        )
+        creator_permission = ProjectPermission.objects.get(user=user, project=project)
 
         if project_dto.is_template:
             self.__sector_setup_handler.setup_sectors_in_project(

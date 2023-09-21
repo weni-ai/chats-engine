@@ -17,6 +17,7 @@ class ProjectConsumer(EDAConsumer):
     @pyamqp_call_dlx_when_error(
         default_exchange=settings.CONNECT_DEFAULT_DEAD_LETTER_EXCHANGE,
         routing_key="",
+        consumer_name="ProjectConsumer",
     )
     def consume(message: amqp.Message):
         channel = message.channel

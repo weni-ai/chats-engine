@@ -15,6 +15,7 @@ class TemplateTypeConsumer(EDAConsumer):
     @pyamqp_call_dlx_when_error(
         default_exchange=settings.CONNECT_DEFAULT_DEAD_LETTER_EXCHANGE,
         routing_key="",
+        consumer_name="TemplateTypeConsumer",
     )
     def consume(message: amqp.Message):
         print(f"[TemplateTypeConsumer] - Consuming a message. Body: {message.body}")
