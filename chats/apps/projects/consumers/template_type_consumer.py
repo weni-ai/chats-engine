@@ -20,11 +20,6 @@ class TemplateTypeConsumer(EDAConsumer):
         print(f"[TemplateTypeConsumer] - Consuming a message. Body: {message.body}")
         body = JSONParser.parse(message.body)
 
-        try:
-            Project.objects.get(uuid=body.get("project_uuid"))
-        except Exception as err:
-            raise InvalidProjectData(err)
-
         template_type_creation = TemplateTypeCreation(config=body)
         template_type_creation.create()
 
