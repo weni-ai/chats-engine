@@ -6,8 +6,6 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from chats.apps.api.v1.internal.eda_clients.flows_eda_client import FlowsEDAClient
-
 from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
     ConnectRESTClient,
 )
@@ -75,9 +73,7 @@ class SectorViewset(viewsets.ModelViewSet):
                 "sector_uuid": str(instance.uuid),
             },
         }
-        if settings.USE_EDA:
-            FlowsEDAClient().request_ticketer(content=content)
-            return
+
         if settings.USE_WENI_FLOWS:
             connect = ConnectRESTClient()
             response = connect.create_ticketer(**content)

@@ -4,7 +4,6 @@ from rest_framework import exceptions, filters, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ModelViewSet
 
-from chats.apps.api.v1.internal.eda_clients.flows_eda_client import FlowsEDAClient
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.api.v1.permissions import AnyQueueAgentPermission, IsSectorManager
 from chats.apps.api.v1.queues import serializers as queue_serializers
@@ -57,9 +56,6 @@ class QueueViewset(ModelViewSet):
             "name": instance.name,
             "sector_uuid": str(instance.sector.uuid),
         }
-        if settings.USE_EDA:
-            FlowsEDAClient().request_queue(action="", content=content)
-            return
         if not settings.USE_WENI_FLOWS:
             return super().perform_create(serializer)
         response = FlowRESTClient().create_queue(**content)
@@ -77,9 +73,6 @@ class QueueViewset(ModelViewSet):
             "name": instance.name,
             "sector_uuid": str(instance.sector.uuid),
         }
-        if settings.USE_EDA:
-            FlowsEDAClient().request_queue(action="", content=content)
-            return
 
         if not settings.USE_WENI_FLOWS:
             return super().perform_create(serializer)
@@ -97,9 +90,6 @@ class QueueViewset(ModelViewSet):
             "sector_uuid": str(instance.sector.uuid),
         }
 
-        if settings.USE_EDA:
-            FlowsEDAClient().request_queue(action="", content=content)
-            return super().perform_destroy(instance)
         if not settings.USE_WENI_FLOWS:
             return super().perform_destroy(instance)
 
