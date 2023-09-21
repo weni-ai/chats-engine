@@ -75,9 +75,6 @@ class SectorViewset(viewsets.ModelViewSet):
                 "sector_uuid": str(instance.uuid),
             },
         }
-        if settings.USE_EDA:
-            FlowsEDAClient().request_ticketer(content=content)
-            return
         if settings.USE_WENI_FLOWS:
             connect = ConnectRESTClient()
             response = connect.create_ticketer(**content)

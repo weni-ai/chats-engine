@@ -1,8 +1,7 @@
 import amqp
 from django.conf import settings
 
-from chats.apps.event_driven.consumers import pyamqp_call_dlx_when_error
-from chats.apps.event_driven.consumers import EDAConsumer
+from chats.apps.event_driven.consumers import EDAConsumer, pyamqp_call_dlx_when_error
 from chats.apps.event_driven.parsers.json_parser import JSONParser
 from chats.apps.projects.usecases.project_creation import (
     ProjectCreationDTO,
@@ -32,7 +31,7 @@ class ProjectConsumer(EDAConsumer):
             date_format=body.get("date_format"),
             template_type_uuid=body.get("template_type_uuid"),
             timezone=body.get("timezone"),
-            authorizations=body.get("authorizations"),
+            authorizations=body.get("authorizations", []),
         )
 
         sector_setup_handler = SectorSetupHandlerUseCase()

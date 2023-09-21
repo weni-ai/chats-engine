@@ -3,8 +3,6 @@ from chats.apps.projects.models import Project, ProjectPermission, TemplateType
 from chats.apps.queues.models import QueueAuthorization
 from chats.apps.sectors.models import SectorAuthorization
 
-from .exceptions import InvalidTemplateTypeData
-
 
 class SectorSetupHandlerUseCase:
     def __init__(self):
