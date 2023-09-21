@@ -6,9 +6,6 @@ from chats.apps.event_driven.consumers import EDAConsumer
 from chats.apps.event_driven.parsers.json_parser import JSONParser
 from chats.apps.projects.usecases import TemplateTypeCreation
 
-from chats.apps.projects.models import Project
-from chats.apps.projects.usecases import InvalidProjectData
-
 
 class TemplateTypeConsumer(EDAConsumer):
     @staticmethod
