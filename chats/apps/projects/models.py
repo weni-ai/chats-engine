@@ -64,6 +64,13 @@ class Project(BaseConfigurableModel, BaseModel):
         return self.name
 
     @property
+    def history_contacts_blocklist(self):
+        try:
+            return self.config.get("history_contacts_blocklist")
+        except AttributeError:
+            return None
+
+    @property
     def openai_token(self):
         try:
             return self.config.get("openai_token")
