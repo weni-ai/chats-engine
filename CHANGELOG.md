@@ -1,3 +1,8 @@
+# 2.1.0
+## Add
+  - Checking if project exists in template type creation.
+  - EDA project consumer.
+
 # 2.0.0
 > This CHANGELOG has not been updated since 05/16/2023 so some commits will not appear in this document between version 1.16.4 and 2.0.0. From this version onwards, it will be constantly updated again.
 ## Add
