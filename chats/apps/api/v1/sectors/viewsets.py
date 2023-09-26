@@ -65,17 +65,18 @@ class SectorViewset(viewsets.ModelViewSet):
             raise exceptions.APIException(
                 detail=f"Error when saving the sector. Exception: {str(e)}"  # NOQA
             )
+        content = {
+            "project_uuid": str(instance.project.uuid),
+            "name": instance.name,
+            "config": {
+                "project_auth": str(instance.get_permission(self.request.user).pk),
+                "sector_uuid": str(instance.uuid),
+            },
+        }
 
         if settings.USE_WENI_FLOWS:
             connect = ConnectRESTClient()
-            response = connect.create_ticketer(
-                project_uuid=str(instance.project.uuid),
-                name=instance.name,
-                config={
-                    "project_auth": str(instance.get_permission(self.request.user).pk),
-                    "sector_uuid": str(instance.uuid),
-                },
-            )
+            response = connect.create_ticketer(**content)
             if response.status_code not in [
                 status.HTTP_200_OK,
                 status.HTTP_201_CREATED,

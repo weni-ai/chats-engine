@@ -50,12 +50,15 @@ class QueueViewset(ModelViewSet):
         return super().get_serializer_class()
 
     def perform_create(self, serializer):
+        instance = serializer.save()
+        content = {
+            "uuid": str(instance.uuid),
+            "name": instance.name,
+            "sector_uuid": str(instance.sector.uuid),
+        }
         if not settings.USE_WENI_FLOWS:
             return super().perform_create(serializer)
-        instance = serializer.save()
-        response = FlowRESTClient().create_queue(
-            str(instance.uuid), instance.name, str(instance.sector.uuid)
-        )
+        response = FlowRESTClient().create_queue(**content)
         if response.status_code not in [status.HTTP_200_OK, status.HTTP_201_CREATED]:
             instance.delete()
             raise exceptions.APIException(
@@ -64,13 +67,17 @@ class QueueViewset(ModelViewSet):
         return instance
 
     def perform_update(self, serializer):
+        instance = serializer.save()
+        content = {
+            "uuid": str(instance.uuid),
+            "name": instance.name,
+            "sector_uuid": str(instance.sector.uuid),
+        }
+
         if not settings.USE_WENI_FLOWS:
             return super().perform_create(serializer)
 
-        instance = serializer.save()
-        response = FlowRESTClient().update_queue(
-            str(instance.uuid), instance.name, str(instance.sector.uuid)
-        )
+        response = FlowRESTClient().update_queue(**content)
         if response.status_code not in [status.HTTP_200_OK, status.HTTP_201_CREATED]:
             raise exceptions.APIException(
                 detail=f"[{response.status_code}] Error updating the queue on flows. Exception: {response.content}"
@@ -78,12 +85,15 @@ class QueueViewset(ModelViewSet):
         return instance
 
     def perform_destroy(self, instance):
+        content = {
+            "uuid": str(instance.uuid),
+            "sector_uuid": str(instance.sector.uuid),
+        }
+
         if not settings.USE_WENI_FLOWS:
             return super().perform_destroy(instance)
 
-        response = FlowRESTClient().destroy_queue(
-            str(instance.uuid), str(instance.sector.uuid)
-        )
+        response = FlowRESTClient().destroy_queue(**content)
         if response.status_code not in [
             status.HTTP_200_OK,
             status.HTTP_201_CREATED,

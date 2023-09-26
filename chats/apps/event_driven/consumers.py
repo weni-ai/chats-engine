@@ -8,7 +8,9 @@ from chats.apps.event_driven.backends.pyamqp_backend import basic_publish
 from .signals import message_finished, message_started
 
 
-def pyamqp_call_dlx_when_error(routing_key: str, default_exchange: str):
+def pyamqp_call_dlx_when_error(
+    routing_key: str, default_exchange: str, consumer_name: str
+):
     def decorator(consumer):
         def consumer_wrapper(*args, **kw):
             message = args[0]
@@ -18,7 +20,7 @@ def pyamqp_call_dlx_when_error(routing_key: str, default_exchange: str):
             except Exception as err:
                 capture_exception(err)
                 channel.basic_reject(message.delivery_tag, requeue=False)
-                print(f"[TemplateTypeConsumer] - Message rejected by: {err}")
+                print(f"[{consumer_name}] - Message rejected by: {err}")
                 callback_body = {
                     "original_message": message.body.decode("utf-8"),
                     "error_type": str(type(err)),
