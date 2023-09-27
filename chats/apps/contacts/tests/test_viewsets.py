@@ -37,6 +37,16 @@ class TestContactsViewsets(BaseAPIChatsTestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json().get("count"), 2)
 
+    def test_admin_list_with_blocked_contacts(self):
+        self.project.add_contact_to_history_blocklist(self.contact_2.external_id)
+
+        payload = {"project": str(self.project.uuid)}
+        self.deactivate_rooms()
+        response = self._list_request(token=self.admin_token, data=payload)[0]
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get("count"), self.count_project_1_contact - 1)
+
     def test_retrieve_contact_ok(self):
         """
         Ensure we can retrieve a contact

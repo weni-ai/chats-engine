@@ -62,6 +62,10 @@ class ContactFilter(filters.FilterSet):
             contact_id=OuterRef("uuid"),
         ).order_by("-ended_at")
 
+        contacts_blocklist = user_permission.project.history_contacts_blocklist
+        if contacts_blocklist:
+            qs = qs.exclude(external_id__in=contacts_blocklist)
+
         queryset = (
             qs.annotate(last_ended_at=Subquery(subquery.values("ended_at")[:1]))
             .filter(last_ended_at__isnull=False)
