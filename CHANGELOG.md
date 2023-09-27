@@ -1,3 +1,8 @@
+# 2.2.0
+## Add
+  - Add new field "history_contacts_blocklist" to the project config json field, the contacts added to this list won't be shown on the contacts endpoint(history)
+  - Add a try/except around the send send_channels_group function for it not to return 4xx/5xx responses when there is a problem on the ws notification(the error will still be logged to sentry)
+
 # 2.1.0
 ## Add
   - Checking if project exists in template type creation.
