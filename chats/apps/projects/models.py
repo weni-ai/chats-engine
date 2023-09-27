@@ -66,7 +66,7 @@ class Project(BaseConfigurableModel, BaseModel):
     @property
     def history_contacts_blocklist(self):
         try:
-            return self.config.get("history_contacts_blocklist")
+            return self.config.get("history_contacts_blocklist", [])
         except AttributeError:
             return []
 
