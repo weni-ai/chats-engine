@@ -38,14 +38,7 @@ class TestContactsViewsets(BaseAPIChatsTestCase):
         self.assertEqual(response.json().get("count"), 2)
 
     def test_admin_list_with_blocked_contacts(self):
-        project = self.project
-        config = project.config or {}
-        blocked_list = project.history_contacts_blocklist or []
-        blocked_list.append(self.contact_2.external_id)
-
-        config["history_contacts_blocklist"] = blocked_list
-        project.config = config
-        project.save()
+        self.project.add_contact_to_history_blocklist(self.contact_2.external_id)
 
         payload = {"project": str(self.project.uuid)}
         self.deactivate_rooms()

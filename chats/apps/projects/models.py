@@ -68,7 +68,7 @@ class Project(BaseConfigurableModel, BaseModel):
         try:
             return self.config.get("history_contacts_blocklist")
         except AttributeError:
-            return None
+            return []
 
     @property
     def openai_token(self):
@@ -76,6 +76,14 @@ class Project(BaseConfigurableModel, BaseModel):
             return self.config.get("openai_token")
         except AttributeError:
             return None
+
+    def add_contact_to_history_blocklist(self, contact_external_id: str):
+        config = self.config or {}
+        blocked_list = self.history_contacts_blocklist
+        blocked_list.append(contact_external_id)
+        config["history_contacts_blocklist"] = blocked_list
+        self.config = config
+        self.save()
 
     def get_permission(self, user):
         try:
