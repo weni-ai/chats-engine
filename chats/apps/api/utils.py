@@ -1,3 +1,5 @@
+import uuid
+
 from rest_framework.authtoken.models import Token
 
 from chats.apps.accounts.models import User
@@ -21,5 +23,9 @@ def create_contact(
     name: str, email: str, status: str = "OFFLINE", custom_fields: dict = {}
 ):
     return Contact.objects.create(
-        name=name, email=email, status=status, custom_fields=custom_fields
+        name=name,
+        email=email,
+        status=status,
+        custom_fields=custom_fields,
+        external_id=str(uuid.uuid4()),
     )
