@@ -232,6 +232,8 @@ class Room(BaseModel):
     def notify_user(self, action: str, user=None, transferred_by: str = ""):
         user = user if user else self.user
         permission = self.get_permission(user)
+        if not permission:
+            return
         content = self.serialized_ws_data
         if transferred_by != "":
             content["transferred_by"] = transferred_by
