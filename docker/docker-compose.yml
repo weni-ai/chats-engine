@@ -64,6 +64,46 @@ services:
       - RABBITMQ_DEFAULT_USER=guest
       - RABBITMQ_DEFAULT_PASS=guest
 
+  sentry:
+    image: sentry
+    links:
+      - redis
+      - postgres
+    ports:
+      - 9000:9000
+    environment:
+      SENTRY_SECRET_KEY: 'AL35sCgOQ71DtBU0jTe6Pv5iwlDneqD6'
+      SENTRY_POSTGRES_HOST: postgres
+      SENTRY_DB_USER: chats
+      SENTRY_DB_PASSWORD: chats
+      SENTRY_REDIS_HOST: redis
+
+  cron:
+    image: sentry
+    links:
+      - redis
+      - postgres
+    command: "sentry run cron"
+    environment:
+      SENTRY_SECRET_KEY: 'AL35sCgOQ71DtBU0jTe6Pv5iwlDneqD6'
+      SENTRY_POSTGRES_HOST: postgres
+      SENTRY_DB_USER: chats
+      SENTRY_DB_PASSWORD: chats
+      SENTRY_REDIS_HOST: redis
+
+  worker:
+    image: sentry
+    links:
+      - redis
+      - postgres
+    command: "sentry run worker"
+    environment:
+      SENTRY_SECRET_KEY: 'AL35sCgOQ71DtBU0jTe6Pv5iwlDneqD6'
+      SENTRY_POSTGRES_HOST: postgres
+      SENTRY_DB_USER: chats
+      SENTRY_DB_PASSWORD: chats
+      SENTRY_REDIS_HOST: redis
+
 volumes:
   postgres:
 
