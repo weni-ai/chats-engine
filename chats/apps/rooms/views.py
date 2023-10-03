@@ -1,3 +1,5 @@
+import json
+
 from django.conf import settings
 from django.db import transaction
 from rest_framework import status
@@ -50,3 +52,23 @@ def get_editable_custom_fields_room(room_filter: dict) -> Room:
         )
 
     return room
+
+
+def create_transfer_json(action: str, from_, to):
+    return {
+        "action": action,
+        "from": {"type": from_.type, "name": from_.name},
+        "to": {"type": to.type, "name": to.name},
+    }
+
+
+def create_feedback_json(method: str, content: dict):
+    return {"method": method, "content": content}
+
+
+def create_room_feedback_message(room: object, feedback: dict, method: str):
+    msg = room.messages.create(
+        text=json.dumps(create_feedback_json(method=method, content=feedback)),
+        seen=True,
+    )
+    msg.notify_room("create")

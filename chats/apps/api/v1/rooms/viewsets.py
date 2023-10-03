@@ -26,6 +26,8 @@ from chats.apps.rooms.views import (
     get_editable_custom_fields_room,
     update_custom_fields,
     update_flows_custom_fields,
+    create_transfer_json,
+    create_room_feedback_message,
 )
 
 
@@ -128,7 +130,6 @@ class RoomViewset(
     def perform_update(self, serializer):
         # TODO Separate this into smaller methods
         old_instance = self.get_object()
-        transfer_history = old_instance.transfer_history or []
         old_user = old_instance.user
 
         user = self.request.data.get("user_email")
@@ -154,13 +155,20 @@ class RoomViewset(
                 room_metric.transfer_count += 1
                 room_metric.save()
 
-            transfer_content = {"type": "user", "name": instance.user.full_name}
-            transfer_history.append(transfer_content)
+            action = "transfer" if self.request.user.email != user else "pick"
+            feedback = create_transfer_json(
+                action=action,
+                from_=old_instance.user or old_instance.queue,
+                to=instance.user,
+            )
 
         if queue:
             # Create constraint to make queue not none
-            transfer_content = {"type": "queue", "name": instance.queue.name}
-            transfer_history.append(transfer_content)
+            feedback = create_transfer_json(
+                action="transfer",
+                from_=old_instance.user or old_instance.queue,
+                to=instance.queue,
+            )
             if (
                 not user
             ):  # if it is only a queue transfer from a user, need to reset the user field
@@ -170,12 +178,12 @@ class RoomViewset(
             room_metric.transfer_count += 1
             room_metric.save()
 
-        instance.transfer_history = transfer_history
+        instance.transfer_history = feedback
         instance.save()
 
         # Create a message with the transfer data and Send to the room group
-        msg = instance.messages.create(text=json.dumps(transfer_content), seen=True)
-        msg.notify_room("create")
+        # TODO separate create message in a function
+        create_room_feedback_message(instance, feedback, method="rt")
 
         if old_user is None and user:  # queued > agent
             instance.notify_queue("update")
@@ -242,6 +250,7 @@ class RoomViewset(
         detail=True,
         methods=["PATCH"],
     )
+    # TODO create message for edit custom field in this code above
     def update_custom_fields(self, request, pk=None):
         custom_fields_update = request.data
         data = {"fields": custom_fields_update}
@@ -258,6 +267,10 @@ class RoomViewset(
 
         room = get_editable_custom_fields_room({"uuid": pk, "is_active": "True"})
 
+        custom_field_name = list(data["fields"])[0]
+        old_custom_field_value = room.custom_fields.get(custom_field_name, None)
+        new_custom_field_value = data["fields"][custom_field_name]
+
         update_flows_custom_fields(
             project=room.queue.sector.project,
             data=data,
@@ -265,6 +278,14 @@ class RoomViewset(
         )
 
         update_custom_fields(room, custom_fields_update)
+
+        feedback = {
+            "user": request.user.first_name,
+            "custom_field_name": custom_field_name,
+            "old": old_custom_field_value,
+            "new": new_custom_field_value,
+        }
+        create_room_feedback_message(room, feedback, method="ecf")
 
         return Response(
             {"Detail": "Custom Field edited with success"},
