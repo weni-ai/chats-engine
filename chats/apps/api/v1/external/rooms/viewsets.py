@@ -17,6 +17,8 @@ from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import (
     close_room,
+    create_room_feedback_message,
+    create_transfer_json,
     get_editable_custom_fields_room,
     update_custom_fields,
     update_flows_custom_fields,
@@ -29,6 +31,7 @@ def add_user_or_queue_to_room(instance, request):
     user = request.data.get("user_email")
     queue = request.data.get("queue_uuid")
 
+    # TODO create json to action forward in this code above
     # Create transfer object based on whether it's a user or a queue transfer and add it to the history
     if (user or queue) is None:
         return None
@@ -171,17 +174,19 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
         modified_on = room.modified_on
         room.user = agent_permission.user
 
-        transfer_history = room.transfer_history or []
-
-        transfer_content = {"type": "user", "name": room.user.full_name}
-        transfer_history.append(transfer_content)
+        # TODO create json to action forward in this code above
+        feedback = create_transfer_json(
+            action="forward",
+            from_="",
+            to=room.user,
+        )
+        room.transfer_history = feedback
         room.save()
 
         room.notify_user("update", user=None)
         room.notify_queue("update")
 
-        msg = room.messages.create(text=json.dumps(transfer_content), seen=True)
-        msg.notify_room("create")
+        create_room_feedback_message(room, feedback, method="rt")
 
         time = timezone.now() - modified_on
         room_metric = RoomMetrics.objects.get_or_create(room=room)[0]
@@ -200,6 +205,8 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
     authentication_classes = [ProjectAdminAuthentication]
 
     def partial_update(self, request, pk=None):
+        # TODO create message for edit custom field in this code above
+
         custom_fields_update = request.data
         data = {"fields": custom_fields_update}
 
@@ -221,6 +228,11 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
                 "is_active": "True",
             }
         )
+
+        custom_field_name = list(data["fields"])[0]
+        old_custom_field_value = room.custom_fields.get(custom_field_name, None)
+        new_custom_field_value = data["fields"][custom_field_name]
+
         update_flows_custom_fields(
             project=room.queue.sector.project,
             data=data,
@@ -228,6 +240,15 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
         )
 
         update_custom_fields(room, custom_fields_update)
+
+        feedback = {
+            "user": request_permission.user.first_name,
+            "custom_field_name": custom_field_name,
+            "old": old_custom_field_value,
+            "new": new_custom_field_value,
+        }
+
+        create_room_feedback_message(room, feedback, method="ecf")
 
         return Response(
             {"Detail": "Custom Field edited with success"},
