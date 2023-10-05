@@ -27,7 +27,6 @@ from chats.apps.rooms.views import (
 
 def add_user_or_queue_to_room(instance, request):
     # TODO Separate this into smaller methods
-    new_transfer_history = instance.transfer_history or []
     user = request.data.get("user_email")
     queue = request.data.get("queue_uuid")
 
@@ -37,16 +36,28 @@ def add_user_or_queue_to_room(instance, request):
         return None
 
     if user and instance.user is not None:
-        _content = {"type": "user", "name": instance.user.first_name}
-        new_transfer_history.append(_content)
+        feedback = create_transfer_json(
+            action="forward",
+            from_="",
+            to=instance.user,
+        )
+        # _content = {"type": "user", "name": instance.user.first_name}
+        # new_transfer_history = feedback
     if queue:
-        _content = {"type": "queue", "name": instance.queue.name}
-        new_transfer_history.append(_content)
-    instance.transfer_history = new_transfer_history
+        feedback = create_transfer_json(
+            action="forward",
+            from_="",
+            to=instance.user,
+        )
+        # _content = {"type": "queue", "name": instance.queue.name}
+        # new_transfer_history.append(_content)
+    instance.transfer_history = feedback
     instance.save()
+    create_room_feedback_message(instance, feedback, method="rt")
+
     # Create a message with the transfer data and Send to the room group
-    msg = instance.messages.create(text=json.dumps(_content), seen=True)
-    msg.notify_room("create")
+    # msg = instance.messages.create(text=json.dumps(_content), seen=True)
+    # msg.notify_room("create")
 
     return instance
 
