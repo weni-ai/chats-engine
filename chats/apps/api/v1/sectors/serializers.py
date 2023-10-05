@@ -174,6 +174,12 @@ class DetailSectorTagSerializer(serializers.ModelSerializer):
         ]
 
 
+class TagSimpleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SectorTag
+        fields = ["uuid", "name"]
+
+
 class SectorAgentsSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
