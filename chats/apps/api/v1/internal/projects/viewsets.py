@@ -121,3 +121,18 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
         return Response(
             dict(connection_status=instance.status), status=status.HTTP_200_OK
         )
+
+    def delete(self, request):
+        try:
+            user_permission = ProjectPermission.objects.get(
+                project_id=request.data["project"], user=request.data["user"]
+            )
+            user_permission.delete()
+            return Response(
+                status.HTTP_204_NO_CONTENT,
+            )
+        except Exception as error:
+            return Response(
+                {"error": f"{type(error)}: {error}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
