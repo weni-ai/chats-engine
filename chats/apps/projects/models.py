@@ -312,6 +312,17 @@ class ProjectPermission(
 
         return queues
 
+    @property
+    def queue_ids_increment(self):
+        increment_queue_ids = list(
+            self.project.sectors.filter(config__can_see_historic=True).values_list(
+                "queues__pk", flat=True
+            )
+        )
+        queue_ids_list = list(self.queue_ids)
+
+        return set(queue_ids_list + increment_queue_ids)
+
     def get_permission(self, user):
         try:
             return self.project.get_permission(user=user)

@@ -53,9 +53,7 @@ class ContactFilter(filters.FilterSet):
             raise exceptions.APIException(
                 detail="Access denied! Make sure you have the right permission to access this project"
             )
-
-        queue_ids = user_permission.queue_ids
-
+        queue_ids = user_permission.queue_ids_increment
         subquery = Room.objects.filter(
             Q(queue_id__in=queue_ids) | Q(user=user, queue__sector__project=value),
             is_active=False,
