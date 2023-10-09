@@ -55,7 +55,8 @@ def get_editable_custom_fields_room(room_filter: dict) -> Room:
 
 
 def create_transfer_json(action: str, from_, to):
-    if hasattr(from_, "meta"):
+    print(to)
+    if hasattr(from_, "_meta"):
         return {
             "action": action,
             "from": {"type": from_._meta.model_name, "name": from_.name},
