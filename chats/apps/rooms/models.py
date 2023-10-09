@@ -49,7 +49,7 @@ class Room(BaseModel):
         blank=True,
         null=True,
     )
-    urn = models.CharField(_("urn"), null=True, blank=True, max_length=100, default="")
+    urn = models.TextField(_("urn"), null=True, blank=True, default="")
 
     callback_url = models.TextField(_("Callback URL"), null=True, blank=True)
 
