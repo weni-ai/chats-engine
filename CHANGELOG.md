@@ -1,3 +1,10 @@
+
+# 2.3.0
+## Add
+  - Add delete action on the project permission endpoint
+## Change
+  - Update URN field from charfield to a textfield
+
 # 2.2.0
 ## Add
   - Add new field "history_contacts_blocklist" to the project config json field, the contacts added to this list won't be shown on the contacts endpoint(history)
