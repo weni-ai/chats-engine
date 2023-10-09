@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
@@ -64,12 +65,22 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
 
     @property
     def available_agents(self):
+        routing_option = self.project.routing_option
+        rooms_count_filter = models.Q(rooms__is_active=True)
+
+        if routing_option == "full_context":
+            rooms_count_filter = (
+                models.Q(rooms__ended_at__date__gte=timezone.now().date())
+                | rooms_count_filter
+            )
+
+        rooms_count_filter = models.Q(
+            rooms_count_filter & models.Q(rooms__queue__sector=self.sector)
+        )
         online_agents = self.online_agents.annotate(
             active_rooms_count=models.Count(
                 "rooms",
-                filter=models.Q(
-                    rooms__is_active=True, rooms__queue__sector=self.sector
-                ),
+                filter=rooms_count_filter,
             )
         )
         return online_agents.filter(active_rooms_count__lt=self.limit).order_by(
