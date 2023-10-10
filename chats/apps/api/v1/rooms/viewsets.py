@@ -23,11 +23,11 @@ from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import (
     close_room,
+    create_room_feedback_message,
+    create_transfer_json,
     get_editable_custom_fields_room,
     update_custom_fields,
     update_flows_custom_fields,
-    create_transfer_json,
-    create_room_feedback_message,
 )
 
 
@@ -224,7 +224,7 @@ class RoomViewset(
                 status=status.HTTP_400_BAD_REQUEST,
                 data={"detail": "OpenAI token not found"},
             )
-        messages = room.last_5_messages
+        messages = room.copilot_messages
         if not messages:
             return Response(
                 status=status.HTTP_400_BAD_REQUEST,
