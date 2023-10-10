@@ -272,12 +272,16 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         chats_flow_start = project.flowstarts.create(**flow_start_data)
         self._create_flow_start_instances(data, chats_flow_start)
 
+        print("aqui 01")
         flow_start = FlowRESTClient().start_flow(project, data)
         chats_flow_start.external_id = flow_start.get("uuid")
         chats_flow_start.name = flow_start.get("flow").get("name")
         chats_flow_start.save()
+        print("aqui 02", chats_flow_start.room)
         feedback = {"name": chats_flow_start.name}
+        print("mensagem feedback", feedback)
         if chats_flow_start.room:
+            print("aqui 03")
             room.notify_room("update")
             # TODO create feedback fs feedback
             create_room_feedback_message(room, feedback, method="fs")
