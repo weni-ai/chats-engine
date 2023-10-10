@@ -255,15 +255,20 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
 
         flow_start_data = {"permission": perm, "flow": flow}
         room_id = data.get("room", None)
+        print("sala vindo do front", room_id)
 
         try:
+            print("veio pro try?")
             room = Room.objects.get(pk=room_id, is_active=True)
+            print("sala", room)
             if room.flowstarts.filter(is_deleted=False).exists():
+                print("primeiro if dentro da sala")
                 return Response(
                     {"Detail": "There already is an active flow start for this room"},
                     status.HTTP_400_BAD_REQUEST,
                 )
             if not room.is_24h_valid:
+                print("segundo if dentro da sala")
                 flow_start_data["room"] = room
                 room.request_callback(room.serialized_ws_data)
         except (ObjectDoesNotExist, ValidationError):
