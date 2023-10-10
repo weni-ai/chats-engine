@@ -282,9 +282,9 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         print("mensagem feedback", feedback)
         if chats_flow_start.room:
             print("aqui 03")
+            create_room_feedback_message(room, feedback, method="fs")
             room.notify_room("update")
             # TODO create feedback fs feedback
-            create_room_feedback_message(room, feedback, method="fs")
         return Response(flow_start, status.HTTP_200_OK)
 
 

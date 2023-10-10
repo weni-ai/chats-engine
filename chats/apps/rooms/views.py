@@ -75,10 +75,12 @@ def create_feedback_json(method: str, content: dict):
 
 
 def create_room_feedback_message(room: object, feedback: dict, method: str):
+    print("criacao de msg")
     msg = room.messages.create(
         text=json.dumps(create_feedback_json(method=method, content=feedback)),
         seen=True,
     )
+    print("mensagem criada", msg)
     msg.notify_room("create")
 
 
