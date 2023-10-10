@@ -8,6 +8,7 @@ from rest_framework.exceptions import APIException
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.dashboard.tasks import close_metrics, generate_metrics
 from chats.apps.rooms.models import Room
+from chats.apps.msgs.models import Message
 
 
 def close_room(room_pk: str):
@@ -75,6 +76,14 @@ def create_feedback_json(method: str, content: dict):
 
 def create_room_feedback_message(room: object, feedback: dict, method: str):
     msg = room.messages.create(
+        text=json.dumps(create_feedback_json(method=method, content=feedback)),
+        seen=True,
+    )
+    msg.notify_room("create")
+
+
+def create_feedback_message(feedback: dict, method: str):
+    msg = Message.objects.create(
         text=json.dumps(create_feedback_json(method=method, content=feedback)),
         seen=True,
     )
