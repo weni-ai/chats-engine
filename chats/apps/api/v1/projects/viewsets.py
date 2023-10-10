@@ -277,10 +277,10 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         chats_flow_start.name = flow_start.get("flow").get("name")
         chats_flow_start.save()
         feedback = {"name": chats_flow_start.name}
+        # TODO create feedback fs feedback
+        create_room_feedback_message(room, feedback, method="fs")
         if chats_flow_start.room:
             room.notify_room("update")
-            # TODO create feedback fs feedback
-            create_room_feedback_message(room, feedback, method="fs")
         return Response(flow_start, status.HTTP_200_OK)
 
 
