@@ -56,7 +56,7 @@ def dashboard_general_data(context: dict, project):
         rooms_filter["queue__sector"] = context.get("sector")
         # rooms_query = Room.objects
         if context.get("tag"):
-            rooms_filter["tags__name"] = context.get("tag")
+            rooms_filter["tags__uuid"] = context.get("tag")
     else:
         rooms_filter["queue__sector__project"] = project
 
@@ -137,7 +137,7 @@ def dashboard_agents_data(context, project):
     if context.get("sector"):
         rooms_filter["rooms__queue__sector"] = context.get("sector")
         if context.get("tag"):
-            rooms_filter["rooms__tags__name"] = context.get("tag")
+            rooms_filter["rooms__tags__uuid"] = context.get("tag")
 
     project_permission_subquery = ProjectPermission.objects.filter(
         project_id=project,
@@ -181,7 +181,7 @@ def dashboard_division_data(context, project=None):
         division_level = "room__queue"
         rooms_filter["room__queue__sector"] = context.get("sector")
         if context.get("tag"):
-            rooms_filter["room__tags__name"] = context.get("tag")
+            rooms_filter["room__tags__uuid"] = context.get("tag")
     else:
         rooms_filter["room__queue__sector__project"] = project
     rooms_filter["room__user__isnull"] = False
@@ -255,7 +255,7 @@ class DashboardRawDataSerializer(serializers.ModelSerializer):
         if self.context.get("sector"):
             rooms_filter["queue__sector"] = self.context.get("sector")
             if self.context.get("tag"):
-                rooms_filter["tags__name"] = self.context.get("tag")
+                rooms_filter["tags__uuid"] = self.context.get("tag")
             if self.context.get("queue"):
                 rooms_filter["queue"] = self.context.get("queue")
         else:
@@ -306,7 +306,7 @@ class DashboardRawDataSerializer(serializers.ModelSerializer):
         if self.context.get("sector"):
             rooms_filter["queue__sector"] = self.context.get("sector")
             if self.context.get("tag"):
-                rooms_filter["tags__name"] = self.context.get("tag")
+                rooms_filter["tags__uuid"] = self.context.get("tag")
         else:
             rooms_filter["queue__sector__project"] = project
 
