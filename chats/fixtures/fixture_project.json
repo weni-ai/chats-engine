@@ -1,0 +1,74 @@
+[
+    {
+        "model": "projects.project",
+        "pk": "c599ecd2-8536-49f5-93f9-3c4fa09c22f9",
+        "fields": {
+            "created_on": "2022-08-24T19:22:15.781Z",
+            "modified_on": "2022-08-24T19:22:15.781Z",
+            "name": "General routing",
+            "timezone": "America/Sao_Paulo",
+            "date_format": "D",
+            "config": {
+                "routing_option": "general"
+            }
+        }
+    },
+    {
+        "model": "projects.projectpermission",
+        "pk": "6ea2e553-a7c1-428d-ab8e-45cbd99c309d",
+        "fields": {
+            "created_on": "2022-08-24T20:27:42.814Z",
+            "modified_on": "2022-08-24T20:27:42.815Z",
+            "project": "c599ecd2-8536-49f5-93f9-3c4fa09c22f9",
+            "user": "agentqueue@chats.weni.ai",
+            "role": 1
+        }
+    },
+    {
+        "model": "projects.projectpermission",
+        "pk": "334549ea-3c8e-4a23-94cb-3cb0a28cbb28",
+        "fields": {
+            "created_on": "2022-08-24T20:25:54.375Z",
+            "modified_on": "2022-08-24T20:25:54.375Z",
+            "project": "c599ecd2-8536-49f5-93f9-3c4fa09c22f9",
+            "user": "johndoe@chats.weni.ai",
+            "role": 2
+        }
+    },
+    {
+        "model": "projects.projectpermission",
+        "pk": "e1d1cdb4-2a54-4bc8-8d63-6c680ffe589e",
+        "fields": {
+            "created_on": "2022-08-24T20:25:36.278Z",
+            "modified_on": "2022-08-24T20:25:36.278Z",
+            "project": "c599ecd2-8536-49f5-93f9-3c4fa09c22f9",
+            "user": "foobar@chats.weni.ai",
+            "role": 2
+        }
+    },
+    {
+        "model": "sectors.sector",
+        "pk": "86792083-021d-4e89-b91f-b367d2948aa1",
+        "fields": {
+            "created_on": "2022-08-24T20:59:49.115Z",
+            "modified_on": "2022-08-24T20:59:49.115Z",
+            "name": "Limited sector",
+            "project": "c599ecd2-8536-49f5-93f9-3c4fa09c22f9",
+            "rooms_limit": 3,
+            "open_offline": false,
+            "work_start": "08:00:00",
+            "work_end": "17:00:00",
+            "is_deleted": false
+        }
+    },
+    {
+        "model": "queues.queue",
+        "pk": "30a237dd-bbff-42ea-ae4a-78675da12529",
+        "fields": {
+            "created_on": "2022-08-24T21:40:15.274Z",
+            "modified_on": "2022-08-24T21:40:15.274Z",
+            "sector": "86792083-021d-4e89-b91f-b367d2948aa1",
+            "name": "New routing queue"
+        }
+    }
+]

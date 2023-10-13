@@ -68,7 +68,7 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         routing_option = self.project.routing_option
         rooms_count_filter = models.Q(rooms__is_active=True)
 
-        if routing_option == "full_context":
+        if routing_option == "general":
             rooms_count_filter = (
                 models.Q(rooms__ended_at__date__gte=timezone.now().date())
                 | rooms_count_filter
