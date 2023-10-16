@@ -313,6 +313,7 @@ class SectorTag(BaseModel):
     class Meta:
         verbose_name = _("Sector Tag")
         verbose_name_plural = _("Sector Tags")
+        ordering = ["name"]
 
         constraints = [
             models.UniqueConstraint(fields=["sector", "name"], name="unique_tag_name")
