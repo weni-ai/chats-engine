@@ -64,6 +64,13 @@ class Project(BaseConfigurableModel, BaseModel):
         return self.name
 
     @property
+    def routing_option(self):
+        try:
+            return self.config.get("routing_option", None)
+        except AttributeError:
+            return None
+
+    @property
     def history_contacts_blocklist(self):
         try:
             return self.config.get("history_contacts_blocklist", [])
