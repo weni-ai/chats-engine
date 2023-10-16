@@ -45,9 +45,9 @@ class SectorQuickMessageViewset(viewsets.ModelViewSet):
             try:
                 project = self.request.GET.get("project")
                 perm = self.request.user.project_permissions.get(project=project)
-            except (AttributeError, ObjectDoesNotExist):
+            except Exception as error:
                 raise exceptions.APIException(
-                    detail="You don't have permission to access this project"
+                    detail=f"You don't have permission to access this project. {type(error)}: {error}"
                 )
             sectors = perm.get_sectors()
             return QuickMessage.objects.all().filter(
