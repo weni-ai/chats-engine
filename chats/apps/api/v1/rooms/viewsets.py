@@ -216,7 +216,7 @@ class RoomViewset(
                 status=status.HTTP_400_BAD_REQUEST,
                 data={"detail": "OpenAI token not found"},
             )
-        messages = room.last_5_messages
+        messages = room.copilot_messages
         if not messages:
             return Response(
                 status=status.HTTP_400_BAD_REQUEST,

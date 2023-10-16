@@ -78,6 +78,13 @@ class Project(BaseConfigurableModel, BaseModel):
             return []
 
     @property
+    def copilot_message_limit(self):
+        try:
+            return self.config.get("copilot_message_limit", 0)
+        except AttributeError:
+            return 0
+
+    @property
     def openai_token(self):
         try:
             return self.config.get("openai_token")

@@ -140,11 +140,12 @@ class Room(BaseModel):
         return RoomSerializer(self).data
 
     @property
-    def last_5_messages(self):
+    def copilot_messages(self):
+        limit = self.queue.sector.project.copilot_message_limit or 5
         return (
             self.messages.exclude(text="")
             .exclude(user__isnull=True, contact__isnull=True)
-            .order_by("-created_on")[:5]
+            .order_by("-created_on")[:limit]
         )
 
     def close(self, tags: list = [], end_by: str = ""):
