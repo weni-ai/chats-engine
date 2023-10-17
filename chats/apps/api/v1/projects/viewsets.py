@@ -296,17 +296,13 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
             )
 
         try:
-            room_contact = Room.objects.get(
+            Room.objects.get(
                 contact=contact, queue__sector__project=project, is_active=True
             )
-        except:
+        except ObjectDoesNotExist:
             return Response(flows_start_verify, status.HTTP_200_OK)
 
-        if room_contact.is_24h_valid:
-            flows_start_verify["show_warning"] = True
-
-            return Response(flows_start_verify, status.HTTP_200_OK)
-
+        flows_start_verify["show_warning"] = True
         return Response(flows_start_verify, status.HTTP_200_OK)
 
 
