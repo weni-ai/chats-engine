@@ -67,7 +67,7 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
 
     def put(
         self, request, *args, **kwargs
-    ):  # TODO: GAMBIARRA ALERT! MOVE THIS LOGIC TO THE SERIALIZER
+    ):  # TODO: GAMBIARRA ALERT! MOVE THIS LOGIC TO THE SERIALIZER or somewhere else
         qs = self.queryset
         try:
             user_email = request.data["user"]
@@ -86,6 +86,11 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
                     "Detail": "The correct required fields are: user(str), role(int) and project(str)"
                 },
                 status.HTTP_400_BAD_REQUEST,
+            )
+        except Project.DoesNotExist:
+            return Response(
+                {"Detail": f"The project {request.data['project']} does not exist yet"},
+                status.HTTP_404_NOT_FOUND,
             )
         return Response({"Detail": "Updated"}, status.HTTP_200_OK)
 

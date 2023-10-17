@@ -60,3 +60,4 @@ class ProjectFlowStartSerializer(serializers.Serializer):
         default="",
         trim_whitespace=True,
     )
+    params = serializers.JSONField(required=False)
