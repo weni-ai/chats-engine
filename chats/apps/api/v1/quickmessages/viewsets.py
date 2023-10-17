@@ -1,4 +1,4 @@
-from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
+from django.core.exceptions import PermissionDenied
 from rest_framework import exceptions, viewsets
 from rest_framework.permissions import IsAuthenticated
 
