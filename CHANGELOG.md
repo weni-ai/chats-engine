@@ -1,4 +1,11 @@
 
+
+# 2.3.1
+## Add
+  - Add retrieve_flow_warning action on the project endpoint to check if a start flow contact have a room.
+## Change
+  - Update dashboard tag filter to verify the uuid instead of the name.
+
 # 2.3.0
 ## Add
   - Add delete action on the project permission endpoint
