@@ -401,3 +401,8 @@ if USE_EDA:
     DEFAULT_DEAD_LETTER_EXCHANGE = env(
         "DEFAULT_DEAD_LETTER_EXCHANGE", default="chats.dlx.topic"
     )
+
+# Websockets
+
+WS_MESSAGE_RETRIES = env.int("WS_MESSAGE_RETRIES", default=5)
+WEBSOCKET_RETRY_SLEEP = env.int("WEBSOCKET_RETRY_SLEEP", default=0.5)
