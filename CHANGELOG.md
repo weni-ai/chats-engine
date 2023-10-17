@@ -1,4 +1,7 @@
-
+# 2.4.0
+## Change
+  - Order tags by name.
+  - Add a recursive retry on the ws message send
 
 # 2.3.1
 ## Add
