@@ -279,6 +279,32 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
             room.notify_room("update")
         return Response(flow_start, status.HTTP_200_OK)
 
+    @action(detail=False, methods=["GET"], url_name="verify-flow-start")
+    def retrieve_flow_warning(self, request, *args, **kwargs):
+        flows_start_verify = {}
+        flows_start_verify["show_warning"] = False
+
+        try:
+            project = Project.objects.get(uuid=request.query_params.get("project"))
+            contact = Contact.objects.get(
+                uuid=request.query_params.get("contact"),
+            )
+        except Exception as error:
+            return Response(
+                {"error": f"{type(error)}: {error}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            Room.objects.get(
+                contact=contact, queue__sector__project=project, is_active=True
+            )
+        except ObjectDoesNotExist:
+            return Response(flows_start_verify, status.HTTP_200_OK)
+
+        flows_start_verify["show_warning"] = True
+        return Response(flows_start_verify, status.HTTP_200_OK)
+
 
 class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
     queryset = ProjectPermission.objects.all()
