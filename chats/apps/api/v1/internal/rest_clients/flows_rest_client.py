@@ -195,6 +195,23 @@ class FlowRESTClient(
         flows = response.json()
         return flows
 
+    def retrieve_flow_template_variables(self, project, flow_uuid):
+        definition = self.retrieve_flow_definitions(project, flow_uuid)
+        nodes = definition["flows"]["nodes"]
+        # template_vars = search_dict_list(d_list = template_vars, field_exists="templating")
+        # Separar codigo de busca na lista de dicionarios da logica do metodo
+        return definition
+
+    def retrieve_flow_template(self, project, template_uuid):
+        response = retry_request_and_refresh_flows_auth_token(
+            project=project,
+            request_method=requests.get,
+            headers=self.project_headers(project.flows_authorization),
+            url=f"{self.base_url}/api/v2/templates.json?uuid={template_uuid}",
+        )
+        flows = response.json()
+        return flows
+
     def start_flow(self, project, data):
         response = retry_request_and_refresh_flows_auth_token(
             project=project,
