@@ -14,6 +14,7 @@ from chats.apps.accounts.authentication.drf.authorization import (
 from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.external.rooms.serializers import RoomFlowSerializer
 from chats.apps.dashboard.models import RoomMetrics
+from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import (
     close_room,
@@ -44,10 +45,11 @@ def add_user_or_queue_to_room(instance, request):
         # _content = {"type": "user", "name": instance.user.first_name}
         # new_transfer_history = feedback
     if queue:
+        feedback_queue = Queue.objects.get(uuid=queue)
         feedback = create_transfer_json(
             action="forward",
             from_="",
-            to=instance.queue,
+            to=feedback_queue,
         )
         # _content = {"type": "queue", "name": instance.queue.name}
         # new_transfer_history.append(_content)
