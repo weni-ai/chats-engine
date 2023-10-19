@@ -47,7 +47,7 @@ def add_user_or_queue_to_room(instance, request):
         feedback = create_transfer_json(
             action="forward",
             from_="",
-            to=instance.user,
+            to=instance.queue,
         )
         # _content = {"type": "queue", "name": instance.queue.name}
         # new_transfer_history.append(_content)
