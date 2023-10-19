@@ -1,5 +1,3 @@
-import json
-
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import IntegrityError
@@ -17,6 +15,8 @@ from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import (
     close_room,
+    create_room_feedback_message,
+    create_transfer_json,
     get_editable_custom_fields_room,
     update_custom_fields,
     update_flows_custom_fields,
@@ -25,7 +25,6 @@ from chats.apps.rooms.views import (
 
 def add_user_or_queue_to_room(instance, request):
     # TODO Separate this into smaller methods
-    new_transfer_history = instance.transfer_history or []
     user = request.data.get("user_email")
     queue = request.data.get("queue_uuid")
 
@@ -34,16 +33,21 @@ def add_user_or_queue_to_room(instance, request):
         return None
 
     if user and instance.user is not None:
-        _content = {"type": "user", "name": instance.user.first_name}
-        new_transfer_history.append(_content)
+        feedback = create_transfer_json(
+            action="forward",
+            from_="",
+            to=instance.user,
+        )
     if queue:
-        _content = {"type": "queue", "name": instance.queue.name}
-        new_transfer_history.append(_content)
-    instance.transfer_history = new_transfer_history
+        feedback = create_transfer_json(
+            action="forward",
+            from_="",
+            to=instance.queue,
+        )
+    instance.transfer_history = feedback
     instance.save()
     # Create a message with the transfer data and Send to the room group
-    msg = instance.messages.create(text=json.dumps(_content), seen=True)
-    msg.notify_room("create")
+    create_room_feedback_message(instance, feedback, method="rt")
 
     return instance
 
@@ -171,17 +175,18 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
         modified_on = room.modified_on
         room.user = agent_permission.user
 
-        transfer_history = room.transfer_history or []
-
-        transfer_content = {"type": "user", "name": room.user.full_name}
-        transfer_history.append(transfer_content)
+        feedback = create_transfer_json(
+            action="forward",
+            from_="",
+            to=room.user,
+        )
+        room.transfer_history = feedback
         room.save()
 
         room.notify_user("update", user=None)
         room.notify_queue("update")
 
-        msg = room.messages.create(text=json.dumps(transfer_content), seen=True)
-        msg.notify_room("create")
+        create_room_feedback_message(room, feedback, method="rt")
 
         time = timezone.now() - modified_on
         room_metric = RoomMetrics.objects.get_or_create(room=room)[0]
@@ -221,6 +226,11 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
                 "is_active": "True",
             }
         )
+
+        custom_field_name = list(data["fields"])[0]
+        old_custom_field_value = room.custom_fields.get(custom_field_name, None)
+        new_custom_field_value = data["fields"][custom_field_name]
+
         update_flows_custom_fields(
             project=room.queue.sector.project,
             data=data,
@@ -228,6 +238,15 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
         )
 
         update_custom_fields(room, custom_fields_update)
+
+        feedback = {
+            "user": request_permission.user.first_name,
+            "custom_field_name": custom_field_name,
+            "old": old_custom_field_value,
+            "new": new_custom_field_value,
+        }
+
+        create_room_feedback_message(room, feedback, method="ecf")
 
         return Response(
             {"Detail": "Custom Field edited with success"},

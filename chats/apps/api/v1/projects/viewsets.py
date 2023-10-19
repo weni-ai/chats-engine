@@ -30,6 +30,7 @@ from chats.apps.projects.models import (
     ProjectPermission,
 )
 from chats.apps.rooms.models import Room
+from chats.apps.rooms.views import create_room_feedback_message
 
 
 class ProjectViewset(viewsets.ReadOnlyModelViewSet):
@@ -275,7 +276,9 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         chats_flow_start.external_id = flow_start.get("uuid")
         chats_flow_start.name = flow_start.get("flow").get("name")
         chats_flow_start.save()
+        feedback = {"name": chats_flow_start.name}
         if chats_flow_start.room:
+            create_room_feedback_message(room, feedback, method="fs")
             room.notify_room("update")
         return Response(flow_start, status.HTTP_200_OK)
 
