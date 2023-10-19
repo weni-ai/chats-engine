@@ -1,3 +1,9 @@
+# 2.4.2
+## Add
+  - New feedback messages.
+## Change
+  - Verify contact via external id on the flowstart validation.
+
 # 2.4.1
 ## Change
   - Add a recursive retry on the ws message send
