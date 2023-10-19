@@ -1,5 +1,3 @@
-import json
-
 from django.conf import settings
 from django.db.models import Max
 from django.utils import timezone
@@ -250,7 +248,6 @@ class RoomViewset(
         detail=True,
         methods=["PATCH"],
     )
-    # TODO create message for edit custom field in this code above
     def update_custom_fields(self, request, pk=None):
         custom_fields_update = request.data
         data = {"fields": custom_fields_update}

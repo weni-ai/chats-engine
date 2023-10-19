@@ -1,5 +1,3 @@
-import json
-
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import IntegrityError
@@ -15,7 +13,6 @@ from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.external.rooms.serializers import RoomFlowSerializer
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.rooms.models import Room
-from chats.apps.queues.models import Queue
 from chats.apps.rooms.views import (
     close_room,
     create_room_feedback_message,
@@ -31,7 +28,6 @@ def add_user_or_queue_to_room(instance, request):
     user = request.data.get("user_email")
     queue = request.data.get("queue_uuid")
 
-    # TODO create json to action forward in this code above
     # Create transfer object based on whether it's a user or a queue transfer and add it to the history
     if (user or queue) is None:
         return None
@@ -45,11 +41,10 @@ def add_user_or_queue_to_room(instance, request):
         # _content = {"type": "user", "name": instance.user.first_name}
         # new_transfer_history = feedback
     if queue:
-        queue_instance = Queue.objects.get(uuid=queue)
         feedback = create_transfer_json(
             action="forward",
             from_="",
-            to=queue_instance,
+            to=instance.queue,
         )
         # _content = {"type": "queue", "name": instance.queue.name}
         # new_transfer_history.append(_content)
@@ -187,7 +182,6 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
         modified_on = room.modified_on
         room.user = agent_permission.user
 
-        # TODO create json to action forward in this code above
         feedback = create_transfer_json(
             action="forward",
             from_="",
@@ -218,8 +212,6 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
     authentication_classes = [ProjectAdminAuthentication]
 
     def partial_update(self, request, pk=None):
-        # TODO create message for edit custom field in this code above
-
         custom_fields_update = request.data
         data = {"fields": custom_fields_update}
 
