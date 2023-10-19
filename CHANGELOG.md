@@ -1,3 +1,7 @@
+# 2.5.0
+## Add
+  - New endpoint to return rooms for the history.
+
 # 2.4.2
 ## Add
   - New feedback messages.
