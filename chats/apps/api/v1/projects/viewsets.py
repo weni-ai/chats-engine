@@ -302,11 +302,7 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         try:
             project = Project.objects.get(uuid=request.query_params.get("project"))
             contact = Contact.objects.get(
-<<<<<<< HEAD
-                external_id=request.query_params.get("contact")
-=======
                 external_id=request.query_params.get("contact"),
->>>>>>> 4dfd11dfe888c1d2412406be1c286e3683ec2e52
             )
         except Exception as error:
             return Response(
