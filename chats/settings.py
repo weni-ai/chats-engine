@@ -406,3 +406,4 @@ if USE_EDA:
 # Websockets
 
 WS_MESSAGE_RETRIES = env.int("WS_MESSAGE_RETRIES", default=5)
+WEBSOCKET_RETRY_SLEEP = env.int("WEBSOCKET_RETRY_SLEEP", default=0.5)

@@ -1,5 +1,3 @@
-import json
-
 from django.conf import settings
 from django.db.models import Max
 from django.utils import timezone

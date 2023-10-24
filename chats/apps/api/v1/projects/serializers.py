@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from timezone_field.rest_framework import TimeZoneSerializerField
 
-from chats.apps.projects.models import LinkContact, Project
+from chats.apps.projects.models import FlowStart, LinkContact, Project
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -60,3 +60,20 @@ class ProjectFlowStartSerializer(serializers.Serializer):
         default="",
         trim_whitespace=True,
     )
+    params = serializers.JSONField(required=False)
+    contact_name = serializers.CharField()
+
+
+class ListFlowStartSerializer(serializers.ModelSerializer):
+    print("veio pro serializer")
+    user = serializers.SerializerMethodField()
+
+    class Meta:
+        model = FlowStart
+        fields = ["contact_data", "name", "user", "created_on", "room"]
+
+    def get_user(self, flow_start: FlowStart) -> str:
+        try:
+            return flow_start.permission.user.full_name
+        except AttributeError:
+            return ""

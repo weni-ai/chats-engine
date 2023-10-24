@@ -1,4 +1,5 @@
 import json
+import time
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
@@ -29,6 +30,7 @@ def send_channels_group(
         )
     except Exception as err:
         if retry > 0:
+            time.sleep(settings.WEBSOCKET_RETRY_SLEEP)
             return send_channels_group(
                 group_name, call_type, content, action, retry - 1
             )

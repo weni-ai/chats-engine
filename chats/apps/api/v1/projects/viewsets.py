@@ -19,6 +19,7 @@ from chats.apps.api.v1.permissions import (
 )
 from chats.apps.api.v1.projects.serializers import (
     LinkContactSerializer,
+    ListFlowStartSerializer,
     ProjectFlowContactSerializer,
     ProjectFlowStartSerializer,
     ProjectSerializer,
@@ -211,6 +212,7 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         return Response(flow_definitions, status.HTTP_200_OK)
 
     def _create_flow_start_instances(self, data, flow_start):
+        # TODO: aqui vou passar o contact_Data, e criar a referencia para o contato especifico.
         groups = data.get("groups", [])
         contacts = data.get("contacts", [])
         instances = []
@@ -252,8 +254,15 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
                 {"Detail": "the user does not have permission in this project"},
                 status.HTTP_401_UNAUTHORIZED,
             )
-
-        flow_start_data = {"permission": perm, "flow": flow}
+        # TODO: passar novo field do contact_data aqui
+        flow_start_data = {
+            "permission": perm,
+            "flow": flow,
+            "contact_data": {
+                "name": data.pop("contact_name"),
+                "external_id": data.get("contacts")[0],
+            },
+        }
         room_id = data.get("room", None)
 
         try:
@@ -272,12 +281,14 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         chats_flow_start = project.flowstarts.create(**flow_start_data)
         self._create_flow_start_instances(data, chats_flow_start)
 
+        # TODO: passar um valor chamado contacts = ["22-33-44"]
         flow_start = FlowRESTClient().start_flow(project, data)
         chats_flow_start.external_id = flow_start.get("uuid")
         chats_flow_start.name = flow_start.get("flow").get("name")
         chats_flow_start.save()
         feedback = {"name": chats_flow_start.name}
         if chats_flow_start.room:
+            create_room_feedback_message(room, feedback, method="fs")
             room.notify_room("update")
             # TODO create feedback fs feedback
             create_room_feedback_message(room, feedback, method="fs")
@@ -291,7 +302,11 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         try:
             project = Project.objects.get(uuid=request.query_params.get("project"))
             contact = Contact.objects.get(
+<<<<<<< HEAD
                 external_id=request.query_params.get("contact")
+=======
+                external_id=request.query_params.get("contact"),
+>>>>>>> 4dfd11dfe888c1d2412406be1c286e3683ec2e52
             )
         except Exception as error:
             return Response(
@@ -308,6 +323,19 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
 
         flows_start_verify["show_warning"] = True
         return Response(flows_start_verify, status.HTTP_200_OK)
+
+    @action(detail=True, methods=["GET"], url_name="list-flows-start")
+    def list_flows_start(self, request, *args, **kwargs):
+        project = self.get_object()
+        permission = project.permissions.get(user=request.user)
+        flow_starts_query = project.flowstarts.all()
+
+        if not permission.is_admin:
+            flow_starts_query = flow_starts_query.filter(permission=permission)
+
+        flow_starts_data = ListFlowStartSerializer(flow_starts_query, many=True).data
+
+        return Response(flow_starts_data, status.HTTP_200_OK)
 
 
 class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):

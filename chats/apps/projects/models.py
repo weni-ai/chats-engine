@@ -422,6 +422,7 @@ class FlowStart(BaseModel):
         blank=True,
     )
     is_deleted = models.BooleanField(_("is deleted?"), default=False)
+    contact_data = models.JSONField(_("contact data"), default=dict)
 
     class Meta:
         verbose_name = _("Flow Start")

@@ -1,5 +1,3 @@
-import json
-
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import IntegrityError
@@ -42,23 +40,18 @@ def add_user_or_queue_to_room(instance, request):
             from_="",
             to=instance.user,
         )
-        # _content = {"type": "user", "name": instance.user.first_name}
-        # new_transfer_history = feedback
     if queue:
         feedback = create_transfer_json(
             action="forward",
             from_="",
             to=instance.queue,
         )
-        # _content = {"type": "queue", "name": instance.queue.name}
-        # new_transfer_history.append(_content)
     instance.transfer_history = feedback
     instance.save()
     create_room_feedback_message(instance, feedback, method="rt")
 
     # Create a message with the transfer data and Send to the room group
-    # msg = instance.messages.create(text=json.dumps(_content), seen=True)
-    # msg.notify_room("create")
+    create_room_feedback_message(instance, feedback, method="rt")
 
     return instance
 
@@ -186,7 +179,6 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
         modified_on = room.modified_on
         room.user = agent_permission.user
 
-        # TODO create json to action forward in this code above
         feedback = create_transfer_json(
             action="forward",
             from_="",

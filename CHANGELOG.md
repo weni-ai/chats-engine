@@ -1,3 +1,26 @@
+# 2.5.0
+## Add
+  - New endpoint to return rooms for the history.
+
+# 2.4.2
+## Add
+  - New feedback messages.
+## Change
+  - Verify contact via external id on the flowstart validation.
+
+# 2.4.1
+## Change
+  - Add a recursive retry on the ws message send
+
+# 2.4.0
+## Change
+  - Order tags by name.
+
+# 2.3.1
+## Add
+  - Add retrieve_flow_warning action on the project endpoint to check if a start flow contact have a room.
+## Change
+  - Update dashboard tag filter to verify the uuid instead of the name.
 
 # 2.3.0
 ## Add
