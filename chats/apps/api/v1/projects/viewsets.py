@@ -216,7 +216,6 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         return Response(flow_definitions, status.HTTP_200_OK)
 
     def _create_flow_start_instances(self, data, flow_start):
-        # TODO: aqui vou passar o contact_Data, e criar a referencia para o contato especifico.
         groups = data.get("groups", [])
         contacts = data.get("contacts", [])
         instances = []
@@ -258,7 +257,6 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
                 {"Detail": "the user does not have permission in this project"},
                 status.HTTP_401_UNAUTHORIZED,
             )
-        # TODO: passar novo field do contact_data aqui
         flow_start_data = {
             "permission": perm,
             "flow": flow,
