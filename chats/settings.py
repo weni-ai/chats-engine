@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     "chats.apps.dashboard",
     "chats.apps.event_driven",
     "chats.apps.history",
+    "chats.apps.discussions",
     "chats.core",
     # third party apps
     "channels",
