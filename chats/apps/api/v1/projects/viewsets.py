@@ -33,6 +33,10 @@ from chats.apps.projects.models import (
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import create_room_feedback_message
 
+from chats.apps.api.v1.projects.pagination import CustomPagination
+
+from chats.apps.api.v1.projects.filters import FlowStartFilter
+
 
 class ProjectViewset(viewsets.ReadOnlyModelViewSet):
     queryset = Project.objects.all()
@@ -318,18 +322,31 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         flows_start_verify["show_warning"] = True
         return Response(flows_start_verify, status.HTTP_200_OK)
 
-    @action(detail=True, methods=["GET"], url_name="list-flows-start")
+    @action(
+        detail=True,
+        methods=["GET"],
+        url_name="list-flows-start",
+    )
     def list_flows_start(self, request, *args, **kwargs):
         project = self.get_object()
         permission = project.permissions.get(user=request.user)
-        flow_starts_query = project.flowstarts.all()
+        flow_starts_query = project.flowstarts.all().order_by("created_on")
+        filtro = FlowStartFilter(request.GET, queryset=flow_starts_query)
+
+        queryset = filtro.qs
 
         if not permission.is_admin:
-            flow_starts_query = flow_starts_query.filter(permission=permission)
+            queryset = queryset.filter(permission=permission)
 
-        flow_starts_data = ListFlowStartSerializer(flow_starts_query, many=True).data
+        paginator = CustomPagination()
+        flow_starts_queryset_paginated = paginator.paginate_queryset(queryset, request)
 
-        return Response(flow_starts_data, status.HTTP_200_OK)
+        flow_starts_data = ListFlowStartSerializer(
+            flow_starts_queryset_paginated, many=True
+        ).data
+
+        paginated_response = paginator.get_paginated_response(flow_starts_data)
+        return Response(paginated_response, status=status.HTTP_200_OK)
 
 
 class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):

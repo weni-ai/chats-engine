@@ -65,7 +65,6 @@ class ProjectFlowStartSerializer(serializers.Serializer):
 
 
 class ListFlowStartSerializer(serializers.ModelSerializer):
-    print("veio pro serializer")
     user = serializers.SerializerMethodField()
 
     class Meta:
