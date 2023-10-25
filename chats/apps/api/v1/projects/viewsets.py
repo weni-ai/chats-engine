@@ -283,7 +283,6 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         chats_flow_start = project.flowstarts.create(**flow_start_data)
         self._create_flow_start_instances(data, chats_flow_start)
 
-        # TODO: passar um valor chamado contacts = ["22-33-44"]
         flow_start = FlowRESTClient().start_flow(project, data)
         chats_flow_start.external_id = flow_start.get("uuid")
         chats_flow_start.name = flow_start.get("flow").get("name")
