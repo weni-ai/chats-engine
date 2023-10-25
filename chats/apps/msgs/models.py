@@ -104,11 +104,21 @@ class Message(BaseModel):
 
 
 class MessageMedia(BaseModel):
+    discussion_message = models.ForeignKey(
+        "discussions.DiscussionMessage",
+        related_name="medias",
+        verbose_name=_("discussion message"),
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+    )
     message = models.ForeignKey(
         Message,
         related_name="medias",
         verbose_name=_("message"),
         on_delete=models.CASCADE,
+        blank=True,
+        null=True,
     )
     content_type = models.CharField(_("Content Type"), max_length=300)
     media_file = models.FileField(
