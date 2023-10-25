@@ -33,7 +33,7 @@ from chats.apps.projects.models import (
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import create_room_feedback_message
 
-from chats.apps.api.v1.projects.pagination import CustomPagination
+from rest_framework.pagination import LimitOffsetPagination
 
 from chats.apps.api.v1.projects.filters import FlowStartFilter
 
@@ -338,15 +338,18 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         if not permission.is_admin:
             queryset = queryset.filter(permission=permission)
 
-        paginator = CustomPagination()
+        paginator = LimitOffsetPagination()
         flow_starts_queryset_paginated = paginator.paginate_queryset(queryset, request)
 
-        flow_starts_data = ListFlowStartSerializer(
-            flow_starts_queryset_paginated, many=True
-        ).data
+        if flow_starts_queryset_paginated is not None:
+            serializer = ListFlowStartSerializer(
+                flow_starts_queryset_paginated, many=True
+            )
+            return paginator.get_paginated_response(serializer.data)
 
-        paginated_response = paginator.get_paginated_response(flow_starts_data)
-        return Response(paginated_response, status=status.HTTP_200_OK)
+        serializer = ListFlowStartSerializer(flow_starts_queryset_paginated, many=True)
+
+        return Response(serializer.data)
 
 
 class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
