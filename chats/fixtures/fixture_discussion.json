@@ -1,0 +1,92 @@
+[
+    {
+        "model": "rooms.room",
+        "pk": "8b120093-da6b-4417-8b47-52166564fcb5",
+        "fields": {
+            "created_on": "2022-09-03T00:20:09.559Z",
+            "modified_on": "2022-09-04T18:16:00.031Z",
+            "user": null,
+            "contact": "3dda1d84-7c03-4f9a-92a5-24059e10d7a7",
+            "queue": "f2519480-7e58-4fc4-9894-9ab1769e29cf",
+            "custom_fields": {
+                "mood": "angry",
+                "country": "brazil"
+            },
+            "callback_url": "http://localhost/test/66a47111-6e6f-43b3-9fdc-a92a18bc57d2",
+            "ended_at": null,
+            "ended_by": null,
+            "is_active": true,
+            "transfer_history": [
+                {
+                    "name": "ENGINE",
+                    "type": "queue"
+                },
+                {
+                    "name": "",
+                    "type": "user"
+                }
+            ],
+            "tags": []
+        }
+    },
+    {
+        "model": "rooms.room",
+        "pk": "4857b3f7-90e0-4df6-a4b1-8f2f6f6b471a",
+        "fields": {
+            "created_on": "2022-09-03T00:20:09.559Z",
+            "modified_on": "2022-09-04T18:16:00.031Z",
+            "user": "amywong@chats.weni.ai",
+            "contact": "4e9b16eb-57d4-4215-954d-939f7742106a",
+            "queue": "f2519480-7e58-4fc4-9894-9ab1769e29cf",
+            "custom_fields": {
+                "mood": "angry",
+                "country": "brazil"
+            },
+            "callback_url": "http://localhost/test/1c830ac0-1ba7-49f9-b8c8-b96af41d4213",
+            "ended_at": null,
+            "ended_by": null,
+            "is_active": true,
+            "transfer_history": [
+                {
+                    "name": "ENGINE",
+                    "type": "queue"
+                },
+                {
+                    "name": "",
+                    "type": "user"
+                }
+            ],
+            "tags": []
+        }
+    },
+    {
+        "model": "rooms.room",
+        "pk": "8eeace79-fbca-454f-a811-56116c87adc5",
+        "fields": {
+            "created_on": "2022-09-03T00:20:09.559Z",
+            "modified_on": "2022-09-04T18:16:00.031Z",
+            "user": "amywong@chats.weni.ai",
+            "contact": "4e9b16eb-57d4-4215-954d-939f7742106a",
+            "queue": "f2519480-7e58-4fc4-9894-9ab1769e29cf",
+            "custom_fields": {
+                "mood": "angry",
+                "country": "brazil"
+            },
+            "callback_url": "http://localhost/test/ac6322ca-4a5b-4e5f-bb00-050c60e93b0b",
+            "ended_at": "2023-09-03T00:20:09.559Z",
+            "ended_by": "agent",
+            "is_active": false,
+            "transfer_history": [
+                {
+                    "name": "ENGINE",
+                    "type": "queue"
+                },
+                {
+                    "name": "",
+                    "type": "user"
+                }
+            ],
+            "tags": []
+        }
+    }
+]
