@@ -2576,6 +2576,14 @@
     },
     {
         "model": "authtoken.token",
+        "pk": "6e52f41093468740d96649736e66e3eb7fbd008a",
+        "fields": {
+            "user": 2,
+            "created": "2022-08-23T20:07:49.267Z"
+        }
+    },
+    {
+        "model": "authtoken.token",
         "pk": "1218da72b087b8be7f0e2520a515e968ab866fdd",
         "fields": {
             "user": 1,
