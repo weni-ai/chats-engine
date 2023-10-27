@@ -90,7 +90,7 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# copy project
+
 COPY --chown=app_user:app_group . .
 
 RUN chmod 777 docker-entrypoint.sh
