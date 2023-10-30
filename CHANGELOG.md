@@ -1,3 +1,10 @@
+# 2.6.0
+## Add
+  - FlowStart model refactor.
+  - New endpoint to list flow starts.
+## Change
+  - Fix history detail permissions.
+
 # 2.5.0
 ## Add
   - New endpoint to return rooms for the history.
