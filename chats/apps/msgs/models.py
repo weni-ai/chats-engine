@@ -109,8 +109,6 @@ class MessageMedia(BaseModel):
         related_name="medias",
         verbose_name=_("message"),
         on_delete=models.CASCADE,
-        blank=True,
-        null=True,
     )
     content_type = models.CharField(_("Content Type"), max_length=300)
     media_file = models.FileField(
