@@ -104,14 +104,6 @@ class Message(BaseModel):
 
 
 class MessageMedia(BaseModel):
-    discussion_message = models.ForeignKey(
-        "discussions.DiscussionMessage",
-        related_name="medias",
-        verbose_name=_("discussion message"),
-        on_delete=models.CASCADE,
-        blank=True,
-        null=True,
-    )
     message = models.ForeignKey(
         Message,
         related_name="medias",
