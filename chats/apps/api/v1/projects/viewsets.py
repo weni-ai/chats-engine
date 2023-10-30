@@ -327,7 +327,9 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
     def list_flows_start(self, request, *args, **kwargs):
         project = self.get_object()
         permission = project.permissions.get(user=request.user)
-        flow_starts_query = project.flowstarts.all().order_by("created_on")
+        flow_starts_query = project.flowstarts.exclude(contact_data={}).order_by(
+            "-created_on"
+        )
         filtro = FlowStartFilter(request.GET, queryset=flow_starts_query)
 
         queryset = filtro.qs
