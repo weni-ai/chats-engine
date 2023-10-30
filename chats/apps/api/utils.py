@@ -1,3 +1,4 @@
+import json
 import uuid
 
 from rest_framework.authtoken.models import Token
@@ -29,3 +30,19 @@ def create_contact(
         custom_fields=custom_fields,
         external_id=str(uuid.uuid4()),
     )
+
+
+def extract_templating_values(json_data):
+    templating_values = []
+
+    flows = json_data.get("flows", [])
+    for flow in flows:
+        nodes = flow.get("nodes", [])
+        for node in nodes:
+            actions = node.get("actions", [])
+            for action in actions:
+                templating_info = action.get("templating", {})
+                if templating_info:
+                    templating_values.append(templating_info)
+
+    return {"template_infos": templating_values}

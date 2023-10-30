@@ -31,6 +31,8 @@ from chats.apps.projects.models import (
 )
 from chats.apps.rooms.models import Room
 
+from chats.apps.api.utils import extract_templating_values
+
 
 class ProjectViewset(viewsets.ReadOnlyModelViewSet):
     queryset = Project.objects.all()
@@ -278,6 +280,22 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         if chats_flow_start.room:
             room.notify_room("update")
         return Response(flow_start, status.HTTP_200_OK)
+
+    @action(detail=False, methods=["GET"], url_name="flows")
+    def retrieve_flow_template_variables(self, request, *args, **kwargs):
+        # recebo id do fluxo e do projeto
+        project = request.query_params.get("project", "")
+        flow_uuid = request.query_params.get("flow", "")
+        # chamo o flow rest client passando esse id para esse endpoint = https://flows.weni.ai/api/v2/definitions.
+        flow_definitions = FlowRESTClient().retrieve_flow_definitions(
+            project=project, flow_uuid=flow_uuid
+        )
+
+        # ele vai me retornar um json onde eu devo fazer a busca
+
+        # após receber o json eu chamo a funcão do utils e retorno esse resultado.
+        template_values = extract_templating_values(flow_definitions)
+        return Response(template_values, status.HTTP_200_OK)
 
 
 class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
