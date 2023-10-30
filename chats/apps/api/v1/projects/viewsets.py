@@ -19,6 +19,7 @@ from chats.apps.api.v1.permissions import (
 )
 from chats.apps.api.v1.projects.serializers import (
     LinkContactSerializer,
+    ListFlowStartSerializer,
     ProjectFlowContactSerializer,
     ProjectFlowStartSerializer,
     ProjectSerializer,
@@ -31,6 +32,10 @@ from chats.apps.projects.models import (
 )
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import create_room_feedback_message
+
+from rest_framework.pagination import LimitOffsetPagination
+
+from chats.apps.api.v1.projects.filters import FlowStartFilter
 
 
 class ProjectViewset(viewsets.ReadOnlyModelViewSet):
@@ -252,8 +257,14 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
                 {"Detail": "the user does not have permission in this project"},
                 status.HTTP_401_UNAUTHORIZED,
             )
-
-        flow_start_data = {"permission": perm, "flow": flow}
+        flow_start_data = {
+            "permission": perm,
+            "flow": flow,
+            "contact_data": {
+                "name": data.pop("contact_name"),
+                "external_id": data.get("contacts")[0],
+            },
+        }
         room_id = data.get("room", None)
 
         try:
@@ -307,6 +318,35 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
 
         flows_start_verify["show_warning"] = True
         return Response(flows_start_verify, status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["GET"],
+        url_name="list-flows-start",
+    )
+    def list_flows_start(self, request, *args, **kwargs):
+        project = self.get_object()
+        permission = project.permissions.get(user=request.user)
+        flow_starts_query = project.flowstarts.all().order_by("created_on")
+        filtro = FlowStartFilter(request.GET, queryset=flow_starts_query)
+
+        queryset = filtro.qs
+
+        if not permission.is_admin:
+            queryset = queryset.filter(permission=permission)
+
+        paginator = LimitOffsetPagination()
+        flow_starts_queryset_paginated = paginator.paginate_queryset(queryset, request)
+
+        if flow_starts_queryset_paginated is not None:
+            serializer = ListFlowStartSerializer(
+                flow_starts_queryset_paginated, many=True
+            )
+            return paginator.get_paginated_response(serializer.data)
+
+        serializer = ListFlowStartSerializer(flow_starts_queryset_paginated, many=True)
+
+        return Response(serializer.data)
 
 
 class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
