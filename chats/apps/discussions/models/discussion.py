@@ -1,11 +1,11 @@
-from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from chats.core.models import BaseModel, BaseSoftDeleteModel, WebSocketsNotifiableMixin
+from chats.core.models import BaseModel, BaseSoftDeleteModel
+from chats.utils.websockets import send_channels_group
 
 
-class Discussion(BaseSoftDeleteModel, BaseModel, WebSocketsNotifiableMixin):
+class Discussion(BaseSoftDeleteModel, BaseModel):
     subject = models.CharField(
         _("Subject Text"), max_length=50, blank=False, null=False
     )
@@ -34,57 +34,47 @@ class Discussion(BaseSoftDeleteModel, BaseModel, WebSocketsNotifiableMixin):
     class Meta:
         verbose_name = "Discussion"
         verbose_name_plural = "Discussions"
-        constraints = [
-            models.UniqueConstraint(
-                fields=[
-                    "room",
-                ],
-                condition=models.Q(is_active=True),
-                name="unique_room_is_activetrue_discussion",
-            )
-        ]
 
     def __str__(self) -> str:
         return f"{self.created_by.full_name} {self.subject}"
 
-    def delete(self):
-        self.is_active = False
-        self.save()
-        self.notify("close")
-
     @property
-    def project(self):
-        return self.queue.sector.project
+    def notification_data(self):
+        return {
+            "uuid": str(self.uuid),
+            "subject": self.subject,
+            "created_by": self.created_by.full_name,
+            "created_on": str(self.created_on),
+            "contact": self.room.contact.name,
+            "is_active": self.is_active,
+            "is_queued": self.is_queued,
+        }
 
-    @property
-    def sector(self):
-        return self.queue.sector
+    def base_notification(self, content, action):
+        if self.user:
+            permission = self.get_permission(self.user)
+            group_name = f"permission_{permission.pk}"
+        else:
+            group_name = f"queue_{self.queue.pk}"
 
-    @property
-    def serialized_ws_data(self):
-        from ..serializers.discussions import DiscussionWSSerializer  # noqa
+        send_channels_group(
+            group_name=group_name,
+            call_type="notify",
+            content=content,
+            action=action,
+        )
 
-        return DiscussionWSSerializer(self).data
-
-    @property
-    def notification_groups(self) -> list:
-        if self.is_queued:
-            return [f"queue_{self.queue.pk}"]
-        return [
-            f"permission_{user_permission}"
-            for user_permission in self.added_users.values_list("permission", flat=True)
-        ]
-
-    def get_action(self, action: str) -> str:
-        return f"discussions.{action}"
-
-    def notify_user(self, user_permission, action: str, content: dict = {}):
+    def notify_users(self, action: str, content: dict = {}):
         if "." not in action:
             action = f"discussions.{action}"
-        content = content or self.serialized_ws_data
-        self.notify(
-            action=action, content=content, groups=[f"permission_{user_permission.pk}"]
-        )
+        content = content or self.notification_data
+        for added_user in self.added_users.all():
+            send_channels_group(
+                group_name=f"permission_{added_user.permission.pk}",
+                call_type="notify",
+                content=content,
+                action=action,
+            )
 
     def notify_queue(
         self,
