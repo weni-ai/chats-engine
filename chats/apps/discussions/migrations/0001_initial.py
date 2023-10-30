@@ -134,6 +134,52 @@ class Migration(migrations.Migration):
             bases=(chats.core.models.WebSocketsNotifiableMixin, models.Model),
         ),
         migrations.CreateModel(
+            name="DiscussionMessage",
+            fields=[
+                (
+                    "uuid",
+                    models.UUIDField(
+                        default=uuid.uuid4, primary_key=True, serialize=False
+                    ),
+                ),
+                (
+                    "created_on",
+                    models.DateTimeField(auto_now_add=True, verbose_name="Created on"),
+                ),
+                (
+                    "modified_on",
+                    models.DateTimeField(auto_now=True, verbose_name="Modified on"),
+                ),
+                ("text", models.TextField(blank=True, null=True, verbose_name="Text")),
+                (
+                    "discussion",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="messages",
+                        to="discussions.discussion",
+                        verbose_name="discussion",
+                    ),
+                ),
+                (
+                    "sender",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="discussion_messages",
+                        to=settings.AUTH_USER_MODEL,
+                        to_field="email",
+                        verbose_name="user",
+                    ),
+                ),
+            ],
+            options={
+                "verbose_name": "Message",
+                "verbose_name_plural": "Messages",
+                "ordering": ["created_on"],
+            },
+        ),
+        migrations.CreateModel(
             name="DiscussionUser",
             fields=[
                 (
