@@ -1,3 +1,8 @@
+# 2.6.1
+## Change
+  - Filter flowstart query to exclude old data.
+  - Reverse order on the flowstart list endpoint.
+
 # 2.6.0
 ## Add
   - FlowStart model refactor.
