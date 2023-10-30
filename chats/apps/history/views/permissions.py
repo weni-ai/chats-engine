@@ -17,7 +17,6 @@ class CanRetrieveRoomHistory(permissions.BasePermission):
         if isinstance(request.user, AnonymousUser):
             return False
         try:
-            perm = obj.get_permission(request.user)
+            return obj.can_retrieve(request.user)
         except ProjectPermission.DoesNotExist:
             return False
-        return perm.is_admin

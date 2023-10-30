@@ -196,6 +196,9 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
 
         return start.time() < created_on.time() < end.time()
 
+    def is_manager(self, user):
+        return self.authorizations.filter(permission__user=user).exists()
+
     def get_or_create_user_authorization(self, user):
         sector_auth, created = self.authorizations.get_or_create(user=user)
 
