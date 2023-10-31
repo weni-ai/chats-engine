@@ -62,6 +62,10 @@ class Discussion(BaseSoftDeleteModel, BaseModel):
         return self.queue.sector
 
     @property
+    def project(self):
+        return self.queue.sector.project
+
+    @property
     def notification_data(self):
         return {
             "uuid": str(self.uuid),
