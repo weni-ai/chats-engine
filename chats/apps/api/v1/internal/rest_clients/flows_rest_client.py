@@ -186,7 +186,6 @@ class FlowRESTClient(
         return flows
 
     def retrieve_flow_definitions(self, project, flow_uuid):
-        print(self.base_url)
         response = retry_request_and_refresh_flows_auth_token(
             project=project,
             request_method=requests.get,
