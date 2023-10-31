@@ -285,10 +285,11 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
     def retrieve_flow_template_variables(self, request, *args, **kwargs):
         # recebo id do fluxo e do projeto
         project = request.query_params.get("project", "")
+        project_instance = Project.objects.get(uuid=project)
         flow_uuid = request.query_params.get("flow", "")
         # chamo o flow rest client passando esse id para esse endpoint = https://flows.weni.ai/api/v2/definitions.
         flow_definitions = FlowRESTClient().retrieve_flow_definitions(
-            project=project, flow_uuid=flow_uuid
+            project=project_instance, flow_uuid=flow_uuid
         )
 
         # ele vai me retornar um json onde eu devo fazer a busca
