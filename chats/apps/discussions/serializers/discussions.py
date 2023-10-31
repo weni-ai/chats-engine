@@ -59,7 +59,6 @@ class DiscussionUserListSerializer(serializers.ModelSerializer):
     class Meta:
         model = DiscussionUser
         fields = [
-            "uuid",
             "first_name",
             "last_name",
             "role",
