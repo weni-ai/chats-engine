@@ -34,7 +34,7 @@ def create_contact(
 
 def extract_templating_values(json_data):
     templating_values = []
-    print(json_data)
+    print("json que veio pro utils:", json_data)
 
     flows = json_data.get("flows", [])
     for flow in flows:
@@ -45,6 +45,6 @@ def extract_templating_values(json_data):
                 templating_info = action.get("templating", {})
                 if templating_info:
                     templating_values.append(templating_info)
-    print("retorno final", templating_values)
+    print("retorno final:", templating_values)
 
     return {"template_infos": templating_values}
