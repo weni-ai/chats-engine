@@ -281,7 +281,7 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
             room.notify_room("update")
         return Response(flow_start, status.HTTP_200_OK)
 
-    @action(detail=True, methods=["GET"], url_name="flows")
+    @action(detail=True, methods=["GET"])
     def retrieve_flow_template_variables(self, request, *args, **kwargs):
         project = self.get_object()
         flow_uuid = request.query_params.get("flow", "")
@@ -289,8 +289,18 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         flow_definitions = FlowRESTClient().retrieve_flow_definitions(
             project=project, flow_uuid=flow_uuid
         )
-        template_values = extract_templating_values(flow_definitions)
-        return Response(template_values, status.HTTP_200_OK)
+        templating_values = extract_templating_values(flow_definitions)
+        return Response(templating_values, status.HTTP_200_OK)
+
+    @action(detail=True, methods=["GET"])
+    def retrieve_flow_template_content(self, request, *args, **kwargs):
+        project = self.get_object()
+        template_uuid = request.query_params.get("template", "")
+
+        flow_template = FlowRESTClient().retrieve_flow_template(
+            project=project, template_uuid=template_uuid
+        )
+        return Response(flow_template, status.HTTP_200_OK)
 
 
 class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
