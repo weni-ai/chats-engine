@@ -17,4 +17,6 @@ class DiscussionFilter(filters.FilterSet):
     )
 
     def filter_project(self, queryset, name, value):
-        return queryset  # Just set the project as an required query param, the permission validation is responsability of the permissions module.
+        return queryset.filter(
+            queue__sector__project=value
+        )  # return only the discussions the user has access

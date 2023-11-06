@@ -212,9 +212,13 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
 
     def get_permission(self, user):
         try:
-            return self.project.permissions.get(user=user)
+            return self.project.get_permission(user=user)
         except ObjectDoesNotExist:
             return None
+
+    def is_manager(self, user):
+        perm = self.get_permission(user=user)
+        return perm.is_admin or self.authorizations.filter(permission=perm).exists()
 
     def delete(self):
         super().delete()
