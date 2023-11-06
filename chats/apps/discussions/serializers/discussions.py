@@ -26,7 +26,9 @@ class DiscussionCreateSerializer(serializers.ModelSerializer):
         discussion.notify("create")
 
         discussion.create_discussion_message(initial_message)
-        discussion.create_discussion_user(user=created_by, role=0)
+        discussion.create_discussion_user(
+            from_user=created_by, to_user=created_by, role=0
+        )
 
         return discussion
 
@@ -55,12 +57,14 @@ class DiscussionUserListSerializer(serializers.ModelSerializer):
     last_name = serializers.CharField(
         source="permission.user.last_name", read_only=True
     )
+    email = serializers.CharField(source="permission.user.email", read_only=True)
 
     class Meta:
         model = DiscussionUser
         fields = [
             "first_name",
             "last_name",
+            "email",
             "role",
         ]
 
