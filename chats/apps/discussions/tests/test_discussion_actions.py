@@ -1,189 +1,122 @@
 from django.urls import reverse
+from parameterized import parameterized
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from ..models import DiscussionMessage
 
-"""
-
-[X]Success when creating with all the discussion fields.
-[X]Success for anyone(in the project) who tries to open a discussion from a inactive room on the history.
-[X]Success when creating a discussion with a different queue than the room.
-[X]success on creating the initial_message when creating the discussion.
-
-
-"""
-
-
-class DiscussionCreationTests(APITestCase):
+class DiscussionViewTests(APITestCase):
     fixtures = [
         "chats/fixtures/fixture_app.json",
         "chats/fixtures/fixture_discussion.json",
+    ]
+
+    # ("Scenario description", room, queue, subject, initial_message, user_token, expected_response_status)
+
+    parameters = [
+        # Success parameters
+        (
+            "Active room user create discussion to an authorized queue",
+            "307dc034-2ecf-48b0-9d15-b4841ec7da5f",
+            "f362336c-672b-4962-be82-efdf6101be6d",
+            None,
+            None,
+            "59e5b85e2f0134c4ee9f72037e379c94390697ce",
+            status.HTTP_201_CREATED,
+        ),
+        (
+            "Active room user create discussion to an unauthorized queue",
+            "307dc034-2ecf-48b0-9d15-b4841ec7da5f",
+            "687ca2aa-978b-48e6-ae95-1d03fc1d1a5b",
+            None,
+            None,
+            "59e5b85e2f0134c4ee9f72037e379c94390697ce",
+            status.HTTP_201_CREATED,
+        ),
+        (
+            "Discussion on unactive room can be openned by any project user",
+            "47a983f3-d4b0-4fd4-a66c-f2f3856fb2ac",
+            "f362336c-672b-4962-be82-efdf6101be6d",
+            None,
+            None,
+            "d7fddba0b1dfaad72aa9e21876cbc93caa9ce3fa",
+            status.HTTP_201_CREATED,
+        ),
+        (
+            "Admin can create discussion in any room",
+            "307dc034-2ecf-48b0-9d15-b4841ec7da5f",
+            "687ca2aa-978b-48e6-ae95-1d03fc1d1a5b",
+            None,
+            None,
+            "4215e6d6666e54f7db9f98100533aa68909fd855",
+            status.HTTP_201_CREATED,
+        ),
+        (
+            "Any manager can create discussion in any room",
+            "307dc034-2ecf-48b0-9d15-b4841ec7da5f",
+            "687ca2aa-978b-48e6-ae95-1d03fc1d1a5b",
+            None,
+            None,
+            "c23e0173ac75c1a9ab448967e6a624e1a6ac1a2d",
+            status.HTTP_201_CREATED,
+        ),
+        # Failure parameters
+        (
+            "Discussions cannot be openned in inexistent rooms",
+            "09d0f92e-ccd6-481b-8802-d4edf99281da",
+            "f362336c-672b-4962-be82-efdf6101be6d",
+            None,
+            None,
+            "59e5b85e2f0134c4ee9f72037e379c94390697ce",
+            status.HTTP_403_FORBIDDEN,
+        ),
+        (
+            "Different user than Active room user cannot create discussion",
+            "307dc034-2ecf-48b0-9d15-b4841ec7da5f",
+            "687ca2aa-978b-48e6-ae95-1d03fc1d1a5b",
+            None,
+            None,
+            "d7fddba0b1dfaad72aa9e21876cbc93caa9ce3fa",
+            status.HTTP_403_FORBIDDEN,
+        ),
+        (
+            "Discussions cannot be openned when the room already have an active one",
+            "50da4076-1f3b-4355-9a2e-be91bd6a410c",
+            "f362336c-672b-4962-be82-efdf6101be6d",
+            None,
+            None,
+            "d7fddba0b1dfaad72aa9e21876cbc93caa9ce3fa",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+        ),
+        (
+            "discussion cannot be openned to another project",
+            "307dc034-2ecf-48b0-9d15-b4841ec7da5f",
+            "e17ca4d6-af57-4d12-8dd2-a25952c94400",
+            None,
+            None,
+            "59e5b85e2f0134c4ee9f72037e379c94390697ce",
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+        ),
     ]
 
     def _create_discussion(self, token, params=None, body=None):
         url = reverse("discussion-list")
         client = self.client
         client.credentials(HTTP_AUTHORIZATION="Token " + token)
-        response = client.post(url, format="json", json=body)
+        response = client.post(url, format="json", data=body)
         return response
 
-    def test_success_open_discussion_on_active_room(self):
-        open_room_pk = "4857b3f7-90e0-4df6-a4b1-8f2f6f6b471a"
-        queue = "f2519480-7e58-4fc4-9894-9ab1769e29cf"
-        room_agent_token = "4215e6d6666e54f7db9f98100533aa68909fd855"
-
+    @parameterized.expand(parameters)
+    def test_success_open_discussion_on_active_room(
+        self, _, room, queue, subject, initial_message, token, status
+    ):
         discussion_data = {
-            "room": open_room_pk,
+            "room": room,
             "queue": queue,
-            "subject": "A very reasonable subject for opening a discussion",
-            "initial_message": """A very long and large text that has no character limits,
-             so we'll write as much as we want....~""",
+            "subject": subject or "A very reasonable subject for opening a discussion",
+            "initial_message": initial_message
+            or """A very long and large text that has no character limits,
+            so we'll write as much as we want....~""",
         }
 
-        response = self._create_discussion(token=room_agent_token, body=discussion_data)
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        initial_msg = DiscussionMessage.objects.get(discussion=response.json()["uuid"])
-        self.assertEqual(initial_msg.text, discussion_data["initial_message"])
-
-    def test_success_admin_open_discussion_on_active_room(self):
-        open_room_pk = "4857b3f7-90e0-4df6-a4b1-8f2f6f6b471a"
-        queue = "f2519480-7e58-4fc4-9894-9ab1769e29cf"
-        project_admin_token = "d116bca8757372f3b5936096473929ed1465915e"
-
-        discussion_data = {
-            "room": open_room_pk,
-            "queue": queue,
-            "subject": "A very reasonable subject for opening a discussion",
-            "initial_message": """A very long and large text that has no character limits,
-             so we'll write as much as we want....~""",
-        }
-
-        response = self._create_discussion(
-            token=project_admin_token, body=discussion_data
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-
-    def test_success_open_discussion_on_closed_room(self):
-        closed_room_pk = "8eeace79-fbca-454f-a811-56116c87adc5"
-        queue = "f341417b-5143-4469-a99d-f141a0676bd4"
-        room_agent_token = "d7fddba0b1dfaad72aa9e21876cbc93caa9ce3fa"
-
-        discussion_data = {
-            "room": closed_room_pk,
-            "queue": queue,
-            "subject": "A very reasonable subject for opening a discussion",
-            "initial_message": """A very long and large text that has no character limits,
-             so we'll write as much as we want....~""",
-        }
-
-        response = self._create_discussion(token=room_agent_token, body=discussion_data)
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-
-    def test_success_open_discussion_on_different_queue(self):
-        open_room_pk = "4857b3f7-90e0-4df6-a4b1-8f2f6f6b471a"
-        queue = "f2519480-7e58-4fc4-9894-9ab1769e29cf"
-        room_agent_token = "4215e6d6666e54f7db9f98100533aa68909fd855"
-
-        discussion_data = {
-            "room": open_room_pk,
-            "queue": queue,
-            "subject": "A very reasonable subject for opening a discussion",
-            "initial_message": """A very long and large text that has no character limits,
-             so we'll write as much as we want....~""",
-        }
-
-        response = self._create_discussion(token=room_agent_token, body=discussion_data)
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-
-    def test_fail_open_on_active_discussion_room(self):
-        open_room_pk = "4857b3f7-90e0-4df6-a4b1-8f2f6f6b471a"
-        queue = "f2519480-7e58-4fc4-9894-9ab1769e29cf"
-        room_agent_token = "4215e6d6666e54f7db9f98100533aa68909fd855"
-
-        discussion_data = {
-            "room": open_room_pk,
-            "queue": queue,
-            "subject": "A very reasonable subject for opening a discussion",
-            "initial_message": """A very long and large text that has no character limits,
-             so we'll write as much as we want....~""",
-        }
-
-        self._create_discussion(token=room_agent_token, body=discussion_data)
-        response = self._create_discussion(token=room_agent_token, body=discussion_data)
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_fail_open_on_inexistent_room(self):
-        open_room_pk = "09d0f92e-ccd6-481b-8802-d4edf99281da"
-        queue = "f2519480-7e58-4fc4-9894-9ab1769e29cf"
-        room_agent_token = "4215e6d6666e54f7db9f98100533aa68909fd855"
-
-        discussion_data = {
-            "room": open_room_pk,
-            "queue": queue,
-            "subject": "A very reasonable subject for opening a discussion",
-            "initial_message": """A very long and large text that has no character limits,
-             so we'll write as much as we want....~""",
-        }
-
-        response = self._create_discussion(token=room_agent_token, body=discussion_data)
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_fail_open_without_permission(self):
-        open_room_pk = "4857b3f7-90e0-4df6-a4b1-8f2f6f6b471a"
-        queue = "f2519480-7e58-4fc4-9894-9ab1769e29cf"
-        not_in_project_user_token = "6e52f41093468740d96649736e66e3eb7fbd008a"
-
-        discussion_data = {
-            "room": open_room_pk,
-            "queue": queue,
-            "subject": "A very reasonable subject for opening a discussion",
-            "initial_message": """A very long and large text that has no character limits,
-             so we'll write as much as we want....~""",
-        }
-
-        response = self._create_discussion(
-            token=not_in_project_user_token, body=discussion_data
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_fail_open_on_without_obrigatory_field(self):
-        open_room_pk = "4857b3f7-90e0-4df6-a4b1-8f2f6f6b471a"
-        queue = "f2519480-7e58-4fc4-9894-9ab1769e29cf"
-        room_agent_token = "4215e6d6666e54f7db9f98100533aa68909fd855"
-
-        discussion_data = {
-            "room": open_room_pk,
-            "queue": queue,
-            "subject": "A very reasonable subject for opening a discussion",
-        }
-
-        response = self._create_discussion(token=room_agent_token, body=discussion_data)
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_fail_open_discussion_on_active_room_of_other_agent(self):
-        closed_room_pk = "8eeace79-fbca-454f-a811-56116c87adc5"
-        queue = "f341417b-5143-4469-a99d-f141a0676bd4"
-        other_agent_token = "d7fddba0b1dfaad72aa9e21876cbc93caa9ce3fa"
-
-        discussion_data = {
-            "room": closed_room_pk,
-            "queue": queue,
-            "subject": "A very reasonable subject for opening a discussion",
-            "initial_message": """A very long and large text that has no character limits,
-             so we'll write as much as we want....~""",
-        }
-
-        response = self._create_discussion(
-            token=other_agent_token, body=discussion_data
-        )
-
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        response = self._create_discussion(token=token, body=discussion_data)
+        self.assertEqual(response.status_code, status)

@@ -90,6 +90,174 @@
         }
     },
     {
+        "model": "contacts.contact",
+        "pk": "1b691cb7-eb40-4ec8-9ca8-7f3d00d5a36b",
+        "fields": {
+            "created_on": "2023-11-06T18:08:28.154Z",
+            "modified_on": "2023-11-06T18:08:28.154Z",
+            "external_id": "19c6b5f1-4985-40a9-950f-c9c94b99a189",
+            "name": "Amos Trantow",
+            "email": null,
+            "status": "",
+            "phone": "",
+            "custom_fields": null
+        }
+    },
+    {
+        "model": "contacts.contact",
+        "pk": "03a23568-ea38-4ddb-bb14-924ac9a0b120",
+        "fields": {
+            "created_on": "2023-11-06T18:10:55.251Z",
+            "modified_on": "2023-11-06T18:10:55.251Z",
+            "external_id": "a542ddb1-4ea6-4d98-aca5-302713dab34e",
+            "name": "Eugene Nikolaus DDS",
+            "email": null,
+            "status": "",
+            "phone": "",
+            "custom_fields": null
+        }
+    },
+    {
+        "model": "contacts.contact",
+        "pk": "a13c4263-a1eb-4d54-83c9-855d6fe998a9",
+        "fields": {
+            "created_on": "2023-11-06T18:11:18.969Z",
+            "modified_on": "2023-11-06T18:11:18.969Z",
+            "external_id": "5c9a7889-67d0-49b3-9b72-1c6fce1866a1",
+            "name": "Jaime Kemmer",
+            "email": null,
+            "status": "",
+            "phone": "",
+            "custom_fields": null
+        }
+    },
+    {
+        "model": "contacts.contact",
+        "pk": "82c89830-3e00-408a-8a8e-d91c16ef2ff1",
+        "fields": {
+            "created_on": "2023-11-06T18:11:19.877Z",
+            "modified_on": "2023-11-06T18:11:19.877Z",
+            "external_id": "973a6bb1-8bbb-41b2-8bee-d588d80f2ca0",
+            "name": "Jeffrey Rath",
+            "email": null,
+            "status": "",
+            "phone": "",
+            "custom_fields": null
+        }
+    },
+    {
+        "model": "contacts.contact",
+        "pk": "5a77f131-c51f-47f9-a68d-417c25966ac8",
+        "fields": {
+            "created_on": "2023-11-06T18:11:20.634Z",
+            "modified_on": "2023-11-06T18:11:20.634Z",
+            "external_id": "b0e504db-2b6b-4781-9b06-1ec15a5c5df7",
+            "name": "Anna Buckridge DVM",
+            "email": null,
+            "status": "",
+            "phone": "",
+            "custom_fields": null
+        }
+    },
+    {
+        "model": "contacts.contact",
+        "pk": "dc7cdf20-1b8a-4c57-881e-6efbf39a3191",
+        "fields": {
+            "created_on": "2023-11-06T18:13:50.660Z",
+            "modified_on": "2023-11-06T18:13:50.660Z",
+            "external_id": "70afbdfb-722f-4f0c-aec8-34c03320d326",
+            "name": "Tyler Feil",
+            "email": null,
+            "status": "",
+            "phone": "",
+            "custom_fields": null
+        }
+    },
+    {
+        "model": "contacts.contact",
+        "pk": "424f0e73-7597-46fa-80fc-d10ce7ef6481",
+        "fields": {
+            "created_on": "2023-11-06T18:13:51.500Z",
+            "modified_on": "2023-11-06T18:13:51.500Z",
+            "external_id": "a666485e-f4f1-4f9e-833d-aafda616612e",
+            "name": "Vera Kling",
+            "email": null,
+            "status": "",
+            "phone": "",
+            "custom_fields": null
+        }
+    },
+    {
+        "model": "contacts.contact",
+        "pk": "820646b6-9611-42dc-be49-c9fc3b9ded25",
+        "fields": {
+            "created_on": "2023-11-06T18:14:01.060Z",
+            "modified_on": "2023-11-06T18:14:01.060Z",
+            "external_id": "4341b9a4-4eca-459a-8671-064cf4ee103f",
+            "name": "Natasha Roob",
+            "email": null,
+            "status": "",
+            "phone": "",
+            "custom_fields": null
+        }
+    },
+    {
+        "model": "contacts.contact",
+        "pk": "b8712ab3-50e4-400b-b14e-4f87979bf70f",
+        "fields": {
+            "created_on": "2023-11-06T18:14:01.931Z",
+            "modified_on": "2023-11-06T18:14:01.931Z",
+            "external_id": "4e6a6d58-d93b-4045-b50d-da1fd901d20f",
+            "name": "Glenda Kutch",
+            "email": null,
+            "status": "",
+            "phone": "",
+            "custom_fields": null
+        }
+    },
+    {
+        "model": "contacts.contact",
+        "pk": "4f83db67-0799-41dc-b502-7abb06abfc31",
+        "fields": {
+            "created_on": "2023-11-06T18:14:18.753Z",
+            "modified_on": "2023-11-06T18:14:18.753Z",
+            "external_id": "1d655f9a-4c16-47d3-98d5-a4729cb46530",
+            "name": "Mrs. Whitney Marquardt",
+            "email": null,
+            "status": "",
+            "phone": "",
+            "custom_fields": null
+        }
+    },
+    {
+        "model": "contacts.contact",
+        "pk": "9d184183-d390-4eb3-9ef1-3a10f77694e5",
+        "fields": {
+            "created_on": "2023-11-06T18:14:19.671Z",
+            "modified_on": "2023-11-06T18:14:19.671Z",
+            "external_id": "888a14d1-558d-43eb-a9b6-09fb860d8660",
+            "name": "Christie Schultz",
+            "email": null,
+            "status": "",
+            "phone": "",
+            "custom_fields": null
+        }
+    },
+    {
+        "model": "contacts.contact",
+        "pk": "e3e12ca8-8e76-4dc5-8d90-e5e90b61450e",
+        "fields": {
+            "created_on": "2023-11-06T19:02:04.462Z",
+            "modified_on": "2023-11-06T19:02:04.462Z",
+            "external_id": "803470ca-1acf-4b77-93c1-80b7e5bcdef2",
+            "name": "Melissa Walker",
+            "email": null,
+            "status": "",
+            "phone": "",
+            "custom_fields": null
+        }
+    },
+    {
         "model": "projects.project",
         "pk": "dae39bcc-bdc2-4b03-b4da-023a117f8474",
         "fields": {
@@ -410,6 +578,840 @@
             "queue": "f362336c-672b-4962-be82-efdf6101be6d",
             "role": 1,
             "permission": "fd7f2121-d407-4154-b442-736697568153"
+        }
+    },
+    {
+        "model": "rooms.room",
+        "pk": "b095d950-e98c-40a9-8397-9baa4697b241",
+        "fields": {
+            "created_on": "2023-11-06T18:14:18.766Z",
+            "modified_on": "2023-11-06T19:15:32.903Z",
+            "user": null,
+            "contact": "4f83db67-0799-41dc-b502-7abb06abfc31",
+            "queue": "71a8b436-7239-4a42-b05c-7d430d98cd66",
+            "custom_fields": null,
+            "urn": "whatsapp:81-978-259-8604",
+            "callback_url": null,
+            "ended_at": null,
+            "ended_by": null,
+            "is_active": true,
+            "is_waiting": false,
+            "transfer_history": {
+                "to": {
+                    "name": "Financeiro",
+                    "type": "queue"
+                },
+                "from": {
+                    "name": "",
+                    "type": ""
+                },
+                "action": "forward"
+            },
+            "tags": []
+        }
+    },
+    {
+        "model": "rooms.room",
+        "pk": "50da4076-1f3b-4355-9a2e-be91bd6a410c",
+        "fields": {
+            "created_on": "2023-11-06T18:14:19.700Z",
+            "modified_on": "2023-11-06T19:15:40.487Z",
+            "user": "linalawson@chats.weni.ai",
+            "contact": "9d184183-d390-4eb3-9ef1-3a10f77694e5",
+            "queue": "71a8b436-7239-4a42-b05c-7d430d98cd66",
+            "custom_fields": null,
+            "urn": "whatsapp:54-624-630-7336",
+            "callback_url": null,
+            "ended_at": null,
+            "ended_by": null,
+            "is_active": true,
+            "is_waiting": false,
+            "transfer_history": {
+                "to": {
+                    "name": "teste",
+                    "type": "user"
+                },
+                "from": {
+                    "name": "Financeiro",
+                    "type": "queue"
+                },
+                "action": "transfer"
+            },
+            "tags": []
+        }
+    },
+    {
+        "model": "rooms.room",
+        "pk": "67930b18-b464-470d-ba57-757dc23dc58c",
+        "fields": {
+            "created_on": "2023-11-06T18:14:01.080Z",
+            "modified_on": "2023-11-06T19:15:48.918Z",
+            "user": null,
+            "contact": "820646b6-9611-42dc-be49-c9fc3b9ded25",
+            "queue": "687ca2aa-978b-48e6-ae95-1d03fc1d1a5b",
+            "custom_fields": null,
+            "urn": "whatsapp:70-373-918-6450",
+            "callback_url": null,
+            "ended_at": null,
+            "ended_by": null,
+            "is_active": true,
+            "is_waiting": false,
+            "transfer_history": {
+                "to": {
+                    "name": "Suporte Tecnico",
+                    "type": "queue"
+                },
+                "from": {
+                    "name": "",
+                    "type": ""
+                },
+                "action": "forward"
+            },
+            "tags": []
+        }
+    },
+    {
+        "model": "rooms.room",
+        "pk": "3272fa3d-0ebf-4a85-94f2-e973a0ea6fcd",
+        "fields": {
+            "created_on": "2023-11-06T18:14:01.954Z",
+            "modified_on": "2023-11-06T19:16:00.530Z",
+            "user": null,
+            "contact": "b8712ab3-50e4-400b-b14e-4f87979bf70f",
+            "queue": "687ca2aa-978b-48e6-ae95-1d03fc1d1a5b",
+            "custom_fields": null,
+            "urn": "whatsapp:9-582-311-6916",
+            "callback_url": null,
+            "ended_at": null,
+            "ended_by": null,
+            "is_active": true,
+            "is_waiting": false,
+            "transfer_history": {
+                "to": {
+                    "name": "Suporte Tecnico",
+                    "type": "queue"
+                },
+                "from": {
+                    "name": "",
+                    "type": ""
+                },
+                "action": "forward"
+            },
+            "tags": []
+        }
+    },
+    {
+        "model": "rooms.room",
+        "pk": "f487cabc-4ec9-4b2a-9b9a-e552831ba937",
+        "fields": {
+            "created_on": "2023-11-06T19:02:04.485Z",
+            "modified_on": "2023-11-06T19:16:10.949Z",
+            "user": null,
+            "contact": "e3e12ca8-8e76-4dc5-8d90-e5e90b61450e",
+            "queue": "687ca2aa-978b-48e6-ae95-1d03fc1d1a5b",
+            "custom_fields": null,
+            "urn": "whatsapp:75-955-726-9757",
+            "callback_url": null,
+            "ended_at": null,
+            "ended_by": null,
+            "is_active": true,
+            "is_waiting": false,
+            "transfer_history": {
+                "to": {
+                    "name": "Suporte Tecnico",
+                    "type": "queue"
+                },
+                "from": {
+                    "name": "",
+                    "type": ""
+                },
+                "action": "forward"
+            },
+            "tags": []
+        }
+    },
+    {
+        "model": "rooms.room",
+        "pk": "222f291e-5ba8-4073-adae-7af36ff6eaeb",
+        "fields": {
+            "created_on": "2023-11-06T18:13:50.701Z",
+            "modified_on": "2023-11-06T19:14:18.102Z",
+            "user": null,
+            "contact": "dc7cdf20-1b8a-4c57-881e-6efbf39a3191",
+            "queue": "4a7fdaac-7aec-4add-b9aa-e95765def91d",
+            "custom_fields": null,
+            "urn": "whatsapp:90-989-342-0795",
+            "callback_url": null,
+            "ended_at": null,
+            "ended_by": null,
+            "is_active": true,
+            "is_waiting": false,
+            "transfer_history": {
+                "to": {
+                    "name": "Empreendimentos",
+                    "type": "queue"
+                },
+                "from": {
+                    "name": "",
+                    "type": ""
+                },
+                "action": "forward"
+            },
+            "tags": []
+        }
+    },
+    {
+        "model": "rooms.room",
+        "pk": "b103c168-f84a-46bb-8fb3-dde700d16841",
+        "fields": {
+            "created_on": "2023-11-06T18:13:51.541Z",
+            "modified_on": "2023-11-06T19:14:26.671Z",
+            "user": "agentqueue@chats.weni.ai",
+            "contact": "424f0e73-7597-46fa-80fc-d10ce7ef6481",
+            "queue": "4a7fdaac-7aec-4add-b9aa-e95765def91d",
+            "custom_fields": null,
+            "urn": "whatsapp:6-749-778-3887",
+            "callback_url": null,
+            "ended_at": null,
+            "ended_by": null,
+            "is_active": true,
+            "is_waiting": false,
+            "transfer_history": {
+                "to": {
+                    "name": "teste",
+                    "type": "user"
+                },
+                "from": {
+                    "name": "Empreendimentos",
+                    "type": "queue"
+                },
+                "action": "transfer"
+            },
+            "tags": []
+        }
+    },
+    {
+        "model": "rooms.room",
+        "pk": "16eb28e9-ddbb-4f08-8bf2-cddd38046431",
+        "fields": {
+            "created_on": "2023-11-06T18:10:55.271Z",
+            "modified_on": "2023-11-06T19:14:57.242Z",
+            "user": null,
+            "contact": "03a23568-ea38-4ddb-bb14-924ac9a0b120",
+            "queue": "f362336c-672b-4962-be82-efdf6101be6d",
+            "custom_fields": null,
+            "urn": "whatsapp:17-983-901-4028",
+            "callback_url": null,
+            "ended_at": null,
+            "ended_by": null,
+            "is_active": true,
+            "is_waiting": false,
+            "transfer_history": {
+                "to": {
+                    "name": "Construção Propria",
+                    "type": "queue"
+                },
+                "from": {
+                    "name": "",
+                    "type": ""
+                },
+                "action": "forward"
+            },
+            "tags": []
+        }
+    },
+    {
+        "model": "rooms.room",
+        "pk": "cf215ed2-d0c0-449a-bc10-fd85a4a63bbd",
+        "fields": {
+            "created_on": "2023-11-06T18:11:18.995Z",
+            "modified_on": "2023-11-06T19:15:05.957Z",
+            "user": null,
+            "contact": "a13c4263-a1eb-4d54-83c9-855d6fe998a9",
+            "queue": "f362336c-672b-4962-be82-efdf6101be6d",
+            "custom_fields": null,
+            "urn": "whatsapp:88-665-811-2037",
+            "callback_url": null,
+            "ended_at": null,
+            "ended_by": null,
+            "is_active": true,
+            "is_waiting": false,
+            "transfer_history": {
+                "to": {
+                    "name": "Construção Propria",
+                    "type": "queue"
+                },
+                "from": {
+                    "name": "",
+                    "type": ""
+                },
+                "action": "forward"
+            },
+            "tags": []
+        }
+    },
+    {
+        "model": "rooms.room",
+        "pk": "21c30743-8e12-4d19-b91f-d5c7d88addd1",
+        "fields": {
+            "created_on": "2023-11-06T18:11:20.656Z",
+            "modified_on": "2023-11-06T19:15:15.813Z",
+            "user": "linalawson@chats.weni.ai",
+            "contact": "5a77f131-c51f-47f9-a68d-417c25966ac8",
+            "queue": "f362336c-672b-4962-be82-efdf6101be6d",
+            "custom_fields": null,
+            "urn": "whatsapp:58-865-412-3925",
+            "callback_url": null,
+            "ended_at": null,
+            "ended_by": null,
+            "is_active": true,
+            "is_waiting": false,
+            "transfer_history": {
+                "to": {
+                    "name": "teste",
+                    "type": "user"
+                },
+                "from": {
+                    "name": "Construção Propria",
+                    "type": "queue"
+                },
+                "action": "transfer"
+            },
+            "tags": []
+        }
+    },
+    {
+        "model": "rooms.room",
+        "pk": "307dc034-2ecf-48b0-9d15-b4841ec7da5f",
+        "fields": {
+            "created_on": "2023-11-06T18:11:19.896Z",
+            "modified_on": "2023-11-06T19:15:26.483Z",
+            "user": "johndoe@chats.weni.ai",
+            "contact": "82c89830-3e00-408a-8a8e-d91c16ef2ff1",
+            "queue": "f362336c-672b-4962-be82-efdf6101be6d",
+            "custom_fields": null,
+            "urn": "whatsapp:13-673-471-1080",
+            "callback_url": null,
+            "ended_at": null,
+            "ended_by": null,
+            "is_active": true,
+            "is_waiting": false,
+            "transfer_history": {
+                "to": {
+                    "name": "teste",
+                    "type": "user"
+                },
+                "from": {
+                    "name": "Construção Propria",
+                    "type": "queue"
+                },
+                "action": "transfer"
+            },
+            "tags": []
+        }
+    },
+    {
+        "model": "rooms.room",
+        "pk": "47a983f3-d4b0-4fd4-a66c-f2f3856fb2ac",
+        "fields": {
+            "created_on": "2023-11-06T18:08:28.174Z",
+            "modified_on": "2023-11-07T17:37:36.159Z",
+            "user": "johndoe@chats.weni.ai",
+            "contact": "1b691cb7-eb40-4ec8-9ca8-7f3d00d5a36b",
+            "queue": "f362336c-672b-4962-be82-efdf6101be6d",
+            "custom_fields": null,
+            "urn": "whatsapp:32-239-317-1671",
+            "callback_url": null,
+            "ended_at": "2023-11-07T17:37:36.158Z",
+            "ended_by": "agent",
+            "is_active": false,
+            "is_waiting": false,
+            "transfer_history": {
+                "to": {
+                    "name": "teste",
+                    "type": "user"
+                },
+                "from": {
+                    "name": "Construção Propria",
+                    "type": "queue"
+                },
+                "action": "pick"
+            },
+            "tags": []
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "bed81d9b-8597-4625-845b-a7c6eec3734d",
+        "fields": {
+            "created_on": "2023-11-06T19:14:18.087Z",
+            "modified_on": "2023-11-06T19:14:18.087Z",
+            "room": "222f291e-5ba8-4073-adae-7af36ff6eaeb",
+            "user": null,
+            "contact": "dc7cdf20-1b8a-4c57-881e-6efbf39a3191",
+            "text": "If we index the port, we can get to the AGP circuit through the open-source AI protocol!",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "421761ea-bd15-4af1-bb52-79ae88692be0",
+        "fields": {
+            "created_on": "2023-11-06T19:14:18.760Z",
+            "modified_on": "2023-11-06T19:14:18.760Z",
+            "room": "222f291e-5ba8-4073-adae-7af36ff6eaeb",
+            "user": null,
+            "contact": "dc7cdf20-1b8a-4c57-881e-6efbf39a3191",
+            "text": "We need to copy the mobile AI circuit!",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "d5efc866-41ae-4ae0-9f45-a4a112056d76",
+        "fields": {
+            "created_on": "2023-11-06T19:14:26.660Z",
+            "modified_on": "2023-11-06T19:14:26.660Z",
+            "room": "b103c168-f84a-46bb-8fb3-dde700d16841",
+            "user": null,
+            "contact": "424f0e73-7597-46fa-80fc-d10ce7ef6481",
+            "text": "If we hack the protocol, we can get to the JBOD matrix through the primary SCSI matrix!",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "68cf1268-5c2c-44f8-bdea-db09e7890cc1",
+        "fields": {
+            "created_on": "2023-11-06T19:14:27.325Z",
+            "modified_on": "2023-11-06T19:14:27.325Z",
+            "room": "b103c168-f84a-46bb-8fb3-dde700d16841",
+            "user": null,
+            "contact": "424f0e73-7597-46fa-80fc-d10ce7ef6481",
+            "text": "Try to calculate the COM bus, maybe it will compress the bluetooth alarm!",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "18d67e87-6601-4b61-8b51-157c04071593",
+        "fields": {
+            "created_on": "2023-11-06T19:14:33.500Z",
+            "modified_on": "2023-11-06T19:14:33.500Z",
+            "room": "47a983f3-d4b0-4fd4-a66c-f2f3856fb2ac",
+            "user": null,
+            "contact": "1b691cb7-eb40-4ec8-9ca8-7f3d00d5a36b",
+            "text": "Use the wireless JBOD interface, then you can copy the solid state port!",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "d9c22fca-26bd-4ef9-98aa-e5a0f0272062",
+        "fields": {
+            "created_on": "2023-11-06T19:14:34.315Z",
+            "modified_on": "2023-11-06T19:14:34.315Z",
+            "room": "47a983f3-d4b0-4fd4-a66c-f2f3856fb2ac",
+            "user": null,
+            "contact": "1b691cb7-eb40-4ec8-9ca8-7f3d00d5a36b",
+            "text": "Use the 1080p ADP card, then you can index the digital hard drive!",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "e4265f73-5910-4fd4-a3d8-2b085e60c041",
+        "fields": {
+            "created_on": "2023-11-06T19:14:57.231Z",
+            "modified_on": "2023-11-06T19:14:57.231Z",
+            "room": "16eb28e9-ddbb-4f08-8bf2-cddd38046431",
+            "user": null,
+            "contact": "03a23568-ea38-4ddb-bb14-924ac9a0b120",
+            "text": "If we reboot the array, we can get to the CSS bandwidth through the 1080p GB array!",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "66e6c991-6a07-4290-8926-a87ed66be019",
+        "fields": {
+            "created_on": "2023-11-06T19:14:57.923Z",
+            "modified_on": "2023-11-06T19:14:57.923Z",
+            "room": "16eb28e9-ddbb-4f08-8bf2-cddd38046431",
+            "user": null,
+            "contact": "03a23568-ea38-4ddb-bb14-924ac9a0b120",
+            "text": "hacking the feed won't do anything, we need to synthesize the haptic XSS matrix!",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "777c53c8-f5c8-48e8-a47b-5e2bb6568ccc",
+        "fields": {
+            "created_on": "2023-11-06T19:15:05.946Z",
+            "modified_on": "2023-11-06T19:15:05.946Z",
+            "room": "cf215ed2-d0c0-449a-bc10-fd85a4a63bbd",
+            "user": null,
+            "contact": "a13c4263-a1eb-4d54-83c9-855d6fe998a9",
+            "text": "I'll index the redundant SQL protocol, that should bus the COM monitor!",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "69444fac-fa1f-4c12-836b-9f971c20d266",
+        "fields": {
+            "created_on": "2023-11-06T19:15:06.608Z",
+            "modified_on": "2023-11-06T19:15:06.608Z",
+            "room": "cf215ed2-d0c0-449a-bc10-fd85a4a63bbd",
+            "user": null,
+            "contact": "a13c4263-a1eb-4d54-83c9-855d6fe998a9",
+            "text": "The SAS driver is down, copy the open-source panel so we can override the THX firewall!",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "f7493ec9-b1e8-40c2-8b28-c708e9b7bf3f",
+        "fields": {
+            "created_on": "2023-11-06T19:15:15.800Z",
+            "modified_on": "2023-11-06T19:15:15.800Z",
+            "room": "21c30743-8e12-4d19-b91f-d5c7d88addd1",
+            "user": null,
+            "contact": "5a77f131-c51f-47f9-a68d-417c25966ac8",
+            "text": "If we reboot the port, we can get to the AI bandwidth through the mobile SDD program!",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "a17ab094-b9ba-454c-ad31-c8e20bc139e5",
+        "fields": {
+            "created_on": "2023-11-06T19:15:19.041Z",
+            "modified_on": "2023-11-06T19:15:19.041Z",
+            "room": "21c30743-8e12-4d19-b91f-d5c7d88addd1",
+            "user": null,
+            "contact": "5a77f131-c51f-47f9-a68d-417c25966ac8",
+            "text": "We need to override the online FTP protocol!",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "9aab10aa-cb80-4dd6-bd4b-2e7b09871591",
+        "fields": {
+            "created_on": "2023-11-06T19:15:26.472Z",
+            "modified_on": "2023-11-06T19:15:26.472Z",
+            "room": "307dc034-2ecf-48b0-9d15-b4841ec7da5f",
+            "user": null,
+            "contact": "82c89830-3e00-408a-8a8e-d91c16ef2ff1",
+            "text": "Try to calculate the XML hard drive, maybe it will copy the digital application!",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "6c2c923c-acd4-471e-adf4-b1cbe52894b2",
+        "fields": {
+            "created_on": "2023-11-06T19:15:32.897Z",
+            "modified_on": "2023-11-06T19:15:32.897Z",
+            "room": "b095d950-e98c-40a9-8397-9baa4697b241",
+            "user": null,
+            "contact": "4f83db67-0799-41dc-b502-7abb06abfc31",
+            "text": "If we reboot the monitor, we can get to the RSS program through the primary HTTP port!",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "209d21aa-8184-4b89-a159-af2e0d18b750",
+        "fields": {
+            "created_on": "2023-11-06T19:15:33.701Z",
+            "modified_on": "2023-11-06T19:15:33.701Z",
+            "room": "b095d950-e98c-40a9-8397-9baa4697b241",
+            "user": null,
+            "contact": "4f83db67-0799-41dc-b502-7abb06abfc31",
+            "text": "We need to bypass the auxiliary HDD alarm!",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "a5a9487f-4c96-4999-ba58-f29a72a79fa7",
+        "fields": {
+            "created_on": "2023-11-06T19:15:40.484Z",
+            "modified_on": "2023-11-06T19:15:40.484Z",
+            "room": "50da4076-1f3b-4355-9a2e-be91bd6a410c",
+            "user": null,
+            "contact": "9d184183-d390-4eb3-9ef1-3a10f77694e5",
+            "text": "I'll input the online SMS card, that should microchip the AGP application!",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "dc668ce2-283e-40e2-94d8-117ce173ad48",
+        "fields": {
+            "created_on": "2023-11-06T19:15:41.124Z",
+            "modified_on": "2023-11-06T19:15:41.124Z",
+            "room": "50da4076-1f3b-4355-9a2e-be91bd6a410c",
+            "user": null,
+            "contact": "9d184183-d390-4eb3-9ef1-3a10f77694e5",
+            "text": "The SCSI capacitor is down, hack the wireless driver so we can generate the EXE feed!",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "1231018a-d6c9-4f79-8e44-e11d97ef99e5",
+        "fields": {
+            "created_on": "2023-11-06T19:15:48.892Z",
+            "modified_on": "2023-11-06T19:15:48.892Z",
+            "room": "67930b18-b464-470d-ba57-757dc23dc58c",
+            "user": null,
+            "contact": "820646b6-9611-42dc-be49-c9fc3b9ded25",
+            "text": "The COM capacitor is down, reboot the back-end matrix so we can calculate the GB hard drive!",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "07e1c4c2-6a82-4315-be66-71106f967550",
+        "fields": {
+            "created_on": "2023-11-06T19:15:51.468Z",
+            "modified_on": "2023-11-06T19:15:51.468Z",
+            "room": "67930b18-b464-470d-ba57-757dc23dc58c",
+            "user": null,
+            "contact": "820646b6-9611-42dc-be49-c9fc3b9ded25",
+            "text": "backing up the sensor won't do anything, we need to transmit the redundant PNG feed!",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "1efc3a32-84a7-41bf-b63a-61c7e5286adb",
+        "fields": {
+            "created_on": "2023-11-06T19:16:00.519Z",
+            "modified_on": "2023-11-06T19:16:00.519Z",
+            "room": "3272fa3d-0ebf-4a85-94f2-e973a0ea6fcd",
+            "user": null,
+            "contact": "b8712ab3-50e4-400b-b14e-4f87979bf70f",
+            "text": "Try to program the FTP program, maybe it will reboot the cross-platform transmitter!",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "4b7d8816-3419-4f95-a30f-9b9437c54606",
+        "fields": {
+            "created_on": "2023-11-06T19:16:01.309Z",
+            "modified_on": "2023-11-06T19:16:01.309Z",
+            "room": "3272fa3d-0ebf-4a85-94f2-e973a0ea6fcd",
+            "user": null,
+            "contact": "b8712ab3-50e4-400b-b14e-4f87979bf70f",
+            "text": "Try to transmit the AGP microchip, maybe it will quantify the redundant card!",
+            "seen": false
+        }
+    },
+    {
+        "model": "msgs.message",
+        "pk": "8d92c017-a5d5-4717-927b-37cc7be249ca",
+        "fields": {
+            "created_on": "2023-11-06T19:16:10.923Z",
+            "modified_on": "2023-11-06T19:16:10.923Z",
+            "room": "f487cabc-4ec9-4b2a-9b9a-e552831ba937",
+            "user": null,
+            "contact": "e3e12ca8-8e76-4dc5-8d90-e5e90b61450e",
+            "text": "Use the digital IB interface, then you can input the primary system!",
+            "seen": false
+        }
+    },
+    {
+        "model": "discussions.discussion",
+        "pk": "3c2d1694-8db9-4f09-976b-e263f9d79c99",
+        "fields": {
+            "created_on": "2023-11-06T19:47:58.045Z",
+            "modified_on": "2023-11-06T19:47:58.045Z",
+            "is_deleted": false,
+            "subject": "synergize strategic experiences",
+            "created_by": "linalawson@chats.weni.ai",
+            "room": "50da4076-1f3b-4355-9a2e-be91bd6a410c",
+            "queue": "71a8b436-7239-4a42-b05c-7d430d98cd66",
+            "is_queued": true,
+            "is_active": true
+        }
+    },
+    {
+        "model": "discussions.discussion",
+        "pk": "36584c70-aaf9-4f5c-b0c3-0547bb23879d",
+        "fields": {
+            "created_on": "2023-11-06T21:06:20.689Z",
+            "modified_on": "2023-11-06T21:11:46.295Z",
+            "is_deleted": false,
+            "subject": "whiteboard cross-platform web-readiness",
+            "created_by": "linalawson@chats.weni.ai",
+            "room": "21c30743-8e12-4d19-b91f-d5c7d88addd1",
+            "queue": "687ca2aa-978b-48e6-ae95-1d03fc1d1a5b",
+            "is_queued": false,
+            "is_active": false
+        }
+    },
+    {
+        "model": "discussions.discussion",
+        "pk": "9e2d9ea7-a130-4d07-ab54-de8284c8c922",
+        "fields": {
+            "created_on": "2023-11-06T19:58:56.897Z",
+            "modified_on": "2023-11-06T20:16:44.894Z",
+            "is_deleted": false,
+            "subject": "synthesize sexy partnerships",
+            "created_by": "agentqueue@chats.weni.ai",
+            "room": "b103c168-f84a-46bb-8fb3-dde700d16841",
+            "queue": "f362336c-672b-4962-be82-efdf6101be6d",
+            "is_queued": false,
+            "is_active": true
+        }
+    },
+    {
+        "model": "discussions.discussionuser",
+        "pk": "d880c2fe-524c-4ab7-823c-506a946878df",
+        "fields": {
+            "created_on": "2023-11-06T19:47:58.092Z",
+            "modified_on": "2023-11-06T19:47:58.092Z",
+            "permission": "27dd61c2-16d5-41b0-8fc0-bb027ffb90f8",
+            "discussion": "3c2d1694-8db9-4f09-976b-e263f9d79c99",
+            "role": 0
+        }
+    },
+    {
+        "model": "discussions.discussionuser",
+        "pk": "305e0f95-f9db-40e1-88a6-a01fad34bcfd",
+        "fields": {
+            "created_on": "2023-11-06T21:06:20.719Z",
+            "modified_on": "2023-11-06T21:06:20.719Z",
+            "permission": "27dd61c2-16d5-41b0-8fc0-bb027ffb90f8",
+            "discussion": "36584c70-aaf9-4f5c-b0c3-0547bb23879d",
+            "role": 0
+        }
+    },
+    {
+        "model": "discussions.discussionuser",
+        "pk": "404ecb31-ae5e-4236-b95a-c6a1f8391030",
+        "fields": {
+            "created_on": "2023-11-06T21:07:30.891Z",
+            "modified_on": "2023-11-06T21:07:30.891Z",
+            "permission": "754bd473-2921-4755-958e-9bf29272ce2a",
+            "discussion": "36584c70-aaf9-4f5c-b0c3-0547bb23879d",
+            "role": 2
+        }
+    },
+    {
+        "model": "discussions.discussionuser",
+        "pk": "48ab983c-e297-4cc7-b63e-fc405aee882f",
+        "fields": {
+            "created_on": "2023-11-06T21:07:41.970Z",
+            "modified_on": "2023-11-06T21:07:41.970Z",
+            "permission": "ec9226f3-dae7-474d-8c31-a0276c19f63e",
+            "discussion": "36584c70-aaf9-4f5c-b0c3-0547bb23879d",
+            "role": 2
+        }
+    },
+    {
+        "model": "discussions.discussionuser",
+        "pk": "59c25277-ae51-47c4-b1dd-772cced4cbe8",
+        "fields": {
+            "created_on": "2023-11-06T19:58:56.940Z",
+            "modified_on": "2023-11-06T19:58:56.940Z",
+            "permission": "a7cf2af5-e43c-4219-b5b7-64708c279357",
+            "discussion": "9e2d9ea7-a130-4d07-ab54-de8284c8c922",
+            "role": 0
+        }
+    },
+    {
+        "model": "discussions.discussionuser",
+        "pk": "06aee1a5-62de-4c92-9615-d0159d9a2920",
+        "fields": {
+            "created_on": "2023-11-06T20:16:42.363Z",
+            "modified_on": "2023-11-06T20:16:42.363Z",
+            "permission": "fd7f2121-d407-4154-b442-736697568153",
+            "discussion": "9e2d9ea7-a130-4d07-ab54-de8284c8c922",
+            "role": 2
+        }
+    },
+    {
+        "model": "discussions.discussionuser",
+        "pk": "a6408afb-0c2d-470f-ba65-93396da238ca",
+        "fields": {
+            "created_on": "2023-11-06T20:21:51.140Z",
+            "modified_on": "2023-11-06T20:21:51.140Z",
+            "permission": "27dd61c2-16d5-41b0-8fc0-bb027ffb90f8",
+            "discussion": "9e2d9ea7-a130-4d07-ab54-de8284c8c922",
+            "role": 2
+        }
+    },
+    {
+        "model": "discussions.discussionuser",
+        "pk": "58436703-3c33-46e3-967a-18e1190b0ee9",
+        "fields": {
+            "created_on": "2023-11-06T20:22:04.325Z",
+            "modified_on": "2023-11-06T20:22:04.325Z",
+            "permission": "27dd61c2-16d5-41b0-8fc0-bb027ffb90f8",
+            "discussion": "9e2d9ea7-a130-4d07-ab54-de8284c8c922",
+            "role": 2
+        }
+    },
+    {
+        "model": "discussions.discussionuser",
+        "pk": "8b3e6648-b7b2-49a0-98db-cd39095bcfca",
+        "fields": {
+            "created_on": "2023-11-06T20:23:52.720Z",
+            "modified_on": "2023-11-06T20:23:52.720Z",
+            "permission": "6aac1cca-c02c-4fad-b8d9-9d36292f8dc7",
+            "discussion": "9e2d9ea7-a130-4d07-ab54-de8284c8c922",
+            "role": 1
+        }
+    },
+    {
+        "model": "discussions.discussionuser",
+        "pk": "c6dbfc4b-b1e9-4c83-9c7c-b5927a00edef",
+        "fields": {
+            "created_on": "2023-11-06T20:24:02.772Z",
+            "modified_on": "2023-11-06T20:24:02.772Z",
+            "permission": "b1fea9b3-f216-4119-8f86-50115c49dfd4",
+            "discussion": "9e2d9ea7-a130-4d07-ab54-de8284c8c922",
+            "role": 1
+        }
+    },
+    {
+        "model": "discussions.discussionmessage",
+        "pk": "77fa59a5-6f29-4e55-b68f-3fbf4f7b08e3",
+        "fields": {
+            "created_on": "2023-11-06T19:47:58.077Z",
+            "modified_on": "2023-11-06T19:47:58.078Z",
+            "discussion": "3c2d1694-8db9-4f09-976b-e263f9d79c99",
+            "sender": "linalawson@chats.weni.ai",
+            "text": "Streamlined holistic archive"
+        }
+    },
+    {
+        "model": "discussions.discussionmessage",
+        "pk": "96d9aaec-0914-46e4-919d-dc5c6860be7a",
+        "fields": {
+            "created_on": "2023-11-06T19:58:56.927Z",
+            "modified_on": "2023-11-06T19:58:56.927Z",
+            "discussion": "9e2d9ea7-a130-4d07-ab54-de8284c8c922",
+            "sender": "agentqueue@chats.weni.ai",
+            "text": "Switchable client-server infrastructure"
+        }
+    },
+    {
+        "model": "discussions.discussionmessage",
+        "pk": "4a4d2b8d-6efc-4158-96bb-aec38883fa32",
+        "fields": {
+            "created_on": "2023-11-06T21:06:20.705Z",
+            "modified_on": "2023-11-06T21:06:20.705Z",
+            "discussion": "36584c70-aaf9-4f5c-b0c3-0547bb23879d",
+            "sender": "linalawson@chats.weni.ai",
+            "text": "Multi-lateral mobile instruction set"
         }
     }
 ]

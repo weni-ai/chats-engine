@@ -1,8 +1,10 @@
 from rest_framework import serializers
+from rest_framework.exceptions import APIException
 
 from chats.apps.api.v1.accounts.serializers import UserNameEmailSerializer
 
 from ..models import Discussion, DiscussionUser
+from ..models.validators import validate_queue_and_room
 
 
 class DiscussionCreateSerializer(serializers.ModelSerializer):
@@ -19,16 +21,27 @@ class DiscussionCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         initial_message = validated_data.pop("initial_message")
+        if not validate_queue_and_room(
+            validated_data.get("queue"), validated_data.get("room")
+        ):
+            raise APIException(
+                detail={"detail": "Cannot set outside project queue on the discussion"},
+            )
+
         created_by = self.context.get("user")
         validated_data["created_by"] = created_by
+        try:
+            discussion = super().create(validated_data)
+            discussion.notify("create")
 
-        discussion = super().create(validated_data)
-        discussion.notify("create")
-
-        discussion.create_discussion_message(initial_message)
-        discussion.create_discussion_user(
-            from_user=created_by, to_user=created_by, role=0
-        )
+            discussion.create_discussion_message(initial_message)
+            discussion.create_discussion_user(
+                from_user=created_by, to_user=created_by, role=0
+            )
+        except Exception as err:
+            raise APIException(
+                detail={"detail": f"{type(err)}: {err}"},
+            )  # TODO: treat this error on the EXCEPTION_HANDLER instead of the serializer
 
         return discussion
 
