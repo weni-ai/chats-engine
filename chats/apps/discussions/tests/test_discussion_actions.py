@@ -4,12 +4,14 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 
-class DiscussionViewTests(APITestCase):
+class BaseDiscussionViewActionTests(APITestCase):
     fixtures = [
         "chats/fixtures/fixture_app.json",
         "chats/fixtures/fixture_discussion.json",
     ]
 
+
+class CreateDiscussionViewActionTests(BaseDiscussionViewActionTests):
     # ("Scenario description", room, queue, subject, initial_message, user_token, expected_response_status)
 
     parameters = [
@@ -98,7 +100,7 @@ class DiscussionViewTests(APITestCase):
         ),
     ]
 
-    def _create_discussion(self, token, params=None, body=None):
+    def _create_discussion(self, token, body=None):
         url = reverse("discussion-list")
         client = self.client
         client.credentials(HTTP_AUTHORIZATION="Token " + token)
@@ -106,8 +108,8 @@ class DiscussionViewTests(APITestCase):
         return response
 
     @parameterized.expand(parameters)
-    def test_success_open_discussion_on_active_room(
-        self, _, room, queue, subject, initial_message, token, status
+    def test_open_discussion(
+        self, _, room, queue, subject, initial_message, token, expected_status
     ):
         discussion_data = {
             "room": room,
@@ -119,4 +121,47 @@ class DiscussionViewTests(APITestCase):
         }
 
         response = self._create_discussion(token=token, body=discussion_data)
-        self.assertEqual(response.status_code, status)
+        self.assertEqual(response.status_code, expected_status)
+
+
+class ListDiscussionsViewActionTests(BaseDiscussionViewActionTests):
+    parameters = [
+        (
+            "Agent can only retrieve theirs discussions or queued discussions when they have access to the queue",
+            "dae39bcc-bdc2-4b03-b4da-023a117f8474",
+            True,
+            "d7fddba0b1dfaad72aa9e21876cbc93caa9ce3fa",
+            status.HTTP_200_OK,
+            2,
+        )(
+            "Admin can list all discussions on the project",
+            "dae39bcc-bdc2-4b03-b4da-023a117f8474",
+            True,
+            "4215e6d6666e54f7db9f98100533aa68909fd855",
+            status.HTTP_200_OK,
+            2,
+        )(
+            "Agent List not active discussions",
+            "dae39bcc-bdc2-4b03-b4da-023a117f8474",
+            False,
+            "d7fddba0b1dfaad72aa9e21876cbc93caa9ce3fa",
+            status.HTTP_200_OK,
+            2,
+        )
+    ]
+
+    def _list_discussions(self, token, params=None):
+        url = reverse("discussion-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + token)
+        response = client.get(url, data=params)
+        return response
+
+    @parameterized.expand(parameters)
+    def test_list_discussions(
+        self, _, project, is_active, token, expected_status, expected_count
+    ):
+        query_filters = {"project": project, "is_active": is_active}
+        response = self._list_discussions(token=token, params=query_filters)
+        self.assertEqual(response.status_code, expected_status)
+        self.assertEqual(response.data.get("count"), expected_count)
