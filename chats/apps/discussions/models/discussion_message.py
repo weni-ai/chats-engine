@@ -42,7 +42,7 @@ class DiscussionMessage(BaseModel):
 
         medias = [
             dict(content_type=media.content_type, url=media.url)
-            for media in self.medias.all()
+            for media in self.discussion_medias.all()
         ]
 
         return {
