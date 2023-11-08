@@ -12,7 +12,6 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("queues", "0005_queue_config"),
-        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ("rooms", "0010_alter_room_urn"),
         ("projects", "0019_flowstart_contact_data"),
     ]
