@@ -70,7 +70,7 @@ class DiscussionViewSet(viewsets.ModelViewSet, DiscussionUserActionsMixin):
         return super().get_paginated_response(data)
 
     def filter_queryset(self, queryset):
-        if self.action == "destroy":
+        if self.action in ["destroy", "retrieve"]:
             return queryset
         return super().filter_queryset(queryset)
 
