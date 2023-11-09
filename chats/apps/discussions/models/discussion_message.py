@@ -12,7 +12,7 @@ class DiscussionMessage(BaseModel):
         verbose_name=_("discussion"),
         on_delete=models.CASCADE,
     )
-    sender = models.ForeignKey(
+    user = models.ForeignKey(
         "accounts.User",
         related_name="discussion_messages",
         verbose_name=_("user"),
@@ -32,17 +32,17 @@ class DiscussionMessage(BaseModel):
     def notification_data(self):
         sender = (
             None
-            if not self.sender
+            if not self.user
             else dict(
-                first_name=self.sender.first_name,
-                last_name=self.sender.last_name,
-                email=self.sender.email,
+                first_name=self.user.first_name,
+                last_name=self.user.last_name,
+                email=self.user.email,
             )
         )
 
         medias = [
             dict(content_type=media.content_type, url=media.url)
-            for media in self.discussion_medias.all()
+            for media in self.medias.all()
         ]
 
         return {
@@ -62,7 +62,7 @@ class DiscussionMessage(BaseModel):
 class DiscussionMessageMedia(BaseModel):
     message = models.ForeignKey(
         "discussions.DiscussionMessage",
-        related_name="discussion_medias",
+        related_name="medias",
         verbose_name=_("discussion message"),
         on_delete=models.CASCADE,
         blank=True,
@@ -71,7 +71,11 @@ class DiscussionMessageMedia(BaseModel):
 
     content_type = models.CharField(_("Content Type"), max_length=300)
     media_file = models.FileField(
-        _("Media File"), null=True, blank=True, max_length=300
+        _("Media File"),
+        null=True,
+        blank=True,
+        max_length=300,
+        upload_to="discussionmedia/%Y/%m/%d/",
     )
 
     class Meta:

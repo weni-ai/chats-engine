@@ -133,21 +133,23 @@ class ListDiscussionsViewActionTests(BaseDiscussionViewActionTests):
             "d7fddba0b1dfaad72aa9e21876cbc93caa9ce3fa",
             status.HTTP_200_OK,
             2,
-        )(
+        ),
+        (
             "Admin can list all discussions on the project",
             "dae39bcc-bdc2-4b03-b4da-023a117f8474",
             True,
             "4215e6d6666e54f7db9f98100533aa68909fd855",
             status.HTTP_200_OK,
             2,
-        )(
+        ),
+        (
             "Agent List not active discussions",
             "dae39bcc-bdc2-4b03-b4da-023a117f8474",
             False,
             "d7fddba0b1dfaad72aa9e21876cbc93caa9ce3fa",
             status.HTTP_200_OK,
             2,
-        )
+        ),
     ]
 
     def _list_discussions(self, token, params=None):

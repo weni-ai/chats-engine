@@ -14,6 +14,7 @@ from ..serializers import (
     DiscussionUserListSerializer,
 )
 from .feedbacks import create_discussion_feedback_message
+from ._discussion_message_actions import DiscussionMessageActionsMixin
 from .permissions import CanManageDiscussion
 
 User = get_user_model()
@@ -63,20 +64,19 @@ class DiscussionUserActionsMixin:
         return Response(serializer.data)
 
 
-class DiscussionViewSet(viewsets.ModelViewSet, DiscussionUserActionsMixin):
+class DiscussionViewSet(
+    viewsets.ModelViewSet, DiscussionUserActionsMixin, DiscussionMessageActionsMixin
+):
     queryset = Discussion.objects.all()
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = DiscussionFilter
     permission_classes = [IsAuthenticated, CanManageDiscussion]
     lookup_field = "uuid"
 
-    def get_paginated_response(self, data):
-        return super().get_paginated_response(data)
-
     def filter_queryset(self, queryset):
-        if self.action in ["destroy", "retrieve"]:
-            return queryset
-        return super().filter_queryset(queryset)
+        if self.action == "list":
+            return super().filter_queryset(queryset)
+        return queryset
 
     def get_serializer_class(self):
         if self.action == "create":
