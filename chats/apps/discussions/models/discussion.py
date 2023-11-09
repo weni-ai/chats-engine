@@ -157,8 +157,9 @@ class Discussion(BaseSoftDeleteModel, BaseModel):
         return discussion_user
 
     def create_discussion_message(self, message, user=None):
-        msg = self.messages.create(sender=user or self.created_by, text=message)
+        msg = self.messages.create(user=user or self.created_by, text=message)
         msg.notify("create")
+        return msg
 
     def get_permission(self, user):
         return self.project.get_permission(user)

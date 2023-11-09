@@ -26,6 +26,15 @@ class DiscussionObjectPermissionActions:
             user_email = self.request.data.get("user_email")
             return user_email == self.user.email
 
+    def send_messages(self):
+        return self.retrieve()
+
+    def list_messages(self):
+        return self.retrieve()
+
+    def send_media_messages(self):
+        return self.retrieve()
+
 
 class CanManageDiscussion(permissions.BasePermission):
     def has_permission(self, request, view):
