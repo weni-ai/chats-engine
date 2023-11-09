@@ -155,6 +155,7 @@ class Discussion(BaseSoftDeleteModel, BaseModel):
         sender = (user or self.created_by) if not system else None
         msg = self.messages.create(user=sender, text=message)
         msg.notify("create")
+        return msg
 
     def get_permission(self, user):
         return self.project.get_permission(user)
