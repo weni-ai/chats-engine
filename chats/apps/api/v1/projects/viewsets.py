@@ -4,6 +4,7 @@ from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -17,6 +18,7 @@ from chats.apps.api.v1.permissions import (
     IsSectorManager,
     ProjectAnyPermission,
 )
+from chats.apps.api.v1.projects.filters import FlowStartFilter
 from chats.apps.api.v1.projects.serializers import (
     LinkContactSerializer,
     ListFlowStartSerializer,
@@ -32,10 +34,6 @@ from chats.apps.projects.models import (
 )
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import create_room_feedback_message
-
-from rest_framework.pagination import LimitOffsetPagination
-
-from chats.apps.api.v1.projects.filters import FlowStartFilter
 
 
 class ProjectViewset(viewsets.ReadOnlyModelViewSet):
@@ -257,23 +255,27 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
                 {"Detail": "the user does not have permission in this project"},
                 status.HTTP_401_UNAUTHORIZED,
             )
+        contact_id = data.get("contacts")[0]
         flow_start_data = {
             "permission": perm,
             "flow": flow,
             "contact_data": {
                 "name": data.pop("contact_name"),
-                "external_id": data.get("contacts")[0],
+                "external_id": contact_id,
             },
         }
         room_id = data.get("room", None)
 
         try:
-            room = Room.objects.get(pk=room_id, is_active=True)
+            room = Room.objects.get(
+                pk=room_id, is_active=True, contact__external_id=contact_id
+            )
             if room.flowstarts.filter(is_deleted=False).exists():
                 return Response(
                     {"Detail": "There already is an active flow start for this room"},
                     status.HTTP_400_BAD_REQUEST,
                 )
+
             if not room.is_24h_valid:
                 flow_start_data["room"] = room
                 room.request_callback(room.serialized_ws_data)
