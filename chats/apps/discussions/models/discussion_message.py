@@ -29,34 +29,17 @@ class DiscussionMessage(BaseModel):
         ordering = ["created_on"]
 
     @property
-    def notification_data(self):
-        sender = (
-            None
-            if not self.user
-            else dict(
-                first_name=self.user.first_name,
-                last_name=self.user.last_name,
-                email=self.user.email,
-            )
+    def serialized_ws_data(self):
+        from ..serializers.discussion_message import (  # noqa
+            DiscussionReadMessageSerializer,
         )
 
-        medias = [
-            dict(content_type=media.content_type, url=media.url)
-            for media in self.medias.all()
-        ]
-
-        return {
-            "uuid": str(self.uuid),
-            "sender": sender,
-            "discussion": str(self.discussion.pk),
-            "text": self.text,
-            "media": medias,
-            "created_on": str(self.created_on),
-        }
+        return DiscussionReadMessageSerializer(self).data
 
     def notify(self, action: str):
-        data = self.notification_data
-        self.discussion.notify(content=data, action=f"msg.{action}")
+        self.discussion.notify(
+            content=self.serialized_ws_data, action=f"discussion_msg.{action}"
+        )
 
 
 class DiscussionMessageMedia(BaseModel):

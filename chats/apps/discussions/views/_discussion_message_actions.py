@@ -24,7 +24,7 @@ class DiscussionMessageActionsMixin:
             serializer = DiscussionCreateMessageSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
             msg = discussion.create_discussion_message(
-                message=serializer.data.get("text"), user=user
+                message=serializer.validated_data.get("text"), user=user
             )
             serialized_msg = DiscussionReadMessageSerializer(instance=msg)
 
