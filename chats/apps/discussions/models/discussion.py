@@ -62,16 +62,10 @@ class Discussion(BaseSoftDeleteModel, BaseModel):
         return self.queue.sector
 
     @property
-    def notification_data(self):
-        return {
-            "uuid": str(self.uuid),
-            "subject": self.subject,
-            "created_by": self.created_by.full_name,
-            "created_on": str(self.created_on),
-            "contact": self.room.contact.name,
-            "is_active": self.is_active,
-            "is_queued": self.is_queued,
-        }
+    def serialized_ws_data(self):
+        from ..serializers.discussions import DiscussionListSerializer  # noqa
+
+        return DiscussionListSerializer(self).data
 
     def base_notification(self, content, action):
         if self.user:
@@ -90,7 +84,7 @@ class Discussion(BaseSoftDeleteModel, BaseModel):
     def notify_user(self, user_permission, action: str, content: dict = {}):
         if "." not in action:
             action = f"discussions.{action}"
-        content = content or self.notification_data
+        content = content or self.serialized_ws_data
         send_channels_group(
             group_name=f"permission_{user_permission.pk}",
             call_type="notify",
@@ -101,7 +95,7 @@ class Discussion(BaseSoftDeleteModel, BaseModel):
     def notify_users(self, action: str, content: dict = {}):
         if "." not in action:
             action = f"discussions.{action}"
-        content = content or self.notification_data
+        content = content or self.serialized_ws_data
         for added_user in self.added_users.all():
             send_channels_group(
                 group_name=f"permission_{added_user.permission.pk}",
@@ -117,7 +111,7 @@ class Discussion(BaseSoftDeleteModel, BaseModel):
     ):
         if "." not in action:
             action = f"discussions.{action}"
-        content = content or self.notification_data
+        content = content or self.serialized_ws_data
         send_channels_group(
             group_name=f"queue_{self.queue.pk}",
             call_type="notify",
@@ -125,16 +119,17 @@ class Discussion(BaseSoftDeleteModel, BaseModel):
             action=action,
         )
 
-    def notify(self, action: str, content: dict = {}):
-        if self.is_queued:
+    def notify(self, action: str, content: dict = {}, to_queue=False):
+        if self.is_queued or to_queue:
             self.notify_queue(action=action, content=content)
-        self.notify_users(action=action, content=content)
+        else:
+            self.notify_users(action=action, content=content)
 
     def check_queued(self):
         if self.is_queued and self.added_users.count() > 1:
             self.is_queued = False
             self.save()
-            self.notify_queue("dequeue")
+            self.notify_queue("update")
             self.notify_users("update")
 
     def can_add_user(self, user_permission) -> bool:
