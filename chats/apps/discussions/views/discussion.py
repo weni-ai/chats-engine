@@ -13,6 +13,7 @@ from ..serializers import (
     DiscussionListSerializer,
     DiscussionUserListSerializer,
 )
+from .feedbacks import create_discussion_feedback_message
 from .permissions import CanManageDiscussion
 
 User = get_user_model()
@@ -30,6 +31,9 @@ class DiscussionUserActionsMixin:
             added_agent = discussion.create_discussion_user(
                 from_user=request.user, to_user=user
             )
+            feedback = {"user": added_agent.user.first_name}
+            create_discussion_feedback_message(discussion, feedback, "add")
+
             return Response(
                 {
                     "first_name": added_agent.user.first_name,
