@@ -1,3 +1,4 @@
+from django.db.utils import IntegrityError
 from rest_framework import serializers
 from rest_framework.exceptions import APIException
 
@@ -24,6 +25,7 @@ class DiscussionCreateSerializer(serializers.ModelSerializer):
         if not validate_queue_and_room(
             validated_data.get("queue"), validated_data.get("room")
         ):
+            APIException.status_code = 400
             raise APIException(
                 detail={"detail": "Cannot set outside project queue on the discussion"},
             )
@@ -38,7 +40,16 @@ class DiscussionCreateSerializer(serializers.ModelSerializer):
             discussion.create_discussion_user(
                 from_user=created_by, to_user=created_by, role=0
             )
+        except IntegrityError:
+            APIException.status_code = 409
+            raise APIException(
+                detail={
+                    "detail": "The room already have an open discussion.",
+                },
+            )
         except Exception as err:
+            APIException.status_code = 400
+
             raise APIException(
                 detail={"detail": f"{type(err)}: {err}"},
             )  # TODO: treat this error on the EXCEPTION_HANDLER instead of the serializer
