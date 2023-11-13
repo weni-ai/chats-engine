@@ -29,6 +29,10 @@ class DiscussionMessage(BaseModel):
         ordering = ["created_on"]
 
     @property
+    def media(self):
+        return self.medias.all()
+
+    @property
     def serialized_ws_data(self):
         from ..serializers.discussion_message import (  # noqa
             DiscussionReadMessageSerializer,

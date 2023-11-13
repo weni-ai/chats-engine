@@ -36,7 +36,7 @@ class MessageMediaSimpleSerializer(serializers.ModelSerializer):
 
 class DiscussionReadMessageSerializer(serializers.ModelSerializer):
     user = UserNameEmailSerializer(many=False, required=False, read_only=True)
-    medias = MessageMediaSimpleSerializer(many=True, required=False)
+    media = MessageMediaSimpleSerializer(many=True, required=False)
 
     class Meta:
         model = DiscussionMessage
@@ -45,7 +45,7 @@ class DiscussionReadMessageSerializer(serializers.ModelSerializer):
             "user",
             "discussion",
             "text",
-            "medias",
+            "media",
             "created_on",
         ]
 
