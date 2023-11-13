@@ -21,20 +21,24 @@ class DiscussionFilter(filters.FilterSet):
     )
 
     def filter_project(self, queryset, name, value):
-        if self.request.query_params.get("room"):
+        if self.request.query_params.get("room") and not self.request.query_params.get(
+            "is_active"
+        ):
             return queryset.filter(queue__sector__project=value)
 
         user = self.request.query_params.get("email") or self.request.user
-        if type(user) == str:
+        if not isinstance(user, User):
             user = User.objects.get(email=user)
 
         permission = user.project_permissions.get(project=value)
-        queryset = queryset.filter(
-            Q(added_users__permission=permission) | Q(is_queued=True)
+
+        queues_filter = (
+            Q(queue__sector__project=value)
+            if permission.is_admin
+            else Q(queue__in=permission.queue_ids)
         )
 
-        if permission.is_admin:
-            return queryset.filter(queue__sector__project=value)
         return queryset.filter(
-            queue__in=permission.queue_ids,
-        ).distinct()  # return only the discussions the user has access
+            Q(queues_filter & Q(is_queued=True))
+            | Q(Q(added_users__permission=permission) | Q(created_by=user))
+        ).distinct()
