@@ -1350,17 +1350,6 @@
     },
     {
         "model": "discussions.discussionuser",
-        "pk": "58436703-3c33-46e3-967a-18e1190b0ee9",
-        "fields": {
-            "created_on": "2023-11-06T20:22:04.325Z",
-            "modified_on": "2023-11-06T20:22:04.325Z",
-            "permission": "27dd61c2-16d5-41b0-8fc0-bb027ffb90f8",
-            "discussion": "9e2d9ea7-a130-4d07-ab54-de8284c8c922",
-            "role": 2
-        }
-    },
-    {
-        "model": "discussions.discussionuser",
         "pk": "8b3e6648-b7b2-49a0-98db-cd39095bcfca",
         "fields": {
             "created_on": "2023-11-06T20:23:52.720Z",
@@ -1388,7 +1377,7 @@
             "created_on": "2023-11-06T19:47:58.077Z",
             "modified_on": "2023-11-06T19:47:58.078Z",
             "discussion": "3c2d1694-8db9-4f09-976b-e263f9d79c99",
-            "sender": "linalawson@chats.weni.ai",
+            "user": "linalawson@chats.weni.ai",
             "text": "Streamlined holistic archive"
         }
     },
@@ -1399,7 +1388,7 @@
             "created_on": "2023-11-06T19:58:56.927Z",
             "modified_on": "2023-11-06T19:58:56.927Z",
             "discussion": "9e2d9ea7-a130-4d07-ab54-de8284c8c922",
-            "sender": "agentqueue@chats.weni.ai",
+            "user": "agentqueue@chats.weni.ai",
             "text": "Switchable client-server infrastructure"
         }
     },
@@ -1410,7 +1399,7 @@
             "created_on": "2023-11-06T21:06:20.705Z",
             "modified_on": "2023-11-06T21:06:20.705Z",
             "discussion": "36584c70-aaf9-4f5c-b0c3-0547bb23879d",
-            "sender": "linalawson@chats.weni.ai",
+            "user": "linalawson@chats.weni.ai",
             "text": "Multi-lateral mobile instruction set"
         }
     }

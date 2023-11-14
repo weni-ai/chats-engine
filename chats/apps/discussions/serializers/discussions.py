@@ -1,3 +1,5 @@
+import json
+
 from django.db.utils import IntegrityError
 from rest_framework import serializers
 from rest_framework.exceptions import APIException
@@ -6,7 +8,17 @@ from chats.apps.api.v1.accounts.serializers import UserNameEmailSerializer
 
 from ..models import Discussion, DiscussionUser
 from ..models.validators import validate_queue_and_room
-from ..views.feedbacks import create_discussion_feedback_message
+
+
+def create_feedback_json(method: str, content: dict):
+    return {"method": method, "content": content}
+
+
+def create_discussion_feedback_message(discussion: object, feedback: dict, method: str):
+    return discussion.create_discussion_message(
+        message=json.dumps(create_feedback_json(method=method, content=feedback)),
+        system=True,
+    )
 
 
 class DiscussionCreateSerializer(serializers.ModelSerializer):
@@ -37,12 +49,12 @@ class DiscussionCreateSerializer(serializers.ModelSerializer):
             discussion = super().create(validated_data)
             discussion.notify("create")
 
+            feedback = {"user": created_by.first_name, "queue": discussion.queue.name}
+            create_discussion_feedback_message(discussion, feedback, "dc")
             discussion.create_discussion_message(initial_message)
             discussion.create_discussion_user(
                 from_user=created_by, to_user=created_by, role=0
             )
-            feedback = {"user": created_by.first_name, "queue": discussion.queue.name}
-            create_discussion_feedback_message(discussion, feedback, "dc")
 
         except IntegrityError:
             APIException.status_code = 409
