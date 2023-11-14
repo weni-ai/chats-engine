@@ -143,7 +143,7 @@ class Discussion(BaseSoftDeleteModel, BaseModel):
         discussion_user = None
 
         if (from_permission and to_permission) and self.can_add_user(from_permission):
-            role = role if role is not None else from_permission.role
+            role = role if role is not None else to_permission.role
             discussion_user = self.added_users.create(
                 permission=to_permission, role=role
             )
