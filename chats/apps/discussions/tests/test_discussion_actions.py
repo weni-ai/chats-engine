@@ -5,14 +5,15 @@ from rest_framework.test import APITestCase
 
 
 class BaseDiscussionViewActionTests(APITestCase):
-    fixtures = [
-        "chats/fixtures/fixture_app.json",
-        "chats/fixtures/fixture_discussion.json",
-    ]
+    ...
 
 
 class CreateDiscussionViewActionTests(BaseDiscussionViewActionTests):
     # ("Scenario description", room, queue, subject, initial_message, user_token, expected_response_status)
+    fixtures = [
+        "chats/fixtures/fixture_app.json",
+        "chats/fixtures/fixture_discussion.json",
+    ]
 
     parameters = [
         # Success parameters
@@ -87,7 +88,7 @@ class CreateDiscussionViewActionTests(BaseDiscussionViewActionTests):
             None,
             None,
             "d7fddba0b1dfaad72aa9e21876cbc93caa9ce3fa",
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status.HTTP_409_CONFLICT,
         ),
         (
             "discussion cannot be openned to another project",
@@ -96,7 +97,7 @@ class CreateDiscussionViewActionTests(BaseDiscussionViewActionTests):
             None,
             None,
             "59e5b85e2f0134c4ee9f72037e379c94390697ce",
-            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status.HTTP_400_BAD_REQUEST,
         ),
     ]
 
@@ -125,6 +126,10 @@ class CreateDiscussionViewActionTests(BaseDiscussionViewActionTests):
 
 
 class ListDiscussionsViewActionTests(BaseDiscussionViewActionTests):
+    fixtures = [
+        "chats/fixtures/fixture_app.json",
+        "chats/fixtures/fixture_discussion.json",
+    ]
     parameters = [
         (
             "Agent can only retrieve theirs discussions or queued discussions when they have access to the queue",
