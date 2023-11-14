@@ -32,7 +32,7 @@ class DiscussionUserActionsMixin:
                 from_user=request.user, to_user=user
             )
             feedback = {"user": added_agent.user.first_name}
-            create_discussion_feedback_message(discussion, feedback, "add")
+            create_discussion_feedback_message(discussion, feedback, "da")
 
             return Response(
                 {

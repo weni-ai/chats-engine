@@ -151,8 +151,9 @@ class Discussion(BaseSoftDeleteModel, BaseModel):
             self.check_queued()
         return discussion_user
 
-    def create_discussion_message(self, message, user=None):
-        msg = self.messages.create(sender=user or self.created_by, text=message)
+    def create_discussion_message(self, message, user=None, system=False):
+        sender = (user or self.created_by) if not system else None
+        msg = self.messages.create(user=sender, text=message)
         msg.notify("create")
 
     def get_permission(self, user):
