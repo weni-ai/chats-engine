@@ -6,7 +6,7 @@ from chats.apps.api.v1.accounts.serializers import UserNameEmailSerializer
 
 from ..models import Discussion, DiscussionUser
 from ..models.validators import validate_queue_and_room
-from .feedbacks import create_discussion_feedback_message
+from ..views.feedbacks import create_discussion_feedback_message
 
 
 class DiscussionCreateSerializer(serializers.ModelSerializer):
@@ -42,7 +42,7 @@ class DiscussionCreateSerializer(serializers.ModelSerializer):
                 from_user=created_by, to_user=created_by, role=0
             )
             feedback = {"user": created_by.first_name, "queue": discussion.queue.name}
-            create_discussion_feedback_message(discussion, feedback, "cd")
+            create_discussion_feedback_message(discussion, feedback, "dc")
 
         except IntegrityError:
             APIException.status_code = 409
