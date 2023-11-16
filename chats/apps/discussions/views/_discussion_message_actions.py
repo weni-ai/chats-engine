@@ -45,8 +45,17 @@ class DiscussionMessageActionsMixin:
         discussion = self.get_object()
 
         queryset = DiscussionMessage.objects.filter(discussion=discussion)
+        ordering = request.GET.get("ordering")
+        if ordering:
+            order_list = ordering.split(",")
+
+            queryset = queryset.order_by(*order_list)
 
         page = self.paginate_queryset(queryset)
+        reverse_page = request.GET.get("reverse_results")
+        if reverse_page:
+            page.reverse()
+
         if page is not None:
             serializer = DiscussionReadMessageSerializer(page, many=True)
             return self.get_paginated_response(serializer.data)

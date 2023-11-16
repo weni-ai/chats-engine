@@ -75,7 +75,6 @@ class DiscussionCreateSerializer(serializers.ModelSerializer):
 
 class DiscussionListSerializer(serializers.ModelSerializer):
     contact = serializers.CharField(source="room.contact.name", read_only=True)
-    created_by = serializers.CharField(source="created_by.first_name", read_only=True)
 
     class Meta:
         model = Discussion
