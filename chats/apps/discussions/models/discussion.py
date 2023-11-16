@@ -63,9 +63,9 @@ class Discussion(BaseSoftDeleteModel, BaseModel):
 
     @property
     def serialized_ws_data(self):
-        from ..serializers.discussions import DiscussionListSerializer  # noqa
+        from ..serializers.discussions import DiscussionWSSerializer  # noqa
 
-        return DiscussionListSerializer(self).data
+        return DiscussionWSSerializer(self).data
 
     def base_notification(self, content, action):
         if self.user:

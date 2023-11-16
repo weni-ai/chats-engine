@@ -73,6 +73,16 @@ class DiscussionCreateSerializer(serializers.ModelSerializer):
         return discussion
 
 
+class DiscussionUserEmailListSerializer(serializers.ModelSerializer):
+    email = serializers.CharField(source="permission.user.email", read_only=True)
+
+    class Meta:
+        model = DiscussionUser
+        fields = [
+            "email",
+        ]
+
+
 class DiscussionListSerializer(serializers.ModelSerializer):
     contact = serializers.CharField(source="room.contact.name", read_only=True)
 
@@ -87,6 +97,27 @@ class DiscussionListSerializer(serializers.ModelSerializer):
             "is_active",
             "is_queued",
         ]
+
+
+class DiscussionWSSerializer(DiscussionListSerializer):
+    added_agents = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Discussion
+        fields = [
+            "uuid",
+            "subject",
+            "created_by",
+            "contact",
+            "created_on",
+            "is_active",
+            "is_queued",
+            "added_agents",
+        ]
+
+    def get_added_agents(self, discussion: Discussion):
+        agents = discussion.added_users.all().values_list("permission__user", flat=True)
+        return agents
 
 
 class DiscussionUserListSerializer(serializers.ModelSerializer):
