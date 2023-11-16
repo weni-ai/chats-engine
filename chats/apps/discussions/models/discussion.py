@@ -167,8 +167,15 @@ class Discussion(BaseSoftDeleteModel, BaseModel):
     def can_retrieve(self, user):
         if self.added_users.filter(permission__user=user).exists():
             return True
+        if self.is_admin_manager_or_creator(user):
+            return True
+        if (
+            self.is_queued
+            and self.queue.authorizations.filter(permission__user=user).exists()
+        ):
+            return True
 
-        return self.is_admin_manager_or_creator(user)
+        return False
 
 
 class DiscussionUser(BaseModel):
