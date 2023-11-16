@@ -116,8 +116,8 @@ class DiscussionWSSerializer(DiscussionListSerializer):
         ]
 
     def get_added_agents(self, discussion: Discussion):
-        agents = discussion.added_users.all().values_list("permission__user", flat=True)
-        return agents
+        agents = discussion.added_users.values_list("permission__user", flat=True)
+        return list(agents)
 
 
 class DiscussionUserListSerializer(serializers.ModelSerializer):
