@@ -14,7 +14,7 @@ class CreateMessageWithMediaUseCase:
         )
 
     def execute(self):
-        text = self.msg_content.pop("text")
+        text = self.msg_content.pop("text", "")
         msg = self._create_message(text)
         media = msg.medias.create(**self.msg_content)
         if self.notify:
