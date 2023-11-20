@@ -67,7 +67,7 @@ class DiscussionCreateSerializer(serializers.ModelSerializer):
             APIException.status_code = 400
 
             raise APIException(
-                detail={"detail": f"{type(err)}: {err}"},
+                detail={"detail": f"{type(err)}: {err}111"},
             )  # TODO: treat this error on the EXCEPTION_HANDLER instead of the serializer
 
         return discussion
