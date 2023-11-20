@@ -4,11 +4,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 
-class BaseDiscussionViewActionTests(APITestCase):
-    ...
-
-
-class CreateDiscussionViewActionTests(BaseDiscussionViewActionTests):
+class CreateDiscussionViewActionTests(APITestCase):
     # ("Scenario description", room, queue, subject, initial_message, user_token, expected_response_status)
     fixtures = [
         "chats/fixtures/fixture_app.json",
@@ -125,14 +121,22 @@ class CreateDiscussionViewActionTests(BaseDiscussionViewActionTests):
         self.assertEqual(response.status_code, expected_status)
 
 
-class ListDiscussionsViewActionTests(BaseDiscussionViewActionTests):
+class ListDiscussionsViewActionTests(APITestCase):
     fixtures = [
         "chats/fixtures/fixture_app.json",
         "chats/fixtures/fixture_discussion.json",
     ]
     parameters = [
         (
-            "Agent can only retrieve theirs discussions or queued discussions when they have access to the queue",
+            "Agent with no access to discussion will not receive any",
+            "dae39bcc-bdc2-4b03-b4da-023a117f8474",
+            True,
+            "59e5b85e2f0134c4ee9f72037e379c94390697ce",
+            status.HTTP_200_OK,
+            0,
+        ),
+        (
+            "Agent can only retrieve their discussions or queued discussions when they have access to the queue",
             "dae39bcc-bdc2-4b03-b4da-023a117f8474",
             True,
             "d7fddba0b1dfaad72aa9e21876cbc93caa9ce3fa",
@@ -140,7 +144,7 @@ class ListDiscussionsViewActionTests(BaseDiscussionViewActionTests):
             2,
         ),
         (
-            "Admin can list all discussions on the project",
+            "Admin can list all active discussions on the project",
             "dae39bcc-bdc2-4b03-b4da-023a117f8474",
             True,
             "4215e6d6666e54f7db9f98100533aa68909fd855",
@@ -153,7 +157,7 @@ class ListDiscussionsViewActionTests(BaseDiscussionViewActionTests):
             False,
             "d7fddba0b1dfaad72aa9e21876cbc93caa9ce3fa",
             status.HTTP_200_OK,
-            2,
+            1,
         ),
     ]
 
@@ -172,3 +176,89 @@ class ListDiscussionsViewActionTests(BaseDiscussionViewActionTests):
         response = self._list_discussions(token=token, params=query_filters)
         self.assertEqual(response.status_code, expected_status)
         self.assertEqual(response.data.get("count"), expected_count)
+
+
+class DestroyDiscussionsViewActionTests(APITestCase):
+    fixtures = [
+        "chats/fixtures/fixture_app.json",
+        "chats/fixtures/fixture_discussion.json",
+    ]
+    parameters = [
+        (
+            "Creator can close discussions",
+            "d7fddba0b1dfaad72aa9e21876cbc93caa9ce3fa",
+            "3c2d1694-8db9-4f09-976b-e263f9d79c99",
+            status.HTTP_204_NO_CONTENT,
+        ),
+        (
+            "Admin can close discussions",
+            "4215e6d6666e54f7db9f98100533aa68909fd855",
+            "3c2d1694-8db9-4f09-976b-e263f9d79c99",
+            status.HTTP_204_NO_CONTENT,
+        ),
+        (
+            "Added user cannot close discussions",
+            "59e5b85e2f0134c4ee9f72037e379c94390697ce",
+            "36584c70-aaf9-4f5c-b0c3-0547bb23879d",
+            status.HTTP_403_FORBIDDEN,
+        ),
+    ]
+
+    def _destroy_discussion(self, token, discussion):
+        url = reverse("discussion-detail", kwargs={"uuid": discussion})
+
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + token)
+        response = client.delete(url)
+        return response
+
+    @parameterized.expand(parameters)
+    def test_destroy_discussions(self, _, token, discussion, expected_status):
+        response = self._destroy_discussion(token=token, discussion=discussion)
+        self.assertEqual(response.status_code, expected_status)
+
+
+class DetailDiscussionsViewActionTests(APITestCase):
+    fixtures = [
+        "chats/fixtures/fixture_app.json",
+        "chats/fixtures/fixture_discussion.json",
+    ]
+    parameters = [
+        (
+            "Creator can detail discussions",
+            "d7fddba0b1dfaad72aa9e21876cbc93caa9ce3fa",
+            "3c2d1694-8db9-4f09-976b-e263f9d79c99",
+            status.HTTP_200_OK,
+        ),
+        (
+            "Admin can detail discussions",
+            "4215e6d6666e54f7db9f98100533aa68909fd855",
+            "3c2d1694-8db9-4f09-976b-e263f9d79c99",
+            status.HTTP_200_OK,
+        ),
+        (
+            "Added user can detail discussions",
+            "59e5b85e2f0134c4ee9f72037e379c94390697ce",
+            "36584c70-aaf9-4f5c-b0c3-0547bb23879d",
+            status.HTTP_200_OK,
+        ),
+        (
+            "Non permitted users cannot detail discussions",
+            "59e5b85e2f0134c4ee9f72037e379c94390697ce",
+            "3c2d1694-8db9-4f09-976b-e263f9d79c99",
+            status.HTTP_403_FORBIDDEN,
+        ),
+    ]
+
+    def _detail_discussion(self, token, discussion):
+        url = reverse("discussion-detail", kwargs={"uuid": discussion})
+
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + token)
+        response = client.get(url)
+        return response
+
+    @parameterized.expand(parameters)
+    def test_detail_discussions(self, _, token, discussion, expected_status):
+        response = self._detail_discussion(token=token, discussion=discussion)
+        self.assertEqual(response.status_code, expected_status)

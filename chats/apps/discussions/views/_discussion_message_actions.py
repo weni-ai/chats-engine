@@ -18,9 +18,9 @@ class DiscussionMessageActionsMixin:
         detail=True, methods=["POST"], url_name="send_messages", filterset_class=None
     )
     def send_messages(self, request, *args, **kwargs):
+        user = request.user
+        discussion = self.get_object()
         try:
-            user = request.user
-            discussion = self.get_object()
             serializer = DiscussionCreateMessageSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
             msg = discussion.create_discussion_message(

@@ -162,10 +162,16 @@ class Discussion(BaseSoftDeleteModel, BaseModel):
 
     def is_admin_manager_or_creator(self, user):
         perm = self.get_permission(user)
-        return perm.is_manager(any_sector=True) or self.created_by == user
+        try:
+            return perm.is_manager(any_sector=True) or self.created_by == user
+        except AttributeError:
+            return False
+
+    def is_added_user(self, user):
+        return self.added_users.filter(permission__user=user).exists()
 
     def can_retrieve(self, user):
-        if self.added_users.filter(permission__user=user).exists():
+        if self.is_added_user(user):
             return True
         if self.is_admin_manager_or_creator(user):
             return True

@@ -27,13 +27,13 @@ class DiscussionObjectPermissionActions:
             return user_email == self.user.email
 
     def send_messages(self):
-        return self.retrieve()
+        return self.obj.is_added_user(self.user)
 
     def list_messages(self):
         return self.retrieve()
 
     def send_media_messages(self):
-        return self.retrieve()
+        return self.send_messages()
 
 
 class CanManageDiscussion(permissions.BasePermission):
