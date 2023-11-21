@@ -73,6 +73,7 @@ class CreateDiscussionUserViewActionTests(APITestCase):
         }
 
         response = self._create_discussion_user(token, discussion, discussion_data)
+
         self.assertEqual(response.status_code, expected_status)
 
 
