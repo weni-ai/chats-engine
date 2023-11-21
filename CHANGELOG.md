@@ -1,3 +1,12 @@
+# 2.6.2
+## Change
+  - Check contact id when starting a flow on a room. Won't consider the room if the contact id is different.
+
+# 2.6.1
+## Change
+  - Filter flowstart query to exclude old data.
+  - Reverse order on the flowstart list endpoint.
+
 # 2.6.0
 ## Add
   - FlowStart model refactor.
