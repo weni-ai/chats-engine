@@ -1,0 +1,2 @@
+class DiscussionValidationException(Exception):
+    pass

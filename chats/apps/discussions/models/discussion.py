@@ -146,8 +146,9 @@ class Discussion(BaseSoftDeleteModel, BaseModel, WebSocketsNotifiableMixin):
             self.check_queued()
         return discussion_user
 
-    def create_discussion_message(self, message, user=None, system=False):
+    def create_discussion_message(self, message, user=None, system=False, notify=True):
         sender = (user or self.created_by) if not system else None
         msg = self.messages.create(user=sender, text=message)
-        msg.notify("create")
+        if notify:
+            msg.notify("create")
         return msg
