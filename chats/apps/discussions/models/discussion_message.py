@@ -2,10 +2,10 @@ from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from chats.core.models import BaseModel
+from chats.core.models import BaseModel, WebSocketsNotifiableMixin
 
 
-class DiscussionMessage(BaseModel):
+class DiscussionMessage(WebSocketsNotifiableMixin, BaseModel):
     discussion = models.ForeignKey(
         "discussions.Discussion",
         related_name="messages",
@@ -34,16 +34,18 @@ class DiscussionMessage(BaseModel):
 
     @property
     def serialized_ws_data(self):
-        from ..serializers.discussion_message import (  # noqa
+        from ..serializers.discussion_messages import (  # noqa
             DiscussionReadMessageSerializer,
         )
 
         return DiscussionReadMessageSerializer(self).data
 
-    def notify(self, action: str):
-        self.discussion.notify(
-            content=self.serialized_ws_data, action=f"discussion_msg.{action}"
-        )
+    @property
+    def notification_groups(self) -> list:
+        return self.discussion.notification_groups
+
+    def get_action(self, action: str) -> str:
+        return f"discussion_msg.{action}"
 
 
 class DiscussionMessageMedia(BaseModel):

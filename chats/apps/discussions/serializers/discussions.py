@@ -6,7 +6,7 @@ from rest_framework.exceptions import APIException
 
 from chats.apps.api.v1.accounts.serializers import UserNameEmailSerializer
 
-from ..models import Discussion, DiscussionUser
+from ..models import Discussion
 from ..models.validators import validate_queue_and_room
 
 
@@ -73,16 +73,6 @@ class DiscussionCreateSerializer(serializers.ModelSerializer):
         return discussion
 
 
-class DiscussionUserEmailListSerializer(serializers.ModelSerializer):
-    email = serializers.CharField(source="permission.user.email", read_only=True)
-
-    class Meta:
-        model = DiscussionUser
-        fields = [
-            "email",
-        ]
-
-
 class DiscussionListSerializer(serializers.ModelSerializer):
     contact = serializers.CharField(source="room.contact.name", read_only=True)
 
@@ -118,25 +108,6 @@ class DiscussionWSSerializer(DiscussionListSerializer):
     def get_added_agents(self, discussion: Discussion):
         agents = discussion.added_users.values_list("permission__user", flat=True)
         return list(agents)
-
-
-class DiscussionUserListSerializer(serializers.ModelSerializer):
-    first_name = serializers.CharField(
-        source="permission.user.first_name", read_only=True
-    )
-    last_name = serializers.CharField(
-        source="permission.user.last_name", read_only=True
-    )
-    email = serializers.CharField(source="permission.user.email", read_only=True)
-
-    class Meta:
-        model = DiscussionUser
-        fields = [
-            "first_name",
-            "last_name",
-            "email",
-            "role",
-        ]
 
 
 class DiscussionDetailSerializer(serializers.ModelSerializer):

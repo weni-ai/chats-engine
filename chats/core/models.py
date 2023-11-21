@@ -4,6 +4,34 @@ from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from chats.utils.websockets import send_channels_group
+
+
+class WebSocketsNotifiableMixin:
+    @property
+    def serialized_ws_data(self) -> dict:
+        ...
+
+    @property
+    def notification_groups(self) -> list:
+        ...
+
+    def get_action(self, action: str) -> str:
+        ...
+
+    def notify(self, action: str, groups: list = [], content: dict = {}) -> None:
+        if "." not in action:
+            action = self.get_action(action)
+        content = content if content else self.serialized_ws_data
+        groups = groups if groups else self.notification_groups
+        for group in groups:
+            send_channels_group(
+                group_name=group,
+                call_type="notify",
+                content=content,
+                action=action,
+            )
+
 
 class BaseModel(models.Model):
     uuid = models.UUIDField(default=uuid.uuid4, primary_key=True)
