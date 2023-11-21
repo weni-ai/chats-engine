@@ -2,6 +2,7 @@ from rest_framework import serializers
 from timezone_field.rest_framework import TimeZoneSerializerField
 
 from chats.apps.projects.models import FlowStart, LinkContact, Project
+from chats.apps.sectors.models import Sector
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -76,3 +77,9 @@ class ListFlowStartSerializer(serializers.ModelSerializer):
             return flow_start.permission.user.full_name
         except AttributeError:
             return ""
+
+
+class SectorDiscussionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Sector
+        fields = ["uuid", "name"]

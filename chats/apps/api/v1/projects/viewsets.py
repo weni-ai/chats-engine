@@ -25,6 +25,7 @@ from chats.apps.api.v1.projects.serializers import (
     ProjectFlowContactSerializer,
     ProjectFlowStartSerializer,
     ProjectSerializer,
+    SectorDiscussionSerializer,
 )
 from chats.apps.contacts.models import Contact
 from chats.apps.projects.models import (
@@ -34,6 +35,7 @@ from chats.apps.projects.models import (
 )
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import create_room_feedback_message
+from chats.apps.sectors.models import Sector
 
 
 class ProjectViewset(viewsets.ReadOnlyModelViewSet):
@@ -351,6 +353,22 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         serializer = ListFlowStartSerializer(flow_starts_queryset_paginated, many=True)
 
         return Response(serializer.data)
+
+    @action(
+        detail=True,
+        methods=["GET"],
+        url_name="list-sectors",
+    )
+    def list_discussion_sector(self, request, *args, **kwargs):
+        project = self.get_object()
+        queryset = Sector.objects.filter(project=project)
+
+        paginator = LimitOffsetPagination()
+        discussion_sectors = paginator.paginate_queryset(queryset, request)
+
+        serializer = SectorDiscussionSerializer(discussion_sectors, many=True)
+
+        return paginator.get_paginated_response(serializer.data)
 
 
 class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
