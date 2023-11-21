@@ -1,8 +1,11 @@
 from django.contrib.auth import get_user_model
+from django.db.utils import IntegrityError
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters, viewsets
+from rest_framework import filters, status, viewsets
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
+from ..exceptions import DiscussionValidationException
 from ..filters import DiscussionFilter
 from ..models import Discussion
 from ..serializers import (
@@ -10,6 +13,7 @@ from ..serializers import (
     DiscussionDetailSerializer,
     DiscussionListSerializer,
 )
+from ..usecases import CreateDiscussionUseCase
 from ._discussion_message_actions import DiscussionMessageActionsMixin
 from ._discussion_user_actions import DiscussionUserActionsMixin
 from .permissions import CanManageDiscussion
@@ -45,3 +49,27 @@ class DiscussionViewSet(
         if self.action == "create":
             context["user"] = self.request.user
         return context
+
+    def create(self, request, *args, **kwargs):
+        try:
+            return super().create(request, *args, **kwargs)
+        except DiscussionValidationException as err:
+            return Response(
+                {"Detail": f"{err}"},
+                status.HTTP_400_BAD_REQUEST,
+            )
+        except IntegrityError:
+            return Response(
+                {"detail": "The room already have an open discussion."},
+                status.HTTP_409_CONFLICT,
+            )
+        except Exception as err:
+            return Response(
+                {"Detail": f"{err}"},
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def perform_create(self, serializer):
+        CreateDiscussionUseCase(
+            serialized_data=serializer.validated_data, created_by=self.request.user
+        ).execute()

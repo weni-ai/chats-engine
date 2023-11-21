@@ -3,9 +3,9 @@ from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from ..app_services.feedbacks import create_discussion_feedback_message
 from ..models import DiscussionUser
 from ..serializers import DiscussionUserListSerializer
-from .feedbacks import create_discussion_feedback_message
 
 User = get_user_model()
 
