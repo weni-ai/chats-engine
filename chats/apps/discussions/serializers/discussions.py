@@ -1,5 +1,3 @@
-import json
-
 from rest_framework import serializers
 
 from chats.apps.api.v1.accounts.serializers import UserNameEmailSerializer
