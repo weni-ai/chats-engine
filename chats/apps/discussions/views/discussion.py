@@ -52,7 +52,14 @@ class DiscussionViewSet(
 
     def create(self, request, *args, **kwargs):
         try:
-            return super().create(request, *args, **kwargs)
+            creation_data = self.get_serializer(data=request.data)
+            creation_data.is_valid(raise_exception=True)
+            discussion = self.perform_create(creation_data)
+            serialized_result = self.get_serializer(discussion)
+            headers = self.get_success_headers(serialized_result.data)
+            return Response(
+                serialized_result.data, status=status.HTTP_201_CREATED, headers=headers
+            )
         except DiscussionValidationException as err:
             return Response(
                 {"Detail": f"{err}"},
@@ -70,6 +77,6 @@ class DiscussionViewSet(
             )
 
     def perform_create(self, serializer):
-        CreateDiscussionUseCase(
+        return CreateDiscussionUseCase(
             serialized_data=serializer.validated_data, created_by=self.request.user
         ).execute()

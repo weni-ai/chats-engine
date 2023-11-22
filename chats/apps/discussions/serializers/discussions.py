@@ -13,9 +13,6 @@ class DiscussionCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Discussion
         fields = ["uuid", "room", "queue", "subject", "initial_message"]
-        read_only_fields = [
-            "uuid",
-        ]
 
 
 class DiscussionListSerializer(serializers.ModelSerializer):
