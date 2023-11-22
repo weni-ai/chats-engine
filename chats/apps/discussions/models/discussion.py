@@ -2,11 +2,10 @@ from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from chats.core.models import BaseModel, BaseSoftDeleteModel
-from chats.utils.websockets import send_channels_group
+from chats.core.models import BaseModel, BaseSoftDeleteModel, WebSocketsNotifiableMixin
 
 
-class Discussion(BaseSoftDeleteModel, BaseModel):
+class Discussion(BaseSoftDeleteModel, BaseModel, WebSocketsNotifiableMixin):
     subject = models.CharField(
         _("Subject Text"), max_length=50, blank=False, null=False
     )
@@ -62,166 +61,93 @@ class Discussion(BaseSoftDeleteModel, BaseModel):
         return self.queue.sector
 
     @property
-    def notification_data(self):
-        return {
-            "uuid": str(self.uuid),
-            "subject": self.subject,
-            "created_by": self.created_by.full_name,
-            "created_on": str(self.created_on),
-            "contact": self.room.contact.name,
-            "is_active": self.is_active,
-            "is_queued": self.is_queued,
-        }
+    def serialized_ws_data(self):
+        # TODO: add serializer when creating discussion endpoints
+        return {}
 
-    def base_notification(self, content, action):
-        if self.user:
-            permission = self.get_permission(self.user)
-            group_name = f"permission_{permission.pk}"
-        else:
-            group_name = f"queue_{self.queue.pk}"
+    @property
+    def notification_groups(self) -> list:
+        if self.is_queued:
+            return [f"queue_{self.queue.pk}"]
+        return [
+            f"permission_{user_permission}"
+            for user_permission in self.added_users.values_list("permission", flat=True)
+        ]
 
-        send_channels_group(
-            group_name=group_name,
-            call_type="notify",
-            content=content,
-            action=action,
-        )
+    def get_action(self, action: str) -> str:
+        return f"discussions.{action}"
 
     def notify_user(self, user_permission, action: str, content: dict = {}):
         if "." not in action:
             action = f"discussions.{action}"
-        content = content or self.notification_data
-        send_channels_group(
-            group_name=f"permission_{user_permission.pk}",
-            call_type="notify",
-            content=content,
-            action=action,
+        content = content or self.serialized_ws_data
+        self.notify(
+            action=action, content=content, groups=[f"permission_{user_permission.pk}"]
         )
-
-    def notify_users(self, action: str, content: dict = {}):
-        if "." not in action:
-            action = f"discussions.{action}"
-        content = content or self.notification_data
-        for added_user in self.added_users.all():
-            send_channels_group(
-                group_name=f"permission_{added_user.permission.pk}",
-                call_type="notify",
-                content=content,
-                action=action,
-            )
 
     def notify_queue(
         self,
         action: str,
         content: dict = {},
     ):
-        if "." not in action:
-            action = f"discussions.{action}"
-        content = content or self.notification_data
-        send_channels_group(
-            group_name=f"queue_{self.queue.pk}",
-            call_type="notify",
-            content=content,
-            action=action,
-        )
-
-    def notify(self, action: str, content: dict = {}):
-        if self.is_queued:
-            self.notify_queue(action=action, content=content)
-        self.notify_users(action=action, content=content)
+        content = content or self.serialized_ws_data
+        self.notify(action=action, content=content, groups=[f"queue_{self.queue.pk}"])
 
     def check_queued(self):
         if self.is_queued and self.added_users.count() > 1:
             self.is_queued = False
             self.save()
-            self.notify_queue("dequeue")
-            self.notify_users("update")
+            self.notify_queue("update")
+
+    # permission block
+    def get_permission(self, user):
+        return self.project.get_permission(user)
 
     def can_add_user(self, user_permission) -> bool:
         if user_permission.is_manager(any_sector=True):
             return True
         return self.added_users.count() < settings.DISCUSSION_AGENTS_LIMIT
 
+    def is_admin_manager_or_creator(self, user):
+        perm = self.get_permission(user)
+        try:
+            return perm.is_manager(any_sector=True) or self.created_by == user
+        except AttributeError:
+            return False
+
+    def is_added_user(self, user):
+        return self.added_users.filter(permission__user=user).exists()
+
+    def can_retrieve(self, user):
+        if self.is_added_user(user):
+            return True
+        if self.is_admin_manager_or_creator(user):
+            return True
+        if (
+            self.is_queued
+            and self.queue.authorizations.filter(permission__user=user).exists()
+        ):
+            return True
+
+        return False
+
+    # messages and discussion users
     def create_discussion_user(self, from_user, to_user, role=None):
         from_permission = self.get_permission(user=from_user)
         to_permission = self.get_permission(user=to_user)
         discussion_user = None
 
         if (from_permission and to_permission) and self.can_add_user(from_permission):
-            role = role if role is not None else from_permission.role
+            role = role if role is not None else to_permission.role
             discussion_user = self.added_users.create(
                 permission=to_permission, role=role
             )
-            discussion_user.notify("create")
             self.check_queued()
         return discussion_user
 
-    def create_discussion_message(self, message, user=None):
-        msg = self.messages.create(sender=user or self.created_by, text=message)
-        msg.notify("create")
-
-    def get_permission(self, user):
-        return self.project.get_permission(user)
-
-    def is_admin_manager_or_creator(self, user):
-        perm = self.get_permission(user)
-        return perm.is_manager(any_sector=True) or self.created_by == user
-
-    def can_retrieve(self, user):
-        if self.added_users.filter(permission__user=user).exists():
-            return True
-
-        return self.is_admin_manager_or_creator(user)
-
-
-class DiscussionUser(BaseModel):
-    class Role(models.IntegerChoices):
-        CREATOR = 0, _("Creator")
-        ADMIN = 1, _("Admin")
-        PARTICIPANT = 2, _("Participant")
-
-    permission = models.ForeignKey(
-        "projects.ProjectPermission",
-        related_name="discussion_users",
-        on_delete=models.CASCADE,
-        verbose_name=_("User"),
-    )
-    discussion = models.ForeignKey(
-        Discussion,
-        related_name="added_users",
-        on_delete=models.CASCADE,
-        verbose_name=_("Discussion"),
-    )
-    role = models.PositiveIntegerField(
-        _("role"), choices=Role.choices, default=Role.PARTICIPANT
-    )
-
-    class Meta:
-        verbose_name = "Discussion User"
-        verbose_name_plural = "Discussions Users"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["permission", "discussion"],
-                name="unique_permission_per_discussion",
-            )
-        ]
-
-    def __str__(self) -> str:
-        return f"{self.discussion.subject} {self.user.full_name} {self.role}"
-
-    def notification_data(self) -> dict:
-        return {
-            "discussion": str(self.discussion.pk),
-            "user": self.permission.user.full_name,
-            "role": self.role,
-        }
-
-    def notify(self, action: str):
-        data = self.notification_data
-        self.discussion.notify_user(
-            user_permission=self.permission, content=data, action=f"d_user.{action}"
-        )
-
-    @property
-    def user(self):
-        return self.permission.user
+    def create_discussion_message(self, message, user=None, system=False, notify=True):
+        sender = (user or self.created_by) if not system else None
+        msg = self.messages.create(user=sender, text=message)
+        if notify:
+            msg.notify("create")
+        return msg
