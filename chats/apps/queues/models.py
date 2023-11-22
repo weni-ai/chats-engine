@@ -76,6 +76,9 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
             "active_rooms_count"
         )
 
+    def is_agent(self, user):
+        return self.authorizations.filter(permission__user=user).exists()
+
     def get_or_create_user_authorization(self, user):
         sector_auth, created = self.authorizations.get_or_create(permission__user=user)
         return sector_auth

@@ -93,6 +93,17 @@ class Room(BaseModel):
         except ObjectDoesNotExist:
             return None
 
+    def can_retrieve(self, user):
+        permission = self.get_permission(user)
+        if not permission:
+            return False
+        if permission.is_admin:
+            return True
+        if user == self.user:
+            return True
+
+        return self.queue.is_agent(user) or self.queue.sector.is_manager(user)
+
     def get_is_waiting(self):
         """If the room does not have any contact message, then it is waiting"""
         check_messages = (

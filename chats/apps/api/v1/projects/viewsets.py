@@ -4,6 +4,7 @@ from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -17,11 +18,14 @@ from chats.apps.api.v1.permissions import (
     IsSectorManager,
     ProjectAnyPermission,
 )
+from chats.apps.api.v1.projects.filters import FlowStartFilter
 from chats.apps.api.v1.projects.serializers import (
     LinkContactSerializer,
+    ListFlowStartSerializer,
     ProjectFlowContactSerializer,
     ProjectFlowStartSerializer,
     ProjectSerializer,
+    SectorDiscussionSerializer,
 )
 from chats.apps.contacts.models import Contact
 from chats.apps.projects.models import (
@@ -31,6 +35,7 @@ from chats.apps.projects.models import (
 )
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import create_room_feedback_message
+from chats.apps.sectors.models import Sector
 
 
 class ProjectViewset(viewsets.ReadOnlyModelViewSet):
@@ -252,17 +257,27 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
                 {"Detail": "the user does not have permission in this project"},
                 status.HTTP_401_UNAUTHORIZED,
             )
-
-        flow_start_data = {"permission": perm, "flow": flow}
+        contact_id = data.get("contacts")[0]
+        flow_start_data = {
+            "permission": perm,
+            "flow": flow,
+            "contact_data": {
+                "name": data.pop("contact_name"),
+                "external_id": contact_id,
+            },
+        }
         room_id = data.get("room", None)
 
         try:
-            room = Room.objects.get(pk=room_id, is_active=True)
+            room = Room.objects.get(
+                pk=room_id, is_active=True, contact__external_id=contact_id
+            )
             if room.flowstarts.filter(is_deleted=False).exists():
                 return Response(
                     {"Detail": "There already is an active flow start for this room"},
                     status.HTTP_400_BAD_REQUEST,
                 )
+
             if not room.is_24h_valid:
                 flow_start_data["room"] = room
                 room.request_callback(room.serialized_ws_data)
@@ -307,6 +322,53 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
 
         flows_start_verify["show_warning"] = True
         return Response(flows_start_verify, status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["GET"],
+        url_name="list-flows-start",
+    )
+    def list_flows_start(self, request, *args, **kwargs):
+        project = self.get_object()
+        permission = project.permissions.get(user=request.user)
+        flow_starts_query = project.flowstarts.exclude(contact_data={}).order_by(
+            "-created_on"
+        )
+        filtro = FlowStartFilter(request.GET, queryset=flow_starts_query)
+
+        queryset = filtro.qs
+
+        if not permission.is_admin:
+            queryset = queryset.filter(permission=permission)
+
+        paginator = LimitOffsetPagination()
+        flow_starts_queryset_paginated = paginator.paginate_queryset(queryset, request)
+
+        if flow_starts_queryset_paginated is not None:
+            serializer = ListFlowStartSerializer(
+                flow_starts_queryset_paginated, many=True
+            )
+            return paginator.get_paginated_response(serializer.data)
+
+        serializer = ListFlowStartSerializer(flow_starts_queryset_paginated, many=True)
+
+        return Response(serializer.data)
+
+    @action(
+        detail=True,
+        methods=["GET"],
+        url_name="list-sectors",
+    )
+    def list_discussion_sector(self, request, *args, **kwargs):
+        project = self.get_object()
+        queryset = Sector.objects.filter(project=project)
+
+        paginator = LimitOffsetPagination()
+        discussion_sectors = paginator.paginate_queryset(queryset, request)
+
+        serializer = SectorDiscussionSerializer(discussion_sectors, many=True)
+
+        return paginator.get_paginated_response(serializer.data)
 
 
 class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
