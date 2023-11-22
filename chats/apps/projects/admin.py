@@ -1,11 +1,11 @@
 from django.contrib import admin
 
 from chats.apps.projects.models import (
+    FlowStart,
+    LinkContact,
     Project,
     ProjectPermission,
     TemplateType,
-    LinkContact,
-    FlowStart,
 )
 
 # Register your models here.
