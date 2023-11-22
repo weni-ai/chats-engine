@@ -2,17 +2,17 @@ from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from chats.core.models import BaseModel
+from chats.core.models import BaseModel, WebSocketsNotifiableMixin
 
 
-class DiscussionMessage(BaseModel):
+class DiscussionMessage(WebSocketsNotifiableMixin, BaseModel):
     discussion = models.ForeignKey(
         "discussions.Discussion",
         related_name="messages",
         verbose_name=_("discussion"),
         on_delete=models.CASCADE,
     )
-    sender = models.ForeignKey(
+    user = models.ForeignKey(
         "accounts.User",
         related_name="discussion_messages",
         verbose_name=_("user"),
@@ -29,40 +29,26 @@ class DiscussionMessage(BaseModel):
         ordering = ["created_on"]
 
     @property
-    def notification_data(self):
-        sender = (
-            None
-            if not self.sender
-            else dict(
-                first_name=self.sender.first_name,
-                last_name=self.sender.last_name,
-                email=self.sender.email,
-            )
-        )
+    def media(self):
+        return self.medias.all()
 
-        medias = [
-            dict(content_type=media.content_type, url=media.url)
-            for media in self.discussion_medias.all()
-        ]
+    @property
+    def serialized_ws_data(self):
+        # TODO: add serializer when creating message endpoints
+        return {}
 
-        return {
-            "uuid": str(self.uuid),
-            "sender": sender,
-            "discussion": str(self.discussion.pk),
-            "text": self.text,
-            "media": medias,
-            "created_on": str(self.created_on),
-        }
+    @property
+    def notification_groups(self) -> list:
+        return self.discussion.notification_groups
 
-    def notify(self, action: str):
-        data = self.notification_data
-        self.discussion.notify(content=data, action=f"msg.{action}")
+    def get_action(self, action: str) -> str:
+        return f"discussion_msg.{action}"
 
 
 class DiscussionMessageMedia(BaseModel):
     message = models.ForeignKey(
         "discussions.DiscussionMessage",
-        related_name="discussion_medias",
+        related_name="medias",
         verbose_name=_("discussion message"),
         on_delete=models.CASCADE,
         blank=True,
@@ -71,7 +57,11 @@ class DiscussionMessageMedia(BaseModel):
 
     content_type = models.CharField(_("Content Type"), max_length=300)
     media_file = models.FileField(
-        _("Media File"), null=True, blank=True, max_length=300
+        _("Media File"),
+        null=True,
+        blank=True,
+        max_length=300,
+        upload_to="discussionmedia/%Y/%m/%d/",
     )
 
     class Meta:

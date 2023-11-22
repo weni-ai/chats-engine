@@ -364,6 +364,8 @@ UNPERMITTED_AUDIO_TYPES = env.list(
 CHATS_FLOWS_TAG = env.str("CHATS_FLOWS_TAG", default="chats")
 CHATS_CACHE_TIME = env.int("CHATS_CACHE_TIME", default=1 * 60 * 60)
 
+DISCUSSION_AGENTS_LIMIT = env.int("DISCUSSION_AGENTS_LIMIT", default=5)
+
 # Celery
 
 METRICS_CUSTOM_QUEUE = env("METRICS_CUSTOM_QUEUE", default="celery")
