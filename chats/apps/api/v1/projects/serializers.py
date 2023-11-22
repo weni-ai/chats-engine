@@ -94,7 +94,8 @@ class ListProjectUsersSerializer(serializers.ModelSerializer):
     first_name = serializers.CharField(source="user.first_name")
     last_name = serializers.CharField(source="user.last_name")
     email = serializers.CharField(source="user.email")
+    photo_url = serializers.CharField(source="user.photo_url")
 
     class Meta:
         model = ProjectPermission
-        fields = ["first_name", "last_name", "email"]
+        fields = ["first_name", "last_name", "email", "photo_url"]
