@@ -14,13 +14,16 @@ from ..serializers import (
     DiscussionListSerializer,
 )
 from ..usecases import CreateDiscussionUseCase
+from ._discussion_message_actions import DiscussionMessageActionsMixin
 from ._discussion_user_actions import DiscussionUserActionsMixin
 from .permissions import CanManageDiscussion
 
 User = get_user_model()
 
 
-class DiscussionViewSet(viewsets.ModelViewSet, DiscussionUserActionsMixin):
+class DiscussionViewSet(
+    viewsets.ModelViewSet, DiscussionUserActionsMixin, DiscussionMessageActionsMixin
+):
     queryset = Discussion.objects.all()
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = DiscussionFilter

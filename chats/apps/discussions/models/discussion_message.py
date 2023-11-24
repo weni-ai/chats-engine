@@ -34,8 +34,11 @@ class DiscussionMessage(WebSocketsNotifiableMixin, BaseModel):
 
     @property
     def serialized_ws_data(self):
-        # TODO: add serializer when creating message endpoints
-        return {}
+        from ..serializers.discussion_messages import (  # noqa
+            DiscussionReadMessageSerializer,
+        )
+
+        return DiscussionReadMessageSerializer(self).data
 
     @property
     def notification_groups(self) -> list:
