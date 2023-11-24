@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     "chats.apps.dashboard",
     "chats.apps.event_driven",
     "chats.apps.history",
+    "chats.apps.discussions",
     "chats.core",
     # third party apps
     "channels",
@@ -362,6 +363,8 @@ UNPERMITTED_AUDIO_TYPES = env.list(
 
 CHATS_FLOWS_TAG = env.str("CHATS_FLOWS_TAG", default="chats")
 CHATS_CACHE_TIME = env.int("CHATS_CACHE_TIME", default=1 * 60 * 60)
+
+DISCUSSION_AGENTS_LIMIT = env.int("DISCUSSION_AGENTS_LIMIT", default=5)
 
 # Celery
 
