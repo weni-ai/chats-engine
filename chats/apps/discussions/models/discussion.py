@@ -144,6 +144,8 @@ class Discussion(BaseSoftDeleteModel, BaseModel, WebSocketsNotifiableMixin):
                 permission=to_permission, role=role
             )
             self.check_queued()
+            self.notify_user(action="update", user_permission=to_permission)
+
         return discussion_user
 
     def create_discussion_message(self, message, user=None, system=False, notify=True):
