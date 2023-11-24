@@ -40,5 +40,5 @@ class DiscussionFilter(filters.FilterSet):
 
         return queryset.filter(
             Q(queues_filter & Q(is_queued=True))
-            | Q(Q(added_users__permission=permission) | Q(created_by=user))
+            | Q(Q(added_users__permission=permission))
         ).distinct()

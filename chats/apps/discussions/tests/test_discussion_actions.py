@@ -118,7 +118,6 @@ class CreateDiscussionViewActionTests(APITestCase):
         }
 
         response = self._create_discussion(token=token, body=discussion_data)
-
         self.assertEqual(response.status_code, expected_status)
 
 
@@ -143,6 +142,14 @@ class ListDiscussionsViewActionTests(APITestCase):
             "d7fddba0b1dfaad72aa9e21876cbc93caa9ce3fa",
             status.HTTP_200_OK,
             2,
+        ),
+        (
+            "Agent cannot retrieve discussions from other projects they have permission on",
+            "34a93b52-231e-11ed-861d-0242ac120002",
+            True,
+            "d7fddba0b1dfaad72aa9e21876cbc93caa9ce3fa",
+            status.HTTP_200_OK,
+            0,
         ),
         (
             "Admin can list all active discussions on the project",
