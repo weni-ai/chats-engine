@@ -62,8 +62,9 @@ class Discussion(BaseSoftDeleteModel, BaseModel, WebSocketsNotifiableMixin):
 
     @property
     def serialized_ws_data(self):
-        # TODO: add serializer when creating discussion endpoints
-        return {}
+        from ..serializers.discussions import DiscussionWSSerializer  # noqa
+
+        return DiscussionWSSerializer(self).data
 
     @property
     def notification_groups(self) -> list:
