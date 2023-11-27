@@ -1,0 +1,99 @@
+<mxfile host="65bd71144e">
+    <diagram id="XUJSLpkWUXcQlG5Avp5I" name="Page-1">
+        <mxGraphModel dx="1783" dy="434" grid="0" gridSize="10" guides="0" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="2" value="DISCUSSION" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;fontColor=#331A00;strokeColor=#CEFFFF;fillColor=#CCE5FF;" parent="1" vertex="1">
+                    <mxGeometry x="554" y="237" width="163" height="210" as="geometry">
+                        <mxRectangle x="169.5" y="428" width="165" height="30" as="alternateBounds"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="3" value="created_by (FK: USER)" style="text;strokeColor=#CEFFFF;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;fontColor=#FFFFFF;strokeWidth=1;" parent="2" vertex="1">
+                    <mxGeometry y="30" width="163" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="6" value="room (FK: ROOM)" style="text;strokeColor=#CEFFFF;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;fontColor=#FFFFFF;strokeWidth=1;" parent="2" vertex="1">
+                    <mxGeometry y="60" width="163" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="5" value="queue (FK: QUEUE)" style="text;strokeColor=#CEFFFF;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;fontColor=#FFFFFF;strokeWidth=1;" parent="2" vertex="1">
+                    <mxGeometry y="90" width="163" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="4" value="subject (CHAR)" style="text;strokeColor=#CEFFFF;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;fontColor=#FFFFFF;strokeWidth=1;" parent="2" vertex="1">
+                    <mxGeometry y="120" width="163" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="53" value="is_queued (BOOL)" style="text;strokeColor=#CEFFFF;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;fontColor=#FFFFFF;strokeWidth=1;" parent="2" vertex="1">
+                    <mxGeometry y="150" width="163" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="7" value="is_active (BOOL)" style="text;strokeColor=#CEFFFF;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;fontColor=#FFFFFF;strokeWidth=1;" parent="2" vertex="1">
+                    <mxGeometry y="180" width="163" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="8" value="DISCUSSIONUSER" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;fontColor=#331A00;strokeColor=#CEFFFF;fillColor=#CCE5FF;" parent="1" vertex="1">
+                    <mxGeometry x="880" y="181" width="239" height="120" as="geometry">
+                        <mxRectangle x="169.5" y="428" width="165" height="30" as="alternateBounds"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="9" value="permission (FK: PROJECTPERMISSION)" style="text;strokeColor=#CEFFFF;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;fontColor=#FFFFFF;strokeWidth=1;" parent="8" vertex="1">
+                    <mxGeometry y="30" width="239" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="10" value="discussion (FK: DISCUSSION)" style="text;strokeColor=#CEFFFF;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;fontColor=#FFFFFF;strokeWidth=1;" parent="8" vertex="1">
+                    <mxGeometry y="60" width="239" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="11" value="role (CHAR)" style="text;strokeColor=#CEFFFF;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;fontColor=#FFFFFF;strokeWidth=1;" parent="8" vertex="1">
+                    <mxGeometry y="90" width="239" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="21" value="&lt;span style=&quot;background-color: rgb(255, 255, 255);&quot;&gt;&lt;span style=&quot;color: rgb(0, 0, 0);&quot;&gt;roles&lt;/span&gt;&lt;br style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;span style=&quot;color: rgb(0, 0, 0);&quot;&gt;0: creator(1:1)&lt;/span&gt;&lt;br style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;span style=&quot;color: rgb(0, 0, 0);&quot;&gt;1: admin(n:n)&lt;/span&gt;&lt;br style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;span style=&quot;color: rgb(0, 0, 0);&quot;&gt;2: participant(n:n)&lt;/span&gt;&lt;/span&gt;" style="text;strokeColor=none;align=left;fillColor=#FFFFFF;html=1;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="880" y="116" width="109" height="58" as="geometry"/>
+                </mxCell>
+                <mxCell id="23" value="DISCUSSIONMESSAGE" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;fontColor=#331A00;strokeColor=#CEFFFF;fillColor=#CCE5FF;" parent="1" vertex="1">
+                    <mxGeometry x="880" y="369" width="185" height="120" as="geometry">
+                        <mxRectangle x="169.5" y="428" width="165" height="30" as="alternateBounds"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="24" value="user (FK: USER)" style="text;strokeColor=#CEFFFF;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;fontColor=#FFFFFF;strokeWidth=1;" parent="23" vertex="1">
+                    <mxGeometry y="30" width="185" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="25" value="discussion (FK: DISCUSSION)" style="text;strokeColor=#CEFFFF;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;fontColor=#FFFFFF;strokeWidth=1;" parent="23" vertex="1">
+                    <mxGeometry y="60" width="185" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="27" value="text (TEXT)" style="text;strokeColor=#CEFFFF;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;fontColor=#FFFFFF;strokeWidth=1;" parent="23" vertex="1">
+                    <mxGeometry y="90" width="185" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="29" value="DISCUSSIONMESSAGEMEDIA" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;fontColor=#331A00;strokeColor=#CCE5FF;fillColor=#CCE5FF;" parent="1" vertex="1">
+                    <mxGeometry x="1251" y="387" width="273" height="120" as="geometry">
+                        <mxRectangle x="169.5" y="428" width="165" height="30" as="alternateBounds"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="31" value="discussion_msg (FK: DISCUSSIONMESSAGE)" style="text;strokeColor=#CEFFFF;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;fontColor=#FFFFFF;strokeWidth=1;" parent="29" vertex="1">
+                    <mxGeometry y="30" width="273" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="32" value="content_type (CHAR)" style="text;strokeColor=#CEFFFF;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;fontColor=#FFFFFF;strokeWidth=1;" parent="29" vertex="1">
+                    <mxGeometry y="60" width="273" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="54" value="media_file (CHAR)" style="text;strokeColor=#CEFFFF;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;fontColor=#FFFFFF;strokeWidth=1;" vertex="1" parent="29">
+                    <mxGeometry y="90" width="273" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="38" style="edgeStyle=none;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="25" target="5" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="40" style="edgeStyle=none;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" parent="1" source="10" target="6" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="41" style="edgeStyle=none;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;exitX=0.005;exitY=-0.067;exitDx=0;exitDy=0;exitPerimeter=0;" parent="1" source="32" target="25" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="52" style="edgeStyle=none;html=1;" parent="1" source="5" target="49" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="42" value="ROOM" style="swimlane;fontStyle=0;childLayout=stackLayout;horizontal=1;startSize=30;horizontalStack=0;resizeParent=1;resizeParentMax=0;resizeLast=0;collapsible=1;marginBottom=0;fontColor=#331A00;strokeColor=#E6CCFF;fillColor=#E6CCFF;" parent="1" vertex="1">
+                    <mxGeometry x="209" y="297" width="155.5" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="49" value="(...)" style="text;strokeColor=#E6CCFF;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;points=[[0,0.5],[1,0.5]];portConstraint=eastwest;rotatable=0;fontColor=#FFFFFF;strokeWidth=1;" parent="42" vertex="1">
+                    <mxGeometry y="30" width="155.5" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="55" value="DB saves only the link to the media, the file is saved in a s3 instance" style="text;strokeColor=none;align=center;fillColor=none;html=1;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+                    <mxGeometry x="1525" y="473" width="123" height="30" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
