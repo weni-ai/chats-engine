@@ -275,3 +275,13 @@ class Room(BaseModel):
             content={"name": "room", "id": str(self.pk)},
             action=f"group.{action}",
         )
+
+    def can_create_discussion(self, user):
+        """
+        Active rooms: only admin, managers and the user on the room are able to create discussions
+        Inactive rooms: anyone in the project can create discussions
+        """
+        if user == self.user:
+            return True
+        perm = self.get_permission(user)
+        return not self.is_active or perm.is_manager(any_sector=True)

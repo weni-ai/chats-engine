@@ -28,6 +28,7 @@ from chats.apps.api.v1.sectors.viewsets import (
     SectorViewset,
 )
 from chats.apps.api.v1.users.viewsets import ProfileViewset
+from chats.apps.discussions.views import DiscussionViewSet
 from chats.apps.history.views import HistoryRoomViewset
 
 
@@ -97,6 +98,7 @@ router.register(
 router.register("media", MessageMediaViewset)
 router.register("contact", ContactViewset)
 router.register("history/rooms", HistoryRoomViewset, basename="history_room")
+router.register("discussion", DiscussionViewSet, basename="discussion")
 router.register("sector", SectorViewset)
 router.register("tag", SectorTagsViewset)
 router.register("project", ProjectViewset)
