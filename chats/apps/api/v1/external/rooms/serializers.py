@@ -9,6 +9,7 @@ from chats.apps.accounts.models import User
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactRelationsSerializer
 from chats.apps.api.v1.queues.serializers import QueueSerializer
+from chats.apps.api.v1.sectors.serializers import TagSimpleSerializer
 from chats.apps.contacts.models import Contact
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.queues.models import Queue
@@ -74,6 +75,30 @@ def get_room_user(
     permission = project.permissions.filter(user=user, status="ONLINE").exists()
 
     return user if permission else None
+
+
+class RoomListSerializer(serializers.ModelSerializer):
+    contact = serializers.CharField(source="contact.name")
+    contact_external_id = serializers.CharField(source="contact.external_id")
+    waiting_time = serializers.IntegerField(source="metric.waiting_time")
+    interaction_time = serializers.IntegerField(source="metric.interaction_time")
+    tags = TagSimpleSerializer(many=True, required=False)
+
+    class Meta:
+        model = Room
+        fields = [
+            "uuid",
+            "user",
+            "contact",
+            "contact_external_id",
+            "urn",
+            "is_active",
+            "ended_at",
+            "created_on",
+            "waiting_time",
+            "interaction_time",
+            "tags",
+        ]
 
 
 class RoomFlowSerializer(serializers.ModelSerializer):
