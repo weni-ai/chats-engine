@@ -1,3 +1,7 @@
+# 3.0.0
+## Add
+  - New Discussions app, responsible for internal communication between agents.
+
 # 2.6.2
 ## Change
   - Check contact id when starting a flow on a room. Won't consider the room if the contact id is different.

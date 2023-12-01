@@ -1121,6 +1121,17 @@ test = ["hypothesis (>=6.34.2)", "pytest (>=7.0.0)", "pytest-xdist (>=2.2.0)", "
 xml = ["lxml (>=4.6.3)"]
 
 [[package]]
+name = "parameterized"
+version = "0.9.0"
+description = "Parameterized testing with any Python test framework"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.extras]
+dev = ["jinja2"]
+
+[[package]]
 name = "parso"
 version = "0.8.3"
 description = "A Python Parser"
@@ -1827,7 +1838,7 @@ python-versions = ">=3.6"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "417e11e22c478190e112501a7d90e5644351419cd4e5eb8488323f2d9f15ecfa"
+content-hash = "3221629b05496d2c207dff31ed6d2702513bbeaf6bc3bd93aedb10e395e82c7b"
 
 [metadata.files]
 amqp = []
@@ -1913,6 +1924,7 @@ numpy = []
 openpyxl = []
 packaging = []
 pandas = []
+parameterized = []
 parso = []
 pathspec = []
 pbr = []
