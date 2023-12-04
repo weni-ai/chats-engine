@@ -2,15 +2,20 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import IntegrityError
 from django.utils import timezone
-from rest_framework import status, viewsets
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.pagination import CursorPagination
 from rest_framework.response import Response
 
 from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
 )
 from chats.apps.api.v1.external.permissions import IsAdminPermission
-from chats.apps.api.v1.external.rooms.serializers import RoomFlowSerializer
+from chats.apps.api.v1.external.rooms.serializers import (
+    RoomFlowSerializer,
+    RoomListSerializer,
+)
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import (
@@ -21,6 +26,8 @@ from chats.apps.rooms.views import (
     update_custom_fields,
     update_flows_custom_fields,
 )
+
+from .filters import RoomFilter
 
 
 def add_user_or_queue_to_room(instance, request):
@@ -251,4 +258,36 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
         return Response(
             {"Detail": "Custom Field edited with success"},
             status.HTTP_200_OK,
+        )
+
+
+class ExternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
+    model = Room
+    queryset = Room.objects
+    serializer_class = RoomListSerializer
+    lookup_field = "uuid"
+    authentication_classes = [ProjectAdminAuthentication]
+
+    filter_backends = [
+        filters.OrderingFilter,
+        filters.SearchFilter,
+        DjangoFilterBackend,
+    ]
+    ordering = ["-created_on"]
+    search_fields = [
+        "contact__external_id",
+        "contact__name",
+        "user__email",
+        "urn",
+    ]
+    filterset_class = RoomFilter
+
+    pagination_class = CursorPagination
+    pagination_class.page_size = 5
+
+    def get_queryset(self):
+        return (
+            super()
+            .get_queryset()
+            .filter(queue__sector__project=self.request.auth.project)
         )
