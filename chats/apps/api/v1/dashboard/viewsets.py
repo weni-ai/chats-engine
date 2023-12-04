@@ -180,24 +180,34 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         """
         project = self.get_object()
         filter = request.query_params
-
-        user_info_context = {}
-        user_info_context["filters"] = request.query_params
-
         # General data
         general_dataset = dashboard_general_data(context=filter, project=project)
         raw_dataset = DashboardRawDataSerializer(instance=project, context=filter)
         combined_dataset = {**general_dataset, **raw_dataset.data}
 
         # Agents Data
-        userinfo_dataset = dashboard_agents_data(context=filter, project=project)
+        agents_service = AgentsService()
+        filters = Filters(
+            start_date=filter.get("start_date"),
+            end_date=filter.get("end_date"),
+            agent=filter.get("agent"),
+            sector=filter.get("sector"),
+            tag=filter.get("tag"),
+            user_request=request.user,
+            is_weni_admin=True
+            if request.user and "weni.ai" in request.user.email
+            else False,
+        )
+        agents_data = agents_service.get_agents_data(filters, project)
+        agents = DashboardAgentsSerializer(agents_data, many=True)
+
         # # Sectors Data
         sector_dataset = dashboard_division_data(context=filter, project=project)
 
         filename = "dashboard_export_data"
 
         data_frame = pandas.DataFrame([combined_dataset])
-        data_frame_1 = pandas.DataFrame(userinfo_dataset)
+        data_frame_1 = pandas.DataFrame(agents.data)
         data_frame_2 = pandas.DataFrame(sector_dataset)
 
         if "xls" in filter:

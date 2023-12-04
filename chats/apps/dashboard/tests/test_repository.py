@@ -1,10 +1,6 @@
-from operator import attrgetter
 from django.test import TestCase
 
 from chats.apps.accounts.models import User
-from chats.apps.api.v1.dashboard.serializers import (
-    dashboard_general_data,
-)
 from chats.apps.projects.models import Project
 
 from chats.apps.api.v1.dashboard.repository import AgentRepository
