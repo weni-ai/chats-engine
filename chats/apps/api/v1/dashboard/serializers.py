@@ -3,15 +3,17 @@ from urllib import parse
 
 import pendulum
 from django.conf import settings
-from django.db.models import Avg, Count, F, OuterRef, Q, Subquery, Sum
+from django.db.models import Avg, F, Sum
 from django.utils import timezone
 from django_redis import get_redis_connection
 from rest_framework import serializers
 
-from chats.apps.accounts.models import User
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.rooms.models import Room
+
+from chats.apps.api.v1.dashboard.repository import *
+from chats.apps.api.v1.dashboard.service import *
 
 
 def dashboard_general_data(context: dict, project):
@@ -107,58 +109,12 @@ def dashboard_general_data(context: dict, project):
 # Maybe separate each serializer in it's own serializer module/file
 
 
-def dashboard_agents_data(context, project):
-    tz = project.timezone
-    initial_datetime = (
-        timezone.now().astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
-    )
-
-    rooms_filter = {}
-    closed_rooms = {"rooms__queue__sector__project": project}
-    opened_rooms = {"rooms__queue__sector__project": project}
-    if context.get("start_date") and context.get("end_date"):
-        start_time = pendulum.parse(context.get("start_date")).replace(tzinfo=tz)
-        end_time = pendulum.parse(context.get("end_date") + " 23:59:59").replace(
-            tzinfo=tz
-        )
-
-        rooms_filter["rooms__created_on__range"] = [start_time, end_time]
-        rooms_filter["rooms__is_active"] = False
-        closed_rooms["rooms__ended_at__range"] = [start_time, end_time]
-
-    else:
-        closed_rooms["rooms__ended_at__gte"] = initial_datetime
-        opened_rooms["rooms__is_active"] = True
-        closed_rooms["rooms__is_active"] = False
-
-    if context.get("agent"):
-        rooms_filter["rooms__user"] = context.get("agent")
-
-    if context.get("sector"):
-        rooms_filter["rooms__queue__sector"] = context.get("sector")
-        if context.get("tag"):
-            rooms_filter["rooms__tags__uuid"] = context.get("tag")
-
-    project_permission_subquery = ProjectPermission.objects.filter(
-        project_id=project,
-        user_id=OuterRef("email"),
-    ).values("status")[:1]
-
-    agents_query = User.objects
-    if not context.get("is_weni_admin"):
-        agents_query = agents_query.exclude(email__endswith="weni.ai")
-
-    agents_query = (
-        agents_query.filter(project_permissions__project=project, is_active=True)
-        .annotate(
-            agent_status=Subquery(project_permission_subquery),
-            closed_rooms=Count("rooms", filter=Q(**closed_rooms, **rooms_filter)),
-            opened_rooms=Count("rooms", filter=Q(**opened_rooms, **rooms_filter)),
-        )
-        .values("first_name", "email", "agent_status", "closed_rooms", "opened_rooms")
-    )
-
-    return agents_query
+class DashboardAgentsSerializer(serializers.Serializer):
+    first_name = serializers.CharField(allow_null=True, required=False)
+    email = serializers.EmailField(allow_null=True, required=False)
+    agent_status = serializers.CharField(allow_null=True, required=False)
+    closed_rooms = serializers.IntegerField(allow_null=True, required=False)
+    opened_rooms = serializers.IntegerField(allow_null=True, required=False)
 
 
 # Maybe separate each serializer in it's own serializer module/file
