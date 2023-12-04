@@ -12,9 +12,6 @@ from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.rooms.models import Room
 
-from chats.apps.api.v1.dashboard.repository import *
-from chats.apps.api.v1.dashboard.service import *
-
 
 def dashboard_general_data(context: dict, project):
     DASHBOARD_ROOMS_CACHE_KEY = "dashboard:{filter}:{metric}"
