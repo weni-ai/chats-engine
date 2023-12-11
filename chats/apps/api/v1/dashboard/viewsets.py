@@ -9,14 +9,17 @@ from rest_framework.response import Response
 
 from chats.apps.api.v1.dashboard.presenter import get_export_data
 from chats.apps.api.v1.dashboard.serializers import (
+    DashboardAgentsSerializer,
     DashboardRawDataSerializer,
-    dashboard_agents_data,
     dashboard_division_data,
     dashboard_general_data,
 )
 from chats.apps.api.v1.permissions import HasDashboardAccess
 from chats.apps.projects.models import Project
 from chats.core.excel_storage import ExcelStorage
+
+from .dto import Filters
+from .service import AgentsService
 
 
 class DashboardLiveViewset(viewsets.GenericViewSet):
@@ -51,15 +54,24 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
     def agent(self, request, *args, **kwargs):
         """Agent metrics for the project or the sector"""
         project = self.get_object()
-        context = request.query_params.dict()
-        context["is_weni_admin"] = (
-            True if request.user and "weni.ai" in request.user.email else False
+        params = request.query_params.dict()
+        filters = Filters(
+            start_date=params.get("start_date"),
+            end_date=params.get("end_date"),
+            agent=params.get("agent"),
+            sector=params.get("sector"),
+            tag=params.get("tag"),
+            user_request=request.user,
+            is_weni_admin=True
+            if request.user and "weni.ai" in request.user.email
+            else False,
         )
-        serialized_data = dashboard_agents_data(
-            project=project,
-            context=context,
-        )
-        return Response({"project_agents": serialized_data}, status.HTTP_200_OK)
+
+        agents_service = AgentsService()
+        agents_data = agents_service.get_agents_data(filters, project)
+        agents = DashboardAgentsSerializer(agents_data, many=True)
+
+        return Response({"project_agents": agents.data}, status.HTTP_200_OK)
 
     @action(
         detail=True,
@@ -169,24 +181,34 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         """
         project = self.get_object()
         filter = request.query_params
-
-        user_info_context = {}
-        user_info_context["filters"] = request.query_params
-
         # General data
         general_dataset = dashboard_general_data(context=filter, project=project)
         raw_dataset = DashboardRawDataSerializer(instance=project, context=filter)
         combined_dataset = {**general_dataset, **raw_dataset.data}
 
         # Agents Data
-        userinfo_dataset = dashboard_agents_data(context=filter, project=project)
+        agents_service = AgentsService()
+        filters = Filters(
+            start_date=filter.get("start_date"),
+            end_date=filter.get("end_date"),
+            agent=filter.get("agent"),
+            sector=filter.get("sector"),
+            tag=filter.get("tag"),
+            user_request=request.user,
+            is_weni_admin=True
+            if request.user and "weni.ai" in request.user.email
+            else False,
+        )
+        agents_data = agents_service.get_agents_data(filters, project)
+        agents = DashboardAgentsSerializer(agents_data, many=True)
+
         # # Sectors Data
         sector_dataset = dashboard_division_data(context=filter, project=project)
 
         filename = "dashboard_export_data"
 
         data_frame = pandas.DataFrame([combined_dataset])
-        data_frame_1 = pandas.DataFrame(userinfo_dataset)
+        data_frame_1 = pandas.DataFrame(agents.data)
         data_frame_2 = pandas.DataFrame(sector_dataset)
 
         if "xls" in filter:
