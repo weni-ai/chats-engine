@@ -1,8 +1,11 @@
+import json
 import logging
 import re
 
+from django.conf import settings
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
+from django_redis import get_redis_connection
 from mozilla_django_oidc.auth import OIDCAuthenticationBackend
 
 from chats.apps.accounts.models import User
@@ -25,6 +28,25 @@ def check_module_permission(claims, user):
 
 
 class WeniOIDCAuthenticationBackend(OIDCAuthenticationBackend):
+    cache_token = settings.OIDC_CACHE_TOKEN
+    cache_ttl = settings.OIDC_CACHE_TTL
+
+    def get_userinfo(self, access_token, *args):
+        if not self.cache_token:
+            return super().get_userinfo(access_token, *args)
+
+        redis_connection = get_redis_connection()
+
+        userinfo = redis_connection.get(access_token)
+
+        if userinfo is not None:
+            return json.loads(userinfo)
+
+        userinfo = super().get_userinfo(access_token, *args)
+        redis_connection.set(access_token, json.dumps(userinfo), self.cache_ttl)
+
+        return userinfo
+
     def verify_claims(self, claims):
         # validação de permissão
         verified = super(WeniOIDCAuthenticationBackend, self).verify_claims(claims)
