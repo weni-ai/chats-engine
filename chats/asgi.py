@@ -22,7 +22,7 @@ from chats.apps.api.websockets.rooms.routing import websocket_urlpatterns  # NOQ
 
 application = ProtocolTypeRouter(
     {
-        "http": django_asgi_app,
+        # "http": django_asgi_app,
         "websocket": TokenAuthMiddleware(URLRouter(websocket_urlpatterns)),
     }
 )
