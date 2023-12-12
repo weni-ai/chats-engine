@@ -299,6 +299,13 @@ if OIDC_ENABLED:
     OIDC_ADMIN_CLIENT_ID = env.str("OIDC_ADMIN_CLIENT_ID")
     OIDC_ADMIN_CLIENT_SECRET = env.str("OIDC_ADMIN_CLIENT_SECRET")
 
+OIDC_CACHE_TOKEN = env.bool(
+    "OIDC_CACHE_TOKEN", default=False
+)  # Enable/disable user token caching (default: False).
+OIDC_CACHE_TTL = env.int(
+    "OIDC_CACHE_TTL", default=600
+)  # Time-to-live for cached user tokens (default: 600 seconds).
+
 
 CONNECT_API_URL = env.str("CONNECT_API_URL", default="")
 USE_CONNECT_V2 = env.bool("USE_CONNECT_V2", default=False)
