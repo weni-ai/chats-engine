@@ -120,14 +120,12 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
 
     @property
     def agent_count(self):
-        agents_count = list(
-            self.queues.annotate(
-                agents=models.Count(
-                    "authorizations", filter=models.Q(authorizations__role=1)
-                )
-            ).values_list("agents", flat=True)
+        agents_count = (
+            self.queues.filter(authorizations__role=1, is_deleted=False)
+            .values_list("authorizations__permission", flat=True)
+            .distinct()
+            .count()
         )
-        agents_count = sum(agents_count)
         return agents_count
 
     @property
