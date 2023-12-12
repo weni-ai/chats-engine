@@ -34,7 +34,7 @@ class SectorSetupHandlerUseCase:
             content = {
                 "project_uuid": str(project.uuid),
                 "name": sector.name,
-                "project_auth": str(creator_permission.pk),
+                "project_auth": str(sector.external_token.pk),
                 "user_email": str(creator_permission.user.email),
                 "uuid": str(sector.uuid),
                 "queues": [],

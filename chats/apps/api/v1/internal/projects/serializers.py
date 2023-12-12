@@ -74,7 +74,7 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
                 project_uuid=str(instance.uuid),
                 name=sector.name,
                 config={
-                    "project_auth": str(permission.pk),
+                    "project_auth": str(sector.external_token.pk),
                     "sector_uuid": str(sector.uuid),
                 },
             )

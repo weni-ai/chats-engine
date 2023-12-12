@@ -69,7 +69,7 @@ class SectorViewset(viewsets.ModelViewSet):
             "project_uuid": str(instance.project.uuid),
             "name": instance.name,
             "config": {
-                "project_auth": str(instance.get_permission(self.request.user).pk),
+                "project_auth": str(instance.external_token.pk),
                 "sector_uuid": str(instance.uuid),
             },
         }

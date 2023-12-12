@@ -342,6 +342,10 @@ class ProjectPermission(
             return max(limits)
         return 0  # If the user is not an agent, it won't be possible to receive rooms automatically
 
+    @property
+    def external_token(self):
+        return self.permissions.get_or_create(user=None, role=1)[0]
+
 
 class LinkContact(BaseModel):
     user = models.ForeignKey(
