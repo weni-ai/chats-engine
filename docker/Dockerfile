@@ -104,7 +104,7 @@ USER "${PROJECT_USER}:${PROJECT_USER}"
 
 EXPOSE 8000
 
-ENTRYPOINT ["docker-entrypoint.sh"]
+ENTRYPOINT ["bash", "docker-entrypoint.sh"]
 CMD ["start"]
 # CMD ["sh", "docker-entrypoint.sh"]
 # #ENTRYPOINT ["docker-entrypoint.sh"]
