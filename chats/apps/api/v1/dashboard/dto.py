@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+from chats.apps.projects.models import ProjectPermission
+
 
 @dataclass
 class Agent:
@@ -18,4 +20,20 @@ class Filters:
     sector: str = None
     tag: str = None
     is_weni_admin: bool = None
-    user_request: str = None
+    user_request: ProjectPermission = None
+    project: str = None
+
+
+@dataclass
+class ClosedRoomData:
+    closed_rooms: dict = None
+
+
+@dataclass
+class TransferRoomData:
+    transfer_count: dict = None
+
+
+@dataclass
+class QueueRoomData:
+    queue_rooms: dict = None
