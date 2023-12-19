@@ -76,8 +76,6 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
                 filter=rooms_count_filter,
             )
         ).filter(active_rooms_count__lt=self.limit)
-        if routing_option is None:
-            return online_agents.order_by("active_rooms_count")
 
         if routing_option == "general":
             rooms_day_closed_filter = models.Q(
@@ -97,6 +95,8 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
             )
 
             return online_agents.order_by("active_and_day_closed_rooms")
+
+        return online_agents.order_by("active_rooms_count")
 
     def is_agent(self, user):
         return self.authorizations.filter(permission__user=user).exists()
