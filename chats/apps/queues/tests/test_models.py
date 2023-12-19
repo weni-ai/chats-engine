@@ -164,7 +164,7 @@ class QueueAvailableAgentsGaneralTestCase(TestCase):
 
         available_agents = self.queue.available_agents
 
-        self.assertEqual(available_agents.count(), 0)
+        self.assertEqual(available_agents.count(), 1)
 
     def test_1_online_user_with_2_active_1_closed(self):
         user = User.objects.get(email="amywong@chats.weni.ai")
@@ -174,7 +174,8 @@ class QueueAvailableAgentsGaneralTestCase(TestCase):
         available_agents = self.queue.available_agents
 
         self.assertEqual(available_agents.count(), 1)
-        self.assertEqual(available_agents.first().active_rooms_count, 3)
+        self.assertEqual(available_agents.first().active_and_day_closed_rooms, 3)
+        self.assertEqual(available_agents.first().active_rooms_count, 2)
 
     def test_2_online_users_with_2_active_1_closed_second_agent_empty(self):
         """
