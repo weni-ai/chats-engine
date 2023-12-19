@@ -3,7 +3,7 @@ from urllib import parse
 
 import pendulum
 from django.conf import settings
-from django.db.models import Avg, F, Sum
+from django.db.models import Avg, F
 from django.utils import timezone
 from django_redis import get_redis_connection
 from rest_framework import serializers
@@ -179,7 +179,7 @@ def dashboard_division_data(context, project=None):
     )
 
 
-class DashboardRawDataSerializer1(serializers.ModelSerializer):
+class DashboardClosedRoomSerializer(serializers.ModelSerializer):
     closed_rooms = serializers.IntegerField(allow_null=True, required=False)
 
     class Meta:
@@ -187,7 +187,7 @@ class DashboardRawDataSerializer1(serializers.ModelSerializer):
         fields = ["closed_rooms"]
 
 
-class DashboardRawDataSerializer2(serializers.ModelSerializer):
+class DashboardTransferCountSerializer(serializers.ModelSerializer):
     transfer_count = serializers.IntegerField(allow_null=True, required=False)
 
     class Meta:
@@ -195,7 +195,7 @@ class DashboardRawDataSerializer2(serializers.ModelSerializer):
         fields = ["transfer_count"]
 
 
-class DashboardRawDataSerializer3(serializers.ModelSerializer):
+class DashboardQueueRoomsSerializer(serializers.ModelSerializer):
     queue_rooms = serializers.IntegerField(allow_null=True, required=False)
 
     class Meta:

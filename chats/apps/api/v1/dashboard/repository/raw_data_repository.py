@@ -1,14 +1,9 @@
-from typing import List
-
 from pendulum.parser import parse as pendulum_parse
 
-from django.db.models import Count, OuterRef, Q, Subquery
 from django.utils import timezone
 
-from chats.apps.accounts.models import User
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.rooms.models import Room
-from chats.apps.api.v1.dashboard.dto import Agent, Filters
 
 
 class ClosedRoomsRepository:
@@ -57,9 +52,9 @@ class ClosedRoomsRepository:
     def closed_rooms(self, filters):
         tz = filters.project.timezone
 
-        self._filter_date_range(filters, tz)  # Atualiza os filtros de data
-        self._filter_sector(filters)  # Atualiza os filtros de setor
-        self._filter_agents(filters)  # Atualiza os filtros de agentes
+        self._filter_date_range(filters, tz)
+        self._filter_sector(filters)
+        self._filter_agents(filters)
 
         if filters.get("user_request"):
             rooms_query = self.model.filter(

@@ -10,9 +10,7 @@ from rest_framework.response import Response
 from chats.apps.api.v1.dashboard.presenter import get_export_data
 from chats.apps.api.v1.dashboard.serializers import (
     DashboardAgentsSerializer,
-    DashboardRawDataSerializer1,
-    DashboardRawDataSerializer2,
-    DashboardRawDataSerializer3,
+    DashboardRawDataSerializer,
     dashboard_division_data,
     dashboard_general_data,
 )
@@ -96,7 +94,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         detail=True,
         methods=["GET"],
         url_name="raw",
-        serializer_class=DashboardRawDataSerializer1,
+        serializer_class=DashboardRawDataSerializer,
     )
     def raw_data(self, request, *args, **kwargs):
         """Raw data for the project, sector, queue and agent."""
