@@ -1,7 +1,7 @@
-FROM python:3.8-slim-buster AS base
+# syntax = docker/dockerfile:1
 
-ARG APP_UID=1000
-ARG APP_GID=1000
+ARG PYTHON_VERSION="3.9"
+ARG POETRY_VERSION="1.1.15"
 
 ARG BUILD_DEPS="\
     python3-dev \
@@ -23,20 +23,21 @@ ARG RUNTIME_DEPS="\
     ffmpeg \
     libmagic1"
 
-ARG APP_PORT="8000"
+FROM python:${PYTHON_VERSION}-slim as base
 
+ARG POETRY_VERSION
+
+ARG APP_PORT="8000"
 ARG APP_VERSION="0.1"
 
 # set environment variables
-ENV PROJECT_PATH="/chats"
-
-ENV APPLICATION_NAME="Chats"
-
 ENV APP_VERSION=${APP_VERSION} \
     RUNTIME_DEPS=${RUNTIME_DEPS} \
     BUILD_DEPS=${BUILD_DEPS} \
-    APP_UID=${APP_UID} \
-    APP_GID=${APP_GID} \
+    APPLICATION_NAME="Chats" \
+    PROJECT_PATH=/chats \
+    PROJECT_USER=app_user \
+    PROJECT_GROUP=app_group \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=UTF-8 \
@@ -51,49 +52,59 @@ LABEL app=${VERSION} \
     description="${APPLICATION_NAME} image" \
     maintainer="${APPLICATION_NAME} Team"
 
-RUN addgroup --gid "${APP_GID}" app_group \
-    && useradd --system -m -d ${PROJECT_PATH} -u "${APP_UID}" -g "${APP_GID}" app_user
+RUN addgroup --gid 1999 "${PROJECT_GROUP}" \
+    && useradd --system -m -d ${PROJECT_PATH} -u 1999 -g 1999 "${PROJECT_USER}"
 
 # set work directory
 WORKDIR ${PROJECT_PATH}
 
-FROM base AS build
+RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 
-RUN if [ ! "x${BUILD_DEPS}" = "x" ] ; then apt-get update \
-    && apt-get install -y --no-install-recommends ${BUILD_DEPS} ; fi
+FROM base as build-poetry
 
-FROM build as build-poetry
+ARG POETRY_VERSION
 
-COPY ./pyproject.toml .
-COPY ./poetry.lock .
+COPY pyproject.toml poetry.lock ./
 
-RUN python -m pip install -U poetry \
-    && poetry export --without-hashes --output /requirements.txt
+RUN --mount=type=cache,mode=0755,target=/pip_cache,id=pip pip install --cache-dir /pip_cache -U poetry=="${POETRY_VERSION}" \
+  && poetry cache clear -n --all pypi \
+  && poetry export --without-hashes --output requirements.txt
 
-FROM build as build-pip
+FROM base as build
 
-COPY --from=build-poetry /requirements.txt .
+ARG BUILD_DEPS
 
-RUN mkdir /install \
-    && pip install --no-cache-dir --prefix=/install -r requirements.txt
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,target=/var/lib/apt,sharing=locked \
+  apt-get update \
+  && apt-get install --no-install-recommends --no-install-suggests -y ${BUILD_DEPS}
+ 
+COPY --from=build-poetry "${PROJECT_PATH}/requirements.txt" /tmp/dep/
+RUN --mount=type=cache,mode=0755,target=/pip_cache,id=pip pip install --cache-dir /pip_cache --prefix=/install -r /tmp/dep/requirements.txt
 
 FROM base
 
-COPY --from=build-pip /install /usr/local
+ARG BUILD_DEPS
+ARG RUNTIME_DEPS
 
-# Clear image and install runtime dependences
-RUN apt-get update \
-    && SUDO_FORCE_REMOVE=yes apt-get remove --purge -y ${BUILD_DEPS} \
-    && apt-get autoremove -y \
-    && apt-get install -y --no-install-recommends ${RUNTIME_DEPS} \
-    && rm -rf /usr/share/man \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,target=/var/lib/apt,sharing=locked \
+  apt-get update \
+  && SUDO_FORCE_REMOVE=yes apt-get remove --purge -y ${BUILD_DEPS} \
+  && apt-get autoremove -y \
+  && apt-get install -y --no-install-recommends ${RUNTIME_DEPS} \
+  && rm -rf /usr/share/man /usr/share/doc \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/*
 
-# copy project
-COPY --chown=app_user:app_group . .
+COPY --from=build /install /usr/local
+COPY --chown=${PROJECT_USER}:${PROJECT_GROUP} . ${PROJECT_PATH}
 
-RUN chmod 777 docker-entrypoint.sh
+USER "${PROJECT_USER}:${PROJECT_USER}"
 
-CMD ["sh", "docker-entrypoint.sh"]
-#ENTRYPOINT ["docker-entrypoint.sh"]
+EXPOSE 8000
+
+ENTRYPOINT ["bash", "docker-entrypoint.sh"]
+CMD ["start"]
+# CMD ["sh", "docker-entrypoint.sh"]
+# #ENTRYPOINT ["docker-entrypoint.sh"]
