@@ -100,11 +100,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 COPY --from=build /install /usr/local
 COPY --chown=${PROJECT_USER}:${PROJECT_GROUP} . ${PROJECT_PATH}
 
-<<<<<<< HEAD
-USER "${PROJECT_USER}:${PROJECT_USER}"
-=======
 USER "${PROJECT_USER}:${PROJECT_GROUP}"
->>>>>>> feature/new-dockerfile
 
 EXPOSE 8000
 
