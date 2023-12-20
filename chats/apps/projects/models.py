@@ -64,6 +64,19 @@ class Project(BaseConfigurableModel, BaseModel):
         return self.name
 
     @property
+    def routing_option(self):
+        """
+        OPTIONS>
+            "general": will consider closed rooms on the day. e.g.: a agent has 3 open rooms and 1 closed,
+                the limit for the sector is 4, new rooms will go to other agents or stay in the queue.
+            None: Will only consider open rooms, does not matter when the room was created.
+        """
+        try:
+            return self.config.get("routing_option", None)
+        except AttributeError:
+            return None
+
+    @property
     def history_contacts_blocklist(self):
         try:
             return self.config.get("history_contacts_blocklist", [])

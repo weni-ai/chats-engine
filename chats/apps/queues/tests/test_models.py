@@ -90,7 +90,7 @@ class QueueSetUpMixin(TestCase):
         )
 
 
-class QueueAvailableAgentsTestCase(QueueSetUpMixin, TestCase):
+class QueueAvailableAgentsDefaultTestCase(QueueSetUpMixin, TestCase):
     def test_available_agents_returns_online_agents(self):
         self.agent_permission.status = "ONLINE"
         self.agent_permission.save()
@@ -142,6 +142,57 @@ class QueueAvailableAgentsTestCase(QueueSetUpMixin, TestCase):
         self.agent_2_permission.save()
 
         self.assertEqual(self.agent_2, self.queue.available_agents.first())
+
+
+class QueueAvailableAgentsGaneralTestCase(TestCase):
+    fixtures = ["chats/fixtures/fixture_app.json", "chats/fixtures/fixture_room.json"]
+
+    def setUp(self):
+        self.queue = Queue.objects.get(pk="f2519480-7e58-4fc4-9894-9ab1769e29cf")
+        self.project = Project.objects.get(pk="34a93b52-231e-11ed-861d-0242ac120002")
+        self.project.config = {"routing_option": "general"}
+        self.project.save()
+        self.sector = self.queue.sector
+        self.sector.rooms_limit = 4
+        self.sector.save()
+
+    def test_1_online_user_with_3_active_1_closed(self):
+        user = User.objects.get(email="amywong@chats.weni.ai")
+        Room.objects.update(user=user)
+        Room.objects.first().close()
+        self.project.permissions.filter(user=user).update(status="ONLINE")
+
+        available_agents = self.queue.available_agents
+
+        self.assertEqual(available_agents.count(), 1)
+
+    def test_1_online_user_with_2_active_1_closed(self):
+        user = User.objects.get(email="amywong@chats.weni.ai")
+        user.rooms.first().close()
+        self.project.permissions.filter(user=user).update(status="ONLINE")
+
+        available_agents = self.queue.available_agents
+
+        self.assertEqual(available_agents.count(), 1)
+        self.assertEqual(available_agents.first().active_and_day_closed_rooms, 3)
+        self.assertEqual(available_agents.first().active_rooms_count, 2)
+
+    def test_2_online_users_with_2_active_1_closed_second_agent_empty(self):
+        """
+        Verify if the first in queue will be the agent with the least rooms
+        """
+        user = User.objects.get(email="amywong@chats.weni.ai")
+        user.rooms.first().close()
+        self.project.permissions.filter(user=user).update(status="ONLINE")
+        self.project.permissions.filter(user__email="linalawson@chats.weni.ai").update(
+            status="ONLINE"
+        )
+
+        available_agents = self.queue.available_agents
+
+        self.assertEqual(available_agents.count(), 2)
+        self.assertEqual(available_agents.first().active_rooms_count, 0)
+        self.assertEqual(available_agents.first().email, "linalawson@chats.weni.ai")
 
 
 class PropertyTests(QueueSetUpMixin, APITestCase):
