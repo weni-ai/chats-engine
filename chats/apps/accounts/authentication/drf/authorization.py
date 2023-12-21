@@ -35,7 +35,7 @@ class ProjectAdminAuthentication(TokenAuthentication):
     def authenticate_credentials(self, key):
         model = self.get_model()
         try:
-            authorization = model.objects.get(uuid=key)
+            authorization = model.auth.get(uuid=key)
             if not authorization.is_admin:
                 raise exceptions.PermissionDenied()
 

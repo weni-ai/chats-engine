@@ -54,6 +54,10 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         ]
 
     @property
+    def external_token(self):
+        return self.project.external_token
+
+    @property
     def completion_context(self):
         try:
             can_input_context = self.config.get("can_input_context")

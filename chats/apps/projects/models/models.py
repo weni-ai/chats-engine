@@ -12,6 +12,8 @@ from chats.apps.api.v1.internal.rest_clients.integrations_rest_client import (
 from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
 from chats.utils.websockets import send_channels_group
 
+from .permission_managers import UserPermissionsManager
+
 # Create your models here.
 
 
@@ -89,6 +91,10 @@ class Project(BaseConfigurableModel, BaseModel):
             return self.config.get("openai_token")
         except AttributeError:
             return None
+
+    @property
+    def external_token(self):
+        return self.permissions.get_or_create(user=None, role=1)[0]
 
     def add_contact_to_history_blocklist(self, contact_external_id: str):
         config = self.config or {}
@@ -210,6 +216,9 @@ class ProjectPermission(
     first_access = models.BooleanField(
         _("Is it the first access of user?"), default=True
     )
+
+    objects = UserPermissionsManager()
+    auth = models.Manager()
 
     class Meta:
         verbose_name = _("Project Permission")
