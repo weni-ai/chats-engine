@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
@@ -64,17 +65,38 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
 
     @property
     def available_agents(self):
+        routing_option = self.project.routing_option
+        rooms_active_filter = models.Q(rooms__is_active=True)
+        rooms_sector_filter = models.Q(rooms__queue__sector=self.sector)
+
+        rooms_count_filter = models.Q(rooms_active_filter & rooms_sector_filter)
         online_agents = self.online_agents.annotate(
             active_rooms_count=models.Count(
                 "rooms",
-                filter=models.Q(
-                    rooms__is_active=True, rooms__queue__sector=self.sector
-                ),
+                filter=rooms_count_filter,
             )
-        )
-        return online_agents.filter(active_rooms_count__lt=self.limit).order_by(
-            "active_rooms_count"
-        )
+        ).filter(active_rooms_count__lt=self.limit)
+
+        if routing_option == "general":
+            rooms_day_closed_filter = models.Q(
+                rooms__ended_at__date__gte=timezone.now().date()
+            )
+            rooms_active_or_day_closed_filter = (
+                rooms_active_filter | rooms_day_closed_filter
+            )
+            rooms_sector_and_active_or_day_closed_filter = (
+                rooms_sector_filter & rooms_active_or_day_closed_filter
+            )
+
+            online_agents = online_agents.annotate(
+                active_and_day_closed_rooms=models.Count(
+                    "rooms", filter=rooms_sector_and_active_or_day_closed_filter
+                )
+            )
+
+            return online_agents.order_by("active_and_day_closed_rooms")
+
+        return online_agents.order_by("active_rooms_count")
 
     def is_agent(self, user):
         return self.authorizations.filter(permission__user=user).exists()
