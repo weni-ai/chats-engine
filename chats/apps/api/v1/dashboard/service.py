@@ -11,9 +11,10 @@ from .repository import (
     ClosedRoomsRepository,
     TransferCountRepository,
     QueueRoomsRepository,
+    SectorRepository,
 )
 
-from .dto import Agent, Filters
+from .dto import Agent, Filters, Sector
 
 
 class AgentsService:
@@ -53,3 +54,9 @@ class RawDataService:
         }
 
         return combined_data
+
+
+class SectorService:
+    def get_sector_data(self, filters: Filters) -> List[Sector]:
+        sectors_repository = SectorRepository()
+        return sectors_repository.division_data(filters)

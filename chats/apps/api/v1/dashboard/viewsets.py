@@ -11,14 +11,14 @@ from chats.apps.api.v1.dashboard.presenter import get_export_data
 from chats.apps.api.v1.dashboard.serializers import (
     DashboardAgentsSerializer,
     DashboardRawDataSerializer,
-    dashboard_division_data,
     dashboard_general_data,
+    DashboardSectorSerializer,
 )
 from chats.apps.api.v1.permissions import HasDashboardAccess
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.core.excel_storage import ExcelStorage
 from .dto import Filters
-from .service import AgentsService, RawDataService
+from .service import AgentsService, RawDataService, SectorService, SectorService
 
 
 class DashboardLiveViewset(viewsets.GenericViewSet):
@@ -82,13 +82,28 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         Can return data on project and sector level (list of sector or list of queues)
         """
         project = self.get_object()
-        context = request.query_params.dict()
-        context["user_request"] = request.user
-        serialized_data = dashboard_division_data(
-            project=project,
-            context=context,
+        params = request.query_params.dict()
+
+        user_permission = ProjectPermission.objects.get(
+            user=request.user, project=project
         )
-        return Response({"sectors": serialized_data}, status.HTTP_200_OK)
+        filters = Filters(
+            start_date=params.get("start_date"),
+            end_date=params.get("end_date"),
+            agent=params.get("agent"),
+            sector=params.get("sector"),
+            tag=params.get("tag"),
+            user_request=user_permission,
+            project=project,
+            is_weni_admin=True
+            if request.user and "weni.ai" in request.user.email
+            else False,
+        )
+
+        sectors_service = SectorService()
+        sectors_data = sectors_service.get_sector_data(filters)
+        serialized_data = DashboardSectorSerializer(sectors_data, many=True)
+        return Response({"sectors": serialized_data.data}, status.HTTP_200_OK)
 
     @action(
         detail=True,
@@ -229,9 +244,12 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         )
         raw_data = raw_data_service.get_raw_data(filters)
 
+        # Sector Data
+        sector_data_service = SectorService()
+        sector_data = sector_data_service.get_sector_data(filters)
         # Datasets
         general_dataset = dashboard_general_data(context=filter, project=project)
-        sector_dataset = dashboard_division_data(context=filter, project=project)
+        sector_dataset = DashboardSectorSerializer(sector_data, many=True)
         agents_dataset = DashboardAgentsSerializer(agents_data, many=True)
 
         combined_dataset = {**general_dataset, **raw_data}
@@ -240,7 +258,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
 
         data_frame = pandas.DataFrame([combined_dataset])
         data_frame_1 = pandas.DataFrame(agents_dataset.data)
-        data_frame_2 = pandas.DataFrame(sector_dataset)
+        data_frame_2 = pandas.DataFrame(sector_dataset.data)
 
         if "xls" in filter:
             excel_buffer = io.BytesIO()

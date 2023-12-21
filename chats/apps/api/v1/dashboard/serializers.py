@@ -127,56 +127,11 @@ class DashboardRawDataSerializer(serializers.Serializer):
 # Maybe separate each serializer in it's own serializer module/file
 
 
-def dashboard_division_data(context, project=None):
-    tz = project.timezone
-    initial_datetime = (
-        timezone.now().astimezone(tz).replace(hour=0, minute=0, second=0, microsecond=0)
-    )
-    rooms_filter = {}
-    division_level = "room__queue__sector"
-
-    user_request = ProjectPermission.objects.get(
-        user=context.get("user_request"), project=project
-    )
-    room_metric_query = RoomMetrics.objects
-
-    if context.get("sector"):
-        division_level = "room__queue"
-        rooms_filter["room__queue__sector"] = context.get("sector")
-        if context.get("tag"):
-            rooms_filter["room__tags__uuid"] = context.get("tag")
-    else:
-        rooms_filter["room__queue__sector__project"] = project
-    rooms_filter["room__user__isnull"] = False
-
-    if context.get("agent"):
-        rooms_filter["room__user"] = context.get("agent")
-
-    if context.get("start_date") and context.get("end_date"):
-        start_time = pendulum.parse(context.get("start_date")).replace(tzinfo=tz)
-        end_time = pendulum.parse(context.get("end_date") + " 23:59:59").replace(
-            tzinfo=tz
-        )
-        rooms_filter["created_on__range"] = [start_time, end_time]
-    else:
-        rooms_filter["created_on__gte"] = initial_datetime
-
-    if user_request:
-        room_metric_query = room_metric_query.filter(
-            room__queue__sector__in=user_request.manager_sectors()
-        )
-
-    return (
-        room_metric_query.filter(**rooms_filter)  # date, project or sector
-        .values(f"{division_level}__uuid")
-        .annotate(
-            name=F(f"{division_level}__name"),
-            waiting_time=Avg("waiting_time"),
-            response_time=Avg("message_response_time"),
-            interact_time=Avg("interaction_time"),
-        )
-        .values("name", "waiting_time", "response_time", "interact_time")
-    )
+class DashboardSectorSerializer(serializers.Serializer):
+    name = serializers.CharField(allow_null=True, required=False)
+    waiting_time = serializers.IntegerField(allow_null=True, required=False)
+    response_time = serializers.IntegerField(allow_null=True, required=False)
+    interact_time = serializers.IntegerField(allow_null=True, required=False)
 
 
 class DashboardClosedRoomSerializer(serializers.ModelSerializer):
