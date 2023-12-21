@@ -18,7 +18,7 @@ from chats.apps.api.v1.permissions import HasDashboardAccess
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.core.excel_storage import ExcelStorage
 from .dto import Filters
-from .service import AgentsService, RawDataService, SectorService, SectorService
+from .service import AgentsService, RawDataService, SectorService
 
 
 class DashboardLiveViewset(viewsets.GenericViewSet):

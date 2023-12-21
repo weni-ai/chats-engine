@@ -3,12 +3,11 @@ from urllib import parse
 
 import pendulum
 from django.conf import settings
-from django.db.models import Avg, F
+from django.db.models import Avg
 from django.utils import timezone
 from django_redis import get_redis_connection
 from rest_framework import serializers
 
-from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.rooms.models import Room
 
