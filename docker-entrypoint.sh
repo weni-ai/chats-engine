@@ -2,6 +2,7 @@
 
 export GUNICORN_APP=${GUNICORN_APP:-"app.wsgi:application"}
 export CELERY_APP=${CELERY_APP:-"app.wsgi:celery"}
+export DAPHNE_APP=${DAPHNE_APP:-"app.asgi:application"}
 export GUNICORN_LOG_CONF=${GUNICORN_LOG_CONF:-"${PROJECT_PATH}/docker/gunicorn/gunicorn-logging.conf"}
 export GUNICORN_CONF=${GUNICORN_CONF:-"${PROJECT_PATH}/docker/gunicorn/gunicorn.conf.py"}
 export LOG_LEVEL=${LOG_LEVEL:-"INFO"}
@@ -14,7 +15,7 @@ echo "Running collectstatic"
 python manage.py collectstatic --noinput
 
 echo "Starting server"
-exec gunicorn chats.asgi -c gunicorn.conf.py
+exec gunicorn chats.wsgi -c gunicorn.conf.py
 
 do_gosu(){
     user="$1"
