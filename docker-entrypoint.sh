@@ -15,7 +15,7 @@ echo "Running collectstatic"
 python manage.py collectstatic --noinput
 
 echo "Starting server"
-exec gunicorn chats.wsgi -c gunicorn.conf.py
+exec gunicorn chats.asgi -c gunicorn.conf.py
 
 do_gosu(){
     user="$1"
