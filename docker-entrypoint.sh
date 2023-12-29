@@ -2,7 +2,7 @@
 
 export GUNICORN_APP=${GUNICORN_APP:-"chats.wsgi"}
 export CELERY_APP=${CELERY_APP:-"chats"}
-export GUNICORN_CONF=${GUNICORN_CONF:-"${PROJECT_PATH}/docker/gunicorn/gunicorn.conf.py"}
+export GUNICORN_CONF=${GUNICORN_CONF:-"${PROJECT_PATH}/gunicorn.conf.py"}
 export LOG_LEVEL=${LOG_LEVEL:-"INFO"}
 export CELERY_MAX_WORKERS=${CELERY_MAX_WORKERS:-'6'}
 # export CELERY_BEAT_DATABASE_FILE=${CELERY_BEAT_DATABASE_FILE:-'/tmp/celery_beat_database'}
