@@ -27,7 +27,6 @@ FROM python:${PYTHON_VERSION}-slim as base
 
 ARG POETRY_VERSION
 
-ARG APP_PORT="8000"
 ARG APP_VERSION="0.1"
 
 # set environment variables
@@ -78,7 +77,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt,sharing=locked \
   apt-get update \
   && apt-get install --no-install-recommends --no-install-suggests -y ${BUILD_DEPS}
- 
+
 COPY --from=build-poetry "${PROJECT_PATH}/requirements.txt" /tmp/dep/
 RUN --mount=type=cache,mode=0755,target=/pip_cache,id=pip pip install --cache-dir /pip_cache --prefix=/install -r /tmp/dep/requirements.txt
 
