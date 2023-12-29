@@ -105,5 +105,3 @@ EXPOSE 8000
 
 ENTRYPOINT ["bash", "docker-entrypoint.sh"]
 CMD ["start"]
-# CMD ["sh", "docker-entrypoint.sh"]
-# #ENTRYPOINT ["docker-entrypoint.sh"]
