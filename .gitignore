@@ -133,6 +133,7 @@ dmypy.json
 
 # Static files
 media/
+static/
 
 # Gunicorn access
 gunicorn.access
