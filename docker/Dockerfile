@@ -27,7 +27,6 @@ FROM python:${PYTHON_VERSION}-slim as base
 
 ARG POETRY_VERSION
 
-ARG APP_PORT="8000"
 ARG APP_VERSION="0.1"
 
 # set environment variables
@@ -106,5 +105,3 @@ EXPOSE 8000
 
 ENTRYPOINT ["bash", "docker-entrypoint.sh"]
 CMD ["start"]
-# CMD ["sh", "docker-entrypoint.sh"]
-# #ENTRYPOINT ["docker-entrypoint.sh"]
