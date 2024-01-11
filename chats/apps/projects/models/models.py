@@ -1,4 +1,4 @@
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
 from django.db import models
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
@@ -94,7 +94,10 @@ class Project(BaseConfigurableModel, BaseModel):
 
     @property
     def external_token(self):
-        return self.permissions.get_or_create(user=None, role=1)[0]
+        try:
+            return self.permissions(manager="auth").get_or_create(user=None, role=1)[0]
+        except MultipleObjectsReturned:
+            return self.permissions(manager="auth").first()
 
     def add_contact_to_history_blocklist(self, contact_external_id: str):
         config = self.config or {}
