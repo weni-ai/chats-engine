@@ -27,7 +27,6 @@ from .service import (
     RoomsDataService,
     RoomsCacheRepository,
 )
-import os
 
 
 class DashboardLiveViewset(viewsets.GenericViewSet):
@@ -46,22 +45,6 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
     def general(self, request, *args, **kwargs):
         """General metrics for the project or the sector"""
         project = self.get_object()
-        context = request.query_params.dict()
-        context["user_request"] = request.user
-        serialized_data = dashboard_general_data(
-            project=project,
-            context=context,
-        )
-        return Response(serialized_data, status.HTTP_200_OK)
-
-    @action(
-        detail=True,
-        methods=["GET"],
-        url_name="rooms_data_1",
-    )
-    def rooms_data_1(self, request, *args, **kwargs):
-        """General metrics for the project or the sector"""
-        project = self.get_object()
 
         user_permission = ProjectPermission.objects.get(
             user=request.user, project=project
@@ -72,6 +55,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             end_date=params.get("end_date"),
             agent=params.get("agent"),
             sector=params.get("sector"),
+            queue=params.get("queue"),
             tag=params.get("tag"),
             user_request=user_permission,
             project=project,
