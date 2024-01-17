@@ -33,6 +33,12 @@ class AgentsService:
 
 class RawDataService:
     def get_raw_data(self, filters: Filters):
+        active_rooms_repository = ActiveChatsRepository()
+        active_rooms_data = active_rooms_repository.active_chats(filters)
+        active_rooms_count = DashboardActiveRoomsSerializer(
+            active_rooms_data, many=True
+        )
+
         closed_rooms_repository = ClosedRoomsRepository()
         closed_rooms_data = closed_rooms_repository.closed_rooms(filters)
         closed_rooms_count = DashboardClosedRoomSerializer(closed_rooms_data, many=True)
@@ -46,12 +52,6 @@ class RawDataService:
         queue_rooms_repository = QueueRoomsRepository()
         queue_rooms_data = queue_rooms_repository.queue_rooms(filters)
         queue_rooms_count = DashboardQueueRoomsSerializer(queue_rooms_data, many=True)
-
-        active_rooms_repository = ActiveChatsRepository()
-        active_rooms_data = active_rooms_repository.active_chats(filters)
-        active_rooms_count = DashboardActiveRoomsSerializer(
-            active_rooms_data, many=True
-        )
 
         serialized_active_rooms = active_rooms_count.data
         serialized_closed_rooms = closed_rooms_count.data

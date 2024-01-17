@@ -271,10 +271,7 @@ class ActiveChatsRepository:
             self.rooms_filter["is_active"] = False
             self.rooms_filter["user__isnull"] = False
         else:
-            self.rooms_filter["created_on__range"] = [
-                initial_datetime,
-                initial_datetime,
-            ]
+            self.rooms_filter["created_on__gte"] = initial_datetime
             self.rooms_filter["user__isnull"] = False
             self.rooms_filter["is_active"] = True
 
@@ -301,6 +298,7 @@ class ActiveChatsRepository:
             self.rooms_filter.pop("created_on__gte")
 
         active_rooms = []
+        print("filtros", self.rooms_filter)
 
         if filters.user_request:
             rooms_query = self.model.filter(
