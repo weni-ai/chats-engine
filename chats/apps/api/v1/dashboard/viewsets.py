@@ -2,23 +2,32 @@ import io
 import json
 
 import pandas
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from chats.apps.api.v1.dashboard.presenter import get_export_data
+from chats.apps.api.v1.dashboard.repository import ORMRoomsDataRepository
 from chats.apps.api.v1.dashboard.serializers import (
     DashboardAgentsSerializer,
     DashboardRawDataSerializer,
     dashboard_general_data,
     DashboardSectorSerializer,
+    DashboardRoomSerializer,
 )
 from chats.apps.api.v1.permissions import HasDashboardAccess
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.core.excel_storage import ExcelStorage
 from .dto import Filters
-from .service import AgentsService, RawDataService, SectorService
+from .service import (
+    AgentsService,
+    RawDataService,
+    SectorService,
+    RoomsDataService,
+    RoomsCacheRepository,
+)
+import os
 
 
 class DashboardLiveViewset(viewsets.GenericViewSet):
@@ -44,6 +53,39 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             context=context,
         )
         return Response(serialized_data, status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["GET"],
+        url_name="rooms_data_1",
+    )
+    def rooms_data_1(self, request, *args, **kwargs):
+        """General metrics for the project or the sector"""
+        project = self.get_object()
+
+        user_permission = ProjectPermission.objects.get(
+            user=request.user, project=project
+        )
+        params = request.query_params.dict()
+        filters = Filters(
+            start_date=params.get("start_date"),
+            end_date=params.get("end_date"),
+            agent=params.get("agent"),
+            sector=params.get("sector"),
+            tag=params.get("tag"),
+            user_request=user_permission,
+            project=project,
+            is_weni_admin=True
+            if request.user and "weni.ai" in request.user.email
+            else False,
+        )
+
+        rooms_service = RoomsDataService(
+            ORMRoomsDataRepository(), RoomsCacheRepository()
+        )
+        rooms_data = rooms_service.get_rooms_data(filters)
+
+        return Response({"rooms data": rooms_data}, status.HTTP_200_OK)
 
     @action(
         detail=True,
@@ -186,11 +228,11 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             table = pandas.DataFrame(dataset)
             table.rename(
                 columns={
-                    0: "Queue Name",
-                    1: "Waiting Time",
-                    2: "Response Time",
-                    3: "Interaction Time",
-                    4: "Open",
+                    0: "Nome da Fila",
+                    1: "Tempo de espera",
+                    2: "Tempo de resposta",
+                    3: "Tempo de interação",
+                    4: "Aberta",
                 },
                 inplace=True,
             )
@@ -212,24 +254,6 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         user_permission = ProjectPermission.objects.get(
             user=request.user, project=project
         )
-
-        # Agents Data
-        agents_service = AgentsService()
-        filters = Filters(
-            start_date=filter.get("start_date"),
-            end_date=filter.get("end_date"),
-            agent=filter.get("agent"),
-            sector=filter.get("sector"),
-            tag=filter.get("tag"),
-            user_request=request.user,
-            is_weni_admin=True
-            if request.user and "weni.ai" in request.user.email
-            else False,
-        )
-        agents_data = agents_service.get_agents_data(filters, project)
-
-        # Raw Data
-        raw_data_service = RawDataService()
         filters = Filters(
             start_date=filter.get("start_date"),
             end_date=filter.get("end_date"),
@@ -242,24 +266,60 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             if request.user and "weni.ai" in request.user.email
             else False,
         )
-        raw_data = raw_data_service.get_raw_data(filters)
 
+        print("filter", filter)
+        # Rooms Data
+        rooms_service = RoomsDataService(
+            ORMRoomsDataRepository(), RoomsCacheRepository()
+        )
+        rooms_data = rooms_service.get_rooms_data(filters)
+        rooms_serializer = DashboardRoomSerializer(rooms_data, many=True)
+        data_frame = pandas.DataFrame(rooms_serializer.data)
+        data_frame.columns = [
+            "Tempo de Espera",
+            "Tempo de Resposta",
+            "Tempo de Interação",
+        ]
+
+        # Raw Data
+        raw_data_service = RawDataService()
+        raw_data = raw_data_service.get_raw_data(filters)
+        raw_data_serializer = DashboardRawDataSerializer(
+            raw_data["raw_data"], many=True
+        )
+        data_frame_1 = pandas.DataFrame(raw_data_serializer.data)
+        data_frame_1.columns = [
+            "Salas Ativas",
+            "Salas Fechadas",
+            "Transferencias",
+            "Salas na Fila",
+        ]
         # Sector Data
         sector_data_service = SectorService()
         sector_data = sector_data_service.get_sector_data(filters)
-        # Datasets
-        general_dataset = dashboard_general_data(context=filter, project=project)
         sector_dataset = DashboardSectorSerializer(sector_data, many=True)
-        agents_dataset = DashboardAgentsSerializer(agents_data, many=True)
+        data_frame_2 = pandas.DataFrame(sector_dataset.data)
+        data_frame_2.columns = [
+            "Nome",
+            "Tempo de Espera",
+            "Tempo de Resposta",
+            "Tempo de Interação",
+        ]
 
-        combined_dataset = {**general_dataset, **raw_data}
+        # Agents Data
+        agents_service = AgentsService()
+        agents_data = agents_service.get_agents_data(filters, project)
+        agents_dataset = DashboardAgentsSerializer(agents_data, many=True)
+        data_frame_3 = pandas.DataFrame(agents_dataset.data)
+        data_frame_3.columns = [
+            "Nome",
+            "Email",
+            "Status",
+            "Salas Fechadas",
+            "Salas Abertas",
+        ]
 
         filename = "dashboard_export_data"
-
-        data_frame = pandas.DataFrame([combined_dataset])
-        data_frame_1 = pandas.DataFrame(agents_dataset.data)
-        data_frame_2 = pandas.DataFrame(sector_dataset.data)
-
         if "xls" in filter:
             excel_buffer = io.BytesIO()
             with pandas.ExcelWriter(excel_buffer, engine="xlsxwriter") as writer:
@@ -281,6 +341,13 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
                     writer,
                     sheet_name="dashboard_infos",
                     startrow=8 + len(data_frame_1.index),
+                    startcol=0,
+                    index=False,
+                )
+                data_frame_3.to_excel(
+                    writer,
+                    sheet_name="dashboard_infos",
+                    startrow=12 + len(data_frame_1.index),
                     startcol=0,
                     index=False,
                 )
@@ -306,8 +373,12 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
                 'attachment; filename="' + filename + ".csv"
             )
 
-            data_frame.to_csv(response, index=False, sep=";")
+            data_frame.to_csv(response, index=False, mode="a", sep=";"),
+            response.write("\n")
             data_frame_1.to_csv(response, index=False, mode="a", sep=";")
+            response.write("\n")
             data_frame_2.to_csv(response, index=False, mode="a", sep=";")
+            response.write("\n")
+            data_frame_3.to_csv(response, index=False, mode="a", sep=";")
 
             return response

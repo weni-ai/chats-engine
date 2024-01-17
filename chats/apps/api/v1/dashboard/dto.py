@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from chats.apps.projects.models import ProjectPermission
+from chats.apps.projects.models import ProjectPermission, Project
 
 
 @dataclass
@@ -29,7 +29,14 @@ class Filters:
     tag: str = None
     is_weni_admin: bool = None
     user_request: ProjectPermission = None
-    project: str = None
+    project: Project = None
+
+
+@dataclass
+class RoomData:
+    interact_time: int = None
+    response_time: int = None
+    waiting_time: int = None
 
 
 @dataclass
@@ -39,9 +46,14 @@ class ClosedRoomData:
 
 @dataclass
 class TransferRoomData:
-    transfer_count: dict = None
+    transfer_count: int = None
 
 
 @dataclass
 class QueueRoomData:
     queue_rooms: dict = None
+
+
+@dataclass
+class ActiveRoomData:
+    active_rooms: int = None
