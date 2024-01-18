@@ -12,7 +12,6 @@ from chats.apps.api.v1.dashboard.repository import ORMRoomsDataRepository
 from chats.apps.api.v1.dashboard.serializers import (
     DashboardAgentsSerializer,
     DashboardRawDataSerializer,
-    dashboard_general_data,
     DashboardSectorSerializer,
     DashboardRoomSerializer,
 )
@@ -310,32 +309,39 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
                 data_frame.to_excel(
                     writer,
                     sheet_name="dashboard_infos",
-                    startrow=1,
+                    startrow=0,
                     startcol=0,
                     index=False,
                 )
+
+                start_row_1 = len(data_frame.index) + 2
                 data_frame_1.to_excel(
                     writer,
                     sheet_name="dashboard_infos",
-                    startrow=4 + len(data_frame.index),
+                    startrow=start_row_1,
                     startcol=0,
                     index=False,
                 )
+
+                start_row_2 = start_row_1 + len(data_frame_1.index) + 2
                 data_frame_2.to_excel(
                     writer,
                     sheet_name="dashboard_infos",
-                    startrow=8 + len(data_frame_1.index),
+                    startrow=start_row_2,
                     startcol=0,
                     index=False,
                 )
+
+                start_row_3 = start_row_2 + len(data_frame_2.index) + 2
                 data_frame_3.to_excel(
                     writer,
                     sheet_name="dashboard_infos",
-                    startrow=12 + len(data_frame_1.index),
+                    startrow=start_row_3,
                     startcol=0,
                     index=False,
                 )
-            excel_buffer.seek(0)  # Move o cursor para o início do buffer
+
+            excel_buffer.seek(0)
             storage = ExcelStorage()
 
             bytes_archive = excel_buffer.getvalue()
