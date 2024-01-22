@@ -1,7 +1,11 @@
+from typing import Any
 from django_filters.rest_framework import DjangoFilterBackend
+
+from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ReadOnlyModelViewSet
+from rest_framework.response import Response
 
 from chats.apps.rooms.models import Room
 
@@ -12,6 +16,7 @@ from ..serializers.rooms import (
     RoomHistorySerializer,
 )
 from .permissions import CanRetrieveRoomHistory
+from ..serializers.messages import MessageReportSerializer
 
 
 class HistoryRoomViewset(ReadOnlyModelViewSet):
@@ -46,3 +51,26 @@ class HistoryRoomViewset(ReadOnlyModelViewSet):
         if self.action == "retrieve":
             return RoomDetailSerializer
         return super().get_serializer_class()
+
+    @action(
+        detail=True,
+        methods=["GET"],
+        url_name="report-messages",
+    )
+    def report_messages(self):
+        room = self.get_object()
+        messages = room.msgs.all()
+        message_values = messages.values(
+            "uuid",
+            "room",
+            "user__email",
+            "contact__name",
+            "text",
+            "media__content_type",
+            "media__url",
+            "created_on",
+        )
+
+        serialized_messages = MessageReportSerializer(message_values, many=True)
+
+        return Response(serialized_messages.data)
