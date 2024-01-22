@@ -26,7 +26,7 @@ class ManagerAgentRoomConsumer(AgentRoomConsumer):
             UserModel = self.user._meta.model
 
             self.project = self.scope["query_params"].get("project")[0]
-        except (KeyError, TypeError):
+        except (KeyError, TypeError, AttributeError):
             close = True
 
         if self.user.is_anonymous or close is True or self.project is None:
