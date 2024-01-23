@@ -35,7 +35,7 @@ def get_export_data(project, filter):
     if filter.get("sector"):
         rooms_filter["queue__sector"] = filter.get("sector")
         if filter.get("tag"):
-            rooms_filter["tags__name"] = filter.get("tag")
+            rooms_filter["tags__uuid"] = filter.get("tag")
     else:
         rooms_filter["queue__sector__project"] = project
 
@@ -105,9 +105,9 @@ def get_general_data(project, filter):
         rooms_filter_waiting_service["queue__sector"] = filter.get("sector")
         rooms_filter_closed["queue__sector"] = filter.get("sector")
         if filter.get("tag"):
-            rooms_filter["tags__name"] = filter.get("tag")
-            rooms_filter_in_progress_chats["tags__name"] = filter.get("tag")
-            rooms_filter_closed["tags__name"] = filter.get("tag")
+            rooms_filter["tags__uuid"] = filter.get("tag")
+            rooms_filter_in_progress_chats["tags__uuid"] = filter.get("tag")
+            rooms_filter_closed["tags__uuid"] = filter.get("tag")
     else:
         rooms_filter["queue__sector__project"] = project
         rooms_filter_in_progress_chats["queue__sector__project"] = project
@@ -203,8 +203,8 @@ def get_agents_data(project, filter):
         rooms_filter["user__rooms__queue__sector"] = filter.get("sector")
         closed_rooms["user__rooms__queue__sector"] = filter.get("sector")
         if filter.get("tag"):
-            rooms_filter["user__rooms__tags__name"] = filter.get("tag")
-            closed_rooms["user__rooms__tags__name"] = filter.get("tag")
+            rooms_filter["user__rooms__tags__uuid"] = filter.get("tag")
+            closed_rooms["user__rooms__tags__uuid"] = filter.get("tag")
     else:
         rooms_filter["user__rooms__queue__sector__project"] = project
         closed_rooms["user__rooms__queue__sector__project"] = project
@@ -247,7 +247,7 @@ def get_sector_data(project, filter):
         model_filter = {"sector": filter.get("sector")}
         rooms_filter["rooms__queue__sector"] = filter.get("sector")
         if filter.get("tag"):
-            rooms_filter["rooms__tags__name"] = filter.get("tag")
+            rooms_filter["rooms__tags__uuid"] = filter.get("tag")
         if filter.get("agent"):
             rooms_filter["rooms__user"] = filter.get("agent")
     else:

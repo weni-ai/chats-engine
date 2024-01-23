@@ -1,8 +1,12 @@
 import uuid
+from typing import List
 
 from rest_framework.authtoken.models import Token
+from rest_framework.utils.serializer_helpers import ReturnList
 
 from chats.apps.accounts.models import User
+from chats.apps.api.v1.dashboard.dto import RoomData
+from chats.apps.api.v1.dashboard.serializers import DashboardRoomSerializer
 from chats.apps.contacts.models import Contact
 from chats.apps.msgs.models import Message as ChatMessage
 
@@ -29,3 +33,15 @@ def create_contact(
         custom_fields=custom_fields,
         external_id=str(uuid.uuid4()),
     )
+
+
+def create_room_dto(rooms_data) -> List[DashboardRoomSerializer]:
+    room_data = [
+        RoomData(
+            interact_time=rooms_data.get("interact_time", None),
+            response_time=rooms_data.get("response_time", None),
+            waiting_time=rooms_data.get("waiting_time", None),
+        )
+    ]
+    serialized_data = DashboardRoomSerializer(room_data, many=True)
+    return serialized_data.data
