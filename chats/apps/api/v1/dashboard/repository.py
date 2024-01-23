@@ -454,13 +454,6 @@ class ORMRoomsDataRepository(RoomsDataRepository):
                 waiting_time=waiting_time_agg,
             )
 
-            # room_data = [
-            #     RoomData(
-            #         interact_time=general_data.get("interact_time", None),
-            #         response_time=general_data.get("response_time", None),
-            #         waiting_time=general_data.get("waiting_time", None),
-            #     )
-            # ]
             return general_data
 
 

@@ -87,7 +87,7 @@ class RoomsDataService:
         self.rooms_data_repository = rooms_data_repository
         self.rooms_cache_repository = rooms_cache_repository
 
-    def get_rooms_data(self, filters: Filters) -> List[DashboardRoomSerializer]:
+    def get_rooms_data(self, filters: Filters):
         get_cache_key = self.rooms_data_repository.get_cache_key(filters)
         get_cached_data = self.rooms_cache_repository.get(get_cache_key)
 
