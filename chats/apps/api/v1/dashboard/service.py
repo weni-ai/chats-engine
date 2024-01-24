@@ -1,16 +1,17 @@
 from typing import List
 
 from chats.apps.api.v1.dashboard.serializers import (
-    DashboardRawDataSerializer1,
-    DashboardRawDataSerializer2,
-    DashboardRawDataSerializer3,
+    DashboardClosedRoomSerializer,
+    DashboardQueueRoomsSerializer,
+    DashboardTransferCountSerializer,
 )
 
-from .dto import Agent, Filters
+from .dto import Agent, Filters, Sector
 from .repository import (
     AgentRepository,
     ClosedRoomsRepository,
     QueueRoomsRepository,
+    SectorRepository,
     TransferCountRepository,
 )
 
@@ -25,15 +26,17 @@ class RawDataService:
     def get_raw_data(self, filters: Filters):
         closed_rooms_repository = ClosedRoomsRepository()
         closed_rooms_data = closed_rooms_repository.closed_rooms(filters)
-        closed_rooms_count = DashboardRawDataSerializer1(closed_rooms_data, many=True)
+        closed_rooms_count = DashboardClosedRoomSerializer(closed_rooms_data, many=True)
 
         transfer_count_repository = TransferCountRepository()
         transfer_count_data = transfer_count_repository.transfer_count(filters)
-        transfer_count = DashboardRawDataSerializer2(transfer_count_data, many=True)
+        transfer_count = DashboardTransferCountSerializer(
+            transfer_count_data, many=True
+        )
 
         queue_rooms_repository = QueueRoomsRepository()
         queue_rooms_data = queue_rooms_repository.queue_rooms(filters)
-        queue_rooms_count = DashboardRawDataSerializer3(queue_rooms_data, many=True)
+        queue_rooms_count = DashboardQueueRoomsSerializer(queue_rooms_data, many=True)
 
         serialized_agents = closed_rooms_count.data
         serialized_transfer_count = transfer_count.data
@@ -50,3 +53,9 @@ class RawDataService:
         }
 
         return combined_data
+
+
+class SectorService:
+    def get_sector_data(self, filters: Filters) -> List[Sector]:
+        sectors_repository = SectorRepository()
+        return sectors_repository.division_data(filters)
