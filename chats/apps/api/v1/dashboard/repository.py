@@ -270,10 +270,7 @@ class ActiveChatsRepository:
             self.rooms_filter["is_active"] = False
             self.rooms_filter["user__isnull"] = False
         else:
-            self.rooms_filter["created_on__range"] = [
-                initial_datetime,
-                initial_datetime,
-            ]
+            self.rooms_filter["created_on__gte"] = initial_datetime
             self.rooms_filter["user__isnull"] = False
             self.rooms_filter["is_active"] = True
 

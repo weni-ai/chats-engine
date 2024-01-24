@@ -53,6 +53,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             agent=params.get("agent"),
             sector=params.get("sector"),
             tag=params.get("tag"),
+            queue=params.get("queue"),
             user_request=user_permission,
             project=project,
             is_weni_admin=True
@@ -82,6 +83,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             agent=params.get("agent"),
             sector=params.get("sector"),
             tag=params.get("tag"),
+            queue=params.get("queue"),
             user_request=request.user,
             is_weni_admin=True
             if request.user and "weni.ai" in request.user.email
@@ -114,6 +116,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             end_date=params.get("end_date"),
             agent=params.get("agent"),
             sector=params.get("sector"),
+            queue=params.get("queue"),
             tag=params.get("tag"),
             user_request=user_permission,
             project=project,
@@ -145,6 +148,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             end_date=params.get("end_date"),
             agent=params.get("agent"),
             sector=params.get("sector"),
+            queue=params.get("queue"),
             tag=params.get("tag"),
             user_request=user_permission,
             project=project,
@@ -239,6 +243,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             end_date=filter.get("end_date"),
             agent=filter.get("agent"),
             sector=filter.get("sector"),
+            queue=filter.get("queue"),
             tag=filter.get("tag"),
             user_request=user_permission,
             project=project,

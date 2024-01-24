@@ -26,6 +26,7 @@ class Filters:
     end_date: str = None
     agent: str = None
     sector: str = None
+    queue: str = None
     tag: str = None
     is_weni_admin: bool = None
     user_request: ProjectPermission = None
