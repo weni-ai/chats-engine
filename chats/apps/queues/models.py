@@ -111,8 +111,11 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         )
         return queue_auth
 
-    def set_user_authorization(self, user, role: int):
-        return self.set_queue_authorization(user, role)
+    def set_user_authorization(self, permission, role: int):
+        queue_auth, created = self.authorizations.get_or_create(
+            permission=permission, role=role
+        )
+        return queue_auth
 
     @property
     def project(self):
