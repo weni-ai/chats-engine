@@ -1,3 +1,7 @@
+# 3.1.0
+## Add
+  - New endpoint for creating sector and queue authorization, giving only the user email.
+
 # 3.0.0
 ## Add
   - New Discussions app, responsible for internal communication between agents.
