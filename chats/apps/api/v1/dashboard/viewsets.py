@@ -69,7 +69,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         )
         rooms_data = rooms_service.get_rooms_data(filters)
 
-        return Response({"rooms data": rooms_data}, status.HTTP_200_OK)
+        return Response({"rooms_data": rooms_data}, status.HTTP_200_OK)
 
     @action(
         detail=True,
