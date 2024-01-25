@@ -1,7 +1,9 @@
 from django.conf import settings
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import exceptions, filters, status
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
@@ -103,6 +105,36 @@ class QueueViewset(ModelViewSet):
                 detail=f"[{response.status_code}] Error deleting the queue on flows. Exception: {response.content}"
             )
         return super().perform_destroy(instance)
+
+    @action(detail=True, methods=["POST"])
+    def authorization(self, request, *args, **kwargs):
+        queue = self.get_object()
+        user_email = request.data.get("user")
+        if not user_email:
+            return Response(
+                {"Detail": "'user' field is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        permission = queue.get_permission(user_email)
+        if not permission:
+            return Response(
+                {
+                    "Detail": f"user {user_email} does not have an account or permission in this project"
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        queue_auth = queue.set_user_authorization(permission, 1)
+
+        return Response(
+            {
+                "uuid": str(queue_auth.uuid),
+                "user": queue_auth.permission.user.email,
+                "queue": queue_auth.sector.name,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class QueueAuthorizationViewset(ModelViewSet):

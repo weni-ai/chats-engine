@@ -102,14 +102,20 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         return self.authorizations.filter(permission__user=user).exists()
 
     def get_or_create_user_authorization(self, user):
-        sector_auth, created = self.authorizations.get_or_create(permission__user=user)
-        return sector_auth
+        queue_auth, created = self.authorizations.get_or_create(permission__user=user)
+        return queue_auth
 
     def set_queue_authorization(self, user, role: int):
-        sector_auth, created = self.authorizations.get_or_create(
+        queue_auth, created = self.authorizations.get_or_create(
             permission__user=user, role=role
         )
-        return sector_auth
+        return queue_auth
+
+    def set_user_authorization(self, permission, role: int):
+        queue_auth, created = self.authorizations.get_or_create(
+            permission=permission, role=role
+        )
+        return queue_auth
 
     @property
     def project(self):

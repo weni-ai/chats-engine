@@ -139,6 +139,36 @@ class SectorViewset(viewsets.ModelViewSet):
             )
         return Response({"sector_count": sector_count}, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=["POST"])
+    def authorization(self, request, *args, **kwargs):
+        sector = self.get_object()
+        user_email = request.data.get("user")
+        if not user_email:
+            return Response(
+                {"Detail": "'user' field is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        permission = sector.get_permission(user_email)
+        if not permission:
+            return Response(
+                {
+                    "Detail": f"user {user_email} does not have an account or permission in this project"
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        sector_auth = sector.set_user_authorization(permission, 1)
+
+        return Response(
+            {
+                "uuid": str(sector_auth.uuid),
+                "user": sector_auth.permission.user.email,
+                "sector": sector_auth.sector.name,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
 
 class SectorTagsViewset(viewsets.ModelViewSet):
     queryset = SectorTag.objects.all()
