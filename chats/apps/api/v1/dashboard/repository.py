@@ -297,7 +297,6 @@ class ActiveChatsRepository:
             self.rooms_filter.pop("created_on__gte")
 
         active_rooms = []
-        print("filtros", self.rooms_filter)
 
         if filters.user_request:
             rooms_query = self.model.filter(
@@ -452,7 +451,6 @@ class ORMRoomsDataRepository(RoomsDataRepository):
                 response_time=message_response_time_agg,
                 waiting_time=waiting_time_agg,
             )
-
             return general_data
 
 

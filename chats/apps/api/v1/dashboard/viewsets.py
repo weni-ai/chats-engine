@@ -8,7 +8,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from chats.apps.api.v1.dashboard.presenter import get_export_data
-from chats.apps.api.v1.dashboard.repository import ORMRoomsDataRepository
+from chats.apps.api.v1.dashboard.repository import (
+    ORMRoomsDataRepository,
+    RoomsCacheRepository,
+)
 from chats.apps.api.v1.dashboard.serializers import (
     DashboardAgentsSerializer,
     DashboardRawDataSerializer,
@@ -20,13 +23,7 @@ from chats.apps.projects.models import Project, ProjectPermission
 from chats.core.excel_storage import ExcelStorage
 
 from .dto import Filters
-from .service import (
-    AgentsService,
-    RawDataService,
-    RoomsCacheRepository,
-    RoomsDataService,
-    SectorService,
-)
+from .service import AgentsService, RawDataService, RoomsDataService, SectorService
 
 
 class DashboardLiveViewset(viewsets.GenericViewSet):
@@ -55,8 +52,8 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             end_date=params.get("end_date"),
             agent=params.get("agent"),
             sector=params.get("sector"),
-            queue=params.get("queue"),
             tag=params.get("tag"),
+            queue=params.get("queue"),
             user_request=user_permission,
             project=project,
             is_weni_admin=True
@@ -86,6 +83,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             agent=params.get("agent"),
             sector=params.get("sector"),
             tag=params.get("tag"),
+            queue=params.get("queue"),
             user_request=request.user,
             is_weni_admin=True
             if request.user and "weni.ai" in request.user.email
@@ -118,6 +116,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             end_date=params.get("end_date"),
             agent=params.get("agent"),
             sector=params.get("sector"),
+            queue=params.get("queue"),
             tag=params.get("tag"),
             user_request=user_permission,
             project=project,
@@ -149,6 +148,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             end_date=params.get("end_date"),
             agent=params.get("agent"),
             sector=params.get("sector"),
+            queue=params.get("queue"),
             tag=params.get("tag"),
             user_request=user_permission,
             project=project,
@@ -243,6 +243,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             end_date=filter.get("end_date"),
             agent=filter.get("agent"),
             sector=filter.get("sector"),
+            queue=filter.get("queue"),
             tag=filter.get("tag"),
             user_request=user_permission,
             project=project,
@@ -342,7 +343,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
                     index=False,
                 )
 
-            excel_buffer.seek(0)
+            excel_buffer.seek(0)  # Move o cursor para o início do buffer
             storage = ExcelStorage()
 
             bytes_archive = excel_buffer.getvalue()
