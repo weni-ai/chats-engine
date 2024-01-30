@@ -142,7 +142,9 @@ class Room(BaseModel):
             created_on__gte=timezone.now() - timedelta(days=1),
             contact=self.contact,
         )
-        return day_validation.exists()
+        if not day_validation.exists():
+            return self.created_on > timezone.now() - timedelta(days=1)
+        return True
 
     @property
     def serialized_ws_data(self):
