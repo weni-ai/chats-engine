@@ -1,3 +1,7 @@
+# 3.2.0
+## Change
+  - Refactoring in dashboard endpoints, applying solid and the design pattern repository with service. 
+    
 # 3.1.0
 ## Add
   - New endpoint for creating sector and queue authorization, giving only the user email.
