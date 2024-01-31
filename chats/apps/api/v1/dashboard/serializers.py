@@ -67,6 +67,9 @@ def dashboard_general_data(context: dict, project):
     message_response_time_agg = Avg("metric__message_response_time")
     waiting_time_agg = Avg("metric__waiting_time")
 
+    # chave do cache será criada no repository do orm django
+    # no else do room data service, vai chamar o repository orm e se tiver valor cria a chave
+    # e chama o set passando essa chave criada mais o resultado da consulta, igual feito na linha 94.
     rooms_filter_general_time_key = DASHBOARD_ROOMS_CACHE_KEY.format(
         filter=parse.urlencode(rooms_filter), metric="general_time"
     )
@@ -114,13 +117,10 @@ class DashboardAgentsSerializer(serializers.Serializer):
 
 
 class DashboardRawDataSerializer(serializers.Serializer):
+    active_rooms = serializers.IntegerField(allow_null=True, required=False)
     closed_rooms = serializers.IntegerField(allow_null=True, required=False)
     transfer_count = serializers.IntegerField(allow_null=True, required=False)
     queue_rooms = serializers.IntegerField(allow_null=True, required=False)
-
-    class Meta:
-        model = Room
-        fields = ["closed_rooms", "transfer_count", "queue_rooms"]
 
 
 # Maybe separate each serializer in it's own serializer module/file
@@ -155,3 +155,17 @@ class DashboardQueueRoomsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Room
         fields = ["queue_rooms"]
+
+
+class DashboardActiveRoomsSerializer(serializers.ModelSerializer):
+    active_rooms = serializers.IntegerField(allow_null=True, required=False)
+
+    class Meta:
+        model = Room
+        fields = ["active_rooms"]
+
+
+class DashboardRoomSerializer(serializers.Serializer):
+    waiting_time = serializers.IntegerField(allow_null=True, required=False)
+    response_time = serializers.IntegerField(allow_null=True, required=False)
+    interact_time = serializers.IntegerField(allow_null=True, required=False)
