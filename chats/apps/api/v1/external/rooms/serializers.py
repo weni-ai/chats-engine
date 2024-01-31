@@ -28,12 +28,19 @@ def get_active_room_flow_start(contact, flow_uuid, project):
     )
     try:
         if flow_start.room.is_active is True:
-            flow_start.is_deleted = True
-            flow_start.save()
-            return flow_start.room
+            flow_start = deactivate_flow_start(flow_start)
+            return flow_start, flow_start.room
     except AttributeError:
-        return None
-    return None
+        return flow_start, None
+    return flow_start, None
+
+
+def deactivate_flow_start(flow_start, room=None):
+    if room:
+        flow_start.room = room
+    flow_start.is_deleted = True
+    flow_start.save()
+    return flow_start
 
 
 def get_room_user(
@@ -167,7 +174,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         contact, created = self.update_or_create_contact(validated_data)
 
-        room = get_active_room_flow_start(contact, flow_uuid, project)
+        flow_start, room = get_active_room_flow_start(contact, flow_uuid, project)
 
         if room is not None:
             return room
@@ -181,6 +188,9 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         room = Room.objects.create(**validated_data, contact=contact, queue=queue)
         RoomMetrics.objects.create(room=room)
+
+        if flow_start:
+            flow_start = deactivate_flow_start(flow_start, room)
 
         return room
 
