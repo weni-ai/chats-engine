@@ -67,9 +67,6 @@ def dashboard_general_data(context: dict, project):
     message_response_time_agg = Avg("metric__message_response_time")
     waiting_time_agg = Avg("metric__waiting_time")
 
-    # chave do cache será criada no repository do orm django
-    # no else do room data service, vai chamar o repository orm e se tiver valor cria a chave
-    # e chama o set passando essa chave criada mais o resultado da consulta, igual feito na linha 94.
     rooms_filter_general_time_key = DASHBOARD_ROOMS_CACHE_KEY.format(
         filter=parse.urlencode(rooms_filter), metric="general_time"
     )

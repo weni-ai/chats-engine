@@ -53,6 +53,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             agent=params.get("agent"),
             sector=params.get("sector"),
             tag=params.get("tag"),
+            queue=params.get("queue"),
             user_request=user_permission,
             project=project,
             is_weni_admin=True
@@ -82,6 +83,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             agent=params.get("agent"),
             sector=params.get("sector"),
             tag=params.get("tag"),
+            queue=params.get("queue"),
             user_request=request.user,
             is_weni_admin=True
             if request.user and "weni.ai" in request.user.email
@@ -114,6 +116,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             end_date=params.get("end_date"),
             agent=params.get("agent"),
             sector=params.get("sector"),
+            queue=params.get("queue"),
             tag=params.get("tag"),
             user_request=user_permission,
             project=project,
@@ -145,6 +148,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             end_date=params.get("end_date"),
             agent=params.get("agent"),
             sector=params.get("sector"),
+            queue=params.get("queue"),
             tag=params.get("tag"),
             user_request=user_permission,
             project=project,
@@ -239,6 +243,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             end_date=filter.get("end_date"),
             agent=filter.get("agent"),
             sector=filter.get("sector"),
+            queue=filter.get("queue"),
             tag=filter.get("tag"),
             user_request=user_permission,
             project=project,
@@ -247,7 +252,6 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             else False,
         )
 
-        print("filter", filter)
         # Rooms Data
         rooms_service = RoomsDataService(
             ORMRoomsDataRepository(), RoomsCacheRepository()
@@ -306,31 +310,38 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
                 data_frame.to_excel(
                     writer,
                     sheet_name="dashboard_infos",
-                    startrow=1,
+                    startrow=0,
                     startcol=0,
                     index=False,
                 )
+
+                start_row_1 = len(data_frame.index) + 2
                 data_frame_1.to_excel(
                     writer,
                     sheet_name="dashboard_infos",
-                    startrow=4 + len(data_frame.index),
+                    startrow=start_row_1,
                     startcol=0,
                     index=False,
                 )
+
+                start_row_2 = start_row_1 + len(data_frame_1.index) + 2
                 data_frame_2.to_excel(
                     writer,
                     sheet_name="dashboard_infos",
-                    startrow=8 + len(data_frame_1.index),
+                    startrow=start_row_2,
                     startcol=0,
                     index=False,
                 )
+
+                start_row_3 = start_row_2 + len(data_frame_2.index) + 2
                 data_frame_3.to_excel(
                     writer,
                     sheet_name="dashboard_infos",
-                    startrow=12 + len(data_frame_1.index),
+                    startrow=start_row_3,
                     startcol=0,
                     index=False,
                 )
+
             excel_buffer.seek(0)  # Move o cursor para o início do buffer
             storage = ExcelStorage()
 
