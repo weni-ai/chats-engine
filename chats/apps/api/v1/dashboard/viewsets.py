@@ -252,7 +252,6 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             else False,
         )
 
-        print("filter", filter)
         # Rooms Data
         rooms_service = RoomsDataService(
             ORMRoomsDataRepository(), RoomsCacheRepository()
