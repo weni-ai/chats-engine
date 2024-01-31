@@ -1,3 +1,7 @@
+# 3.2.1
+## Change
+  - Consider room creation date if the room has no messages in the 24h close validation.
+
 # 3.2.0
 ## Change
   - Refactoring in dashboard endpoints, applying solid and the design pattern repository with service. 
