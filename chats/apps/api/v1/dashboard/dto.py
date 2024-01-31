@@ -13,6 +13,14 @@ class Agent:
 
 
 @dataclass
+class Sector:
+    name: str = None
+    waiting_time: int = None
+    response_time: int = None
+    interact_time: int = None
+
+
+@dataclass
 class Filters:
     start_date: str = None
     end_date: str = None

@@ -1,14 +1,15 @@
 from typing import List
 
-from django.db.models import Count, OuterRef, Q, Subquery, Sum
+from django.db.models import Avg, Count, F, OuterRef, Q, Subquery, Sum
 from django.utils import timezone
 from pendulum.parser import parse as pendulum_parse
 
 from chats.apps.accounts.models import User
+from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.rooms.models import Room
 
-from .dto import Agent, ClosedRoomData, Filters, QueueRoomData, TransferRoomData
+from .dto import Agent, ClosedRoomData, Filters, QueueRoomData, Sector, TransferRoomData
 
 
 class AgentRepository:
@@ -234,3 +235,75 @@ class QueueRoomsRepository:
             return queue_rooms
 
         return queue_rooms
+
+
+class SectorRepository:
+    def __init__(self) -> None:
+        self.model = RoomMetrics.objects
+        self.rooms_filter = {}
+        self.division_level = "room__queue__sector"
+
+    def _filter_date_range(self, filters, tz):
+        initial_datetime = (
+            timezone.now()
+            .astimezone(tz)
+            .replace(hour=0, minute=0, second=0, microsecond=0)
+        )
+
+        if filters.start_date and filters.end_date:
+            start_time = pendulum_parse(filters.start_date, tzinfo=tz)
+            end_time = pendulum_parse(filters.end_date + " 23:59:59", tzinfo=tz)
+            self.rooms_filter["created_on__range"] = [start_time, end_time]
+            return self.rooms_filter
+
+        self.rooms_filter["created_on__range"] = [initial_datetime, initial_datetime]
+        return self.rooms_filter
+
+    def _filter_sector(self, filters):
+        self.rooms_filter["room__user__isnull"] = False
+
+        if filters.sector:
+            self.division_level = "room__queue"
+            self.rooms_filter["room__queue__sector"] = filters.get("sector")
+            if filters.get("tag"):
+                self.rooms_filter["room__tags__uuid"] = filters.get("tag")
+        else:
+            self.rooms_filter["room__queue__sector__project"] = filters.project
+
+    def _filter_agents(self, filters):
+        if filters.get("agent"):
+            self.rooms_filter["room__user"] = filters.get("agent")
+
+    def division_data(self, filters):
+        tz = filters.project.timezone
+
+        self._filter_date_range(filters, tz)
+        self._filter_sector(filters)
+
+        room_metric_query = self.model.filter(
+            room__queue__sector__in=filters.user_request.manager_sectors()
+        )
+
+        sector_query = (
+            room_metric_query.filter(**self.rooms_filter)  # date, project or sector
+            .values(f"{self.division_level}__uuid")
+            .annotate(
+                name=F(f"{self.division_level}__name"),
+                waiting_time=Avg("waiting_time"),
+                response_time=Avg("message_response_time"),
+                interact_time=Avg("interaction_time"),
+            )
+            .values("name", "waiting_time", "response_time", "interact_time")
+        )
+
+        sectors = [
+            Sector(
+                name=sector["name"],
+                waiting_time=sector["waiting_time"],
+                response_time=sector["response_time"],
+                interact_time=sector["interact_time"],
+            )
+            for sector in sector_query
+        ]
+
+        return sectors
