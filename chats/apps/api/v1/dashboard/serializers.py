@@ -3,7 +3,7 @@ from urllib import parse
 
 import pendulum
 from django.conf import settings
-from django.db.models import Avg, F, Sum
+from django.db.models import Avg, F
 from django.utils import timezone
 from django_redis import get_redis_connection
 from rest_framework import serializers
@@ -114,6 +114,16 @@ class DashboardAgentsSerializer(serializers.Serializer):
     opened_rooms = serializers.IntegerField(allow_null=True, required=False)
 
 
+class DashboardRawDataSerializer(serializers.Serializer):
+    closed_rooms = serializers.IntegerField(allow_null=True, required=False)
+    transfer_count = serializers.IntegerField(allow_null=True, required=False)
+    queue_rooms = serializers.IntegerField(allow_null=True, required=False)
+
+    class Meta:
+        model = Room
+        fields = ["closed_rooms", "transfer_count", "queue_rooms"]
+
+
 # Maybe separate each serializer in it's own serializer module/file
 
 
@@ -169,144 +179,25 @@ def dashboard_division_data(context, project=None):
     )
 
 
-class DashboardRawDataSerializer(serializers.ModelSerializer):
-    closed_rooms = serializers.SerializerMethodField()
-    transfer_count = serializers.SerializerMethodField()
-    queue_rooms = serializers.SerializerMethodField()
+class DashboardRawDataSerializer1(serializers.ModelSerializer):
+    closed_rooms = serializers.IntegerField(allow_null=True, required=False)
 
     class Meta:
         model = Room
-        fields = ["closed_rooms", "transfer_count", "queue_rooms"]
+        fields = ["closed_rooms"]
 
-    def get_closed_rooms(self, project):
-        tz = project.timezone
-        initial_datetime = (
-            timezone.now()
-            .astimezone(tz)
-            .replace(hour=0, minute=0, second=0, microsecond=0)
-        )
 
-        user_request = ProjectPermission.objects.get(
-            user=self.context.get("user_request"), project=project
-        )
-        rooms_query = Room.objects
+class DashboardRawDataSerializer2(serializers.ModelSerializer):
+    transfer_count = serializers.IntegerField(allow_null=True, required=False)
 
-        rooms_filter = {}
-        rooms_filter["is_active"] = False
+    class Meta:
+        model = Room
+        fields = ["transfer_count"]
 
-        if self.context.get("start_date") and self.context.get("end_date"):
-            start_time = pendulum.parse(self.context.get("start_date")).replace(
-                tzinfo=tz
-            )
-            end_time = pendulum.parse(
-                self.context.get("end_date") + " 23:59:59"
-            ).replace(tzinfo=tz)
-            rooms_filter["ended_at__range"] = [start_time, end_time]
-        else:
-            rooms_filter["ended_at__gte"] = initial_datetime
 
-        if self.context.get("sector"):
-            rooms_filter["queue__sector"] = self.context.get("sector")
-            if self.context.get("tag"):
-                rooms_filter["tags__uuid"] = self.context.get("tag")
-            if self.context.get("queue"):
-                rooms_filter["queue"] = self.context.get("queue")
-        else:
-            rooms_filter["queue__sector__project"] = project
+class DashboardRawDataSerializer3(serializers.ModelSerializer):
+    queue_rooms = serializers.IntegerField(allow_null=True, required=False)
 
-        if self.context.get("agent"):
-            rooms_filter["user"] = self.context.get("agent")
-
-        if user_request:
-            rooms_query = rooms_query.filter(
-                queue__sector__in=user_request.manager_sectors()
-            )
-
-        closed_rooms = rooms_query.filter(**rooms_filter).count()
-
-        return closed_rooms
-
-    def get_transfer_count(self, project):
-        tz = project.timezone
-
-        tz = project.timezone
-        initial_datetime = (
-            timezone.now()
-            .astimezone(tz)
-            .replace(hour=0, minute=0, second=0, microsecond=0)
-        )
-        rooms_filter = {}
-
-        user_request = ProjectPermission.objects.get(
-            user=self.context.get("user_request"), project=project
-        )
-        rooms_query = Room.objects
-
-        if self.context.get("start_date") and self.context.get("end_date"):
-            start_time = pendulum.parse(self.context.get("start_date")).replace(
-                tzinfo=tz
-            )
-            end_time = pendulum.parse(
-                self.context.get("end_date") + " 23:59:59"
-            ).replace(tzinfo=tz)
-            rooms_filter["created_on__range"] = [
-                start_time,
-                end_time,
-            ]
-        else:
-            rooms_filter["created_on__gte"] = initial_datetime
-
-        if self.context.get("sector"):
-            rooms_filter["queue__sector"] = self.context.get("sector")
-            if self.context.get("tag"):
-                rooms_filter["tags__uuid"] = self.context.get("tag")
-        else:
-            rooms_filter["queue__sector__project"] = project
-
-        if user_request:
-            rooms_query = rooms_query.filter(
-                queue__sector__in=user_request.manager_sectors()
-            )
-
-        transfer_metric = rooms_query.filter(**rooms_filter).aggregate(
-            count=Sum("metric__transfer_count")
-        )
-
-        return transfer_metric["count"]
-
-    def get_queue_rooms(self, project):
-        tz = project.timezone
-        rooms_filter = {}
-        rooms_filter["user__isnull"] = True
-        rooms_filter["is_active"] = True
-
-        user_request = ProjectPermission.objects.get(
-            user=self.context.get("user_request"), project=project
-        )
-        rooms_query = Room.objects
-
-        if self.context.get("start_date") and self.context.get("end_date"):
-            start_time = pendulum.parse(self.context.get("start_date")).replace(
-                tzinfo=tz
-            )
-            end_time = pendulum.parse(
-                self.context.get("end_date") + " 23:59:59"
-            ).replace(tzinfo=tz)
-            rooms_filter["created_on__range"] = [
-                start_time,
-                end_time,
-            ]
-
-        if self.context.get("sector"):
-            rooms_filter["queue__sector"] = self.context.get("sector")
-        else:
-            rooms_filter["queue__sector__project"] = project
-
-        if user_request:
-            rooms_query = rooms_query.filter(
-                queue__sector__in=user_request.manager_sectors()
-            )
-
-        queue_rooms_metric = rooms_query.filter(**rooms_filter).count()
-
-        return queue_rooms_metric
+    class Meta:
+        model = Room
+        fields = ["queue_rooms"]
