@@ -1,3 +1,7 @@
+# 3.2.2
+## Fix
+  - Passing gte to live filters in dashboard.
+
 # 3.2.1
 ## Change
   - Consider room creation date if the room has no messages in the 24h close validation.
