@@ -328,7 +328,7 @@ class SectorRepository:
             self.rooms_filter["created_on__range"] = [start_time, end_time]
             return self.rooms_filter
 
-        self.rooms_filter["created_on__range"] = [initial_datetime, initial_datetime]
+        self.rooms_filter["created_on__gte"] = initial_datetime
         return self.rooms_filter
 
     def _filter_sector(self, filters):
@@ -399,10 +399,7 @@ class ORMRoomsDataRepository(RoomsDataRepository):
             self.rooms_filter["created_on__range"] = [start_time, end_time]
             self.rooms_filter["user__isnull"] = False
         else:
-            self.rooms_filter["created_on__range"] = [
-                initial_datetime,
-                initial_datetime,
-            ]
+            self.rooms_filter["created_on__gte"] = initial_datetime
 
     def _filter_agents(self, filters):
         if filters.agent:
