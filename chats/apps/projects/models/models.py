@@ -97,7 +97,7 @@ class Project(BaseConfigurableModel, BaseModel):
         try:
             return self.permissions(manager="auth").get_or_create(user=None, role=1)[0]
         except MultipleObjectsReturned:
-            return self.permissions(manager="auth").first()
+            return self.permissions(manager="auth").filter(user=None, role=1).first()
 
     def add_contact_to_history_blocklist(self, contact_external_id: str):
         config = self.config or {}
