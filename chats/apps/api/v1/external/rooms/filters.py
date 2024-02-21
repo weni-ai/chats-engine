@@ -6,4 +6,4 @@ from chats.apps.rooms.models import Room
 class RoomFilter(filters.FilterSet):
     class Meta:
         model = Room
-        fields = ["urn", "is_active"]
+        fields = ["urn", "is_active", "sector", "sector__name"]

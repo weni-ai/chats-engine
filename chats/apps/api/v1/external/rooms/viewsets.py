@@ -277,6 +277,8 @@ class ExternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
     search_fields = [
         "contact__external_id",
         "contact__name",
+        "sector__name",
+        "sector",
         "user__email",
         "urn",
     ]
