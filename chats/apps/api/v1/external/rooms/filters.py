@@ -16,5 +16,7 @@ class RoomFilter(filters.FilterSet):
         fields = ["urn", "is_active", "sector"]
 
     def filter_sector(self, queryset, name, value):
-        sector_filter = Q(queue__sector__uuid=value) | Q(queue__sector__name=value)
+        sector_filter = Q(queue__sector__uuid__icontains=value) | Q(
+            queue__sector__name__icontains=value
+        )
         return queryset.filter(sector_filter)
