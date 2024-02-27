@@ -41,6 +41,7 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
     can_edit_custom_fields = models.BooleanField(
         _("Can edit custom fields?"), default=False
     )
+    objects = SectorManager()
 
     class Meta:
         verbose_name = _("Sector")
