@@ -100,6 +100,28 @@ class FlowsQueueMixin:
         return response
 
 
+class FlowsSectorMixin:
+    def destroy_sector(
+        self,
+        sector_uuid: str,
+        user_email: str,
+    ):
+        response = requests.delete(
+            url=f"{self.base_url}/api/v2/internals/ticketers/{sector_uuid}/?user={user_email}/",
+            headers=self.headers,
+        )
+
+        if response.status_code not in [
+            status.HTTP_200_OK,
+            status.HTTP_201_CREATED,
+            status.HTTP_204_NO_CONTENT,
+        ]:
+            LOGGER.debug(
+                f"[{response.status_code}] Failed to delete the sector. response: {response.content}"
+            )
+        return response
+
+
 class FlowsContactsAndGroupsMixin:
     def project_headers(self, token):
         headers = {
@@ -154,6 +176,7 @@ class FlowRESTClient(
     InternalAuthentication,
     FlowsContactsAndGroupsMixin,
     FlowsQueueMixin,
+    FlowsSectorMixin,
 ):
     def __init__(self, *args, **kwargs):
         self.base_url = settings.FLOWS_API_URL
