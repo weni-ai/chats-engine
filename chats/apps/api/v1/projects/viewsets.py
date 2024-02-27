@@ -362,7 +362,7 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
     )
     def list_discussion_sector(self, request, *args, **kwargs):
         project = self.get_object()
-        queryset = Sector.objects.filter(project=project)
+        queryset = Sector.objects.filter(project=project, is_deleted=False)
 
         paginator = LimitOffsetPagination()
         discussion_sectors = paginator.paginate_queryset(queryset, request)
