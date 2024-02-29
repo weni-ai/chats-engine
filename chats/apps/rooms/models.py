@@ -70,6 +70,7 @@ class Room(BaseModel):
         verbose_name=_("tags"),
         blank=True,
     )
+    protocol = models.TextField(_("urn"), null=True, blank=True, default="")
 
     class Meta:
         verbose_name = _("Room")
