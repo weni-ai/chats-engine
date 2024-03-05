@@ -8,7 +8,7 @@ from chats.apps.rooms.models import Room
 
 class RoomHistorySerializer(serializers.ModelSerializer):
     user = UserNameSerializer(many=False, read_only=True)
-    contact = ContactSimpleSerializer(many=False, read_only=True)
+    contact = serializers.SerializerMethodField()
     tags = TagSimpleSerializer(many=True, read_only=True)
 
     class Meta:
@@ -20,7 +20,14 @@ class RoomHistorySerializer(serializers.ModelSerializer):
             "user",
             "contact",
             "tags",
+            "protocol",
         ]
+
+    def get_contact(self, obj):
+        contact_data = ContactSimpleSerializer(obj.contact).data
+        if obj.protocol:
+            contact_data["name"] = f"{contact_data['name']} | {obj.protocol}"
+        return contact_data
 
 
 class RoomBasicSerializer(serializers.ModelSerializer):
@@ -34,7 +41,7 @@ class RoomBasicSerializer(serializers.ModelSerializer):
 
 class RoomDetailSerializer(serializers.ModelSerializer):
     user = UserNameSerializer(many=False, read_only=True)
-    contact = ContactSimpleSerializer(many=False, read_only=True)
+    contact = serializers.SerializerMethodField()
     tags = TagSimpleSerializer(many=True, read_only=True)
 
     class Meta:
@@ -48,4 +55,11 @@ class RoomDetailSerializer(serializers.ModelSerializer):
             "user",
             "contact",
             "tags",
+            "protocol",
         ]
+
+    def get_contact(self, obj):
+        contact_data = ContactSimpleSerializer(obj.contact).data
+        if obj.protocol:
+            contact_data["name"] = f"{contact_data['name']} | {obj.protocol}"
+        return contact_data

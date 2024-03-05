@@ -43,7 +43,7 @@ class RoomViewset(
         filters.SearchFilter,
     ]
     filterset_class = room_filters.RoomFilter
-    search_fields = ["contact__name", "urn"]
+    search_fields = ["contact__name", "urn", "protocol"]
     ordering_fields = "__all__"
     ordering = ["user", "-last_interaction"]
 

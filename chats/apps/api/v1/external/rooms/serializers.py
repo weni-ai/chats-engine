@@ -143,6 +143,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             "flow_uuid",
             "urn",
             "is_anon",
+            "protocol",
         ]
         read_only_fields = [
             "uuid",
@@ -159,6 +160,8 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         project = sector.project
 
         created_on = validated_data.get("created_on", timezone.now().time())
+        protocol = validated_data.get("custom_fields", {}).pop("protocol", None)
+
         self.check_work_time(sector, created_on)
 
         self.handle_urn(validated_data)
@@ -179,7 +182,9 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             contact, queue, user, groups, created, flow_uuid, project
         )
 
-        room = Room.objects.create(**validated_data, contact=contact, queue=queue)
+        room = Room.objects.create(
+            **validated_data, contact=contact, queue=queue, protocol=protocol
+        )
         RoomMetrics.objects.create(room=room)
 
         return room
