@@ -1,3 +1,15 @@
+# 3.2.5
+## Add
+  - New feature, room protocol.
+
+# 3.2.4
+## Fix
+  - External rooms filter sector.
+    
+# 3.2.3
+## Fix
+  - Passing underscore to rooms data results.
+    
 # 3.2.2
 ## Fix
   - Passing gte to live filters in dashboard.
