@@ -181,9 +181,14 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
                 status.HTTP_400_BAD_REQUEST,
             )
         data = serializer.validated_data
-        contact = FlowRESTClient().create_contact(project, data).json()
-
-        return Response(contact, status.HTTP_201_CREATED)
+        contact_response = FlowRESTClient().create_contact(project, data)
+        contact_response_data = contact_response.json()
+        response_status = (
+            status.HTTP_201_CREATED
+            if contact_response.status_code in [200, 201]
+            else status.HTTP_400_BAD_REQUEST
+        )
+        return Response(contact_response_data, response_status)
 
     @action(detail=True, methods=["GET"], url_name="groups")
     def list_groups(self, request, *args, **kwargs):
