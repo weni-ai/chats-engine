@@ -73,13 +73,6 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.sector_authorizations.values_list("sector__id", flat=True)
 
     @property
-    def last_interaction(self):
-        try:
-            return self.messages.last().created_on
-        except AttributeError:
-            return ""
-
-    @property
     def full_name(self):
         return f"{self.first_name} {self.last_name}"
 
