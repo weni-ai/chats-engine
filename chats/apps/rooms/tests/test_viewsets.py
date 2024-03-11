@@ -113,14 +113,14 @@ class RoomTests(APITestCase):
         response, results = self._request_list_rooms(token, data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        self.assertEqual(response.json().get("count"), len(rooms))
+        self.assertEqual(len(response.json().get("results")), len(rooms))
         for result in results:
             self.assertIn(result.get("uuid"), rooms)
 
     def _not_ok_list_rooms(self, token, data: dict):
         response, _ = self._request_list_rooms(token, data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.json().get("count"), 0)
+        self.assertEqual(len(response.json().get("results")), 0)
 
     def test_list_rooms_given_agents(self):
         self._ok_list_rooms(

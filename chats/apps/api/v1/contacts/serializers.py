@@ -88,11 +88,11 @@ class ContactWSSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class ContactSimpleSerializer(ContactSerializer):
+class ContactSimpleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Contact
         fields = [
             "uuid",
-            "name",
             "external_id",
+            "name",
         ]
