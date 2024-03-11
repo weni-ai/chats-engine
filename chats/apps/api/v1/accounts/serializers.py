@@ -15,7 +15,6 @@ class LoginSerializer(AuthTokenSerializer, serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
-    last_interaction = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -24,18 +23,11 @@ class UserSerializer(serializers.ModelSerializer):
             "last_name",
             "email",
             "status",
-            "last_interaction",
         ]
         ref_name = None
 
     def get_status(self, user: User):
-        """
-        TODO: Return if a user has active channel groups
-        """
         return ""
-
-    def get_last_interaction(self, user: User):
-        return user.last_interaction
 
 
 class UserNameSerializer(serializers.ModelSerializer):
