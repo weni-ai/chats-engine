@@ -28,6 +28,13 @@ class RoomFilter(filters.FilterSet):
         help_text=_("Is active?"),
     )
 
+    is_queued = filters.BooleanFilter(
+        field_name="is_active",
+        required=False,
+        method="filter_is_queued",
+        help_text=_("Is queued?"),
+    )
+
     def filter_project(self, queryset, name, value):
         try:
             project_permission = self.request.user.project_permissions.get(
@@ -57,3 +64,6 @@ class RoomFilter(filters.FilterSet):
 
     def filter_is_active(self, queryset, name, value):
         return queryset.filter(is_active=value)
+
+    def filter_is_queued(self, queryset, name, value):
+        return queryset.filter(user__isnull=value)
