@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db.models import Max
+from django.forms import ValidationError
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
@@ -287,4 +288,40 @@ class RoomViewset(
         return Response(
             {"Detail": "Custom Field edited with success"},
             status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=True,
+        methods=[
+            "PATCH",
+        ],
+        url_name="pick_queue_room",
+    )
+    def pick_queue_room(self, request, *args, **kwargs):
+        room = self.get_object()
+        if room.user:
+            return Response(
+                {"detail": "Room is not queued"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = self.request.GET.get("user_email")
+        queue = self.request.GET.get("queue_uuid")
+
+        action = "pick"
+        feedback = create_transfer_json(
+            action=action,
+            from_=queue,
+            to=user,
+        )
+
+        room.user = user
+        room.transfer_history = feedback
+        room.save()
+
+        create_room_feedback_message(room, feedback, method="rt")
+        room.notify_user("update")
+
+        return Response(
+            {"detail": "Room picked successfully"}, status=status.HTTP_200_OK
         )
