@@ -1,6 +1,5 @@
 from django.conf import settings
 from django.db.models import Max
-from django.forms import ValidationError
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
