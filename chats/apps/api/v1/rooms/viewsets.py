@@ -8,6 +8,7 @@ from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
+from chats.apps.accounts.models import User
 
 from chats.apps.api.v1 import permissions as api_permissions
 from chats.apps.api.v1.internal.rest_clients.openai_rest_client import OpenAIClient
@@ -305,13 +306,11 @@ class RoomViewset(
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        user = self.request.GET.get("user_email")
-        queue = self.request.GET.get("queue_uuid")
-
+        user = User.objects.get(email=self.request.GET.get("user_email"))
         action = "pick"
         feedback = create_transfer_json(
             action=action,
-            from_=queue,
+            from_=room.queue,
             to=user,
         )
 
