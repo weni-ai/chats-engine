@@ -7,6 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
+from chats.apps.accounts.models import User
 
 from chats.apps.api.v1 import permissions as api_permissions
 from chats.apps.api.v1.internal.rest_clients.openai_rest_client import OpenAIClient
@@ -287,4 +288,38 @@ class RoomViewset(
         return Response(
             {"Detail": "Custom Field edited with success"},
             status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=True,
+        methods=[
+            "PATCH",
+        ],
+        url_name="pick_queue_room",
+    )
+    def pick_queue_room(self, request, *args, **kwargs):
+        room = self.get_object()
+        if room.user:
+            return Response(
+                {"detail": "Room is not queued"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = User.objects.get(email=self.request.GET.get("user_email"))
+        action = "pick"
+        feedback = create_transfer_json(
+            action=action,
+            from_=room.queue,
+            to=user,
+        )
+
+        room.user = user
+        room.transfer_history = feedback
+        room.save()
+
+        create_room_feedback_message(room, feedback, method="rt")
+        room.notify_user("update")
+
+        return Response(
+            {"detail": "Room picked successfully"}, status=status.HTTP_200_OK
         )
