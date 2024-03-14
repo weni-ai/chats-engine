@@ -128,7 +128,7 @@ class FlowsContactsAndGroupsMixin:
             response = self.list_contacts(
                 project=project, query_filters={"urn": f"whatsapp:{num_var}"}
             )
-            if not response.get("results"):
+            if response.get("results") != []:
                 return True  # contact already exists, early return
         return False  # contact does not exist
 
