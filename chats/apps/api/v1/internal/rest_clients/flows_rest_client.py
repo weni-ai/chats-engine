@@ -121,6 +121,17 @@ class FlowsContactsAndGroupsMixin:
         contacts["previous"] = get_cursor(contacts.get("previous") or "")
         return contacts
 
+    def validate_contact_exists(self, urn, project):
+        number = urn.split(":")[1]
+        num_variations = [f"{number[:4]}{number[-8:]}", f"{number[:4]}9{number[-8:]}"]
+        for num_var in num_variations:
+            response = self.list_contacts(
+                project=project, query_filters={"urn": f"whatsapp:{num_var}"}
+            )
+            if not response.get("results"):
+                return True  # contact already exists, early return
+        return False  # contact does not exist
+
     def create_contact(self, project, data: dict, contact_id: str = ""):
         url = (
             f"{self.base_url}/api/v2/contacts.json"
