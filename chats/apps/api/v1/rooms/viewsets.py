@@ -305,7 +305,7 @@ class RoomViewset(
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        user = User.objects.get(email=self.request.GET.get("user_email"))
+        user = User.objects.get(email=request.query_params.get("user_email"))
         action = "pick"
         feedback = create_transfer_json(
             action=action,
