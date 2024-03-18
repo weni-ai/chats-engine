@@ -8,6 +8,8 @@ from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
+from chats.apps.accounts.models import User
+from chats.apps.queues.models import Queue
 from chats.apps.api.v1 import permissions as api_permissions
 from chats.apps.api.v1.internal.rest_clients.openai_rest_client import OpenAIClient
 from chats.apps.api.v1.msgs.serializers import ChatCompletionSerializer
@@ -27,6 +29,7 @@ from chats.apps.rooms.views import (
     create_transfer_json,
     create_room_feedback_message,
 )
+from chats.apps.api.utils import verify_user_room
 
 
 class RoomViewset(
@@ -140,6 +143,7 @@ class RoomViewset(
         instance = serializer.instance
 
         # Create transfer object based on whether it's a user or a queue transfer and add it to the history
+        # esse codigo aqui funciona quando alguem edita a sala pegando da fila, nao eh pra usar nas transfers
         if user:
             if old_instance.user is None:
                 time = timezone.now() - old_instance.modified_on
@@ -287,4 +291,63 @@ class RoomViewset(
         return Response(
             {"Detail": "Custom Field edited with success"},
             status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=False,
+        methods=["PATCH"],
+        url_name="mass_transfer",
+    )
+    def mass_transfer(self, request, pk=None):
+        rooms_list = Room.objects.filter(uuid__in=self.request.GET.get("rooms_ids"))
+
+        user_email = self.request.GET.get("user_email")
+        queue_uuid = self.request.GET.get("queue")
+        user_request = self.request.GET.get("user_request")
+
+        if not (user_email or queue_uuid):
+            return None
+
+        try:
+            if user_email:
+                user = User.objects.get(email=user_email)
+
+                for room in rooms_list:
+                    transfer_user = verify_user_room(room, user_request)
+                    print(transfer_user)
+                    feedback = create_transfer_json(
+                        action="transfer",
+                        from_=transfer_user,
+                        to=user,
+                    )
+                    room.user = user
+                    room.save()
+
+                    create_room_feedback_message(room, feedback, method="rt")
+                    room.notify_user("update")
+
+            if queue_uuid:
+                queue = Queue.objects.get(uuid=queue_uuid)
+
+                for room in rooms_list:
+                    verify_user_room(room, user_request)
+                    feedback = create_transfer_json(
+                        action="transfer",
+                        from_=verify_user_room,
+                        to=queue,
+                    )
+                    room.queue = queue
+                    room.save()
+
+                    create_room_feedback_message(room, feedback, method="rt")
+                    room.notify_queue("update")
+
+        except Exception as error:
+            return Response(
+                {"error": {error}}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        return Response(
+            {"success": "Mass transfer completed"},
+            status=status.HTTP_200_OK,
         )
