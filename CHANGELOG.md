@@ -1,3 +1,9 @@
+# 3.3.0
+## Add
+  - Error handling on the contact creation.
+## Change
+  - Removal of the 'last_interaction' property on the user model and serializers.
+
 # 3.2.5
 ## Add
   - New feature, room protocol.

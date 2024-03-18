@@ -181,7 +181,15 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
                 status.HTTP_400_BAD_REQUEST,
             )
         data = serializer.validated_data
-        contact_response = FlowRESTClient().create_contact(project, data)
+        flows_client = FlowRESTClient()
+        urn = data.get("urns")[0]
+        if flows_client.validate_contact_exists(urn=urn, project=project):
+            return Response(
+                "{'urns':['URN belongs to another contact']}",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        contact_response = flows_client.create_contact(project, data)
         contact_response_data = contact_response.json()
         response_status = (
             status.HTTP_201_CREATED
