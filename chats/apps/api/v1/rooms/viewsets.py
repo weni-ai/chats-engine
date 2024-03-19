@@ -318,7 +318,7 @@ class RoomViewset(
         room.save()
 
         create_room_feedback_message(room, feedback, method="rt")
-        room.notify_user("update")
+        room.notify_queue("update")
 
         return Response(
             {"detail": "Room picked successfully"}, status=status.HTTP_200_OK
