@@ -1,3 +1,7 @@
+# 3.4.0
+## Add
+  - New endpoint for the agent to get a room.
+
 # 3.3.0
 ## Add
   - Error handling on the contact creation.
