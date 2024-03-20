@@ -331,14 +331,14 @@ class RoomViewset(
     @action(
         detail=False,
         methods=["PATCH"],
-        url_name="mass_transfer",
+        url_name="bulk_transfer",
     )
-    def mass_transfer(self, request, pk=None):
-        rooms_list = Room.objects.filter(uuid__in=self.request.GET.get("rooms_ids"))
+    def bulk_transfer(self, request, pk=None):
+        rooms_list = Room.objects.filter(uuid__in=request.query_params.get("rooms_ids"))
 
-        user_email = self.request.GET.get("user_email")
-        queue_uuid = self.request.GET.get("queue")
-        user_request = self.request.GET.get("user_request")
+        user_email = request.query_params.get("user_email")
+        queue_uuid = request.query_params.get("queue")
+        user_request = request.query_params.get("user_request")
 
         if not (user_email or queue_uuid):
             return None
