@@ -325,7 +325,8 @@ class RoomViewset(
         room.notify_queue("update")
 
         return Response(
-            {"detail": "Room picked successfully"}, status=status.HTTP_200_OK)
+            {"detail": "Room picked successfully"}, status=status.HTTP_200_OK
+        )
 
     @action(
         detail=False,
@@ -384,5 +385,4 @@ class RoomViewset(
         return Response(
             {"success": "Mass transfer completed"},
             status=status.HTTP_200_OK,
->>>>>>> feature/mass-transfer
         )
