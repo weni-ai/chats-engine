@@ -24,7 +24,6 @@ class ProjectPermissionConsumer(EDAConsumer):
         body = JSONParser.parse(message.body)
 
         project_permission_dto = ProjectPermissionDTO(
-            uuid=body.get("uuid"),
             project=body.get("project"),
             user=body.get("user"),
             role=body.get("role"),
