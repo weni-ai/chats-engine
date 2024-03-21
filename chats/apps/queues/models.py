@@ -7,6 +7,7 @@ from django.utils.translation import gettext_lazy as _
 from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
 
 User = get_user_model()
+from .queue_managers import QueueManager
 
 
 class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
@@ -20,6 +21,7 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
     default_message = models.TextField(
         _("Default queue message"), null=True, blank=True
     )
+    objects = QueueManager()
 
     class Meta:
         verbose_name = _("Sector Queue")
