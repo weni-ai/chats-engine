@@ -334,10 +334,11 @@ class RoomViewset(
         url_name="bulk_transfer",
     )
     def bulk_transfer(self, request, pk=None):
-        rooms_list = Room.objects.filter(uuid__in=request.query_params.get("rooms_ids"))
+        rooms_list = Room.objects.filter(uuid__in=request.data.get("rooms_ids"))
+        print("list de salas", rooms_list)
 
         user_email = request.query_params.get("user_email")
-        queue_uuid = request.query_params.get("queue")
+        queue_uuid = request.query_params.get("queue_uuid")
         user_request = request.query_params.get("user_request")
 
         if not (user_email or queue_uuid):
