@@ -334,6 +334,7 @@ class RoomViewset(
         url_name="bulk_transfer",
     )
     def bulk_transfer(self, request, pk=None):
+        print("salas vindo da requisição", request.data.get("rooms_list"))
         rooms_list = Room.objects.filter(uuid__in=request.data.get("rooms_list"))
         print("list de salas", rooms_list)
 
