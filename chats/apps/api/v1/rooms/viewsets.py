@@ -334,9 +334,7 @@ class RoomViewset(
         url_name="bulk_transfer",
     )
     def bulk_transfer(self, request, pk=None):
-        print("salas vindo da requisição", request.data.get("rooms_list"))
         rooms_list = Room.objects.filter(uuid__in=request.data.get("rooms_list"))
-        print("list de salas", rooms_list)
 
         user_email = request.query_params.get("user_email")
         queue_uuid = request.query_params.get("queue_uuid")
@@ -351,7 +349,6 @@ class RoomViewset(
 
                 for room in rooms_list:
                     transfer_user = verify_user_room(room, user_request)
-                    print(transfer_user)
                     feedback = create_transfer_json(
                         action="transfer",
                         from_=transfer_user,
@@ -367,10 +364,10 @@ class RoomViewset(
                 queue = Queue.objects.get(uuid=queue_uuid)
 
                 for room in rooms_list:
-                    verify_user_room(room, user_request)
+                    transfer_user = verify_user_room(room, user_request)
                     feedback = create_transfer_json(
                         action="transfer",
-                        from_=verify_user_room,
+                        from_=transfer_user,
                         to=queue,
                     )
                     room.queue = queue
