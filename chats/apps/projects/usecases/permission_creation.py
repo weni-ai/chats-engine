@@ -4,6 +4,8 @@ from django.contrib.auth import get_user_model
 
 from ..models import ProjectPermission
 
+from chats.apps.projects.usecases import InvalidProjectPermission
+
 User = get_user_model()
 
 
@@ -50,9 +52,12 @@ class ProjectPermissionCreationUseCase:
         )
 
     def delete_permission(self, project_permission_dto: ProjectPermissionDTO):
-        # verificar se a permissão existe antes de deletar
-        project_permission = ProjectPermission.objects.get(
-            project=project_permission_dto.project,
-            user=project_permission_dto.user,
-        )
+        try:
+            project_permission = ProjectPermission.objects.get(
+                project=project_permission_dto.project,
+                user=project_permission_dto.user,
+            )
+        except Exception as err:
+            raise InvalidProjectPermission(err)
+
         project_permission.delete()
