@@ -42,19 +42,12 @@ class ProjectPermissionCreationUseCase:
         role_value = self.role_mapping()
         project = self.get_project()
 
-        project_permission = ProjectPermission.objects.filter(
-            project=project_permission_dto.project,
-            user=project_permission_dto.user,
-        ).first()
-
-        if project_permission is not None:
-            self.edit_permission(project_permission, user, role_value, project)
-
-        project_permission = ProjectPermission.objects.create(
-            project=project,
-            user=user,
-            role=role_value,
+        project_permission, created = ProjectPermission.objects.get_or_create(
+            project=project, user=user, defaults={"role": role_value}
         )
+
+        if not created:
+            self.edit_permission(project_permission, user, role_value, project)
 
     def delete_permission(self, project_permission_dto: ProjectPermissionDTO):
         try:
