@@ -36,11 +36,10 @@ class ProjectPermissionCreationUseCase:
         user, _ = self.get_or_create_user_by_email(project_permission_dto.user)
         role_value = self.role_mapping()
 
-        project_permission = ProjectPermission.objects.get(
+        project_permission = ProjectPermission.objects.filter(
             project=project_permission_dto.project,
             user=project_permission_dto.user,
-            default=None,
-        )
+        ).first()
 
         if project_permission is not None:
             self.edit_permission(project_permission, user, role_value)
