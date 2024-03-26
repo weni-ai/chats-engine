@@ -46,7 +46,7 @@ class ProjectPermissionCreationUseCase:
 
         project_permission = ProjectPermission.objects.create(
             project=project_permission_dto.project,
-            user=project_permission_dto.user,
+            user=user,
             role=role_value,
         )
 
