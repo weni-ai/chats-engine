@@ -1,3 +1,8 @@
+# 3.5.0
+## Add
+  - New EDA consumer to create project permissions.
+  - New mixin in flows rest client to delete ticketer when chats delete a sector.
+
 # 3.4.1
 ## Add
   - Change queue and sectors model managers to list only activated objects.
