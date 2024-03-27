@@ -9,6 +9,8 @@ from django.utils.translation import gettext_lazy as _
 from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
 from chats.utils.websockets import send_channels_group
 
+from .sector_managers import SectorManager
+
 User = get_user_model()
 from .sector_managers import SectorManager
 

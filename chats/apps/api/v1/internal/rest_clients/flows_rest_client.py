@@ -100,6 +100,27 @@ class FlowsQueueMixin:
         return response
 
 
+class FlowsSectorMixin:
+    def destroy_sector(
+        self,
+        sector_uuid: str,
+        user_email: str,
+    ):
+        response = requests.delete(
+            url=f"{self.base_url}/api/v2/internals/sectors/{sector_uuid}/?user={user_email}/",
+            headers=self.headers,
+        )
+        if response.status_code not in [
+            status.HTTP_200_OK,
+            status.HTTP_201_CREATED,
+            status.HTTP_204_NO_CONTENT,
+        ]:
+            LOGGER.debug(
+                f"[{response.status_code}] Failed to delete the sector. response: {response.content}"
+            )
+        return response
+
+
 class FlowsContactsAndGroupsMixin:
     def project_headers(self, token):
         headers = {
@@ -120,17 +141,6 @@ class FlowsContactsAndGroupsMixin:
         contacts["next"] = get_cursor(contacts.get("next") or "")
         contacts["previous"] = get_cursor(contacts.get("previous") or "")
         return contacts
-
-    def validate_contact_exists(self, urn, project):
-        number = urn.split(":")[1]
-        num_variations = [f"{number[:4]}{number[-8:]}", f"{number[:4]}9{number[-8:]}"]
-        for num_var in num_variations:
-            response = self.list_contacts(
-                project=project, query_filters={"urn": f"whatsapp:{num_var}"}
-            )
-            if response.get("results") != []:
-                return True  # contact already exists, early return
-        return False  # contact does not exist
 
     def create_contact(self, project, data: dict, contact_id: str = ""):
         url = (
@@ -165,6 +175,7 @@ class FlowRESTClient(
     InternalAuthentication,
     FlowsContactsAndGroupsMixin,
     FlowsQueueMixin,
+    FlowsSectorMixin,
 ):
     def __init__(self, *args, **kwargs):
         self.base_url = settings.FLOWS_API_URL

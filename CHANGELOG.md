@@ -1,3 +1,11 @@
+# 3.4.1
+## Add
+  - Change queue and sectors model managers to list only activated objects.
+
+# 3.4.0
+## Add
+  - New endpoint for the agent to get a room.
+
 # 3.3.0
 ## Add
   - Error handling on the contact creation.
