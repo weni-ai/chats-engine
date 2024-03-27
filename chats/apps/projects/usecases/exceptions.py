@@ -12,3 +12,7 @@ class InvalidDLQHeaders(Exception):
 
 class ReceivedErrorMessage(Exception):
     pass
+
+
+class InvalidProjectPermission(Exception):
+    pass
