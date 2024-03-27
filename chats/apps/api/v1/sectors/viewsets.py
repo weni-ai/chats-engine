@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
     ConnectRESTClient,
 )
+from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.api.v1.permissions import (
     HasAgentPermissionAnyQueueSector,
     IsProjectAdmin,
@@ -107,6 +108,23 @@ class SectorViewset(viewsets.ModelViewSet):
         serializer.save()
 
     def perform_destroy(self, instance):
+        content = {
+            "sector_uuid": str(instance.uuid),
+            "user_email": self.request.query_params.get("user_email"),
+        }
+
+        if not settings.USE_WENI_FLOWS:
+            return super().perform_destroy(instance)
+
+        response = FlowRESTClient().destroy_sector(**content)
+        if response.status_code not in [
+            status.HTTP_200_OK,
+            status.HTTP_201_CREATED,
+            status.HTTP_204_NO_CONTENT,
+        ]:
+            raise exceptions.APIException(
+                detail=f"[{response.status_code}] Error deleting the sector on flows. Exception: {response.content}"
+            )
         instance.delete()
         return Response(
             {"is_deleted": True},
