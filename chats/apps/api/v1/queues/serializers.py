@@ -1,8 +1,12 @@
+from django.contrib.auth import get_user_model
+
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.queues.models import Queue, QueueAuthorization
+
+User = get_user_model()
 
 
 class QueueSerializer(serializers.ModelSerializer):
@@ -99,3 +103,15 @@ class QueueAuthorizationReadOnlyListSerializer(serializers.ModelSerializer):
 
     def get_user(self, auth):
         return UserSerializer(auth.permission.user).data
+
+
+class QueueAgentsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            "first_name",
+            "last_name",
+            "email",
+            "photo_url",
+            "language",
+        ]
