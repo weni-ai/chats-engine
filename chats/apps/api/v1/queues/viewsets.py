@@ -136,6 +136,22 @@ class QueueViewset(ModelViewSet):
             status=status.HTTP_201_CREATED,
         )
 
+    @action(detail=False, methods=["PATCH"])
+    def queue_priorization(self, request, *args, **kwargs):
+        queues_list = QueueAuthorization.objects.filter(
+            queue__in=request.data.get("queues_uuid")
+        )
+
+        for queue_authorization in queues_list:
+            if queue_authorization.role == 1:
+                queue_authorization.role = 2
+                queue_authorization.save()
+            else:
+                queue_authorization.role = 1
+                queue_authorization.save()
+
+        return Response(status=status.HTTP_200_OK)
+
 
 class QueueAuthorizationViewset(ModelViewSet):
     queryset = QueueAuthorization.objects.all()
