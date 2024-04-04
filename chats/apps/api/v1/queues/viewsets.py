@@ -1,4 +1,5 @@
-from itertools import chain
+from django.contrib.auth import get_user_model
+
 from django.conf import settings
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import exceptions, filters, status
@@ -16,6 +17,8 @@ from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.sectors.models import Sector, SectorAuthorization
 
 from .serializers import QueueAgentsSerializer
+
+User = get_user_model()
 
 
 class QueueViewset(ModelViewSet):
@@ -156,6 +159,24 @@ class QueueViewset(ModelViewSet):
 
         serializer = QueueAgentsSerializer(combined_permissions, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["GET"])
+    def list_queue_permissions(self, request, *args, **kwargs):
+        user_email = request.data.get("user_email")
+
+        user = User.objects.get(email=user_email)
+        project = request.data.get("project")
+
+        queue_permissions = QueueAuthorization.objects.filter(
+            permission__user=user, queue__sector__project=project
+        )
+        serializer_data = queue_serializers.QueueAuthorizationSerializer(
+            queue_permissions, many=True
+        )
+
+        return Response(
+            {"user_permissions": serializer_data.data}, status=status.HTTP_200_OK
+        )
 
 
 class QueueAuthorizationViewset(ModelViewSet):
