@@ -59,6 +59,8 @@ class QueueReadOnlyListSerializer(serializers.ModelSerializer):
 
 
 class QueueAuthorizationSerializer(serializers.ModelSerializer):
+    queue_name = serializers.CharField(source="queue.name", read_only=True)
+
     class Meta:
         model = QueueAuthorization
         fields = "__all__"
