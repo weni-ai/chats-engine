@@ -1,12 +1,14 @@
+import json
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
-from rest_framework import status, viewsets
+from rest_framework import status, viewsets, mixins
 from rest_framework.decorators import action
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.viewsets import GenericViewSet
 
 from chats.apps.api.v1.internal.projects.serializers import (
     CheckAccessReadSerializer,
@@ -39,7 +41,12 @@ from chats.apps.rooms.views import create_room_feedback_message
 from chats.apps.sectors.models import Sector
 
 
-class ProjectViewset(viewsets.ReadOnlyModelViewSet):
+class ProjectViewset(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    GenericViewSet,
+):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
     permission_classes = [
@@ -399,6 +406,17 @@ class ProjectViewset(viewsets.ReadOnlyModelViewSet):
         serializer = ListProjectUsersSerializer(users, many=True)
 
         return paginator.get_paginated_response(serializer.data)
+
+    def partial_update(self, request, uuid=None):
+        project = self.get_object()
+        config = request.data.get("config")
+
+        if config:
+            config = json.loads(config)
+            project.config = project.config or {}
+            project.config.update(config)
+            project.save()
+        return Response(ProjectSerializer(project).data, status=status.HTTP_200_OK)
 
 
 class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
