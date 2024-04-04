@@ -1,3 +1,5 @@
+from django.contrib.auth import get_user_model
+
 from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
 from django.db import models
 from django.db.models import Q
@@ -13,6 +15,8 @@ from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteMo
 from chats.utils.websockets import send_channels_group
 
 from .permission_managers import UserPermissionsManager
+
+User = get_user_model()
 
 # Create your models here.
 
@@ -154,6 +158,12 @@ class Project(BaseConfigurableModel, BaseModel):
     @property
     def random_admin(self):
         return self.admin_permissions.first()
+
+    @property
+    def admins(self):
+        return User.objects.filter(
+            project_permissions__project=self, project_permissions__role=1
+        )
 
     def get_sectors(self, user, custom_filters: dict = {}):
         user_permission = self.get_permission(user)

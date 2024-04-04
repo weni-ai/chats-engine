@@ -6,6 +6,8 @@ from ..models import ProjectPermission, Project
 
 from chats.apps.projects.usecases import InvalidProjectPermission
 
+from ..models import Project, ProjectPermission
+
 User = get_user_model()
 
 
