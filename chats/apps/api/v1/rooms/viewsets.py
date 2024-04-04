@@ -370,6 +370,7 @@ class RoomViewset(
                         from_=transfer_user,
                         to=queue,
                     )
+                    room.user = None
                     room.queue = queue
                     room.save()
 
