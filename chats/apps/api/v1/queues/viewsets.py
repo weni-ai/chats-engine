@@ -162,10 +162,10 @@ class QueueViewset(ModelViewSet):
 
     @action(detail=False, methods=["GET"])
     def list_queue_permissions(self, request, *args, **kwargs):
-        user_email = request.data.get("user_email")
+        user_email = request.query_params.get("user_email")
 
         user = User.objects.get(email=user_email)
-        project = request.data.get("project")
+        project = request.query_params.get("project")
 
         queue_permissions = QueueAuthorization.objects.filter(
             permission__user=user,
