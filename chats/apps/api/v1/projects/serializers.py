@@ -12,17 +12,19 @@ from chats.apps.sectors.models import Sector
 
 class ProjectSerializer(serializers.ModelSerializer):
     timezone = TimeZoneSerializerField(use_pytz=False)
+    config = serializers.SerializerMethodField()
 
     class Meta:
         model = Project
-        fields = [
-            "name",
-            "date_format",
-            "timezone",
-        ]
+        fields = ["name", "date_format", "timezone", "config"]
         read_only_fields = [
             "timezone",
         ]
+
+    def get_config(self, project: Project):
+        config = project.config
+        config.pop("chat_gpt_token", None)
+        return config
 
 
 class LinkContactSerializer(serializers.ModelSerializer):
