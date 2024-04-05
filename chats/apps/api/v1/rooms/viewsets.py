@@ -8,6 +8,7 @@ from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from chats.apps.accounts.models import User
+from chats.apps.queues.models import Queue
 
 from chats.apps.api.v1 import permissions as api_permissions
 from chats.apps.api.v1.internal.rest_clients.openai_rest_client import OpenAIClient
@@ -28,6 +29,7 @@ from chats.apps.rooms.views import (
     create_transfer_json,
     create_room_feedback_message,
 )
+from chats.apps.api.utils import verify_user_room
 
 
 class RoomViewset(
@@ -322,4 +324,63 @@ class RoomViewset(
 
         return Response(
             {"detail": "Room picked successfully"}, status=status.HTTP_200_OK
+        )
+
+    @action(
+        detail=False,
+        methods=["PATCH"],
+        url_name="bulk_transfer",
+    )
+    def bulk_transfer(self, request, pk=None):
+        rooms_list = Room.objects.filter(uuid__in=request.data.get("rooms_list"))
+
+        user_email = request.query_params.get("user_email")
+        queue_uuid = request.query_params.get("queue_uuid")
+        user_request = request.query_params.get("user_request")
+
+        if not (user_email or queue_uuid):
+            return None
+
+        try:
+            if user_email:
+                user = User.objects.get(email=user_email)
+
+                for room in rooms_list:
+                    transfer_user = verify_user_room(room, user_request)
+                    feedback = create_transfer_json(
+                        action="transfer",
+                        from_=transfer_user,
+                        to=user,
+                    )
+                    room.user = user
+                    room.save()
+
+                    create_room_feedback_message(room, feedback, method="rt")
+                    room.notify_user("update")
+
+            if queue_uuid:
+                queue = Queue.objects.get(uuid=queue_uuid)
+
+                for room in rooms_list:
+                    transfer_user = verify_user_room(room, user_request)
+                    feedback = create_transfer_json(
+                        action="transfer",
+                        from_=transfer_user,
+                        to=queue,
+                    )
+                    room.user = None
+                    room.queue = queue
+                    room.save()
+
+                    create_room_feedback_message(room, feedback, method="rt")
+                    room.notify_queue("update")
+
+        except Exception as error:
+            return Response(
+                {"error": {error}}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        return Response(
+            {"success": "Mass transfer completed"},
+            status=status.HTTP_200_OK,
         )
