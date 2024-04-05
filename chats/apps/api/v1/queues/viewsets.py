@@ -168,7 +168,9 @@ class QueueViewset(ModelViewSet):
         project = request.data.get("project")
 
         queue_permissions = QueueAuthorization.objects.filter(
-            permission__user=user, queue__sector__project=project
+            permission__user=user,
+            queue__sector__project=project,
+            queue__is_deleted=False,
         )
         serializer_data = queue_serializers.QueueAuthorizationSerializer(
             queue_permissions, many=True
