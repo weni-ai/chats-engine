@@ -9,7 +9,10 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
-from chats.apps.api.v1.permissions import AnyQueueAgentPermission, IsSectorManager
+from chats.apps.api.v1.permissions import (
+    AnyQueueAgentPermission,
+    IsSectorManager,
+)
 from chats.apps.api.v1.queues import serializers as queue_serializers
 from chats.apps.api.v1.queues.filters import QueueAuthorizationFilter, QueueFilter
 from chats.apps.queues.models import Queue, QueueAuthorization
@@ -166,11 +169,15 @@ class QueueAuthorizationViewset(ModelViewSet):
     serializer_class = queue_serializers.QueueAuthorizationSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = QueueAuthorizationFilter
-    permission_classes = [
-        IsAuthenticated,
-        IsSectorManager,
-    ]
+    permission_classes = []
     lookup_field = "uuid"
+
+    def get_permissions(self):
+        if self.action in ["list", "update_queue_permissions"]:
+            permission_classes = [IsAuthenticated, AnyQueueAgentPermission]
+        else:
+            permission_classes = [IsAuthenticated, IsSectorManager]
+        return [permission() for permission in permission_classes]
 
     def get_queryset(self):
         if self.action != "list":
@@ -181,3 +188,19 @@ class QueueAuthorizationViewset(ModelViewSet):
         if self.action in ["list", "retrieve"]:
             return queue_serializers.QueueAuthorizationReadOnlyListSerializer
         return super().get_serializer_class()
+
+    @action(detail=True, methods=["PATCH"])
+    def update_queue_permissions(self, request, *args, **kwargs):
+        queue_permission = self.get_object()
+
+        role = request.data.get("role")
+
+        queue_permission.role = role
+        queue_permission.save()
+
+        serializer_data = queue_serializers.QueueAuthorizationSerializer(
+            queue_permission
+        )
+        return Response(
+            {"user_permission": serializer_data.data}, status=status.HTTP_200_OK
+        )
