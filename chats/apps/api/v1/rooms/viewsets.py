@@ -348,6 +348,7 @@ class RoomViewset(
                 user = User.objects.get(email=user_email)
 
                 for room in rooms_list:
+                    old_user = room.user
                     transfer_user = verify_user_room(room, user_request)
                     feedback = create_transfer_json(
                         action="transfer",
@@ -358,6 +359,7 @@ class RoomViewset(
                     room.save()
 
                     create_room_feedback_message(room, feedback, method="rt")
+                    room.notify_user("update", user=old_user)
                     room.notify_user("update")
 
             if queue_uuid:
