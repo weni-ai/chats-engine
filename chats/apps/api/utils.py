@@ -44,3 +44,11 @@ def create_room_dto(rooms_data) -> List[DashboardRoomSerializer]:
     ]
     serialized_data = DashboardRoomSerializer(room_data, many=True)
     return serialized_data.data
+
+
+def verify_user_room(room, user_request):
+    user_request = User.objects.get(email=user_request)
+
+    if room.user:
+        return room.user
+    return user_request
