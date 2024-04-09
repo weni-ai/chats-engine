@@ -7,9 +7,9 @@ from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
-from chats.apps.accounts.models import User
-from chats.apps.queues.models import Queue
 
+from chats.apps.accounts.models import User
+from chats.apps.api.utils import verify_user_room
 from chats.apps.api.v1 import permissions as api_permissions
 from chats.apps.api.v1.internal.rest_clients.openai_rest_client import OpenAIClient
 from chats.apps.api.v1.msgs.serializers import ChatCompletionSerializer
@@ -20,16 +20,16 @@ from chats.apps.api.v1.rooms.serializers import (
     TransferRoomSerializer,
 )
 from chats.apps.dashboard.models import RoomMetrics
+from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import (
     close_room,
+    create_room_feedback_message,
+    create_transfer_json,
     get_editable_custom_fields_room,
     update_custom_fields,
     update_flows_custom_fields,
-    create_transfer_json,
-    create_room_feedback_message,
 )
-from chats.apps.api.utils import verify_user_room
 
 
 class RoomViewset(
@@ -346,6 +346,7 @@ class RoomViewset(
                 user = User.objects.get(email=user_email)
 
                 for room in rooms_list:
+                    old_user = room.user
                     transfer_user = verify_user_room(room, user_request)
                     feedback = create_transfer_json(
                         action="transfer",
@@ -356,6 +357,7 @@ class RoomViewset(
                     room.save()
 
                     create_room_feedback_message(room, feedback, method="rt")
+                    room.notify_user("update", user=old_user)
                     room.notify_user("update")
 
             if queue_uuid:
