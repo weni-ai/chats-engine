@@ -1,4 +1,3 @@
-from itertools import chain
 from django.conf import settings
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import exceptions, filters, status
@@ -11,9 +10,9 @@ from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTCl
 from chats.apps.api.v1.permissions import AnyQueueAgentPermission, IsSectorManager
 from chats.apps.api.v1.queues import serializers as queue_serializers
 from chats.apps.api.v1.queues.filters import QueueAuthorizationFilter, QueueFilter
-from chats.apps.projects.models.models import Project, ProjectPermission
+from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue, QueueAuthorization
-from chats.apps.sectors.models import Sector, SectorAuthorization
+from chats.apps.sectors.models import Sector
 
 from .serializers import QueueAgentsSerializer
 
