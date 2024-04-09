@@ -44,7 +44,12 @@ if [[ "start" == "$1" ]]; then
       --bind=0.0.0.0:8000 \
       -c "${GUNICORN_CONF}"
 elif [[ "start-websocket" == "$1" ]]; then
-    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec daphne -b 0.0.0.0 -p 8000 chats.asgi:application
+    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" python manage.py collectstatic --noinput
+    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec gunicorn "${GUNICORN_APP}" \
+      --name="${APPLICATION_NAME}" \
+      --chdir="${PROJECT_PATH}" \
+      --bind=0.0.0.0:8000 \
+      -c "${GUNICORN_CONF}"
 elif [[ "celery-worker" == "$1" ]]; then
     celery_queue="celery"
     if [ "${2}" ] ; then
