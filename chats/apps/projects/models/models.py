@@ -340,7 +340,7 @@ class ProjectPermission(
         )
         queue_agent_queues = list(
             self.queue_authorizations.exclude(
-                queue__uuid__in=sector_manager_queues
+                queue__uuid__in=sector_manager_queues, role=2
             ).values_list("queue", flat=True)
         )
         queues = set(sector_manager_queues + queue_agent_queues)
