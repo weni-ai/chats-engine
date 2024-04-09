@@ -315,6 +315,12 @@ class RoomViewset(
             to=user,
         )
 
+        time = timezone.now() - room.modified_on
+        room_metric = RoomMetrics.objects.get_or_create(room=room)[0]
+        room_metric.waiting_time += time.total_seconds()
+        room_metric.queued_count += 1
+        room_metric.save()
+
         room.user = user
         room.transfer_history = feedback
         room.save()
