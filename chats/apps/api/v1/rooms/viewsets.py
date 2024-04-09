@@ -7,8 +7,8 @@ from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
-from chats.apps.accounts.models import User
 
+from chats.apps.accounts.models import User
 from chats.apps.api.v1 import permissions as api_permissions
 from chats.apps.api.v1.internal.rest_clients.openai_rest_client import OpenAIClient
 from chats.apps.api.v1.msgs.serializers import ChatCompletionSerializer
@@ -22,11 +22,11 @@ from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import (
     close_room,
+    create_room_feedback_message,
+    create_transfer_json,
     get_editable_custom_fields_room,
     update_custom_fields,
     update_flows_custom_fields,
-    create_transfer_json,
-    create_room_feedback_message,
 )
 
 
@@ -313,15 +313,15 @@ class RoomViewset(
             to=user,
         )
 
-        room.user = user
-        room.transfer_history = feedback
-        room.save()
-
         time = timezone.now() - room.modified_on
         room_metric = RoomMetrics.objects.get_or_create(room=room)[0]
         room_metric.waiting_time += time.total_seconds()
         room_metric.queued_count += 1
         room_metric.save()
+
+        room.user = user
+        room.transfer_history = feedback
+        room.save()
 
         create_room_feedback_message(room, feedback, method="rt")
         room.notify_queue("update")
