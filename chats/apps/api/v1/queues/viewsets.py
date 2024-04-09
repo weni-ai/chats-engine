@@ -10,7 +10,11 @@ from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTCl
 from chats.apps.api.v1.permissions import AnyQueueAgentPermission, IsSectorManager
 from chats.apps.api.v1.queues import serializers as queue_serializers
 from chats.apps.api.v1.queues.filters import QueueAuthorizationFilter, QueueFilter
+from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.sectors.models import Sector
+
+from .serializers import QueueAgentsSerializer
 
 
 class QueueViewset(ModelViewSet):
@@ -135,6 +139,22 @@ class QueueViewset(ModelViewSet):
             },
             status=status.HTTP_201_CREATED,
         )
+
+    @action(detail=True, methods=["GET"])
+    def transfer_agents(self, *args, **kwargs):
+        instance = self.get_object()
+        queue_agents = instance.agents
+
+        sector = Sector.objects.get(queues=instance)
+        sector_agents = sector.managers
+
+        project = Project.objects.get(sectors__queues=instance)
+        project_admins = project.admins
+
+        combined_permissions = queue_agents.union(sector_agents, project_admins)
+
+        serializer = QueueAgentsSerializer(combined_permissions, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class QueueAuthorizationViewset(ModelViewSet):
