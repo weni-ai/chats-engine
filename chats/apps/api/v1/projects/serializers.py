@@ -23,7 +23,8 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def get_config(self, project: Project):
         config = project.config
-        config.pop("chat_gpt_token", None)
+        if config is not None and "chat_gpt_token" in config.keys():
+            config.pop("chat_gpt_token", None)
         return config
 
 
