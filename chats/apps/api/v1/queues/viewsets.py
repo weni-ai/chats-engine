@@ -11,12 +11,13 @@ from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTCl
 from chats.apps.api.v1.permissions import (
     AnyQueueAgentPermission,
     IsSectorManager,
+    ProjectAnyPermission,
 )
 from chats.apps.api.v1.queues import serializers as queue_serializers
 from chats.apps.api.v1.queues.filters import QueueAuthorizationFilter, QueueFilter
-from chats.apps.projects.models.models import Project, ProjectPermission
+from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue, QueueAuthorization
-from chats.apps.sectors.models import Sector, SectorAuthorization
+from chats.apps.sectors.models import Sector
 
 from .serializers import QueueAgentsSerializer
 
@@ -193,7 +194,7 @@ class QueueAuthorizationViewset(ModelViewSet):
 
     def get_permissions(self):
         if self.action in ["list", "update_queue_permissions"]:
-            permission_classes = [IsAuthenticated, AnyQueueAgentPermission]
+            permission_classes = [IsAuthenticated, ProjectAnyPermission]
         else:
             permission_classes = [IsAuthenticated, IsSectorManager]
         return [permission() for permission in permission_classes]
@@ -217,9 +218,7 @@ class QueueAuthorizationViewset(ModelViewSet):
         queue_permission.role = role
         queue_permission.save()
 
-        serializer_data = queue_serializers.QueueAuthorizationSerializer(
-            queue_permission
-        )
+        serializer_data = queue_serializers.QueueUpdateSerializer(queue_permission)
         return Response(
             {"user_permission": serializer_data.data}, status=status.HTTP_200_OK
         )
