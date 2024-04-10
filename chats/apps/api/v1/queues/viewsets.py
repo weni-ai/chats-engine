@@ -11,6 +11,7 @@ from rest_framework.viewsets import ModelViewSet
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.api.v1.permissions import (
     AnyQueueAgentPermission,
+    IsQueueAgent,
     IsSectorManager,
 )
 from chats.apps.api.v1.queues import serializers as queue_serializers
@@ -174,7 +175,7 @@ class QueueAuthorizationViewset(ModelViewSet):
 
     def get_permissions(self):
         if self.action in ["list", "update_queue_permissions"]:
-            permission_classes = [IsAuthenticated, AnyQueueAgentPermission]
+            permission_classes = [IsAuthenticated, IsQueueAgent]
         else:
             permission_classes = [IsAuthenticated, IsSectorManager]
         return [permission() for permission in permission_classes]
@@ -198,7 +199,7 @@ class QueueAuthorizationViewset(ModelViewSet):
         queue_permission.role = role
         queue_permission.save()
 
-        serializer_data = queue_serializers.QueueAuthorizationSerializer(
+        serializer_data = queue_serializers.QueueAuthorizationUpdateSerializer(
             queue_permission
         )
         return Response(
