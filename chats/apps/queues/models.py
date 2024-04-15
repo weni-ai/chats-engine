@@ -64,6 +64,7 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         return self.agents.filter(
             project_permissions__status="ONLINE",
             project_permissions__project=self.sector.project,
+            project_permissions__queue_authorizations__queue=self,
         ).exclude(
             project_permissions__queue_authorizations__role=2
         )  # TODO: Set this variable to ProjectPermission.STATUS_ONLINE
