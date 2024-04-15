@@ -68,7 +68,7 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
             project_permissions__status="ONLINE",
             project_permissions__project=self.sector.project,
             project_permissions__queue_authorizations__queue=queue,
-            project_permissions__queue_authorizations__role__ne=2,  # Exclude role=2
+            project_permissions__queue_authorizations__role=1,  # Exclude role=2
         )  # TODO: Set this variable to ProjectPermission.STATUS_ONLINE
 
     @property
