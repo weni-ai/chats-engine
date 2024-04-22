@@ -143,7 +143,12 @@ class QueueViewset(ModelViewSet):
     @action(detail=True, methods=["GET"])
     def transfer_agents(self, *args, **kwargs):
         instance = self.get_object()
-        queue_agents = instance.agents
+        agents = instance.agents
+
+        queue_agents = agents.filter(
+            project_permissions__queue_authorizations__role=1,
+            project_permissions__queue_authorizations__queue=instance,
+        )
 
         sector = Sector.objects.get(queues=instance)
         sector_agents = sector.managers
