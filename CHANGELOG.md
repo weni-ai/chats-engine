@@ -1,3 +1,11 @@
+# 3.5.1
+## Add
+  - New endpoint to make bulk transfer.
+  - New function to edit config field in project.
+  - New endpoint to transfer agents.
+## Fix
+  - Calculating waiting time metric in new endpoint to get rooms.
+
 # 3.5.0
 ## Add
   - New EDA consumer to create project permissions.
