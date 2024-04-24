@@ -1,5 +1,4 @@
 from django.contrib.auth import get_user_model
-
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
@@ -63,6 +62,8 @@ class QueueReadOnlyListSerializer(serializers.ModelSerializer):
 
 
 class QueueAuthorizationSerializer(serializers.ModelSerializer):
+    queue_name = serializers.CharField(source="queue.name", read_only=True)
+
     class Meta:
         model = QueueAuthorization
         fields = "__all__"

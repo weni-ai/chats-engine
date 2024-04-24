@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import exceptions, filters, status
 from rest_framework.decorators import action
@@ -7,7 +8,11 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
-from chats.apps.api.v1.permissions import AnyQueueAgentPermission, IsSectorManager
+from chats.apps.api.v1.permissions import (
+    AnyQueueAgentPermission,
+    IsQueueAgent,
+    IsSectorManager,
+)
 from chats.apps.api.v1.queues import serializers as queue_serializers
 from chats.apps.api.v1.queues.filters import QueueAuthorizationFilter, QueueFilter
 from chats.apps.projects.models.models import Project
@@ -15,6 +20,8 @@ from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.sectors.models import Sector
 
 from .serializers import QueueAgentsSerializer
+
+User = get_user_model()
 
 
 class QueueViewset(ModelViewSet):
@@ -143,7 +150,12 @@ class QueueViewset(ModelViewSet):
     @action(detail=True, methods=["GET"])
     def transfer_agents(self, *args, **kwargs):
         instance = self.get_object()
-        queue_agents = instance.agents
+        agents = instance.agents
+
+        queue_agents = agents.filter(
+            project_permissions__queue_authorizations__role=1,
+            project_permissions__queue_authorizations__queue=instance,
+        )
 
         sector = Sector.objects.get(queues=instance)
         sector_agents = sector.managers
@@ -156,17 +168,41 @@ class QueueViewset(ModelViewSet):
         serializer = QueueAgentsSerializer(combined_permissions, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @action(detail=False, methods=["GET"])
+    def list_queue_permissions(self, request, *args, **kwargs):
+        user_email = request.query_params.get("user_email")
+
+        user = User.objects.get(email=user_email)
+        project = request.query_params.get("project")
+
+        queue_permissions = QueueAuthorization.objects.filter(
+            permission__user=user,
+            queue__sector__project=project,
+            queue__is_deleted=False,
+        )
+        serializer_data = queue_serializers.QueueAuthorizationSerializer(
+            queue_permissions, many=True
+        )
+
+        return Response(
+            {"user_permissions": serializer_data.data}, status=status.HTTP_200_OK
+        )
+
 
 class QueueAuthorizationViewset(ModelViewSet):
     queryset = QueueAuthorization.objects.all()
     serializer_class = queue_serializers.QueueAuthorizationSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = QueueAuthorizationFilter
-    permission_classes = [
-        IsAuthenticated,
-        IsSectorManager,
-    ]
+    permission_classes = []
     lookup_field = "uuid"
+
+    def get_permissions(self):
+        if self.action in ["list", "update_queue_permissions"]:
+            permission_classes = [IsAuthenticated, IsQueueAgent]
+        else:
+            permission_classes = [IsAuthenticated, IsSectorManager]
+        return [permission() for permission in permission_classes]
 
     def get_queryset(self):
         if self.action != "list":
@@ -177,3 +213,19 @@ class QueueAuthorizationViewset(ModelViewSet):
         if self.action in ["list", "retrieve"]:
             return queue_serializers.QueueAuthorizationReadOnlyListSerializer
         return super().get_serializer_class()
+
+    @action(detail=True, methods=["PATCH"])
+    def update_queue_permissions(self, request, *args, **kwargs):
+        queue_permission = self.get_object()
+
+        role = request.data.get("role")
+
+        queue_permission.role = role
+        queue_permission.save()
+
+        serializer_data = queue_serializers.QueueAuthorizationUpdateSerializer(
+            queue_permission
+        )
+        return Response(
+            {"user_permission": serializer_data.data}, status=status.HTTP_200_OK
+        )
