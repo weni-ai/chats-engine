@@ -9,9 +9,9 @@ from rest_framework.viewsets import ModelViewSet
 
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.api.v1.permissions import (
-    AnyQueueAgentPermission,
     IsQueueAgent,
     IsSectorManager,
+    ProjectAnyPermission,
 )
 from chats.apps.api.v1.queues import serializers as queue_serializers
 from chats.apps.api.v1.queues.filters import QueueAuthorizationFilter, QueueFilter
@@ -29,20 +29,16 @@ class QueueViewset(ModelViewSet):
     serializer_class = queue_serializers.QueueSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = QueueFilter
-    permission_classes = [
-        IsAuthenticated,
-        IsSectorManager,
-    ]
+    permission_classes = []
 
     lookup_field = "uuid"
 
     def get_permissions(self):
         permission_classes = self.permission_classes
-        if self.action == "list":
-            permission_classes = [
-                IsAuthenticated,
-                AnyQueueAgentPermission,
-            ]
+        if self.action in ["list", "transfer_agents"]:
+            permission_classes = [IsAuthenticated, ProjectAnyPermission]
+        else:
+            permission_classes = [IsAuthenticated, IsSectorManager]
 
         return [permission() for permission in permission_classes]
 
