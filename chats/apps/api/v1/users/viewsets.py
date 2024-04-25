@@ -26,6 +26,9 @@ class ProfileViewset(viewsets.GenericViewSet):
         return Response(serializer.data)
 
     def retrieve(self, request, *args, **kwargs):
+        project_uuid = request.query_params.get("project_uuid")
+        serializer_context = {"project_uuid": project_uuid}
+
         obj = self.get_object()
-        serializer = self.serializer_class(obj)
+        serializer = self.serializer_class(obj, context=serializer_context)
         return Response(serializer.data)

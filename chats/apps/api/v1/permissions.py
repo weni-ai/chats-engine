@@ -72,7 +72,10 @@ class IsSectorAgent(permissions.BasePermission):
 
 class ProjectAnyPermission(permissions.BasePermission):
     def has_object_permission(self, request, view, obj) -> bool:
-        return obj.permissions.filter(user=request.user).exists()
+        try:
+            return obj.permissions.filter(user=request.user).exists()
+        except ObjectDoesNotExist:
+            return obj.get_permission(request.user)
 
 
 class AnyQueueAgentPermission(permissions.BasePermission):

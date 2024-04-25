@@ -1,5 +1,4 @@
 from django.contrib.auth import get_user_model
-
 from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
 from django.db import models
 from django.db.models import Q
@@ -316,8 +315,8 @@ class ProjectPermission(
 
         if self.is_manager(sector=str(sector.uuid)):
             return True
-        queue_authorization = self.queue_authorizations.get(queue__uuid=queue)
-        return queue_authorization.role == 1  # 1 = agent role at QueueAuthorization
+        self.queue_authorizations.get(queue__uuid=queue)
+        return True  # 1 = agent role at QueueAuthorization
 
     def is_agent_on_sector(self, sector: str) -> bool:
         if self.is_admin:
@@ -339,9 +338,9 @@ class ProjectPermission(
             .distinct()
         )
         queue_agent_queues = list(
-            self.queue_authorizations.exclude(
-                queue__uuid__in=sector_manager_queues
-            ).values_list("queue", flat=True)
+            self.queue_authorizations.exclude(queue__uuid__in=sector_manager_queues)
+            .exclude(role=2)
+            .values_list("queue", flat=True)
         )
         queues = set(sector_manager_queues + queue_agent_queues)
 
