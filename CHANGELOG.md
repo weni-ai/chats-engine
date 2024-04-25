@@ -1,6 +1,14 @@
+# 3.5.4
+## Fix
+  - Passing generic Exception in "ProjectAnyPermission" permission.
+
+# 3.5.3
+## Add
+  - New feature, queue priorization.
+
 # 3.5.2
 ## Add
-  - New feature queue priorization.
+  - Verify if chat gpt token in project config.
 
 # 3.5.1
 ## Add
