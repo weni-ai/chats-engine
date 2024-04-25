@@ -74,7 +74,7 @@ class ProjectAnyPermission(permissions.BasePermission):
     def has_object_permission(self, request, view, obj) -> bool:
         try:
             return obj.permissions.filter(user=request.user).exists()
-        except ObjectDoesNotExist:
+        except Exception:
             return obj.get_permission(request.user)
 
 
