@@ -1,3 +1,7 @@
+# 3.5.2
+## Add
+  - New feature queue priorization.
+
 # 3.5.1
 ## Add
   - New endpoint to make bulk transfer.
