@@ -11,6 +11,7 @@ from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTCl
 from chats.apps.api.v1.permissions import (
     IsQueueAgent,
     IsSectorManager,
+    ProjectAnyPermission,
 )
 from chats.apps.api.v1.queues import serializers as queue_serializers
 from chats.apps.api.v1.queues.filters import QueueAuthorizationFilter, QueueFilter
@@ -36,7 +37,7 @@ class QueueViewset(ModelViewSet):
         permission_classes = self.permission_classes
 
         if self.action in ["list", "transfer_agents"]:
-            permission_classes = [IsAuthenticated, IsQueueAgent]
+            permission_classes = [IsAuthenticated, ProjectAnyPermission]
         else:
             permission_classes = [IsAuthenticated, IsSectorManager]
         return [permission() for permission in permission_classes]
