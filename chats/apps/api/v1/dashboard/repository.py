@@ -239,6 +239,7 @@ class QueueRoomsRepository:
 
         self._filter_date_range(filters, tz)
         self._filter_sector(filters)
+        print(filters)
         queue_rooms = []
         if filters.user_request:
             rooms_query = self.model.filter(
@@ -296,22 +297,22 @@ class ActiveChatsRepository:
         if self.rooms_filter.get("created_on__gte"):
             self.rooms_filter.pop("created_on__gte")
 
-        active_rooms = []
+        active_chats = []
 
         if filters.user_request:
             rooms_query = self.model.filter(
                 queue__sector__in=filters.user_request.manager_sectors()
             )
             active_chats_count = rooms_query.filter(**self.rooms_filter).count()
-            active_rooms = [ActiveRoomData(active_rooms=active_chats_count)]
-            return active_rooms
+            active_chats = [ActiveRoomData(active_rooms=active_chats_count)]
+            return active_chats
 
-        return active_rooms
+        return active_chats
 
 
 class SectorRepository:
     def __init__(self) -> None:
-        self.model = RoomMetrics.objects
+        self.model = RoomMetrics.objects.exclude(room__queue__is_deleted=True)
         self.rooms_filter = {}
         self.division_level = "room__queue__sector"
 
@@ -356,25 +357,57 @@ class SectorRepository:
         room_metric_query = self.model.filter(
             room__queue__sector__in=filters.user_request.manager_sectors()
         )
+        print("filtro division", self.rooms_filter)
 
         sector_query = (
-            room_metric_query.filter(**self.rooms_filter)  # date, project or sector
+            room_metric_query.filter(**self.rooms_filter)
             .values(f"{self.division_level}__uuid")
             .annotate(
+                uuid=F(f"{self.division_level}__uuid"),
                 name=F(f"{self.division_level}__name"),
                 waiting_time=Avg("waiting_time"),
                 response_time=Avg("message_response_time"),
                 interact_time=Avg("interaction_time"),
             )
-            .values("name", "waiting_time", "response_time", "interact_time")
+            .values("uuid", "name", "waiting_time", "response_time", "interact_time")
         )
+        print(type(filters))
+        print(filters)
 
+        a = QueueRoomsRepository()
+        b = ActiveChatsRepository()
+        c = ClosedRoomsRepository()
         sectors = [
             Sector(
+                uuid=str(sector["uuid"]),
                 name=sector["name"],
                 waiting_time=sector["waiting_time"],
                 response_time=sector["response_time"],
                 interact_time=sector["interact_time"],
+                active_rooms=sum(
+                    map(
+                        lambda room: room.active_rooms,
+                        ActiveChatsRepository.active_chats(
+                            b, filters.set_sector(str(sector["uuid"]))
+                        ),
+                    )
+                ),
+                queue_rooms=sum(
+                    map(
+                        lambda room: room.queue_rooms,
+                        QueueRoomsRepository.queue_rooms(
+                            a, filters.set_sector(str(sector["uuid"]))
+                        ),
+                    )  # type: ignore
+                ),
+                closed_rooms=sum(
+                    map(
+                        lambda room: room.closed_rooms,
+                        ClosedRoomsRepository.closed_rooms(
+                            c, filters.set_sector(str(sector["uuid"]))
+                        ),
+                    )  # type: ignore
+                ),
             )
             for sector in sector_query
         ]
@@ -384,7 +417,7 @@ class SectorRepository:
 
 class ORMRoomsDataRepository(RoomsDataRepository):
     def __init__(self) -> None:
-        self.model = Room.objects
+        self.model = Room.objects.exclude(queue__is_deleted=True)
         self.rooms_filter = {}
 
     def _filter_date_range(self, filters, tz):
@@ -442,7 +475,7 @@ class ORMRoomsDataRepository(RoomsDataRepository):
             rooms_query = self.model.filter(
                 queue__sector__in=filters.user_request.manager_sectors()
             )
-
+            print("filtro general", self.rooms_filter)
             general_data = rooms_query.filter(**self.rooms_filter).aggregate(
                 interact_time=interact_time_agg,
                 response_time=message_response_time_agg,

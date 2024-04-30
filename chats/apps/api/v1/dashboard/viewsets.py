@@ -31,7 +31,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
     queryset = Project.objects.all()
 
     def get_permissions(self):
-        permission_classes = [permissions.IsAuthenticated, HasDashboardAccess]
+        permission_classes = [permissions.IsAuthenticated]
         return [permission() for permission in permission_classes]
 
     @action(
@@ -56,9 +56,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             queue=params.get("queue"),
             user_request=user_permission,
             project=project,
-            is_weni_admin=True
-            if request.user and "weni.ai" in request.user.email
-            else False,
+            is_weni_admin=(
+                True if request.user and "weni.ai" in request.user.email else False
+            ),
         )
 
         rooms_service = RoomsDataService(
@@ -85,9 +85,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=params.get("tag"),
             queue=params.get("queue"),
             user_request=request.user,
-            is_weni_admin=True
-            if request.user and "weni.ai" in request.user.email
-            else False,
+            is_weni_admin=(
+                True if request.user and "weni.ai" in request.user.email else False
+            ),
         )
 
         agents_service = AgentsService()
@@ -120,9 +120,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=params.get("tag"),
             user_request=user_permission,
             project=project,
-            is_weni_admin=True
-            if request.user and "weni.ai" in request.user.email
-            else False,
+            is_weni_admin=(
+                True if request.user and "weni.ai" in request.user.email else False
+            ),
         )
 
         sectors_service = SectorService()
@@ -152,9 +152,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=params.get("tag"),
             user_request=user_permission,
             project=project,
-            is_weni_admin=True
-            if request.user and "weni.ai" in request.user.email
-            else False,
+            is_weni_admin=(
+                True if request.user and "weni.ai" in request.user.email else False
+            ),
         )
 
         raw_service = RawDataService()
@@ -247,9 +247,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=filter.get("tag"),
             user_request=user_permission,
             project=project,
-            is_weni_admin=True
-            if request.user and "weni.ai" in request.user.email
-            else False,
+            is_weni_admin=(
+                True if request.user and "weni.ai" in request.user.email else False
+            ),
         )
 
         # Rooms Data

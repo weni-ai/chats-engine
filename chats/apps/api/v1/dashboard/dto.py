@@ -14,10 +14,14 @@ class Agent:
 
 @dataclass
 class Sector:
+    uuid: str = None
     name: str = None
     waiting_time: int = None
     response_time: int = None
     interact_time: int = None
+    active_rooms: int = None
+    queue_rooms: int = None
+    closed_rooms: int = None
 
 
 @dataclass
@@ -31,6 +35,10 @@ class Filters:
     is_weni_admin: bool = None
     user_request: ProjectPermission = None
     project: Project = None
+
+    def set_sector(self, sector_uuid):
+        self.sector = sector_uuid
+        return self
 
 
 @dataclass
@@ -58,3 +66,7 @@ class QueueRoomData:
 @dataclass
 class ActiveRoomData:
     active_rooms: int = None
+
+    def set_sector(self, sector_uuid):
+        self.sector = sector_uuid
+        return self
