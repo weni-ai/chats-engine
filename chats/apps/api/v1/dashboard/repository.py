@@ -3,7 +3,7 @@ from typing import List
 from urllib import parse
 
 from django.conf import settings
-from django.db.models import Avg, Count, F, OuterRef, Q, Subquery, Sum
+from django.db.models import Avg, Count, F, OuterRef, Q, Subquery, Sum, FloatField
 from django.utils import timezone
 from django_redis import get_redis_connection
 from pendulum.parser import parse as pendulum_parse
@@ -23,6 +23,7 @@ from .dto import (
     TransferRoomData,
 )
 from .interfaces import CacheRepository, RoomsDataRepository
+from django.db.models.functions import Coalesce
 
 
 class AgentRepository:
@@ -365,9 +366,15 @@ class SectorRepository:
             .annotate(
                 uuid=F(f"{self.division_level}__uuid"),
                 name=F(f"{self.division_level}__name"),
-                waiting_time=Avg("waiting_time"),
-                response_time=Avg("message_response_time"),
-                interact_time=Avg("interaction_time"),
+                waiting_time=Coalesce(
+                    Avg("waiting_time"), 0.0, output_field=FloatField()
+                ),
+                response_time=Coalesce(
+                    Avg("message_response_time"), 0.0, output_field=FloatField()
+                ),
+                interact_time=Coalesce(
+                    Avg("interaction_time"), 0.0, output_field=FloatField()
+                ),
             )
             .values("uuid", "name", "waiting_time", "response_time", "interact_time")
         )
