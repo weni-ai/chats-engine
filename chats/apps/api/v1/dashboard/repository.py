@@ -316,6 +316,7 @@ class SectorRepository:
         self.model = RoomMetrics.objects.exclude(room__queue__is_deleted=True)
         self.rooms_filter = {}
         self.division_level = "room__queue__sector"
+        self.rooms_filter["room__user__isnull"] = False
 
     def _filter_date_range(self, filters, tz):
         initial_datetime = (
@@ -329,13 +330,11 @@ class SectorRepository:
             end_time = pendulum_parse(filters.end_date + " 23:59:59", tzinfo=tz)
             self.rooms_filter["created_on__range"] = [start_time, end_time]
             return self.rooms_filter
-
-        self.rooms_filter["created_on__gte"] = initial_datetime
+        else:
+            self.rooms_filter["created_on__gte"] = initial_datetime
         return self.rooms_filter
 
     def _filter_sector(self, filters):
-        self.rooms_filter["room__user__isnull"] = False
-
         if filters.sector:
             self.division_level = "room__queue"
             self.rooms_filter["room__queue__sector"] = filters.sector
@@ -426,6 +425,7 @@ class ORMRoomsDataRepository(RoomsDataRepository):
     def __init__(self) -> None:
         self.model = Room.objects.exclude(queue__is_deleted=True)
         self.rooms_filter = {}
+        self.rooms_filter["user__isnull"] = False
 
     def _filter_date_range(self, filters, tz):
         initial_datetime = (
@@ -437,7 +437,6 @@ class ORMRoomsDataRepository(RoomsDataRepository):
             start_time = pendulum_parse(filters.start_date, tzinfo=tz)
             end_time = pendulum_parse(filters.end_date + " 23:59:59", tzinfo=tz)
             self.rooms_filter["created_on__range"] = [start_time, end_time]
-            self.rooms_filter["user__isnull"] = False
         else:
             self.rooms_filter["created_on__gte"] = initial_datetime
 
