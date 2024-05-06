@@ -14,6 +14,7 @@ class Agent:
 
 @dataclass
 class Sector:
+    uuid: str = None
     name: str = None
     waiting_time: int = None
     response_time: int = None

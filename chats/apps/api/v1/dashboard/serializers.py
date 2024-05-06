@@ -124,6 +124,7 @@ class DashboardRawDataSerializer(serializers.Serializer):
 
 
 class DashboardSectorSerializer(serializers.Serializer):
+    uuid = serializers.CharField(allow_null=True, required=False)
     name = serializers.CharField(allow_null=True, required=False)
     waiting_time = serializers.IntegerField(allow_null=True, required=False)
     response_time = serializers.IntegerField(allow_null=True, required=False)

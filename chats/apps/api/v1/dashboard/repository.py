@@ -314,6 +314,7 @@ class SectorRepository:
         self.model = RoomMetrics.objects
         self.rooms_filter = {}
         self.division_level = "room__queue__sector"
+        self.rooms_filter["room__user__isnull"] = False
 
     def _filter_date_range(self, filters, tz):
         initial_datetime = (
@@ -327,13 +328,12 @@ class SectorRepository:
             end_time = pendulum_parse(filters.end_date + " 23:59:59", tzinfo=tz)
             self.rooms_filter["created_on__range"] = [start_time, end_time]
             return self.rooms_filter
+        else:
+            self.rooms_filter["created_on__gte"] = initial_datetime
 
-        self.rooms_filter["created_on__gte"] = initial_datetime
         return self.rooms_filter
 
     def _filter_sector(self, filters):
-        self.rooms_filter["room__user__isnull"] = False
-
         if filters.sector:
             self.division_level = "room__queue"
             self.rooms_filter["room__queue__sector"] = filters.sector
@@ -361,16 +361,18 @@ class SectorRepository:
             room_metric_query.filter(**self.rooms_filter)  # date, project or sector
             .values(f"{self.division_level}__uuid")
             .annotate(
+                uuid=F(f"{self.division_level}__uuid"),
                 name=F(f"{self.division_level}__name"),
                 waiting_time=Avg("waiting_time"),
                 response_time=Avg("message_response_time"),
                 interact_time=Avg("interaction_time"),
             )
-            .values("name", "waiting_time", "response_time", "interact_time")
+            .values("uuid", "name", "waiting_time", "response_time", "interact_time")
         )
 
         sectors = [
             Sector(
+                uuid=str(sector["uuid"]),
                 name=sector["name"],
                 waiting_time=sector["waiting_time"],
                 response_time=sector["response_time"],
@@ -386,6 +388,7 @@ class ORMRoomsDataRepository(RoomsDataRepository):
     def __init__(self) -> None:
         self.model = Room.objects
         self.rooms_filter = {}
+        self.rooms_filter["user__isnull"] = False
 
     def _filter_date_range(self, filters, tz):
         initial_datetime = (
