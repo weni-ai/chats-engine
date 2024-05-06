@@ -361,16 +361,18 @@ class SectorRepository:
             room_metric_query.filter(**self.rooms_filter)  # date, project or sector
             .values(f"{self.division_level}__uuid")
             .annotate(
+                uuid=F(f"{self.division_level}__uuid"),
                 name=F(f"{self.division_level}__name"),
                 waiting_time=Avg("waiting_time"),
                 response_time=Avg("message_response_time"),
                 interact_time=Avg("interaction_time"),
             )
-            .values("name", "waiting_time", "response_time", "interact_time")
+            .values("uuid", "name", "waiting_time", "response_time", "interact_time")
         )
 
         sectors = [
             Sector(
+                uuid=str(sector["uuid"]),
                 name=sector["name"],
                 waiting_time=sector["waiting_time"],
                 response_time=sector["response_time"],
