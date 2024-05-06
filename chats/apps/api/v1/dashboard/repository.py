@@ -97,7 +97,7 @@ class AgentRepository:
 
 class ClosedRoomsRepository:
     def __init__(self) -> None:
-        self.model = Room.objects
+        self.model = Room.objects.exclude(queue__is_deleted=True)
         self.rooms_filter = {}
 
     def _filter_date_range(self, filters, tz):
@@ -156,7 +156,7 @@ class ClosedRoomsRepository:
 
 class TransferCountRepository:
     def __init__(self) -> None:
-        self.model = Room.objects
+        self.model = Room.objects.exclude(queue__is_deleted=True)
         self.rooms_filter = {}
 
     def _filter_date_range(self, filters, tz):
@@ -213,7 +213,7 @@ class TransferCountRepository:
 
 class QueueRoomsRepository:
     def __init__(self) -> None:
-        self.model = Room.objects
+        self.model = Room.objects.exclude(queue__is_deleted=True)
         self.rooms_filter = {}
 
     def _filter_date_range(self, filters, tz):
@@ -254,7 +254,7 @@ class QueueRoomsRepository:
 
 class ActiveChatsRepository:
     def __init__(self) -> None:
-        self.model = Room.objects
+        self.model = Room.objects.exclude(queue__is_deleted=True)
         self.rooms_filter = {}
 
     def _filter_date_range(self, filters, tz):
@@ -311,7 +311,7 @@ class ActiveChatsRepository:
 
 class SectorRepository:
     def __init__(self) -> None:
-        self.model = RoomMetrics.objects
+        self.model = RoomMetrics.objects.exclude(room__queue__is_deleted=True)
         self.rooms_filter = {}
         self.division_level = "room__queue__sector"
         self.rooms_filter["room__user__isnull"] = False
@@ -386,7 +386,7 @@ class SectorRepository:
 
 class ORMRoomsDataRepository(RoomsDataRepository):
     def __init__(self) -> None:
-        self.model = Room.objects
+        self.model = Room.objects.exclude(queue__is_deleted=True)
         self.rooms_filter = {}
         self.rooms_filter["user__isnull"] = False
 
