@@ -286,6 +286,10 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         sector_data = sector_data_service.get_sector_data(filters)
         sector_dataset = DashboardSectorSerializer(sector_data, many=True)
         data_frame_2 = pandas.DataFrame(sector_dataset.data)
+        data_frame_2 = data_frame_2[
+            ["name", "waiting_time", "response_time", "interact_time"]
+        ]
+
         if not data_frame_2.empty:
             data_frame_2.columns = [
                 "Nome",
