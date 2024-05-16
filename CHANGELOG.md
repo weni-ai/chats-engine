@@ -1,6 +1,10 @@
-# 3.5.5
+# 3.5.6
 ## Fix
   - Verify if data frame exists before translate, to avoid translating an empty dataframe in export dashboard.
+
+# 3.5.5
+## Fix
+  - Removing deleted queue from metrics.
 
 # 3.5.4
 ## Fix
