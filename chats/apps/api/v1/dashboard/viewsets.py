@@ -56,9 +56,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             queue=params.get("queue"),
             user_request=user_permission,
             project=project,
-            is_weni_admin=True
-            if request.user and "weni.ai" in request.user.email
-            else False,
+            is_weni_admin=(
+                True if request.user and "weni.ai" in request.user.email else False
+            ),
         )
 
         rooms_service = RoomsDataService(
@@ -85,9 +85,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=params.get("tag"),
             queue=params.get("queue"),
             user_request=request.user,
-            is_weni_admin=True
-            if request.user and "weni.ai" in request.user.email
-            else False,
+            is_weni_admin=(
+                True if request.user and "weni.ai" in request.user.email else False
+            ),
         )
 
         agents_service = AgentsService()
@@ -120,9 +120,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=params.get("tag"),
             user_request=user_permission,
             project=project,
-            is_weni_admin=True
-            if request.user and "weni.ai" in request.user.email
-            else False,
+            is_weni_admin=(
+                True if request.user and "weni.ai" in request.user.email else False
+            ),
         )
 
         sectors_service = SectorService()
@@ -152,9 +152,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=params.get("tag"),
             user_request=user_permission,
             project=project,
-            is_weni_admin=True
-            if request.user and "weni.ai" in request.user.email
-            else False,
+            is_weni_admin=(
+                True if request.user and "weni.ai" in request.user.email else False
+            ),
         )
 
         raw_service = RawDataService()
@@ -210,16 +210,17 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             )
 
             table = pandas.DataFrame(dataset)
-            table.rename(
-                columns={
-                    0: "Nome da Fila",
-                    1: "Tempo de espera",
-                    2: "Tempo de resposta",
-                    3: "Tempo de interação",
-                    4: "Aberta",
-                },
-                inplace=True,
-            )
+            if not table.empty:
+                table.rename(
+                    columns={
+                        0: "Nome da Fila",
+                        1: "Tempo de espera",
+                        2: "Tempo de resposta",
+                        3: "Tempo de interação",
+                        4: "Aberta",
+                    },
+                    inplace=True,
+                )
             table.to_csv(response, encoding="utf-8", index=False)
             return response
 
@@ -247,9 +248,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=filter.get("tag"),
             user_request=user_permission,
             project=project,
-            is_weni_admin=True
-            if request.user and "weni.ai" in request.user.email
-            else False,
+            is_weni_admin=(
+                True if request.user and "weni.ai" in request.user.email else False
+            ),
         )
 
         # Rooms Data
@@ -259,11 +260,12 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         rooms_data = rooms_service.get_rooms_data(filters)
         rooms_serializer = DashboardRoomSerializer(rooms_data, many=True)
         data_frame = pandas.DataFrame(rooms_serializer.data)
-        data_frame.columns = [
-            "Tempo de Espera",
-            "Tempo de Resposta",
-            "Tempo de Interação",
-        ]
+        if not data_frame.empty:
+            data_frame.columns = [
+                "Tempo de Espera",
+                "Tempo de Resposta",
+                "Tempo de Interação",
+            ]
 
         # Raw Data
         raw_data_service = RawDataService()
@@ -272,36 +274,39 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             raw_data["raw_data"], many=True
         )
         data_frame_1 = pandas.DataFrame(raw_data_serializer.data)
-        data_frame_1.columns = [
-            "Salas Ativas",
-            "Salas Fechadas",
-            "Transferencias",
-            "Salas na Fila",
-        ]
+        if not data_frame_1.empty:
+            data_frame_1.columns = [
+                "Salas Ativas",
+                "Salas Fechadas",
+                "Transferencias",
+                "Salas na Fila",
+            ]
         # Sector Data
         sector_data_service = SectorService()
         sector_data = sector_data_service.get_sector_data(filters)
         sector_dataset = DashboardSectorSerializer(sector_data, many=True)
         data_frame_2 = pandas.DataFrame(sector_dataset.data)
-        data_frame_2.columns = [
-            "Nome",
-            "Tempo de Espera",
-            "Tempo de Resposta",
-            "Tempo de Interação",
-        ]
+        if not data_frame_2.empty:
+            data_frame_2.columns = [
+                "Nome",
+                "Tempo de Espera",
+                "Tempo de Resposta",
+                "Tempo de Interação",
+            ]
 
         # Agents Data
         agents_service = AgentsService()
         agents_data = agents_service.get_agents_data(filters, project)
         agents_dataset = DashboardAgentsSerializer(agents_data, many=True)
         data_frame_3 = pandas.DataFrame(agents_dataset.data)
-        data_frame_3.columns = [
-            "Nome",
-            "Email",
-            "Status",
-            "Salas Fechadas",
-            "Salas Abertas",
-        ]
+        if not data_frame_3.empty:
+            data_frame_3.columns = [
+                "Nome",
+                "Email",
+                "Status",
+                "Salas Fechadas",
+                "Salas Abertas",
+            ]
 
         filename = "dashboard_export_data"
         if "xls" in filter:
