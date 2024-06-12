@@ -13,6 +13,7 @@ from .service import AgentsService
 class InternalDashboardViewset(viewsets.GenericViewSet):
     lookup_field = "uuid"
     queryset = Project.objects.all()
+    serializer_class = DashboardAgentsSerializer
     permission_classes = [permissions.IsAuthenticated, ModuleHasPermission]
 
     @action(

@@ -4,7 +4,7 @@ from chats.apps.api.v1.sectors.serializers import TagSimpleSerializer
 from chats.apps.rooms.models import Room
 
 
-class RoomListSerializer(serializers.ModelSerializer):
+class RoomInternalListSerializer(serializers.ModelSerializer):
     contact = serializers.CharField(source="contact.name")
     agent = serializers.SerializerMethodField()
     tags = TagSimpleSerializer(many=True, required=False)
