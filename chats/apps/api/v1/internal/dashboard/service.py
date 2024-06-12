@@ -1,10 +1,8 @@
-from typing import List
-
-from .dto import Agent, Filters
+from .dto import Filters
 from .repository import AgentRepository
 
 
 class AgentsService:
-    def get_agents_data(self, filters: Filters, project) -> List[Agent]:
+    def get_agents_data(self, filters: Filters, project):
         agents_repository = AgentRepository()
         return agents_repository.get_agents_data(filters, project)

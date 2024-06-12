@@ -6,6 +6,7 @@ from chats.apps.rooms.models import Room
 
 class RoomFilter(filters.FilterSet):
     created_on = filters.DateFromToRangeFilter(required=False)
+    ended_on = filters.DateFromToRangeFilter(required=False)
     project = filters.CharFilter(
         required=True,
         method="filter_project",
