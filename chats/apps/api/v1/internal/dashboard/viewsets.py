@@ -10,7 +10,7 @@ from .dto import Filters
 from .service import AgentsService
 
 
-class DashboardLiveViewset(viewsets.GenericViewSet):
+class InternalDashboardViewset(viewsets.GenericViewSet):
     lookup_field = "uuid"
     queryset = Project.objects.all()
     permission_classes = [permissions.IsAuthenticated, ModuleHasPermission]
@@ -32,9 +32,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=params.get("tag"),
             queue=params.get("queue"),
             user_request=params.get("user_request"),
-            is_weni_admin=(
-                True if request.user and "weni.ai" in request.user.email else False
-            ),
+            is_weni_admin=(True if "weni.ai" in params.get("user_request") else False),
         )
 
         agents_service = AgentsService()
