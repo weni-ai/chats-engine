@@ -26,7 +26,7 @@ class RoomFilter(filters.FilterSet):
         method="filter_contact",
     )
 
-    tag = filters.CharFilter(
+    tags = filters.CharFilter(
         required=False,
         method="filter_tags",
         help_text="Room Tags",
@@ -35,7 +35,6 @@ class RoomFilter(filters.FilterSet):
     class Meta:
         model = Room
         fields = [
-            "created_on",
             "is_active",
             "queue",
         ]
