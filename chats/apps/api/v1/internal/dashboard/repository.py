@@ -7,14 +7,14 @@ from pendulum.parser import parse as pendulum_parse
 from chats.apps.accounts.models import User
 from chats.apps.projects.models import ProjectPermission
 
-from .dto import Agent, Filters
+from .dto import Filters
 
 
 class AgentRepository:
     def __init__(self):
         self.model = User.objects
 
-    def get_agents_data(self, filters: Filters, project) -> List[Agent]:
+    def get_agents_data(self, filters: Filters, project):
         tz = project.timezone
         initial_datetime = (
             timezone.now()
