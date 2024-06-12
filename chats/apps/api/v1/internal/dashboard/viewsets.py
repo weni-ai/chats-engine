@@ -32,7 +32,7 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
             sector=params.get("sector"),
             tag=params.get("tag"),
             queue=params.get("queue"),
-            user_request=params.get("user_request"),
+            user_request=params.get("user_request", ""),
             is_weni_admin=(True if "weni.ai" in params.get("user_request") else False),
         )
 

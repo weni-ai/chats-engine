@@ -1,5 +1,3 @@
-from typing import List
-
 from django.db.models import Count, OuterRef, Q, Subquery
 from django.utils import timezone
 from pendulum.parser import parse as pendulum_parse
@@ -77,8 +75,8 @@ class AgentRepository:
                 "last_name",
                 "email",
                 "status",
-                "closed_rooms",
-                "opened_rooms",
+                "closed",
+                "opened",
             )
         )
 
