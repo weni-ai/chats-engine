@@ -20,4 +20,4 @@ class DashboardAgentsSerializer(serializers.Serializer):
         return "gray"
 
     def get_agent(self, obj):
-        return f"{obj.first_name} {obj.last_name}"
+        return f"{obj.get('first_name')} {obj.get('last_name')}"
