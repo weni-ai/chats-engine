@@ -66,7 +66,6 @@ class WeniOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         username = re.sub("[^A-Za-z0-9]+", "", username)
         user = self.UserModel.objects.get_or_create(email=email)[0]
 
-        user.name = claims.get("name", "")
         user.first_name = claims.get("given_name", "")
         user.last_name = claims.get("family_name", "")
         user.save()
