@@ -20,6 +20,10 @@ class RoomFilter(filters.FilterSet):
         field_name="user",
         required=False,
     )
+    attending = filters.BooleanFilter(
+        required=False,
+        method="filter_attending",
+    )
     contact = filters.CharFilter(
         field_name="user",
         required=False,
@@ -53,3 +57,6 @@ class RoomFilter(filters.FilterSet):
     def filter_tags(self, queryset, name, value):
         values = value.split(",")
         return queryset.filter(tags__name__in=values)
+
+    def filter_attending(self, queryset, name, value):
+        return queryset.filter(user__isnull=not value)
