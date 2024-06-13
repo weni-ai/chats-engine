@@ -49,7 +49,7 @@ class AgentRepository:
         if filters.sector:
             rooms_filter["rooms__queue__sector"] = filters.sector
             if filters.tag:
-                rooms_filter["rooms__tags__uuid"] = filters.tag
+                rooms_filter["rooms__tags__in"] = filters.tag.split(",")
 
         project_permission_subquery = ProjectPermission.objects.filter(
             project_id=project,
