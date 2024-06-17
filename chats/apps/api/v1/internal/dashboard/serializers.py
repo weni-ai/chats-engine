@@ -3,9 +3,9 @@ from rest_framework import serializers
 
 class DashboardAgentsSerializer(serializers.Serializer):
     link = serializers.SerializerMethodField()
-    opened = serializers.IntegerField(allow_null=True, required=False)
+    opened = serializers.SerializerMethodField()
+    closed = serializers.SerializerMethodField()
     agent = serializers.SerializerMethodField()
-    closed = serializers.IntegerField(allow_null=True, required=False)
     status = serializers.SerializerMethodField()
 
     def get_link(self, obj):
@@ -21,3 +21,9 @@ class DashboardAgentsSerializer(serializers.Serializer):
 
     def get_agent(self, obj):
         return f"{obj.get('first_name')} {obj.get('last_name')}"
+
+    def get_opened(self, obj):
+        return obj.get("opened")
+
+    def get_closed(self, obj):
+        return obj.get("closed")
