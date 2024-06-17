@@ -1,6 +1,6 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, permissions, viewsets
-from rest_framework.pagination import CursorPagination
+from rest_framework.pagination import LimitOffsetPagination
 
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.api.v1.internal.rooms.serializers import RoomInternalListSerializer
@@ -29,5 +29,5 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
     ]
     filterset_class = RoomFilter
 
-    pagination_class = CursorPagination
+    pagination_class = LimitOffsetPagination
     pagination_class.page_size = 5

@@ -27,4 +27,7 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
         ]
 
     def get_agent(self, obj):
-        return obj.user.full_name
+        try:
+            return obj.user.full_name
+        except AttributeError:
+            return ""

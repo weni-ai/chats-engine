@@ -10,7 +10,7 @@ class DashboardAgentsSerializer(serializers.Serializer):
 
     def get_link(self, obj):
         return {
-            "url": f"chats:dashboard/view-mode/:{obj.get('email', '')}",
+            "url": f"chats:dashboard/view-mode/{obj.get('email', '')}",
             "type": "internal",
         }
 
