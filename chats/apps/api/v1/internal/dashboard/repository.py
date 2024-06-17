@@ -12,7 +12,7 @@ class AgentRepository:
     def __init__(self):
         self.model = User.objects
 
-    def get_agents_data(self, filters: Filters, project) -> List[Agent]:
+    def get_agents_data(self, filters: Filters, project):
         tz = project.timezone
         initial_datetime = (
             timezone.now()
