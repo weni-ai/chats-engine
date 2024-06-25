@@ -69,6 +69,17 @@ class Project(BaseConfigurableModel, BaseModel):
         return self.name
 
     @property
+    def agents_can_see_queue_history(self):
+        """
+        True > agents will see the whole history of the queues they have permission in
+        False > agents will only see rooms that have been closed by them
+        """
+        try:
+            return self.config.get("agents_can_see_queue_history", True)
+        except AttributeError:
+            return True
+
+    @property
     def routing_option(self):
         """
         OPTIONS>

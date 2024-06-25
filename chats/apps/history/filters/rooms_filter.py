@@ -59,11 +59,22 @@ class HistoryRoomFilter(filters.FilterSet):
                 detail="Access denied! Make sure you have the right permission to access this project"
             )
 
-        queue_ids = user_permission.queue_ids
-
         contacts_blocklist = user_permission.project.history_contacts_blocklist
         if contacts_blocklist:
             qs = qs.exclude(contact__external_id__in=contacts_blocklist)
+
+        project = user_permission.project
+        if (
+            user_permission.is_admin is False
+            and project.agents_can_see_queue_history is False
+        ):
+            return qs.filter(
+                user=user,
+                queue__sector__project=value,
+                is_active=False,
+                ended_at__isnull=False,
+            )
+        queue_ids = user_permission.queue_ids
 
         return qs.filter(
             Q(queue__in=queue_ids) | Q(user=user, queue__sector__project=value),
