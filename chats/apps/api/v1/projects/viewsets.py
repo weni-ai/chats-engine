@@ -342,8 +342,12 @@ class ProjectViewset(
             return Response(flows_start_verify, status.HTTP_200_OK)
 
         flows_start_verify["show_warning"] = True
-        flows_start_verify["attendant"] = room.user
-        flows_start_verify["queue"] = room.queue
+        if room.queue is not None:
+            flows_start_verify["queue"] = room.queue.name
+
+        if room.user is not None:
+            flows_start_verify["agent"] = room.user.first_name
+
         return Response(flows_start_verify, status.HTTP_200_OK)
 
     @action(
