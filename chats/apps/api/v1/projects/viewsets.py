@@ -335,13 +335,15 @@ class ProjectViewset(
             )
 
         try:
-            Room.objects.get(
+            room = Room.objects.get(
                 contact=contact, queue__sector__project=project, is_active=True
             )
         except ObjectDoesNotExist:
             return Response(flows_start_verify, status.HTTP_200_OK)
 
         flows_start_verify["show_warning"] = True
+        flows_start_verify["attendant"] = room.user
+        flows_start_verify["queue"] = room.queue
         return Response(flows_start_verify, status.HTTP_200_OK)
 
     @action(
