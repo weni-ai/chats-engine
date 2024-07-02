@@ -1,6 +1,5 @@
 from django.db.models import Count, OuterRef, Q, Subquery
 from django.utils import timezone
-from pendulum.parser import parse as pendulum_parse
 
 from chats.apps.accounts.models import User
 from chats.apps.projects.models import ProjectPermission
@@ -32,8 +31,8 @@ class AgentRepository:
         if filters.tag:
             rooms_filter["rooms__tags__in"] = filters.tag.split(",")
         if filters.start_date and filters.end_date:
-            start_time = pendulum_parse(filters.start_date, tzinfo=tz)
-            end_time = pendulum_parse(filters.end_date + " 23:59:59", tzinfo=tz)
+            start_time = filters.start_date
+            end_time = filters.end_date
 
             rooms_filter["rooms__created_on__range"] = [start_time, end_time]
             rooms_filter["rooms__is_active"] = False
