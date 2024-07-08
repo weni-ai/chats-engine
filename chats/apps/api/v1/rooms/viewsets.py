@@ -368,6 +368,7 @@ class RoomViewset(
 
             if queue_uuid:
                 queue = Queue.objects.get(uuid=queue_uuid)
+
                 for room in rooms_list:
                     transfer_user = verify_user_room(room, user_request)
                     feedback = create_transfer_json(
