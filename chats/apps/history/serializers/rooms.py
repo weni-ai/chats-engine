@@ -21,6 +21,7 @@ class RoomHistorySerializer(serializers.ModelSerializer):
             "contact",
             "tags",
             "protocol",
+            "service_chat",
         ]
 
     def get_contact(self, obj):
