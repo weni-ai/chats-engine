@@ -368,7 +368,11 @@ class RoomViewset(
 
             if queue_uuid:
                 queue = Queue.objects.get(uuid=queue_uuid)
-
+                if queue.project != room.queuue.project:
+                    return Response(
+                        {"error": "Cannot transfer rooms to different projects"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
                 for room in rooms_list:
                     transfer_user = verify_user_room(room, user_request)
                     feedback = create_transfer_json(
