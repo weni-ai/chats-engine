@@ -353,6 +353,14 @@ class RoomViewset(
 
                 for room in rooms_list:
                     old_user = room.user
+                    project = room.queue.project
+                    if not project.permissions.filter(user=user).exists():
+                        return Response(
+                            {
+                                "error": f"User {user.email} has no permission on the project {project.name} <{project.uuid}>"
+                            },
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
                     transfer_user = verify_user_room(room, user_request)
                     feedback = create_transfer_json(
                         action="transfer",
@@ -368,12 +376,14 @@ class RoomViewset(
 
             if queue_uuid:
                 queue = Queue.objects.get(uuid=queue_uuid)
-                if queue.project != room.queuue.project:
-                    return Response(
-                        {"error": "Cannot transfer rooms to different projects"},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
                 for room in rooms_list:
+                    if queue.project != room.queuue.project:
+                        return Response(
+                            {
+                                "error": "Cannot transfer rooms from a project to another"
+                            },
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
                     transfer_user = verify_user_room(room, user_request)
                     feedback = create_transfer_json(
                         action="transfer",
