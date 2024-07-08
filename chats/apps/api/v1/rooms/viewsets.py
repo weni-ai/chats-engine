@@ -377,7 +377,7 @@ class RoomViewset(
             if queue_uuid:
                 queue = Queue.objects.get(uuid=queue_uuid)
                 for room in rooms_list:
-                    if queue.project != room.queuue.project:
+                    if queue.project != room.project:
                         return Response(
                             {
                                 "error": "Cannot transfer rooms from a project to another"
