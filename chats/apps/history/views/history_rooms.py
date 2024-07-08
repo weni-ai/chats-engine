@@ -31,6 +31,7 @@ class HistoryRoomViewset(ReadOnlyModelViewSet):
         "user__last_name",
         "user__email",
         "protocol",
+        "service_chat",
     ]
     ordering = ["-ended_at"]
 
