@@ -291,3 +291,13 @@ class ExternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
             .get_queryset()
             .filter(queue__sector__project=self.request.auth.project)
         )
+
+    @action(detail=False, methods=["GET"], url_name="count")
+    def count(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset()).filter(is_active=True)
+        waiting = queryset.filter(user__isnull=True).count()
+        in_service = queryset.filter(user__isnull=False).count()
+
+        return Response(
+            {"waiting": waiting, "in_service": in_service}, status=status.HTTP_200_OK
+        )

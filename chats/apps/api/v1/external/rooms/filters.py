@@ -13,7 +13,7 @@ class RoomFilter(filters.FilterSet):
 
     class Meta:
         model = Room
-        fields = ["urn", "is_active", "sector"]
+        fields = ["urn", "is_active", "sector", "queue"]
 
     def filter_sector(self, queryset, name, value):
         sector_filter = Q(queue__sector__uuid__icontains=value) | Q(
