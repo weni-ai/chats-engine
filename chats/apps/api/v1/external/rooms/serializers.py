@@ -161,6 +161,9 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         created_on = validated_data.get("created_on", timezone.now().time())
         protocol = validated_data.get("custom_fields", {}).pop("protocol", None)
+        service_chat = validated_data.get("custom_fields", {}).pop(
+            "service_chats", None
+        )
 
         self.check_work_time(sector, created_on)
 
@@ -183,7 +186,11 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         )
 
         room = Room.objects.create(
-            **validated_data, contact=contact, queue=queue, protocol=protocol
+            **validated_data,
+            contact=contact,
+            queue=queue,
+            protocol=protocol,
+            service_chat=service_chat
         )
         RoomMetrics.objects.create(room=room)
 

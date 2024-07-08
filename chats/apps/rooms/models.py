@@ -72,6 +72,10 @@ class Room(BaseModel):
     )
     protocol = models.TextField(_("protocol"), null=True, blank=True, default="")
 
+    service_chat = models.TextField(
+        _("service chat"), null=True, blank=True, default=""
+    )
+
     class Meta:
         verbose_name = _("Room")
         verbose_name_plural = _("Rooms")

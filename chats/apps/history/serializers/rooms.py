@@ -25,8 +25,13 @@ class RoomHistorySerializer(serializers.ModelSerializer):
 
     def get_contact(self, obj):
         contact_data = ContactSimpleSerializer(obj.contact).data
-        if obj.protocol:
+        if obj.protocol and obj.service_chat:
+            contact_data["name"] = (
+                f"{contact_data['name']} | {obj.protocol} | {obj.service_chat}"
+            )
+        elif obj.protocol:
             contact_data["name"] = f"{contact_data['name']} | {obj.protocol}"
+
         return contact_data
 
 
