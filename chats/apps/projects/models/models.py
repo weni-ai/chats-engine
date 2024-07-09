@@ -185,7 +185,9 @@ class Project(BaseConfigurableModel, BaseModel):
             return sectors
         sector_auth_filter = Q(authorizations__permission=user_permission)
         queue_auth_filter = Q(queues__authorizations__permission=user_permission)
-        return sectors.filter(sector_auth_filter | queue_auth_filter).distinct()
+        return sectors.filter(
+            Q(sector_auth_filter | queue_auth_filter), **custom_filters
+        ).distinct()
 
 
 class ProjectPermission(
@@ -261,7 +263,9 @@ class ProjectPermission(
             return sectors
         sector_auth_filter = Q(authorizations__permission=self)
         queue_auth_filter = Q(queues__authorizations__permission=self)
-        return sectors.filter(sector_auth_filter | queue_auth_filter).distinct()
+        return sectors.filter(
+            Q(sector_auth_filter | queue_auth_filter), **custom_filters
+        ).distinct()
 
     def notify_user(self, action, sender="user"):
         """ """
