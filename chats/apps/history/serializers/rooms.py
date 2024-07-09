@@ -28,7 +28,7 @@ class RoomHistorySerializer(serializers.ModelSerializer):
         contact_data = ContactSimpleSerializer(obj.contact).data
         if obj.protocol and obj.service_chat:
             contact_data["name"] = (
-                f"{contact_data['name']} | {obj.protocol} | {obj.service_chat}"
+                f"{obj.service_chat} | {obj.protocol} | {contact_data['name']}"
             )
         elif obj.protocol:
             contact_data["name"] = f"{contact_data['name']} | {obj.protocol}"
