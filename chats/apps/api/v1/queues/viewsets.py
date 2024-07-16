@@ -161,7 +161,12 @@ class QueueViewset(ModelViewSet):
 
         combined_permissions = queue_agents.union(sector_agents, project_admins)
 
-        serializer = QueueAgentsSerializer(combined_permissions, many=True)
+        if project.config.get("filter_offline_agents") == True:
+            combined_permissions = instance.online_users
+
+        serializer = QueueAgentsSerializer(
+            combined_permissions, many=True, context={"project": project}
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["GET"])

@@ -70,6 +70,13 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         )  # TODO: Set this variable to ProjectPermission.STATUS_ONLINE
 
     @property
+    def online_users(self):
+        return User.objects.filter(
+            project_permissions__project=self.sector.project,
+            project_permissions__status="ONLINE",
+        )
+
+    @property
     def available_agents(self):
         routing_option = self.project.routing_option
         rooms_active_filter = models.Q(rooms__is_active=True)

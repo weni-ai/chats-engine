@@ -107,12 +107,23 @@ class QueueAuthorizationReadOnlyListSerializer(serializers.ModelSerializer):
 
 
 class QueueAgentsSerializer(serializers.ModelSerializer):
+    status = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = [
+            "status",
             "first_name",
             "last_name",
             "email",
             "photo_url",
             "language",
         ]
+
+    def get_status(self, obj):
+        project = self.context.get("project")
+        if project:
+            project_permission = obj.project_permissions.get(project=project)
+            if project_permission.status == "ONLINE":
+                return "true"
+        return "false"
