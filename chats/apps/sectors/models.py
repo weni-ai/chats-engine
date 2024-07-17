@@ -150,6 +150,13 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         )
 
     @property
+    def online_managers(self):
+        return User.objects.filter(
+            project_permissions__sector_authorizations__sector=self,
+            project_permissions__status="ONLINE",
+        )
+
+    @property
     def contact_count(self):
         # qs = (
         #     self.rooms.filter(contact__isnull=False)

@@ -175,6 +175,14 @@ class Project(BaseConfigurableModel, BaseModel):
             project_permissions__project=self, project_permissions__role=1
         )
 
+    @property
+    def online_admins(self):
+        return User.objects.filter(
+            project_permissions__project=self,
+            project_permissions__role=1,
+            project_permissions__status="ONLINE",
+        )
+
     def get_sectors(self, user, custom_filters: dict = {}):
         user_permission = self.get_permission(user)
         sectors = self.sectors.all()
