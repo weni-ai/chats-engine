@@ -12,7 +12,13 @@ class RoomFilter(filters.FilterSet):
     created_on__lte = filters.DateFilter(
         required=False, field_name="created_on", lookup_expr="lte"
     )
-    ended_on = filters.DateFromToRangeFilter(required=False)
+    ended_at = filters.DateFromToRangeFilter(required=False)
+    ended_at__gte = filters.DateFilter(
+        required=False, field_name="ended_at", lookup_expr="gte"
+    )
+    ended_at__lte = filters.DateFilter(
+        required=False, field_name="ended_at", lookup_expr="lte"
+    )
     project = filters.CharFilter(
         required=True,
         method="filter_project",
