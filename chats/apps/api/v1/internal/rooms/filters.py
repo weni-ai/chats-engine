@@ -6,17 +6,17 @@ from chats.apps.rooms.models import Room
 
 class RoomFilter(filters.FilterSet):
     created_on = filters.DateFromToRangeFilter(required=False)
-    created_on__gte = filters.DateFilter(
+    created_on__gte = filters.DateTimeFilter(
         required=False, field_name="created_on", lookup_expr="gte"
     )
-    created_on__lte = filters.DateFilter(
+    created_on__lte = filters.DateTimeFilter(
         required=False, field_name="created_on", lookup_expr="lte"
     )
     ended_at = filters.DateFromToRangeFilter(required=False)
-    ended_at__gte = filters.DateFilter(
+    ended_at__gte = filters.DateTimeFilter(
         required=False, field_name="ended_at", lookup_expr="gte"
     )
-    ended_at__lte = filters.DateFilter(
+    ended_at__lte = filters.DateTimeFilter(
         required=False, field_name="ended_at", lookup_expr="lte"
     )
     project = filters.CharFilter(
