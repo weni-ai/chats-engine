@@ -49,11 +49,19 @@ class SectorQuickMessageViewset(viewsets.ModelViewSet):
                 raise exceptions.APIException(
                     detail=f"You don't have permission to access this project. {type(error)}: {error}"
                 )
+            sector = self.request.GET.get("sector")
+            if sector:
+                return (
+                    QuickMessage.objects.filter(sector=sector)
+                    if perm.is_manager(sector=sector)
+                    else QuickMessage.objects.none()
+                )
+
             sectors = perm.get_sectors()
-            return QuickMessage.objects.all().filter(
-                sector__isnull=False, sector__in=sectors
-            )
-        return QuickMessage.objects.all().filter(sector__isnull=False)
+
+            return QuickMessage.objects.filter(sector__isnull=False, sector__in=sectors)
+
+        return QuickMessage.objects.filter(sector__isnull=False)
 
     def get_permissions(self):
         permission_classes = self.permission_classes
