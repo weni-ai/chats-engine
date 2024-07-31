@@ -395,7 +395,8 @@ class RoomViewset(
                     room.save()
 
                     create_room_feedback_message(room, feedback, method="rt")
-                    room.notify_user("update")
+                    user = User.objects.get(email=user_email)
+                    room.notify_user("update", user=user)
                     room.notify_queue("update")
 
         except Exception as error:
