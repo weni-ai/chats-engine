@@ -395,8 +395,7 @@ class RoomViewset(
                     room.save()
 
                     create_room_feedback_message(room, feedback, method="rt")
-                    if not queue.is_agent(user):
-                        room.notify_user("update")
+                    room.notify_user("update")
                     room.notify_queue("update")
 
         except Exception as error:
