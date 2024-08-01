@@ -371,6 +371,7 @@ class ProjectPermission(
 
     def get_permission(self, user):
         try:
+            print("get permission project", self.project.get_permission(user=user))
             return self.project.get_permission(user=user)
         except ObjectDoesNotExist:
             return None

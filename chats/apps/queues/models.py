@@ -45,6 +45,7 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
 
     def get_permission(self, user):
         try:
+            print("get permission queues", self.queue.get_permission(user))
             return self.sector.get_permission(user=user)
         except ObjectDoesNotExist:
             return None
@@ -165,6 +166,7 @@ class QueueAuthorization(BaseModel):
 
     def get_permission(self, user):
         try:
+            print("get permission queues auth", self.queue.get_permission(user))
             return self.queue.get_permission(user)
         except ObjectDoesNotExist:
             return None

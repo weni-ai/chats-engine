@@ -94,6 +94,7 @@ class Room(BaseModel):
 
     def get_permission(self, user):
         try:
+            print("get permission room", self.queue.get_permission(user))
             return self.queue.get_permission(user)
         except ObjectDoesNotExist:
             return None
@@ -244,10 +245,14 @@ class Room(BaseModel):
 
     def notify_user(self, action: str, user=None, transferred_by: str = ""):
         user = user if user else self.user
+        print("notify user", user)
         permission = self.get_permission(user)
+        print("permission", permission)
         if not permission:
+            print("dentro do not permission")
             return
         content = self.serialized_ws_data
+        print("content", content)
         if transferred_by != "":
             content["transferred_by"] = transferred_by
 
