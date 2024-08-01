@@ -371,7 +371,10 @@ class RoomViewset(
                     room.save()
 
                     create_room_feedback_message(room, feedback, method="rt")
-                    room.notify_user("update", user=old_user)
+                    if old_user:
+                        room.notify_user("update", user=old_user)
+                    else:
+                        room.notify_user("update", user=transfer_user)
                     room.notify_user("update")
 
             if queue_uuid:
