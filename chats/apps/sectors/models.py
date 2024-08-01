@@ -228,7 +228,6 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
 
     def get_permission(self, user):
         try:
-            print("get permission sector", self.project.get_permission(user=user))
             return self.project.get_permission(user=user)
         except ObjectDoesNotExist:
             return None

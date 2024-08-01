@@ -94,7 +94,6 @@ class Room(BaseModel):
 
     def get_permission(self, user):
         try:
-            print("get permission room", self.queue.get_permission(user))
             return self.queue.get_permission(user)
         except ObjectDoesNotExist:
             return None
