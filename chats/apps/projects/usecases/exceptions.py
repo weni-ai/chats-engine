@@ -16,3 +16,7 @@ class ReceivedErrorMessage(Exception):
 
 class InvalidProjectPermission(Exception):
     pass
+
+
+class InvalidSectorData(Exception):
+    pass
