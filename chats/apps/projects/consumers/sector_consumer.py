@@ -19,8 +19,9 @@ class SectorConsumer(EDAConsumer):
 
         body = JSONParser.parse(message.body)
 
-        sector_dtos = SectorCreationUseCase.create_sector_dto(body)
+        sector_use_case = SectorCreationUseCase()
 
-        # SectorCreationUseCase.create(sector_dtos)
+        sector_dtos = sector_use_case.create_sector_dto(body)
+        sector_use_case.create(body, sector_dtos)
 
         channel.basic_ack(message.delivery_tag)
