@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 
-from chats.apps.projects.models.models import ProjectPermission
+from chats.apps.projects.models.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.sectors.models import Sector, SectorAuthorization
 from chats.apps.feature_version.models import FeatureVersion
@@ -41,10 +41,11 @@ class SectorCreationUseCase:
 
     def create(self, body, sector_dtos):
         for sector in sector_dtos:
+            project = Project.objects.get(pk=body["project_uuid"])
             created_sector = Sector.objects.create(
                 uuid=sector.uuid,
                 name=sector.name,
-                project=body["project"],
+                project=project,
                 rooms_limit=sector.service_limit,
                 work_start=sector.working_hours["init"],
                 work_end=sector.working_hours["close"],
@@ -81,9 +82,10 @@ class SectorCreationUseCase:
 
     def create_feature_version(self, body, sector_dtos):
         sector_dicts = [dto_to_dict(dto) for dto in sector_dtos]
+        project = Project.objects.get(pk=body["project_uuid"])
 
         FeatureVersion.objects.create(
-            project=body["project"],
+            project=project,
             feature_version=body["feature_version"],
             sectors=sector_dicts,
         )
