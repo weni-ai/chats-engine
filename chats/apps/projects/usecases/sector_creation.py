@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 
 from chats.apps.projects.models.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue, QueueAuthorization
-from chats.apps.sectors.models import Sector, SectorAuthorization
+from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 from chats.apps.feature_version.models import FeatureVersion
 
 from chats.apps.api.v1.dto.sector_dto import SectorDTO, dto_to_dict
@@ -43,13 +43,16 @@ class SectorCreationUseCase:
         for sector in sector_dtos:
             project = Project.objects.get(pk=body["project_uuid"])
             created_sector = Sector.objects.create(
-                uuid=sector.uuid,
                 name=sector.name,
                 project=project,
                 rooms_limit=sector.service_limit,
                 work_start=sector.working_hours["init"],
                 work_end=sector.working_hours["close"],
             )
+
+            for tag in sector.tags:
+                SectorTag.objects.create(name=tag, sector=created_sector)
+
             for manager in sector.manager_email:
                 manager_permission = ProjectPermission.objects.get(
                     user=manager, project=project
@@ -62,7 +65,6 @@ class SectorCreationUseCase:
                 created_queue = Queue.objects.create(
                     sector=created_sector,
                     name=queue.name,
-                    uuid=queue.uuid,
                 )
 
                 for agent in queue.agents:
