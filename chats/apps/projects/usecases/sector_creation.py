@@ -1,15 +1,11 @@
-from dataclasses import dataclass
-
 from django.contrib.auth import get_user_model
 
 from chats.apps.projects.models.models import ProjectPermission
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.sectors.models import Sector, SectorAuthorization
-from .exceptions import InvalidSectorData
+from chats.apps.feature_version.models import FeatureVersion
 
-from chats.apps.projects.consumers.sector_consumer import SectorConsumer
-
-from chats.apps.api.v1.dto.sector_dto import SectorDTO
+from chats.apps.api.v1.dto.sector_dto import SectorDTO, dto_to_dict
 from chats.apps.api.v1.dto.queue_dto import QueueDTO
 
 from chats.apps.api.v1.internal.eda_clients.flows_eda_client import FlowsEDAClient
@@ -82,3 +78,12 @@ class SectorCreationUseCase:
                 "queues": [],
             }
             self._flows_client.request_ticketer(content=content)
+
+    def create_feature_version(self, body, sector_dtos):
+        sector_dicts = [dto_to_dict(dto) for dto in sector_dtos]
+
+        FeatureVersion.objects.create(
+            project=body["project"],
+            feature_version=body["feature_version"],
+            sectors=sector_dicts,
+        )

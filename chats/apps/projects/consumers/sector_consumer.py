@@ -23,5 +23,6 @@ class SectorConsumer(EDAConsumer):
 
         sector_dtos = sector_use_case.create_sector_dto(body)
         sector_use_case.create(body, sector_dtos)
+        sector_use_case.create_feature_version(body, sector_dtos)
 
         channel.basic_ack(message.delivery_tag)
