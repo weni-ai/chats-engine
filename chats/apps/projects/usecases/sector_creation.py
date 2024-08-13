@@ -51,7 +51,7 @@ class SectorCreationUseCase:
                 work_end=sector.working_hours["close"],
             )
             for manager in sector.manager_email:
-                manager_permission = ProjectPermission.objects.get(email=manager)
+                manager_permission = ProjectPermission.objects.get(user=manager)
                 SectorAuthorization.objects.create(
                     role=1, permission=manager_permission, sector=created_sector
                 )
@@ -64,7 +64,7 @@ class SectorCreationUseCase:
                 )
 
                 for agent in queue.agents:
-                    agent_permission = ProjectPermission.objects.get(email=agent)
+                    agent_permission = ProjectPermission.objects.get(user=agent)
                     QueueAuthorization.objects.create(
                         role=1,
                         permission=agent_permission,
