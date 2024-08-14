@@ -24,6 +24,8 @@ from django.views.static import serve
 from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
+from django.http import HttpResponse
+
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -39,8 +41,13 @@ schema_view = get_schema_view(
 )
 
 
+def index(request):
+    print(request.META.get('HTTP_USER_AGENT', 'unknown'))
+    return HttpResponse()
+
+
 urlpatterns = [
-    path("", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),
+    path("", index, name="schema-redoc"),
     path("admin/", admin.site.urls),
     path("v1/", include("chats.apps.api.v1.urls")),
 ]
