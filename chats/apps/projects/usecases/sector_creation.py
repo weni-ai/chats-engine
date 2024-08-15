@@ -77,7 +77,7 @@ class SectorCreationUseCase:
                         queue=created_queue,
                     )
             content = {
-                "project_uuid": str(created_sector.project),
+                "project_uuid": str(created_sector.project.uuid),
                 "name": created_sector.name,
                 "project_auth": str(created_sector.external_token.pk),
                 "user_email": str(body["user_email"]),
