@@ -23,10 +23,10 @@ from django.contrib import admin
 from django.urls import path, re_path
 from django.views.static import serve
 from chats.apps.api.v1.swagger import schema_view
-from chats.apps.api.v1.internal.views import HealthCheckView
+from django.http import HttpResponse
 
 urlpatterns = [
-    path("", HealthCheckView.as_view()),
+    path("", lambda _: HttpResponse()),
     path("doc/", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),
     path("admin/", admin.site.urls),
     path("v1/", include("chats.apps.api.v1.urls")),
