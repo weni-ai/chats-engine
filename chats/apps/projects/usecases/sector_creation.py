@@ -60,11 +60,21 @@ class SectorCreationUseCase:
                 SectorAuthorization.objects.create(
                     role=1, permission=manager_permission, sector=created_sector
                 )
-
+            content = {
+                "project_uuid": str(created_sector.project.uuid),
+                "name": created_sector.name,
+                "project_auth": str(created_sector.external_token.pk),
+                "user_email": str(body["user_email"]),
+                "uuid": str(created_sector.uuid),
+                "queues": [],
+            }
             for queue in sector.queues:
                 created_queue = Queue.objects.create(
                     sector=created_sector,
                     name=queue.name,
+                )
+                content["queues"].append(
+                    {"uuid": str(created_queue.uuid), "name": created_queue.name}
                 )
 
                 for agent in queue.agents:
@@ -76,14 +86,7 @@ class SectorCreationUseCase:
                         permission=agent_permission,
                         queue=created_queue,
                     )
-            content = {
-                "project_uuid": str(created_sector.project.uuid),
-                "name": created_sector.name,
-                "project_auth": str(created_sector.external_token.pk),
-                "user_email": str(body["user_email"]),
-                "uuid": str(created_sector.uuid),
-                "queues": [],
-            }
+
             self._flows_client.request_ticketer(content=content)
 
     def create_feature_version(self, body, sector_dtos):
