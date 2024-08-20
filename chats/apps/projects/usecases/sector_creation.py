@@ -49,6 +49,7 @@ class SectorCreationUseCase:
                 work_start=sector.working_hours["init"],
                 work_end=sector.working_hours["close"],
             )
+            sector["uuid"] = str(created_sector.uuid)
 
             for tag in sector.tags:
                 SectorTag.objects.create(name=tag, sector=created_sector)
@@ -73,6 +74,7 @@ class SectorCreationUseCase:
                     sector=created_sector,
                     name=queue.name,
                 )
+                queue["uuid"] = str(created_queue.uuid)
                 content["queues"].append(
                     {"uuid": str(created_queue.uuid), "name": created_queue.name}
                 )
