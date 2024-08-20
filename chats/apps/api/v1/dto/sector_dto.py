@@ -14,6 +14,12 @@ class SectorDTO:
     queues: List[QueueDTO]
 
 
+@dataclass
+class FeatureVersionDTO:
+    project: str
+    feature_version: str
+
+
 def dto_to_dict(dto: SectorDTO) -> Dict:
     return {
         "manager_email": dto.manager_email,

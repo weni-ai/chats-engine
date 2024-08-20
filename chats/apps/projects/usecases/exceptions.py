@@ -20,3 +20,7 @@ class InvalidProjectPermission(Exception):
 
 class InvalidSectorData(Exception):
     pass
+
+
+class InvalidFeatureVersion(Exception):
+    pass

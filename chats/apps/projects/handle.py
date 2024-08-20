@@ -6,6 +6,7 @@ from .consumers import (
     DeadLetterConsumer,
     ProjectPermissionConsumer,
     SectorConsumer,
+    DeleteIntegrationConsumer,
 )
 
 
@@ -17,5 +18,8 @@ def handle_consumers(channel: Channel) -> None:
     channel.basic_consume(
         "chats.permissions", callback=ProjectPermissionConsumer().handle
     )
-    channel.basic_consume("chats.sectors", callback=SectorConsumer().handle)
+    channel.basic_consume("chats.create_integration", callback=SectorConsumer().handle)
+    channel.basic_consume(
+        "chats.delete_integration", callback=DeleteIntegrationConsumer().handle
+    )
     channel.basic_consume("chats.dlq", callback=DeadLetterConsumer.consume)
