@@ -31,7 +31,6 @@ class SectorCreationUseCase:
                 service_limit=sector["service_limit"],
                 tags=sector["tags"],
                 name=sector["name"],
-                uuid=sector["uuid"],
                 queues=queues,
             )
             sector_dtos.append(sector_dto)
