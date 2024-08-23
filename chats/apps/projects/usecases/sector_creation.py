@@ -1,9 +1,9 @@
 from django.contrib.auth import get_user_model
 
-from chats.apps.projects.models.models import Project, ProjectPermission
-from chats.apps.queues.models import Queue, QueueAuthorization
-from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
-from chats.apps.feature_version.models import FeatureVersion
+from chats.apps.projects.models.models import Project
+from chats.apps.queues.models import Queue
+from chats.apps.sectors.models import Sector, SectorTag
+from chats.apps.feature_version.models import IntegratedFeature
 
 from chats.apps.api.v1.dto.sector_dto import SectorDTO, dto_to_dict
 from chats.apps.api.v1.dto.queue_dto import QueueDTO
@@ -39,7 +39,7 @@ class SectorCreationUseCase:
 
         return sector_dtos
 
-    def create(self, body, sector_dtos):
+    def integrate_feature(self, body, sector_dtos):
         for sector in sector_dtos:
             project = Project.objects.get(pk=body["project_uuid"])
             created_sector = Sector.objects.create(
@@ -54,13 +54,6 @@ class SectorCreationUseCase:
             for tag in sector.tags:
                 SectorTag.objects.create(name=tag, sector=created_sector)
 
-            for manager in sector.manager_email:
-                manager_permission = ProjectPermission.objects.get(
-                    user=manager, project=project
-                )
-                SectorAuthorization.objects.create(
-                    role=1, permission=manager_permission, sector=created_sector
-                )
             content = {
                 "project_uuid": str(created_sector.project.uuid),
                 "name": created_sector.name,
@@ -80,24 +73,14 @@ class SectorCreationUseCase:
                     {"uuid": str(created_queue.uuid), "name": created_queue.name}
                 )
 
-                for agent in queue.agents:
-                    agent_permission = ProjectPermission.objects.get(
-                        user=agent, project=project
-                    )
-                    QueueAuthorization.objects.create(
-                        role=1,
-                        permission=agent_permission,
-                        queue=created_queue,
-                    )
-
             self._flows_client.request_ticketer(content=content)
 
-    def create_feature_version(self, body, sector_dtos):
+    def create_integrated_feature_object(self, body, sector_dtos):
         sector_dicts = [dto_to_dict(dto) for dto in sector_dtos]
         project = Project.objects.get(pk=body["project_uuid"])
 
-        FeatureVersion.objects.create(
+        IntegratedFeature.objects.create(
             project=project,
-            feature_version=body["feature_version"],
-            sectors=sector_dicts,
+            feature=body["feature_uuid"],
+            current_version=sector_dicts,
         )
