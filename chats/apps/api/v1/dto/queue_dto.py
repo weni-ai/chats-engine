@@ -6,4 +6,3 @@ from typing import List, Dict
 class QueueDTO:
     uuid: str
     name: str
-    agents: List[str]

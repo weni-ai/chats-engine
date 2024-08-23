@@ -23,11 +23,10 @@ class SectorCreationUseCase:
 
         for sector in message_body["sectors"]:
             queues = [
-                QueueDTO(uuid=queue["uuid"], name=queue["name"], agents=queue["agents"])
+                QueueDTO(uuid=queue["uuid"], name=queue["name"])
                 for queue in sector["queues"]
             ]
             sector_dto = SectorDTO(
-                manager_email=sector["manager_email"],
                 working_hours=sector["working_hours"],
                 service_limit=sector["service_limit"],
                 tags=sector["tags"],
