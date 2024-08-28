@@ -60,7 +60,7 @@ class SectorCreationUseCase:
                 "queues": [],
             }
             for queue in sector.queues:
-                created_queue = Queue.objects.get_or_create(
+                created_queue, _ = Queue.objects.get_or_create(
                     sector=created_sector,
                     name=queue.name,
                 )
