@@ -37,7 +37,7 @@ class SectorCreationUseCase:
     def integrate_feature(self, body, sector_dtos):
         for sector in sector_dtos:
             project = Project.objects.get(pk=body["project_uuid"])
-            created_sector = Sector.objects.get_or_create(
+            created_sector, _ = Sector.objects.get_or_create(
                 name=sector.name,
                 project=project,
                 defaults={
