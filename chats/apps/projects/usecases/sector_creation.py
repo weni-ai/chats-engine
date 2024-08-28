@@ -37,17 +37,19 @@ class SectorCreationUseCase:
     def integrate_feature(self, body, sector_dtos):
         for sector in sector_dtos:
             project = Project.objects.get(pk=body["project_uuid"])
-            created_sector = Sector.objects.create(
+            created_sector = Sector.objects.get_or_create(
                 name=sector.name,
                 project=project,
-                rooms_limit=sector.service_limit,
-                work_start=sector.working_hours["init"],
-                work_end=sector.working_hours["close"],
+                defaults={
+                    "rooms_limit": sector.service_limit,
+                    "work_start": sector.working_hours["init"],
+                    "work_end": sector.working_hours["close"],
+                },
             )
             sector.uuid = str(created_sector.uuid)
 
             for tag in sector.tags:
-                SectorTag.objects.create(name=tag, sector=created_sector)
+                SectorTag.objects.get_or_create(name=tag, sector=created_sector)
 
             content = {
                 "project_uuid": str(created_sector.project.uuid),
@@ -58,7 +60,7 @@ class SectorCreationUseCase:
                 "queues": [],
             }
             for queue in sector.queues:
-                created_queue = Queue.objects.create(
+                created_queue = Queue.objects.get_or_create(
                     sector=created_sector,
                     name=queue.name,
                 )
