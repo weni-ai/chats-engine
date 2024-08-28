@@ -22,8 +22,5 @@ def dto_to_dict(dto: SectorDTO) -> Dict:
     return {
         "name": dto.name,
         "tags": dto.tags,
-        "queues": [
-            {"uuid": queue.uuid, "name": queue.name, "agents": queue.agents}
-            for queue in dto.queues
-        ],
+        "queues": [{"uuid": queue.uuid, "name": queue.name} for queue in dto.queues],
     }
