@@ -1,3 +1,71 @@
+# 3.7.9
+## Add
+ - feature retail
+   
+# 3.7.8
+## Add
+  - adding health check view and doc endpoint
+
+# 3.7.7
+## Fix
+  - passing user when transfer to user
+    
+# 3.7.6
+## Fix
+  -  passing user to ws notify
+
+# 3.7.5
+## Fix
+  -  ws message when transfer queue
+    
+# 3.7.4
+## Add
+  -  returning 400 if project uuid its not provided
+    
+# 3.7.3
+## Add
+  - flag for offline agents in transfer 
+    
+# 3.7.2
+## Add
+  - formating history name 
+    
+# 3.7.1
+## Add
+  - verify if the given queue is part of the project
+    
+# 3.7.0
+## Add
+  - rooms count endpoint 
+
+# 3.6.5
+## Fix
+  - remove timezone parse
+    
+# 3.6.4
+## Add
+  - queue and agent in flow warning
+
+# 3.6.3
+## Add
+  - add agents_can_see_queue_history config flag into project
+
+# 3.6.2
+## Fix
+  - fix tags filter
+    
+# 3.6.1
+## Fix
+  - remove ':' from the url string
+
+# 3.6.0
+## Add
+  - New feature, internal dash endpoints
+
+# 3.5.7
+## Fix
+  - Removing uuid from sector info when exporting.
+   
 # 3.5.6
 ## Fix
   - Verify if data frame exists before translate, to avoid translating an empty dataframe in export dashboard.
