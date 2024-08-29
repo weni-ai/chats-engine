@@ -357,7 +357,10 @@ class RoomViewset(
                     if not project.permissions.filter(user=user).exists():
                         return Response(
                             {
-                                "error": f"User {user.email} has no permission on the project {project.name} <{project.uuid}>"
+                                "error": (
+                                    f"User {user.email} has no permission on the project "
+                                    f"{project.name} <{project.uuid}>"
+                                )
                             },
                             status=status.HTTP_400_BAD_REQUEST,
                         )
