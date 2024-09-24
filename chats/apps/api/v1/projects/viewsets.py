@@ -1,9 +1,12 @@
 import json
+
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.db.models import CharField, Value
+from django.db.models.functions import Concat
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
-from rest_framework import status, viewsets, mixins
+from rest_framework import filters, mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
@@ -426,10 +429,15 @@ class ProjectViewset(
 
 
 class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
-    queryset = ProjectPermission.objects.all()
+    queryset = ProjectPermission.objects.all().annotate(
+        full_name=Concat(
+            "user__first_name", Value(" "), "user__last_name", output_field=CharField()
+        )
+    )
     serializer_class = ProjectPermissionReadSerializer
     permission_classes = []
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    search_fields = ["user_id", "full_name"]
     filterset_fields = ["project", "role", "status"]
     lookup_field = "uuid"
 
