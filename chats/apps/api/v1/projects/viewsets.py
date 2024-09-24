@@ -437,7 +437,7 @@ class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
     serializer_class = ProjectPermissionReadSerializer
     permission_classes = []
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
-    search_fields = ["user_id", "full_name"]
+    search_fields = ["user__email", "full_name"]
     filterset_fields = ["project", "role", "status"]
     lookup_field = "uuid"
 
