@@ -96,9 +96,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
     unread_msgs = serializers.SerializerMethodField()
     last_message = serializers.SerializerMethodField()
     is_waiting = serializers.SerializerMethodField()
-    linked_user = serializers.SerializerMethodField()
     is_24h_valid = serializers.SerializerMethodField()
-    flowstart_data = serializers.SerializerMethodField()
     last_interaction = serializers.DateTimeField(read_only=True)
     can_edit_custom_fields = serializers.SerializerMethodField()
 
@@ -106,41 +104,23 @@ class ListRoomSerializer(serializers.ModelSerializer):
         model = Room
         fields = [
             "uuid",
+            "user",
+            "contact",
+            "unread_msgs",
+            "last_message",
+            "is_waiting",
+            "is_24h_valid",
+            "last_interaction",
+            "can_edit_custom_fields",
             "custom_fields",
             "urn",
             "transfer_history",
             "protocol",
             "service_chat",
         ]
-        read_only_fields = [
-            "ended_at",
-            "custom_fields",
-            "urn",
-            "linked_user",
-            "is_24h_valid",
-            "last_interaction",
-            "can_edit_custom_fields",
-        ]
 
     def get_is_24h_valid(self, room: Room) -> bool:
         return room.is_24h_valid
-
-    def get_flowstart_data(self, room: Room) -> bool:
-        try:
-            flowstart = room.flowstarts.get(is_deleted=False)
-        except (ObjectDoesNotExist, MultipleObjectsReturned):
-            return {}
-        return {
-            "name": flowstart.name,
-            "is_deleted": flowstart.is_deleted,
-            "created_on": flowstart.created_on,
-        }
-
-    def get_linked_user(self, room: Room):
-        try:
-            return room.contact.get_linked_user(room.queue.sector.project).full_name
-        except AttributeError:
-            return ""
 
     def get_is_waiting(self, room: Room):
         return room.get_is_waiting()
