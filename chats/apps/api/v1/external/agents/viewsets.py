@@ -28,6 +28,9 @@ class AgentFlowViewset(viewsets.ReadOnlyModelViewSet):
     authentication_classes = [ProjectAdminAuthentication]
 
     def get_queryset(self):
-        permission = get_permission_token_from_request(self.request)
+        # permission = get_permission_token_from_request(self.request)
+        permission = self.request.auth
         qs = super().get_queryset()
-        return qs.filter(project__permissions=permission, project__permissions__role=1)
+        return qs.filter(
+            project__permissions=permission.pk, project__permissions__role=1
+        )
