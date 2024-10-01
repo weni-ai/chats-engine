@@ -15,6 +15,7 @@ from chats.apps.api.v1.internal.rest_clients.openai_rest_client import OpenAICli
 from chats.apps.api.v1.msgs.serializers import ChatCompletionSerializer
 from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1.rooms.serializers import (
+    ListRoomSerializer,
     RoomMessageStatusSerializer,
     RoomSerializer,
     TransferRoomSerializer,
@@ -68,6 +69,8 @@ class RoomViewset(
     def get_serializer_class(self):
         if "update" in self.action:
             return TransferRoomSerializer
+        elif "list" in self.action:
+            return ListRoomSerializer
         return super().get_serializer_class()
 
     @action(

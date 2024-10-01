@@ -14,20 +14,14 @@ class LoginSerializer(AuthTokenSerializer, serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    status = serializers.SerializerMethodField()
-
     class Meta:
         model = User
         fields = [
             "first_name",
             "last_name",
             "email",
-            "status",
         ]
         ref_name = None
-
-    def get_status(self, user: User):
-        return ""
 
 
 class UserNameSerializer(serializers.ModelSerializer):
