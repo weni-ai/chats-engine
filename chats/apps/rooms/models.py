@@ -90,6 +90,9 @@ class Room(BaseModel):
                 name="unique_contact_queue_is_activetrue_room",
             )
         ]
+        indexes = [
+            models.Index(fields=["project_uuid"]),
+        ]
 
     def save(self, *args, **kwargs) -> None:
         if self.__original_is_active is False:
