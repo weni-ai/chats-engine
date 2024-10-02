@@ -37,7 +37,7 @@ class RoomFilter(filters.FilterSet):
             return queryset.none()
         user = self.request.query_params.get("email") or self.request.user
 
-        if type(user) == str:
+        if type(user) is str:
             user = User.objects.get(email=user)
             project_permission = user.project_permissions.get(project__uuid=value)
 

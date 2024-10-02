@@ -141,6 +141,56 @@ class ListRoomSerializer(serializers.ModelSerializer):
         return room.queue.sector.can_edit_custom_fields
 
 
+class ListOptimizedRoomSerializer(serializers.ModelSerializer):
+
+    user = serializers.SerializerMethodField()
+    contact = serializers.SerializerMethodField()
+    unread_msgs = serializers.IntegerField(required=False, default=0)
+    last_message = serializers.CharField(read_only=True)
+    is_waiting = serializers.CharField(
+        read_only=True, source="is_waiting_combined"
+    )  # precisa mesmo verificar flowstarts? o campo is_waiting deveria ser o suficiente para essa feature
+    is_24h_valid = serializers.BooleanField(default=True)
+    last_interaction = serializers.DateTimeField(read_only=True)
+    can_edit_custom_fields = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Room
+        fields = [
+            "uuid",
+            "user",
+            "contact",
+            "unread_msgs",
+            "last_message",
+            "is_waiting",
+            "is_24h_valid",
+            "last_interaction",
+            "can_edit_custom_fields",
+            "custom_fields",
+            "urn",
+            "transfer_history",
+            "protocol",
+            "service_chat",
+        ]
+
+    def get_user(self, room: Room):
+        return {
+            "first_name": room.user.first_name,
+            "last_name": room.user.last_name,
+            "email": room.user.email,
+        }
+
+    def get_contact(self, room: Room):
+        return {
+            "uuid": room.contact.uuid,
+            "name": room.contact.name,
+            "external_id": room.contact.external_id,
+        }
+
+    def get_can_edit_custom_fields(self, room: Room):
+        return room.queue.sector.can_edit_custom_fields
+
+
 class TransferRoomSerializer(serializers.ModelSerializer):
     user = UserSerializer(many=False, required=False, read_only=True)
     user_email = serializers.SlugRelatedField(

@@ -1,5 +1,18 @@
+from datetime import timedelta
+
 from django.conf import settings
-from django.db.models import Max
+from django.db.models import (
+    BooleanField,
+    Case,
+    Count,
+    Exists,
+    Max,
+    OuterRef,
+    Q,
+    Subquery,
+    Value,
+    When,
+)
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
@@ -21,6 +34,7 @@ from chats.apps.api.v1.rooms.serializers import (
     TransferRoomSerializer,
 )
 from chats.apps.dashboard.models import RoomMetrics
+from chats.apps.msgs.models import Message
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import (
@@ -42,9 +56,9 @@ class RoomViewset(
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
     filter_backends = [
-        OrderingFilter,
         DjangoFilterBackend,
         filters.SearchFilter,
+        OrderingFilter,
     ]
     filterset_class = room_filters.RoomFilter
     search_fields = ["contact__name", "urn", "protocol", "service_chat"]
@@ -60,11 +74,54 @@ class RoomViewset(
             )
         return [permission() for permission in permission_classes]
 
-    def get_queryset(self):
+    def get_queryset(self):  # separar queries list e retrieve de update e close
+        from chats.apps.projects.models import FlowStart
+
         if self.action != "list":
             self.filterset_class = None
         qs = super().get_queryset()
-        return qs.annotate(last_interaction=Max("messages__created_on"))
+
+        last_24h = timezone.now() - timedelta(days=1)
+
+        qs = (
+            qs.annotate(
+                last_interaction=Max("messages__created_on"),
+                unread_msgs=Count("messages", filter=Q(messages__seen=False)),
+                last_contact_interaction=Max(
+                    "messages__created_on", filter=Q(messages__contact__isnull=False)
+                ),
+                is_24h_valid=Case(
+                    When(
+                        Q(
+                            urn__startswith="whatsapp",
+                            last_contact_interaction__lt=last_24h,
+                        ),
+                        then=False,
+                    ),
+                    default=True,
+                    output_field=BooleanField(),
+                ),
+                last_message_text=Subquery(
+                    Message.objects.filter(room=OuterRef("pk"))
+                    .exclude(user__isnull=True, contact__isnull=True, text="")
+                    .order_by("-created_on")
+                    .values("text")[:1]
+                ),
+                has_active_flowstarts=Exists(
+                    FlowStart.objects.filter(room=OuterRef("pk"), is_deleted=False)
+                ),
+                is_waiting_combined=Case(
+                    When(has_active_flowstarts=True, then=Value(True)),
+                    When(is_waiting=True, then=Value(True)),
+                    default=Value(False),
+                    output_field=BooleanField(),
+                ),
+            )
+            .select_related("user", "contact", "queue__sector")
+            .prefetch_related("flowstarts", "messages")
+        )
+
+        return qs
 
     def get_serializer_class(self):
         if "update" in self.action:
