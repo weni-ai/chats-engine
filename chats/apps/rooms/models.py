@@ -51,6 +51,10 @@ class Room(BaseModel):
     )
     urn = models.TextField(_("urn"), null=True, blank=True, default="")
 
+    project_uuid = models.TextField(
+        _("project_uuid"), null=True, blank=True, default=""
+    )
+
     callback_url = models.TextField(_("Callback URL"), null=True, blank=True)
 
     ended_at = models.DateTimeField(
@@ -85,6 +89,9 @@ class Room(BaseModel):
                 condition=models.Q(is_active=True),
                 name="unique_contact_queue_is_activetrue_room",
             )
+        ]
+        indexes = [
+            models.Index(fields=["project_uuid"]),
         ]
 
     def save(self, *args, **kwargs) -> None:
