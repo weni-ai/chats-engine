@@ -59,9 +59,12 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
             permission, created = instance.permissions.get_or_create(user=user, role=1)
 
             sector = instance.sectors.create(
-                name="Setor Padrão", rooms_limit=5, work_start="08:00", work_end="18:00"
+                name="Default Sector",
+                rooms_limit=5,
+                work_start="08:00",
+                work_end="18:00",
             )
-            queue = sector.queues.create(name="Fila 1")
+            queue = sector.queues.create(name="Queue 1")
             SectorAuthorization.objects.create(
                 role=1, permission=permission, sector=sector
             )
