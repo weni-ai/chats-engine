@@ -46,7 +46,7 @@ class RoomFilter(filters.FilterSet):
             return queryset.filter(
                 user_filter, is_active=True, queue__in=project_permission.queue_ids
             )
-        user_project = Q(user=user) & Q(queue__sector__project__uuid=value)
+        user_project = Q(user=user) & Q(project__uuid=value)
         queue_filter = Q(user__isnull=True) & Q(queue__in=project_permission.queue_ids)
         ff = user_project | queue_filter
         queryset = queryset.filter(
