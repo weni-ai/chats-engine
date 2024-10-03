@@ -150,7 +150,9 @@ class ListOptimizedRoomSerializer(serializers.ModelSerializer):
     is_waiting = serializers.CharField(
         read_only=True, source="is_waiting_combined"
     )  # precisa mesmo verificar flowstarts? o campo is_waiting deveria ser o suficiente para essa feature
-    is_24h_valid = serializers.BooleanField(default=True)
+    is_24h_valid = serializers.BooleanField(
+        default=True, source="is_24h_valid_computed"
+    )
     last_interaction = serializers.DateTimeField(read_only=True)
     can_edit_custom_fields = serializers.SerializerMethodField()
 
@@ -174,11 +176,18 @@ class ListOptimizedRoomSerializer(serializers.ModelSerializer):
         ]
 
     def get_user(self, room: Room):
-        return {
-            "first_name": room.user.first_name,
-            "last_name": room.user.last_name,
-            "email": room.user.email,
-        }
+        try:
+            return {
+                "first_name": room.user.first_name,
+                "last_name": room.user.last_name,
+                "email": room.user.email,
+            }
+        except AttributeError:
+            {
+                "first_name": "",
+                "last_name": "",
+                "email": "",
+            }
 
     def get_contact(self, room: Room):
         return {
