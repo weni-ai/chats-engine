@@ -103,7 +103,8 @@ class RoomViewset(
                 ),
                 last_message_text=Subquery(
                     Message.objects.filter(room=OuterRef("pk"))
-                    .exclude(user__isnull=True, contact__isnull=True, text="")
+                    .exclude(user__isnull=True, contact__isnull=True)
+                    .exclude(text="")
                     .order_by("-created_on")
                     .values("text")[:1]
                 ),
