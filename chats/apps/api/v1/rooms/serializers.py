@@ -146,8 +146,8 @@ class ListOptimizedRoomSerializer(serializers.ModelSerializer):
     contact = serializers.SerializerMethodField()
     unread_msgs = serializers.IntegerField(required=False, default=0)
     last_message = serializers.CharField(read_only=True, source="last_message_text")
-    is_waiting = serializers.BooleanField(
-        read_only=True, source="is_waiting_combined"
+    is_waiting = (
+        serializers.BooleanField()
     )  # precisa mesmo verificar flowstarts? o campo is_waiting deveria ser o suficiente para essa feature
     is_24h_valid = serializers.BooleanField(
         default=True, source="is_24h_valid_computed"

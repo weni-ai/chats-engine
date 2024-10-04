@@ -1,16 +1,14 @@
 from datetime import timedelta
 
 from django.conf import settings
-from django.db.models import (
+from django.db.models import (  # Exists,; Value,
     BooleanField,
     Case,
     Count,
-    Exists,
     Max,
     OuterRef,
     Q,
     Subquery,
-    Value,
     When,
 )
 from django.utils import timezone
@@ -75,7 +73,7 @@ class RoomViewset(
         return [permission() for permission in permission_classes]
 
     def get_queryset(self):  # separar queries list e retrieve de update e close
-        from chats.apps.projects.models import FlowStart
+        # from chats.apps.projects.models import FlowStart
 
         if self.action != "list":
             self.filterset_class = None
@@ -108,15 +106,15 @@ class RoomViewset(
                     .order_by("-created_on")
                     .values("text")[:1]
                 ),
-                has_active_flowstarts=Exists(
-                    FlowStart.objects.filter(room=OuterRef("pk"), is_deleted=False)
-                ),
-                is_waiting_combined=Case(
-                    When(has_active_flowstarts=True, then=Value(True)),
-                    When(is_waiting=True, then=Value(True)),
-                    default=Value(False),
-                    output_field=BooleanField(),
-                ),
+                # has_active_flowstarts=Exists(
+                #     FlowStart.objects.filter(room=OuterRef("pk"), is_deleted=False)
+                # ),
+                # is_waiting_combined=Case(
+                #     When(has_active_flowstarts=True, then=Value(True)),
+                #     When(is_waiting=True, then=Value(True)),
+                #     default=Value(False),
+                #     output_field=BooleanField(),
+                # ),
             )
             .select_related("user", "contact", "queue__sector")
             .prefetch_related("flowstarts", "messages")

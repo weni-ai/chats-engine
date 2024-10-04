@@ -303,8 +303,10 @@ class ProjectViewset(
                 )
 
             if not room.is_24h_valid:
-                flow_start_data["room"] = room  # room.is_waiting=True
+                flow_start_data["room"] = room
                 room.request_callback(room.serialized_ws_data)
+                room.is_waiting = True
+                room.save()
         except (ObjectDoesNotExist, ValidationError):
             pass
 
