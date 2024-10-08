@@ -2218,6 +2218,7 @@
             "ended_at": null,
             "ended_by": null,
             "is_active": true,
+            "project_uuid": "34a93b52-231e-11ed-861d-0242ac120002",
             "transfer_history": [
                 {
                     "name": "ENGINE",
@@ -2248,6 +2249,7 @@
             "ended_at": "2022-08-26T11:30:05.198Z",
             "ended_by": "agent",
             "is_active": true,
+            "project_uuid": "34a93b52-231e-11ed-861d-0242ac120002",
             "transfer_history": [
                 {
                     "name": "",
