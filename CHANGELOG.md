@@ -1,3 +1,11 @@
+# 3.10.0
+## Change
+ - Improve RoomViewset List Queryset
+
+# 3.9.0 
+## Add
+ - Project UUID field on rooms
+
 # 3.7.9
 ## Add
  - feature retail
