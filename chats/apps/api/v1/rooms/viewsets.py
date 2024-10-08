@@ -72,9 +72,9 @@ class RoomViewset(
             )
         return [permission() for permission in permission_classes]
 
-    def get_queryset(self):  # separar queries list e retrieve de update e close
-        # from chats.apps.projects.models import FlowStart
-
+    def get_queryset(
+        self,
+    ):  # TODO: sparate list and retrieve queries from update and close
         if self.action != "list":
             self.filterset_class = None
         qs = super().get_queryset()
