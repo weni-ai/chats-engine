@@ -16,6 +16,7 @@
             "ended_at": null,
             "ended_by": null,
             "is_active": true,
+            "project_uuid": "34a93b52-231e-11ed-861d-0242ac120002",
             "transfer_history": [
                 {
                     "name": "ENGINE",
@@ -46,6 +47,7 @@
             "ended_at": null,
             "ended_by": null,
             "is_active": true,
+            "project_uuid": "34a93b52-231e-11ed-861d-0242ac120002",
             "transfer_history": [
                 {
                     "name": "ENGINE",
@@ -76,6 +78,7 @@
             "ended_at": "2023-09-03T00:20:09.559Z",
             "ended_by": "agent",
             "is_active": false,
+            "project_uuid": "34a93b52-231e-11ed-861d-0242ac120002",
             "transfer_history": [
                 {
                     "name": "ENGINE",
@@ -626,6 +629,7 @@
             "ended_by": null,
             "is_active": true,
             "is_waiting": false,
+            "project_uuid": "dae39bcc-bdc2-4b03-b4da-023a117f8474",
             "transfer_history": {
                 "to": {
                     "name": "teste",
@@ -656,6 +660,7 @@
             "ended_by": null,
             "is_active": true,
             "is_waiting": false,
+            "project_uuid": "dae39bcc-bdc2-4b03-b4da-023a117f8474",
             "transfer_history": {
                 "to": {
                     "name": "Suporte Tecnico",
@@ -686,6 +691,7 @@
             "ended_by": null,
             "is_active": true,
             "is_waiting": false,
+            "project_uuid": "dae39bcc-bdc2-4b03-b4da-023a117f8474",
             "transfer_history": {
                 "to": {
                     "name": "Suporte Tecnico",
@@ -716,6 +722,7 @@
             "ended_by": null,
             "is_active": true,
             "is_waiting": false,
+            "project_uuid": "dae39bcc-bdc2-4b03-b4da-023a117f8474",
             "transfer_history": {
                 "to": {
                     "name": "Suporte Tecnico",
@@ -746,6 +753,7 @@
             "ended_by": null,
             "is_active": true,
             "is_waiting": false,
+            "project_uuid": "dae39bcc-bdc2-4b03-b4da-023a117f8474",
             "transfer_history": {
                 "to": {
                     "name": "Empreendimentos",
@@ -776,6 +784,7 @@
             "ended_by": null,
             "is_active": true,
             "is_waiting": false,
+            "project_uuid": "dae39bcc-bdc2-4b03-b4da-023a117f8474",
             "transfer_history": {
                 "to": {
                     "name": "teste",
@@ -806,6 +815,7 @@
             "ended_by": null,
             "is_active": true,
             "is_waiting": false,
+            "project_uuid": "dae39bcc-bdc2-4b03-b4da-023a117f8474",
             "transfer_history": {
                 "to": {
                     "name": "Construção Propria",
@@ -836,6 +846,7 @@
             "ended_by": null,
             "is_active": true,
             "is_waiting": false,
+            "project_uuid": "dae39bcc-bdc2-4b03-b4da-023a117f8474",
             "transfer_history": {
                 "to": {
                     "name": "Construção Propria",
@@ -866,6 +877,7 @@
             "ended_by": null,
             "is_active": true,
             "is_waiting": false,
+            "project_uuid": "dae39bcc-bdc2-4b03-b4da-023a117f8474",
             "transfer_history": {
                 "to": {
                     "name": "teste",
@@ -896,6 +908,7 @@
             "ended_by": null,
             "is_active": true,
             "is_waiting": false,
+            "project_uuid": "dae39bcc-bdc2-4b03-b4da-023a117f8474",
             "transfer_history": {
                 "to": {
                     "name": "teste",
@@ -926,6 +939,7 @@
             "ended_by": "agent",
             "is_active": false,
             "is_waiting": false,
+            "project_uuid": "dae39bcc-bdc2-4b03-b4da-023a117f8474",
             "transfer_history": {
                 "to": {
                     "name": "teste",

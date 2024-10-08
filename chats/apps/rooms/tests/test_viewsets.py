@@ -96,10 +96,21 @@ class RoomTests(APITestCase):
 
         # ROOMS
         self.room_1 = Room.objects.create(
-            contact=self.contact, queue=self.queue_1, user=self.agent
+            contact=self.contact,
+            queue=self.queue_1,
+            user=self.agent,
+            project_uuid=str(self.project.uuid),
         )
-        self.room_2 = Room.objects.create(contact=self.contact_2, queue=self.queue_2)
-        self.room_3 = Room.objects.create(contact=self.contact_3, queue=self.queue_3)
+        self.room_2 = Room.objects.create(
+            contact=self.contact_2,
+            queue=self.queue_2,
+            project_uuid=str(self.project.uuid),
+        )
+        self.room_3 = Room.objects.create(
+            contact=self.contact_3,
+            queue=self.queue_3,
+            project_uuid=str(self.project.uuid),
+        )
 
     def _request_list_rooms(self, token, data: dict):
         url = reverse("room-list")
@@ -112,8 +123,8 @@ class RoomTests(APITestCase):
     def _ok_list_rooms(self, token, rooms: list, data: dict):
         response, results = self._request_list_rooms(token, data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-
         self.assertEqual(response.json().get("count"), len(rooms))
+
         for result in results:
             self.assertIn(result.get("uuid"), rooms)
 

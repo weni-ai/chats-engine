@@ -14,6 +14,7 @@ from chats.apps.contacts.models import Contact
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
+from chats.apps.rooms.views import close_room
 
 
 def get_active_room_flow_start(contact, flow_uuid, project):
@@ -32,6 +33,15 @@ def get_active_room_flow_start(contact, flow_uuid, project):
             flow_start.save()
             return flow_start.room
     except AttributeError:
+        # if create new room, but there's a room flowstart to another flow, close the room and the flowstart
+        query_filters.pop("flow")
+        flowstarts = project.flowstarts.filter(**query_filters)
+        for fs in flowstarts:
+            fs.is_deleted = True
+            fs.save()
+            room = fs.room
+            room.close([], "new_room")
+            close_room(str(room.pk))
         return None
     return None
 
