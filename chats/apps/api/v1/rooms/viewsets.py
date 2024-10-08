@@ -26,7 +26,7 @@ from chats.apps.api.v1.internal.rest_clients.openai_rest_client import OpenAICli
 from chats.apps.api.v1.msgs.serializers import ChatCompletionSerializer
 from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1.rooms.serializers import (
-    ListOptimizedRoomSerializer,
+    ListRoomSerializer,
     RoomMessageStatusSerializer,
     RoomSerializer,
     TransferRoomSerializer,
@@ -106,15 +106,6 @@ class RoomViewset(
                     .order_by("-created_on")
                     .values("text")[:1]
                 ),
-                # has_active_flowstarts=Exists(
-                #     FlowStart.objects.filter(room=OuterRef("pk"), is_deleted=False)
-                # ),
-                # is_waiting_combined=Case(
-                #     When(has_active_flowstarts=True, then=Value(True)),
-                #     When(is_waiting=True, then=Value(True)),
-                #     default=Value(False),
-                #     output_field=BooleanField(),
-                # ),
             )
             .select_related("user", "contact", "queue__sector")
             .prefetch_related("flowstarts", "messages")
@@ -126,7 +117,7 @@ class RoomViewset(
         if "update" in self.action:
             return TransferRoomSerializer
         elif "list" in self.action:
-            return ListOptimizedRoomSerializer
+            return ListRoomSerializer
         return super().get_serializer_class()
 
     @action(
