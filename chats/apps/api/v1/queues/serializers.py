@@ -41,6 +41,12 @@ class QueueSerializer(serializers.ModelSerializer):
         return data
 
 
+class QueueSimpleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Queue
+        fields = ["uuid", "name"]
+
+
 class QueueUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Queue

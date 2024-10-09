@@ -1,16 +1,7 @@
 from datetime import timedelta
 
 from django.conf import settings
-from django.db.models import (
-    BooleanField,
-    Case,
-    Count,
-    Max,
-    OuterRef,
-    Q,
-    Subquery,
-    When,
-)
+from django.db.models import BooleanField, Case, Count, Max, OuterRef, Q, Subquery, When
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
@@ -105,7 +96,7 @@ class RoomViewset(
                 .order_by("-created_on")
                 .values("text")[:1]
             ),
-        ).select_related("user", "contact", "queue__sector")
+        ).select_related("user", "contact", "queue", "queue__sector")
 
         return qs
 
