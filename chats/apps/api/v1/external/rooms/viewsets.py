@@ -77,25 +77,14 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         Close a room, setting the ended_at date and turning the is_active flag as false
         """
         instance = self.get_object()
-        for attempt in range(settings.MAX_RETRIES):
-            try:
-                with transaction.atomic():
-                    instance.close(None, "agent")
-                    serialized_data = RoomFlowSerializer(instance=instance)
-                    instance.notify_queue("close")
-                    if not settings.ACTIVATE_CALC_METRICS:
-                        return Response(serialized_data.data, status=status.HTTP_200_OK)
+        instance.close(None, "agent")
+        serialized_data = RoomFlowSerializer(instance=instance)
+        instance.notify_queue("close")
+        if not settings.ACTIVATE_CALC_METRICS:
+            return Response(serialized_data.data, status=status.HTTP_200_OK)
 
-                    close_room(str(instance.pk))
-                    return Response(serialized_data.data, status=status.HTTP_200_OK)
-            except DatabaseError as error:
-                if attempt < settings.MAX_RETRIES - 1:
-                    continue
-                else:
-                    return Response(
-                        {"error": f"Transaction failed after retries: {str(error)}"},
-                        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    )
+        close_room(str(instance.pk))
+        return Response(serialized_data.data, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs):
         try:
