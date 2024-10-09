@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
-from django.db import IntegrityError
+from django.db import DatabaseError, IntegrityError, transaction
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
@@ -77,14 +77,25 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         Close a room, setting the ended_at date and turning the is_active flag as false
         """
         instance = self.get_object()
-        instance.close(None, "agent")
-        serialized_data = RoomFlowSerializer(instance=instance)
-        instance.notify_queue("close")
-        if not settings.ACTIVATE_CALC_METRICS:
-            return Response(serialized_data.data, status=status.HTTP_200_OK)
+        for attempt in range(settings.MAX_RETRIES):
+            try:
+                with transaction.atomic():
+                    instance.close(None, "agent")
+                    serialized_data = RoomFlowSerializer(instance=instance)
+                    instance.notify_queue("close")
+                    if not settings.ACTIVATE_CALC_METRICS:
+                        return Response(serialized_data.data, status=status.HTTP_200_OK)
 
-        close_room(str(instance.pk))
-        return Response(serialized_data.data, status=status.HTTP_200_OK)
+                    close_room(str(instance.pk))
+                    return Response(serialized_data.data, status=status.HTTP_200_OK)
+            except DatabaseError as error:
+                if attempt < settings.MAX_RETRIES - 1:
+                    continue
+                else:
+                    return Response(
+                        {"error": f"Transaction failed after retries: {str(error)}"},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    )
 
     def create(self, request, *args, **kwargs):
         try:
