@@ -4,7 +4,7 @@ from rest_framework import serializers
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactRelationsSerializer
-from chats.apps.api.v1.queues.serializers import QueueSerializer
+from chats.apps.api.v1.queues.serializers import QueueSerializer, QueueSimpleSerializer
 from chats.apps.api.v1.sectors.serializers import DetailSectorTagSerializer
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
@@ -89,6 +89,7 @@ class RoomSerializer(serializers.ModelSerializer):
 
 class ListRoomSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
+    queue = QueueSimpleSerializer(many=False, read_only=True)
     contact = serializers.SerializerMethodField()
     unread_msgs = serializers.IntegerField(required=False, default=0)
     last_message = serializers.CharField(read_only=True, source="last_message_text")
@@ -104,6 +105,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
         fields = [
             "uuid",
             "user",
+            "queue",
             "contact",
             "unread_msgs",
             "last_message",
