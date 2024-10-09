@@ -11,6 +11,8 @@ from rest_framework.exceptions import ValidationError
 
 from chats.core.models import BaseModel
 from chats.utils.websockets import send_channels_group
+from requests.exceptions import RequestException
+from sentry_sdk import capture_exception
 
 
 class Room(BaseModel):
@@ -51,10 +53,6 @@ class Room(BaseModel):
     )
     urn = models.TextField(_("urn"), null=True, blank=True, default="")
 
-    project_uuid = models.TextField(
-        _("project_uuid"), null=True, blank=True, default=""
-    )
-
     callback_url = models.TextField(_("Callback URL"), null=True, blank=True)
 
     ended_at = models.DateTimeField(
@@ -89,9 +87,6 @@ class Room(BaseModel):
                 condition=models.Q(is_active=True),
                 name="unique_contact_queue_is_activetrue_room",
             )
-        ]
-        indexes = [
-            models.Index(fields=["project_uuid"]),
         ]
 
     def save(self, *args, **kwargs) -> None:
@@ -179,16 +174,24 @@ class Room(BaseModel):
         if self.callback_url is None:
             return None
 
-        requests.post(
-            self.callback_url,
-            data=json.dumps(
-                {"type": "room.update", "content": room_data},
-                sort_keys=True,
-                indent=1,
-                cls=DjangoJSONEncoder,
-            ),
-            headers={"content-type": "application/json"},
-        )
+        try:
+            response = requests.post(
+                self.callback_url,
+                data=json.dumps(
+                    {"type": "room.update", "content": room_data},
+                    sort_keys=True,
+                    indent=1,
+                    cls=DjangoJSONEncoder,
+                ),
+                headers={"content-type": "application/json"},
+            )
+            response.raise_for_status()
+
+        except RequestException as error:
+            capture_exception(error)
+            raise RuntimeError(
+                f"Failed to send callback to {self.callback_url}: {str(error)}"
+            )
 
     def base_notification(self, content, action):
         if self.user:

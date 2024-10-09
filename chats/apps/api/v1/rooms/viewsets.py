@@ -1,14 +1,14 @@
-from datetime import timedelta
-
 from django.conf import settings
-from django.db.models import BooleanField, Case, Count, Max, OuterRef, Q, Subquery, When
+from django.db.models import Max
 from django.utils import timezone
+from django.db import transaction, DatabaseError
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
+
 
 from chats.apps.accounts.models import User
 from chats.apps.api.utils import verify_user_room
@@ -17,13 +17,11 @@ from chats.apps.api.v1.internal.rest_clients.openai_rest_client import OpenAICli
 from chats.apps.api.v1.msgs.serializers import ChatCompletionSerializer
 from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1.rooms.serializers import (
-    ListRoomSerializer,
     RoomMessageStatusSerializer,
     RoomSerializer,
     TransferRoomSerializer,
 )
 from chats.apps.dashboard.models import RoomMetrics
-from chats.apps.msgs.models import Message
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import (
@@ -34,6 +32,7 @@ from chats.apps.rooms.views import (
     update_custom_fields,
     update_flows_custom_fields,
 )
+from sentry_sdk import capture_exception
 
 
 class RoomViewset(
@@ -45,9 +44,9 @@ class RoomViewset(
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
     filter_backends = [
+        OrderingFilter,
         DjangoFilterBackend,
         filters.SearchFilter,
-        OrderingFilter,
     ]
     filterset_class = room_filters.RoomFilter
     search_fields = ["contact__name", "urn", "protocol", "service_chat"]
@@ -63,48 +62,15 @@ class RoomViewset(
             )
         return [permission() for permission in permission_classes]
 
-    def get_queryset(
-        self,
-    ):  # TODO: sparate list and retrieve queries from update and close
+    def get_queryset(self):
         if self.action != "list":
             self.filterset_class = None
         qs = super().get_queryset()
-
-        last_24h = timezone.now() - timedelta(days=1)
-
-        qs = qs.annotate(
-            last_interaction=Max("messages__created_on"),
-            unread_msgs=Count("messages", filter=Q(messages__seen=False)),
-            last_contact_interaction=Max(
-                "messages__created_on", filter=Q(messages__contact__isnull=False)
-            ),
-            is_24h_valid_computed=Case(
-                When(
-                    Q(
-                        urn__startswith="whatsapp",
-                        last_contact_interaction__lt=last_24h,
-                    ),
-                    then=False,
-                ),
-                default=True,
-                output_field=BooleanField(),
-            ),
-            last_message_text=Subquery(
-                Message.objects.filter(room=OuterRef("pk"))
-                .exclude(user__isnull=True, contact__isnull=True)
-                .exclude(text="")
-                .order_by("-created_on")
-                .values("text")[:1]
-            ),
-        ).select_related("user", "contact", "queue", "queue__sector")
-
-        return qs
+        return qs.annotate(last_interaction=Max("messages__created_on"))
 
     def get_serializer_class(self):
         if "update" in self.action:
             return TransferRoomSerializer
-        elif "list" in self.action:
-            return ListRoomSerializer
         return super().get_serializer_class()
 
     @action(
@@ -149,17 +115,30 @@ class RoomViewset(
         # Add send room notification to the channels group
         instance = self.get_object()
 
-        tags = request.data.get("tags", None)
-        instance.close(tags, "agent")
-        serialized_data = RoomSerializer(instance=instance)
-        instance.notify_queue("close", callback=True)
-        instance.notify_user("close")
+        for attempt in range(settings.MAX_RETRIES):
+            try:
+                with transaction.atomic():
+                    tags = request.data.get("tags", None)
+                    instance.close(tags, "agent")
+                    serialized_data = RoomSerializer(instance=instance)
+                    instance.notify_queue("close", callback=True)
+                    instance.notify_user("close")
 
-        if not settings.ACTIVATE_CALC_METRICS:
-            return Response(serialized_data.data, status=status.HTTP_200_OK)
+                    if not settings.ACTIVATE_CALC_METRICS:
+                        return Response(serialized_data.data, status=status.HTTP_200_OK)
 
-        close_room(str(instance.pk))
-        return Response(serialized_data.data, status=status.HTTP_200_OK)
+                    close_room(str(instance.pk))
+                    return Response(serialized_data.data, status=status.HTTP_200_OK)
+
+            except DatabaseError as error:
+                capture_exception(error)
+                if attempt < settings.MAX_RETRIES - 1:
+                    continue
+                else:
+                    return Response(
+                        {"error": f"Transaction failed after retries: {str(error)}"},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    )
 
     def perform_create(self, serializer):
         serializer.save()
