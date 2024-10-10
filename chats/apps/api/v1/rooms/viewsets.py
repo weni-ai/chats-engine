@@ -1,3 +1,4 @@
+import time
 from datetime import timedelta
 
 from django.conf import settings
@@ -166,6 +167,7 @@ class RoomViewset(
 
             except DatabaseError as error:
                 if attempt < settings.MAX_RETRIES - 1:
+                    time.sleep(settings.RETRY_DELAY_SECONDS)
                     continue
                 else:
                     return Response(
