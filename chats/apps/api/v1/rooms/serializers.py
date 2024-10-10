@@ -4,7 +4,9 @@ from rest_framework import serializers
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactRelationsSerializer
-from chats.apps.api.v1.queues.serializers import QueueSerializer, QueueSimpleSerializer
+from chats.apps.api.v1.queues.serializers import (  # , QueueSimpleSerializer
+    QueueSerializer,
+)
 from chats.apps.api.v1.sectors.serializers import DetailSectorTagSerializer
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
@@ -89,7 +91,9 @@ class RoomSerializer(serializers.ModelSerializer):
 
 class ListRoomSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
-    queue = QueueSimpleSerializer(many=False, read_only=True)
+    queue = (
+        serializers.SerializerMethodField()
+    )  # QueueSimpleSerializer(many=False, read_only=True)
     contact = serializers.SerializerMethodField()
     unread_msgs = serializers.IntegerField(required=False, default=0)
     last_message = serializers.CharField(read_only=True, source="last_message_text")
@@ -126,6 +130,17 @@ class ListRoomSerializer(serializers.ModelSerializer):
                 "first_name": room.user.first_name,
                 "last_name": room.user.last_name,
                 "email": room.user.email,
+            }
+        except AttributeError:
+            return None
+
+    def get_queue(self, room: Room):
+        try:
+            return {
+                "uuid": str(room.queue.uuid),
+                "name": room.queue.name,
+                "sector": str(room.queue.sector.uuid),
+                "sector_name": room.queue.sector.name,
             }
         except AttributeError:
             return None
