@@ -1,6 +1,5 @@
 import json
 
-import requests
 from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
@@ -8,6 +7,7 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 
 from chats.core.models import BaseModel
+from chats.core.requests import get_request_session_with_retries
 
 
 class Message(BaseModel):
@@ -86,8 +86,10 @@ class Message(BaseModel):
         self.room.base_notification(content=data, action=f"msg.{action}")
         if self.room.callback_url and callback:
             data = self.update_msg_text_with_signature(data)
-
-            requests.post(
+            request_session = get_request_session_with_retries(
+                status_forcelist=[429, 500, 502, 503, 504], method_whitelist=["POST"]
+            )
+            request_session.post(
                 self.room.callback_url,
                 data=json.dumps(
                     {"type": "msg.create", "content": data},
@@ -147,7 +149,10 @@ class MessageMedia(BaseModel):
         msg_data["text"] = ""
 
         if self.message.room.callback_url:
-            requests.post(
+            request_session = get_request_session_with_retries(
+                status_forcelist=[429, 500, 502, 503, 504], method_whitelist=["POST"]
+            )
+            request_session.post(
                 self.message.room.callback_url,
                 data=json.dumps(
                     {"type": "msg.create", "content": msg_data},
