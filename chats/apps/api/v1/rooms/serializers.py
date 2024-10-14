@@ -90,10 +90,7 @@ class RoomSerializer(serializers.ModelSerializer):
 class ListRoomSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
     contact = serializers.SerializerMethodField()
-    queue = (
-        serializers.SerializerMethodField()
-    )  # QueueSimpleSerializer(many=False, read_only=True)
-    tags = serializers.SerializerMethodField()
+    queue = serializers.SerializerMethodField()
     flowstart_data = serializers.SerializerMethodField()
     unread_msgs = serializers.IntegerField(required=False, default=0)
     last_message = serializers.CharField(read_only=True, source="last_message_text")
@@ -111,8 +108,6 @@ class ListRoomSerializer(serializers.ModelSerializer):
             "uuid",
             "user",
             "queue",
-            "tags",
-            "flowstart_data",
             "contact",
             "unread_msgs",
             "last_message",
@@ -125,8 +120,6 @@ class ListRoomSerializer(serializers.ModelSerializer):
             "transfer_history",
             "protocol",
             "service_chat",
-            "created_on",
-            "ended_at",
         ]
 
     def get_user(self, room: Room):
@@ -149,12 +142,6 @@ class ListRoomSerializer(serializers.ModelSerializer):
             }
         except AttributeError:
             return None
-
-    def get_tags(self, room: Room):
-        return []
-
-    def get_flowstart_data(self, room: Room):
-        return {}
 
     def get_contact(self, room: Room):
         return {
