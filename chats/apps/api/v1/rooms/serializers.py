@@ -153,16 +153,8 @@ class ListRoomSerializer(serializers.ModelSerializer):
     def get_tags(self, room: Room):
         return []
 
-    def get_flowstart_data(self, room: Room) -> bool:
-        try:
-            flowstart = room.flowstarts.get(is_deleted=False)
-        except (ObjectDoesNotExist, MultipleObjectsReturned):
-            return {}
-        return {
-            "name": flowstart.name,
-            "is_deleted": flowstart.is_deleted,
-            "created_on": flowstart.created_on,
-        }
+    def get_flowstart_data(self, room: Room):
+        return {}
 
     def get_contact(self, room: Room):
         return {
