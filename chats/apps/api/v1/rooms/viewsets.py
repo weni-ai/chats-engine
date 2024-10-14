@@ -167,7 +167,8 @@ class RoomViewset(
 
             except DatabaseError as error:
                 if attempt < settings.MAX_RETRIES - 1:
-                    time.sleep(settings.RETRY_DELAY_SECONDS)
+                    delay = settings.RETRY_DELAY_SECONDS * (2**attempt)
+                    time.sleep(delay)
                     continue
                 else:
                     return Response(
