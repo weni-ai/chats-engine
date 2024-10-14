@@ -7,7 +7,6 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from requests.exceptions import RequestException
 from rest_framework.exceptions import ValidationError
 
 from chats.core.models import BaseModel
@@ -180,23 +179,16 @@ class Room(BaseModel):
         if self.callback_url is None:
             return None
 
-        try:
-            response = requests.post(
-                self.callback_url,
-                data=json.dumps(
-                    {"type": "room.update", "content": room_data},
-                    sort_keys=True,
-                    indent=1,
-                    cls=DjangoJSONEncoder,
-                ),
-                headers={"content-type": "application/json"},
-            )
-            response.raise_for_status()
-
-        except RequestException as error:
-            raise RuntimeError(
-                f"Failed to send callback to {self.callback_url}: {str(error)}"
-            )
+        requests.post(
+            self.callback_url,
+            data=json.dumps(
+                {"type": "room.update", "content": room_data},
+                sort_keys=True,
+                indent=1,
+                cls=DjangoJSONEncoder,
+            ),
+            headers={"content-type": "application/json"},
+        )
 
     def base_notification(self, content, action):
         if self.user:
