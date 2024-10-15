@@ -147,8 +147,9 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
 
     @database_sync_to_async
     def set_user_status(self, status: str):
+        self.permission.refresh_from_db()
         self.permission.status = status
-        self.permission.save()
+        self.permission.save(update_fields=["status"])
         self.permission.notify_user("update", "system")
 
     @database_sync_to_async
