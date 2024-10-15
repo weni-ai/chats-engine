@@ -1,3 +1,4 @@
+import time
 from datetime import timedelta
 
 from django.conf import settings
@@ -148,12 +149,31 @@ class RoomViewset(
         """
         # Add send room notification to the channels group
         instance = self.get_object()
+        for attempt in range(settings.MAX_RETRIES):
+            try:
+                with transaction.atomic():
+                    tags = request.data.get("tags", None)
+                    instance.close(tags, "agent")
+                    serialized_data = RoomSerializer(instance=instance)
+                    instance.notify_queue("close", callback=True)
+                    instance.notify_user("close")
 
-        tags = request.data.get("tags", None)
-        instance.close(tags, "agent")
-        serialized_data = RoomSerializer(instance=instance)
-        instance.notify_queue("close", callback=True)
-        instance.notify_user("close")
+                    if not settings.ACTIVATE_CALC_METRICS:
+                        return Response(serialized_data.data, status=status.HTTP_200_OK)
+
+                    close_room(str(instance.pk))
+                    return Response(serialized_data.data, status=status.HTTP_200_OK)
+
+            except DatabaseError as error:
+                if attempt < settings.MAX_RETRIES - 1:
+                    delay = settings.RETRY_DELAY_SECONDS * (2**attempt)
+                    time.sleep(delay)
+                    continue
+                else:
+                    return Response(
+                        {"error": f"Transaction failed after retries: {str(error)}"},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    )
 
         if not settings.ACTIVATE_CALC_METRICS:
             return Response(serialized_data.data, status=status.HTTP_200_OK)
