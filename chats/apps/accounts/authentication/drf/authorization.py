@@ -68,7 +68,7 @@ class ProjectAdminAuthentication(TokenAuthentication):
 
     def authenticate_credentials(self, key):
         if not self.cache_token:
-            return super()._authenticate_credentials(key)
+            return self._authenticate_credentials(key)
         redis_connection = get_redis_connection()
 
         cache_authorization = redis_connection.get(key)
@@ -78,7 +78,7 @@ class ProjectAdminAuthentication(TokenAuthentication):
             authorization = ProjectAdminDTO(**cache_authorization)
             return (authorization.user_email, authorization)
 
-        auth_instance = super()._authenticate_credentials(key)[1]
+        auth_instance = self._authenticate_credentials(key)[1]
         authorization = ProjectAdminDTO(
             pk=str(auth_instance.pk),
             project=str(auth_instance.project_id),
