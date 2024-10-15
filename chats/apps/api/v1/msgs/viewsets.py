@@ -1,3 +1,4 @@
+from django.db import transaction
 from django_filters.rest_framework import DjangoFilterBackend
 from pydub.exceptions import CouldntDecodeError
 from rest_framework import filters, mixins, pagination, parsers, status, viewsets
@@ -40,8 +41,9 @@ class MessageViewset(
         return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
-        serializer.save()
-        serializer.instance.notify_room("create", True)
+        with transaction.atomic():
+            serializer.save()
+            serializer.instance.notify_room("create", True)
 
     def perform_update(self, serializer):
         serializer.save()
@@ -106,7 +108,8 @@ class MessageMediaViewset(
             )
 
     def perform_create(self, serializer):
-        serializer.save()
-        instance = serializer.instance
-        instance.message.notify_room("update")
-        instance.callback()
+        with transaction.atomic():
+            serializer.save()
+            instance = serializer.instance
+            instance.message.notify_room("update")
+            instance.callback()

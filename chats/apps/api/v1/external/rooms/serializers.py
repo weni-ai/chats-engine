@@ -40,8 +40,9 @@ def get_active_room_flow_start(contact, flow_uuid, project):
             fs.is_deleted = True
             fs.save()
             room = fs.room
-            room.close([], "new_room")
-            close_room(str(room.pk))
+            if room.is_active:
+                room.close([], "new_room")
+                close_room(str(room.pk))
         return None
     return None
 

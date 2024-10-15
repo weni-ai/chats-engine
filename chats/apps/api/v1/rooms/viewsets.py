@@ -2,7 +2,6 @@ import time
 from datetime import timedelta
 
 from django.conf import settings
-from django.db import DatabaseError, transaction
 from django.db.models import BooleanField, Case, Count, Max, OuterRef, Q, Subquery, When
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
@@ -175,6 +174,12 @@ class RoomViewset(
                         {"error": f"Transaction failed after retries: {str(error)}"},
                         status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     )
+
+        if not settings.ACTIVATE_CALC_METRICS:
+            return Response(serialized_data.data, status=status.HTTP_200_OK)
+
+        close_room(str(instance.pk))
+        return Response(serialized_data.data, status=status.HTTP_200_OK)
 
     def perform_create(self, serializer):
         serializer.save()
