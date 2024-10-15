@@ -7,20 +7,25 @@ from chats.apps.rooms.models import Room
 class MessagePermission(permissions.BasePermission):
     def has_permission(self, request, view):
         user = request.user
-        if view.action in ["list", "create"]:
-            room_uuid = request.data.get("room") or request.query_params.get("room")
-            try:
-                room = Room.objects.get(uuid=room_uuid)
-                if room.user == user:
-                    return True
-                project = room.queue.sector.project
-                permission = user.project_permissions.get(project=project)
-            except Room.DoesNotExist:
-                project_uuid = request.query_params.get("project")
-                permission = user.project_permissions.get(project__uuid=project_uuid)
-            return permission.role > 0
+        if view.action not in ["list", "create"]:
+            return super().has_permission(request, view)
 
-        return super().has_permission(request, view)
+        room_uuid = request.data.get("room") or request.query_params.get("room")
+        room = (
+            Room.objects.filter(uuid=room_uuid)
+            .select_related("queue__sector__project")
+            .first()
+        )
+        if room:
+            if room.user == user:
+                return True
+            project = room.queue.sector.project
+            permission = user.project_permissions.get(project=project)
+        else:
+            project_uuid = request.query_params.get("project")
+            permission = user.project_permissions.get(project__uuid=project_uuid)
+
+        return permission.role > 0 if view.action == "list" else False
 
     def has_object_permission(self, request, view, message) -> bool:
         if isinstance(request.user, AnonymousUser):
