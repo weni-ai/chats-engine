@@ -1,6 +1,7 @@
 import json
 
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.db import transaction
 from django.db.models import CharField, Value
 from django.db.models.functions import Concat
 from django_filters.rest_framework import DjangoFilterBackend
@@ -263,6 +264,7 @@ class ProjectViewset(
         url_name="flows",
         serializer_class=ProjectFlowStartSerializer,
     )
+    @transaction.atomic  # revert room update if the flows request fails
     def start_flow(self, request, *args, **kwargs):
         project = self.get_object()
         serializer = ProjectFlowStartSerializer(data=request.data)
