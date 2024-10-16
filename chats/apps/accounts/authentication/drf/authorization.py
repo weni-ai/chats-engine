@@ -10,10 +10,13 @@ from chats.apps.projects.models import ProjectPermission
 
 
 class ProjectAdminDTO:
-    def __init__(self, pk: str, project: str, user_email: str, role: int) -> None:
+    def __init__(
+        self, pk: str, project: str, user_email: str, user_first_name: str, role: int
+    ) -> None:
         self.pk = pk
         self.project = project
         self.user_email = user_email
+        self.user_first_name = user_first_name
         self.role = role
 
     def __dict__(self) -> dict:
@@ -83,6 +86,7 @@ class ProjectAdminAuthentication(TokenAuthentication):
             pk=str(auth_instance.pk),
             project=str(auth_instance.project_id),
             user_email=auth_instance.user_id,
+            user_first_name=auth_instance.user.first_name,
             role=auth_instance.role,
         )
         redis_connection.set(key, json.dumps(dict(authorization)), self.cache_ttl)

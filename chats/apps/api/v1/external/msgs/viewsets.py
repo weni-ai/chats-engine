@@ -4,9 +4,9 @@ from rest_framework import filters, mixins, viewsets
 from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
 )
+from chats.apps.api.v1.external.msgs.filters import MessageFilter
 from chats.apps.api.v1.external.msgs.serializers import MsgFlowSerializer
 from chats.apps.api.v1.external.permissions import IsAdminPermission
-from chats.apps.api.v1.msgs.filters import MessageFilter
 from chats.apps.msgs.models import Message as ChatMessage
 
 
@@ -24,10 +24,15 @@ class MessageFlowViewset(
     authentication_classes = [ProjectAdminAuthentication]
     lookup_field = "uuid"
 
-    def create(self, request, *args, **kwargs):
-        return super().create(request, *args, **kwargs)
-
     def perform_create(self, serializer):
+        validated_data = serializer.validated_data
+        room = validated_data.room
+        if room.project_uuid != self.request.auth.project:
+            self.permission_denied(
+                self.request,
+                message="Ticketer token permission failed on room project",
+                code=403,
+            )
         instance = serializer.save()
         instance.notify_room("create")
         room = instance.room

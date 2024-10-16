@@ -6,7 +6,7 @@ from chats.apps.projects.models import ProjectPermission
 
 class IsAdminPermission(permissions.BasePermission):
     def has_permission(self, request, view):  # pragma: no cover
-        if view.action in ["list", "create"]:
+        if view.action == "list":
             try:
                 permission = request.auth
                 project = permission.project
@@ -74,9 +74,12 @@ class ValidatePermissionRequest:
     def is_valid(self):
         try:
             if self.level_name == "project":
-                return str(self.project.pk) == self.level_id
+                return str(self.project) == self.level_id
             if self.queryset != {}:
-                return self.project.sectors.filter(**self.queryset).exists()
+                from chats.apps.projects.models import Project
+
+                project = Project.objects.get(pk=self.project)
+                return project.sectors.filter(**self.queryset).exists()
         except ObjectDoesNotExist:
             return False
         return False

@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
@@ -99,12 +99,21 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
             )
 
     def perform_create(self, serializer):
-        serializer.save()
-        if serializer.instance.flowstarts.exists():
-            instance = serializer.instance
+        validated_data = serializer.validated_data
+        queue_or_sector = validated_data.queue or validated_data.sector
+        project = queue_or_sector.project
+        if str(project.pk) != self.request.auth.project:
+            self.permission_denied(
+                self.request,
+                message="Ticketer token permission failed on room project",
+                code=403,
+            )
+        room = serializer.save()
+        if room.flowstarts.exists():
+            instance = room
             notification_type = "update"
         else:
-            instance = add_user_or_queue_to_room(serializer.instance, self.request)
+            instance = add_user_or_queue_to_room(room, self.request)
             notification_type = "create"
 
         notify_level = "user" if instance.user else "queue"
@@ -139,13 +148,16 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
             )
         request_permission = self.request.auth
         project = request_permission.project
-        try:
-            room = Room.objects.get(
+        room = (
+            Room.objects.filter(
                 callback_url__endswith=pk,
-                queue__sector__project=project,
+                project_uuid=project,
                 is_active=True,
             )
-        except (Room.DoesNotExist, ValidationError):
+            .select_related("user", "queue__sector__project")
+            .first()
+        )
+        if room is None:
             return Response(
                 {
                     "Detail": "Ticket with the given id was not found, it does not exist or it is closed"
@@ -171,6 +183,7 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
             )
         try:
             agent = filters.get("agent")
+            project = room.project
             agent_permission = project.permissions.get(user__email=agent)
         except ObjectDoesNotExist:
             return Response(
@@ -239,7 +252,7 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
         new_custom_field_value = data["fields"][custom_field_name]
 
         update_flows_custom_fields(
-            project=room.queue.sector.project,
+            project=room.project,
             data=data,
             contact_id=room.contact.external_id,
         )
@@ -247,7 +260,7 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
         update_custom_fields(room, custom_fields_update)
 
         feedback = {
-            "user": request_permission.user.first_name,
+            "user": request_permission.user_first_name,
             "custom_field_name": custom_field_name,
             "old": old_custom_field_value,
             "new": new_custom_field_value,
