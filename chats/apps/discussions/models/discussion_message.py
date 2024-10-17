@@ -3,6 +3,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from chats.core.models import BaseModel, WebSocketsNotifiableMixin
+from chats.core.storage_backends import PrivateMediaStorage
 
 
 class DiscussionMessage(WebSocketsNotifiableMixin, BaseModel):
@@ -65,6 +66,7 @@ class DiscussionMessageMedia(BaseModel):
         blank=True,
         max_length=300,
         upload_to="discussionmedia/%Y/%m/%d/",
+        storage=PrivateMediaStorage(),
     )
 
     class Meta:
