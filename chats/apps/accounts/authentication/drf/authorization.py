@@ -64,8 +64,14 @@ class ProjectAdminAuthentication(TokenAuthentication):
             authorization = model.auth.get(uuid=key)
             if not authorization.is_admin:
                 raise exceptions.PermissionDenied()
-
-            return (authorization.user, authorization)
+            authorization = ProjectAdminDTO(
+                pk=str(authorization.pk),
+                project=str(authorization.project_id),
+                user_email=authorization.user_id,
+                user_first_name=authorization.user.first_name,
+                role=authorization.role,
+            )
+            return (authorization.user_email, authorization)
         except ProjectPermission.DoesNotExist:
             raise exceptions.AuthenticationFailed(_("Invalid token."))
 

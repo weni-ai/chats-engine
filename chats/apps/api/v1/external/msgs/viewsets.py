@@ -26,7 +26,7 @@ class MessageFlowViewset(
 
     def perform_create(self, serializer):
         validated_data = serializer.validated_data
-        room = validated_data.room
+        room = validated_data.get("room")
         if room.project_uuid != self.request.auth.project:
             self.permission_denied(
                 self.request,

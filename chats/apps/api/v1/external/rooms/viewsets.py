@@ -100,7 +100,7 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         validated_data = serializer.validated_data
-        queue_or_sector = validated_data.queue or validated_data.sector
+        queue_or_sector = validated_data.get("queue") or validated_data.get("sector")
         project = queue_or_sector.project
         if str(project.pk) != self.request.auth.project:
             self.permission_denied(
