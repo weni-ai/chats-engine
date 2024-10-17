@@ -9,11 +9,6 @@ from chats.apps.api.v1.external.sectors.serializers import SectorFlowSerializer
 from chats.apps.sectors.models import Sector
 
 
-def get_permission_token_from_request(request):
-    auth_header = request.META.get("HTTP_AUTHORIZATION")
-    return auth_header.split()[1]
-
-
 class SectorFlowViewset(viewsets.ReadOnlyModelViewSet):
     model = Sector
     queryset = Sector.objects.exclude(is_deleted=True)
@@ -29,6 +24,6 @@ class SectorFlowViewset(viewsets.ReadOnlyModelViewSet):
     authentication_classes = [ProjectAdminAuthentication]
 
     def get_queryset(self):
-        permission = get_permission_token_from_request(self.request)
+        permission = self.request.auth
         qs = super().get_queryset()
-        return qs.filter(project__permissions__uuid=permission)
+        return qs.filter(project__permissions__uuid=permission.pk)
