@@ -19,14 +19,6 @@ class ProjectAdminDTO:
         self.user_first_name = user_first_name
         self.role = role
 
-    def __dict__(self) -> dict:
-        return {
-            "pk": self.pk,
-            "project": self.project,
-            "user_email": self.user_email,
-            "role": self.role,
-        }
-
 
 class ProjectAdminAuthentication(TokenAuthentication):
     keyword = "Bearer"
@@ -88,6 +80,6 @@ class ProjectAdminAuthentication(TokenAuthentication):
             return (authorization.user_email, authorization)
 
         authorization = self._authenticate_credentials(key)[1]
-        redis_connection.set(key, json.dumps(dict(authorization)), self.cache_ttl)
+        redis_connection.set(key, json.dumps(authorization.__dict__), self.cache_ttl)
 
         return (authorization.user_email, authorization)
