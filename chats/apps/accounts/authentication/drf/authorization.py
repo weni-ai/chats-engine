@@ -87,14 +87,7 @@ class ProjectAdminAuthentication(TokenAuthentication):
             authorization = ProjectAdminDTO(**cache_authorization)
             return (authorization.user_email, authorization)
 
-        auth_instance = self._authenticate_credentials(key)[1]
-        authorization = ProjectAdminDTO(
-            pk=str(auth_instance.pk),
-            project=str(auth_instance.project_id),
-            user_email=auth_instance.user_id,
-            user_first_name=auth_instance.user.first_name,
-            role=auth_instance.role,
-        )
+        authorization = self._authenticate_credentials(key)[1]
         redis_connection.set(key, json.dumps(dict(authorization)), self.cache_ttl)
 
         return (authorization.user_email, authorization)
