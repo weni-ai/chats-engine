@@ -198,7 +198,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         room = Room.objects.create(
             **validated_data,
-            project_uuid=str(project.uuid),
+            project_uuid=str(queue.project.uuid),
             contact=contact,
             queue=queue,
             protocol=protocol,
