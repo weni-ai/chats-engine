@@ -10,11 +10,6 @@ from chats.apps.api.v1.external.queues.serializers import QueueFlowSerializer
 from chats.apps.queues.models import Queue
 
 
-def get_permission_token_from_request(request):
-    auth_header = request.META.get("HTTP_AUTHORIZATION")
-    return auth_header.split()[1]
-
-
 class QueueFlowViewset(viewsets.ReadOnlyModelViewSet):
     model = Queue
     queryset = Queue.objects.exclude(is_deleted=True)
@@ -28,7 +23,7 @@ class QueueFlowViewset(viewsets.ReadOnlyModelViewSet):
     authentication_classes = [ProjectAdminAuthentication]
 
     def get_queryset(self):
-        permission = get_permission_token_from_request(self.request)
+        permission = self.request.auth
         qs = super().get_queryset()
 
-        return qs.filter(sector__project__permissions__uuid=permission)
+        return qs.filter(sector__project__permissions__uuid=permission.pk)
