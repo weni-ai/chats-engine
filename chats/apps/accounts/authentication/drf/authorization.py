@@ -59,8 +59,10 @@ class ProjectAdminAuthentication(TokenAuthentication):
             authorization = ProjectAdminDTO(
                 pk=str(authorization.pk),
                 project=str(authorization.project_id),
-                user_email=authorization.user_id,
-                user_first_name=authorization.user.first_name,
+                user_email=authorization.user_id or "",
+                user_first_name=(
+                    authorization.user.first_name if authorization.user else ""
+                ),
                 role=authorization.role,
             )
             return (authorization.user_email, authorization)
