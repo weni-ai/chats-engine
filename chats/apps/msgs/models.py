@@ -114,7 +114,10 @@ class MessageMedia(BaseModel):
     )
     content_type = models.CharField(_("Content Type"), max_length=300)
     media_file = models.FileField(
-        _("Media File"), null=True, blank=True, max_length=300
+        _("Media File"),
+        null=True,
+        blank=True,
+        max_length=300,
     )
     media_url = models.TextField(_("Media url"), null=True, blank=True)
 
