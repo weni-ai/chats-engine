@@ -36,6 +36,8 @@ from chats.apps.rooms.views import (
     update_custom_fields,
     update_flows_custom_fields,
 )
+import sentry_sdk
+from requests.exceptions import HTTPError, RequestException
 
 
 class RoomViewset(
@@ -157,7 +159,19 @@ class RoomViewset(
                     tags = request.data.get("tags", None)
                     instance.close(tags, "agent")
                     serialized_data = RoomSerializer(instance=instance)
-                    instance.notify_queue("close", callback=True)
+
+                    try:
+                        instance.notify_queue("close", callback=True)
+                    except HTTPError as http_error:
+                        if http_error.response.status_code == 404:
+                            sentry_sdk.capture_message(
+                                f"Callback return 404 ERROR CODE to: {instance}"
+                            )
+                        else:
+                            raise
+                    except RequestException as error:
+                        sentry_sdk.capture_exception(error)
+                        raise
                     instance.notify_user("close")
 
                     if not settings.ACTIVATE_CALC_METRICS:
@@ -166,14 +180,14 @@ class RoomViewset(
                     close_room(str(instance.pk))
                     return Response(serialized_data.data, status=status.HTTP_200_OK)
 
-            except DatabaseError as error:
+            except DatabaseError as db_error:
                 if attempt < settings.MAX_RETRIES - 1:
                     delay = settings.RETRY_DELAY_SECONDS * (2**attempt)
                     time.sleep(delay)
                     continue
                 else:
                     return Response(
-                        {"error": f"Transaction failed after retries: {str(error)}"},
+                        {"error": f"Transaction failed after retries: {str(db_error)}"},
                         status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     )
 
