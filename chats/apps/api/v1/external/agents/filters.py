@@ -24,7 +24,7 @@ class AgentFlowFilter(filters.FilterSet):
     )
 
     def filter_queue(self, queryset, name, value):
-        return queryset.filter(queue_authorizations__queue__uuid=value)
+        return queryset.filter(queue_authorizations__queue=value)
 
     def filter_sector(self, queryset, name, value):
-        return queryset.filter(sector_authorizations__sector__uuid=value)
+        return queryset.filter(sector_authorizations__sector=value)

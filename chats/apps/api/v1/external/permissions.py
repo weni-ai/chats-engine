@@ -18,7 +18,6 @@ class IsAdminPermission(permissions.BasePermission):
                 return validation.is_valid
             except (AttributeError, IndexError, ProjectPermission.DoesNotExist):
                 return False
-
         return super().has_permission(request, view)
 
     def has_object_permission(self, request, view, obj):
@@ -30,7 +29,7 @@ class IsAdminPermission(permissions.BasePermission):
             project = obj.project
         except ProjectPermission.DoesNotExist:
             return False
-        return permission.project == project
+        return permission.project == str(project.uuid)
 
 
 LEVEL_NAME_MAPPING = {
