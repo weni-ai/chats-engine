@@ -4,7 +4,6 @@ from rest_framework import viewsets
 from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
 )
-from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.external.sectors.serializers import SectorFlowSerializer
 from chats.apps.sectors.models import Sector
 
@@ -17,13 +16,12 @@ class SectorFlowViewset(viewsets.ReadOnlyModelViewSet):
     filterset_fields = [
         "name",
     ]
-    permission_classes = [
-        IsAdminPermission,
-    ]
     lookup_field = "uuid"
     authentication_classes = [ProjectAdminAuthentication]
 
     def get_queryset(self):
         permission = self.request.auth
         qs = super().get_queryset()
-        return qs.filter(project__permissions__uuid=permission.pk)
+        if permission is None or permission.role != 1:
+            return qs.none()
+        return qs.filter(project=permission.project)
