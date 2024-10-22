@@ -1,5 +1,6 @@
 import json
 from datetime import timedelta
+import time
 
 import requests
 from django.core.exceptions import ObjectDoesNotExist
@@ -9,9 +10,12 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from requests.exceptions import RequestException
 from rest_framework.exceptions import ValidationError
+import sentry_sdk
 
 from chats.core.models import BaseModel
 from chats.utils.websockets import send_channels_group
+from django.db import DatabaseError, transaction
+from django.conf import settings
 
 
 class Room(BaseModel):
@@ -180,23 +184,37 @@ class Room(BaseModel):
         if self.callback_url is None:
             return None
 
-        try:
-            response = requests.post(
-                self.callback_url,
-                data=json.dumps(
-                    {"type": "room.update", "content": room_data},
-                    sort_keys=True,
-                    indent=1,
-                    cls=DjangoJSONEncoder,
-                ),
-                headers={"content-type": "application/json"},
-            )
-            response.raise_for_status()
+        for attempt in range(settings.MAX_RETRIES):
+            try:
+                response = requests.post(
+                    self.callback_url,
+                    data=json.dumps(
+                        {"type": "room.update", "content": room_data},
+                        sort_keys=True,
+                        indent=1,
+                        cls=DjangoJSONEncoder,
+                    ),
+                    headers={"content-type": "application/json"},
+                )
 
-        except RequestException as error:
-            raise RuntimeError(
-                f"Failed to send callback to {self.callback_url}: {str(error)}"
-            )
+                if response.status_code == 404:
+                    sentry_sdk.capture_message(
+                        f"Callback returned 404 ERROR for URL: {self.callback_url} with data: {room_data}"
+                    )
+                    return None
+                else:
+                    response.raise_for_status()
+
+                return response
+
+            except RequestException as error:
+                if attempt < settings.MAX_RETRIES - 1:
+                    delay = settings.RETRY_DELAY_SECONDS * (2**attempt)
+                    time.sleep(delay)
+                else:
+                    raise RuntimeError(
+                        f"Failed to send callback to {self.callback_url} after {attempt + 1} attempts: {str(error)}"
+                    )
 
     def base_notification(self, content, action):
         if self.user:
