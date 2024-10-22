@@ -1,7 +1,10 @@
 import json
+import time
 from datetime import timedelta
 
 import requests
+import sentry_sdk
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
@@ -180,23 +183,35 @@ class Room(BaseModel):
         if self.callback_url is None:
             return None
 
-        try:
-            response = requests.post(
-                self.callback_url,
-                data=json.dumps(
-                    {"type": "room.update", "content": room_data},
-                    sort_keys=True,
-                    indent=1,
-                    cls=DjangoJSONEncoder,
-                ),
-                headers={"content-type": "application/json"},
-            )
-            response.raise_for_status()
+        for attempt in range(settings.MAX_RETRIES):
+            try:
+                response = requests.post(
+                    self.callback_url,
+                    data=json.dumps(
+                        {"type": "room.update", "content": room_data},
+                        sort_keys=True,
+                        indent=1,
+                        cls=DjangoJSONEncoder,
+                    ),
+                    headers={"content-type": "application/json"},
+                )
 
-        except RequestException as error:
-            raise RuntimeError(
-                f"Failed to send callback to {self.callback_url}: {str(error)}"
-            )
+                if response.status_code == 404:
+                    sentry_sdk.capture_message(
+                        f"Callback returned 404 ERROR for URL: {self.callback_url}"
+                    )
+                    return None
+                else:
+                    response.raise_for_status()
+
+            except RequestException:
+                if attempt < settings.MAX_RETRIES - 1:
+                    delay = settings.RETRY_DELAY_SECONDS * (2**attempt)
+                    time.sleep(delay)
+                else:
+                    raise RuntimeError(
+                        f"Failed to send callback to {self.callback_url}"
+                    )
 
     def base_notification(self, content, action):
         if self.user:
