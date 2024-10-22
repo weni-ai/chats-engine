@@ -4,15 +4,9 @@ from rest_framework import viewsets
 from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
 )
-from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.external.queues.filters import QueueFlowFilter
 from chats.apps.api.v1.external.queues.serializers import QueueFlowSerializer
 from chats.apps.queues.models import Queue
-
-
-def get_permission_token_from_request(request):
-    auth_header = request.META.get("HTTP_AUTHORIZATION")
-    return auth_header.split()[1]
 
 
 class QueueFlowViewset(viewsets.ReadOnlyModelViewSet):
@@ -21,14 +15,13 @@ class QueueFlowViewset(viewsets.ReadOnlyModelViewSet):
     serializer_class = QueueFlowSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = QueueFlowFilter
-    permission_classes = [
-        IsAdminPermission,
-    ]
+
     lookup_field = "uuid"
     authentication_classes = [ProjectAdminAuthentication]
 
     def get_queryset(self):
-        permission = get_permission_token_from_request(self.request)
+        permission = self.request.auth
         qs = super().get_queryset()
-
-        return qs.filter(sector__project__permissions__uuid=permission)
+        if permission is None or permission.role != 1:
+            return qs.none()
+        return qs.filter(sector__project=permission.project)

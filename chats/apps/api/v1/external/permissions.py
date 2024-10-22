@@ -6,7 +6,7 @@ from chats.apps.projects.models import ProjectPermission
 
 class IsAdminPermission(permissions.BasePermission):
     def has_permission(self, request, view):  # pragma: no cover
-        if view.action in ["list", "create"]:
+        if view.action == "list":
             try:
                 permission = request.auth
                 project = permission.project
@@ -18,7 +18,6 @@ class IsAdminPermission(permissions.BasePermission):
                 return validation.is_valid
             except (AttributeError, IndexError, ProjectPermission.DoesNotExist):
                 return False
-
         return super().has_permission(request, view)
 
     def has_object_permission(self, request, view, obj):
@@ -30,7 +29,7 @@ class IsAdminPermission(permissions.BasePermission):
             project = obj.project
         except ProjectPermission.DoesNotExist:
             return False
-        return permission.project == project
+        return permission.project == str(project.uuid)
 
 
 LEVEL_NAME_MAPPING = {
@@ -74,9 +73,12 @@ class ValidatePermissionRequest:
     def is_valid(self):
         try:
             if self.level_name == "project":
-                return str(self.project.pk) == self.level_id
+                return str(self.project) == self.level_id
             if self.queryset != {}:
-                return self.project.sectors.filter(**self.queryset).exists()
+                from chats.apps.projects.models import Project
+
+                project = Project.objects.get(pk=self.project)
+                return project.sectors.filter(**self.queryset).exists()
         except ObjectDoesNotExist:
             return False
         return False
