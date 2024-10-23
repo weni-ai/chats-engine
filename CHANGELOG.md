@@ -1,3 +1,8 @@
+# 3.10.7
+## Add
+ - Close ticket request retry
+ - External endpoints refactor
+
 # 3.10.0
 ## Change
  - Improve RoomViewset List Queryset
