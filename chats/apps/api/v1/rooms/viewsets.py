@@ -43,7 +43,7 @@ class RoomViewset(
     mixins.UpdateModelMixin,
     GenericViewSet,
 ):
-    queryset = Room.objects.all()
+    queryset = Room.objects.filter(is_active=True)
     serializer_class = RoomSerializer
     filter_backends = [
         DjangoFilterBackend,

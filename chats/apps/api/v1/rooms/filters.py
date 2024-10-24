@@ -12,7 +12,7 @@ User = get_user_model()
 class RoomFilter(filters.FilterSet):
     class Meta:
         model = Room
-        fields = ["queue", "is_active"]
+        fields = ["queue", "is_waiting"]
 
     project = filters.CharFilter(
         field_name="project",
@@ -21,11 +21,9 @@ class RoomFilter(filters.FilterSet):
         help_text=_("Project's UUID"),
     )
 
-    is_active = filters.BooleanFilter(
-        field_name="is_active",
+    attending = filters.BooleanFilter(
         required=False,
-        method="filter_is_active",
-        help_text=_("Is active?"),
+        method="filter_attending",
     )
 
     def filter_project(self, queryset, name, value):
@@ -43,17 +41,14 @@ class RoomFilter(filters.FilterSet):
 
         if project_permission.is_admin:
             user_filter = Q(user=user) | Q(user__isnull=True)
-            return queryset.filter(
-                user_filter, is_active=True, queue__in=project_permission.queue_ids
-            )
+            return queryset.filter(user_filter, queue__in=project_permission.queue_ids)
         user_project = Q(user=user) & Q(project_uuid=value)
         queue_filter = Q(user__isnull=True) & Q(queue__in=project_permission.queue_ids)
         ff = user_project | queue_filter
         queryset = queryset.filter(
             ff,
-            is_active=True,
         )
         return queryset
 
-    def filter_is_active(self, queryset, name, value):
-        return queryset.filter(is_active=value)
+    def filter_attending(self, queryset, name, value):
+        return queryset.filter(user__isnull=not value)
