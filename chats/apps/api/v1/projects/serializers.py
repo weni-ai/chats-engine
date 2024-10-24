@@ -43,6 +43,7 @@ class LinkContactSerializer(serializers.ModelSerializer):
 
 
 class ProjectFlowContactSerializer(serializers.Serializer):
+    uuid = serializers.CharField(required=False)
     name = serializers.CharField()
     language = serializers.CharField(required=False, max_length=3)
     urns = serializers.ListField(child=serializers.CharField(), max_length=100)
