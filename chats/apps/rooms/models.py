@@ -224,14 +224,17 @@ class Room(BaseModel):
         self.user = None
         self.save()
 
-    def base_notification(self, content, action):
-        group_name = f"queue_{self.queue.pk}"
+    def get_notification_group(self):
         if self.user:
             permission = self.get_permission(self.user)
-            group_name = (
-                group_name if permission is None else f"permission_{permission.pk}"
-            )
+            if permission is not None:
+                return f"permission_{permission.pk}"
             self.send_to_queue()
+
+        return f"queue_{self.queue.pk}"
+
+    def base_notification(self, content, action):
+        group_name = self.get_notification_group()
 
         send_channels_group(
             group_name=group_name,
