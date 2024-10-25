@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 from datetime import timedelta
 
@@ -15,6 +16,8 @@ from rest_framework.exceptions import ValidationError
 
 from chats.core.models import BaseModel
 from chats.utils.websockets import send_channels_group
+
+LOGGER = logging.getLogger(__name__)
 
 
 class Room(BaseModel):
@@ -213,12 +216,25 @@ class Room(BaseModel):
                         f"Failed to send callback to {self.callback_url}"
                     )
 
-    def base_notification(self, content, action):
+    def send_to_queue(self):
+        LOGGER.info(
+            msg="Return room to queue as the user does not have permission.",
+            stack_info=True,
+        )
+        self.user = None
+        self.save()
+
+    def get_notification_group(self):
         if self.user:
             permission = self.get_permission(self.user)
-            group_name = f"permission_{permission.pk}"
-        else:
-            group_name = f"queue_{self.queue.pk}"
+            if permission is not None:
+                return f"permission_{permission.pk}"
+            self.send_to_queue()
+
+        return f"queue_{self.queue.pk}"
+
+    def base_notification(self, content, action):
+        group_name = self.get_notification_group()
 
         send_channels_group(
             group_name=group_name,
