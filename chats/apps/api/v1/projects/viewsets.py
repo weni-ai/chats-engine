@@ -209,6 +209,33 @@ class ProjectViewset(
         )
         return Response(contact_response_data, response_status)
 
+    @action(detail=True, methods=["PUT"], url_name="edit_contact")
+    def edit_contact(self, request, *args, **kwargs):
+        project = self.get_object()
+        serializer = ProjectFlowContactSerializer(data=request.data)
+        flows_client = FlowRESTClient()
+
+        if serializer.is_valid() is False:
+            return Response(
+                {"Detail": "Data not valid."},
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        contact_uuid = request.data.get("uuid")
+        data = serializer.validated_data
+
+        contact_response = flows_client.create_contact(
+            project=project, data=data, contact_id=contact_uuid
+        )
+
+        contact_response_data = contact_response.json()
+        response_status = (
+            status.HTTP_200_OK
+            if contact_response.status_code in [200, 201]
+            else status.HTTP_400_BAD_REQUEST
+        )
+        return Response(contact_response_data, response_status)
+
     @action(detail=True, methods=["GET"], url_name="groups")
     def list_groups(self, request, *args, **kwargs):
         project = self.get_object()
