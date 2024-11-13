@@ -1,3 +1,10 @@
+# 3.11.0
+## Add
+  - org field in project
+## Change
+ - assing project uuid to flows when create a queue.
+ - using refresh from db to get the last version of permission object before closing connection.
+
 # 3.10.8
 ## Add
   - Endpoint to edit contact on flows
