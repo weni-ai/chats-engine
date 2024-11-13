@@ -51,11 +51,11 @@ def retry_request_and_refresh_flows_auth_token(
 
 
 class FlowsQueueMixin:
-    def create_queue(self, uuid: str, name: str, sector_uuid: str):
+    def create_queue(self, uuid: str, name: str, sector_uuid: str, project_uuid: str):
         response = requests.post(
             url=f"{self.base_url}/api/v2/internals/ticketers/{sector_uuid}/queues/",
             headers=self.headers,
-            json={"uuid": uuid, "name": name},
+            json={"uuid": uuid, "name": name, "project_uuid": project_uuid},
         )
         if response.status_code not in [
             status.HTTP_200_OK,

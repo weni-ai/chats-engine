@@ -60,6 +60,7 @@ class Project(BaseConfigurableModel, BaseModel):
         null=True,
         blank=True,
     )
+    org = models.CharField(_("org uuid"), max_length=50, null=True, blank=True)
 
     class Meta:
         verbose_name = _("Project")

@@ -64,6 +64,7 @@ class QueueViewset(ModelViewSet):
             "uuid": str(instance.uuid),
             "name": instance.name,
             "sector_uuid": str(instance.sector.uuid),
+            "project_uuid": str(instance.sector.project.uuid),
         }
         if not settings.USE_WENI_FLOWS:
             return super().perform_create(serializer)
