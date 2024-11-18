@@ -11,7 +11,19 @@ User = get_user_model()
 class DiscussionFilter(filters.FilterSet):
     class Meta:
         model = Discussion
-        fields = ["room", "is_active"]
+        fields = ["room", "is_active", "subject"]
+
+    subject = filters.CharFilter(
+        field_name="subject",
+        lookup_expr="icontains",
+        help_text=_("Filter discussions by subject text"),
+    )
+
+    contact = filters.CharFilter(
+        field_name="room__contact__name",
+        lookup_expr="icontains",
+        help_text=_("Filter discussions by contact's name"),
+    )
 
     project = filters.CharFilter(
         field_name="project",
