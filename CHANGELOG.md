@@ -1,3 +1,7 @@
+# 3.11.1
+## Add
+  - new filters in discussion
+
 # 3.11.0
 ## Add
   - org field in project
