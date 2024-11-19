@@ -11,7 +11,12 @@ User = get_user_model()
 class DiscussionFilter(filters.FilterSet):
     class Meta:
         model = Discussion
-        fields = ["room", "is_active"]
+        fields = ["room", "is_active", "subject"]
+
+    search = filters.CharFilter(
+        method="filter_search",
+        help_text=_("Filter discussions by subject or contact's name"),
+    )
 
     project = filters.CharFilter(
         field_name="project",
@@ -19,6 +24,11 @@ class DiscussionFilter(filters.FilterSet):
         method="filter_project",
         help_text=_("Projects's UUID"),
     )
+
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(
+            Q(subject__icontains=value) | Q(room__contact__name__icontains=value)
+        )
 
     def filter_project(self, queryset, name, value):
         if self.request.query_params.get("room") and not self.request.query_params.get(
