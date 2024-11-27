@@ -35,6 +35,7 @@ from chats.apps.rooms.views import (
     update_custom_fields,
     update_flows_custom_fields,
 )
+from chats.apps.projects.usecases.send_room_info import RoomInfoUseCase
 
 
 class RoomViewset(
@@ -161,6 +162,10 @@ class RoomViewset(
             return Response(serialized_data.data, status=status.HTTP_200_OK)
 
         close_room(str(instance.pk))
+
+        room_client = RoomInfoUseCase()
+        room_client.get_room(instance)
+
         return Response(serialized_data.data, status=status.HTTP_200_OK)
 
     def perform_create(self, serializer):
