@@ -80,7 +80,7 @@ class SectorAuthorizationViewset(viewsets.ModelViewSet):
 
 
 class SectorTagsViewset(viewsets.ModelViewSet):
-    queryset = SectorTag.objects.all()
+    queryset = SectorTag.objects.all().order_by("name")
     serializer_class = SectorTagSerializer
     permission_classes = [IsAuthenticated, ModuleHasPermission]
     filter_backends = [DjangoFilterBackend]

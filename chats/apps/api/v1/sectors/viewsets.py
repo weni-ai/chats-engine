@@ -189,7 +189,7 @@ class SectorViewset(viewsets.ModelViewSet):
 
 
 class SectorTagsViewset(viewsets.ModelViewSet):
-    queryset = SectorTag.objects.all()
+    queryset = SectorTag.objects.all().order_by("name")
     serializer_class = sector_serializers.SectorTagSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = SectorTagFilter
