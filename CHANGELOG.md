@@ -1,3 +1,7 @@
+#3.11.2
+## Add
+ - ordering tags by name
+
 # 3.11.1
 ## Add
   - new filters in discussion
