@@ -107,6 +107,7 @@ def dashboard_general_data(context: dict, project):
 
 class DashboardAgentsSerializer(serializers.Serializer):
     first_name = serializers.CharField(allow_null=True, required=False)
+    last_name = serializers.CharField(allow_null=True, required=False)
     email = serializers.EmailField(allow_null=True, required=False)
     agent_status = serializers.CharField(allow_null=True, required=False)
     closed_rooms = serializers.IntegerField(allow_null=True, required=False)

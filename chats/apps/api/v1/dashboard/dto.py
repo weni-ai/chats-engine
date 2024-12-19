@@ -6,6 +6,7 @@ from chats.apps.projects.models import Project, ProjectPermission
 @dataclass
 class Agent:
     first_name: str = None
+    last_name: str = None
     email: str = None
     agent_status: str = None
     closed_rooms: int = None
