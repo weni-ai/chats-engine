@@ -149,6 +149,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             "contact",
             "created_on",
             "custom_fields",
+            "ticket_uuid",
             "callback_url",
             "is_waiting",
             "flow_uuid",
