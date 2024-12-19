@@ -151,7 +151,7 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
         project = request_permission.project
         room = (
             Room.objects.filter(
-                (Q(ticket__uuid=pk) | Q(callback_url__endswith=pk))
+                (Q(ticket_uuid=pk) | Q(callback_url__endswith=pk))
                 & Q(project_uuid=project)
                 & Q(is_active=True)
             )
