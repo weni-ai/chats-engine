@@ -24,6 +24,7 @@ class RepositoryTests(TestCase):
         )
         for fields in agents_fields:
             self.assertTrue(hasattr(fields, "first_name"))
+            self.assertTrue(hasattr(fields, "last_name"))
             self.assertTrue(hasattr(fields, "email"))
             self.assertTrue(hasattr(fields, "agent_status"))
             self.assertTrue(hasattr(fields, "closed_rooms"))
@@ -39,6 +40,7 @@ class RepositoryTests(TestCase):
         )
 
         self.assertEqual(agents_fields[2].first_name, "")
+        self.assertEqual(agents_fields[2].last_name, "")
         self.assertEqual(agents_fields[2].email, "amywong@chats.weni.ai")
         self.assertEqual(agents_fields[2].agent_status, "OFFLINE")
         self.assertEqual(agents_fields[2].closed_rooms, 0)
