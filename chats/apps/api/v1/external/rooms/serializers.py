@@ -132,6 +132,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
     contact = ContactRelationsSerializer(many=False, required=False, read_only=False)
     flow_uuid = serializers.CharField(required=False, write_only=True, allow_null=True)
     is_anon = serializers.BooleanField(write_only=True, required=False, default=False)
+    ticket_uuid = serializers.UUIDField(required=False)
 
     class Meta:
         model = Room
@@ -144,6 +145,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             "transfer_history",
             # Writable Fields
             "sector_uuid",
+            "ticket_uuid",
             "queue_uuid",
             "user_email",
             "contact",
