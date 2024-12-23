@@ -1,4 +1,8 @@
-#3.11.2
+# 3.11.3
+## Add
+ - last name to dashboard agent returned data
+
+# 3.11.2
 ## Add
  - ordering tags by name
 
