@@ -25,6 +25,7 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
             "queue",
             "created_on",
             "tags",
+            "link",
         ]
 
     def get_agent(self, obj):
@@ -39,5 +40,6 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
                 f"chats:dashboard/view-mode/{obj.user.email}/?room_uuid={obj.uuid}"
                 if obj.user
                 else None
-            )
+            ),
+            "type": "internal",
         }
