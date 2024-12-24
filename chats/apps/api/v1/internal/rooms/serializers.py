@@ -10,6 +10,7 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
     tags = TagSimpleSerializer(many=True, required=False)
     sector = serializers.CharField(source="queue.sector.name")
     queue = serializers.CharField(source="queue.name")
+    link = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -31,3 +32,12 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
             return obj.user.full_name
         except AttributeError:
             return ""
+
+    def get_link(self, obj: Room) -> dict:
+        return {
+            "url": (
+                f"chats:dashboard/view-mode/{obj.user.email}/?room_uuid={obj.uuid}"
+                if obj.user
+                else None
+            )
+        }
