@@ -1,3 +1,7 @@
+# 3.12.0
+## Add
+ - chat redirect link to the room data returned via the rooms list internal endpoint
+
 # 3.11.3
 ## Add
  - last name to dashboard agent returned data
