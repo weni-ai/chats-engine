@@ -1,3 +1,7 @@
+# 3.12.1
+## Fix
+  - check if room is active before returning redirection link
+
 # 3.12.0
 ## Add
  - chat redirect link to the room data returned via the rooms list internal endpoint
