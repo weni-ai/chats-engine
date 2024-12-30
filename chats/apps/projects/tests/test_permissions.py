@@ -32,6 +32,10 @@ class EndpointPermissionTestCase(TestCase):
                     f"O endpoint {path} não possui permission_classes definidas.",
                 )
             except Resolver404:
-                continue
+                print("erro", path)
             except AttributeError:
                 continue
+
+
+# o resolver retorna todas as urls
+# mas as urls que sao dinamicas (no caso do chats, 151 de 334) precisam ter algum dado passado pra ela pra funcionar
