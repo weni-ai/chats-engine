@@ -1,3 +1,7 @@
+# 3.13.0
+## Add
+  - ticket_uuid field in Room
+
 # 3.12.1
 ## Fix
   - check if room is active before returning redirection link
