@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import Callable
 
@@ -8,6 +9,7 @@ from rest_framework import status
 from chats.apps.api.v1.internal.rest_clients.internal_authorization import (
     InternalAuthentication,
 )
+from chats.core.requests import request_with_retry
 
 LOGGER = logging.getLogger(__name__)
 
@@ -236,4 +238,24 @@ class FlowRESTClient(
             json=data,
             headers=self.project_headers(project.flows_authorization),
         )
+        return response.json()
+
+    def update_ticket_assignee(self, ticket_uuid: str, user_email: str):
+        url = f"{self.base_url}/api/v2/internals/ticket_assignee"
+
+        data = {
+            "uuid": ticket_uuid,
+            "email": user_email,
+        }
+
+        response = request_with_retry(
+            requests.post,
+            request_kwargs={
+                "url": url,
+                "headers": self.headers,
+                "json": json.dumps(data),
+                "timeout": 60,
+            },
+        )
+
         return response.json()
