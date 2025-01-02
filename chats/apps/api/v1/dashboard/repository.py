@@ -77,13 +77,19 @@ class AgentRepository:
                 opened_rooms=Count("rooms", filter=Q(**opened_rooms, **rooms_filter)),
             )
             .values(
-                "first_name", "email", "agent_status", "closed_rooms", "opened_rooms"
+                "first_name",
+                "last_name",
+                "email",
+                "agent_status",
+                "closed_rooms",
+                "opened_rooms",
             )
         )
 
         user_agents = [
             Agent(
                 first_name=user_agent["first_name"],
+                last_name=user_agent["last_name"],
                 email=user_agent["email"],
                 agent_status=user_agent["agent_status"],
                 closed_rooms=user_agent["closed_rooms"],

@@ -47,6 +47,7 @@ class SerializerTests(TestCase):
     def test_returned_fields_from_dashboard_agent_serializer(self):
         serializer_data: Dict[str, Any] = {
             "first_name": "John",
+            "last_name": "Smith",
             "email": "invalid_email",
             "agent_status": "ACTIVE",
             "closed_rooms": 3,

@@ -1,4 +1,16 @@
-#3.11.2
+# 3.12.1
+## Fix
+  - check if room is active before returning redirection link
+
+# 3.12.0
+## Add
+ - chat redirect link to the room data returned via the rooms list internal endpoint
+
+# 3.11.3
+## Add
+ - last name to dashboard agent returned data
+
+# 3.11.2
 ## Add
  - ordering tags by name
 
