@@ -321,5 +321,5 @@ class Room(BaseModel):
         return not self.is_active or perm.is_manager(any_sector=True)
 
     def update_ticket(self):
-        if self.ticket_uuid:
+        if self.ticket_uuid and self.user:
             update_ticket_on_flows.delay(self.ticket_uuid, self.user.email)
