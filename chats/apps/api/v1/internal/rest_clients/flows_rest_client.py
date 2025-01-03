@@ -261,5 +261,5 @@ class FlowRESTClient(
                 indent=1,
                 cls=DjangoJSONEncoder,
             ),
-            headers={"content-type": "application/json"},
+            headers=self.headers,
         )
