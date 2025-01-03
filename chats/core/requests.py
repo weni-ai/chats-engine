@@ -55,5 +55,5 @@ def request_with_retry(
         else:
             return response
 
-    if exception:
+    if exception and settings.USE_SENTRY:
         capture_exception(exception)
