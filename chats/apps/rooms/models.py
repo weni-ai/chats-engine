@@ -59,6 +59,7 @@ class Room(BaseModel):
     project_uuid = models.TextField(
         _("project_uuid"), null=True, blank=True, default=""
     )
+    ticket_uuid = models.UUIDField(_("ticket uuid"), null=True, blank=True)
 
     callback_url = models.TextField(_("Callback URL"), null=True, blank=True)
 
