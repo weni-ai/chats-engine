@@ -38,7 +38,7 @@ def request_with_retry(
     request_kwargs: dict,
     attempts: int = 5,
     wait_time: int = 1,
-    backoff_factor: int = 1,
+    backoff_factor: int = 2,
 ) -> Response:
     exception = None
 
@@ -47,7 +47,7 @@ def request_with_retry(
             response: Response = request_method(**request_kwargs)
             response.raise_for_status()
 
-        except requests.HTTPError as exp:
+        except Exception as exp:
             wait_time *= backoff_factor
             exception = exp
 
