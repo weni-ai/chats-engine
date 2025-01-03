@@ -258,4 +258,7 @@ class FlowRESTClient(
             },
         )
 
+        if not response:
+            return None
+
         return response.json()
