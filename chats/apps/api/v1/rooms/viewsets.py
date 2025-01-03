@@ -420,6 +420,8 @@ class RoomViewset(
                         room.notify_user("update", user=transfer_user)
                     room.notify_user("update")
 
+                    room.update_ticket()
+
             if queue_uuid:
                 queue = Queue.objects.get(uuid=queue_uuid)
                 for room in rooms_list:
