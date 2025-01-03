@@ -4,12 +4,13 @@ from typing import Callable
 
 import requests
 from django.conf import settings
+from django.core.serializers.json import DjangoJSONEncoder
 from rest_framework import status
 
 from chats.apps.api.v1.internal.rest_clients.internal_authorization import (
     InternalAuthentication,
 )
-from chats.core.requests import request_with_retry
+from chats.core.requests import get_request_session_with_retries
 
 LOGGER = logging.getLogger(__name__)
 
@@ -248,17 +249,17 @@ class FlowRESTClient(
             "email": user_email,
         }
 
-        response = request_with_retry(
-            requests.post,
-            request_kwargs={
-                "url": url,
-                "headers": self.headers,
-                "json": json.dumps(data),
-                "timeout": 60,
-            },
+        request_session = get_request_session_with_retries(
+            status_forcelist=[429, 500, 502, 503, 504], method_whitelist=["POST"]
         )
 
-        if not response:
-            return None
-
-        return response.json()
+        request_session.post(
+            url,
+            data=json.dumps(
+                data,
+                sort_keys=True,
+                indent=1,
+                cls=DjangoJSONEncoder,
+            ),
+            headers={"content-type": "application/json"},
+        )
