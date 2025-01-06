@@ -1,8 +1,10 @@
 import json
+import uuid
 
 from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 
@@ -10,7 +12,8 @@ from chats.core.models import BaseModel
 from chats.core.requests import get_request_session_with_retries
 
 
-class Message(BaseModel):
+class Message(models.Model):
+    uuid = models.UUIDField(default=uuid.uuid4, primary_key=True)
     room = models.ForeignKey(
         "rooms.Room",
         related_name="messages",
@@ -36,6 +39,10 @@ class Message(BaseModel):
     )
     text = models.TextField(_("Text"), blank=True, null=True)
     seen = models.BooleanField(_("Was it seen?"), default=False)
+    created_on = models.DateTimeField(
+        _("Created on"), editable=False, default=timezone.now
+    )
+    modified_on = models.DateTimeField(_("Modified on"), auto_now=True)
 
     class Meta:
         verbose_name = "Message"
@@ -55,6 +62,10 @@ class Message(BaseModel):
             )
 
         return super().save(*args, **kwargs)
+
+    @property
+    def edited(self) -> bool:
+        return bool(self.modified_by)
 
     @property
     def serialized_ws_data(self) -> dict:
