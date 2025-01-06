@@ -6,7 +6,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 
-from chats.core.models import BaseModel, BaseModelWithManualCreatedOn
+from chats.core.models import BaseModelWithManualCreatedOn
 from chats.core.requests import get_request_session_with_retries
 
 
