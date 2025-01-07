@@ -1,3 +1,9 @@
+# 3.13.1
+## Add
+  - is_active field to ListRoomSerializer
+## Fix
+  - new message timestamp
+
 # 3.13.0
 ## Add
   - ticket_uuid field in Room
