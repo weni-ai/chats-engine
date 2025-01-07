@@ -100,6 +100,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
 
     last_interaction = serializers.DateTimeField(read_only=True)
     can_edit_custom_fields = serializers.SerializerMethodField()
+    is_active = serializers.BooleanField(default=True)
 
     class Meta:
         model = Room
@@ -119,6 +120,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
             "transfer_history",
             "protocol",
             "service_chat",
+            "is_active",
         ]
 
     def get_user(self, room: Room):
