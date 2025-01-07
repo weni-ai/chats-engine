@@ -9,15 +9,12 @@ from chats.utils.websockets import send_channels_group
 
 class WebSocketsNotifiableMixin:
     @property
-    def serialized_ws_data(self) -> dict:
-        ...
+    def serialized_ws_data(self) -> dict: ...
 
     @property
-    def notification_groups(self) -> list:
-        ...
+    def notification_groups(self) -> list: ...
 
-    def get_action(self, action: str) -> str:
-        ...
+    def get_action(self, action: str) -> str: ...
 
     def notify(self, action: str, groups: list = [], content: dict = {}) -> None:
         if "." not in action:
@@ -46,6 +43,15 @@ class BaseModel(models.Model):
     @property
     def edited(self) -> bool:
         return bool(self.modified_by)
+
+
+class BaseModelWithManualCreatedOn(BaseModel):
+    created_on = models.DateTimeField(
+        _("Created on"), editable=False, default=timezone.now
+    )
+
+    class Meta:
+        abstract = True
 
 
 class BaseSoftDeleteModel(models.Model):
