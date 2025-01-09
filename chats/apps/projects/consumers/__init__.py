@@ -3,3 +3,5 @@ from .project_consumer import ProjectConsumer
 from .dead_letter_consumer import DeadLetterConsumer
 from .permission_consumer import ProjectPermissionConsumer
 from .sector_consumer import SectorConsumer
+from .update_message_consumer import MessageConsumer
+from .update_status_consumer import MessageStatusConsumer
