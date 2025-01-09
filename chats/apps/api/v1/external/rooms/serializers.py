@@ -206,7 +206,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             protocol=protocol,
             service_chat=service_chat
         )
-        RoomMetrics.objects.create(room=room)
+        RoomMetrics.objects.get_or_create(room=room)
 
         return room
 
