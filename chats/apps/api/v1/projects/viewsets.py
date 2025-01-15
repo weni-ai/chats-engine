@@ -460,10 +460,17 @@ class ProjectViewset(
 
 
 class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
-    queryset = ProjectPermission.objects.all().annotate(
-        full_name=Concat(
-            "user__first_name", Value(" "), "user__last_name", output_field=CharField()
+    queryset = (
+        ProjectPermission.objects.all()
+        .annotate(
+            full_name=Concat(
+                "user__first_name",
+                Value(" "),
+                "user__last_name",
+                output_field=CharField(),
+            )
         )
+        .order_by("full_name")
     )
     serializer_class = ProjectPermissionReadSerializer
     permission_classes = []
