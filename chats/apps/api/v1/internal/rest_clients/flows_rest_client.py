@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import Callable
 
@@ -83,9 +84,10 @@ class FlowsQueueMixin:
             )
         return response
 
-    def destroy_queue(self, uuid: str, sector_uuid: str):
+    def destroy_queue(self, uuid: str, sector_uuid: str, project_uuid: str):
         response = requests.delete(
             url=f"{self.base_url}/api/v2/internals/ticketers/{sector_uuid}/queues/{uuid}/",
+            json={"project_uuid": project_uuid},
             headers=self.headers,
         )
 
