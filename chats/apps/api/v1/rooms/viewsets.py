@@ -35,6 +35,8 @@ from chats.apps.rooms.views import (
     update_custom_fields,
     update_flows_custom_fields,
 )
+from django.utils.timezone import make_aware
+from datetime import datetime, timedelta
 
 
 class RoomViewset(
@@ -452,3 +454,39 @@ class RoomViewset(
             {"success": "Mass transfer completed"},
             status=status.HTTP_200_OK,
         )
+
+    @action(detail=True, methods=["get"], url_path="human-service-count")
+    def filter_rooms(self, request, pk=None):
+        project_uuid = pk
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
+
+        if not project_uuid:
+            return Response({"error": "'project_uuid' is required."}, status=400)
+
+        default_start_date = make_aware(datetime.now() - timedelta(days=30))
+        default_end_date = make_aware(datetime.now())
+
+        try:
+            if start_date:
+                start_date = make_aware(datetime.strptime(start_date, "%Y-%m-%d"))
+            else:
+                start_date = default_start_date
+
+            if end_date:
+                end_date = make_aware(datetime.strptime(end_date, "%Y-%m-%d"))
+            else:
+                end_date = default_end_date
+        except ValueError:
+            return Response(
+                {"error": "Invalid date format. Use 'YYYY-MM-DD'."}, status=400
+            )
+
+        rooms = Room.objects.filter(
+            queue__sector__project=project_uuid,
+            created_on__gte=start_date,
+            created_on__lte=end_date,
+        )
+
+        room_count = rooms.count()
+        return Response({"room_count": room_count})
