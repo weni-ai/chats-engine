@@ -1,3 +1,10 @@
+# 3.13.2
+## Add
+  - new endpoint to list human service rooms.
+## Fix
+  - order by name in project permission endpoint
+  - passing project uuid to flows when deleting a queue.
+
 # 3.13.1
 ## Add
   - is_active field to ListRoomSerializer
