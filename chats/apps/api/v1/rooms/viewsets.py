@@ -36,7 +36,7 @@ from chats.apps.rooms.views import (
     update_flows_custom_fields,
 )
 from django.utils.timezone import make_aware
-from datetime import datetime, timedelta
+from datetime import datetime
 
 
 class RoomViewset(
