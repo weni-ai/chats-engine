@@ -455,9 +455,9 @@ class RoomViewset(
             status=status.HTTP_200_OK,
         )
 
-    @action(detail=True, methods=["get"], url_path="human-service-count")
+    @action(detail=False, methods=["get"], url_path="human-service-count")
     def filter_rooms(self, request, pk=None):
-        project_uuid = pk
+        project_uuid = request.query_params.get("project_uuid")
         start_date = request.query_params.get("start_date")
         end_date = request.query_params.get("end_date")
 
