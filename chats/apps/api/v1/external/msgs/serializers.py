@@ -35,6 +35,7 @@ class MsgFlowSerializer(serializers.ModelSerializer):
     media = MessageMediaSerializer(required=False, many=True, read_only=True)
     contact = ContactRelationsSerializer(many=False, required=False, read_only=True)
     user = UserSerializer(many=False, required=False, read_only=True)
+    created_on = serializers.DateTimeField(required=False)
 
     class Meta:
         model = Message
