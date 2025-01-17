@@ -1,7 +1,10 @@
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+from django.utils import timezone
+from django.utils.timezone import timedelta
 
+from chats.apps.msgs.models import Message
 from chats.apps.rooms.models import Room
 
 
@@ -23,7 +26,7 @@ class MsgsExternalTests(APITestCase):
         queue.save()
         return queue
 
-    def _request_create_message(self, direction: str = "incoming"):
+    def _request_create_message(self, direction: str = "incoming", created_on=None):
         url = reverse("external_message-list")
         client = self.client
         client.credentials(
@@ -31,9 +34,10 @@ class MsgsExternalTests(APITestCase):
         )
         data = {
             "room": self.room.uuid,
-            "text": "olá.",
+            "text": "olá!!!!.",
             "direction": direction,
             "attachments": [{"content_type": "string", "url": "http://example.com"}],
+            "created_on": created_on,
         }
         return client.post(url, data=data, format="json")
 
@@ -41,9 +45,15 @@ class MsgsExternalTests(APITestCase):
         """
         Verify if the external message endpoint are creating messages correctly.
         """
-        response = self._request_create_message()
+        created_on = timezone.now() - timedelta(days=5)
+        response = self._request_create_message(created_on=created_on)
+
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(self.room.messages.count(), 3)
+
+        msg = Message.objects.filter(uuid=response.data["uuid"]).first()
+        self.assertIsNotNone(msg)
+        self.assertEqual(msg.created_on, created_on)
 
     def test_create_with_default_message_room_without_user(self):
         _ = self._remove_user()
