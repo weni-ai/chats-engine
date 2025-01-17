@@ -34,7 +34,7 @@ class MsgsExternalTests(APITestCase):
         )
         data = {
             "room": self.room.uuid,
-            "text": "olá!!!!.",
+            "text": "olá.",
             "direction": direction,
             "attachments": [{"content_type": "string", "url": "http://example.com"}],
             "created_on": created_on,
