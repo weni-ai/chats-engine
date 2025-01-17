@@ -55,7 +55,6 @@ class MsgFlowSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "uuid",
             "user",
-            "created_on",
             "contact",
             "media",
         ]
