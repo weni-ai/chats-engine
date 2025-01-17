@@ -55,6 +55,20 @@ class MsgsExternalTests(APITestCase):
         self.assertIsNotNone(msg)
         self.assertEqual(msg.created_on, created_on)
 
+    def test_create_external_msgs_with_null_created_on(self):
+        """
+        Verify if the external message endpoint are creating messages correctly
+        when passing a null created_on.
+        """
+        response = self._request_create_message()
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(self.room.messages.count(), 3)
+
+        msg = Message.objects.filter(uuid=response.data["uuid"]).first()
+        self.assertIsNotNone(msg)
+        self.assertEqual(msg.created_on.date(), timezone.now().date())
+
     def test_create_with_default_message_room_without_user(self):
         _ = self._remove_user()
 
