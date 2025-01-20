@@ -21,6 +21,7 @@ class Room(BaseModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.__original_is_active = self.is_active
+        self.__original_user = self.user
 
     user = models.ForeignKey(
         "accounts.User",
@@ -107,8 +108,9 @@ class Room(BaseModel):
         if self.__original_is_active is False:
             raise ValidationError({"detail": _("Closed rooms cannot receive updates")})
 
-        if self.user and not self.user_assigned_at:
-            # TODO: Check if the transfer causes this value to change
+        if (self.user and not self.user_assigned_at) or (
+            self.pk and self.user != self.__original_user
+        ):
             self.user_assigned_at = timezone.now()
 
         return super().save(*args, **kwargs)
