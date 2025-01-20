@@ -85,6 +85,10 @@ class Room(BaseModel):
         _("service chat"), null=True, blank=True, default=""
     )
 
+    user_assigned_at = models.DateTimeField(
+        _("User assigned at"), null=True, blank=True
+    )
+
     class Meta:
         verbose_name = _("Room")
         verbose_name_plural = _("Rooms")
@@ -102,6 +106,11 @@ class Room(BaseModel):
     def save(self, *args, **kwargs) -> None:
         if self.__original_is_active is False:
             raise ValidationError({"detail": _("Closed rooms cannot receive updates")})
+
+        if self.user and not self.user_assigned_at:
+            # TODO: Check if the transfer causes this value to change
+            self.user_assigned_at = timezone.now()
+
         return super().save(*args, **kwargs)
 
     def get_permission(self, user):
