@@ -498,7 +498,6 @@ class RoomViewset(
         detail=False,
         methods=["get"],
         url_name="rooms-info",
-        url_path="rooms-info",
         serializer_class=RoomInfoSerializer,
     )
     def rooms_info(self, request: Request, pk=None) -> Response:
