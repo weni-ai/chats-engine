@@ -10,6 +10,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from model_utils import FieldTracker
 from requests.exceptions import RequestException
 from rest_framework.exceptions import ValidationError
 
@@ -21,7 +22,6 @@ class Room(BaseModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.__original_is_active = self.is_active
-        self.__original_user = self.user
 
     user = models.ForeignKey(
         "accounts.User",
@@ -90,6 +90,8 @@ class Room(BaseModel):
         _("User assigned at"), null=True, blank=True
     )
 
+    tracker = FieldTracker(fields=["user"])
+
     class Meta:
         verbose_name = _("Room")
         verbose_name_plural = _("Rooms")
@@ -108,8 +110,10 @@ class Room(BaseModel):
         if self.__original_is_active is False:
             raise ValidationError({"detail": _("Closed rooms cannot receive updates")})
 
-        if (self.user and not self.user_assigned_at) or (
-            self.pk and self.user != self.__original_user
+        if (
+            self.user
+            and not self.user_assigned_at
+            or (self.pk and self.tracker.has_changed("user"))
         ):
             self.user_assigned_at = timezone.now()
 
