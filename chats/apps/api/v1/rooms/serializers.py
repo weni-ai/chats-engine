@@ -1,3 +1,4 @@
+from datetime import datetime
 from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
 from rest_framework import serializers
 
@@ -233,3 +234,25 @@ class RoomContactSerializer(serializers.ModelSerializer):
 
     def get_is_waiting(self, room: Room):
         return room.get_is_waiting()
+
+
+class RoomInfoSerializer(serializers.ModelSerializer):
+    first_user_message_sent_at = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Room
+        fields = [
+            "uuid",
+            "first_user_message_sent_at",
+            "user_assigned_at",
+        ]
+
+    def get_first_user_message_sent_at(self, room: Room) -> datetime:
+        if (
+            first_user_message := room.messages.filter(user__isnull=False)
+            .order_by("created_on")
+            .first()
+        ):
+            return first_user_message.created_on
+
+        return None

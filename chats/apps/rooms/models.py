@@ -10,6 +10,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from model_utils import FieldTracker
 from requests.exceptions import RequestException
 from rest_framework.exceptions import ValidationError
 
@@ -85,6 +86,12 @@ class Room(BaseModel):
         _("service chat"), null=True, blank=True, default=""
     )
 
+    user_assigned_at = models.DateTimeField(
+        _("User assigned at"), null=True, blank=True
+    )
+
+    tracker = FieldTracker(fields=["user"])
+
     class Meta:
         verbose_name = _("Room")
         verbose_name_plural = _("Rooms")
@@ -102,6 +109,14 @@ class Room(BaseModel):
     def save(self, *args, **kwargs) -> None:
         if self.__original_is_active is False:
             raise ValidationError({"detail": _("Closed rooms cannot receive updates")})
+
+        if (
+            self.user
+            and not self.user_assigned_at
+            or (self.pk and self.tracker.has_changed("user"))
+        ):
+            self.user_assigned_at = timezone.now()
+
         return super().save(*args, **kwargs)
 
     def get_permission(self, user):

@@ -8,8 +8,10 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
+
 
 from chats.apps.accounts.models import User
 from chats.apps.api.utils import verify_user_room
@@ -19,6 +21,7 @@ from chats.apps.api.v1.msgs.serializers import ChatCompletionSerializer
 from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1.rooms.serializers import (
     ListRoomSerializer,
+    RoomInfoSerializer,
     RoomMessageStatusSerializer,
     RoomSerializer,
     TransferRoomSerializer,
@@ -490,3 +493,31 @@ class RoomViewset(
 
         room_count = rooms.count()
         return Response({"room_count": room_count})
+
+    @action(
+        detail=False,
+        methods=["get"],
+        url_name="rooms-info",
+        serializer_class=RoomInfoSerializer,
+    )
+    def rooms_info(self, request: Request, pk=None) -> Response:
+        project_uuid = request.query_params.get("project_uuid")
+
+        if not project_uuid:
+            return Response(
+                {"error": "'project_uuid' is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        query = {"project_uuid": project_uuid}
+
+        if uuid := request.query_params.get("uuid"):
+            query["uuid"] = uuid
+
+        rooms = self.paginate_queryset(
+            Room.objects.filter(**query).order_by("-created_on")
+        )
+
+        return Response(
+            RoomInfoSerializer(rooms, many=True).data, status=status.HTTP_200_OK
+        )
