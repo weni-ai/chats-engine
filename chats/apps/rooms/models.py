@@ -14,6 +14,7 @@ from model_utils import FieldTracker
 from requests.exceptions import RequestException
 from rest_framework.exceptions import ValidationError
 
+from chats.apps.rooms.tasks import update_ticket_on_flows
 from chats.core.models import BaseModel
 from chats.utils.websockets import send_channels_group
 
@@ -333,3 +334,7 @@ class Room(BaseModel):
             return True
         perm = self.get_permission(user)
         return not self.is_active or perm.is_manager(any_sector=True)
+
+    def update_ticket(self):
+        if self.ticket_uuid and self.user:
+            update_ticket_on_flows.delay(self.ticket_uuid, self.user.email)

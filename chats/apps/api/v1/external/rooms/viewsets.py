@@ -206,6 +206,7 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
 
         room.notify_user("update", user=None)
         room.notify_queue("update")
+        room.update_ticket()
 
         create_room_feedback_message(room, feedback, method="rt")
 
