@@ -1,3 +1,10 @@
+# 3.13.3
+## Add
+  - new endpoint for rooms' user assignment information
+  - flows API call to update the ticket info about the user assignment
+## Fix
+  - new messages from flows timestamps
+
 # 3.13.2
 ## Add
   - new endpoint to list human service rooms.
