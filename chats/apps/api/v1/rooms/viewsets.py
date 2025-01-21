@@ -467,20 +467,24 @@ class RoomViewset(
         default_start_date = make_aware(datetime.now() - timedelta(days=30))
         default_end_date = make_aware(datetime.now())
 
-        try:
-            if start_date:
-                start_date = make_aware(datetime.strptime(start_date, "%Y-%m-%d"))
-            else:
-                start_date = default_start_date
+        def parse_date(date_str, default):
+            if not date_str:
+                return default
+            try:
+                return make_aware(datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S"))
+            except ValueError:
+                try:
+                    return make_aware(datetime.strptime(date_str, "%Y-%m-%d"))
+                except ValueError:
+                    raise ValueError(
+                        "Invalid date format. Use 'YYYY-MM-DD' or 'YYYY-MM-DD HH:MM:SS'."
+                    )
 
-            if end_date:
-                end_date = make_aware(datetime.strptime(end_date, "%Y-%m-%d"))
-            else:
-                end_date = default_end_date
-        except ValueError:
-            return Response(
-                {"error": "Invalid date format. Use 'YYYY-MM-DD'."}, status=400
-            )
+        try:
+            start_date = parse_date(start_date, default_start_date)
+            end_date = parse_date(end_date, default_end_date)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=400)
 
         rooms = Room.objects.filter(
             queue__sector__project=project_uuid,
