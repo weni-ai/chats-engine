@@ -46,6 +46,7 @@ class MsgFlowSerializer(serializers.ModelSerializer):
             "text",
             "direction",
             "attachments",
+            "created_on",
             # Read
             "user",
             "contact",
