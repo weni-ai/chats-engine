@@ -61,9 +61,12 @@ class MsgFlowSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, attrs: dict):
-        if "created_on" in attrs and attrs["created_on"] is None:
-            # defaults to current time and date
+        if "created_on" in attrs:
             attrs.pop("created_on")
+
+        # if "created_on" in attrs and attrs["created_on"] is None:
+        #     # defaults to current time and date
+        #     attrs.pop("created_on")
 
         return super().validate(attrs)
 
