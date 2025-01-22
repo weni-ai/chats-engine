@@ -35,7 +35,7 @@ class MsgFlowSerializer(serializers.ModelSerializer):
     media = MessageMediaSerializer(required=False, many=True, read_only=True)
     contact = ContactRelationsSerializer(many=False, required=False, read_only=True)
     user = UserSerializer(many=False, required=False, read_only=True)
-    created_on = serializers.DateTimeField(required=False, allow_null=True)
+    # created_on = serializers.DateTimeField(required=False, allow_null=True)
 
     class Meta:
         model = Message
@@ -44,7 +44,6 @@ class MsgFlowSerializer(serializers.ModelSerializer):
             # Write
             "room",
             "text",
-            "created_on",
             "direction",
             "attachments",
             # Read
