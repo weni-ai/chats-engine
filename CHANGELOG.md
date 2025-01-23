@@ -1,3 +1,15 @@
+# 3.13.6
+## Add
+  - reintroduce created_on in MsgFlowSerializer
+
+# 3.13.5
+## Fix
+  - remove completely created_on from MsgFlowSerializer
+
+# 3.13.4
+## Fix
+  - remove created_on from MsgFlowSerializer's validate method
+
 # 3.13.3
 ## Add
   - new endpoint for rooms' user assignment information
