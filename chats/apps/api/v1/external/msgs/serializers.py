@@ -61,31 +61,68 @@ class MsgFlowSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data):
-        direction = validated_data.pop("direction")
-        medias = validated_data.pop("attachments")
-        room = validated_data.get("room")
-        text = validated_data.get("text")
+        if isinstance(validated_data, list):
+            messages = []
+            for data in validated_data:
+                direction = data.pop("direction")
+                medias = data.pop("attachments")
+                room = data.get("room")
+                text = data.get("text")
 
-        if text is None and medias == []:
-            raise exceptions.APIException(
-                detail="Cannot create message without text or media"
-            )
-        if direction == "incoming":
-            validated_data["contact"] = room.contact
+                if text is None and not medias:
+                    raise exceptions.APIException(
+                        detail="Cannot create message without text or media"
+                    )
+                if direction == "incoming":
+                    data["contact"] = room.contact
 
-        is_waiting = room.get_is_waiting()
-        was_24h_valid = room.is_24h_valid
-        msg = super().create(validated_data)
-        media_list = [MessageMedia(**media_data, message=msg) for media_data in medias]
-        medias = MessageMedia.objects.bulk_create(media_list)
+                is_waiting = room.get_is_waiting()
+                was_24h_valid = room.is_24h_valid
+                msg = super().create(data)
 
-        if direction == "incoming":
-            validated_data["contact"] = room.contact
-            if is_waiting:
-                room.is_waiting = False
-                room.save()
-                room.notify_room("update")
-            elif not was_24h_valid:
-                room.notify_room("update")
+                media_list = [
+                    MessageMedia(**media_data, message=msg) for media_data in medias
+                ]
+                MessageMedia.objects.bulk_create(media_list)
 
-        return msg
+                if direction == "incoming":
+                    if is_waiting:
+                        room.is_waiting = False
+                        room.save()
+                        room.notify_room("update")
+                    elif not was_24h_valid:
+                        room.notify_room("update")
+
+                messages.append(msg)
+            return messages
+        else:
+            direction = validated_data.pop("direction")
+            medias = validated_data.pop("attachments")
+            room = validated_data.get("room")
+            text = validated_data.get("text")
+
+            if text is None and not medias:
+                raise exceptions.APIException(
+                    detail="Cannot create message without text or media"
+                )
+            if direction == "incoming":
+                validated_data["contact"] = room.contact
+
+            is_waiting = room.get_is_waiting()
+            was_24h_valid = room.is_24h_valid
+            msg = super().create(validated_data)
+
+            media_list = [
+                MessageMedia(**media_data, message=msg) for media_data in medias
+            ]
+            MessageMedia.objects.bulk_create(media_list)
+
+            if direction == "incoming":
+                if is_waiting:
+                    room.is_waiting = False
+                    room.save()
+                    room.notify_room("update")
+                elif not was_24h_valid:
+                    room.notify_room("update")
+
+            return msg
