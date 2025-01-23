@@ -1,3 +1,7 @@
+# 3.13.7
+## Add
+  - user info (email and name) to RoomInfoSerializer
+
 # 3.13.6
 ## Add
   - reintroduce created_on in MsgFlowSerializer
