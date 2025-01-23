@@ -238,14 +238,26 @@ class RoomContactSerializer(serializers.ModelSerializer):
 
 class RoomInfoSerializer(serializers.ModelSerializer):
     first_user_message_sent_at = serializers.SerializerMethodField()
+    user = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
         fields = [
             "uuid",
+            "user",
             "first_user_message_sent_at",
             "user_assigned_at",
         ]
+
+    def get_user(self, room: Room) -> dict:
+        user: User = room.user
+
+        if not user:
+            return None
+
+        name = f"{user.first_name} {user.last_name}".strip()
+
+        return {"email": user.email, "name": name}
 
     def get_first_user_message_sent_at(self, room: Room) -> datetime:
         if (
