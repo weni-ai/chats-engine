@@ -1,3 +1,59 @@
+# 3.13.7
+## Add
+  - user info (email and name) to RoomInfoSerializer
+
+# 3.13.6
+## Add
+  - reintroduce created_on in MsgFlowSerializer
+
+# 3.13.5
+## Fix
+  - remove completely created_on from MsgFlowSerializer
+
+# 3.13.4
+## Fix
+  - remove created_on from MsgFlowSerializer's validate method
+
+# 3.13.3
+## Add
+  - new endpoint for rooms' user assignment information
+  - flows API call to update the ticket info about the user assignment
+## Fix
+  - new messages from flows timestamps
+
+# 3.13.2
+## Add
+  - new endpoint to list human service rooms.
+## Fix
+  - order by name in project permission endpoint
+  - passing project uuid to flows when deleting a queue.
+
+# 3.13.1
+## Add
+  - is_active field to ListRoomSerializer
+## Fix
+  - new message timestamp
+
+# 3.13.0
+## Add
+  - ticket_uuid field in Room
+
+# 3.12.1
+## Fix
+  - check if room is active before returning redirection link
+
+# 3.12.0
+## Add
+ - chat redirect link to the room data returned via the rooms list internal endpoint
+
+# 3.11.3
+## Add
+ - last name to dashboard agent returned data
+
+# 3.11.2
+## Add
+ - ordering tags by name
+
 # 3.11.1
 ## Add
   - new filters in discussion

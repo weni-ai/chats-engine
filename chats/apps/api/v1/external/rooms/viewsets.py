@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError
+from django.db.models import Q
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
@@ -150,9 +151,9 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
         project = request_permission.project
         room = (
             Room.objects.filter(
-                callback_url__endswith=pk,
-                project_uuid=project,
-                is_active=True,
+                (Q(ticket_uuid=pk) | Q(callback_url__endswith=pk))
+                & Q(project_uuid=project)
+                & Q(is_active=True)
             )
             .select_related("user", "queue__sector__project")
             .first()
@@ -205,6 +206,7 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
 
         room.notify_user("update", user=None)
         room.notify_queue("update")
+        room.update_ticket()
 
         create_room_feedback_message(room, feedback, method="rt")
 

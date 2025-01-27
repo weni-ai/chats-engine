@@ -98,6 +98,7 @@ class QueueViewset(ModelViewSet):
         content = {
             "uuid": str(instance.uuid),
             "sector_uuid": str(instance.sector.uuid),
+            "project_uuid": str(instance.sector.project.uuid),
         }
 
         if not settings.USE_WENI_FLOWS:

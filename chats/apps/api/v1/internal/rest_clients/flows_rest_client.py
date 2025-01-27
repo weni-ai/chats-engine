@@ -1,13 +1,16 @@
+import json
 import logging
 from typing import Callable
 
 import requests
 from django.conf import settings
+from django.core.serializers.json import DjangoJSONEncoder
 from rest_framework import status
 
 from chats.apps.api.v1.internal.rest_clients.internal_authorization import (
     InternalAuthentication,
 )
+from chats.core.requests import get_request_session_with_retries
 
 LOGGER = logging.getLogger(__name__)
 
@@ -83,9 +86,10 @@ class FlowsQueueMixin:
             )
         return response
 
-    def destroy_queue(self, uuid: str, sector_uuid: str):
+    def destroy_queue(self, uuid: str, sector_uuid: str, project_uuid: str):
         response = requests.delete(
             url=f"{self.base_url}/api/v2/internals/ticketers/{sector_uuid}/queues/{uuid}/",
+            json={"project_uuid": project_uuid},
             headers=self.headers,
         )
 
@@ -237,3 +241,26 @@ class FlowRESTClient(
             headers=self.project_headers(project.flows_authorization),
         )
         return response.json()
+
+    def update_ticket_assignee(self, ticket_uuid: str, user_email: str):
+        url = f"{self.base_url}/api/v2/internals/ticket_assignee"
+
+        data = {
+            "uuid": ticket_uuid,
+            "email": user_email,
+        }
+
+        request_session = get_request_session_with_retries(
+            status_forcelist=[429, 500, 502, 503, 504], method_whitelist=["POST"]
+        )
+
+        request_session.post(
+            url,
+            data=json.dumps(
+                data,
+                sort_keys=True,
+                indent=1,
+                cls=DjangoJSONEncoder,
+            ),
+            headers=self.headers,
+        )

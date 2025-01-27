@@ -35,6 +35,7 @@ class MsgFlowSerializer(serializers.ModelSerializer):
     media = MessageMediaSerializer(required=False, many=True, read_only=True)
     contact = ContactRelationsSerializer(many=False, required=False, read_only=True)
     user = UserSerializer(many=False, required=False, read_only=True)
+    created_on = serializers.DateTimeField(required=False, allow_null=True)
 
     class Meta:
         model = Message
@@ -43,9 +44,9 @@ class MsgFlowSerializer(serializers.ModelSerializer):
             # Write
             "room",
             "text",
-            "created_on",
             "direction",
             "attachments",
+            "created_on",
             # Read
             "user",
             "contact",
@@ -55,10 +56,16 @@ class MsgFlowSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "uuid",
             "user",
-            "created_on",
             "contact",
             "media",
         ]
+
+    def validate(self, attrs: dict):
+        if "created_on" in attrs and attrs["created_on"] is None:
+            # defaults to current time and date
+            attrs.pop("created_on")
+
+        return super().validate(attrs)
 
     def create(self, validated_data):
         direction = validated_data.pop("direction")

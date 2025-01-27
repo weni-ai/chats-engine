@@ -12,6 +12,7 @@
                 "mood": "angry",
                 "country": "brazil"
             },
+            "ticket_uuid": "66a47111-6e6f-43b3-9fdc-a92a18bc57d2",
             "callback_url": "http://localhost/test/66a47111-6e6f-43b3-9fdc-a92a18bc57d2",
             "ended_at": null,
             "ended_by": null,
@@ -43,6 +44,7 @@
                 "mood": "angry",
                 "country": "brazil"
             },
+            "ticket_uuid": "1c830ac0-1ba7-49f9-b8c8-b96af41d4213",
             "callback_url": "http://localhost/test/1c830ac0-1ba7-49f9-b8c8-b96af41d4213",
             "ended_at": null,
             "ended_by": null,
@@ -74,6 +76,7 @@
                 "mood": "angry",
                 "country": "brazil"
             },
+            "ticket_uuid": "ac6322ca-4a5b-4e5f-bb00-050c60e93b0b",
             "callback_url": "http://localhost/test/ac6322ca-4a5b-4e5f-bb00-050c60e93b0b",
             "ended_at": "2023-09-03T00:20:09.559Z",
             "ended_by": "agent",
