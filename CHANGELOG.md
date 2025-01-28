@@ -1,3 +1,7 @@
+# 3.14.0
+## Add
+  - Introduced a new publisher that triggers when a room is closed
+
 # 3.13.7
 ## Add
   - user info (email and name) to RoomInfoSerializer
