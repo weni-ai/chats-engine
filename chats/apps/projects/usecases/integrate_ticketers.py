@@ -11,15 +11,18 @@ from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTCl
 
 class IntegratedTicketers:
     def integrate_ticketer(self, project):
-        projects = Project.objects.filter(org=project.org)
+        projects = Project.objects.filter(org=project.org).exclude(
+            config__its_main=True
+        )
 
-        for project in projects:
-            sectors = Sector.objects.filter(project=project)
+        for secundary_project in projects:
+            sectors = Sector.objects.filter(
+                project=project, config__integration_token=secundary_project.uuid
+            )
 
-            # quando chamar via criação de setor unico, pegar apenas o setor que ta sendo criado e nao todos
             for sector in sectors:
                 content = {
-                    "project_uuid": str(project.uuid),
+                    "project_uuid": str(secundary_project.uuid),
                     "name": sector.name,
                     "config": {
                         "project_auth": str(sector.external_token.pk),
@@ -37,13 +40,14 @@ class IntegratedTicketers:
                     )
 
     def integrate_topic(self, project):
-        # projetos secundarios. Dar exclude no proprio projeto passado pra função.
-        projects = Project.objects.filter(org=project.org)
-
-        # percorrendo os projetos que estão na mesma org do projeto principal (os secundarios)
+        projects = Project.objects.filter(org=project.org).exclude(
+            config__its_main=True
+        )
         for secundary_project in projects:
-            # queues que fazem parte dos setores do projeto principal
-            queues = Queue.objects.filter(sector__project=project)
+            queues = Queue.objects.filter(
+                sector__project=project,
+                sector__project__config__integration_token=secundary_project.uuid,
+            )
 
             for queue in queues:
                 content = {
@@ -60,25 +64,3 @@ class IntegratedTicketers:
                     raise exceptions.APIException(
                         detail=f"[{response.status_code}] Error posting the queue on flows. Exception: {response.content}"
                     )
-
-
-# instance_queue = queue (fila do setor principal)
-
-# content_queue = {
-#     "uuid": str(instance_queue.uuid),
-#     "name": instance_queue.name,
-#     "sector_uuid": str(instance_queue.sector.uuid),
-#     "project_uuid": uuid do projeto secundario,
-# }
-# response = FlowRESTClient().create_queue(**content_queue)
-
-
-# instance = sector (instancia do setor do projeto principal)
-# content = {
-#     "project_uuid": uuid do projeto secundario,
-#     "name": instance.name,
-#     "config": {
-#         "project_auth": str(instance.external_token.pk) (do projeto secundário?),
-#         "sector_uuid": str(instance.uuid),
-#     }
-# }
