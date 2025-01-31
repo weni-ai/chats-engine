@@ -15,6 +15,9 @@ from chats.utils.websockets import send_channels_group
 
 from .permission_managers import UserPermissionsManager
 
+from django.core.exceptions import ValidationError
+from django.db import transaction
+
 User = get_user_model()
 
 # Create your models here.
@@ -500,3 +503,35 @@ class ContactGroupFlowReference(BaseModel):
     @property
     def project(self):
         return self.flow_start.project
+
+
+class CustomStatus(models.Model):
+    name = models.CharField(max_length=255)
+    project = models.ForeignKey(
+        "Project", on_delete=models.CASCADE, related_name="custom_statuses"
+    )
+    is_deleted = models.BooleanField(default=False)
+
+    def delete(self, *args, **kwargs):
+        self.is_deleted = True
+        self.save(update_fields=["is_deleted"])
+
+    def save(self, *args, **kwargs):
+        if not self.pk:
+            with transaction.atomic():
+                existing_count = (
+                    CustomStatus.objects.select_for_update()
+                    .filter(project=self.project, is_deleted=False)
+                    .count()
+                )
+                if existing_count >= 3:
+                    raise ValidationError(
+                        "A project can have a maximum of 3 custom statuses."
+                    )
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        unique_together = ("name", "project")
