@@ -11,13 +11,11 @@ from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTCl
 
 class IntegratedTicketers:
     def integrate_ticketer(self, project):
-        projects = Project.objects.filter(org=project.org).exclude(
-            config__its_principal=True
-        )
+        projects = Project.objects.filter(org=project.org, config__its_secundary=True)
 
         for secundary_project in projects:
             sectors = Sector.objects.filter(
-                project=project, config__integration_token=secundary_project.uuid
+                project=project, config__integration_token=str(secundary_project.uuid)
             )
 
             for sector in sectors:
@@ -40,13 +38,12 @@ class IntegratedTicketers:
                     )
 
     def integrate_topic(self, project):
-        projects = Project.objects.filter(org=project.org).exclude(
-            config__its_principal=True
-        )
+        projects = Project.objects.filter(org=project.org, config__its_secundary=True)
+
         for secundary_project in projects:
             queues = Queue.objects.filter(
                 sector__project=project,
-                sector__project__config__integration_token=secundary_project.uuid,
+                sector__project__config__integration_token=str(secundary_project.uuid),
             )
 
             for queue in queues:
@@ -68,7 +65,7 @@ class IntegratedTicketers:
     def integrate_individual_ticketer(self, project, integrated_token):
         try:
             sector = Sector.objects.get(
-                project=project, config__integration_token=integrated_token
+                project=project, config__integration_token=str(integrated_token)
             )
             content = {
                 "project_uuid": str(sector.config.get("integration_token")),
@@ -96,7 +93,7 @@ class IntegratedTicketers:
         try:
             queue = Queue.objects.filter(
                 sector__project=project,
-                sector__project__config__integration_token=sector_integrated_token,
+                sector__project__config__integration_token=str(sector_integrated_token),
             )
             content = {
                 "uuid": str(queue.uuid),
