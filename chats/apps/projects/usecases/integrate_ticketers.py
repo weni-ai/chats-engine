@@ -12,7 +12,7 @@ from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTCl
 class IntegratedTicketers:
     def integrate_ticketer(self, project):
         projects = Project.objects.filter(org=project.org).exclude(
-            config__its_main=True
+            config__its_principal=True
         )
 
         for secundary_project in projects:
@@ -41,7 +41,7 @@ class IntegratedTicketers:
 
     def integrate_topic(self, project):
         projects = Project.objects.filter(org=project.org).exclude(
-            config__its_main=True
+            config__its_principal=True
         )
         for secundary_project in projects:
             queues = Queue.objects.filter(
@@ -64,3 +64,55 @@ class IntegratedTicketers:
                     raise exceptions.APIException(
                         detail=f"[{response.status_code}] Error posting the queue on flows. Exception: {response.content}"
                     )
+
+    def integrate_individual_ticketer(self, project, integrated_token):
+        try:
+            sector = Sector.objects.get(
+                project=project, config__integration_token=integrated_token
+            )
+            content = {
+                "project_uuid": str(sector.config.get("integration_token")),
+                "name": sector.name,
+                "config": {
+                    "project_auth": str(sector.external_token.pk),
+                    "sector_uuid": str(sector.uuid),
+                },
+            }
+            connect = ConnectRESTClient()
+            response = connect.create_ticketer(**content)
+            if response.status_code not in [
+                status.HTTP_200_OK,
+                status.HTTP_201_CREATED,
+            ]:
+                raise exceptions.APIException(
+                    detail=f"[{response.status_code}] Error posting the sector/ticketer on flows. Exception: {response.content}"
+                )
+        except:
+            raise exceptions.APIException(
+                detail=f"there is not secundary project for that sector"
+            )
+
+    def integrate__individual_topic(self, project, sector_integrated_token):
+        try:
+            queue = Queue.objects.filter(
+                sector__project=project,
+                sector__project__config__integration_token=sector_integrated_token,
+            )
+            content = {
+                "uuid": str(queue.uuid),
+                "name": queue.name,
+                "sector_uuid": str(queue.sector.uuid),
+                "project_uuid": str(queue.sector.config.get("integration_token")),
+            }
+            response = FlowRESTClient().create_queue(**content)
+            if response.status_code not in [
+                status.HTTP_200_OK,
+                status.HTTP_201_CREATED,
+            ]:
+                raise exceptions.APIException(
+                    detail=f"[{response.status_code}] Error posting the queue on flows. Exception: {response.content}"
+                )
+        except:
+            raise exceptions.APIException(
+                detail=f"there is not secundary project for that queue"
+            )

@@ -93,7 +93,9 @@ class SectorViewset(viewsets.ModelViewSet):
                 )
         if project.config.get("its_main"):
             integrate_use_case = IntegratedTicketers()
-            integrate_use_case.integrate_ticketer(project)
+            integrate_use_case.integrate_individual_ticketer(
+                project, instance.config.get("integration_token")
+            )
 
     def update(self, request, *args, **kwargs):
         sector = self.get_object()
