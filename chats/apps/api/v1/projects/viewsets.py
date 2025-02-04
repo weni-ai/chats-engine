@@ -460,6 +460,29 @@ class ProjectViewset(
             project.save()
         return Response(ProjectSerializer(project).data, status=status.HTTP_200_OK)
 
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="set-project-principal",
+    )
+    def set_project_as_principal(self, request, *args, **kwargs):
+        project = self.get_object()
+
+        config = project.config or {}
+        config["its_principal"] = True
+        project.config = config
+        project.save()
+
+        org_projects = Project.objects.filter(org=project.org).exclude(pk=project.pk)
+        org_projects.update(config={"its_secundary": True})
+
+        return Response(
+            {
+                "detail": "Project set as principal and other projects in the same org set as secondary."
+            },
+            status=status.HTTP_200_OK,
+        )
+
 
 class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
     queryset = (
@@ -536,26 +559,3 @@ class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
             )
 
         return Response("ticketers and topics integrated", status=status.HTTP_200_OK)
-
-    @action(
-        detail=False,
-        methods=["post"],
-        url_path="set-project-principal",
-    )
-    def set_project_as_principal(self, request, *args, **kwargs):
-        project = request.query_params.get("project")
-
-        config = project.config or {}
-        config["its_principal"] = True
-        project.config = config
-        project.save()
-
-        org_projects = Project.objects.filter(org=project.org).exclude(pk=project.pk)
-        org_projects.update(config={"its_secundary": True})
-
-        return Response(
-            {
-                "detail": "Project set as principal and other projects in the same org set as secondary."
-            },
-            status=status.HTTP_200_OK,
-        )
