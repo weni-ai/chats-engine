@@ -44,6 +44,8 @@ from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import create_room_feedback_message
 from chats.apps.sectors.models import Sector
 
+from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
+
 
 class ProjectViewset(
     mixins.ListModelMixin,
@@ -518,3 +520,19 @@ class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
                 status.HTTP_401_UNAUTHORIZED,
             )
         return Response(serialized_data.data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["POST"], url_name="integrate_sectors")
+    def integrate_sectors(self, request, *args, **kwargs):
+        try:
+            project = Project.objects.get(uuid=request.query_params["project"])
+            integrations = IntegratedTicketers()
+
+            integrations.integrate_ticketer(project)
+            integrations.integrate_topic(project)
+        except Exception as error:
+            return Response(
+                {"error integrating ticketers": f"{type(error)}: {error}"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response("ticketers and topics integrated", status=status.HTTP_200_OK)

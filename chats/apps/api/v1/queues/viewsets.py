@@ -21,6 +21,10 @@ from chats.apps.sectors.models import Sector
 
 from .serializers import QueueAgentsSerializer
 
+
+from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
+
+
 User = get_user_model()
 
 
@@ -60,6 +64,9 @@ class QueueViewset(ModelViewSet):
 
     def perform_create(self, serializer):
         instance = serializer.save()
+
+        project = Project.objects.get(uuid=instance.sector.project.uuid)
+
         content = {
             "uuid": str(instance.uuid),
             "name": instance.name,
@@ -74,6 +81,11 @@ class QueueViewset(ModelViewSet):
             raise exceptions.APIException(
                 detail=f"[{response.status_code}] Error posting the queue on flows. Exception: {response.content}"
             )
+
+        if project.config.get("its_principal"):
+            integrate_use_case = IntegratedTicketers()
+            integrate_use_case.integrate_topic(project)
+
         return instance
 
     def perform_update(self, serializer):
