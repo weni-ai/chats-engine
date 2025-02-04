@@ -538,12 +538,12 @@ class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
         return Response("ticketers and topics integrated", status=status.HTTP_200_OK)
 
     @action(
-        detail=True,
+        detail=False,
         methods=["post"],
         url_path="set-project-principal",
     )
     def set_project_as_principal(self, request, *args, **kwargs):
-        project = self.get_object()
+        project = request.query_params.get("project")
 
         config = project.config or {}
         config["its_principal"] = True
