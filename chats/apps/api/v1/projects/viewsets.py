@@ -548,7 +548,10 @@ class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
     def integrate_sectors(self, request, *args, **kwargs):
         try:
             project = Project.objects.get(uuid=request.query_params["project"])
+            print("projeto principal", project)
             integrations = IntegratedTicketers()
+
+            print("classe de integracao", integrations)
 
             integrations.integrate_ticketer(project)
             integrations.integrate_topic(project)

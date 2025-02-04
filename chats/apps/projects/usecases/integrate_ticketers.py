@@ -11,12 +11,16 @@ from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTCl
 
 class IntegratedTicketers:
     def integrate_ticketer(self, project):
+        print("dentro da funcao de integracao")
         projects = Project.objects.filter(org=project.org, config__its_secundary=True)
+        print("projects secundarios", projects)
 
         for secundary_project in projects:
+            print("dentro do for secundario", secundary_project)
             sectors = Sector.objects.filter(
                 project=project, config__integration_token=str(secundary_project.uuid)
             )
+            print("setores do principal", sectors)
 
             for sector in sectors:
                 content = {
@@ -29,6 +33,7 @@ class IntegratedTicketers:
                 }
                 connect = ConnectRESTClient()
                 response = connect.create_ticketer(**content)
+                print("resposta", response.json())
                 if response.status_code not in [
                     status.HTTP_200_OK,
                     status.HTTP_201_CREATED,
