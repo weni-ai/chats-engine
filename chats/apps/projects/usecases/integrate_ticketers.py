@@ -48,7 +48,7 @@ class IntegratedTicketers:
         for secundary_project in projects:
             queues = Queue.objects.filter(
                 sector__project=project,
-                sector__project__config__integration_token=str(secundary_project.uuid),
+                sector__config__integration_token=str(secundary_project.uuid),
             )
 
             for queue in queues:
