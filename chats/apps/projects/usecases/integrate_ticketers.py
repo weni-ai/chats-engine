@@ -98,7 +98,7 @@ class IntegratedTicketers:
         try:
             queue = Queue.objects.filter(
                 sector__project=project,
-                sector__project__config__integration_token=str(sector_integrated_token),
+                sector__config__integration_token=str(sector_integrated_token),
             )
             content = {
                 "uuid": str(queue.uuid),
