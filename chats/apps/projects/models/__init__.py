@@ -5,4 +5,6 @@ from .models import (  # noqa
     Project,
     ProjectPermission,
     TemplateType,
+    CustomStatus,
+    CustomStatusType,
 )

@@ -505,10 +505,10 @@ class ContactGroupFlowReference(BaseModel):
         return self.flow_start.project
 
 
-class CustomStatus(models.Model):
+class CustomStatusType(models.Model):
     name = models.CharField(max_length=255)
     project = models.ForeignKey(
-        "Project", on_delete=models.CASCADE, related_name="custom_statuses"
+        Project, on_delete=models.CASCADE, related_name="custom_statuses"
     )
     is_deleted = models.BooleanField(default=False)
 
@@ -520,13 +520,13 @@ class CustomStatus(models.Model):
         if not self.pk:
             with transaction.atomic():
                 existing_count = (
-                    CustomStatus.objects.select_for_update()
+                    CustomStatusType.objects.select_for_update()
                     .filter(project=self.project, is_deleted=False)
                     .count()
                 )
-                if existing_count >= 3:
+                if existing_count > 10:
                     raise ValidationError(
-                        "A project can have a maximum of 3 custom statuses."
+                        "A project can have a maximum of 10 custom statuses."
                     )
         super().save(*args, **kwargs)
 
@@ -535,3 +535,18 @@ class CustomStatus(models.Model):
 
     class Meta:
         unique_together = ("name", "project")
+
+
+class CustomStatus(models.Model):
+    user = models.ForeignKey(
+        "accounts.User",
+        related_name="user_custom_status",
+        verbose_name=_("user"),
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        to_field="email",
+    )
+    status_type = models.ForeignKey("CustomStatusType", on_delete=models.CASCADE)
+    is_active = models.BooleanField(default=True)
+    break_time = models.PositiveIntegerField(_("Custom status timming"))

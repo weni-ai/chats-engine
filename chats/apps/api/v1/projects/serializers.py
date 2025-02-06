@@ -6,6 +6,8 @@ from chats.apps.projects.models import (
     LinkContact,
     Project,
     ProjectPermission,
+    CustomStatusType,
+    CustomStatus,
 )
 from chats.apps.sectors.models import Sector
 
@@ -103,3 +105,17 @@ class ListProjectUsersSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectPermission
         fields = ["first_name", "last_name", "email", "photo_url"]
+
+
+class CustomStatusTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomStatusType
+        fields = ["id", "name", "project", "is_deleted"]
+        read_only_fields = ["id", "is_deleted"]
+
+
+class CustomStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomStatus
+        fields = ["id", "user", "status_type", "is_active", "break_time"]
+        read_only_fields = ["id"]

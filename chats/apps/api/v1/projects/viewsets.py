@@ -7,7 +7,7 @@ from django.db.models.functions import Concat
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
-from rest_framework import filters, mixins, status, viewsets
+from rest_framework import filters, mixins, status, viewsets, decorators
 from rest_framework.decorators import action
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
@@ -33,6 +33,8 @@ from chats.apps.api.v1.projects.serializers import (
     ProjectFlowStartSerializer,
     ProjectSerializer,
     SectorDiscussionSerializer,
+    CustomStatusTypeSerializer,
+    CustomStatusSerializer,
 )
 from chats.apps.contacts.models import Contact
 from chats.apps.projects.models import (
@@ -43,6 +45,7 @@ from chats.apps.projects.models import (
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import create_room_feedback_message
 from chats.apps.sectors.models import Sector
+from chats.apps.projects.models import CustomStatusType, CustomStatus
 
 
 class ProjectViewset(
@@ -518,3 +521,37 @@ class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
                 status.HTTP_401_UNAUTHORIZED,
             )
         return Response(serialized_data.data, status=status.HTTP_200_OK)
+
+
+class CustomStatusTypeViewSet(viewsets.ModelViewSet):
+    queryset = CustomStatusType.objects.filter(is_deleted=False)
+    serializer_class = CustomStatusTypeSerializer
+
+    def perform_create(self, serializer):
+        try:
+            with transaction.atomic():
+                instance = serializer.save()
+                return instance
+        except ValidationError as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CustomStatusViewSet(viewsets.ModelViewSet):
+    queryset = CustomStatus.objects.all()
+    serializer_class = CustomStatusSerializer
+    permission_classes = [
+        IsAuthenticated,
+        ProjectAnyPermission,
+    ]
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+    @decorators.action(detail=False, methods=["get"])
+    def last_status(self, request):
+        last_status = (
+            CustomStatus.objects.filter(user=request.user).order_by("-id").first()
+        )
+        if last_status:
+            return Response(CustomStatusSerializer(last_status).data)
+        return Response({"detail": "No status found"}, status=404)
