@@ -32,7 +32,7 @@ urlpatterns = [
     path("doc/", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),
     path("admin/", admin.site.urls),
     path("v1/", include("chats.apps.api.v1.urls")),
-    path("api/prometheus/", metrics_view, name="metrics_view"),
+    path("api/prometheus/metrics", metrics_view, name="metrics_view"),
 ]
 
 # Static files
