@@ -25,13 +25,14 @@ from django.urls import path, re_path
 from django.views.static import serve
 
 from chats.apps.api.v1.swagger import schema_view
+from chats.apps.api.v1.prometheus.views import metrics_view
 
 urlpatterns = [
     path("", lambda _: HttpResponse()),
     path("doc/", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),
     path("admin/", admin.site.urls),
     path("v1/", include("chats.apps.api.v1.urls")),
-    path("api/prometheus/", include("django_prometheus.urls")),
+    path("api/prometheus/", metrics_view, name="metrics_view"),
 ]
 
 # Static files
