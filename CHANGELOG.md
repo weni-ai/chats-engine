@@ -1,3 +1,11 @@
+# 3.15.0
+## Add
+  - New endpoint to set project as primary project to be used in infracommerce integration.
+## Add
+  - Endpoint to integrate primary and secondary projects
+## Add
+   - Adding prometheus endpoint for monitoring the application.
+
 # 3.14.0
 ## Add
   - Introduced a new publisher that triggers when a room is closed
