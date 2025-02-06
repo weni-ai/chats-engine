@@ -16,14 +16,13 @@ from chats.apps.api.v1.permissions import (
 from chats.apps.api.v1.queues import serializers as queue_serializers
 from chats.apps.api.v1.queues.filters import QueueAuthorizationFilter, QueueFilter
 from chats.apps.projects.models.models import Project
+from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.sectors.models import Sector
 
 from .serializers import QueueAgentsSerializer
 
 User = get_user_model()
-
-from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 
 
 class QueueViewset(ModelViewSet):

@@ -1,26 +1,23 @@
-from chats.apps.projects.models import Project
-from chats.apps.sectors.models import Sector
-from chats.apps.queues.models import Queue
+from rest_framework import exceptions, status
 
 from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
     ConnectRESTClient,
 )
-from rest_framework import exceptions, status
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
+from chats.apps.projects.models import Project
+from chats.apps.queues.models import Queue
+from chats.apps.sectors.models import Sector
 
 
 class IntegratedTicketers:
     def integrate_ticketer(self, project):
-        print("dentro da funcao de integracao")
         projects = Project.objects.filter(org=project.org, config__its_secundary=True)
-        print("projects secundarios", projects)
 
         for secundary_project in projects:
-            print("dentro do for secundario", secundary_project)
             sectors = Sector.objects.filter(
-                project=project, config__integration_token=str(secundary_project.uuid)
+                project=project,
+                config__integration_token=str(secundary_project.uuid),
             )
-            print("setores do principal", sectors)
 
             for sector in sectors:
                 content = {
@@ -33,13 +30,16 @@ class IntegratedTicketers:
                 }
                 connect = ConnectRESTClient()
                 response = connect.create_ticketer(**content)
-                print("resposta", response.json())
+
                 if response.status_code not in [
                     status.HTTP_200_OK,
                     status.HTTP_201_CREATED,
                 ]:
                     raise exceptions.APIException(
-                        detail=f"[{response.status_code}] Error posting the sector/ticketer on flows. Exception: {response.content}"
+                        detail=(
+                            f"[{response.status_code}] Error posting the sector/ticketer "
+                            f"on flows. Exception: {response.content}"
+                        )
                     )
 
     def integrate_topic(self, project):
@@ -64,7 +64,10 @@ class IntegratedTicketers:
                     status.HTTP_201_CREATED,
                 ]:
                     raise exceptions.APIException(
-                        detail=f"[{response.status_code}] Error posting the queue on flows. Exception: {response.content}"
+                        detail=(
+                            f"[{response.status_code}] Error posting the queue on flows. "
+                            f"Exception: {response.content}"
+                        )
                     )
 
     def integrate_individual_ticketer(self, project, integrated_token):
@@ -87,11 +90,16 @@ class IntegratedTicketers:
                 status.HTTP_201_CREATED,
             ]:
                 raise exceptions.APIException(
-                    detail=f"[{response.status_code}] Error posting the sector/ticketer on flows. Exception: {response.content}"
+                    detail=(
+                        f"[{response.status_code}] Error posting the sector/ticketer "
+                        f"on flows. Exception: {response.content}"
+                    )
                 )
-        except:
+        except exceptions.APIException:
+            raise
+        except Exception as e:
             raise exceptions.APIException(
-                detail=f"there is not secundary project for that sector"
+                detail=f"Error processing sector ticketer integration: {e}"
             )
 
     def integrate__individual_topic(self, project, sector_integrated_token):
@@ -99,7 +107,10 @@ class IntegratedTicketers:
             queue = Queue.objects.filter(
                 sector__project=project,
                 sector__config__integration_token=str(sector_integrated_token),
-            )
+            ).first()
+            if not queue:
+                raise ValueError("Queue not found")
+
             content = {
                 "uuid": str(queue.uuid),
                 "name": queue.name,
@@ -112,9 +123,14 @@ class IntegratedTicketers:
                 status.HTTP_201_CREATED,
             ]:
                 raise exceptions.APIException(
-                    detail=f"[{response.status_code}] Error posting the queue on flows. Exception: {response.content}"
+                    detail=(
+                        f"[{response.status_code}] Error posting the queue on flows. "
+                        f"Exception: {response.content}"
+                    )
                 )
-        except:
+        except exceptions.APIException:
+            raise
+        except Exception as e:
             raise exceptions.APIException(
-                detail=f"there is not secundary project for that queue"
+                detail=f"Error processing queue integration: {e}"
             )
