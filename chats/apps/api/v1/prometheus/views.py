@@ -1,7 +1,6 @@
 import os
 
 from django.http import HttpResponseForbidden
-from django.http import HttpResponse
 from django_prometheus.exports import ExportToDjangoView
 
 
