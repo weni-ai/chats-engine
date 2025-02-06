@@ -22,8 +22,8 @@ from chats.apps.api.v1.sectors.filters import (
     SectorTagFilter,
 )
 from chats.apps.projects.models import Project
-from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
+from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 
 
 class SectorViewset(viewsets.ModelViewSet):
@@ -92,7 +92,7 @@ class SectorViewset(viewsets.ModelViewSet):
                     detail=f"[{response.status_code}] Error posting the sector/ticketer on flows. Exception: {response.content}"  # NOQA
                 )
 
-        if project.config.get("its_main"):
+        if project.config and project.config.get("its_main", False):
             integrate_use_case = IntegratedTicketers()
             integrate_use_case.integrate_individual_ticketer(
                 project, instance.config.get("integration_token")
