@@ -142,6 +142,8 @@ CACHES = {
 
 DATABASES = dict(default=env.db(var="DATABASE_URL"))
 
+DATABASES["default"]["ENGINE"].replace("django.", "django_prometheus.")
+
 # User
 
 AUTH_USER_MODEL = "accounts.User"
