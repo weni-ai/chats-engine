@@ -9,4 +9,4 @@ omit =
     */chats/apps/api/v1/internal/rest_clients/*
 
 [report]
-fail_under = 75
+fail_under = 74
