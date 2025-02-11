@@ -46,6 +46,7 @@ from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import create_room_feedback_message
 from chats.apps.sectors.models import Sector
 from chats.apps.projects.models import CustomStatusType, CustomStatus
+from datetime import datetime
 
 
 class ProjectViewset(
@@ -526,6 +527,10 @@ class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
 class CustomStatusTypeViewSet(viewsets.ModelViewSet):
     queryset = CustomStatusType.objects.filter(is_deleted=False)
     serializer_class = CustomStatusTypeSerializer
+    permission_classes = [
+        IsAuthenticated,
+        ProjectAnyPermission,
+    ]
 
     def perform_create(self, serializer):
         try:
@@ -555,3 +560,39 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
         if last_status:
             return Response(CustomStatusSerializer(last_status).data)
         return Response({"detail": "No status found"}, status=404)
+
+    @action(detail=True, methods=["post"])
+    def close_status(self, request, pk=None):
+        try:
+            instance = CustomStatus.objects.get(pk=pk)
+        except CustomStatus.DoesNotExist:
+            return Response(
+                {"detail": "Custom Status not found."}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        end_time = request.data.get("end_time")
+
+        if not end_time:
+            return Response(
+                {"detail": "end_time is required."}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            end_time = datetime.fromisoformat(end_time)
+            created_on = instance.created_on
+
+            break_time = int((end_time - created_on).total_seconds() / 60)
+
+            instance.break_time = break_time
+            instance.is_active = False
+            instance.save()
+
+            return Response(
+                {"detail": "CustomStatus updated successfully."},
+                status=status.HTTP_200_OK,
+            )
+        except ValueError:
+            return Response(
+                {"detail": "Invalid end_time format."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )

@@ -10,13 +10,18 @@ from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTCl
 from chats.apps.api.v1.internal.rest_clients.integrations_rest_client import (
     IntegrationsRESTClient,
 )
-from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
+from chats.core.models import (
+    BaseConfigurableModel,
+    BaseModel,
+    BaseSoftDeleteModel,
+)
 from chats.utils.websockets import send_channels_group
 
 from .permission_managers import UserPermissionsManager
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.utils import timezone
 
 User = get_user_model()
 
@@ -537,7 +542,7 @@ class CustomStatusType(models.Model):
         unique_together = ("name", "project")
 
 
-class CustomStatus(models.Model):
+class CustomStatus(BaseModel):
     user = models.ForeignKey(
         "accounts.User",
         related_name="user_custom_status",

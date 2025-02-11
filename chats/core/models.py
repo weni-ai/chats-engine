@@ -75,3 +75,12 @@ class BaseConfigurableModel(models.Model):
 
     class Meta:
         abstract = True
+
+
+class BaseIntegrationConfigurableModel(models.Model):
+    integration_config = models.JSONField(
+        _("config to use in project integration"), blank=True, null=True, default=dict
+    )
+
+    class Meta:
+        abstract = True
