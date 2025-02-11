@@ -6,7 +6,12 @@ from django.db.models import Count, F, Q, Value
 from django.db.models.functions import Concat
 from django.utils.translation import gettext_lazy as _
 
-from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
+from chats.core.models import (
+    BaseConfigurableModel,
+    BaseModel,
+    BaseSoftDeleteModel,
+    BaseIntegrationConfigurableModel,
+)
 from chats.utils.websockets import send_channels_group
 
 from .sector_managers import SectorManager
@@ -14,7 +19,12 @@ from .sector_managers import SectorManager
 User = get_user_model()
 
 
-class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
+class Sector(
+    BaseSoftDeleteModel,
+    BaseConfigurableModel,
+    BaseModel,
+    BaseIntegrationConfigurableModel,
+):
     name = models.CharField(_("name"), max_length=120)
     project = models.ForeignKey(
         "projects.Project",
