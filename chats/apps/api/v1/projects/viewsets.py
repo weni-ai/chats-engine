@@ -467,6 +467,17 @@ class ProjectViewset(
     def set_project_as_principal(self, request, *args, **kwargs):
         project = self.get_object()
 
+        existing_principal = (
+            Project.objects.filter(org=project.org, config__its_principal=True)
+            .exclude(pk=project.pk)
+            .exists()
+        )
+        if existing_principal:
+            return Response(
+                {"detail": "Já existe um projeto principal nesta organização."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         config = project.config or {}
         config["its_principal"] = True
         project.config = config
@@ -486,10 +497,7 @@ class ProjectViewset(
     def integrate_sectors(self, request, *args, **kwargs):
         try:
             project = Project.objects.get(uuid=request.query_params["project"])
-            print("projeto principal", project)
             integrations = IntegratedTicketers()
-
-            print("classe de integracao", integrations)
 
             integrations.integrate_ticketer(project)
             integrations.integrate_topic(project)
