@@ -18,6 +18,7 @@ class ProjectCreationDTO:
     timezone: str
     template_type_uuid: str
     authorizations: list
+    org: str
 
 
 class ProjectCreationUseCase:
@@ -57,6 +58,7 @@ class ProjectCreationUseCase:
             is_template=project_dto.is_template,
             date_format=project_dto.date_format,
             timezone=project_dto.timezone,
+            org=project_dto.org,
         )
 
         creator_permission, _ = ProjectPermission.objects.get_or_create(
