@@ -47,7 +47,6 @@ class DashboardTests(APITestCase):
         """
         Verify if the interaction_time of a room metric its calculated correctly.
         """
-        print("1")
         url = "/v1/external/rooms/"
         client = self.client
         client.credentials(
@@ -64,13 +63,10 @@ class DashboardTests(APITestCase):
                 "custom_fields": {},
             },
         }
-        print("2")
         client.post(url, data=data, format="json")
-        print("3")
         room_created = Room.objects.get(queue_id=data["queue_uuid"])
         room_created.user = self.manager_user
         room_created.save()
-        print("4")
 
         time.sleep(3)
 
@@ -83,9 +79,7 @@ class DashboardTests(APITestCase):
                 "1a84b46e-0f91-41da-ac9d-a68c0b9753ab",
             ]
         }
-        print("4")
         client.patch(url_close, data=data_close, format="json")
-        print("5")
 
         room_closed = Room.objects.get(queue_id=data["queue_uuid"])
         metric = RoomMetrics.objects.get(room=room_closed)
