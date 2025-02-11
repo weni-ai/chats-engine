@@ -474,7 +474,9 @@ class ProjectViewset(
         )
         if existing_principal:
             return Response(
-                {"detail": "Já existe um projeto principal nesta organização."},
+                {
+                    "detail": "There is already a principal project in this organization."
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
