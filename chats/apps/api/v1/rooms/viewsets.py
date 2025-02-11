@@ -154,22 +154,33 @@ class RoomViewset(
         """
         Close a room, setting the ended_at date and turning the is_active flag as false
         """
+        print("1")
         # Add send room notification to the channels group
         instance = self.get_object()
+        print("2")
 
         tags = request.data.get("tags", None)
+        print("3")
         instance.close(tags, "agent")
+        print("4")
         serialized_data = RoomSerializer(instance=instance)
+        print("5")
         instance.notify_queue("close", callback=True)
+        print("6")
         instance.notify_user("close")
+        print("7")
 
         if not settings.ACTIVATE_CALC_METRICS:
+            print("7.1")
             return Response(serialized_data.data, status=status.HTTP_200_OK)
 
+        print("8")
         close_room(str(instance.pk))
-
+        print("9")
         room_client = RoomInfoUseCase()
+        print("10")
         room_client.get_room(instance)
+        print("11")
 
         return Response(serialized_data.data, status=status.HTTP_200_OK)
 
