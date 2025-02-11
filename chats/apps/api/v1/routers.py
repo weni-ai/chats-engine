@@ -25,6 +25,7 @@ from chats.apps.api.v1.quickmessages.viewsets import (
     SectorQuickMessageViewset,
 )
 from chats.apps.api.v1.rooms.viewsets import RoomViewset
+from chats.apps.api.v1.groups_sectors.viewsets import GroupSectorViewset
 from chats.apps.api.v1.sectors.viewsets import (
     SectorAuthorizationViewset,
     SectorTagsViewset,
@@ -103,6 +104,7 @@ router.register("contact", ContactViewset)
 router.register("history/rooms", HistoryRoomViewset, basename="history_room")
 router.register("discussion", DiscussionViewSet, basename="discussion")
 router.register("sector", SectorViewset)
+router.register("group_sector", GroupSectorViewset, basename="group_sector")
 router.register("tag", SectorTagsViewset)
 router.register("project", ProjectViewset)
 router.register(
