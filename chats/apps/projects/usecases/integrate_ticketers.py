@@ -16,7 +16,7 @@ class IntegratedTicketers:
         for secundary_project in projects:
             sectors = Sector.objects.filter(
                 project=project,
-                config__integration_token=str(secundary_project.uuid),
+                integration_config__integration_token=str(secundary_project.uuid),
             )
 
             for sector in sectors:
@@ -48,7 +48,9 @@ class IntegratedTicketers:
         for secundary_project in projects:
             queues = Queue.objects.filter(
                 sector__project=project,
-                sector__config__integration_token=str(secundary_project.uuid),
+                sector__integration_config__integration_token=str(
+                    secundary_project.uuid
+                ),
             )
 
             for queue in queues:
@@ -73,10 +75,11 @@ class IntegratedTicketers:
     def integrate_individual_ticketer(self, project, integrated_token):
         try:
             sector = Sector.objects.get(
-                project=project, config__integration_token=str(integrated_token)
+                project=project,
+                integration_config__integration_token=str(integrated_token),
             )
             content = {
-                "project_uuid": str(sector.config.get("integration_token")),
+                "project_uuid": str(sector.integration_config.get("integration_token")),
                 "name": sector.name,
                 "config": {
                     "project_auth": str(sector.external_token.pk),
@@ -104,13 +107,17 @@ class IntegratedTicketers:
         try:
             queue = Queue.objects.filter(
                 sector__project=project,
-                sector__config__integration_token=str(sector_integrated_token),
+                sector__integration_config__integration_token=str(
+                    sector_integrated_token
+                ),
             )
             content = {
                 "uuid": str(queue.uuid),
                 "name": queue.name,
                 "sector_uuid": str(queue.sector.uuid),
-                "project_uuid": str(queue.sector.config.get("integration_token")),
+                "project_uuid": str(
+                    queue.sector.integration_config.get("integration_token")
+                ),
             }
             response = FlowRESTClient().create_queue(**content)
             if response.status_code not in [
