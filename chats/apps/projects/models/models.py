@@ -510,7 +510,7 @@ class ContactGroupFlowReference(BaseModel):
         return self.flow_start.project
 
 
-class CustomStatusType(models.Model):
+class CustomStatusType(BaseModel):
     name = models.CharField(max_length=255)
     project = models.ForeignKey(
         Project, on_delete=models.CASCADE, related_name="custom_statuses"
