@@ -555,7 +555,9 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
     @decorators.action(detail=False, methods=["get"])
     def last_status(self, request):
         last_status = (
-            CustomStatus.objects.filter(user=request.user).order_by("-id").first()
+            CustomStatus.objects.filter(user=request.user, is_active=True)
+            .order_by("-uuid")
+            .first()
         )
         if last_status:
             return Response(CustomStatusSerializer(last_status).data)
@@ -581,7 +583,7 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
             end_time = datetime.fromisoformat(end_time)
             created_on = instance.created_on
 
-            break_time = int((end_time - created_on).total_seconds() / 60)
+            break_time = int((end_time - created_on).total_seconds())
 
             instance.break_time = break_time
             instance.is_active = False
