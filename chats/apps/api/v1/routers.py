@@ -13,6 +13,10 @@ from chats.apps.api.v1.external.rooms.viewsets import (
     RoomUserExternalViewSet,
 )
 from chats.apps.api.v1.external.sectors.viewsets import SectorFlowViewset
+from chats.apps.api.v1.groups_sectors.viewsets import (
+    GroupSectorAuthorizationViewset,
+    GroupSectorViewset,
+)
 from chats.apps.api.v1.internal.dashboard.viewsets import InternalDashboardViewset
 from chats.apps.api.v1.internal.projects import viewsets as project_internal_views
 from chats.apps.api.v1.internal.rooms.viewsets import InternalListRoomsViewSet
@@ -25,7 +29,6 @@ from chats.apps.api.v1.quickmessages.viewsets import (
     SectorQuickMessageViewset,
 )
 from chats.apps.api.v1.rooms.viewsets import RoomViewset
-from chats.apps.api.v1.groups_sectors.viewsets import GroupSectorViewset
 from chats.apps.api.v1.sectors.viewsets import (
     SectorAuthorizationViewset,
     SectorTagsViewset,
@@ -105,6 +108,11 @@ router.register("history/rooms", HistoryRoomViewset, basename="history_room")
 router.register("discussion", DiscussionViewSet, basename="discussion")
 router.register("sector", SectorViewset)
 router.register("group_sector", GroupSectorViewset, basename="group_sector")
+router.register(
+    "authorization/group_sector",
+    GroupSectorAuthorizationViewset,
+    basename="group_sector_auth",
+)
 router.register("tag", SectorTagsViewset)
 router.register("project", ProjectViewset)
 router.register(

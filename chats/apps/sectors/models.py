@@ -1,4 +1,5 @@
 from uuid import UUID
+
 import pendulum
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
@@ -373,6 +374,9 @@ class SectorGroupSector(BaseModel):
             )
         ]
 
+    def __str__(self):
+        return f"{self.sector_group.name} - {self.sector.name}"
+
 
 class GroupSector(BaseModel, BaseSoftDeleteModel):
     name = models.CharField(_("Name"), max_length=120)
@@ -397,24 +401,6 @@ class GroupSector(BaseModel, BaseSoftDeleteModel):
     def __str__(self):
         return self.name
 
-    def add_sector(self, sector: UUID):
-        try:
-            sector_obj = Sector.objects.get(uuid=sector, project=self.project)
-        except ObjectDoesNotExist:
-            raise ObjectDoesNotExist("Sector not found in project")
-        if self.sectors.filter(uuid=sector).exists():
-            raise Exception("Sector already in sector group")
-        self.sectors.add(sector_obj)
-
-    def remove_sector(self, sector: UUID):
-        try:
-            sector_obj = Sector.objects.get(uuid=sector, project=self.project)
-        except ObjectDoesNotExist:
-            raise ObjectDoesNotExist("Sector not found in project")
-        if not self.sectors.filter(uuid=sector).exists():
-            raise ObjectDoesNotExist("Sector not found in sector group")
-        self.sectors.remove(sector_obj)
-
     def get_sectors(self):
         return self.sectors.all()
 
@@ -423,7 +409,7 @@ class GroupSector(BaseModel, BaseSoftDeleteModel):
             return self.project.get_permission(user)
         except ObjectDoesNotExist:
             return None
-        
+
 
 class GroupSectorAuthorization(BaseModel):
     ROLE_NOT_SETTED = 0
@@ -453,8 +439,14 @@ class GroupSectorAuthorization(BaseModel):
         verbose_name = _("Group Sector Authorization")
         verbose_name_plural = _("Group Sector Authorizations")
         constraints = [
-            models.UniqueConstraint(fields=["group_sector", "permission"], name="unique_group_sector_auth")
+            models.UniqueConstraint(
+                fields=["group_sector", "permission", "role"],
+                name="unique_group_sector_auth",
+            )
         ]
+
+    def __str__(self):
+        return f"{self.group_sector.name} - {self.permission.user.email} - {self.role}"
 
     @property
     def is_manager(self):
@@ -463,3 +455,9 @@ class GroupSectorAuthorization(BaseModel):
     @property
     def is_agent(self):
         return self.role == self.ROLE_AGENT
+
+    def get_permission(self, user):
+        try:
+            return self.group_sector.project.get_permission(user)
+        except ObjectDoesNotExist:
+            return None

@@ -1,7 +1,7 @@
 from rest_framework import serializers
+
 from chats.apps.api.v1.sectors.serializers import SectorSerializer
-from chats.apps.sectors.models import GroupSector
-from chats.apps.sectors.models import GroupSectorAuthorization
+from chats.apps.sectors.models import GroupSector, GroupSectorAuthorization
 
 
 class GroupSectorSerializer(serializers.ModelSerializer):
@@ -38,10 +38,15 @@ class GroupSectorUpdateSerializer(serializers.ModelSerializer):
 class GroupSectorAuthorizationSerializer(serializers.ModelSerializer):
     class Meta:
         model = GroupSectorAuthorization
-        fields = ["group_sector", "permission", "role"]
-        read_only_fields = ["group_sector"]
+        fields = ["uuid", "group_sector", "permission", "role"]
+        read_only_fields = ["uuid"]
 
     def validate(self, attrs):
-        if attrs.get("role") not in [GroupSectorAuthorization.ROLE_MANAGER, GroupSectorAuthorization.ROLE_AGENT]:
-            raise serializers.ValidationError({"role": "Invalid role. Must be 1 (manager) or 2 (agent)"})
+        if attrs.get("role") not in [
+            GroupSectorAuthorization.ROLE_MANAGER,
+            GroupSectorAuthorization.ROLE_AGENT,
+        ]:
+            raise serializers.ValidationError(
+                {"role": "Invalid role. Must be 1 (manager) or 2 (agent)"}
+            )
         return attrs
