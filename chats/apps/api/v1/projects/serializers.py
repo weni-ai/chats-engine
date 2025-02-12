@@ -110,12 +110,12 @@ class ListProjectUsersSerializer(serializers.ModelSerializer):
 class CustomStatusTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomStatusType
-        fields = ["id", "name", "project", "is_deleted"]
-        read_only_fields = ["id", "is_deleted"]
+        fields = ["uuid", "name", "project", "is_deleted"]
+        read_only_fields = ["uuid", "is_deleted"]
 
 
 class CustomStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomStatus
-        fields = ["id", "user", "status_type", "is_active", "break_time"]
-        read_only_fields = ["id"]
+        fields = ["uuid", "user", "status_type", "is_active", "break_time"]
+        read_only_fields = ["uuid"]
