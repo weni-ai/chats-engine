@@ -17,7 +17,10 @@ from chats.apps.api.v1.queues import serializers as queue_serializers
 from chats.apps.api.v1.queues.filters import QueueAuthorizationFilter, QueueFilter
 from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue, QueueAuthorization
-from chats.apps.sectors.models import Sector
+from chats.apps.sectors.models import Sector, SectorGroupSector
+from chats.apps.sectors.usecases.group_sector_authorization import (
+    QueueGroupSectorAuthorizationCreationUseCase,
+)
 
 from .serializers import QueueAgentsSerializer
 
@@ -66,6 +69,12 @@ class QueueViewset(ModelViewSet):
             "sector_uuid": str(instance.sector.uuid),
             "project_uuid": str(instance.sector.project.uuid),
         }
+        use_group_sectors = SectorGroupSector.objects.filter(
+            sector=instance.sector
+        ).exists()
+        if use_group_sectors:
+            QueueGroupSectorAuthorizationCreationUseCase(instance).execute()
+
         if not settings.USE_WENI_FLOWS:
             return super().perform_create(serializer)
         response = FlowRESTClient().create_queue(**content)
