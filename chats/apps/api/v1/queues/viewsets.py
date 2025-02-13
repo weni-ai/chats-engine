@@ -17,6 +17,7 @@ from chats.apps.api.v1.queues import serializers as queue_serializers
 from chats.apps.api.v1.queues.filters import QueueAuthorizationFilter, QueueFilter
 from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.sectors.models import Sector, SectorGroupSector
 from chats.apps.sectors.usecases.group_sector_authorization import (
     QueueGroupSectorAuthorizationCreationUseCase,
@@ -63,6 +64,9 @@ class QueueViewset(ModelViewSet):
 
     def perform_create(self, serializer):
         instance = serializer.save()
+
+        project = Project.objects.get(uuid=instance.sector.project.uuid)
+
         content = {
             "uuid": str(instance.uuid),
             "name": instance.name,
@@ -83,6 +87,13 @@ class QueueViewset(ModelViewSet):
             raise exceptions.APIException(
                 detail=f"[{response.status_code}] Error posting the queue on flows. Exception: {response.content}"
             )
+
+        if project.config and project.config.get("its_main", False):
+            integrate_use_case = IntegratedTicketers()
+            integrate_use_case.integrate__individual_topic(
+                project, instance.sector.config.get("integration_token")
+            )
+
         return instance
 
     def perform_update(self, serializer):
