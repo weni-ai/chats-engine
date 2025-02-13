@@ -10,10 +10,18 @@ from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTCl
 from chats.apps.api.v1.internal.rest_clients.integrations_rest_client import (
     IntegrationsRESTClient,
 )
-from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
+from chats.core.models import (
+    BaseConfigurableModel,
+    BaseModel,
+    BaseSoftDeleteModel,
+)
 from chats.utils.websockets import send_channels_group
 
 from .permission_managers import UserPermissionsManager
+
+from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.utils import timezone
 
 User = get_user_model()
 
@@ -500,3 +508,50 @@ class ContactGroupFlowReference(BaseModel):
     @property
     def project(self):
         return self.flow_start.project
+
+
+class CustomStatusType(BaseModel):
+    name = models.CharField(max_length=255)
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE, related_name="custom_statuses"
+    )
+    is_deleted = models.BooleanField(default=False)
+
+    def delete(self, *args, **kwargs):
+        self.is_deleted = True
+        self.save(update_fields=["is_deleted"])
+
+    def save(self, *args, **kwargs):
+        if not self.pk:
+            with transaction.atomic():
+                existing_count = (
+                    CustomStatusType.objects.select_for_update()
+                    .filter(project=self.project, is_deleted=False)
+                    .count()
+                )
+                if existing_count > 10:
+                    raise ValidationError(
+                        "A project can have a maximum of 10 custom statuses."
+                    )
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        unique_together = ("name", "project")
+
+
+class CustomStatus(BaseModel):
+    user = models.ForeignKey(
+        "accounts.User",
+        related_name="user_custom_status",
+        verbose_name=_("user"),
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        to_field="email",
+    )
+    status_type = models.ForeignKey("CustomStatusType", on_delete=models.CASCADE)
+    is_active = models.BooleanField(default=True)
+    break_time = models.PositiveIntegerField(_("Custom status timming"))
