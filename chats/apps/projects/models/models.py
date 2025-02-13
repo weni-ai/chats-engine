@@ -552,6 +552,8 @@ class CustomStatus(BaseModel):
         blank=True,
         to_field="email",
     )
-    status_type = models.ForeignKey("CustomStatusType", on_delete=models.CASCADE)
+    status_type = models.ForeignKey(
+        "CustomStatusType", on_delete=models.CASCADE, to_field="uuid"
+    )
     is_active = models.BooleanField(default=True)
     break_time = models.PositiveIntegerField(_("Custom status timming"))
