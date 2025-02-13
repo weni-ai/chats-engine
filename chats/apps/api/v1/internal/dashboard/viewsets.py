@@ -41,3 +41,29 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         agents = DashboardAgentsSerializer(agents_data, many=True)
 
         return Response({"results": agents.data}, status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["GET"],
+        url_name="custom_status_agent",
+    )
+    def custom_status_agent(self, request, *args, **kwargs):
+        """Agent metrics for the custom status"""
+        project = self.get_object()
+        params = request.query_params.dict()
+        filters = Filters(
+            start_date=params.get("start_date"),
+            end_date=params.get("end_date"),
+            agent=params.get("agent"),
+            sector=params.get("sector"),
+            tag=params.get("tags"),
+            queue=params.get("queue"),
+            user_request=params.get("user_request", ""),
+            is_weni_admin=(True if "weni.ai" in params.get("user_request") else False),
+        )
+
+        agents_service = AgentsService()
+        agents_data = agents_service.get_agents_custom_status(filters, project)
+        agents = DashboardAgentsSerializer(agents_data, many=True)
+
+        return Response({"results": agents.data}, status.HTTP_200_OK)
