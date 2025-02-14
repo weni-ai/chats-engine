@@ -538,6 +538,12 @@ class CustomStatusType(BaseModel):
     def __str__(self):
         return self.name
 
+    def get_permission(self, user):
+        try:
+            return self.project.permissions.get(user=user)
+        except ProjectPermission.DoesNotExist:
+            return None
+
     class Meta:
         unique_together = ("name", "project")
 
