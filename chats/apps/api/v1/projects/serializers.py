@@ -117,7 +117,14 @@ class CustomStatusTypeSerializer(serializers.ModelSerializer):
 class CustomStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomStatus
-        fields = ["uuid", "user", "status_type", "is_active", "break_time"]
+        fields = [
+            "uuid",
+            "user",
+            "status_type",
+            "is_active",
+            "break_time",
+            "created_on",
+        ]
         read_only_fields = [
             "uuid",
         ]
