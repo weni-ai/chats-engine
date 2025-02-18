@@ -533,10 +533,26 @@ class CustomStatusTypeViewSet(viewsets.ModelViewSet):
     ]
 
     def perform_create(self, serializer):
+        return serializer.save()
+
+    def create(self, request, *args, **kwargs):
         try:
             with transaction.atomic():
-                instance = serializer.save()
-                return instance
+                data = request.data
+                if not isinstance(data, list):
+                    data = [data]
+
+                instances = []
+                for item in data:
+                    serializer = self.get_serializer(data=item)
+                    serializer.is_valid(raise_exception=True)
+                    instance = self.perform_create(serializer)
+                    instances.append(instance)
+
+                response_serializer = self.get_serializer(instances, many=True)
+                return Response(
+                    response_serializer.data, status=status.HTTP_201_CREATED
+                )
         except ValidationError as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
