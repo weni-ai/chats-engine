@@ -562,4 +562,4 @@ class CustomStatus(BaseModel):
         "CustomStatusType", on_delete=models.CASCADE, to_field="uuid"
     )
     is_active = models.BooleanField(default=True)
-    break_time = models.PositiveIntegerField(_("Custom status timming"))
+    break_time = models.PositiveIntegerField(_("Custom status timming"), default=0)

@@ -121,3 +121,4 @@ class CustomStatusSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "uuid",
         ]
+        break_time = serializers.IntegerField(required=False)
