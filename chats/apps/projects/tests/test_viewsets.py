@@ -95,7 +95,6 @@ class TestCustomStatusViewSet(APITestCase):
             "user": self.user.email,
             "status_type": self.status_type.pk,
             "is_active": True,
-            "break_time": 0,
         }
 
         response = self.client.post(reverse("customstatus-list"), body)
