@@ -615,7 +615,7 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
     def last_status(self, request):
         last_status = (
             CustomStatus.objects.filter(user=request.user, is_active=True)
-            .order_by("-uuid")
+            .order_by("-created_on")
             .first()
         )
         if last_status:
