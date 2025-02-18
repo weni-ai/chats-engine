@@ -122,3 +122,40 @@ class TestCustomStatusViewSet(APITestCase):
         response = self.client.get(reverse("customstatus-last-status"))
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["break_time"], 1)
+
+    def test_close_status(self):
+        status_instance = CustomStatus.objects.create(
+            user=self.user, status_type=self.status_type, is_active=True
+        )
+
+        end_time = (datetime.now() + timedelta(seconds=3600)).isoformat()
+        response = self.client.post(
+            reverse("customstatus-close-status", args=[str(status_instance.pk)]),
+            {"end_time": end_time},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        status_instance.refresh_from_db()
+        self.assertFalse(status_instance.is_active)
+        self.assertEqual(status_instance.break_time, 3600)
+
+    def test_close_status_not_found(self):
+        random_uuid = uuid.uuid4()
+        response = self.client.post(
+            reverse("customstatus-close-status", args=[str(random_uuid)]),
+            {"end_time": datetime.now().isoformat()},
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.data["detail"], "Custom Status not found.")
+
+    def test_close_status_invalid_end_time(self):
+        status_instance = CustomStatus.objects.create(
+            user=self.user, status_type=self.status_type, is_active=True
+        )
+
+        response = self.client.post(
+            reverse("customstatus-close-status", args=[str(status_instance.pk)]),
+            {"end_time": "invalid-format"},
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["detail"], "Invalid end_time format.")

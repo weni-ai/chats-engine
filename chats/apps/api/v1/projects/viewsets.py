@@ -47,6 +47,7 @@ from chats.apps.rooms.views import create_room_feedback_message
 from chats.apps.sectors.models import Sector
 from chats.apps.projects.models import CustomStatusType, CustomStatus
 from datetime import datetime
+import pytz
 
 
 class ProjectViewset(
@@ -588,18 +589,29 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                 {"detail": "Custom Status not found."}, status=status.HTTP_404_NOT_FOUND
             )
 
-        end_time = request.data.get("end_time")
-
-        if not end_time:
+        end_time_str = request.data.get("end_time")
+        if not end_time_str:
             return Response(
                 {"detail": "end_time is required."}, status=status.HTTP_400_BAD_REQUEST
             )
 
         try:
-            end_time = datetime.fromisoformat(end_time)
-            created_on = instance.created_on
+            end_time = datetime.fromisoformat(end_time_str)
 
-            break_time = int((end_time - created_on).total_seconds())
+            project_tz = instance.status_type.project.timezone
+
+            if isinstance(project_tz, str):
+                project_tz = pytz.timezone(project_tz)
+
+            if end_time.tzinfo is None:
+                if hasattr(project_tz, "localize"):
+                    end_time = project_tz.localize(end_time)
+                else:
+                    end_time = end_time.replace(tzinfo=project_tz)
+
+            local_created_on = instance.created_on.astimezone(project_tz)
+
+            break_time = int((end_time - local_created_on).total_seconds())
 
             instance.break_time = break_time
             instance.is_active = False
