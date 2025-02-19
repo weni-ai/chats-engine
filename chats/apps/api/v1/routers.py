@@ -37,6 +37,7 @@ from chats.apps.api.v1.sectors.viewsets import (
 from chats.apps.api.v1.users.viewsets import ProfileViewset
 from chats.apps.discussions.views import DiscussionViewSet
 from chats.apps.history.views import HistoryRoomViewset
+from chats.apps.api.v1.orgs.viewsets import OrgProjectViewSet
 
 
 class Router(routers.SimpleRouter):
@@ -114,6 +115,10 @@ router.register(
     basename="group_sector_auth",
 )
 router.register("tag", SectorTagsViewset)
+router.register(
+    r"org/(?P<org>[\w-]+)/projects", OrgProjectViewSet, basename="org-projects"
+)
+
 router.register("project", ProjectViewset)
 router.register(
     "permission/project", ProjectPermissionViewset, basename="project_permission"
