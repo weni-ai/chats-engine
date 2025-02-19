@@ -92,10 +92,10 @@ class SectorViewset(viewsets.ModelViewSet):
                     detail=f"[{response.status_code}] Error posting the sector/ticketer on flows. Exception: {response.content}"  # NOQA
                 )
 
-        if project.config and project.config.get("its_main", False):
+        if project.config and project.config.get("its_principal", False):
             integrate_use_case = IntegratedTicketers()
             integrate_use_case.integrate_individual_ticketer(
-                project, instance.config.get("integration_token")
+                project, instance.config.get("secondary_project")
             )
 
     def update(self, request, *args, **kwargs):
