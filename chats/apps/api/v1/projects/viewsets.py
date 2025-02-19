@@ -473,7 +473,7 @@ class ProjectViewset(
         project.save()
 
         org_projects = Project.objects.filter(org=project.org).exclude(pk=project.pk)
-        org_projects.update(config={"its_secundary": True})
+        org_projects.update(config={"its_principal": False})
 
         return Response(
             {
