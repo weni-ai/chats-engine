@@ -1,5 +1,3 @@
-from uuid import UUID
-
 import pendulum
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
