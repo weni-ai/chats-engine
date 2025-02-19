@@ -114,8 +114,9 @@ class RoomListSerializer(serializers.ModelSerializer):
 
 class RoomMetricsSerializer(serializers.ModelSerializer):
     user_name = serializers.SerializerMethodField()
-    first_user_message_at = serializers.SerializerMethodField()
+    first_user_message = serializers.SerializerMethodField()
     tags = TagSimpleSerializer(many=True, required=False)
+    interaction_time = serializers.IntegerField(source="metric.interaction_time")
 
     class Meta:
         model = Room
@@ -125,7 +126,7 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
             "ended_at",
             "user",
             "user_name",
-            "assigned_at",
+            "user_assigned_at",
             "first_user_message",
             "tags",
         ]
