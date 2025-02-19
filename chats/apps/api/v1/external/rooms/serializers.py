@@ -112,6 +112,36 @@ class RoomListSerializer(serializers.ModelSerializer):
         ]
 
 
+class RoomMetricsSerializer(serializers.ModelSerializer):
+    user_name = serializers.SerializerMethodField()
+    first_user_message_at = serializers.SerializerMethodField()
+    tags = TagSimpleSerializer(many=True, required=False)
+
+    class Meta:
+        model = Room
+        fields = [
+            "created_on",
+            "interaction_time",
+            "ended_at",
+            "user",
+            "user_name",
+            "assigned_at",
+            "first_user_message",
+            "tags",
+        ]
+
+    def get_user_name(self, obj):
+        if obj.user:
+            return f"{obj.user.first_name} {obj.user.last_name}".strip()
+        return None
+
+    def get_first_user_message(self, obj):
+        first_msg = (
+            obj.messages.filter(user__isnull=False).order_by("created_on").first()
+        )
+        return first_msg.created_on if first_msg else None
+
+
 class RoomFlowSerializer(serializers.ModelSerializer):
     user = UserSerializer(many=False, required=False, read_only=True)
     user_email = serializers.SlugRelatedField(
@@ -204,7 +234,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             contact=contact,
             queue=queue,
             protocol=protocol,
-            service_chat=service_chat
+            service_chat=service_chat,
         )
         RoomMetrics.objects.create(room=room)
 

@@ -10,6 +10,7 @@ from chats.apps.api.v1.external.rooms.viewsets import (
     CustomFieldsUserExternalViewSet,
     ExternalListRoomsViewSet,
     RoomFlowViewSet,
+    RoomMetricsViewSet,
     RoomUserExternalViewSet,
 )
 from chats.apps.api.v1.external.sectors.viewsets import SectorFlowViewset
@@ -176,6 +177,11 @@ router.register(
     "external/custom_field",
     CustomFieldsUserExternalViewSet,
     basename="external_custom_field",
+)
+router.register(
+    "external/rooms_metrics",
+    RoomMetricsViewSet,
+    basename="external_room_metrics",
 )
 router.register(
     "external/list_rooms",
