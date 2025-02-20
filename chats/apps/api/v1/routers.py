@@ -18,7 +18,12 @@ from chats.apps.api.v1.internal.projects import viewsets as project_internal_vie
 from chats.apps.api.v1.internal.rooms.viewsets import InternalListRoomsViewSet
 from chats.apps.api.v1.internal.users import viewsets as user_internal_views
 from chats.apps.api.v1.msgs.viewsets import MessageMediaViewset, MessageViewset
-from chats.apps.api.v1.projects.viewsets import ProjectPermissionViewset, ProjectViewset
+from chats.apps.api.v1.projects.viewsets import (
+    ProjectPermissionViewset,
+    ProjectViewset,
+    CustomStatusTypeViewSet,
+    CustomStatusViewSet,
+)
 from chats.apps.api.v1.queues.viewsets import QueueAuthorizationViewset, QueueViewset
 from chats.apps.api.v1.quickmessages.viewsets import (
     QuickMessageViewset,
@@ -105,6 +110,8 @@ router.register("discussion", DiscussionViewSet, basename="discussion")
 router.register("sector", SectorViewset)
 router.register("tag", SectorTagsViewset)
 router.register("project", ProjectViewset)
+router.register("custom_status", CustomStatusViewSet)
+router.register("custom_status_type", CustomStatusTypeViewSet)
 router.register(
     "permission/project", ProjectPermissionViewset, basename="project_permission"
 )
