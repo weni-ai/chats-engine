@@ -534,6 +534,7 @@ class CustomStatusTypeViewSet(viewsets.ModelViewSet):
         IsAuthenticated,
         ProjectAnyPermission,
     ]
+    filter_backends = [DjangoFilterBackend]
     filterset_class = CustomStatusTypeFilterSet
 
     def perform_create(self, serializer):
