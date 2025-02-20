@@ -1,4 +1,4 @@
-from datetime import timedelta
+import pendulum
 from typing import Dict, List
 
 from django.utils import timezone
@@ -144,8 +144,10 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
             obj.messages.filter(user__isnull=False).order_by("created_on").first()
         )
         if first_msg:
-            return first_msg.created_on - timedelta(hours=3)
+            msg_date = pendulum.instance(first_msg.created_on).in_tz("America/Sao_Paulo")
+            return msg_date.isoformat()
         return None
+
 
 class RoomFlowSerializer(serializers.ModelSerializer):
     user = UserSerializer(many=False, required=False, read_only=True)
