@@ -22,6 +22,7 @@ from chats.apps.api.v1.internal.projects import viewsets as project_internal_vie
 from chats.apps.api.v1.internal.rooms.viewsets import InternalListRoomsViewSet
 from chats.apps.api.v1.internal.users import viewsets as user_internal_views
 from chats.apps.api.v1.msgs.viewsets import MessageMediaViewset, MessageViewset
+from chats.apps.api.v1.orgs.viewsets import OrgProjectViewSet
 from chats.apps.api.v1.projects.viewsets import ProjectPermissionViewset, ProjectViewset
 from chats.apps.api.v1.queues.viewsets import QueueAuthorizationViewset, QueueViewset
 from chats.apps.api.v1.quickmessages.viewsets import (
@@ -37,7 +38,6 @@ from chats.apps.api.v1.sectors.viewsets import (
 from chats.apps.api.v1.users.viewsets import ProfileViewset
 from chats.apps.discussions.views import DiscussionViewSet
 from chats.apps.history.views import HistoryRoomViewset
-from chats.apps.api.v1.orgs.viewsets import OrgProjectViewSet
 
 
 class Router(routers.SimpleRouter):
