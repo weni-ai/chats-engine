@@ -89,10 +89,10 @@ class QueueViewset(ModelViewSet):
                 detail=f"[{response.status_code}] Error posting the queue on flows. Exception: {response.content}"
             )
 
-        if project.config and project.config.get("its_main", False):
+        if project.config and project.config.get("its_principal", False):
             integrate_use_case = IntegratedTicketers()
             integrate_use_case.integrate__individual_topic(
-                project, instance.sector.config.get("integration_token")
+                project, instance.sector.config.get("secondary_project")
             )
 
         return instance

@@ -18,7 +18,7 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ["name", "date_format", "timezone", "config"]
+        fields = ["name", "date_format", "timezone", "config", "org"]
         read_only_fields = [
             "timezone",
         ]

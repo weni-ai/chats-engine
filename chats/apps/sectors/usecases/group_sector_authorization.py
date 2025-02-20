@@ -13,6 +13,8 @@ class GroupSectorAuthorizationCreationUseCase:
         try:
             self.group_sector = GroupSector.objects.get(uuid=group_sector_uuid)
             self.permission = ProjectPermission.objects.get(uuid=permission_uuid)
+        except ObjectDoesNotExist:
+            raise ValueError("Group sector or permission not found")
         except Exception as e:
             raise ValueError(str(e))
         self.role = role
@@ -44,7 +46,7 @@ class GroupSectorAuthorizationCreationUseCase:
             raise ValueError(str(e))
 
     def _validate_role(self):
-        if self.role not in [
+        if int(self.role) not in [
             GroupSectorAuthorization.ROLE_MANAGER,
             GroupSectorAuthorization.ROLE_AGENT,
         ]:
@@ -126,6 +128,12 @@ class AddSectorToGroupSectorUseCase:
         except ObjectDoesNotExist:
             raise ObjectDoesNotExist("Sector not found in project")
 
+    def _validate_exists_another_group_sector(self):
+        if self.sector.sector_group_sectors.exclude(
+            uuid=self.group_sector.uuid
+        ).exists():
+            raise ValueError("Sector is already in another group sector")
+
     def _add_sector_to_group_sector(self):
         if self.group_sector.sectors.filter(uuid=self.sector_uuid).exists():
             raise ValueError("Sector already in group sector")
@@ -146,6 +154,7 @@ class AddSectorToGroupSectorUseCase:
 
     @transaction.atomic
     def execute(self):
+        self._validate_exists_another_group_sector()
         self._add_sector_to_group_sector()
         self._create_sector_permissions()
         self._create_queue_permissions()
@@ -155,6 +164,14 @@ class RemoveSectorFromGroupSectorUseCase:
     def __init__(self, sector_uuid: UUID, group_sector: GroupSector):
         self.sector_uuid = sector_uuid
         self.group_sector = group_sector
+
+    def _validate_sector_exists_in_project(self):
+        try:
+            self.sector = Sector.objects.get(
+                uuid=self.sector_uuid, project=self.group_sector.project
+            )
+        except ObjectDoesNotExist:
+            raise ObjectDoesNotExist("Sector not found in project")
 
     def _remove_sector_from_group_sector(self):
         if not self.group_sector.sectors.filter(uuid=self.sector_uuid).exists():
@@ -180,6 +197,7 @@ class RemoveSectorFromGroupSectorUseCase:
 
     @transaction.atomic
     def execute(self):
+        self._validate_sector_exists_in_project()
         self._delete_sector_permissions()
         self._delete_queue_permissions()
         self._remove_sector_from_group_sector()
