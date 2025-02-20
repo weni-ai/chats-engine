@@ -144,7 +144,9 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
             obj.messages.filter(user__isnull=False).order_by("created_on").first()
         )
         if first_msg:
-            msg_date = pendulum.instance(first_msg.created_on).in_tz("America/Sao_Paulo")
+            msg_date = pendulum.instance(first_msg.created_on).in_tz(
+                "America/Sao_Paulo"
+            )
             return msg_date.isoformat()
         return None
 
