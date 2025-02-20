@@ -13,6 +13,8 @@ from datetime import datetime, timedelta
 from chats.apps.projects.models import CustomStatusType, CustomStatus
 import uuid
 
+from chats.apps.projects.models.models import ProjectPermission
+
 
 class PermissionTests(APITestCase):
     fixtures = ["chats/fixtures/fixture_app.json"]
@@ -81,7 +83,9 @@ class TestCustomStatusViewSet(APITestCase):
     def setUp(self):
         self.user = User.objects.get(pk=9)
         self.project = Project.objects.get(pk="34a93b52-231e-11ed-861d-0242ac120002")
-
+        self.project_permission = ProjectPermission.objects.get(
+            user=self.user, project=self.project
+        )
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
 
@@ -91,8 +95,11 @@ class TestCustomStatusViewSet(APITestCase):
         )
 
     def test_create_custom_status(self):
+        project_permission = self.project_permission
+        project_permission.status = "ONLINE"
+        project_permission.save()
+
         body = {
-            "user": self.user.email,
             "status_type": self.status_type.pk,
             "is_active": True,
         }
@@ -104,6 +111,10 @@ class TestCustomStatusViewSet(APITestCase):
                 user=self.user, status_type=self.status_type
             ).exists()
         )
+
+        project_permission.refresh_from_db()
+
+        self.assertEqual(project_permission.status, "OFFLINE")
 
     def test_last_status(self):
         CustomStatus.objects.create(
@@ -128,22 +139,35 @@ class TestCustomStatusViewSet(APITestCase):
             user=self.user, status_type=self.status_type, is_active=True
         )
 
+        project_permission = self.project_permission
+
         end_time = (datetime.now() + timedelta(seconds=3600)).isoformat()
+        payload = {
+            "end_time": end_time,
+            "is_active": True,
+        }
+
         response = self.client.post(
             reverse("customstatus-close-status", args=[str(status_instance.pk)]),
-            {"end_time": end_time},
+            payload,
+            format="json",
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
         status_instance.refresh_from_db()
         self.assertFalse(status_instance.is_active)
         self.assertEqual(status_instance.break_time, 3600)
 
+        project_permission.refresh_from_db()
+        self.assertEqual(project_permission.status, "ONLINE")
+
     def test_close_status_not_found(self):
         random_uuid = uuid.uuid4()
+        end_time = datetime.fromisoformat("2025-02-19T13:06:43.473+00:00")
         response = self.client.post(
             reverse("customstatus-close-status", args=[str(random_uuid)]),
-            {"end_time": datetime.now().isoformat()},
+            {"end_time": end_time},
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(response.data["detail"], "Custom Status not found.")

@@ -47,7 +47,9 @@ from chats.apps.rooms.views import create_room_feedback_message
 from chats.apps.sectors.models import Sector
 from chats.apps.projects.models import CustomStatusType, CustomStatus
 from datetime import datetime
-import pytz
+from rest_framework import serializers
+from chats.apps.api.utils import ensure_timezone
+from chats.apps.api.v1.projects.filters import CustomStatusTypeFilterSet
 
 
 class ProjectViewset(
@@ -532,6 +534,7 @@ class CustomStatusTypeViewSet(viewsets.ModelViewSet):
         IsAuthenticated,
         ProjectAnyPermission,
     ]
+    filterset_class = CustomStatusTypeFilterSet
 
     def perform_create(self, serializer):
         return serializer.save()
@@ -567,7 +570,20 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
     ]
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        user = self.request.user
+
+        status_type = serializer.validated_data.get("status_type")
+        project = status_type.project if status_type else None
+
+        with transaction.atomic():
+            updated_rows = ProjectPermission.objects.filter(
+                user=user, project=project
+            ).update(status="OFFLINE")
+            if updated_rows == 0:
+                raise serializers.ValidationError(
+                    {"status": "Can't update user status in project."}
+                )
+            serializer.save(user=user)
 
     @decorators.action(detail=False, methods=["get"])
     def last_status(self, request):
@@ -584,45 +600,52 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
     def close_status(self, request, pk=None):
         try:
             instance = CustomStatus.objects.get(pk=pk)
+
+            with transaction.atomic():
+                end_time_str = request.data.get("end_time")
+                is_active = request.data.get("is_active", False)
+
+                if end_time_str is None:
+                    return Response(
+                        {"detail": "end_time is required."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                try:
+                    if is_active:
+                        updated_rows = ProjectPermission.objects.filter(
+                            user=instance.user, project=instance.status_type.project
+                        ).update(status="ONLINE")
+
+                        if updated_rows == 0:
+                            raise serializers.ValidationError(
+                                {"status": "Can't update user status in project."}
+                            )
+
+                    end_time = datetime.fromisoformat(end_time_str)
+                    project_tz = instance.status_type.project.timezone
+
+                    end_time = ensure_timezone(end_time, project_tz)
+
+                    local_created_on = instance.created_on.astimezone(project_tz)
+                    break_time = int((end_time - local_created_on).total_seconds())
+
+                    instance.break_time = break_time
+                    instance.is_active = False
+                    instance.save()
+
+                    return Response(
+                        {"detail": "CustomStatus updated successfully."},
+                        status=status.HTTP_200_OK,
+                    )
+
+                except ValueError as error:
+                    return Response(
+                        {"detail": f"Invalid end_time format: {error}"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
         except CustomStatus.DoesNotExist:
             return Response(
                 {"detail": "Custom Status not found."}, status=status.HTTP_404_NOT_FOUND
-            )
-
-        end_time_str = request.data.get("end_time")
-        if not end_time_str:
-            return Response(
-                {"detail": "end_time is required."}, status=status.HTTP_400_BAD_REQUEST
-            )
-
-        try:
-            end_time = datetime.fromisoformat(end_time_str)
-
-            project_tz = instance.status_type.project.timezone
-
-            if isinstance(project_tz, str):
-                project_tz = pytz.timezone(project_tz)
-
-            if end_time.tzinfo is None:
-                if hasattr(project_tz, "localize"):
-                    end_time = project_tz.localize(end_time)
-                else:
-                    end_time = end_time.replace(tzinfo=project_tz)
-
-            local_created_on = instance.created_on.astimezone(project_tz)
-
-            break_time = int((end_time - local_created_on).total_seconds())
-
-            instance.break_time = break_time
-            instance.is_active = False
-            instance.save()
-
-            return Response(
-                {"detail": "CustomStatus updated successfully."},
-                status=status.HTTP_200_OK,
-            )
-        except ValueError:
-            return Response(
-                {"detail": "Invalid end_time format."},
-                status=status.HTTP_400_BAD_REQUEST,
             )
