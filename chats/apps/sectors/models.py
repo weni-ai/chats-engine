@@ -348,3 +348,114 @@ class SectorTag(BaseModel):
     @property
     def project(self):
         return self.sector.project
+
+
+class SectorGroupSector(BaseModel):
+    sector_group = models.ForeignKey(
+        "GroupSector",
+        related_name="sector_group_sectors",
+        on_delete=models.CASCADE,
+    )
+    sector = models.ForeignKey(
+        Sector,
+        related_name="sector_group_sectors",
+        on_delete=models.CASCADE,
+    )
+
+    class Meta:
+        verbose_name = _("Sector Group Sector")
+        verbose_name_plural = _("Sector Group Sectors")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["sector_group", "sector"],
+                name="unique_sector_group_sector",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.sector_group.name} - {self.sector.name}"
+
+
+class GroupSector(BaseModel, BaseSoftDeleteModel):
+    name = models.CharField(_("Name"), max_length=120)
+    project = models.ForeignKey(
+        "projects.Project",
+        verbose_name=_("Project"),
+        related_name="group_sectors",
+        on_delete=models.CASCADE,
+    )
+    sectors = models.ManyToManyField(
+        Sector,
+        through=SectorGroupSector,
+        related_name="group_sectors",
+        blank=True,
+    )
+    rooms_limit = models.PositiveIntegerField(_("Rooms limit per employee"))
+
+    class Meta:
+        verbose_name = _("Group Sector")
+        verbose_name_plural = _("Group Sectors")
+
+    def __str__(self):
+        return self.name
+
+    def get_sectors(self):
+        return self.sectors.all()
+
+    def get_permission(self, user):
+        try:
+            return self.project.get_permission(user)
+        except ObjectDoesNotExist:
+            return None
+
+
+class GroupSectorAuthorization(BaseModel):
+    ROLE_NOT_SETTED = 0
+    ROLE_MANAGER = 1
+    ROLE_AGENT = 2
+
+    ROLE_CHOICES = [
+        (ROLE_NOT_SETTED, _("not set")),
+        (ROLE_MANAGER, _("manager")),
+        (ROLE_AGENT, _("agent")),
+    ]
+    group_sector = models.ForeignKey(
+        "GroupSector",
+        related_name="group_sector_authorizations",
+        on_delete=models.CASCADE,
+    )
+    permission = models.ForeignKey(
+        "projects.ProjectPermission",
+        related_name="group_sector_authorizations",
+        on_delete=models.CASCADE,
+    )
+    role = models.PositiveIntegerField(
+        _("role"), choices=ROLE_CHOICES, default=ROLE_NOT_SETTED
+    )
+
+    class Meta:
+        verbose_name = _("Group Sector Authorization")
+        verbose_name_plural = _("Group Sector Authorizations")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["group_sector", "permission", "role"],
+                name="unique_group_sector_auth",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.group_sector.name} - {self.permission.user.email} - {self.role}"
+
+    @property
+    def is_manager(self):
+        return self.role == self.ROLE_MANAGER
+
+    @property
+    def is_agent(self):
+        return self.role == self.ROLE_AGENT
+
+    def get_permission(self, user):
+        try:
+            return self.group_sector.project.get_permission(user)
+        except ObjectDoesNotExist:
+            return None

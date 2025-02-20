@@ -13,6 +13,10 @@ from chats.apps.api.v1.external.rooms.viewsets import (
     RoomUserExternalViewSet,
 )
 from chats.apps.api.v1.external.sectors.viewsets import SectorFlowViewset
+from chats.apps.api.v1.groups_sectors.viewsets import (
+    GroupSectorAuthorizationViewset,
+    GroupSectorViewset,
+)
 from chats.apps.api.v1.internal.dashboard.viewsets import InternalDashboardViewset
 from chats.apps.api.v1.internal.projects import viewsets as project_internal_views
 from chats.apps.api.v1.internal.rooms.viewsets import InternalListRoomsViewSet
@@ -33,6 +37,7 @@ from chats.apps.api.v1.sectors.viewsets import (
 from chats.apps.api.v1.users.viewsets import ProfileViewset
 from chats.apps.discussions.views import DiscussionViewSet
 from chats.apps.history.views import HistoryRoomViewset
+from chats.apps.api.v1.orgs.viewsets import OrgProjectViewSet
 
 
 class Router(routers.SimpleRouter):
@@ -103,7 +108,17 @@ router.register("contact", ContactViewset)
 router.register("history/rooms", HistoryRoomViewset, basename="history_room")
 router.register("discussion", DiscussionViewSet, basename="discussion")
 router.register("sector", SectorViewset)
+router.register("group_sector", GroupSectorViewset, basename="group_sector")
+router.register(
+    "authorization/group_sector",
+    GroupSectorAuthorizationViewset,
+    basename="group_sector_auth",
+)
 router.register("tag", SectorTagsViewset)
+router.register(
+    r"org/(?P<org>[\w-]+)/projects", OrgProjectViewSet, basename="org-projects"
+)
+
 router.register("project", ProjectViewset)
 router.register(
     "permission/project", ProjectPermissionViewset, basename="project_permission"

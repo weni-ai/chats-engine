@@ -8,7 +8,7 @@ class GetPermission:
         self.data = request.data or request.query_params
 
         # Get the instance type and pk
-        for key in ["project", "sector", "queue"]:
+        for key in ["project", "sector", "queue", "group_sector"]:
             pk = self.data.get(key, None)
             if pk:
                 self.pk = pk
@@ -26,6 +26,10 @@ class GetPermission:
     @property
     def queue(self):
         return Q(project__sectors__queues=self.pk)
+
+    @property
+    def group_sector(self):
+        return Q(project__group_sectors=self.pk)
 
     @property
     def permission(self):
