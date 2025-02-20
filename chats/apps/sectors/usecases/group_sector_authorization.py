@@ -13,6 +13,8 @@ class GroupSectorAuthorizationCreationUseCase:
         try:
             self.group_sector = GroupSector.objects.get(uuid=group_sector_uuid)
             self.permission = ProjectPermission.objects.get(uuid=permission_uuid)
+        except ObjectDoesNotExist:
+            raise ValueError("Group sector or permission not found")
         except Exception as e:
             raise ValueError(str(e))
         self.role = role
@@ -44,7 +46,7 @@ class GroupSectorAuthorizationCreationUseCase:
             raise ValueError(str(e))
 
     def _validate_role(self):
-        if self.role not in [
+        if int(self.role) not in [
             GroupSectorAuthorization.ROLE_MANAGER,
             GroupSectorAuthorization.ROLE_AGENT,
         ]:

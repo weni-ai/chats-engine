@@ -3,4 +3,5 @@ from .group_sector_authorization import (
     GroupSectorAuthorizationCreationUseCase,
     GroupSectorAuthorizationDeletionUseCase,
     RemoveSectorFromGroupSectorUseCase,
+    QueueGroupSectorAuthorizationCreationUseCase,
 )

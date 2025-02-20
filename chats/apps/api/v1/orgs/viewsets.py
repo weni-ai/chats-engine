@@ -1,9 +1,10 @@
-from rest_framework import mixins
-from rest_framework.viewsets import GenericViewSet
-from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
+from rest_framework import mixins
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.viewsets import GenericViewSet
 
 from chats.apps.projects.models import Project
+
 from .serializers import OrgProjectSerializer
 
 
