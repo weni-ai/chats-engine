@@ -64,6 +64,6 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
 
         agents_service = AgentsService()
         agents_data = agents_service.get_agents_custom_status(filters, project)
-        agents = DashboardAgentsSerializer(agents_data, many=True)
+        agents = DashboardAgentsSerializer(agents_data, many=True, context={"project": project} )
 
         return Response({"results": agents.data}, status.HTTP_200_OK)

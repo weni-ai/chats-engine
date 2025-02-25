@@ -24,25 +24,25 @@ class DashboardAgentsSerializer(serializers.Serializer):
         return f"{obj.get('first_name')} {obj.get('last_name')}"
 
     def get_custom_status(self, obj):
-        custom_status_list = obj.get("custom_status")
+        custom_status_list = obj.get('custom_status') or []
+        
+        project = self.context.get('project')
+        all_status_types = project.custom_statuses.filter(
+            is_deleted=False
+        ).values_list('name', flat=True)
 
-        if not custom_status_list:
-            return None
-
-        aggregated_status = {}
-
-        for status_item in custom_status_list:
-            status_type = status_item.get("status_type")
-            break_time = status_item.get("break_time", 0)
-
-            if status_type in aggregated_status:
-                aggregated_status[status_type] += break_time
-            else:
-                aggregated_status[status_type] = break_time
-
-        aggregated_status_list = [
-            {"status_type": status_type, "break_time": total_time}
-            for status_type, total_time in aggregated_status.items()
+        status_dict = {status_type: 0 for status_type in all_status_types}
+        
+        if custom_status_list:
+            for status_item in custom_status_list:
+                status_type = status_item.get('status_type')
+                break_time = status_item.get('break_time', 0)
+                if status_type in status_dict:
+                    status_dict[status_type] = break_time
+        
+        result = [
+            {'status_type': status_type, 'break_time': break_time}
+            for status_type, break_time in status_dict.items()
         ]
-
-        return aggregated_status_list
+        
+        return result
