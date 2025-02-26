@@ -255,7 +255,7 @@ class GroupSectorAuthorizationTests(APITestCase):
         client = self.client
         client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
         response = client.delete(url)
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_delete_group_sector_authorization_invalid_uuid(self):
         """
