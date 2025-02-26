@@ -1,3 +1,4 @@
+from django.db import transaction
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -39,6 +40,7 @@ class GroupSectorViewset(viewsets.ModelViewSet):
             self.filterset_class = None
         return super().get_queryset()
 
+    @transaction.atomic
     def perform_create(self, serializer):
         serializer.save()
 
