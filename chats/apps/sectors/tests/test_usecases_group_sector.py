@@ -179,23 +179,23 @@ class GroupSectorAuthorizationUseCaseTests(APITestCase):
 
     def test_create_group_sector_authorization_invalid_group_sector(self):
         """Test creating authorization with invalid group sector UUID"""
-        use_case = GroupSectorAuthorizationCreationUseCase(
-            group_sector_uuid=self.project_permission.uuid,
-            permission_uuid=self.project_permission.uuid,
-            role=GroupSectorAuthorization.ROLE_MANAGER,
-        )
-        with self.assertRaises(ValueError):
-            use_case.execute()
+        with self.assertRaises(ValueError) as context:
+            GroupSectorAuthorizationCreationUseCase(
+                group_sector_uuid="00000000-0000-0000-0000-000000000000",  # Invalid UUID
+                permission_uuid=self.project_permission.uuid,
+                role=GroupSectorAuthorization.ROLE_MANAGER,
+            )
+        self.assertEqual(str(context.exception), "Group sector or permission not found")
 
     def test_create_group_sector_authorization_invalid_permission(self):
         """Test creating authorization with invalid permission UUID"""
-        use_case = GroupSectorAuthorizationCreationUseCase(
-            group_sector_uuid=self.project_permission.uuid,
-            permission_uuid=self.project_permission.uuid,
-            role=GroupSectorAuthorization.ROLE_MANAGER,
-        )
-        with self.assertRaises(ValueError):
-            use_case.execute()
+        with self.assertRaises(ValueError) as context:
+            GroupSectorAuthorizationCreationUseCase(
+                group_sector_uuid=self.group_sector.uuid,
+                permission_uuid="00000000-0000-0000-0000-000000000000",  # Invalid UUID
+                role=GroupSectorAuthorization.ROLE_MANAGER,
+            )
+        self.assertEqual(str(context.exception), "Group sector or permission not found")
 
     def test_delete_group_sector_authorization_with_sectors(self):
         """Test deleting authorization that has sectors with permissions"""
