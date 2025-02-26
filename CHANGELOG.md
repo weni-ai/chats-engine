@@ -1,3 +1,7 @@
+# 3.15.2
+## Add
+  - new endpoint to list rooms metrics
+
 # 3.15.1
 ## Fix
   - Export chats dashboard data to CSV and XLS
