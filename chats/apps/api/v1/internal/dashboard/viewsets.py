@@ -14,7 +14,7 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
     lookup_field = "uuid"
     queryset = Project.objects.all()
     serializer_class = DashboardAgentsSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, ModuleHasPermission]
 
     @action(
         detail=True,
