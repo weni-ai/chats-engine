@@ -142,7 +142,7 @@ class GroupSectorAuthorizationViewset(viewsets.ModelViewSet):
             response = {
                 "message": "Group sector authorization deleted successfully",
             }
-            return Response(response, status=status.HTTP_204_NO_CONTENT)
+            return Response(response, status=status.HTTP_200_OK)
         except Exception as e:
             response = {
                 "message": str(e),
