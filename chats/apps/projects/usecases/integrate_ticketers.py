@@ -98,7 +98,10 @@ class IntegratedTicketers:
 
         except Sector.MultipleObjectsReturned:
             raise exceptions.APIException(
-                detail="Error posting the sector/ticketer on flows. There is more than one sector with the same secondary project"
+                detail=(
+                    "Error posting the sector/ticketer on flows. There is more than one "
+                    "sector with the same secondary project"
+                )
             )
 
         except Exception as e:
