@@ -8,6 +8,7 @@ from django.contrib.auth.models import Permission
 
 from chats.apps.api.utils import create_user_and_token
 from chats.apps.queues.models import Queue
+from chats.apps.rooms.models import Room
 
 
 class RoomsExternalTests(APITestCase):
@@ -22,6 +23,13 @@ class RoomsExternalTests(APITestCase):
         client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
 
         return client.post(url, data=data, format="json")
+
+    def _close_room(self, token: str, room_id: str):
+        url = reverse("external_rooms-close", kwargs={"uuid": room_id})
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+        return client.put(url, format="json")
 
     def test_create_external_room(self):
         """
@@ -161,6 +169,12 @@ class RoomsExternalTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.get("urn"), None)
+
+    def test_close_room(self):
+        room = Room.objects.create(queue=self.queue_1)
+
+        response = self._close_room("f3ce543e-d77e-4508-9140-15c95752a380", room.uuid)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
 
 class RoomsFlowStartExternalTests(APITestCase):
