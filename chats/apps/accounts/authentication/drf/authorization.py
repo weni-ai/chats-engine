@@ -1,4 +1,5 @@
 import json
+from uuid import UUID
 
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
@@ -85,3 +86,14 @@ class ProjectAdminAuthentication(TokenAuthentication):
         redis_connection.set(key, json.dumps(authorization.__dict__), self.cache_ttl)
 
         return (authorization.user_email, authorization)
+
+
+def get_auth_class(request):
+    auth = get_authorization_header(request)
+    token = auth.split()[1].decode() if len(auth.split()) > 1 else ""
+
+    try:
+        UUID(token)
+        return [ProjectAdminAuthentication]
+    except ValueError:
+        return [TokenAuthentication]
