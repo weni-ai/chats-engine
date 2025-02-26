@@ -1,4 +1,3 @@
-from django.core.exceptions import ObjectDoesNotExist
 from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
