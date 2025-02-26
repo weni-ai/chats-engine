@@ -2,7 +2,7 @@ from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from chats.apps.api.v1.internal.dashboard.serializers import DashboardAgentsSerializer
+from chats.apps.api.v1.internal.dashboard.serializers import DashboardAgentsSerializer, DashboardCustomAgentStatusSerializer
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.projects.models import Project
 
@@ -64,6 +64,6 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
 
         agents_service = AgentsService()
         agents_data = agents_service.get_agents_custom_status(filters, project)
-        agents = DashboardAgentsSerializer(agents_data, many=True, context={"project": project} )
+        agents = DashboardCustomAgentStatusSerializer(agents_data, many=True, context={"project": project} )
 
         return Response({"results": agents.data}, status.HTTP_200_OK)
