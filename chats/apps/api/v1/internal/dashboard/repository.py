@@ -127,7 +127,6 @@ class AgentRepository:
             CustomStatus.objects.filter(
                 user=OuterRef("email"),
                 status_type__project=project,
-                is_active=True,
             )
             .values("user")
             .annotate(
