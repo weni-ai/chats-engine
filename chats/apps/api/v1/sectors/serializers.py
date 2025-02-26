@@ -59,6 +59,7 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
 class SectorReadOnlyListSerializer(serializers.ModelSerializer):
     agents = serializers.SerializerMethodField()
     contacts = serializers.SerializerMethodField()
+    has_group_sector = serializers.SerializerMethodField()
 
     class Meta:
         model = Sector
@@ -69,6 +70,7 @@ class SectorReadOnlyListSerializer(serializers.ModelSerializer):
             "contacts",
             "can_trigger_flows",
             "created_on",
+            "has_group_sector",
         ]
 
     def get_agents(self, sector: Sector):
@@ -76,6 +78,9 @@ class SectorReadOnlyListSerializer(serializers.ModelSerializer):
 
     def get_contacts(self, sector: Sector):
         return sector.contact_count
+
+    def get_has_group_sector(self, sector: Sector):
+        return sector.sector_group_sectors.exists()
 
 
 class SectorReadOnlyRetrieveSerializer(serializers.ModelSerializer):

@@ -42,6 +42,13 @@ class GroupSectorViewset(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save()
 
+    def perform_destroy(self, instance):
+        for sector in instance.sectors.all():
+            RemoveSectorFromGroupSectorUseCase(
+                sector_uuid=sector.uuid, group_sector=instance
+            ).execute()
+        instance.delete()
+
     @action(
         detail=True,
         methods=["POST"],
@@ -142,7 +149,7 @@ class GroupSectorAuthorizationViewset(viewsets.ModelViewSet):
             response = {
                 "message": "Group sector authorization deleted successfully",
             }
-            return Response(response, status=status.HTTP_204_NO_CONTENT)
+            return Response(response, status=status.HTTP_200_OK)
         except Exception as e:
             response = {
                 "message": str(e),
