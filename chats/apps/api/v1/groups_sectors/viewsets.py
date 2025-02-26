@@ -42,6 +42,13 @@ class GroupSectorViewset(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save()
 
+    def perform_destroy(self, instance):
+        for sector in instance.sectors.all():
+            RemoveSectorFromGroupSectorUseCase(
+                sector_uuid=sector.uuid, group_sector=instance
+            ).execute()
+        instance.delete()
+
     @action(
         detail=True,
         methods=["POST"],
