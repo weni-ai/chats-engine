@@ -19,7 +19,6 @@ from chats.apps.api.v1.groups_sectors.viewsets import (
     GroupSectorViewset,
 )
 from chats.apps.api.v1.internal.dashboard.viewsets import InternalDashboardViewset
-# flake8: noqa: F811
 from chats.apps.api.v1.internal.projects import viewsets as project_internal_views
 from chats.apps.api.v1.internal.rooms.viewsets import InternalListRoomsViewSet
 from chats.apps.api.v1.internal.users import viewsets as user_internal_views
@@ -31,7 +30,6 @@ from chats.apps.api.v1.projects.viewsets import (
     CustomStatusViewSet,
 )
 from chats.apps.api.v1.orgs.viewsets import OrgProjectViewSet
-from chats.apps.api.v1.projects.viewsets import ProjectPermissionViewset, ProjectViewset
 from chats.apps.api.v1.queues.viewsets import QueueAuthorizationViewset, QueueViewset
 from chats.apps.api.v1.quickmessages.viewsets import (
     QuickMessageViewset,

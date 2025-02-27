@@ -54,18 +54,18 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
         ).values_list('name', flat=True)
 
         status_dict = {status_type: 0 for status_type in all_status_types}
-        
+
         if custom_status_list:
             for status_item in custom_status_list:
                 status_type = status_item.get('status_type')
                 break_time = status_item.get('break_time', 0)
                 if status_type in status_dict:
                     status_dict[status_type] = break_time
-        
+
         result = [
             {'status_type': status_type, 'break_time': break_time}
             for status_type, break_time in status_dict.items()
         ]
-        
+
         return result
 
