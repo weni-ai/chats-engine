@@ -7,7 +7,7 @@ from django.db.models.functions import Concat
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
-from rest_framework import filters, mixins, status, viewsets
+from rest_framework import filters, mixins, status, viewsets, decorators
 from rest_framework.decorators import action
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
@@ -33,6 +33,8 @@ from chats.apps.api.v1.projects.serializers import (
     ProjectFlowStartSerializer,
     ProjectSerializer,
     SectorDiscussionSerializer,
+    CustomStatusTypeSerializer,
+    CustomStatusSerializer,
 )
 from chats.apps.contacts.models import Contact
 from chats.apps.projects.models import (
@@ -43,6 +45,11 @@ from chats.apps.projects.models import (
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import create_room_feedback_message
 from chats.apps.sectors.models import Sector
+from chats.apps.projects.models import CustomStatusType, CustomStatus
+from datetime import datetime
+from rest_framework import serializers
+from chats.apps.api.utils import ensure_timezone
+from chats.apps.api.v1.projects.filters import CustomStatusTypeFilterSet
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 
 
@@ -561,3 +568,128 @@ class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
                 status.HTTP_401_UNAUTHORIZED,
             )
         return Response(serialized_data.data, status=status.HTTP_200_OK)
+
+
+class CustomStatusTypeViewSet(viewsets.ModelViewSet):
+    queryset = CustomStatusType.objects.filter(is_deleted=False)
+    serializer_class = CustomStatusTypeSerializer
+    permission_classes = [
+        IsAuthenticated,
+        ProjectAnyPermission,
+    ]
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = CustomStatusTypeFilterSet
+
+    def perform_create(self, serializer):
+        return serializer.save()
+
+    def create(self, request, *args, **kwargs):
+        try:
+            with transaction.atomic():
+                data = request.data
+                if not isinstance(data, list):
+                    data = [data]
+
+                instances = []
+                for item in data:
+                    serializer = self.get_serializer(data=item)
+                    serializer.is_valid(raise_exception=True)
+                    instance = self.perform_create(serializer)
+                    instances.append(instance)
+
+                response_serializer = self.get_serializer(instances, many=True)
+                return Response(
+                    response_serializer.data, status=status.HTTP_201_CREATED
+                )
+        except ValidationError as error:
+            return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CustomStatusViewSet(viewsets.ModelViewSet):
+    queryset = CustomStatus.objects.all()
+    serializer_class = CustomStatusSerializer
+    permission_classes = [
+        IsAuthenticated,
+        ProjectAnyPermission,
+    ]
+
+    def perform_create(self, serializer):
+        user = self.request.user
+
+        status_type = serializer.validated_data.get("status_type")
+        project = status_type.project if status_type else None
+
+        with transaction.atomic():
+            updated_rows = ProjectPermission.objects.filter(
+                user=user, project=project
+            ).update(status="OFFLINE")
+            if updated_rows == 0:
+                raise serializers.ValidationError(
+                    {"status": "Can't update user status in project."}
+                )
+            serializer.save(user=user)
+
+    @decorators.action(detail=False, methods=["get"])
+    def last_status(self, request):
+        last_status = (
+            CustomStatus.objects.filter(user=request.user, is_active=True)
+            .order_by("-created_on")
+            .first()
+        )
+        if last_status:
+            return Response(CustomStatusSerializer(last_status).data)
+        return Response({"detail": "No status found"}, status=404)
+
+    @action(detail=True, methods=["post"])
+    def close_status(self, request, pk=None):
+        try:
+            instance = CustomStatus.objects.get(pk=pk)
+
+            with transaction.atomic():
+                end_time_str = request.data.get("end_time")
+                is_active = request.data.get("is_active", False)
+
+                if end_time_str is None:
+                    return Response(
+                        {"detail": "end_time is required."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                try:
+                    if is_active:
+                        updated_rows = ProjectPermission.objects.filter(
+                            user=instance.user, project=instance.status_type.project
+                        ).update(status="ONLINE")
+
+                        if updated_rows == 0:
+                            raise serializers.ValidationError(
+                                {"status": "Can't update user status in project."}
+                            )
+
+                    end_time = datetime.fromisoformat(end_time_str)
+                    project_tz = instance.status_type.project.timezone
+
+                    end_time = ensure_timezone(end_time, project_tz)
+
+                    local_created_on = instance.created_on.astimezone(project_tz)
+                    break_time = int((end_time - local_created_on).total_seconds())
+
+                    instance.break_time = break_time
+                    instance.is_active = False
+                    instance.save()
+
+                    return Response(
+                        {"detail": "CustomStatus updated successfully."},
+                        status=status.HTTP_200_OK,
+                    )
+
+                except ValueError as error:
+                    return Response(
+                        {"detail": f"Invalid end_time format: {error}"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+        except CustomStatus.DoesNotExist:
+            return Response(
+                {"detail": "Custom Status not found."}, status=status.HTTP_404_NOT_FOUND
+            )
