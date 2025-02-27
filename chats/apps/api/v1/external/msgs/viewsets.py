@@ -3,7 +3,6 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, viewsets
 
 from chats.apps.accounts.authentication.drf.authorization import (
-    ProjectAdminAuthentication,
     get_auth_class,
 )
 from chats.apps.api.v1.external.msgs.filters import MessageFilter
