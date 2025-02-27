@@ -1,16 +1,14 @@
+import uuid
+from datetime import datetime, timedelta
+
 from django.urls import reverse
+from django.utils import timezone
+from rest_framework import status
 from rest_framework.authtoken.models import Token
-from rest_framework.test import APITestCase
+from rest_framework.test import APIClient, APITestCase
 
 from chats.apps.accounts.models import User
-from chats.apps.projects.models import Project
-
-from rest_framework.test import APIClient
-from rest_framework import status
-from datetime import datetime, timedelta
-from chats.apps.projects.models import CustomStatusType, CustomStatus
-import uuid
-
+from chats.apps.projects.models import CustomStatus, CustomStatusType, Project
 from chats.apps.projects.models.models import ProjectPermission
 
 
@@ -139,7 +137,7 @@ class TestCustomStatusViewSet(APITestCase):
 
         project_permission = self.project_permission
 
-        end_time = (datetime.now() + timedelta(seconds=3600)).isoformat()
+        end_time = (timezone.now() + timedelta(seconds=3600)).isoformat()
         payload = {
             "end_time": end_time,
             "is_active": True,
@@ -180,4 +178,7 @@ class TestCustomStatusViewSet(APITestCase):
             {"end_time": "invalid-format"},
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data["detail"], "Invalid end_time format.")
+        self.assertEqual(
+            response.data["detail"],
+            "Invalid end_time format: Invalid isoformat string: 'invalid-format'",
+        )
