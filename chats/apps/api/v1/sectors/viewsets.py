@@ -23,6 +23,7 @@ from chats.apps.api.v1.sectors.filters import (
 )
 from chats.apps.projects.models import Project
 from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
+from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 
 
 class SectorViewset(viewsets.ModelViewSet):
@@ -66,6 +67,9 @@ class SectorViewset(viewsets.ModelViewSet):
             raise exceptions.APIException(
                 detail=f"Error when saving the sector. Exception: {str(e)}"  # NOQA
             )
+
+        project = Project.objects.get(uuid=instance.project.uuid)
+
         content = {
             "project_uuid": str(instance.project.uuid),
             "name": instance.name,
@@ -87,6 +91,12 @@ class SectorViewset(viewsets.ModelViewSet):
                 raise exceptions.APIException(
                     detail=f"[{response.status_code}] Error posting the sector/ticketer on flows. Exception: {response.content}"  # NOQA
                 )
+
+        if project.config and project.config.get("its_principal", False):
+            integrate_use_case = IntegratedTicketers()
+            integrate_use_case.integrate_individual_ticketer(
+                project, instance.config.get("secondary_project")
+            )
 
     def update(self, request, *args, **kwargs):
         sector = self.get_object()

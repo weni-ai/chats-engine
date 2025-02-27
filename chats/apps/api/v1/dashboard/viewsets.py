@@ -306,6 +306,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         if not data_frame_3.empty:
             data_frame_3.columns = [
                 "Nome",
+                "Sobrenome",
                 "Email",
                 "Status",
                 "Salas Fechadas",

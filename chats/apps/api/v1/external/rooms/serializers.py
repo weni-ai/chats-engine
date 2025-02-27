@@ -1,3 +1,4 @@
+import pendulum
 from typing import Dict, List
 
 from django.utils import timezone
@@ -112,6 +113,44 @@ class RoomListSerializer(serializers.ModelSerializer):
         ]
 
 
+class RoomMetricsSerializer(serializers.ModelSerializer):
+    user_name = serializers.SerializerMethodField()
+    first_user_message = serializers.SerializerMethodField()
+    tags = TagSimpleSerializer(many=True, required=False)
+    interaction_time = serializers.IntegerField(source="metric.interaction_time")
+    contact_external_id = serializers.CharField(source="contact.external_id")
+
+    class Meta:
+        model = Room
+        fields = [
+            "created_on",
+            "interaction_time",
+            "ended_at",
+            "contact_external_id",
+            "user",
+            "user_name",
+            "user_assigned_at",
+            "first_user_message",
+            "tags",
+        ]
+
+    def get_user_name(self, obj):
+        if obj.user:
+            return f"{obj.user.first_name} {obj.user.last_name}".strip()
+        return None
+
+    def get_first_user_message(self, obj):
+        first_msg = (
+            obj.messages.filter(user__isnull=False).order_by("created_on").first()
+        )
+        if first_msg:
+            msg_date = pendulum.instance(first_msg.created_on).in_tz(
+                "America/Sao_Paulo"
+            )
+            return msg_date.isoformat()
+        return None
+
+
 class RoomFlowSerializer(serializers.ModelSerializer):
     user = UserSerializer(many=False, required=False, read_only=True)
     user_email = serializers.SlugRelatedField(
@@ -204,7 +243,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             contact=contact,
             queue=queue,
             protocol=protocol,
-            service_chat=service_chat
+            service_chat=service_chat,
         )
         RoomMetrics.objects.create(room=room)
 
