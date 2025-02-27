@@ -1,4 +1,5 @@
 import time
+from unittest.mock import patch
 
 from django.urls import reverse
 from rest_framework.authtoken.models import Token
@@ -17,6 +18,20 @@ class DashboardTests(APITestCase):
         self.queue_1 = Queue.objects.get(uuid="f341417b-5143-4469-a99d-f141a0676bd4")
         self.manager_user = User.objects.get(pk=7)
         self.login_token = Token.objects.get_or_create(user=self.manager_user)[0]
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.patcher = patch(
+            "chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room",
+            return_value=None,
+        )
+        cls.mocked_function = cls.patcher.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.patcher.stop()
+        super().tearDownClass()
 
     def test_create_room_metrics(self):
         """
