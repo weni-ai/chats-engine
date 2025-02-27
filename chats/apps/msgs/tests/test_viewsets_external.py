@@ -1,9 +1,14 @@
+from unittest import mock
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 from django.utils import timezone
 from django.utils.timezone import timedelta
+from django.contrib.auth.models import Permission
+from django.contrib.contenttypes.models import ContentType
 
+from chats.apps.accounts.models import User
+from chats.apps.api.utils import create_user_and_token
 from chats.apps.msgs.models import Message
 from chats.apps.rooms.models import Room
 
@@ -26,12 +31,15 @@ class MsgsExternalTests(APITestCase):
         queue.save()
         return queue
 
-    def _request_create_message(self, direction: str = "incoming", created_on=None):
+    def _request_create_message(
+        self, direction: str = "incoming", created_on=None, token=None
+    ):
+        if token is None:
+            token = "f3ce543e-d77e-4508-9140-15c95752a380"
+
         url = reverse("external_message-list")
         client = self.client
-        client.credentials(
-            HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380"
-        )
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
         data = {
             "room": self.room.uuid,
             "text": "olá.",
@@ -40,6 +48,24 @@ class MsgsExternalTests(APITestCase):
             "created_on": created_on,
         }
         return client.post(url, data=data, format="json")
+
+    def _request_update_message(self, message, data, token=None):
+        if token is None:
+            token = "f3ce543e-d77e-4508-9140-15c95752a380"
+
+        url = reverse("external_message-detail", kwargs={"uuid": message.uuid})
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+        return client.patch(url, data=data, format="json")
+
+    def _request_list_messages(self, token=None):
+        if token is None:
+            token = "f3ce543e-d77e-4508-9140-15c95752a380"
+
+        url = reverse("external_message-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+        return client.get(url, {"room": self.room.uuid}, format="json")
 
     def test_create_external_msgs(self):
         """
@@ -143,3 +169,116 @@ class MsgsExternalTests(APITestCase):
             self.room.messages.order_by("-created_on").first().text,
             queue.default_message,
         )
+
+    @mock.patch(
+        "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
+    )
+    def test_create_external_msgs_with_internal_token(self, mock_get_userinfo):
+        mock_get_userinfo.return_value = {
+            "sub": "test_user",
+            "email": "test_user@example.com",
+        }
+
+        user, token = create_user_and_token("test_user")
+
+        permission, created = Permission.objects.get_or_create(
+            codename="can_communicate_internally",
+            content_type=ContentType.objects.get_for_model(User),
+        )
+        user.user_permissions.add(permission)
+        self.client.force_authenticate(user)
+
+        response = self._request_create_message(token=token)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_cannot_create_external_msgs_with_internal_token_without_can_communicate_internally_perm(
+        self,
+    ):
+        user, token = create_user_and_token("test_user")
+        self.client.force_authenticate(user)
+
+        response = self._request_create_message(token=token)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_update_external_msgs(self):
+        message = self.room.messages.create(
+            text="test.",
+        )
+
+        data = {
+            "text": "updated.",
+        }
+
+        response = self._request_update_message(message, data=data)
+        message.refresh_from_db(fields=["text"])
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(message.text, data.get("text"))
+
+    @mock.patch(
+        "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
+    )
+    def test_update_external_msgs_with_internal_token(self, mock_get_userinfo):
+        mock_get_userinfo.return_value = {
+            "sub": "test_user",
+            "email": "test_user@example.com",
+        }
+
+        message = self.room.messages.create(
+            text="test.",
+        )
+
+        data = {
+            "text": "updated.",
+        }
+
+        user, token = create_user_and_token("test_user")
+
+        permission, created = Permission.objects.get_or_create(
+            codename="can_communicate_internally",
+            content_type=ContentType.objects.get_for_model(User),
+        )
+        user.user_permissions.add(permission)
+        self.client.force_authenticate(user)
+
+        response = self._request_update_message(message, data=data, token=token)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_cannot_update_external_msgs_with_internal_token_without_can_communicate_internally_perm(
+        self,
+    ):
+        message = self.room.messages.create(
+            text="test.",
+        )
+
+        user, token = create_user_and_token("test_user")
+        self.client.force_authenticate(user)
+
+        response = self._request_update_message(message, data={}, token=token)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_list_external_msgs(self):
+        response = self._request_list_messages()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_list_external_msgs_with_internal_token(self):
+        user, token = create_user_and_token("test_user")
+
+        permission, created = Permission.objects.get_or_create(
+            codename="can_communicate_internally",
+            content_type=ContentType.objects.get_for_model(User),
+        )
+        user.user_permissions.add(permission)
+        self.client.force_authenticate(user)
+
+        response = self._request_list_messages(token=token)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_cannot_list_external_msgs_with_internal_token_without_can_communicate_internally_perm(
+        self,
+    ):
+        user, token = create_user_and_token("test_user")
+        self.client.force_authenticate(user)
+
+        response = self._request_list_messages(token=token)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
