@@ -176,6 +176,39 @@ class RoomsExternalTests(APITestCase):
         response = self._close_room("f3ce543e-d77e-4508-9140-15c95752a380", room.uuid)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    @mock.patch(
+        "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
+    )
+    def test_close_room_with_internal_token(self, mock_get_userinfo):
+        room = Room.objects.create(queue=self.queue_1)
+        mock_get_userinfo.return_value = {
+            "sub": "test_user",
+            "email": "test_user@example.com",
+            "preferred_username": "test_user",
+            "given_name": "Test",
+            "family_name": "User",
+        }
+
+        user, token = create_user_and_token("test_user")
+        permission, created = Permission.objects.get_or_create(
+            codename="can_communicate_internally",
+            content_type=ContentType.objects.get_for_model(User),
+        )
+        user.user_permissions.add(permission)
+        self.client.force_authenticate(user)
+
+        response = self._close_room(token, room.uuid)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_cannot_close_room_with_token_without_can_communicate_internally_perm(self):
+        user, token = create_user_and_token("test_user")
+        self.client.force_authenticate(user)
+
+        room = Room.objects.create(queue=self.queue_1)
+
+        response = self._close_room(token, room.uuid)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
 
 class RoomsFlowStartExternalTests(APITestCase):
     fixtures = ["chats/fixtures/fixture_app.json"]
