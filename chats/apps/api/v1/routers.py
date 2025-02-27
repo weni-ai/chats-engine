@@ -14,6 +14,7 @@ from chats.apps.api.v1.external.rooms.viewsets import (
 )
 from chats.apps.api.v1.external.sectors.viewsets import SectorFlowViewset
 from chats.apps.api.v1.internal.dashboard.viewsets import InternalDashboardViewset
+# flake8: noqa: F811
 from chats.apps.api.v1.internal.projects import viewsets as project_internal_views
 from chats.apps.api.v1.internal.rooms.viewsets import InternalListRoomsViewSet
 from chats.apps.api.v1.internal.users import viewsets as user_internal_views

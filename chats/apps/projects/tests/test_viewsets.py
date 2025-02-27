@@ -5,10 +5,8 @@ from rest_framework.test import APITestCase
 from chats.apps.accounts.models import User
 from chats.apps.projects.models import Project
 
-import pytest
 from rest_framework.test import APIClient
 from rest_framework import status
-from django.contrib.auth import get_user_model
 from datetime import datetime, timedelta
 from chats.apps.projects.models import CustomStatusType, CustomStatus
 import uuid

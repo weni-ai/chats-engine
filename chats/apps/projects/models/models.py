@@ -21,7 +21,6 @@ from .permission_managers import UserPermissionsManager
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.utils import timezone
 
 User = get_user_model()
 
