@@ -60,7 +60,7 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
                 status_type = status_item.get("status_type")
                 break_time = status_item.get("break_time", 0)
                 if status_type in status_dict:
-                    status_dict[status_type] = break_time
+                    status_dict[status_type] += break_time
 
         result = [
             {"status_type": status_type, "break_time": break_time}
