@@ -645,6 +645,18 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
         try:
             instance = CustomStatus.objects.get(pk=pk)
 
+            last_active_status = CustomStatus.objects.filter(
+                user=instance.user,
+                status_type__project=instance.status_type.project,
+                is_active=True
+            ).order_by('-created_on').first()
+        
+            if last_active_status and last_active_status.uuid != instance.uuid:
+                return Response(
+                    {"detail": "you can't close this status because it's not the last active status."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
             with transaction.atomic():
                 end_time_str = request.data.get("end_time")
                 is_active = request.data.get("is_active", False)

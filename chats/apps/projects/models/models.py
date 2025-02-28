@@ -21,6 +21,7 @@ from .permission_managers import UserPermissionsManager
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db import IntegrityError
 
 User = get_user_model()
 
@@ -562,3 +563,39 @@ class CustomStatus(BaseModel):
     )
     is_active = models.BooleanField(default=True)
     break_time = models.PositiveIntegerField(_("Custom status timming"), default=0)
+    project = models.ForeignKey(
+        Project, 
+        on_delete=models.CASCADE,
+        null=True,
+        editable=False  # Não aparece em formulários
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'project'],
+                condition=models.Q(is_active=True),
+                name='unique_active_custom_status_per_user_project'
+            )
+        ]
+        
+    def save(self, *args, **kwargs):
+        if self.status_type:
+            self.project = self.status_type.project
+            
+        try:
+            with transaction.atomic():
+                if self.is_active and self.user:
+                    CustomStatus.objects.filter(
+                        user=self.user,
+                        project=self.project,
+                        is_active=True
+                    ).exclude(pk=self.pk).update(is_active=False)
+                
+                super().save(*args, **kwargs)
+        except IntegrityError as error:
+            if 'unique_active_custom_status_per_user_project' in str(error):
+                raise ValidationError(
+                    "you can't have more than one active status per project."
+                )
+            raise
