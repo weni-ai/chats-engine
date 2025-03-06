@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import transaction
@@ -7,13 +8,14 @@ from django.db.models.functions import Concat
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
-from rest_framework import filters, mixins, status, viewsets, decorators
+from rest_framework import decorators, filters, mixins, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
+from chats.apps.api.utils import ensure_timezone
 from chats.apps.api.v1.internal.projects.serializers import (
     CheckAccessReadSerializer,
     ProjectPermissionReadSerializer,
@@ -24,8 +26,13 @@ from chats.apps.api.v1.permissions import (
     IsSectorManager,
     ProjectAnyPermission,
 )
-from chats.apps.api.v1.projects.filters import FlowStartFilter
+from chats.apps.api.v1.projects.filters import (
+    CustomStatusTypeFilterSet,
+    FlowStartFilter,
+)
 from chats.apps.api.v1.projects.serializers import (
+    CustomStatusSerializer,
+    CustomStatusTypeSerializer,
     LinkContactSerializer,
     ListFlowStartSerializer,
     ListProjectUsersSerializer,
@@ -33,24 +40,19 @@ from chats.apps.api.v1.projects.serializers import (
     ProjectFlowStartSerializer,
     ProjectSerializer,
     SectorDiscussionSerializer,
-    CustomStatusTypeSerializer,
-    CustomStatusSerializer,
 )
 from chats.apps.contacts.models import Contact
 from chats.apps.projects.models import (
     ContactGroupFlowReference,
+    CustomStatus,
+    CustomStatusType,
     Project,
     ProjectPermission,
 )
+from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import create_room_feedback_message
 from chats.apps.sectors.models import Sector
-from chats.apps.projects.models import CustomStatusType, CustomStatus
-from datetime import datetime
-from rest_framework import serializers
-from chats.apps.api.utils import ensure_timezone
-from chats.apps.api.v1.projects.filters import CustomStatusTypeFilterSet
-from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 
 
 class ProjectViewset(
@@ -645,16 +647,22 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
         try:
             instance = CustomStatus.objects.get(pk=pk)
 
-            last_active_status = CustomStatus.objects.filter(
-                user=instance.user,
-                status_type__project=instance.status_type.project,
-                is_active=True
-            ).order_by('-created_on').first()
-        
+            last_active_status = (
+                CustomStatus.objects.filter(
+                    user=instance.user,
+                    status_type__project=instance.status_type.project,
+                    is_active=True,
+                )
+                .order_by("-created_on")
+                .first()
+            )
+
             if last_active_status and last_active_status.uuid != instance.uuid:
                 return Response(
-                    {"detail": "you can't close this status because it's not the last active status."},
-                    status=status.HTTP_400_BAD_REQUEST
+                    {
+                        "detail": "you can't close this status because it's not the last active status."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
             with transaction.atomic():
