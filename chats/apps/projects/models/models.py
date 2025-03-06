@@ -1,6 +1,10 @@
 from django.contrib.auth import get_user_model
-from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
-from django.db import models
+from django.core.exceptions import (
+    MultipleObjectsReturned,
+    ObjectDoesNotExist,
+    ValidationError,
+)
+from django.db import IntegrityError, models, transaction
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from requests.exceptions import JSONDecodeError
@@ -10,17 +14,10 @@ from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTCl
 from chats.apps.api.v1.internal.rest_clients.integrations_rest_client import (
     IntegrationsRESTClient,
 )
-from chats.core.models import (
-    BaseConfigurableModel,
-    BaseModel,
-    BaseSoftDeleteModel,
-)
+from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
 from chats.utils.websockets import send_channels_group
 
 from .permission_managers import UserPermissionsManager
-
-from django.core.exceptions import ValidationError
-from django.db import transaction
 
 User = get_user_model()
 
@@ -562,3 +559,36 @@ class CustomStatus(BaseModel):
     )
     is_active = models.BooleanField(default=True)
     break_time = models.PositiveIntegerField(_("Custom status timming"), default=0)
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        null=True,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "project"],
+                condition=models.Q(is_active=True),
+                name="unique_active_custom_status_per_user_project",
+            )
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.status_type:
+            self.project = self.status_type.project
+
+        try:
+            with transaction.atomic():
+                if self.is_active and self.user:
+                    CustomStatus.objects.filter(
+                        user=self.user, project=self.project, is_active=True
+                    ).exclude(pk=self.pk).update(is_active=False)
+
+                super().save(*args, **kwargs)
+        except IntegrityError as error:
+            if "unique_active_custom_status_per_user_project" in str(error):
+                raise ValidationError(
+                    "you can't have more than one active status per project."
+                )
+            raise
