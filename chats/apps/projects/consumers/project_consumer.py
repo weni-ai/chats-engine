@@ -32,7 +32,7 @@ class ProjectConsumer(EDAConsumer):
             template_type_uuid=body.get("template_type_uuid"),
             timezone=body.get("timezone"),
             authorizations=body.get("authorizations", []),
-            org=body.get("organization"),
+            org=body.get("organization_uuid"),
         )
 
         sector_setup_handler = SectorSetupHandlerUseCase()
