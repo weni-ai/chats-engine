@@ -17,6 +17,7 @@ class IntegratedTicketers:
             sectors = Sector.objects.filter(
                 project=project,
                 config__secondary_project=str(secondary_project.uuid),
+                config__integrated=False,
             )
 
             for sector in sectors:
@@ -28,6 +29,8 @@ class IntegratedTicketers:
                         "sector_uuid": str(sector.uuid),
                     },
                 }
+                sector.config["integrated"] = True
+                sector.save()
                 connect = ConnectRESTClient()
                 response = connect.create_ticketer(**content)
 
@@ -49,6 +52,7 @@ class IntegratedTicketers:
             queues = Queue.objects.filter(
                 sector__project=project,
                 sector__config__secondary_project=str(secondary_project.uuid),
+                sector__config__integrated=False,
             )
 
             for queue in queues:
@@ -73,7 +77,9 @@ class IntegratedTicketers:
     def integrate_individual_ticketer(self, project, integrated_token):
         try:
             sector = Sector.objects.get(
-                project=project, config__secondary_project=str(integrated_token)
+                project=project,
+                config__secondary_project=str(integrated_token),
+                config__integrated=False,
             )
             content = {
                 "project_uuid": str(sector.config.get("secondary_project")),
@@ -114,6 +120,7 @@ class IntegratedTicketers:
             queues = Queue.objects.filter(
                 sector__project=project,
                 sector__config__secondary_project=str(sector_integrated_token),
+                sector__config__integrated=False,
             )
 
             for queue in queues:
