@@ -19,7 +19,6 @@ class ProjectCreationDTO:
     template_type_uuid: str
     authorizations: list
     org: str
-    config: dict
 
 
 class ProjectCreationUseCase:
