@@ -18,6 +18,7 @@ class ProjectCreationDTO:
     timezone: str
     template_type_uuid: str
     authorizations: list
+    org: str
 
 
 class ProjectCreationUseCase:
@@ -26,6 +27,12 @@ class ProjectCreationUseCase:
 
     def get_or_create_user_by_email(self, email: str) -> tuple:
         return User.objects.get_or_create(email=email)
+
+    def _config_its_principal(self, project_dto: ProjectCreationDTO) -> dict:
+        exists = Project.objects.filter(
+            org=project_dto.org, config__its_principal=True
+        ).exists()
+        return {"its_principal": False} if exists else {}
 
     def create_project(self, project_dto: ProjectCreationDTO):
         project: Project = None
@@ -51,12 +58,15 @@ class ProjectCreationUseCase:
         if Project.objects.filter(uuid=project_dto.uuid).exists():
             raise InvalidProjectData(f"The project `{project_dto.uuid}` already exist!")
 
+        _config = self._config_its_principal(project_dto)
         project = Project.objects.create(
             uuid=project_dto.uuid,
             name=project_dto.name,
             is_template=project_dto.is_template,
             date_format=project_dto.date_format,
             timezone=project_dto.timezone,
+            org=project_dto.org,
+            config=_config,
         )
 
         creator_permission, _ = ProjectPermission.objects.get_or_create(
