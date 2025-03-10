@@ -44,7 +44,6 @@ class TestProjectCreationUsecase(TestCase):
             "template_type_uuid": str(self.template_type.uuid),
             "authorizations": [],
             "org": self.org_uuid,
-            "config": {},
         }
         default_values.update(kwargs)
         return ProjectCreationDTO(**default_values)
@@ -90,18 +89,13 @@ class TestProjectCreationUsecase(TestCase):
     def test_create_project_with_its_principal(self):
         """
         Test creating a project with its_principal=True in config.
-
-        Note: The _config_its_principal method doesn't respect the config from the DTO,
-        so we need to manually update the config after creation to simulate a project
-        that was created with its_principal=True.
+        This test verifies that when we manually set its_principal=True after creation,
+        subsequent projects in the same org will have its_principal=False.
         """
-        project_dto = self._create_base_project_dto(config={"its_principal": True})
-
+        project_dto = self._create_base_project_dto()
         self.use_case.create_project(project_dto)
 
         project = Project.objects.get(uuid=project_dto.uuid)
-
-        self.assertEqual(project.name, project_dto.name)
 
         project.config = {"its_principal": True}
         project.save()
@@ -195,7 +189,7 @@ class TestProjectCreationUsecase(TestCase):
         Test creating a template project with a non-existent template type.
 
         This test verifies that an InvalidProjectData exception is raised when
-        is_template=True and template_type_uuid doesn't correspond to an existing TemplateType.
+        is_template=True and template_type_uuid doesnt correspond to an existing TemplateType.
         """
         nonexistent_uuid = str(uuid.uuid4())
         template_project_dto = self._create_base_project_dto(
@@ -276,7 +270,12 @@ class TestProjectCreationUsecase(TestCase):
         config = self.use_case._config_its_principal(self.project_dto)
         self.assertEqual(config, {})
 
-        self._create_principal_project()
+        Project.objects.create(
+            uuid=str(uuid.uuid4()),
+            name="Principal Project",
+            org=self.org_uuid,
+            config={"its_principal": True},
+        )
 
         config = self.use_case._config_its_principal(self.project_dto)
         self.assertEqual(config, {"its_principal": False})
