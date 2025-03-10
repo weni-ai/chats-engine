@@ -548,8 +548,6 @@ class CustomStatusType(BaseModel):
                 name="unique_custom_status"
             )
         ]
-        unique_together = ("name", "project")
-
 
 class CustomStatus(BaseModel):
     user = models.ForeignKey(
