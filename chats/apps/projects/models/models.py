@@ -5,7 +5,7 @@ from django.core.exceptions import (
     ValidationError,
 )
 from django.db import IntegrityError, models, transaction
-from django.db.models import Q
+from django.db.models import Q, UniqueConstraint
 from django.utils.translation import gettext_lazy as _
 from requests.exceptions import JSONDecodeError
 from timezone_field import TimeZoneField
@@ -541,6 +541,13 @@ class CustomStatusType(BaseModel):
             return None
 
     class Meta:
+        constraints = [
+            UniqueConstraint(
+                fields=["name", "project"],
+                condition=Q(is_deleted=False),
+                name="unique_custom_status"
+            )
+        ]
         unique_together = ("name", "project")
 
 
