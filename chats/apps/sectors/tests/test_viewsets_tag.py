@@ -5,7 +5,7 @@ from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
 from chats.apps.projects.models import Project
-from chats.apps.sectors.models import Sector
+from chats.apps.sectors.models import Sector, SectorTag
 
 
 class SectorTagTests(APITestCase):
@@ -100,3 +100,25 @@ class SectorTagTests(APITestCase):
         client.credentials(HTTP_AUTHORIZATION="Token " + self.manager_token.key)
         response = client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_cannot_list_sector_tags_from_projects_without_permission(self):
+        """
+        Verify if the list endpoint for sector tags only returns tags from projects the user has access to.
+        """
+        project = Project.objects.create(name="project 3")
+        sector = Sector.objects.create(
+            name="sector 3",
+            project=project,
+            rooms_limit=1,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        tag = SectorTag.objects.create(name="tag 3", sector=sector)
+
+        response = self.list_sector_tag_with_token(self.manager_token.key)
+        results = response.json().get("results")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        tags_uuids = [result.get("uuid") for result in results]
+
+        self.assertNotIn(str(tag.uuid), tags_uuids)
