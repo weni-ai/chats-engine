@@ -17,6 +17,7 @@ from rest_framework.exceptions import ValidationError
 from chats.apps.rooms.tasks import update_ticket_on_flows
 from chats.core.models import BaseModel
 from chats.utils.websockets import send_channels_group
+from chats.apps.projects.usecases.status_service import InServiceStatusTracker
 
 
 class Room(BaseModel):
@@ -195,6 +196,11 @@ class Room(BaseModel):
         if tags is not None:
             self.tags.add(*tags)
         self.save()
+        
+        # Atualizar o status In-Service do agente quando fechar a sala
+        if self.user:
+            project = self.queue.sector.project
+            InServiceStatusTracker.update_room_count(self.user, project, "closed")
 
     def request_callback(self, room_data: dict):
         if self.callback_url is None:

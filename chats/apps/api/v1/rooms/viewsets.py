@@ -41,6 +41,7 @@ from chats.apps.rooms.views import (
 from django.utils.timezone import make_aware
 from datetime import datetime
 from chats.apps.projects.usecases.send_room_info import RoomInfoUseCase
+from chats.apps.projects.usecases.status_service import InServiceStatusTracker
 
 
 class RoomViewset(
@@ -423,10 +424,19 @@ class RoomViewset(
                     room.user = user
                     room.save()
 
+                    # Atualizar o status In-Service do novo agente
+
                     create_room_feedback_message(room, feedback, method="rt")
                     if old_user:
+                        #quando tem old user é pq a transferencia é do agente para outro agente.
+                        #nesse caso eu atualizo o old pra closed e o new pra assigned?
+                        InServiceStatusTracker.update_room_count(old_user, project, "closed")
+                        InServiceStatusTracker.update_room_count(user, project, "assigned")
                         room.notify_user("update", user=old_user)
                     else:
+                        #aqui é pq a transferencia é direto pro agente. entao nao precisa 
+                        #mudar pra nenhum old user.
+                        InServiceStatusTracker.update_room_count(user, project, "assigned")
                         room.notify_user("update", user=transfer_user)
                     room.notify_user("update")
 
@@ -448,6 +458,8 @@ class RoomViewset(
                         from_=transfer_user,
                         to=queue,
                     )
+                    #como essa transferencia é do agente pra fila é preciso atualizar o status do agente para closed
+                    InServiceStatusTracker.update_room_count(room.user, room.project, "closed")
                     room.user = None
                     room.queue = queue
                     room.save()

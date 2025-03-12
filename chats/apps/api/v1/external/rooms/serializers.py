@@ -16,7 +16,7 @@ from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import close_room
-
+from chats.apps.projects.usecases.status_service import InServiceStatusTracker
 
 def get_active_room_flow_start(contact, flow_uuid, project):
     query_filters = {
@@ -246,6 +246,12 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             service_chat=service_chat,
         )
         RoomMetrics.objects.create(room=room)
+
+        # Atualizar o status In-Service do agente ao criar a sala
+        if validated_data.get("user"):
+            InServiceStatusTracker.update_room_count(
+                validated_data["user"], project, "assigned"
+            )
 
         return room
 
