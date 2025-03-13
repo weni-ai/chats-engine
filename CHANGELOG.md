@@ -1,3 +1,20 @@
+# 3.17.3
+## Add
+  - Verify 404 status before deleting queue in chats
+  - Changing constraint in custom status type and verify soft deleted custom status before delete.
+    
+# 3.17.2
+## Add
+  - Automatically create projects as secondary when necessary.
+    
+# 3.17.1
+## Fix
+  - Break time calculation
+    
+# 3.17.0
+## Add
+  - Custom status feature
+
 # 3.16.0
 ## Add
   - Add group sector
