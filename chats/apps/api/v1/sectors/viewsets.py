@@ -207,15 +207,17 @@ class SectorTagsViewset(viewsets.ModelViewSet):
     lookup_field = "uuid"
 
     def get_queryset(self):
-        queryset = (
-            super()
-            .get_queryset()
-            .filter(
+        queryset = super().get_queryset()
+
+        if self.request.user.has_perm("accounts.can_communicate_internally"):
+            queryset = queryset.all()
+
+        else:
+            queryset = queryset.filter(
                 sector__project__in=ProjectPermission.objects.filter(
                     user=self.request.user
                 ).values_list("project", flat=True)
             )
-        )
 
         if self.action != "list":
             self.filterset_class = None
