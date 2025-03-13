@@ -353,6 +353,8 @@ class ProjectViewset(
         self._create_flow_start_instances(data, chats_flow_start)
 
         flow_start = FlowRESTClient().start_flow(project, data)
+        print("flow_start", flow_start)
+
         chats_flow_start.external_id = flow_start.get("uuid")
         chats_flow_start.name = flow_start.get("flow").get("name")
         chats_flow_start.save()
