@@ -89,10 +89,11 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         return Response(serialized_data.data, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs):
+        print("Creating room - request.data	")
         print(request.data)
         try:
             response = super().create(request, *args, **kwargs)
-            print(response.data)
+            print("Creating room - response.data")
             return response
 
         except IntegrityError:
