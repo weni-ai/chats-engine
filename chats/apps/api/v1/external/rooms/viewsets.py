@@ -93,6 +93,7 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
             return super().create(request, *args, **kwargs)
 
         except IntegrityError:
+            print("IntegrityError while creating room")
             return Response(
                 {
                     "detail": "The contact already have an open room in the especified queue",
