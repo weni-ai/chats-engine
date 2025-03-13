@@ -609,17 +609,23 @@ class CustomStatusTypeViewSet(viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
 
-        has_active_custom_status = CustomStatus.objects.filter(
+        has_active_custom_statuses = CustomStatus.objects.filter(
             status_type=instance, is_active=True
         ).exists()
 
-        if has_active_custom_status:
+        if has_active_custom_statuses:
             return Response(
-                {"error": "This status type cannot be deleted because there are active CustomStatus records associated with it."},
+                {
+                    "error": (
+                        "This status type cannot be deleted because there are "
+                        "active CustomStatus records associated with it."
+                    )
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         return super().destroy(request, *args, **kwargs)
+
 
 class CustomStatusViewSet(viewsets.ModelViewSet):
     queryset = CustomStatus.objects.all()
