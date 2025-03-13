@@ -35,7 +35,9 @@ def get_active_room_flow_start(contact, flow_uuid, project):
             return flow_start.room
     except AttributeError:
         # if create new room, but there's a room flowstart to another flow, close the room and the flowstart
-        if project.config.get("ignore_close_rooms_on_flow_start", False):
+        config = project.config or {}
+
+        if config.get("ignore_close_rooms_on_flow_start", False):
             return None
 
         query_filters.pop("flow")
