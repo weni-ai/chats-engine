@@ -35,10 +35,14 @@ def get_active_room_flow_start(contact, flow_uuid, project):
             return flow_start.room
     except AttributeError:
         # if create new room, but there's a room flowstart to another flow, close the room and the flowstart
+        print("pegando sala do flowstart")
         config = project.config or {}
 
         if config.get("ignore_close_rooms_on_flow_start", False):
+            print("ignorando close rooms on flow start")
             return None
+
+        print("não ignorou")
 
         query_filters.pop("flow")
         flowstarts = project.flowstarts.filter(**query_filters)
@@ -256,9 +260,11 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         return room
 
     def validate_unique_active_project(self, contact, project):
+        print("validando unique active project")
         if Room.objects.filter(
             is_active=True, contact=contact, queue__sector__project=project
         ).exists():
+            print("já existe uma sala ativa")
             raise ValidationError(
                 {"detail": _("The contact already have an open room in the project")}
             )

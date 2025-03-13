@@ -94,6 +94,7 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         try:
             response = super().create(request, *args, **kwargs)
             print("Creating room - response.data")
+            print(response.data)
             return response
 
         except IntegrityError:
