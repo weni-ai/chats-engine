@@ -608,6 +608,20 @@ class CustomStatusTypeViewSet(viewsets.ModelViewSet):
         except ValidationError as error:
             return Response({"error": str(error)}, status=status.HTTP_400_BAD_REQUEST)
 
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        has_active_custom_status = CustomStatus.objects.filter(
+            status_type=instance, is_active=True
+        ).exists()
+
+        if has_active_custom_status:
+            return Response(
+                {"error": "This status type cannot be deleted because there are active CustomStatus records associated with it."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return super().destroy(request, *args, **kwargs)
 
 class CustomStatusViewSet(viewsets.ModelViewSet):
     queryset = CustomStatus.objects.all()
