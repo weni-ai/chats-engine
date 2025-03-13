@@ -545,9 +545,10 @@ class CustomStatusType(BaseModel):
             UniqueConstraint(
                 fields=["name", "project"],
                 condition=Q(is_deleted=False),
-                name="unique_custom_status"
+                name="unique_custom_status",
             )
         ]
+
 
 class CustomStatus(BaseModel):
     user = models.ForeignKey(
