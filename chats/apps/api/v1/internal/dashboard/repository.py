@@ -148,6 +148,24 @@ class AgentRepository:
         if filters.agent:
             agents_query = agents_query.filter(email=filters.agent)
 
+        # Filtros para os agentes baseados na hierarquia setor -> fila
+        agents_filter = {}
+        
+        # Caso 1: Tem fila e setor - filtra agentes que estão na fila específica que pertence ao setor
+        if filters.queue and filters.sector:
+            agents_filter["project_permissions__queue_authorizations__queue"] = filters.queue
+            agents_filter["project_permissions__queue_authorizations__queue__sector"] = filters.sector
+        # Caso 2: Tem apenas fila - filtra agentes que estão na fila específica
+        elif filters.queue:
+            agents_filter["project_permissions__queue_authorizations__queue"] = filters.queue
+        # Caso 3: Tem apenas setor - filtra agentes que estão em qualquer fila do setor
+        elif filters.sector:
+            agents_filter["project_permissions__queue_authorizations__queue__sector"] = filters.sector
+
+        # Aplica os filtros específicos de fila/setor, se houver
+        if agents_filter:
+            agents_query = agents_query.filter(**agents_filter).distinct()
+            
         agents_query = (
             agents_query.filter(project_permissions__project=project, is_active=True)
             .annotate(
