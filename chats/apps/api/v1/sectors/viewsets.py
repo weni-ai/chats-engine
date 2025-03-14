@@ -22,6 +22,7 @@ from chats.apps.api.v1.sectors.filters import (
     SectorTagFilter,
 )
 from chats.apps.projects.models import Project
+from chats.apps.projects.models.models import ProjectPermission
 from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 
@@ -206,9 +207,22 @@ class SectorTagsViewset(viewsets.ModelViewSet):
     lookup_field = "uuid"
 
     def get_queryset(self):
+        queryset = super().get_queryset()
+
+        if self.request.user.has_perm("accounts.can_communicate_internally"):
+            queryset = queryset.all()
+
+        else:
+            queryset = queryset.filter(
+                sector__project__in=ProjectPermission.objects.filter(
+                    user=self.request.user
+                ).values_list("project", flat=True)
+            )
+
         if self.action != "list":
             self.filterset_class = None
-        return super().get_queryset()
+
+        return queryset
 
     def get_permissions(self):
         permission_classes = self.permission_classes
