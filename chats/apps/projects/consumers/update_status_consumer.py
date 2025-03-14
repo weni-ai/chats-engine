@@ -25,7 +25,7 @@ class MessageStatusConsumer(EDAConsumer):
             )
         else:
             print(
-                f"[MessageStatusConsumer] - Skipping message. 'message_id' is missing or empty."
+                "[MessageStatusConsumer] - Skipping message. 'message_id' is missing or empty."
             )
 
         channel.basic_ack(message.delivery_tag)
