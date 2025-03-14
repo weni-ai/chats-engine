@@ -34,9 +34,16 @@ def get_active_room_flow_start(contact, flow_uuid, project):
             flow_start.save()
             return flow_start.room
     except AttributeError:
+        config = project.config or {}
+
+        if config.get("ignore_close_rooms_on_flow_start", False):
+            return None
+
         # if create new room, but there's a room flowstart to another flow, close the room and the flowstart
+
         query_filters.pop("flow")
         flowstarts = project.flowstarts.filter(**query_filters)
+
         for fs in flowstarts:
             fs.is_deleted = True
             fs.save()
@@ -230,7 +237,10 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         if room is not None:
             return room
 
-        self.validate_unique_active_project(contact, project)
+        room = self.validate_unique_active_project(contact, project)
+
+        if room is not None:
+            return room
 
         user = validated_data.get("user")
         validated_data["user"] = get_room_user(
@@ -250,9 +260,16 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         return room
 
     def validate_unique_active_project(self, contact, project):
-        if Room.objects.filter(
+        queryset = Room.objects.filter(
             is_active=True, contact=contact, queue__sector__project=project
-        ).exists():
+        )
+
+        if queryset.exists():
+            config = project.config or {}
+
+            if config.get("ignore_close_rooms_on_flow_start", False):
+                return queryset.first()
+
             raise ValidationError(
                 {"detail": _("The contact already have an open room in the project")}
             )
