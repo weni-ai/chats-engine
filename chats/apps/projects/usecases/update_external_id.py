@@ -1,5 +1,6 @@
-from chats.apps.msgs.models import Message, MessageMedia
 from django.db import transaction
+
+from chats.apps.msgs.models import Message, MessageMedia
 
 
 class UpdateExternalIdMessageUseCase:
