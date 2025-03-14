@@ -34,11 +34,12 @@ def get_active_room_flow_start(contact, flow_uuid, project):
             flow_start.save()
             return flow_start.room
     except AttributeError:
-        # if create new room, but there's a room flowstart to another flow, close the room and the flowstart
         config = project.config or {}
 
         if config.get("ignore_close_rooms_on_flow_start", False):
             return None
+
+        # if create new room, but there's a room flowstart to another flow, close the room and the flowstart
 
         query_filters.pop("flow")
         flowstarts = project.flowstarts.filter(**query_filters)
