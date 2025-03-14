@@ -22,7 +22,7 @@ class MessageConsumer(EDAConsumer):
 
         update_message_usecase = UpdateExternalIdMessageUseCase()
         update_message_usecase.update_external_id(
-            body["message_uuid"], body["external_id"]
+            body["chatsUUID"], body["message_id"]
         )
 
         channel.basic_ack(message.delivery_tag)
