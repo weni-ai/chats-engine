@@ -1,3 +1,88 @@
+# 3.17.3
+## Add
+  - Verify 404 status before deleting queue in chats
+  - Changed the constraint on `custom status type` to ensure valid relationships and prevent unintended deletions. Now, before deleting a custom status, the system verifies whether it has been soft deleted to avoid inconsistencies.
+    
+# 3.17.2
+## Add
+  - Automatically create projects as secondary when necessary.
+    
+# 3.17.1
+## Fix
+  - Break time calculation
+    
+# 3.17.0
+## Add
+  - Custom status feature
+
+# 3.16.0
+## Add
+  - Add group sector
+ 
+# 3.15.3
+## Add
+  - Add new contact urn to rooms metrics
+
+# 3.15.2
+## Add
+  - New endpoint to list rooms metrics
+
+# 3.15.1
+## Fix
+  - Export chats dashboard data to CSV and XLS
+
+# 3.15.0
+## Add
+  - New endpoint to set project as primary project to be used in infracommerce integration.
+## Add
+  - Endpoint to integrate primary and secondary projects
+## Add
+   - Adding prometheus endpoint for monitoring the application.
+
+# 3.14.0
+## Add
+  - Introduced a new publisher that triggers when a room is closed
+
+# 3.13.7
+## Add
+  - user info (email and name) to RoomInfoSerializer
+
+# 3.13.6
+## Add
+  - reintroduce created_on in MsgFlowSerializer
+
+# 3.13.5
+## Fix
+  - remove completely created_on from MsgFlowSerializer
+
+# 3.13.4
+## Fix
+  - remove created_on from MsgFlowSerializer's validate method
+
+# 3.13.3
+## Add
+  - new endpoint for rooms' user assignment information
+  - flows API call to update the ticket info about the user assignment
+## Fix
+  - new messages from flows timestamps
+
+# 3.13.2
+## Add
+  - new endpoint to list human service rooms.
+## Fix
+  - order by name in project permission endpoint
+  - passing project uuid to flows when deleting a queue.
+
+# 3.13.1
+## Add
+  - is_active field to ListRoomSerializer
+## Fix
+  - new message timestamp
+
+# 3.13.0
+## Add
+  - ticket_uuid field in Room
+
 # 3.12.1
 ## Fix
   - check if room is active before returning redirection link

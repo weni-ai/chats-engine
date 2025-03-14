@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError
+from django.db.models import Q
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
@@ -15,6 +16,7 @@ from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.external.rooms.serializers import (
     RoomFlowSerializer,
     RoomListSerializer,
+    RoomMetricsSerializer,
 )
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.rooms.models import Room
@@ -27,7 +29,7 @@ from chats.apps.rooms.views import (
     update_flows_custom_fields,
 )
 
-from .filters import RoomFilter
+from .filters import RoomFilter, RoomMetricsFilter
 
 
 def add_user_or_queue_to_room(instance, request):
@@ -150,9 +152,9 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
         project = request_permission.project
         room = (
             Room.objects.filter(
-                callback_url__endswith=pk,
-                project_uuid=project,
-                is_active=True,
+                (Q(ticket_uuid=pk) | Q(callback_url__endswith=pk))
+                & Q(project_uuid=project)
+                & Q(is_active=True)
             )
             .select_related("user", "queue__sector__project")
             .first()
@@ -205,6 +207,7 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
 
         room.notify_user("update", user=None)
         room.notify_queue("update")
+        room.update_ticket()
 
         create_room_feedback_message(room, feedback, method="rt")
 
@@ -313,4 +316,34 @@ class ExternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
 
         return Response(
             {"waiting": waiting, "in_service": in_service}, status=status.HTTP_200_OK
+        )
+
+
+class RoomMetricsViewSet(viewsets.ReadOnlyModelViewSet):
+    model = Room
+    queryset = Room.objects.select_related("user").prefetch_related("messages", "tags")
+    serializer_class = RoomMetricsSerializer
+    lookup_field = "uuid"
+    authentication_classes = [ProjectAdminAuthentication]
+
+    filter_backends = [
+        filters.OrderingFilter,
+        filters.SearchFilter,
+        DjangoFilterBackend,
+    ]
+    ordering = ["-created_on"]
+    search_fields = [
+        "contact__external_id",
+        "contact__name",
+        "user__email",
+        "urn",
+    ]
+    filterset_class = RoomMetricsFilter
+    pagination_class = None
+
+    def get_queryset(self):
+        return (
+            super()
+            .get_queryset()
+            .filter(queue__sector__project=self.request.auth.project)
         )

@@ -6,11 +6,11 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 
-from chats.core.models import BaseModel
+from chats.core.models import BaseModelWithManualCreatedOn
 from chats.core.requests import get_request_session_with_retries
 
 
-class Message(BaseModel):
+class Message(BaseModelWithManualCreatedOn):
     room = models.ForeignKey(
         "rooms.Room",
         related_name="messages",
@@ -113,7 +113,7 @@ class Message(BaseModel):
         return self.room.project
 
 
-class MessageMedia(BaseModel):
+class MessageMedia(BaseModelWithManualCreatedOn):
     message = models.ForeignKey(
         Message,
         related_name="medias",

@@ -17,7 +17,11 @@ from chats.apps.api.v1.queues import serializers as queue_serializers
 from chats.apps.api.v1.queues.filters import QueueAuthorizationFilter, QueueFilter
 from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue, QueueAuthorization
-from chats.apps.sectors.models import Sector
+from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
+from chats.apps.sectors.models import Sector, SectorGroupSector
+from chats.apps.sectors.usecases.group_sector_authorization import (
+    QueueGroupSectorAuthorizationCreationUseCase,
+)
 
 from .serializers import QueueAgentsSerializer
 
@@ -60,12 +64,21 @@ class QueueViewset(ModelViewSet):
 
     def perform_create(self, serializer):
         instance = serializer.save()
+
+        project = Project.objects.get(uuid=instance.sector.project.uuid)
+
         content = {
             "uuid": str(instance.uuid),
             "name": instance.name,
             "sector_uuid": str(instance.sector.uuid),
             "project_uuid": str(instance.sector.project.uuid),
         }
+        use_group_sectors = SectorGroupSector.objects.filter(
+            sector=instance.sector
+        ).exists()
+        if use_group_sectors:
+            QueueGroupSectorAuthorizationCreationUseCase(instance).execute()
+
         if not settings.USE_WENI_FLOWS:
             return super().perform_create(serializer)
         response = FlowRESTClient().create_queue(**content)
@@ -74,6 +87,13 @@ class QueueViewset(ModelViewSet):
             raise exceptions.APIException(
                 detail=f"[{response.status_code}] Error posting the queue on flows. Exception: {response.content}"
             )
+
+        if project.config and project.config.get("its_principal", False):
+            integrate_use_case = IntegratedTicketers()
+            integrate_use_case.integrate__individual_topic(
+                project, instance.sector.config.get("secondary_project")
+            )
+
         return instance
 
     def perform_update(self, serializer):
@@ -98,12 +118,17 @@ class QueueViewset(ModelViewSet):
         content = {
             "uuid": str(instance.uuid),
             "sector_uuid": str(instance.sector.uuid),
+            "project_uuid": str(instance.sector.project.uuid),
         }
 
         if not settings.USE_WENI_FLOWS:
             return super().perform_destroy(instance)
 
         response = FlowRESTClient().destroy_queue(**content)
+
+        if response.status_code == status.HTTP_404_NOT_FOUND:
+            return super().perform_destroy(instance)
+
         if response.status_code not in [
             status.HTTP_200_OK,
             status.HTTP_201_CREATED,

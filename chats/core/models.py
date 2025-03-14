@@ -48,6 +48,15 @@ class BaseModel(models.Model):
         return bool(self.modified_by)
 
 
+class BaseModelWithManualCreatedOn(BaseModel):
+    created_on = models.DateTimeField(
+        _("Created on"), editable=False, default=timezone.now
+    )
+
+    class Meta:
+        abstract = True
+
+
 class BaseSoftDeleteModel(models.Model):
     is_deleted = models.BooleanField(_("is deleted?"), default=False)
 
@@ -66,6 +75,15 @@ class BaseSoftDeleteModel(models.Model):
 
 class BaseConfigurableModel(models.Model):
     config = models.JSONField(_("config"), blank=True, null=True)
+
+    class Meta:
+        abstract = True
+
+
+class BaseIntegrationConfigurableModel(models.Model):
+    integration_config = models.JSONField(
+        _("config to use in project integration"), blank=True, null=True, default=dict
+    )
 
     class Meta:
         abstract = True

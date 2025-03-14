@@ -8,8 +8,10 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
+
 
 from chats.apps.accounts.models import User
 from chats.apps.api.utils import verify_user_room
@@ -19,6 +21,7 @@ from chats.apps.api.v1.msgs.serializers import ChatCompletionSerializer
 from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1.rooms.serializers import (
     ListRoomSerializer,
+    RoomInfoSerializer,
     RoomMessageStatusSerializer,
     RoomSerializer,
     TransferRoomSerializer,
@@ -35,6 +38,9 @@ from chats.apps.rooms.views import (
     update_custom_fields,
     update_flows_custom_fields,
 )
+from django.utils.timezone import make_aware
+from datetime import datetime
+from chats.apps.projects.usecases.send_room_info import RoomInfoUseCase
 
 
 class RoomViewset(
@@ -161,6 +167,10 @@ class RoomViewset(
             return Response(serialized_data.data, status=status.HTTP_200_OK)
 
         close_room(str(instance.pk))
+
+        room_client = RoomInfoUseCase()
+        room_client.get_room(instance)
+
         return Response(serialized_data.data, status=status.HTTP_200_OK)
 
     def perform_create(self, serializer):
@@ -366,6 +376,7 @@ class RoomViewset(
 
         create_room_feedback_message(room, feedback, method="rt")
         room.notify_queue("update")
+        room.update_ticket()
 
         return Response(
             {"detail": "Room picked successfully"}, status=status.HTTP_200_OK
@@ -419,6 +430,8 @@ class RoomViewset(
                         room.notify_user("update", user=transfer_user)
                     room.notify_user("update")
 
+                    room.update_ticket()
+
             if queue_uuid:
                 queue = Queue.objects.get(uuid=queue_uuid)
                 for room in rooms_list:
@@ -451,4 +464,68 @@ class RoomViewset(
         return Response(
             {"success": "Mass transfer completed"},
             status=status.HTTP_200_OK,
+        )
+
+    @action(detail=False, methods=["get"], url_path="human-service-count")
+    def filter_rooms(self, request, pk=None):
+        project_uuid = request.query_params.get("project_uuid")
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
+
+        if not project_uuid:
+            return Response({"error": "'project_uuid' is required."}, status=400)
+
+        default_start_date = make_aware(datetime.now() - timedelta(days=30))
+        default_end_date = make_aware(datetime.now())
+
+        try:
+            if start_date:
+                start_date = make_aware(datetime.strptime(start_date, "%Y-%m-%d"))
+            else:
+                start_date = default_start_date
+
+            if end_date:
+                end_date = make_aware(datetime.strptime(end_date, "%Y-%m-%d"))
+            else:
+                end_date = default_end_date
+        except ValueError:
+            return Response(
+                {"error": "Invalid date format. Use 'YYYY-MM-DD'."}, status=400
+            )
+
+        rooms = Room.objects.filter(
+            queue__sector__project=project_uuid,
+            created_on__gte=start_date,
+            created_on__lte=end_date,
+        )
+
+        room_count = rooms.count()
+        return Response({"room_count": room_count})
+
+    @action(
+        detail=False,
+        methods=["get"],
+        url_name="rooms-info",
+        serializer_class=RoomInfoSerializer,
+    )
+    def rooms_info(self, request: Request, pk=None) -> Response:
+        project_uuid = request.query_params.get("project_uuid")
+
+        if not project_uuid:
+            return Response(
+                {"error": "'project_uuid' is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        query = {"project_uuid": project_uuid}
+
+        if uuid := request.query_params.get("uuid"):
+            query["uuid"] = uuid
+
+        rooms = self.paginate_queryset(
+            Room.objects.filter(**query).order_by("-created_on")
+        )
+
+        return Response(
+            RoomInfoSerializer(rooms, many=True).data, status=status.HTTP_200_OK
         )
