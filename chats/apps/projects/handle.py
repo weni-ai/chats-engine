@@ -19,7 +19,7 @@ def handle_consumers(channel: Channel) -> None:
     channel.basic_consume(
         "chats.permissions", callback=ProjectPermissionConsumer().handle
     )
-    channel.basic_consume("flows.messages", callback=MessageConsumer().handle)
-    channel.basic_consume("billing.messages", callback=MessageStatusConsumer().handle)
+    channel.basic_consume("flows.msgs", callback=MessageConsumer().handle)
+    channel.basic_consume("billing.msgs", callback=MessageStatusConsumer().handle)
     channel.basic_consume("chats.integrated-feature", callback=SectorConsumer().handle)
     channel.basic_consume("chats.dlq", callback=DeadLetterConsumer.consume)
