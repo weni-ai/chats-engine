@@ -1,3 +1,20 @@
+# 3.17.3
+## Add
+  - Verify 404 status before deleting queue in chats
+  - Changed the constraint on `custom status type` to ensure valid relationships and prevent unintended deletions. Now, before deleting a custom status, the system verifies whether it has been soft deleted to avoid inconsistencies.
+    
+# 3.17.2
+## Add
+  - Automatically create projects as secondary when necessary.
+    
+# 3.17.1
+## Fix
+  - Break time calculation
+    
+# 3.17.0
+## Add
+  - Custom status feature
+
 # 3.16.0
 ## Add
   - Add group sector
