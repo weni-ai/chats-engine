@@ -26,10 +26,8 @@ class IntegratedTicketers:
                     "config": {
                         "project_auth": str(sector.external_token.pk),
                         "sector_uuid": str(sector.uuid),
-                        "project_info": {
-                            "uuid": str(secundary_project.uuid),
-                            "name": secundary_project.name,
-                        },
+                        "project_uuid":str(secundary_project.uuid),
+                        "project_name_origin":secundary_project.name
                     },
                 }
                 connect = ConnectRESTClient()
@@ -85,6 +83,8 @@ class IntegratedTicketers:
                 "config": {
                     "project_auth": str(sector.external_token.pk),
                     "sector_uuid": str(sector.uuid),
+                    "project_uuid":str(sector.project.uuid),
+                    "project_name_origin":sector.project.name
                 },
             }
             connect = ConnectRESTClient()
