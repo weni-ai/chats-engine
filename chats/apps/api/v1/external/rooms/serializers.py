@@ -236,6 +236,10 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         validated_data["user"] = get_room_user(
             contact, queue, user, groups, created, flow_uuid, project
         )
+        principal_project_info = {}
+
+        if "project_info" in validated_data:
+            principal_project_info = validated_data["project_info"]
 
         room = Room.objects.create(
             **validated_data,
@@ -244,6 +248,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             queue=queue,
             protocol=protocol,
             service_chat=service_chat,
+            config=principal_project_info
         )
         RoomMetrics.objects.create(room=room)
 
