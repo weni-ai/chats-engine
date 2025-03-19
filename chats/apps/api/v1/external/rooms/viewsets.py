@@ -89,6 +89,12 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         return Response(serialized_data.data, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs):
+        print("Create room request data:")
+        print(request.data)
+
+        print("Create room request headers:")
+        print(request.headers)
+
         try:
             return super().create(request, *args, **kwargs)
 
