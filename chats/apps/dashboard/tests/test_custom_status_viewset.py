@@ -15,7 +15,6 @@ class TestCustomStatusViewSet(TestCase):
     def setUp(self):
         self.factory = APIRequestFactory()
         
-        # Criar usuário
         self.user = User.objects.create(
             email="test@test.com",
             first_name="Test",
@@ -23,26 +22,22 @@ class TestCustomStatusViewSet(TestCase):
             is_active=True
         )
         
-        # Criar projeto
         self.project = Project.objects.create(
             name="Test Project",
             timezone=pytz.timezone("America/Sao_Paulo")
         )
         
-        # Criar permissão do projeto
         self.project_permission = ProjectPermission.objects.create(
             user=self.user,
             project=self.project,
             status="ONLINE"
         )
         
-        # Criar tipo de status
         self.status_type = CustomStatusType.objects.create(
             name="Lunch",
             project=self.project
         )
         
-        # Criar status customizado
         self.custom_status = CustomStatus.objects.create(
             user=self.user,
             status_type=self.status_type,
@@ -67,7 +62,7 @@ class TestCustomStatusViewSet(TestCase):
 
     def test_last_status_without_active_status(self):
         """Testa o retorno quando não há status ativo"""
-        # Desativa todos os status
+
         CustomStatus.objects.all().update(is_active=False)
         
         request = self.factory.get('/custom-status/last-status/')
@@ -105,7 +100,7 @@ class TestCustomStatusViewSet(TestCase):
 
     def test_close_status_not_last_active(self):
         """Testa tentativa de fechar um status que não é o último ativo"""
-        # Criar um status mais recente
+
         newer_status = CustomStatus.objects.create(
             user=self.user,
             status_type=self.status_type,

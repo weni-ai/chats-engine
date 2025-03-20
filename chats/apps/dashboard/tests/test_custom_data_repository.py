@@ -21,7 +21,6 @@ class TestAgentRepository(TestCase):
     def setUp(self):
         self.repository = AgentRepository()
         
-        # Criar projeto e timezone
         self.project = Project.objects.create(
             name="Test Project",
             timezone=pytz.timezone("America/Sao_Paulo"),
@@ -32,7 +31,6 @@ class TestAgentRepository(TestCase):
             }
         )
         
-        # Criar agentes
         self.agent1 = User.objects.create(
             email="agent1@test.com",
             first_name="Agent",
@@ -46,7 +44,6 @@ class TestAgentRepository(TestCase):
             is_active=True
         )
         
-        # Criar permissões
         self.permission1 = ProjectPermission.objects.create(
             user=self.agent1,
             project=self.project,
@@ -60,7 +57,6 @@ class TestAgentRepository(TestCase):
             role=ProjectPermission.ROLE_ATTENDANT
         )
         
-        # Criar setor e fila
         self.sector = Sector.objects.create(
             name="Test Sector",
             project=self.project,
@@ -73,14 +69,12 @@ class TestAgentRepository(TestCase):
             can_edit_custom_fields=False
         )
         
-        # Criar fila com configurações necessárias
         self.queue = Queue.objects.create(
             name="Test Queue",
             sector=self.sector,
             default_message="Welcome to the queue"
         )
         
-        # Criar autorização da fila para os agentes
         QueueAuthorization.objects.create(
             queue=self.queue,
             permission=self.permission1,
@@ -92,13 +86,11 @@ class TestAgentRepository(TestCase):
             role=QueueAuthorization.ROLE_AGENT
         )
         
-        # Criar custom status type e status
         self.status_type = CustomStatusType.objects.create(
             name="Lunch",
             project=self.project
         )
         
-        # O custom status será automaticamente vinculado ao projeto através do status_type
         self.custom_status = CustomStatus.objects.create(
             user=self.agent1,
             status_type=self.status_type,
@@ -167,7 +159,7 @@ class TestAgentRepository(TestCase):
 
     def test_get_agents_custom_status_weni_admin(self):
         """Testa o filtro de admin Weni"""
-        # Criar um agente Weni
+
         weni_agent = User.objects.create(
             email="agent@weni.ai",
             first_name="Weni",
@@ -180,7 +172,7 @@ class TestAgentRepository(TestCase):
             status="ONLINE"
         )
 
-        # Teste com is_weni_admin=False
+
         filters = Filters(
             queue=None,
             sector=None,
@@ -194,15 +186,12 @@ class TestAgentRepository(TestCase):
         result = self.repository.get_agents_custom_status(filters, self.project)
         agents = list(result)
         
-        # Não deve incluir o agente Weni
         self.assertFalse(any(a["email"].endswith("weni.ai") for a in agents))
 
-        # Teste com is_weni_admin=True
         filters.is_weni_admin = True
         result = self.repository.get_agents_custom_status(filters, self.project)
         agents = list(result)
         
-        # Deve incluir o agente Weni
         self.assertTrue(any(a["email"].endswith("weni.ai") for a in agents))
 
     def test_get_agents_custom_status_inactive_agents(self):
