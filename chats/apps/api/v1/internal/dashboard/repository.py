@@ -63,12 +63,31 @@ class AgentRepository:
         if filters.agent:
             agents_query = agents_query.filter(email=filters.agent)
 
+        custom_status_subquery = Subquery(
+            CustomStatus.objects.filter(
+                user=OuterRef("email"),
+                status_type__project=project,
+            )
+            .values("user")
+            .annotate(
+                aggregated=JSONBAgg(
+                    JSONObject(
+                        status_type=F("status_type__name"),
+                        break_time=F("break_time"),
+                    )
+                )
+            )
+            .values("aggregated"),
+            output_field=JSONField(),
+        )
+
         agents_query = (
             agents_query.filter(project_permissions__project=project, is_active=True)
             .annotate(
                 status=Subquery(project_permission_subquery),
                 closed=Count("rooms", filter=Q(**closed_rooms, **rooms_filter)),
                 opened=Count("rooms", filter=Q(**opened_rooms, **rooms_filter)),
+                custom_status=custom_status_subquery,
             )
             .values(
                 "first_name",
@@ -77,6 +96,7 @@ class AgentRepository:
                 "status",
                 "closed",
                 "opened",
+                "custom_status",
             )
         )
 
