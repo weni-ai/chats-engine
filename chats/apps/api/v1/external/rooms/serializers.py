@@ -268,7 +268,13 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             config = project.config or {}
 
             if config.get("ignore_close_rooms_on_flow_start", False):
-                return queryset.first()
+                room = queryset.first()
+                room.request_callback(room.serialized_ws_data)
+
+                room.callback_url = self.validated_data.get("callback_url")
+                room.save(update_fields=["callback_url"])
+
+                return room
 
             raise ValidationError(
                 {"detail": _("The contact already have an open room in the project")}
