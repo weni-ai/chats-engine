@@ -1,5 +1,7 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, viewsets
+from rest_framework.response import Response
+from rest_framework import status
 
 from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
@@ -24,20 +26,63 @@ class MessageFlowViewset(
     authentication_classes = [ProjectAdminAuthentication]
     lookup_field = "uuid"
 
+    def create(self, request, *args, **kwargs):
+        is_batch = isinstance(request.data, list)
+        if not is_batch:
+            return super().create(request, *args, **kwargs)
+
+        serializer = self.get_serializer(data=request.data, many=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(
+            serializer.data, status=status.HTTP_201_CREATED, headers=headers
+        )
+
     def perform_create(self, serializer):
-        validated_data = serializer.validated_data
-        room = validated_data.get("room")
-        if room.project_uuid != self.request.auth.project:
-            self.permission_denied(
-                self.request,
-                message="Ticketer token permission failed on room project",
-                code=403,
-            )
-        instance = serializer.save()
-        instance.notify_room("create")
-        room = instance.room
-        if room.user is None and instance.contact:
-            room.trigger_default_message()
+        if isinstance(serializer.validated_data, list):
+            # Verifica permissões para todos os rooms no batch
+            for validated_data in serializer.validated_data:
+                room = validated_data.get("room")
+                if room.project_uuid != self.request.auth.project:
+                    self.permission_denied(
+                        self.request,
+                        message="Ticketer token permission failed on room project",
+                        code=403,
+                    )
+            
+            # Usa o método create do serializer que já suporta batch
+            instances = serializer.save()
+            
+            # Processa notificações e trigger_default_message para cada mensagem
+            rooms_processed = set()
+            for instance in instances:
+                room = instance.room
+                if room and room.uuid not in rooms_processed:
+                    room.notify_room("create")
+                    rooms_processed.add(room.uuid)
+                    
+                    if room.user is None and instance.contact:
+                        room.trigger_default_message()
+            
+            return instances
+        else:
+            # Caso de mensagem única
+            validated_data = serializer.validated_data
+            room = validated_data.get("room")
+            if room.project_uuid != self.request.auth.project:
+                self.permission_denied(
+                    self.request,
+                    message="Ticketer token permission failed on room project",
+                    code=403,
+                )
+            instance = serializer.save()
+            instance.notify_room("create")
+            
+            if instance.room.user is None and instance.contact:
+                instance.room.trigger_default_message()
+            
+            return instance
 
     def perform_update(self, serializer):
         instance = serializer.save()
