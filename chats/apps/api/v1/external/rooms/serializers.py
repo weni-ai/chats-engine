@@ -272,7 +272,8 @@ class RoomFlowSerializer(serializers.ModelSerializer):
                 room.request_callback(room.serialized_ws_data)
 
                 room.callback_url = self.validated_data.get("callback_url")
-                room.save(update_fields=["callback_url"])
+                room.ticket_uuid = self.validated_data.get("ticket_uuid")
+                room.save(update_fields=["callback_url", "ticket_uuid"])
 
                 return room
 
