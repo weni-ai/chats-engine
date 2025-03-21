@@ -1,3 +1,4 @@
+import logging
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django_filters.rest_framework import DjangoFilterBackend
@@ -24,6 +25,9 @@ from chats.apps.sectors.usecases.group_sector_authorization import (
 )
 
 from .serializers import QueueAgentsSerializer
+
+
+LOGGER = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -108,10 +112,14 @@ class QueueViewset(ModelViewSet):
             return super().perform_create(serializer)
 
         response = FlowRESTClient().update_queue(**content)
+
         if response.status_code not in [status.HTTP_200_OK, status.HTTP_201_CREATED]:
-            raise exceptions.APIException(
-                detail=f"[{response.status_code}] Error updating the queue on flows. Exception: {response.content}"
+            LOGGER.error(
+                "[%s] Error updating the queue on Flows. Exception: %s",
+                response.status_code,
+                response.content,
             )
+
         return instance
 
     def perform_destroy(self, instance):
