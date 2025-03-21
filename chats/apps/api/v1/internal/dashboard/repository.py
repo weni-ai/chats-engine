@@ -31,12 +31,24 @@ class AgentRepository:
         agents_filters = Q(project_permissions__project=project) & Q(is_active=True)
 
         if filters.queue:
+            # If filtering by queue, the agents list will include:
+            # - Agents with authorization to the queue
+            #   (even if they were never assigned to a room from the queue)
+            # - Agents that are linked to rooms related to the queue
+            #   (even if they don't have authorization to the queue anymore)
+
             rooms_filter["rooms__queue"] = filters.queue
             agents_filters &= Q(
                 project_permissions__queue_authorizations__queue=filters.queue
             ) | Q(rooms__queue=filters.queue)
 
         elif filters.sector:
+            # If filtering by sector, the agents list will include:
+            # - Agents with authorization to the sector
+            #   (even if they were never assigned to a room from the sector)
+            # - Agents that are linked to rooms related to the sector
+            #   (even if they don't have authorization to the sector anymore)
+
             rooms_filter["rooms__queue__sector"] = filters.sector
             agents_filters &= Q(
                 project_permissions__sector_authorizations__sector=filters.sector
