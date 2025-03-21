@@ -18,7 +18,7 @@ class MessageStatusConsumer(EDAConsumer):
         print(f"[MessageStatusConsumer] - Consuming a message. Body: {message.body}")
         body = JSONParser.parse(message.body)
 
-        if body.get("message_id"):
+        if body.get("message_id") and body.get("message_status"):
             update_message_usecase = UpdateStatusMessageUseCase()
             update_message_usecase.update_status_message(
                 body["message_id"], body["message_status"]
