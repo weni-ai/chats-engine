@@ -247,6 +247,10 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             contact, queue, user, groups, created, flow_uuid, project
         )
 
+        #mensagem ta vindo aqui na criação, verificar o campo history no validated_data e chamar a funcao que cria mensagem.
+        #verificar quando chega duas requisições com mesmo uuid de sala, caso chegue pode ser que seja necessario ir 
+        # para fluxo diferente das mensagens (no lugar do create
+        #ir para update/view)
         room, created = Room.objects.get_or_create(
             **validated_data,
             project_uuid=str(queue.project.uuid),
