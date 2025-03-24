@@ -1,3 +1,4 @@
+from chats.apps.api.v1.external.msgs.serializers import MsgFlowSerializer
 import pendulum
 from typing import Dict, List
 
@@ -34,9 +35,16 @@ def get_active_room_flow_start(contact, flow_uuid, project):
             flow_start.save()
             return flow_start.room
     except AttributeError:
+        config = project.config or {}
+
+        if config.get("ignore_close_rooms_on_flow_start", False):
+            return None
+
         # if create new room, but there's a room flowstart to another flow, close the room and the flowstart
+
         query_filters.pop("flow")
         flowstarts = project.flowstarts.filter(**query_filters)
+
         for fs in flowstarts:
             fs.is_deleted = True
             fs.save()
@@ -172,6 +180,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
     flow_uuid = serializers.CharField(required=False, write_only=True, allow_null=True)
     is_anon = serializers.BooleanField(write_only=True, required=False, default=False)
     ticket_uuid = serializers.UUIDField(required=False)
+    history = MsgFlowSerializer(many=True, required=False, write_only=True)
 
     class Meta:
         model = Room
@@ -196,6 +205,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             "urn",
             "is_anon",
             "protocol",
+            "history",
         ]
         read_only_fields = [
             "uuid",
@@ -208,6 +218,8 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         extra_kwargs = {"queue": {"required": False, "read_only": True}}
 
     def create(self, validated_data):
+        history_data = validated_data.pop('history', [])
+        
         queue, sector = self.get_queue_and_sector(validated_data)
         project = sector.project
 
@@ -228,6 +240,8 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         room = get_active_room_flow_start(contact, flow_uuid, project)
 
         if room is not None:
+            if history_data:
+                self.process_message_history(room, history_data)
             return room
 
         self.validate_unique_active_project(contact, project)
@@ -247,15 +261,89 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         )
         RoomMetrics.objects.create(room=room)
 
+        if history_data:
+            self.process_message_history(room, history_data)
+        
         return room
 
-    def validate_unique_active_project(self, contact, project):
-        if Room.objects.filter(
-            is_active=True, contact=contact, queue__sector__project=project
-        ).exists():
-            raise ValidationError(
-                {"detail": _("The contact already have an open room in the project")}
-            )
+    def process_message_history(self, room, history_data):
+        is_waiting = room.get_is_waiting()
+        was_24h_valid = room.is_24h_valid
+        need_update_room = False
+        any_incoming_msgs = False
+        
+        messages_to_create = []
+        media_data_map = {}
+        
+        for i, msg_data in enumerate(history_data):
+            direction = msg_data.pop('direction')
+            medias = msg_data.pop('attachments', [])
+            text = msg_data.get('text')
+            
+            if text is None and not medias:
+                continue
+            
+            if direction == 'incoming':
+                msg_data['contact'] = room.contact
+                any_incoming_msgs = True
+                
+                if is_waiting:
+                    need_update_room = True
+                    room.is_waiting = False
+                elif not was_24h_valid:
+                    need_update_room = True
+            
+            msg_data['room'] = room
+            message = Message(**msg_data)
+            messages_to_create.append(message)
+            
+            if medias:
+                media_data_map[i] = medias
+        
+        if need_update_room:
+            room.save()
+        
+        if messages_to_create:
+            try:
+                created_messages = Message.objects.bulk_create(messages_to_create, return_ids=True)
+                
+                all_media = []
+                for i, message in enumerate(created_messages):
+                    if i in media_data_map:
+                        for media_data in media_data_map[i]:
+                            all_media.append(
+                                MessageMedia(
+                                    content_type=media_data['content_type'],
+                                    media_url=media_data['url'],
+                                    message=message
+                                )
+                            )
+                
+                if all_media:
+                    MessageMedia.objects.bulk_create(all_media)
+                    
+            except TypeError:
+                for i, message_obj in enumerate(messages_to_create):
+                    message = Message.objects.create(
+                        room=message_obj.room,
+                        contact=getattr(message_obj, 'contact', None),
+                        text=message_obj.text,
+                    )
+                    
+                    if i in media_data_map:
+                        media_list = [
+                            MessageMedia(
+                                content_type=media_data['content_type'],
+                                media_url=media_data['url'],
+                                message=message
+                            ) for media_data in media_data_map[i]
+                        ]
+                        MessageMedia.objects.bulk_create(media_list)
+            
+            room.notify_room("create")
+            
+            if room.user is None and room.contact and any_incoming_msgs:
+                room.trigger_default_message()
 
     def get_queue_and_sector(self, validated_data):
         try:
@@ -300,3 +388,25 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         return Contact.objects.update_or_create(
             external_id=contact_external_id, defaults=contact_data
         )
+
+    def validate_unique_active_project(self, contact, project):
+        queryset = Room.objects.filter(
+            is_active=True, contact=contact, queue__sector__project=project
+        )
+
+        if queryset.exists():
+            config = project.config or {}
+
+            if config.get("ignore_close_rooms_on_flow_start", False):
+                room = queryset.first()
+                room.request_callback(room.serialized_ws_data)
+
+                room.callback_url = self.validated_data.get("callback_url")
+                room.ticket_uuid = self.validated_data.get("ticket_uuid")
+                room.save(update_fields=["callback_url", "ticket_uuid"])
+
+                return room
+
+            raise ValidationError(
+                {"detail": _("The contact already have an open room in the project")}
+            )
