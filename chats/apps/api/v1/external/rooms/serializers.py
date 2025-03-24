@@ -181,8 +181,8 @@ class RoomFlowSerializer(serializers.ModelSerializer):
     flow_uuid = serializers.CharField(required=False, write_only=True, allow_null=True)
     is_anon = serializers.BooleanField(write_only=True, required=False, default=False)
     ticket_uuid = serializers.UUIDField(required=False)
-    history = MsgFlowSerializer(many=True, required=False, write_only=True)
-
+    history = serializers.ListField(child=serializers.DictField(), required=False, write_only=True)
+    
     class Meta:
         model = Room
         fields = [
