@@ -1,4 +1,5 @@
 from chats.apps.api.v1.external.msgs.serializers import MsgFlowSerializer
+from chats.apps.msgs.models import Message, MessageMedia
 import pendulum
 from typing import Dict, List
 
