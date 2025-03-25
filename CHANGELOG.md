@@ -1,3 +1,11 @@
+# 3.17.4
+## Add
+  - Success status return when updating queue, regardless of Flows response
+  - Filter agents by queue and sector on dashboard
+
+## Fix
+  - Tags list permissions checking
+
 # 3.17.3
 ## Add
   - Verify 404 status before deleting queue in chats

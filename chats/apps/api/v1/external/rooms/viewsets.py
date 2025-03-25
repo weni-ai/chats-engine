@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError
@@ -113,6 +114,7 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         
         return Response(status=status.HTTP_201_CREATED)
 
+    @transaction.atomic
     def create(self, request, *args, **kwargs):
         print("Create room request data:")
         print(request.data)
