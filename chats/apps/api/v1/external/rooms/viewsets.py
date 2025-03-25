@@ -28,6 +28,7 @@ from chats.apps.rooms.views import (
     update_custom_fields,
     update_flows_custom_fields,
 )
+from chats.apps.msgs.models import Message, MessageMedia
 
 from .filters import RoomFilter, RoomMetricsFilter
 
@@ -87,6 +88,30 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
 
         close_room(str(instance.pk))
         return Response(serialized_data.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def history(self, request, uuid=None):
+        """
+        Endpoint para criar histórico de mensagens em uma sala existente.
+        Reutiliza a lógica existente do process_message_history.
+        """
+        room = self.get_object()
+        
+        if room.project_uuid != self.request.auth.project:
+            return self.permission_denied(
+                request,
+                message="Ticketer token permission failed on room project",
+                code=403,
+            )
+        
+        messages_data = request.data
+        if not isinstance(messages_data, list):
+            messages_data = [messages_data]
+        
+        serializer = RoomFlowSerializer()
+        serializer.process_message_history(room, messages_data)
+        
+        return Response(status=status.HTTP_201_CREATED)
 
     def create(self, request, *args, **kwargs):
         print("Create room request data:")
