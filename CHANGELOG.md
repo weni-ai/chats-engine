@@ -1,3 +1,8 @@
+# 3.17.5
+## Add
+  - "ignore_close_rooms_on_flow_start" experimental project flag verification to allow active rooms to remain open when receiving a new ticket for the same contact in the same project
+
+
 # 3.17.4
 ## Add
   - Success status return when updating queue, regardless of Flows response
