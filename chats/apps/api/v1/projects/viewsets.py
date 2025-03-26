@@ -10,7 +10,6 @@ from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import decorators, filters, mixins, serializers, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -376,19 +375,30 @@ class ProjectViewset(
         flows_start_verify = {}
         flows_start_verify["show_warning"] = False
 
-        if not (
-            project := self.get_queryset()
-            .filter(uuid=request.query_params.get("project"))
-            .first()
-        ):
-            raise DRFValidationError({"project": "Project not found"})
+        project_uuid = request.query_params.get("project")
+        contact_uuid = request.query_params.get("contact")
 
-        if not (
-            contact := Contact.objects.filter(
-                external_id=request.query_params.get("contact")
-            ).first()
-        ):
-            raise DRFValidationError({"contact": "Contact not found"})
+        try:
+            if not (project := self.get_queryset().filter(uuid=project_uuid).first()):
+                return Response(
+                    {"project": "Project not found"}, status.HTTP_404_NOT_FOUND
+                )
+        except Exception as error:
+            return Response(
+                {"project": f"{type(error)}: {error}"}, status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            if not (
+                contact := Contact.objects.filter(external_id=contact_uuid).first()
+            ):
+                return Response(
+                    {"contact": "Contact not found"}, status.HTTP_404_NOT_FOUND
+                )
+        except Exception as error:
+            return Response(
+                {"contact": f"{type(error)}: {error}"}, status.HTTP_400_BAD_REQUEST
+            )
 
         try:
             room = Room.objects.get(
@@ -505,16 +515,20 @@ class ProjectViewset(
 
     @action(detail=False, methods=["POST"], url_name="integrate_sectors")
     def integrate_sectors(self, request, *args, **kwargs):
-        if not (
-            project := self.get_queryset()
-            .filter(Project, uuid=request.query_params["project"])
-            .first()
-        ):
-            raise DRFValidationError({"project": "Project not found"})
-
-        print("projeto principal", project)
-
         try:
+            project_uuid = request.query_params.get("project")
+
+            if not (
+                project := self.get_queryset()
+                .filter(Project, uuid=project_uuid)
+                .first()
+            ):
+                return Response(
+                    {"project": "Project not found"}, status.HTTP_404_NOT_FOUND
+                )
+
+            print("projeto principal", project)
+
             integrations = IntegratedTicketers()
 
             print("classe de integracao", integrations)
