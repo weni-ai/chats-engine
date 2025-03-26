@@ -89,7 +89,7 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         close_room(str(instance.pk))
         return Response(serialized_data.data, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=["POST"], url_path="history/")
+    @action(detail=True, methods=["POST"], url_path="history")
     def history(self, request, uuid=None):
         """
         Endpoint para criar histórico de mensagens em uma sala existente.
