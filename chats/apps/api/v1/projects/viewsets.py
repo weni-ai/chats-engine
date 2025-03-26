@@ -5,6 +5,7 @@ from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import transaction
 from django.db.models import CharField, Value
 from django.db.models.functions import Concat
+from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
@@ -70,6 +71,11 @@ class ProjectViewset(
     lookup_field = "uuid"
 
     def get_queryset(self):
+        # Allow all projects for internal communication users
+        if self.request.user.has_perm("accounts.can_communicate_internally"):
+            return super().get_queryset()
+
+        # Allow only projects where the user has access
         return super().get_queryset().filter(permissions__user=self.request.user)
 
     @swagger_auto_schema(
@@ -371,8 +377,11 @@ class ProjectViewset(
         flows_start_verify["show_warning"] = False
 
         try:
-            project = Project.objects.get(uuid=request.query_params.get("project"))
-            contact = Contact.objects.get(
+            project: Project = get_object_or_404(
+                Project, uuid=request.query_params.get("project")
+            )
+            contact: Contact = get_object_or_404(
+                Contact,
                 external_id=request.query_params.get("contact"),
             )
         except Exception as error:
@@ -497,7 +506,9 @@ class ProjectViewset(
     @action(detail=False, methods=["POST"], url_name="integrate_sectors")
     def integrate_sectors(self, request, *args, **kwargs):
         try:
-            project = Project.objects.get(uuid=request.query_params["project"])
+            project: Project = get_object_or_404(
+                Project, uuid=request.query_params["project"]
+            )
             print("projeto principal", project)
             integrations = IntegratedTicketers()
 
