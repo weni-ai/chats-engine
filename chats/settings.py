@@ -95,7 +95,6 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "chats.urls"
-APPEND_SLASH = False
 
 TEMPLATES = [
     {
