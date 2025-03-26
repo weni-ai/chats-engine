@@ -69,6 +69,9 @@ class ProjectViewset(
     ]
     lookup_field = "uuid"
 
+    def get_queryset(self):
+        return super().get_queryset().filter(permissions__user=self.request.user)
+
     @swagger_auto_schema(
         manual_parameters=[
             openapi.Parameter(
