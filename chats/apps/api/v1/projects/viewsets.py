@@ -520,7 +520,7 @@ class ProjectViewset(
 
             if not (
                 project := self.get_queryset()
-                .filter(Project, uuid=project_uuid)
+                .filter(uuid=project_uuid)
                 .first()
             ):
                 return Response(
