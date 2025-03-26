@@ -340,7 +340,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             external_id=contact_external_id, defaults=contact_data
         )
 
-    def process_message_history(self, room, history_data):
+    def process_message_history(self, room, messages_data):
         is_waiting = room.get_is_waiting()
         was_24h_valid = room.is_24h_valid
         need_update_room = False
@@ -349,13 +349,14 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         messages_to_create = []
         media_data_map = {}
         
-        for i, msg_data in enumerate(history_data):
+        for message_index, msg_data in enumerate(messages_data):
             direction = msg_data.pop('direction')
             medias = msg_data.pop('attachments', [])
             text = msg_data.get('text')
+            created_on = msg_data.get('created_on')
             
             if text is None and not medias:
-                continue
+                raise serializers.ValidationError({"detail": "Cannot create message without text or media"})
             
             if direction == 'incoming':
                 msg_data['contact'] = room.contact
@@ -368,51 +369,33 @@ class RoomFlowSerializer(serializers.ModelSerializer):
                     need_update_room = True
             
             msg_data['room'] = room
+            msg_data['created_on'] = created_on
             message = Message(**msg_data)
             messages_to_create.append(message)
             
             if medias:
-                media_data_map[i] = medias
+                media_data_map[message_index] = medias
         
         if need_update_room:
             room.save()
         
         if messages_to_create:
-            try:
-                created_messages = Message.objects.bulk_create(messages_to_create, return_ids=True)
-                
-                all_media = []
-                for i, message in enumerate(created_messages):
-                    if i in media_data_map:
-                        for media_data in media_data_map[i]:
-                            all_media.append(
-                                MessageMedia(
-                                    content_type=media_data['content_type'],
-                                    media_url=media_data['url'],
-                                    message=message
-                                )
-                            )
-                
-                if all_media:
-                    MessageMedia.objects.bulk_create(all_media)
-                    
-            except TypeError:
-                for i, message_obj in enumerate(messages_to_create):
-                    message = Message.objects.create(
-                        room=message_obj.room,
-                        contact=getattr(message_obj, 'contact', None),
-                        text=message_obj.text,
-                    )
-                    
-                    if i in media_data_map:
-                        media_list = [
+            created_messages = Message.objects.bulk_create(messages_to_create)
+            
+            all_media = []
+            for message_index, message in enumerate(created_messages):
+                if message_index in media_data_map:
+                    for media_data in media_data_map[message_index]:
+                        all_media.append(
                             MessageMedia(
                                 content_type=media_data['content_type'],
                                 media_url=media_data['url'],
                                 message=message
-                            ) for media_data in media_data_map[i]
-                        ]
-                        MessageMedia.objects.bulk_create(media_list)
+                            )
+                        )
+            
+            if all_media:
+                MessageMedia.objects.bulk_create(all_media)
             
             room.notify_room("create")
             
