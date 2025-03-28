@@ -182,7 +182,8 @@ class RoomFlowSerializer(serializers.ModelSerializer):
     is_anon = serializers.BooleanField(write_only=True, required=False, default=False)
     ticket_uuid = serializers.UUIDField(required=False)
     history = serializers.ListField(child=serializers.DictField(), required=False, write_only=True)
-    
+    config = serializers.JSONField(required=False, read_only=False)
+
     class Meta:
         model = Room
         fields = [
@@ -258,12 +259,13 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         principal_project_info = {}
 
         if "project_info" in validated_data:
+            print("tem project_info", validated_data["project_info"])
             principal_project_info = validated_data.pop("project_info")
         #mensagem ta vindo aqui na criação, verificar o campo history no validated_data e chamar a funcao que cria mensagem.
         #verificar quando chega duas requisições com mesmo uuid de sala, caso chegue pode ser que seja necessario ir 
         # para fluxo diferente das mensagens (no lugar do create
         #ir para update/view)
-        room, created = Room.objects.get_or_create(
+        room = Room.objects.create(
             **validated_data,
             project_uuid=str(queue.project.uuid),
             contact=contact,
@@ -272,7 +274,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             service_chat=service_chat,
             config=principal_project_info
         )
-        RoomMetrics.objects.get_or_create(room=room)
+        RoomMetrics.objects.create(room=room)
 
         if history_data:
             self.process_message_history(room, history_data)
