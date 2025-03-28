@@ -226,6 +226,10 @@ class RoomFlowSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         attrs["config"] = self.initial_data.get("project_info", {})
 
+        if "project_info" in attrs:
+            attrs.pop("project_info")
+    
+
         return super().validate(attrs)
     
     def create(self, validated_data):
