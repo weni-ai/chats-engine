@@ -221,6 +221,8 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         extra_kwargs = {"queue": {"required": False, "read_only": True}}
 
     def create(self, validated_data):
+        print("INÍCIO DO CREATE - validated_data recebido:", validated_data)
+
         history_data = validated_data.pop('history', [])
         
         queue, sector = self.get_queue_and_sector(validated_data)
@@ -261,10 +263,12 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         if "project_info" in validated_data:
             print("tem project_info", validated_data["project_info"])
             principal_project_info = validated_data.pop("project_info")
+
         #mensagem ta vindo aqui na criação, verificar o campo history no validated_data e chamar a funcao que cria mensagem.
         #verificar quando chega duas requisições com mesmo uuid de sala, caso chegue pode ser que seja necessario ir 
         # para fluxo diferente das mensagens (no lugar do create
         #ir para update/view)
+
         room = Room.objects.create(
             **validated_data,
             project_uuid=str(queue.project.uuid),
