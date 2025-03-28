@@ -254,6 +254,10 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         validated_data["user"] = get_room_user(
             contact, queue, user, groups, created, flow_uuid, project
         )
+        principal_project_info = {}
+
+        if "project_info" in validated_data:
+            principal_project_info = validated_data["project_info"]
 
         #mensagem ta vindo aqui na criação, verificar o campo history no validated_data e chamar a funcao que cria mensagem.
         #verificar quando chega duas requisições com mesmo uuid de sala, caso chegue pode ser que seja necessario ir 
@@ -266,6 +270,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             queue=queue,
             protocol=protocol,
             service_chat=service_chat,
+            config=principal_project_info
         )
         RoomMetrics.objects.get_or_create(room=room)
 
