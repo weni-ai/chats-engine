@@ -265,9 +265,6 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             contact, queue, user, groups, created, flow_uuid, project
         )
 
-        principal_project_info = getattr(self, '_project_info', {})
-
-
         room = Room.objects.create(
             **validated_data,
             project_uuid=str(queue.project.uuid),
@@ -275,7 +272,6 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             queue=queue,
             protocol=protocol,
             service_chat=service_chat,
-            config=principal_project_info
         )
         RoomMetrics.objects.create(room=room)
 
