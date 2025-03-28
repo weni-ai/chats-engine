@@ -159,6 +159,9 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
             return msg_date.isoformat()
         return None
 
+class ProjectInfoSerializer(serializers.Serializer):
+    uuid = serializers.UUIDField(required=False, read_only=False)
+    name = serializers.CharField(required=False, read_only=False)
 
 class RoomFlowSerializer(serializers.ModelSerializer):
     user = UserSerializer(many=False, required=False, read_only=True)
@@ -182,8 +185,8 @@ class RoomFlowSerializer(serializers.ModelSerializer):
     is_anon = serializers.BooleanField(write_only=True, required=False, default=False)
     ticket_uuid = serializers.UUIDField(required=False)
     history = serializers.ListField(child=serializers.DictField(), required=False, write_only=True)
-    config = serializers.JSONField(required=False, read_only=False)
-
+    project_info = ProjectInfoSerializer(required=False, write_only=True)
+    
     class Meta:
         model = Room
         fields = [
@@ -220,19 +223,12 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         ]
         extra_kwargs = {"queue": {"required": False, "read_only": True}}
 
-       # Sobrescreva o método validate para capturar project_info
     def validate(self, attrs):
-        # Obtenha os dados da requisição original
-        request_data = self.initial_data if hasattr(self, 'initial_data') else {}
-        
-        # Guarde project_info para uso posterior
-        self._project_info = request_data.get('project_info', {})
-        
-        return attrs
+        attrs["config"] = self.initial_data.get("project_info", {})
 
+        return super().validate(attrs)
+    
     def create(self, validated_data):
-        print("INÍCIO DO CREATE - validated_data recebido:", validated_data)
-
         history_data = validated_data.pop('history', [])
         
         queue, sector = self.get_queue_and_sector(validated_data)
@@ -269,6 +265,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             contact, queue, user, groups, created, flow_uuid, project
         )
 
+        print("no create", getattr(self, '_project_info', {}))
         principal_project_info = getattr(self, '_project_info', {})
 
 

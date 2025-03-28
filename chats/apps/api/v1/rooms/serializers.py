@@ -34,7 +34,8 @@ class RoomSerializer(serializers.ModelSerializer):
     flowstart_data = serializers.SerializerMethodField()
     last_interaction = serializers.DateTimeField(read_only=True)
     can_edit_custom_fields = serializers.SerializerMethodField()
-
+    config = serializers.JSONField(required=False, read_only=True)
+    
     class Meta:
         model = Room
         fields = "__all__"
