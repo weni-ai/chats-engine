@@ -211,7 +211,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             "is_anon",
             "protocol",
             "history",
-            "config"
+            "project_info"
         ]
         read_only_fields = [
             "uuid",
@@ -265,14 +265,8 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             contact, queue, user, groups, created, flow_uuid, project
         )
 
-        print("no create", getattr(self, '_project_info', {}))
         principal_project_info = getattr(self, '_project_info', {})
 
-
-        #mensagem ta vindo aqui na criação, verificar o campo history no validated_data e chamar a funcao que cria mensagem.
-        #verificar quando chega duas requisições com mesmo uuid de sala, caso chegue pode ser que seja necessario ir 
-        # para fluxo diferente das mensagens (no lugar do create
-        #ir para update/view)
 
         room = Room.objects.create(
             **validated_data,
