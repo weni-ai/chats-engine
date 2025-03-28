@@ -207,6 +207,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             "is_anon",
             "protocol",
             "history",
+            "config"
         ]
         read_only_fields = [
             "uuid",
@@ -257,8 +258,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         principal_project_info = {}
 
         if "project_info" in validated_data:
-            principal_project_info = validated_data["project_info"]
-
+            principal_project_info = validated_data.pop("project_info")
         #mensagem ta vindo aqui na criação, verificar o campo history no validated_data e chamar a funcao que cria mensagem.
         #verificar quando chega duas requisições com mesmo uuid de sala, caso chegue pode ser que seja necessario ir 
         # para fluxo diferente das mensagens (no lugar do create
