@@ -14,7 +14,7 @@ from model_utils import FieldTracker
 from requests.exceptions import RequestException
 from rest_framework.exceptions import ValidationError
 
-from chats.apps.rooms.tasks import update_ticket_on_flows
+from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.core.models import BaseModel
 from chats.utils.websockets import send_channels_group
 from chats.core.models import BaseConfigurableModel
@@ -338,4 +338,4 @@ class Room(BaseModel, BaseConfigurableModel):
 
     def update_ticket(self):
         if self.ticket_uuid and self.user:
-            update_ticket_on_flows.delay(self.ticket_uuid, self.user.email)
+            FlowRESTClient().update_ticket_assignee(self.ticket_uuid, self.user.email)
