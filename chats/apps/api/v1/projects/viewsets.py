@@ -69,6 +69,14 @@ class ProjectViewset(
     ]
     lookup_field = "uuid"
 
+    def get_queryset(self):
+        # Allow all projects for internal communication users
+        if self.request.user.has_perm("accounts.can_communicate_internally"):
+            return super().get_queryset()
+
+        # Allow only projects where the user has access
+        return super().get_queryset().filter(permissions__user=self.request.user)
+
     @swagger_auto_schema(
         manual_parameters=[
             openapi.Parameter(
@@ -367,15 +375,29 @@ class ProjectViewset(
         flows_start_verify = {}
         flows_start_verify["show_warning"] = False
 
+        project_uuid = request.query_params.get("project")
+        contact_uuid = request.query_params.get("contact")
+
         try:
-            project = Project.objects.get(uuid=request.query_params.get("project"))
-            contact = Contact.objects.get(
-                external_id=request.query_params.get("contact"),
-            )
+            if not (project := self.get_queryset().filter(uuid=project_uuid).first()):
+                return Response(
+                    {"project": "Project not found"}, status.HTTP_404_NOT_FOUND
+                )
         except Exception as error:
             return Response(
-                {"error": f"{type(error)}: {error}"},
-                status=status.HTTP_400_BAD_REQUEST,
+                {"project": f"{type(error)}: {error}"}, status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            if not (
+                contact := Contact.objects.filter(external_id=contact_uuid).first()
+            ):
+                return Response(
+                    {"contact": "Contact not found"}, status.HTTP_404_NOT_FOUND
+                )
+        except Exception as error:
+            return Response(
+                {"contact": f"{type(error)}: {error}"}, status.HTTP_400_BAD_REQUEST
             )
 
         try:
@@ -494,8 +516,19 @@ class ProjectViewset(
     @action(detail=False, methods=["POST"], url_name="integrate_sectors")
     def integrate_sectors(self, request, *args, **kwargs):
         try:
-            project = Project.objects.get(uuid=request.query_params["project"])
+            project_uuid = request.query_params.get("project")
+
+            if not (
+                project := self.get_queryset()
+                .filter(uuid=project_uuid)
+                .first()
+            ):
+                return Response(
+                    {"project": "Project not found"}, status.HTTP_404_NOT_FOUND
+                )
+
             print("projeto principal", project)
+
             integrations = IntegratedTicketers()
 
             print("classe de integracao", integrations)
