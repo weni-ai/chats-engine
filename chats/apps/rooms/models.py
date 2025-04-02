@@ -117,7 +117,7 @@ class Room(BaseModel, BaseConfigurableModel):
             is_new: Boolean indicando se é uma sala nova
         """
         # Verificar se o usuário mudou
-        old_user = None if is_new else self.tracker.previous('user')
+        old_user = None if is_new or self.tracker.previous('user') is None else self.tracker.previous('user')
         new_user = self.user
 
         print(f"DEBUG - is_new: {is_new}")
