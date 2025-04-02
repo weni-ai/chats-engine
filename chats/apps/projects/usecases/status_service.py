@@ -149,7 +149,7 @@ class InServiceStatusTracker:
         Returns:
             Tupla com (status_obj, from_cache)
         """
-        user_id = user.id
+        user_id = user.uuid
         project_id = project.pk
         
         # Tentar obter do cache primeiro
@@ -179,7 +179,7 @@ class InServiceStatusTracker:
         if not user:
             return
             
-        user_id = user.id
+        user_id = user.uuid
         project_id = project.pk
         
         keys = cls.get_cache_keys(user_id, project_id)
