@@ -119,6 +119,11 @@ class Room(BaseModel, BaseConfigurableModel):
         # Verificar se o usuário mudou
         old_user = None if is_new else self.tracker.previous('user')
         new_user = self.user
+
+        print(f"DEBUG - is_new: {is_new}")
+        print(f"DEBUG - old_user: {old_user}")
+        print(f"DEBUG - tracker previous user: {self.tracker.previous('user')}")
+        print(f"DEBUG - new_user: {new_user}")
         
         # Verificar se o status ativo mudou
         old_is_active = None if is_new else self.tracker.previous('is_active')
