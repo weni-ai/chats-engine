@@ -25,6 +25,7 @@ class MessageFlowViewset(
     lookup_field = "uuid"
 
     def perform_create(self, serializer):
+        print("Request data:", self.request.data)
         validated_data = serializer.validated_data
         room = validated_data.get("room")
         if room.project_uuid != self.request.auth.project:
