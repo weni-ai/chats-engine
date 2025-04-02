@@ -1,7 +1,6 @@
 import json
 import time
 from datetime import timedelta
-import uuid
 
 import requests
 import sentry_sdk
@@ -93,8 +92,6 @@ class Room(BaseModel, BaseConfigurableModel):
     user_assigned_at = models.DateTimeField(
         _("User assigned at"), null=True, blank=True
     )
-
-    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
     tracker = FieldTracker(fields=['user', 'is_active'])
 
