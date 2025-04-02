@@ -573,6 +573,7 @@ class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
 
 
 class CustomStatusTypeViewSet(viewsets.ModelViewSet):
+    queryset = CustomStatusType.objects.all() 
     serializer_class = CustomStatusTypeSerializer
     permission_classes = [
         IsAuthenticated,

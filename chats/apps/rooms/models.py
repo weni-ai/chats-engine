@@ -1,6 +1,7 @@
 import json
 import time
 from datetime import timedelta
+import uuid
 
 import requests
 import sentry_sdk
@@ -92,7 +93,9 @@ class Room(BaseModel):
         _("User assigned at"), null=True, blank=True
     )
 
-    tracker = FieldTracker(fields=["user"])
+    uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    tracker = FieldTracker(fields=['user', 'is_active'])
 
     class Meta:
         verbose_name = _("Room")
@@ -108,6 +111,53 @@ class Room(BaseModel):
             models.Index(fields=["project_uuid"]),
         ]
 
+    def _update_agent_service_status(self, is_new):
+        """
+        Atualiza o status 'In-Service' dos agentes baseado nas mudanças na sala
+        
+        Args:
+            is_new: Boolean indicando se é uma sala nova
+        """
+        # Verificar se o usuário mudou
+        old_user = None if is_new else self.tracker.previous('user')
+        new_user = self.user
+        
+        # Verificar se o status ativo mudou
+        old_is_active = None if is_new else self.tracker.previous('is_active')
+        
+        # Obter o projeto a partir da fila
+        project = getattr(self.queue, 'sector', None)
+        if project:
+            project = getattr(project, 'project', None)
+            
+        if not project:
+            return  # Se não encontrar projeto, não faz nada
+        
+        # Se for uma sala nova com um usuário atribuído
+        if is_new and new_user:
+            InServiceStatusTracker.update_room_count(new_user, project, "assigned")
+            return
+        
+        # Se não for uma sala nova, verificar as alterações
+        # Caso 1: Usuário foi atribuído a uma sala que não tinha usuário
+        if old_user is None and new_user is not None:
+            InServiceStatusTracker.update_room_count(new_user, project, "assigned")
+        
+        # Caso 2: Usuário foi alterado de um agente para outro
+        elif old_user is not None and new_user is not None and old_user != new_user:
+            # Remover sala do agente anterior
+            InServiceStatusTracker.update_room_count(old_user, project, "closed")
+            # Adicionar sala ao novo agente
+            InServiceStatusTracker.update_room_count(new_user, project, "assigned")
+        
+        # Caso 3: Usuário foi removido da sala (transferência para fila)
+        elif old_user is not None and new_user is None:
+            InServiceStatusTracker.update_room_count(old_user, project, "closed")
+        
+        # Caso 4: Sala foi fechada
+        if old_is_active is True and self.is_active is False and self.user:
+            InServiceStatusTracker.update_room_count(self.user, project, "closed")
+    
     def save(self, *args, **kwargs) -> None:
         if self.__original_is_active is False:
             raise ValidationError({"detail": _("Closed rooms cannot receive updates")})
@@ -119,7 +169,14 @@ class Room(BaseModel):
         ):
             self.user_assigned_at = timezone.now()
 
-        return super().save(*args, **kwargs)
+        # Capturar o estado anterior para comparação
+        is_new = self._state.adding
+        
+        # Salvar o objeto primeiro
+        super().save(*args, **kwargs)
+        
+        # Atualizar o status dos agentes após salvar
+        self._update_agent_service_status(is_new)
 
     def get_permission(self, user):
         try:
@@ -197,10 +254,6 @@ class Room(BaseModel):
             self.tags.add(*tags)
         self.save()
         
-        # Atualizar o status In-Service do agente quando fechar a sala
-        if self.user:
-            project = self.queue.sector.project
-            InServiceStatusTracker.update_room_count(self.user, project, "closed")
 
     def request_callback(self, room_data: dict):
         if self.callback_url is None:

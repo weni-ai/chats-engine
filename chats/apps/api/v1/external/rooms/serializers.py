@@ -247,12 +247,6 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         )
         RoomMetrics.objects.create(room=room)
 
-        # Atualizar o status In-Service do agente ao criar a sala
-        if validated_data.get("user"):
-            InServiceStatusTracker.update_room_count(
-                validated_data["user"], project, "assigned"
-            )
-
         return room
 
     def validate_unique_active_project(self, contact, project):
