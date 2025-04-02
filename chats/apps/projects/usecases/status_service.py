@@ -218,6 +218,7 @@ class InServiceStatusTracker:
         
         try:
             if action == "assigned":
+                print("entrou no assigned")
                 # Incrementar o contador de salas de forma atômica
                 new_count = cache.incr(keys["room_count"], 1)
                 
@@ -243,6 +244,7 @@ class InServiceStatusTracker:
                             cache.set(keys["start_time"], timezone.now(), timeout)
                 
             elif action == "closed":
+                print("entrou no closed")
                 # Obter contagem atual (com fallback para 0)
                 count = cache.get(keys["room_count"], 0)
                 
