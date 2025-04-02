@@ -40,6 +40,7 @@ class MessageFlowViewset(
         )
 
     def perform_create(self, serializer):
+        print("Request data:", self.request.data)
         if isinstance(serializer.validated_data, list):
             # Verifica permissões para todos os rooms no batch
             for validated_data in serializer.validated_data:

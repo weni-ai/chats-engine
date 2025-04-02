@@ -1,3 +1,11 @@
+# 3.17.6
+## Add
+  - transaction atomicity to the create method of the RoomFlowViewSet
+## Fix
+  - project details permissions, to ensure that users can only view projects they are authorized to access
+  - update ticket on flows call, removing celery task
+
+
 # 3.17.5
 ## Add
   - "ignore_close_rooms_on_flow_start" experimental project flag verification to allow active rooms to remain open when receiving a new ticket for the same contact in the same project
