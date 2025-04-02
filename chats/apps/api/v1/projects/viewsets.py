@@ -606,7 +606,7 @@ class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
 
 
 class CustomStatusTypeViewSet(viewsets.ModelViewSet):
-    queryset = CustomStatusType.objects.filter(is_deleted=False)
+    queryset = CustomStatusType.objects.all() 
     serializer_class = CustomStatusTypeSerializer
     permission_classes = [
         IsAuthenticated,
@@ -614,6 +614,12 @@ class CustomStatusTypeViewSet(viewsets.ModelViewSet):
     ]
     filter_backends = [DjangoFilterBackend]
     filterset_class = CustomStatusTypeFilterSet
+
+    def get_queryset(self):
+            return CustomStatusType.objects.filter(
+                is_deleted=False,
+                config__created_by_system__isnull=True
+            )
 
     def perform_create(self, serializer):
         return serializer.save()
@@ -687,7 +693,7 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
     @decorators.action(detail=False, methods=["get"])
     def last_status(self, request):
         last_status = (
-            CustomStatus.objects.filter(user=request.user, is_active=True)
+            CustomStatus.objects.filter(user=request.user, is_active=True, status_type__config__created_by_system__isnull=True)
             .order_by("-created_on")
             .first()
         )
