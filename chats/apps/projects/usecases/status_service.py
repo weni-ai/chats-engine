@@ -1,9 +1,10 @@
 from django.core.cache import cache
 from django.utils import timezone
 from django.db import transaction
-from chats.apps.projects.models.models import CustomStatusType, CustomStatus
+from chats.apps.projects.models.models import CustomStatusType, CustomStatus, Project
 from typing import Dict, Tuple, Optional, List
 import logging
+from django.contrib.auth import get_user_model
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +150,22 @@ class InServiceStatusTracker:
         Returns:
             Tupla com (status_obj, from_cache)
         """
-        user_id = user.uuid
+        User = get_user_model()
+        if isinstance(user, str):
+            user_obj = User.objects.filter(email=user).first()
+            if not user_obj:
+                logger.warning(f"Usuário não encontrado para email: {user}")
+                return
+            user = user_obj
+
+        if isinstance(project, (int, str)):
+            project_obj = Project.objects.filter(pk=project).first()
+            if not project_obj:
+                logger.warning(f"Projeto não encontrado para ID: {project}")
+                return
+            project = project_obj
+
+        user_id = user.pk
         project_id = project.pk
         
         # Tentar obter do cache primeiro
@@ -179,7 +195,22 @@ class InServiceStatusTracker:
         if not user:
             return
             
-        user_id = user.uuid
+        User = get_user_model()
+        if isinstance(user, str):
+            user_obj = User.objects.filter(email=user).first()
+            if not user_obj:
+                logger.warning(f"Usuário não encontrado para email: {user}")
+                return
+            user = user_obj
+
+        if isinstance(project, (int, str)):
+            project_obj = Project.objects.filter(pk=project).first()
+            if not project_obj:
+                logger.warning(f"Projeto não encontrado para ID: {project}")
+                return
+            project = project_obj
+
+        user_id = user.pk
         project_id = project.pk
         
         keys = cls.get_cache_keys(user_id, project_id)
