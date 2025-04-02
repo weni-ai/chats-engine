@@ -39,11 +39,6 @@ class Message(BaseModelWithManualCreatedOn):
     external_id = models.CharField(
         _("External ID"), max_length=200, blank=True, null=True
     )
-    status = models.JSONField(
-        _("message status"),
-        blank=True,
-        null=True,
-    )
 
     class Meta:
         verbose_name = "Message"
