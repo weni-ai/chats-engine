@@ -25,7 +25,6 @@ class MessageFlowViewset(
     lookup_field = "uuid"
 
     def perform_create(self, serializer):
-        print("Request data:", self.request.data)
         validated_data = serializer.validated_data
         room = validated_data.get("room")
         if room.project_uuid != self.request.auth.project:
@@ -34,6 +33,7 @@ class MessageFlowViewset(
                 message="Ticketer token permission failed on room project",
                 code=403,
             )
+        serializer.is_valid(raise_exception=True)
         instance = serializer.save()
         instance.notify_room("create")
         room = instance.room
