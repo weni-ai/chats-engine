@@ -208,7 +208,12 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         return is_online
 
     def is_attending(self, created_on):
-        tz = pendulum.timezone(str(self.project.timezone))
+        project_tz = self.project.timezone
+
+        if not project_tz:
+            project_tz = "America/Sao_Paulo"
+
+        tz = pendulum.timezone(str(project_tz))
         created_on = pendulum.parse(str(created_on)).in_timezone(tz)
         start = pendulum.parse(str(self.work_start))
         end = pendulum.parse(str(self.work_end))
