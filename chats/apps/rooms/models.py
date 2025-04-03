@@ -142,31 +142,31 @@ class Room(BaseModel, BaseConfigurableModel):
         
         # Se for uma sala nova com um usuário atribuído
         if is_new and new_user:
-            InServiceStatusTracker.update_room_count(new_user, project, "assigned")
+            InServiceStatusTracker.safe_update_room_count(new_user, project, "assigned")
             return
         
         # Se não for uma sala nova, verificar as alterações
         # Caso 1: Usuário foi atribuído a uma sala que não tinha usuário
         if old_user is None and new_user is not None:
             print("entrou no caso 1")
-            InServiceStatusTracker.update_room_count(new_user, project, "assigned")
+            InServiceStatusTracker.safe_update_room_count(new_user, project, "assigned")
         
         # Caso 2: Usuário foi alterado de um agente para outro
         elif old_user is not None and new_user is not None and old_user != new_user:
             print("entrou no caso 2")
             # Remover sala do agente anterior
-            InServiceStatusTracker.update_room_count(old_user, project, "closed")
+            InServiceStatusTracker.safe_update_room_count(old_user, project, "closed")
             # Adicionar sala ao novo agente
-            InServiceStatusTracker.update_room_count(new_user, project, "assigned")
+            InServiceStatusTracker.safe_update_room_count(new_user, project, "assigned")
         
         # Caso 3: Usuário foi removido da sala (transferência para fila)
         elif old_user is not None and new_user is None:
             print("entrou no caso 3")
-            InServiceStatusTracker.update_room_count(old_user, project, "closed")
+            InServiceStatusTracker.safe_update_room_count(old_user, project, "closed")
         
         if self.__original_is_active is True and self.is_active is False and self.user:
             print("PRIORITÁRIO: Sala fechada")
-            InServiceStatusTracker.update_room_count(self.user, project, "closed")
+            InServiceStatusTracker.safe_update_room_count(self.user, project, "closed")
             return  # Importante: sair da função após tratar o fechamento
     
     def save(self, *args, **kwargs) -> None:

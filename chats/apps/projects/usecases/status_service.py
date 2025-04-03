@@ -5,6 +5,7 @@ from chats.apps.projects.models.models import CustomStatusType, CustomStatus, Pr
 from typing import Dict, Tuple, Optional, List
 import logging
 from django.contrib.auth import get_user_model
+from chats.apps.rooms.models import Room
 
 logger = logging.getLogger(__name__)
 
@@ -219,6 +220,42 @@ class InServiceStatusTracker:
         return status, False
     
     @classmethod
+    def safe_update_room_count(cls, user, project, action="assigned") -> None:
+        """
+        Versão segura do update_room_count que processa a atualização assincronamente 
+        para não bloquear o fluxo principal de negócios.
+        
+        Args:
+            user: O usuário agente
+            project: O projeto atual
+            action: "assigned" quando uma sala é atribuída, "closed" quando fechada
+        """
+        import threading
+        
+        # Processamento assíncrono em thread separada para não bloquear o fluxo principal
+        def async_update():
+            try:
+                cls.update_room_count(user, project, action)
+            except Exception as e:
+                # Apenas logar o erro, sem interromper o fluxo principal
+                logger.error(f"Erro ao atualizar contador de salas: {e}")
+                try:
+                    if user and project:
+                        user_id = user.pk if hasattr(user, 'pk') else user
+                        project_id = project.pk if hasattr(project, 'pk') else project
+                        keys = cls.get_cache_keys(user_id, project_id)
+                        for key in keys.values():
+                            cache.delete(key)
+                except Exception:
+                    pass  # Ignorar erros secundários
+        
+        # Iniciar thread para processamento assíncrono
+        thread = threading.Thread(target=async_update)
+        thread.daemon = True  # Thread terminará quando aplicação principal terminar
+        thread.start()
+        # Não fazemos join() para não bloquear o fluxo principal
+    
+    @classmethod
     def update_room_count(cls, user, project, action="assigned") -> None:
         """
         Atualiza o contador de salas e o status In-Service do agente
@@ -253,39 +290,34 @@ class InServiceStatusTracker:
         keys = cls.get_cache_keys(user_id, project_id)
         timeout = cls.get_cache_timeout(project_id)
         
-        logger.debug(f"Update room count: user={user_id}, project={project_id}, action={action}")
-        logger.debug(f"Chaves geradas: {keys}")
-        logger.debug(f"Contador antes: {cache.get(keys['room_count'], 0)}")
-        
         try:
             if action == "assigned":
                 # Garantir que a chave exista antes de incrementar
                 if cache.get(keys["room_count"]) is None:
                     # Se o contador não existe mas deveria existir um status ativo, verificar o banco
-                    status, _ = cls.get_current_status(user, project)
-                    if status:
-                        # Inicializar contador baseado no número atual de salas do agente no projeto
-                        from chats.apps.rooms.models import Room
+                    # Otimização: Fazer uma única consulta para verificar status ativo
+                    status_type = cls.get_or_create_status_type(project)
+                    status_exists = CustomStatus.objects.filter(
+                        user=user,
+                        status_type=status_type,
+                        is_active=True,
+                        project=project
+                    ).exists()
+                    
+                    if status_exists:
+                        # Verificar número real de salas ativas
                         room_count = Room.objects.filter(
                             user=user, 
                             queue__sector__project=project, 
                             is_active=True
                         ).count()
                         
-                        if room_count > 0:
-                            logger.info(f"Recuperando contador para {user_id}:{project_id} - {room_count} salas ativas encontradas no banco")
-                            # Incluir a sala atual no contador
-                            cache.set(keys["room_count"], room_count, timeout)
-                            # Garantir que as outras chaves também existam
-                            cache.set(keys["status_id"], str(status.uuid), timeout)
-                            cache.set(keys["start_time"], status.created_on, timeout)
-                        else:
-                            # Este é um caso extremo - há um status ativo mas nenhuma sala
-                            # Inicializar com 0 para preparar para o incremento
-                            logger.warning(f"Status ativo encontrado para {user_id}:{project_id} mas nenhuma sala ativa. Inicializando com 0.")
-                            cache.set(keys["room_count"], 0, timeout)
+                        # Otimização: realizar múltiplas operações de cache em uma única chamada
+                        # usando cache.set_many quando possível
+                        cache_data = {keys["room_count"]: max(0, room_count)}
+                        cache.set_many(cache_data, timeout)
                     else:
-                        # Nenhum status ativo encontrado, inicializar contador com 0
+                        # Nenhum status ativo, iniciar com 0
                         cache.set(keys["room_count"], 0, timeout)
                 
                 # Incrementar o contador de salas de forma atômica
@@ -294,12 +326,17 @@ class InServiceStatusTracker:
                 # Se é a primeira sala, criar um novo CustomStatus
                 if new_count == 1:
                     with transaction.atomic():
-                        # Verificar se já existe um status ativo
-                        status, from_cache = cls.get_current_status(user, project)
+                        # Verificar existência de status ativo
+                        status_type = cls.get_or_create_status_type(project)
+                        status = CustomStatus.objects.filter(
+                            user=user,
+                            status_type=status_type,
+                            is_active=True,
+                            project=project
+                        ).first()
                         
                         if not status:
                             # Criar novo status
-                            status_type = cls.get_or_create_status_type(project)
                             status = CustomStatus.objects.create(
                                 user=user,
                                 status_type=status_type,
@@ -308,58 +345,47 @@ class InServiceStatusTracker:
                                 break_time=0
                             )
                             
-                            # Atualizar cache com o timeout apropriado para este projeto
-                            cache.set(keys["status_id"], str(status.uuid), timeout)
-                            cache.set(keys["start_time"], timezone.now(), timeout)
-                
-                # Após incrementar
-                logger.debug(f"Contador depois: {cache.get(keys['room_count'], 0)}")
+                            # Atualizar cache com o timeout apropriado
+                            now = timezone.now()
+                            cache_data = {
+                                keys["status_id"]: str(status.uuid),
+                                keys["start_time"]: now
+                            }
+                            cache.set_many(cache_data, timeout)
                 
             elif action == "closed":
                 # Verificar se as chaves de cache existem
                 current_count = cache.get(keys["room_count"])
                 
-                # Se o contador não existe no cache, verificar se existe um status ativo no banco
+                # Se o contador não existe no cache, verificar banco
                 if current_count is None:
-                    # Verificar se existem salas ativas para este agente no projeto
-                    from chats.apps.rooms.models import Room
+                    # Consultar banco para número de salas ativas
                     room_count = Room.objects.filter(
                         user=user, 
                         queue__sector__project=project, 
                         is_active=True
                     ).count()
                     
-                    # Verificar também se existe um status ativo
-                    status, _ = cls.get_current_status(user, project)
+                    # Verificar existência de status ativo
+                    status_type = cls.get_or_create_status_type(project)
+                    status = CustomStatus.objects.filter(
+                        user=user,
+                        status_type=status_type,
+                        is_active=True,
+                        project=project
+                    ).first()
                     
                     if status:
-                        # Existe um status ativo no banco
-                        if room_count > 0:
-                            # Há salas ativas, inicializar o contador com o valor real
-                            # Não adicionamos +1 pois a sala que está sendo fechada já está incluída no room_count
-                            logger.warning(f"Status ativo encontrado para {user_id}:{project_id} sem contador no cache. Inicializando com {room_count} salas.")
-                            cache.set(keys["room_count"], room_count, timeout)
-                            cache.set(keys["status_id"], str(status.uuid), timeout)
-                            cache.set(keys["start_time"], status.created_on, timeout)
-                            current_count = room_count
-                        else:
-                            # Não há salas ativas, mas existe um status ativo
-                            # Definir contador como 1 para que possa ser decrementado para 0
-                            logger.warning(f"Status ativo encontrado para {user_id}:{project_id} mas nenhuma sala ativa no banco. Inicializando com 1.")
-                            cache.set(keys["room_count"], 1, timeout)
-                            cache.set(keys["status_id"], str(status.uuid), timeout)
-                            cache.set(keys["start_time"], status.created_on, timeout)
-                            current_count = 1
+                        # Inicializar contador com valor real
+                        cache.set(keys["room_count"], room_count, timeout)
+                        cache.set(keys["status_id"], str(status.uuid), timeout)
+                        cache.set(keys["start_time"], status.created_on, timeout)
+                        current_count = room_count
                     else:
-                        # Não existe status ativo
+                        # Não há status ativo
                         if room_count > 0:
-                            # Caso extremo: há salas ativas mas nenhum status ativo
-                            # Criar um status temporário e definir contador igual ao número de salas
-                            logger.warning(f"Nenhum status ativo encontrado para {user_id}:{project_id} mas {room_count} salas ativas. Criando status e inicializando contador.")
-                            
-                            # Criar um novo status
+                            # Há salas, mas nenhum status - criar um novo
                             with transaction.atomic():
-                                status_type = cls.get_or_create_status_type(project)
                                 new_status = CustomStatus.objects.create(
                                     user=user,
                                     status_type=status_type,
@@ -367,75 +393,70 @@ class InServiceStatusTracker:
                                     project=project,
                                     break_time=0
                                 )
-                                
                                 cache.set(keys["room_count"], room_count, timeout)
                                 cache.set(keys["status_id"], str(new_status.uuid), timeout)
                                 cache.set(keys["start_time"], timezone.now(), timeout)
                                 current_count = room_count
                         else:
-                            # Não há status ativo nem salas ativas - situação normal
-                            logger.info(f"Tentativa de fechar sala para {user_id}:{project_id} sem contador no cache nem status ativo. Definindo como 0.")
+                            # Nenhuma sala ativa nem status
                             cache.set(keys["room_count"], 0, timeout)
                             current_count = 0
                 
-                # Decrementar o contador (com proteção para não ficar negativo)
-                if current_count > 0:
+                # Decrementar de forma segura
+                if current_count and current_count > 0:
                     new_count = cache.decr(keys["room_count"], 1)
                 else:
                     new_count = 0
                     cache.set(keys["room_count"], 0, timeout)
                 
-                # Se não tem mais salas ativas, finalizar o CustomStatus
+                # Finalizar status se não há mais salas
                 if new_count == 0:
                     status_id = cache.get(keys["status_id"])
                     start_time = cache.get(keys["start_time"])
                     
-                    if status_id and start_time:
+                    if status_id:
                         try:
                             with transaction.atomic():
-                                # Buscar o CustomStatus ativo
-                                custom_status = CustomStatus.objects.select_for_update().get(
-                                    uuid=status_id,
-                                    is_active=True
-                                )
-                                
-                                # Calcular a duração do serviço
-                                service_duration = timezone.now() - start_time
-                                
-                                # Atualizar e finalizar o CustomStatus
-                                custom_status.is_active = False
-                                custom_status.break_time = int(service_duration.total_seconds())
-                                custom_status.save(update_fields=['is_active', 'break_time'])
-                                logger.info(f"Status finalizado para {user_id}:{project_id}, duração: {service_duration}")
-                        
-                        except CustomStatus.DoesNotExist:
-                            logger.warning(
-                                f"Tentativa de finalizar CustomStatus inexistente: {status_id}"
-                            )
-                        except Exception as e:
-                            logger.error(f"Erro ao finalizar CustomStatus: {e}")
+                                try:
+                                    # Buscar e finalizar status
+                                    custom_status = CustomStatus.objects.select_for_update().get(
+                                        uuid=status_id,
+                                        is_active=True
+                                    )
+                                    
+                                    # Calcular duração
+                                    service_duration = timezone.now() - (start_time or custom_status.created_on)
+                                    
+                                    # Finalizar status
+                                    custom_status.is_active = False
+                                    custom_status.break_time = int(service_duration.total_seconds())
+                                    custom_status.save(update_fields=['is_active', 'break_time'])
+                                except CustomStatus.DoesNotExist:
+                                    # Status pode ter sido finalizado por outro processo
+                                    pass
                         finally:
-                            # Limpar os dados do cache mesmo se ocorrer erro
-                            cache.delete(keys["status_id"])
-                            cache.delete(keys["start_time"])
+                            # Limpar cache independente do resultado
+                            cache.delete_many([keys["status_id"], keys["start_time"]])
                     else:
-                        # Verificar se existe um status ativo no banco que não está no cache
-                        status, _ = cls.get_current_status(user, project)
-                        if status:
+                        # Verificar se há algum status ativo no banco não refletido no cache
+                        status_type = cls.get_or_create_status_type(project)
+                        active_status = CustomStatus.objects.filter(
+                            user=user,
+                            status_type=status_type,
+                            is_active=True,
+                            project=project
+                        ).first()
+                        
+                        if active_status:
                             try:
                                 with transaction.atomic():
-                                    # Finalizar o status
-                                    status.is_active = False
-                                    # Usar o created_on como substituto para o start_time
-                                    service_duration = timezone.now() - status.created_on
-                                    status.break_time = int(service_duration.total_seconds())
-                                    status.save(update_fields=['is_active', 'break_time'])
-                                    logger.info(f"Status ativo encontrado no banco para {user_id}:{project_id} sem entradas no cache. Finalizado.")
-                            except Exception as e:
-                                logger.error(f"Erro ao finalizar status do banco sem cache: {e}")
+                                    # Finalizar status
+                                    service_duration = timezone.now() - active_status.created_on
+                                    active_status.is_active = False
+                                    active_status.break_time = int(service_duration.total_seconds())
+                                    active_status.save(update_fields=['is_active', 'break_time'])
+                            except Exception:
+                                pass  # Ignorar erros secundários
             
-            else:
-                logger.warning(f"Ação desconhecida: {action}")
-                
         except Exception as e:
             logger.error(f"Erro ao atualizar contagem de salas: {e}")
