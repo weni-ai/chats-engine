@@ -25,6 +25,7 @@ class Room(BaseModel, BaseConfigurableModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.__original_is_active = self.is_active
+        self._original_user = self.user
 
     user = models.ForeignKey(
         "accounts.User",
@@ -116,10 +117,13 @@ class Room(BaseModel, BaseConfigurableModel):
         Args:
             is_new: Boolean indicando se é uma sala nova
         """
-        # Verificar se o usuário mudou
-        old_user = None if is_new or self.tracker.previous('user') is None else self.tracker.previous('user')
+        # Verificar diretamente se a sala já tinha um usuário antes deste save
+        if not hasattr(self, '_original_user'):
+            self._original_user = None
+        
+        old_user = self._original_user
         new_user = self.user
-
+        
         print(f"DEBUG - is_new: {is_new}")
         print(f"DEBUG - old_user: {old_user}")
         print(f"DEBUG - tracker previous user: {self.tracker.previous('user')}")
