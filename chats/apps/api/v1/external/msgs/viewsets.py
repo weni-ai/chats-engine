@@ -40,7 +40,6 @@ class MessageFlowViewset(
         )
 
     def perform_create(self, serializer):
-        print("Request data:", self.request.data)
         if isinstance(serializer.validated_data, list):
             # Verifica permissões para todos os rooms no batch
             for validated_data in serializer.validated_data:
@@ -77,6 +76,7 @@ class MessageFlowViewset(
                     message="Ticketer token permission failed on room project",
                     code=403,
                 )
+            serializer.is_valid(raise_exception=True)
             instance = serializer.save()
             instance.notify_room("create")
             
