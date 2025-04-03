@@ -38,17 +38,25 @@ class InServiceStatusTracker:
         return cls.EXTENDED_CACHE_TIMEOUT
     
     @classmethod
-    def get_cache_keys(cls, user_id: int, project_id: int) -> Dict[str, str]:
+    def get_cache_keys(cls, user_id, project_id):
         """
         Retorna as chaves de cache para um agente
         
         Args:
-            user_id: ID do usuário
-            project_id: ID do projeto
-            
-        Returns:
-            Dict com as chaves de cache
+            user_id: ID do usuário ou objeto User
+            project_id: ID do projeto ou objeto Project
         """
+        # Normalizar as entradas (objeto → str)
+        if hasattr(user_id, 'email'):
+            user_id = user_id.email
+        elif hasattr(user_id, 'pk'):
+            user_id = user_id.pk
+            
+        if hasattr(project_id, 'name'):
+            project_id = project_id.name
+        elif hasattr(project_id, 'pk'):
+            project_id = project_id.pk
+            
         return {
             "room_count": f"in_service_room_count:{user_id}:{project_id}",
             "status_id": f"in_service_status_id:{user_id}:{project_id}",
@@ -216,9 +224,17 @@ class InServiceStatusTracker:
         keys = cls.get_cache_keys(user_id, project_id)
         timeout = cls.get_cache_timeout(project_id)
         
+        print(f"DEBUG - Chamando update_room_count com user={user} ({type(user)}), project={project} ({type(project)})")
+        print(f"DEBUG - Chaves geradas: {keys}")
+        print(f"DEBUG - Contador antes: {cache.get(keys['room_count'], 0)}")
+        
         try:
             if action == "assigned":
                 print("entrou no assigned")
+                # Garantir que a chave exista antes de incrementar
+                if cache.get(keys["room_count"]) is None:
+                    cache.set(keys["room_count"], 0, timeout)
+                
                 # Incrementar o contador de salas de forma atômica
                 new_count = cache.incr(keys["room_count"], 1)
                 
@@ -242,6 +258,9 @@ class InServiceStatusTracker:
                             # Atualizar cache com o timeout apropriado para este projeto
                             cache.set(keys["status_id"], str(status.uuid), timeout)
                             cache.set(keys["start_time"], timezone.now(), timeout)
+                
+                # Após incrementar
+                print(f"DEBUG - Contador depois: {cache.get(keys['room_count'], 0)}")
                 
             elif action == "closed":
                 print("entrou no closed")
