@@ -164,10 +164,10 @@ class Room(BaseModel, BaseConfigurableModel):
             print("entrou no caso 3")
             InServiceStatusTracker.update_room_count(old_user, project, "closed")
         
-        # Caso 4: Sala foi fechada
-        if old_is_active is True and self.is_active is False and self.user:
-            print("entrou no caso 4")
+        if self.__original_is_active is True and self.is_active is False and self.user:
+            print("PRIORITÁRIO: Sala fechada")
             InServiceStatusTracker.update_room_count(self.user, project, "closed")
+            return  # Importante: sair da função após tratar o fechamento
     
     def save(self, *args, **kwargs) -> None:
         if self.__original_is_active is False:
