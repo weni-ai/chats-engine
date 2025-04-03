@@ -5,7 +5,6 @@ from chats.apps.projects.models.models import CustomStatusType, CustomStatus, Pr
 from typing import Dict, Tuple, Optional, List
 import logging
 from django.contrib.auth import get_user_model
-from chats.apps.rooms.models import Room
 
 logger = logging.getLogger(__name__)
 
@@ -306,6 +305,8 @@ class InServiceStatusTracker:
                     
                     if status_exists:
                         # Verificar número real de salas ativas
+                        # Importação local para evitar importação circular
+                        from chats.apps.rooms.models import Room
                         room_count = Room.objects.filter(
                             user=user, 
                             queue__sector__project=project, 
@@ -360,6 +361,8 @@ class InServiceStatusTracker:
                 # Se o contador não existe no cache, verificar banco
                 if current_count is None:
                     # Consultar banco para número de salas ativas
+                    # Importação local para evitar importação circular
+                    from chats.apps.rooms.models import Room
                     room_count = Room.objects.filter(
                         user=user, 
                         queue__sector__project=project, 
