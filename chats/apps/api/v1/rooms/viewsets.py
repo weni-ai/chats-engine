@@ -421,10 +421,14 @@ class RoomViewset(
                         from_=transfer_user,
                         to=user,
                     )
+                    
+                    # Garantir que _original_user seja configurado para o usuário atual
+                    room._original_user = room.user
+                    
+                    # Definir o novo usuário e salvar
                     room.user = user
+                    room.transfer_history = feedback
                     room.save()
-
-                    # Atualizar o status In-Service do novo agente
 
                     create_room_feedback_message(room, feedback, method="rt")
                     if old_user:
@@ -451,8 +455,14 @@ class RoomViewset(
                         from_=transfer_user,
                         to=queue,
                     )
+                    
+                    # Garantir que _original_user seja configurado para o usuário atual
+                    room._original_user = room.user
+                    
+                    # Definir o novo usuário (None) e fila, depois salvar
                     room.user = None
                     room.queue = queue
+                    room.transfer_history = feedback
                     room.save()
 
                     create_room_feedback_message(room, feedback, method="rt")
