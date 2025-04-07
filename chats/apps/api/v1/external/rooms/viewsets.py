@@ -91,8 +91,8 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["POST"])
     def history(self, request, uuid=None):
         """
-        Endpoint para criar histórico de mensagens em uma sala existente.
-        Reutiliza a lógica existente do process_message_history.
+        Endpoint to create message history in an existing room.
+        Reuses the existing process_message_history logic.
         """
         room = self.get_object()
 
