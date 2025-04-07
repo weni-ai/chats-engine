@@ -160,6 +160,17 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
 
 
 class ProjectInfoSerializer(serializers.Serializer):
+    """
+    Serializer for representing basic project information.
+
+    Used for including minimal project details in other serializers,
+    particularly in the context of room flow operations.
+
+    Fields:
+        uuid: The unique identifier of the project
+        name: The display name of the project
+    """
+
     uuid = serializers.UUIDField(required=False, read_only=False)
     name = serializers.CharField(required=False, read_only=False)
 
@@ -225,6 +236,14 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             "transfer_history",
         ]
         extra_kwargs = {"queue": {"required": False, "read_only": True}}
+
+    def validate(self, attrs):
+        attrs["config"] = self.initial_data.get("project_info", {})
+
+        if "project_info" in attrs:
+            attrs.pop("project_info")
+
+        return super().validate(attrs)
 
     def create(self, validated_data):
         history_data = validated_data.pop("history", [])
