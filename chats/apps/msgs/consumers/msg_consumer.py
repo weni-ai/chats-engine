@@ -10,7 +10,7 @@ class MsgConsumer(EDAConsumer):
     @staticmethod
     @pyamqp_call_dlx_when_error(
         default_exchange=settings.CONNECT_DEFAULT_DEAD_LETTER_EXCHANGE,
-        routing_key="",
+        routing_key="whatsapp-cloud-token",
         consumer_name="MsgConsumer",
     )
     def consume(message: amqp.Message):
