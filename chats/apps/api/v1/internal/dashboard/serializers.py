@@ -15,6 +15,9 @@ class DashboardAgentsSerializer(serializers.Serializer):
         }
 
     def get_status(self, obj):
+        if obj.get("status") == "ONLINE":
+            return {"status": "green", "label": None}
+            
         custom_status_list = obj.get("custom_status") or []
         
         if custom_status_list:
@@ -28,8 +31,6 @@ class DashboardAgentsSerializer(serializers.Serializer):
                         "label": status_type
                     }
         
-        if obj.get("status") == "ONLINE":
-            return {"status": "green", "label": None}
         return {"status": "gray", "label": None}
 
     def get_agent(self, obj):
@@ -51,6 +52,9 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
         }
 
     def get_status(self, obj):
+        if obj.get("status") == "ONLINE":
+            return {"status": "green", "label": None}
+            
         custom_status_list = obj.get("custom_status") or []
         
         if custom_status_list:
@@ -64,8 +68,6 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
                         "label": status_type
                     }
         
-        if obj.get("status") == "ONLINE":
-            return {"status": "green", "label": None}
         return {"status": "gray", "label": None}
 
     def get_agent(self, obj):
