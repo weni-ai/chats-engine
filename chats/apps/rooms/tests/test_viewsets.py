@@ -2,8 +2,9 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
-
+from rest_framework.response import Response
 from chats.apps.api.utils import create_contact, create_user_and_token
+from chats.apps.contacts.models import Contact
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.rooms.models import Room
@@ -331,3 +332,89 @@ class RoomsManagerTests(APITestCase):
         room.refresh_from_db()
         self.assertEquals(response.status_code, status.HTTP_200_OK)
         self.assertEquals(room.user, self.agent_2)
+
+
+class TestRoomsViewSet(APITestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(email="test@test.com")
+        self.project = Project.objects.create(name="Test Project")
+        self.project_permission = ProjectPermission.objects.create(
+            user=self.user,
+            project=self.project,
+            role=ProjectPermission.ROLE_ATTENDANT,
+        )
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(
+            name="Test Queue",
+            sector=self.sector,
+        )
+        self.queue_permission = QueueAuthorization.objects.create(
+            permission=self.project_permission,
+            queue=self.queue,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        self.client.force_authenticate(user=self.user)
+
+    def list_rooms(self, filters: dict = {}) -> Response:
+        url = reverse("room-list")
+
+        return self.client.get(url, filters)
+
+    def test_room_order_by_created_on(self):
+        room_1 = Room.objects.create(
+            project_uuid=str(self.project.uuid),
+            is_active=True,
+            queue=self.queue,
+            contact=Contact.objects.create(),
+        )
+        room_2 = Room.objects.create(
+            project_uuid=str(self.project.uuid),
+            is_active=True,
+            queue=self.queue,
+            contact=Contact.objects.create(),
+        )
+
+        response = self.list_rooms(
+            filters={"project": str(self.project.uuid), "ordering": "created_on"}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.json().get("results")[0].get("uuid"), str(room_1.uuid)
+        )
+        self.assertEqual(
+            response.json().get("results")[1].get("uuid"), str(room_2.uuid)
+        )
+
+    def test_room_order_by_inverted_created_on(self):
+        room_1 = Room.objects.create(
+            project_uuid=str(self.project.uuid),
+            is_active=True,
+            queue=self.queue,
+            contact=Contact.objects.create(),
+        )
+        room_2 = Room.objects.create(
+            project_uuid=str(self.project.uuid),
+            is_active=True,
+            queue=self.queue,
+            contact=Contact.objects.create(),
+        )
+
+        response = self.list_rooms(
+            filters={"project": str(self.project.uuid), "ordering": "-created_on"}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.json().get("results")[0].get("uuid"), str(room_2.uuid)
+        )
+        self.assertEqual(
+            response.json().get("results")[1].get("uuid"), str(room_1.uuid)
+        )
