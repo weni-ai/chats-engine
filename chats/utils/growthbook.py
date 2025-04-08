@@ -24,18 +24,29 @@ class GrowthBookClient:
             )
             client_key = getattr(settings, "GROWTHBOOK_CLIENT_KEY", None)
             enabled = getattr(settings, "GROWTHBOOK_ENABLED", False)
+
+            # Get default attributes from settings or use empty dict
+            default_attributes = getattr(settings, "GROWTHBOOK_DEFAULT_ATTRIBUTES", {})
+
             if not client_key:
-                logger.info("GrowthBook is disabled or missing client_key")
+                logger.warning(
+                    "GrowthBook is disabled due to missing client_key. Feature flags will not be evaluated."
+                )
                 cls._client = None
             else:
                 try:
                     cls._client = GrowthBook(
-                        api_host=api_host, client_key=client_key, enabled=enabled, attributes={}
+                        api_host=api_host,
+                        client_key=client_key,
+                        enabled=enabled,
+                        attributes=default_attributes,
                     )
                     cls._client.load_features()
                     logger.info("GrowthBook initialized successfully")
                 except Exception as e:
-                    logger.error(f"Error initializing GrowthBook: {e}")
+                    logger.error(
+                        f"Error initializing GrowthBook with api_host='{api_host}', enabled={enabled}: {e}"
+                    )
                     cls._client = None
             cls._instance = cls()
         return cls._client
