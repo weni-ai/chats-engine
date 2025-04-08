@@ -19,10 +19,13 @@ class DashboardAgentsSerializer(serializers.Serializer):
         
         if custom_status_list:
             for status_item in custom_status_list:
-                if status_item.get("break_time", 0) > 0:
+                status_type = status_item.get("status_type")
+                break_time = status_item.get("break_time", 0)
+                
+                if status_type != "In-Service" and break_time > 0:
                     return {
                         "status": "orange",
-                        "label": status_item.get("status_type")
+                        "label": status_type
                     }
         
         if obj.get("status") == "ONLINE":
@@ -52,10 +55,13 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
         
         if custom_status_list:
             for status_item in custom_status_list:
-                if status_item.get("break_time", 0) > 0:
+                status_type = status_item.get("status_type")
+                break_time = status_item.get("break_time", 0)
+                
+                if status_type != "In-Service" and break_time > 0:
                     return {
                         "status": "orange",
-                        "label": status_item.get("status_type")
+                        "label": status_type
                     }
         
         if obj.get("status") == "ONLINE":
