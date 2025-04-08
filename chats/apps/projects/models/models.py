@@ -39,8 +39,8 @@ class TemplateType(BaseSoftDeleteModel, BaseModel):
 class RoomRoutingType(models.TextChoices):
     """
     GENERAL: Agents can select rooms from the queue.
-    If agents are online and has not reached the limit of rooms,
-    new rooms are routed to them, despite rooms being waiting in the queue.
+    If agents are online and have not reached the limit of rooms,
+    new rooms are routed to them, despite rooms waiting in the queue.
 
     QUEUE_PRIORITY: Rooms are routed based on the queue priority,
     with new rooms being added to the end of the queue, even if agents
