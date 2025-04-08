@@ -14,37 +14,29 @@ class GrowthBookClient:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(GrowthBookClient, cls).__new__(cls)
-            cls._initialize()
         return cls._instance
 
     @classmethod
-    def _initialize(cls):
-        try:
+    def get_client(cls):
+        if cls._instance is None:
             api_host = getattr(
                 settings, "GROWTHBOOK_API_HOST", "https://cdn.growthbook.io"
             )
             client_key = getattr(settings, "GROWTHBOOK_CLIENT_KEY", None)
             enabled = getattr(settings, "GROWTHBOOK_ENABLED", False)
-
             if not client_key:
                 logger.info("GrowthBook is disabled or missing client_key")
                 cls._client = None
-                return
-
-            cls._client = GrowthBook(
-                api_host=api_host, client_key=client_key, enabled=enabled, attributes={}
-            )
-
-            cls._client.load_features()
-
-            logger.info("GrowthBook initialized successfully")
-        except Exception as e:
-            logger.error(f"Error initializing GrowthBook: {e}")
-            cls._client = None
-
-    @classmethod
-    def get_client(cls):
-        if cls._instance is None:
+            else:
+                try:
+                    cls._client = GrowthBook(
+                        api_host=api_host, client_key=client_key, enabled=enabled, attributes={}
+                    )
+                    cls._client.load_features()
+                    logger.info("GrowthBook initialized successfully")
+                except Exception as e:
+                    logger.error(f"Error initializing GrowthBook: {e}")
+                    cls._client = None
             cls._instance = cls()
         return cls._client
 
