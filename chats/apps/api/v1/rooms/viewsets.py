@@ -30,7 +30,6 @@ from chats.apps.api.v1.rooms.serializers import (
 )
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.msgs.models import Message
-from chats.apps.projects.models.models import Project, RoomRoutingType
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import (
