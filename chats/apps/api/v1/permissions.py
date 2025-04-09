@@ -121,10 +121,6 @@ class IsQueueAgent(permissions.BasePermission):
         except ProjectPermission.DoesNotExist:
             return False
 
-        import pdb
-
-        pdb.set_trace()
-
         if not perm:
             return False
 

@@ -231,7 +231,6 @@ class Project(BaseConfigurableModel, BaseModel):
             Q(sector_auth_filter | queue_auth_filter), **custom_filters
         ).distinct()
 
-    @property
     def is_admin(self, user):
         return self.permissions.filter(
             user=user, role=ProjectPermission.ROLE_ADMIN
