@@ -1,10 +1,12 @@
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
+from rest_framework.response import Response
 from rest_framework.test import APITestCase
 
 from chats.apps.api.utils import create_contact, create_user_and_token
 from chats.apps.projects.models import Project, ProjectPermission
+from chats.apps.projects.tests.decorators import with_project_permission
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorAuthorization
@@ -331,3 +333,48 @@ class RoomsManagerTests(APITestCase):
         room.refresh_from_db()
         self.assertEquals(response.status_code, status.HTTP_200_OK)
         self.assertEquals(room.user, self.agent_2)
+
+
+class RoomPickTests(APITestCase):
+    def setUp(self) -> None:
+        self.project = Project.objects.create()
+        self.sector = Sector.objects.create(
+            project=self.project, rooms_limit=10, work_start="05:00", work_end="23:00"
+        )
+        self.queue = Queue.objects.create(sector=self.sector)
+        self.room = Room.objects.create(queue=self.queue)
+
+        self.user = User.objects.create(email="test@example.com")
+
+        self.client.force_authenticate(user=self.user)
+
+    def pick_room_from_queue(self) -> Response:
+        url = reverse("room-pick_queue_room", kwargs={"pk": str(self.room.pk)})
+
+        return self.client.patch(url)
+
+    def test_cannot_pick_room_from_queue_without_project_permission(self):
+        response = self.pick_room_from_queue()
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data["detail"].code, "permission_denied")
+
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
+    def test_cannot_pick_room_if_room_is_already_picked(self):
+        pass
+
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
+    def test_can_pick_room_if_room_is_not_picked(self):
+        pass
+
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
+    def test_cannot_pick_room_if_routing_type_is_queue_priority_and_user_is_not_project_admin_or_sector_manager(
+        self,
+    ):
+        pass
+
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
+    def test_can_pick_room_if_project_routing_type_is_queue_priority_and_user_is_project_admin_or_sector_manager(
+        self,
+    ):
+        pass

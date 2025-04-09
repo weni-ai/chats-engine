@@ -3,10 +3,12 @@ from datetime import timedelta
 from django.conf import settings
 from django.db import transaction
 from django.db.models import BooleanField, Case, Count, Max, OuterRef, Q, Subquery, When
-from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
+from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.filters import OrderingFilter
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -28,6 +30,7 @@ from chats.apps.api.v1.rooms.serializers import (
 )
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.msgs.models import Message
+from chats.apps.projects.models.models import Project, RoomRoutingType
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import (
@@ -349,14 +352,21 @@ class RoomViewset(
         url_name="pick_queue_room",
     )
     def pick_queue_room(self, request, *args, **kwargs):
-        room = self.get_object()
+        room: Room = self.get_object()
+        user: User = request.user
+
+        if not room.can_pick_queue(user):
+            raise PermissionDenied(
+                detail=_("User does not have permission to pick this room"),
+                code="user_is_not_project_admin_or_sector_manager",
+            )
+
         if room.user:
             return Response(
-                {"detail": "Room is not queued"},
+                {"detail": _("Room is not queued")},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        user = User.objects.get(email=self.request.GET.get("user_email"))
         action = "pick"
         feedback = create_transfer_json(
             action=action,
@@ -379,7 +389,7 @@ class RoomViewset(
         room.update_ticket()
 
         return Response(
-            {"detail": "Room picked successfully"}, status=status.HTTP_200_OK
+            {"detail": _("Room picked successfully")}, status=status.HTTP_200_OK
         )
 
     @action(

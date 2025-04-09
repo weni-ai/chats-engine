@@ -120,6 +120,14 @@ class IsQueueAgent(permissions.BasePermission):
             perm = obj.get_permission(request.user)
         except ProjectPermission.DoesNotExist:
             return False
+
+        import pdb
+
+        pdb.set_trace()
+
+        if not perm:
+            return False
+
         try:
             return perm.is_agent(str(obj.queue.pk))
         except ObjectDoesNotExist:
