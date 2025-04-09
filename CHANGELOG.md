@@ -1,6 +1,6 @@
 # 3.18.0
 ## Add
-   - creating messages when opening a room using batch and bringing project information to the room.
+   - implemented batch processing for message creation during room initialization, enhanced rooms with relevant project metadata and context information.
    - change version ubuntu-20.04 to ubuntu-latest ci.yaml
      
 # 3.17.6
