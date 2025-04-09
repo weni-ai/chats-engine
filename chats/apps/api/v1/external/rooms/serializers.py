@@ -13,6 +13,7 @@ from chats.apps.api.v1.queues.serializers import QueueSerializer
 from chats.apps.api.v1.sectors.serializers import TagSimpleSerializer
 from chats.apps.contacts.models import Contact
 from chats.apps.dashboard.models import RoomMetrics
+from chats.apps.projects.models.models import Project, RoomRoutingType
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import close_room
@@ -62,8 +63,21 @@ def get_room_user(
     groups: List[Dict[str, str]],
     is_created: bool,
     flow_uuid,
-    project,
+    project: Project,
 ):
+    # TODO [queue priority]: Check project routing type
+    # TODO: [queue priority]: Move this logic to more appropriate place
+    if project.room_routing_type == RoomRoutingType.QUEUE_PRIORITY:
+        current_queue_size = queue.rooms.filter(
+            is_active=True, user__isnull=True
+        ).count()
+
+        if current_queue_size == 0:
+            # TODO: [queue priority]: Check if this logic is correct
+            return queue.available_agents.first()
+
+        return None
+
     # User that started the flow, if any
     reference_filter = [group["uuid"] for group in groups]
     reference_filter.append(contact.external_id)
