@@ -1,3 +1,8 @@
+# 3.18.0
+## Add
+   - creating messages when opening a room using batch and bringing project information to the room.
+   - change version ubuntu-20.04 to ubuntu-latest ci.yaml
+     
 # 3.17.6
 ## Add
   - transaction atomicity to the create method of the RoomFlowViewSet
