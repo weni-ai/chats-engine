@@ -19,6 +19,7 @@ class DashboardAgentsSerializer(serializers.Serializer):
         
         if custom_status_list:
             for status_item in custom_status_list:
+                print(f"DEBUG - Custom status item: {status_item}")
                 status_type = status_item.get("status_type")
                 break_time = status_item.get("break_time", 0)
                 is_active = status_item.get("is_active", False)
@@ -59,6 +60,7 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
         
         if custom_status_list:
             for status_item in custom_status_list:
+                print(f"DEBUG - Custom status item: {status_item}")
                 status_type = status_item.get("status_type")
                 break_time = status_item.get("break_time", 0)
                 is_active = status_item.get("is_active", False)
