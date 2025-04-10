@@ -89,7 +89,6 @@ def get_room_user(
         if linked_user is not None and linked_user.is_online:
             return linked_user.user
 
-    # Online user on the queue
     if user and project.permissions.filter(user=user, status="ONLINE").exists():
         return user
 
