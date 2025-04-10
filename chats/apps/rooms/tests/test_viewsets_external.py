@@ -3,7 +3,9 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from chats.apps.projects.models.models import Project, RoomRoutingType
 from chats.apps.queues.models import Queue
+from chats.apps.sectors.models import Sector
 
 
 class RoomsExternalTests(APITestCase):
@@ -108,6 +110,30 @@ class RoomsExternalTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.get("urn"), None)
+
+    def test_create_external_room_with_queue_priority_when_queue_is_empty(self):
+        project = Project.objects.create(
+            room_routing_type=RoomRoutingType.QUEUE_PRIORITY,
+            timezone="America/Sao_Paulo",
+        )
+        sector = Sector.objects.create(
+            project=project, rooms_limit=1, work_start="00:00", work_end="23:59"
+        )
+        queue = Queue.objects.create(sector=sector)
+
+        data = {
+            "queue_uuid": str(queue.uuid),
+            "contact": {
+                "external_id": "e3955fd5-5705-55cd-b480-b45594b70282",
+                "name": "kallil",
+                "email": "kallil@email.com",
+                "phone": "+5511985543332",
+                "urn": "whatsapp:5521917078266?auth=eyJhbGciOiAiSFM",
+                "custom_fields": {},
+            },
+        }
+        response = self._create_room(project.external_token.uuid, data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
 
 class RoomsFlowStartExternalTests(APITestCase):
