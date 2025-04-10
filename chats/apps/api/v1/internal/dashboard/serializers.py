@@ -24,7 +24,7 @@ class DashboardAgentsSerializer(serializers.Serializer):
                 break_time = status_item.get("break_time", 0)
                 is_active = status_item.get("is_active", False)
 
-                if status_type != "In-Service" and break_time > 0 and is_active:
+                if status_type != "In-Service" and is_active:
                     return {
                         "status": "orange",
                         "label": status_type
@@ -65,7 +65,7 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
                 break_time = status_item.get("break_time", 0)
                 is_active = status_item.get("is_active", False)
 
-                if status_type != "In-Service" and break_time > 0 and is_active:
+                if status_type != "In-Service" and is_active:
                     return {
                         "status": "orange",
                         "label": status_type
