@@ -1,3 +1,9 @@
+# 3.18.1
+## Add
+   - Custom status support for agent status serialization in API responses
+   - Enhanced agent status information in dashboard interfaces
+   - Additional status details for better operational monitoring
+     
 # 3.18.0
 ## Add
    - implemented batch processing for message creation during room initialization, enhanced rooms with relevant project metadata and context information.
