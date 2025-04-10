@@ -13,14 +13,8 @@ class DashboardAgentsSerializer(serializers.Serializer):
             "url": f"chats:dashboard/view-mode/{obj.get('email', '')}",
             "type": "internal",
         }
-
+    
     def get_status(self, obj):
-        if obj.get("status") == "ONLINE":
-            return {"status": "green", "label": None}
-            
-        if obj.get("status") == "OFFLINE":
-            return {"status": "gray", "label": None}
-            
         custom_status_list = obj.get("custom_status") or []
         
         if custom_status_list:
@@ -33,6 +27,11 @@ class DashboardAgentsSerializer(serializers.Serializer):
                         "status": "orange",
                         "label": status_type
                     }
+        
+        if obj.get("status") == "ONLINE":
+            return {"status": "green", "label": None}
+        elif obj.get("status") == "OFFLINE":
+            return {"status": "gray", "label": None}
         
         return {"status": "gray", "label": None}
 
@@ -55,12 +54,6 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
         }
 
     def get_status(self, obj):
-        if obj.get("status") == "ONLINE":
-            return {"status": "green", "label": None}
-            
-        if obj.get("status") == "OFFLINE":
-            return {"status": "gray", "label": None}
-            
         custom_status_list = obj.get("custom_status") or []
         
         if custom_status_list:
@@ -73,6 +66,11 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
                         "status": "orange",
                         "label": status_type
                     }
+        
+        if obj.get("status") == "ONLINE":
+            return {"status": "green", "label": None}
+        elif obj.get("status") == "OFFLINE":
+            return {"status": "gray", "label": None}
         
         return {"status": "gray", "label": None}
 
