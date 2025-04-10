@@ -95,6 +95,7 @@ class AgentRepository:
                     JSONObject(
                         status_type=F("status_type__name"),
                         break_time=F("break_time"),
+                        is_active=F("is_active")
                     )
                 )
             )
@@ -176,6 +177,7 @@ class AgentRepository:
                     JSONObject(
                         status_type=F("status_type__name"),
                         break_time=F("break_time"),
+                        is_active=F("is_active")
                     )
                 )
             )
