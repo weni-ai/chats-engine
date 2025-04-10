@@ -1,5 +1,3 @@
-from functools import cached_property
-
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, transaction
@@ -99,11 +97,11 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         close_room(str(instance.pk))
         return Response(serialized_data.data, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=["POST"], url_path="history")
+    @action(detail=True, methods=["POST"])
     def history(self, request, uuid=None):
         """
-        Endpoint para criar histórico de mensagens em uma sala existente.
-        Reutiliza a lógica existente do process_message_history.
+        Endpoint to create message history in an existing room.
+        Reuses the existing process_message_history logic.
         """
         room = self.get_object()
 

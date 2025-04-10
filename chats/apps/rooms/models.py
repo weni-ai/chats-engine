@@ -15,7 +15,7 @@ from requests.exceptions import RequestException
 from rest_framework.exceptions import ValidationError
 
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
-from chats.core.models import BaseModel
+from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
 from chats.core.models import BaseConfigurableModel
 from chats.apps.projects.usecases.status_service import InServiceStatusTracker
