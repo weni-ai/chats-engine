@@ -1,3 +1,4 @@
+from functools import cached_property
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, transaction
