@@ -1,13 +1,11 @@
-from django.db.models import Count, OuterRef, Q, Subquery, F
+from django.contrib.postgres.aggregates import JSONBAgg
+from django.contrib.postgres.fields import JSONField
+from django.db.models import Count, F, OuterRef, Q, Subquery
+from django.db.models.functions import JSONObject
 from django.utils import timezone
 
 from chats.apps.accounts.models import User
 from chats.apps.projects.models import ProjectPermission
-
-from django.db.models.functions import JSONObject
-from django.contrib.postgres.aggregates import JSONBAgg
-from django.contrib.postgres.fields import JSONField
-
 from chats.apps.projects.models.models import CustomStatus
 
 from .dto import Filters
@@ -74,6 +72,7 @@ class AgentRepository:
                     JSONObject(
                         status_type=F("status_type__name"),
                         break_time=F("break_time"),
+                        is_active=F("is_active"),
                     )
                 )
             )
@@ -154,6 +153,7 @@ class AgentRepository:
                     JSONObject(
                         status_type=F("status_type__name"),
                         break_time=F("break_time"),
+                        is_active=F("is_active"),
                     )
                 )
             )
