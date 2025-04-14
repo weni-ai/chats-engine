@@ -20,9 +20,7 @@ class MsgConsumer(EDAConsumer):
 
         if body.get("chats_uuid") and body.get("message_id"):
             set_msg_external_id_usecase = SetMsgExternalIdUseCase()
-            set_msg_external_id_usecase.execute(
-                body["chats_uuid"], body["message_id"]
-            )
+            set_msg_external_id_usecase.execute(body["chats_uuid"], body["message_id"])
         else:
             print(
                 "[MsgConsumer] - Skipping message. 'chats_uuid' or 'message_id' is missing or empty."
