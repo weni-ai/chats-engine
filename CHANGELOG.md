@@ -1,8 +1,14 @@
-# 3.18.1
+# 3.18.2
 ## Add
   - Add whatsapp external_id on messages
 ## Fix
   - Queue list endpoint permissions, to avoid returning queues from projects in which users do not have authorization.
+
+# 3.18.1
+## Add
+   - Custom status support for agent status serialization in API responses
+   - Enhanced agent status information in dashboard interfaces
+   - Additional status details for better operational monitoring
 
 # 3.18.0
 ## Add
