@@ -59,7 +59,13 @@ class QueueViewset(ModelViewSet):
             qs = qs.filter(is_deleted=self.request.query_params.get("is_deleted", None))
         else:
             qs = qs.exclude(is_deleted=True)
-        return qs
+
+        # Allow all projects for internal communication users
+        if self.request.user.has_perm("accounts.can_communicate_internally"):
+            return qs
+
+        # Allow only projects where the user has access
+        return qs.filter(sector__project__permissions__user=self.request.user)
 
     def get_serializer_class(self):
         if self.action == "list":
