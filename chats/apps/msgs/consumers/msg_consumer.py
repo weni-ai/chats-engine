@@ -16,16 +16,14 @@ class MsgConsumer(EDAConsumer):
     def consume(message: amqp.Message):
         channel = message.channel
         print(f"[MsgConsumer] - Consuming a message. Body: {message.body}")
-        # body = JSONParser.parse(message.body)
+        body = JSONParser.parse(message.body)
 
-        # if body.get("message_id"):
-        #     set_msg_external_id_usecase = SetMsgExternalIdUseCase()
-        #     set_msg_external_id_usecase.execute(
-        #         body["message_id"], body["external_id"]
-        #     )
-        # else:
-        #     print(
-        #         "[MsgConsumer] - Skipping message. 'message_id' is missing or empty."
-        #     )
+        if body.get("chats_uuid") and body.get("message_id"):
+            set_msg_external_id_usecase = SetMsgExternalIdUseCase()
+            set_msg_external_id_usecase.execute(body["chats_uuid"], body["message_id"])
+        else:
+            print(
+                "[MsgConsumer] - Skipping message. 'chats_uuid' or 'message_id' is missing or empty."
+            )
 
         channel.basic_ack(message.delivery_tag)
