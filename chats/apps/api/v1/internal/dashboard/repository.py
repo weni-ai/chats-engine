@@ -48,11 +48,11 @@ class AgentRepository:
             #   (even if they were never assigned to a room from the sector)
             # - Agents that are linked to rooms related to the sector
             #   (even if they don't have authorization to the sector anymore)
-
-            rooms_filter["rooms__queue__sector__in"] = filters.sector
+            print("filtro de setores", filters.sector)
+            rooms_filter["rooms__queue__sector"] = filters.sector
             agents_filters &= Q(
-                project_permissions__sector_authorizations__sector__in=filters.sector
-            ) | Q(rooms__queue__sector__in=filters.sector)
+                project_permissions__sector_authorizations__sector=filters.sector
+            ) | Q(rooms__queue__sector=filters.sector)
         else:
             rooms_filter["rooms__queue__sector__project"] = project
         if filters.tag:
