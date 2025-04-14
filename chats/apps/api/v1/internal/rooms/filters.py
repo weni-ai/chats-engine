@@ -23,7 +23,7 @@ class RoomFilter(filters.FilterSet):
         required=True,
         method="filter_project",
     )
-    sector = filters.CharFilter(
+    sector = filters.BaseInFilter(
         required=False,
         method="filter_sector",
     )
@@ -55,13 +55,6 @@ class RoomFilter(filters.FilterSet):
 
     def filter_project(self, queryset, name, value):
         return queryset.filter(queue__sector__project=value)
-    
-    def filter_sector(self, queryset, name, value):
-        if not value:
-            return queryset
-        
-        sector_ids = value.split(',')
-        return queryset.filter(queue__sector__in=sector_ids)
 
     def filter_contact(self, queryset, name, value):
         return queryset.filter(
