@@ -15,9 +15,23 @@ class DashboardAgentsSerializer(serializers.Serializer):
         }
 
     def get_status(self, obj):
+        custom_status_list = obj.get("custom_status") or []
+
+        if custom_status_list:
+            for status_item in custom_status_list:
+                print(f"DEBUG - Custom status item: {status_item}")
+                status_type = status_item.get("status_type")
+                is_active = status_item.get("is_active", False)
+
+                if status_type != "In-Service" and is_active:
+                    return {"status": "orange", "label": status_type}
+
         if obj.get("status") == "ONLINE":
-            return "green"
-        return "gray"
+            return {"status": "green", "label": None}
+        elif obj.get("status") == "OFFLINE":
+            return {"status": "gray", "label": None}
+
+        return {"status": "gray", "label": None}
 
     def get_agent(self, obj):
         return f"{obj.get('first_name')} {obj.get('last_name')}"
@@ -38,9 +52,23 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
         }
 
     def get_status(self, obj):
+        custom_status_list = obj.get("custom_status") or []
+
+        if custom_status_list:
+            for status_item in custom_status_list:
+                print(f"DEBUG - Custom status item: {status_item}")
+                status_type = status_item.get("status_type")
+                is_active = status_item.get("is_active", False)
+
+                if status_type != "In-Service" and is_active:
+                    return {"status": "orange", "label": status_type}
+
         if obj.get("status") == "ONLINE":
-            return "green"
-        return "gray"
+            return {"status": "green", "label": None}
+        elif obj.get("status") == "OFFLINE":
+            return {"status": "gray", "label": None}
+
+        return {"status": "gray", "label": None}
 
     def get_agent(self, obj):
         return f"{obj.get('first_name')} {obj.get('last_name')}"

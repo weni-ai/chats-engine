@@ -1,13 +1,11 @@
-from django.db.models import Count, OuterRef, Q, Subquery, F
+from django.contrib.postgres.aggregates import JSONBAgg
+from django.contrib.postgres.fields import JSONField
+from django.db.models import Count, F, OuterRef, Q, Subquery
+from django.db.models.functions import JSONObject
 from django.utils import timezone
 
 from chats.apps.accounts.models import User
 from chats.apps.projects.models import ProjectPermission
-
-from django.db.models.functions import JSONObject
-from django.contrib.postgres.aggregates import JSONBAgg
-from django.contrib.postgres.fields import JSONField
-
 from chats.apps.projects.models.models import CustomStatus
 
 from .dto import Filters
@@ -84,12 +82,32 @@ class AgentRepository:
         if filters.agent:
             agents_query = agents_query.filter(email=filters.agent)
 
+        custom_status_subquery = Subquery(
+            CustomStatus.objects.filter(
+                user=OuterRef("email"),
+                status_type__project=project,
+            )
+            .values("user")
+            .annotate(
+                aggregated=JSONBAgg(
+                    JSONObject(
+                        status_type=F("status_type__name"),
+                        break_time=F("break_time"),
+                        is_active=F("is_active"),
+                    )
+                )
+            )
+            .values("aggregated"),
+            output_field=JSONField(),
+        )
+
         agents_query = (
             agents_query.filter(agents_filters)
             .annotate(
                 status=Subquery(project_permission_subquery),
                 closed=Count("rooms", filter=Q(**closed_rooms, **rooms_filter)),
                 opened=Count("rooms", filter=Q(**opened_rooms, **rooms_filter)),
+                custom_status=custom_status_subquery,
             )
             .distinct()
             .values(
@@ -99,6 +117,7 @@ class AgentRepository:
                 "status",
                 "closed",
                 "opened",
+                "custom_status",
             )
         )
 
@@ -156,6 +175,7 @@ class AgentRepository:
                     JSONObject(
                         status_type=F("status_type__name"),
                         break_time=F("break_time"),
+                        is_active=F("is_active"),
                     )
                 )
             )
