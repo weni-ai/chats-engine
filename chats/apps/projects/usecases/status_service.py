@@ -84,7 +84,7 @@ class InServiceStatusService:
                     project=project,
                     break_time=0
                 )
-                logger.info(f"Status In-Service criado para usuário {user.id} no projeto {project.id}")
+                logger.info(f"Status In-Service criado para usuário {user.pk} no projeto {project.pk}")
     
     @classmethod
     @transaction.atomic
@@ -138,14 +138,14 @@ class InServiceStatusService:
             is_active=True, 
             user__isnull=False
         ).values('user', 'queue__sector__project').annotate(
-            count=Count('id')
+            count=Count('pk')
         ).values_list('user', 'queue__sector__project').distinct()
         
         # Sincronizar cada agente
-        for user_id, project_id in active_agents:
+        for user_pk, project_pk in active_agents:
             try:
                 with transaction.atomic():
-                    cls.sync_agent_status(user_id, project_id)
+                    cls.sync_agent_status(user_pk, project_pk)
             except Exception as e:
                 logger.error(f"Erro ao sincronizar status: {e}")
     
