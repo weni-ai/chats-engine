@@ -8,11 +8,15 @@ logger = logging.getLogger(__name__)
 
 class QueueRouterService:
     """
-    Service to route rooms to available agents.
+    Service to route rooms to available agents, to be used when
+    the project is configured to use queue priority routing.
     """
 
     def __init__(self, queue: Queue):
         self.queue = queue
+
+        if not self.queue.sector.project.use_queue_priority_routing:
+            raise ValueError("Queue priority routing is not enabled for this project")
 
     def route_rooms(self):
         """

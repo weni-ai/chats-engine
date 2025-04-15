@@ -15,6 +15,7 @@ from requests.exceptions import RequestException
 from rest_framework.exceptions import ValidationError
 
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
+from chats.apps.queues.tasks import start_queue_priority_routing
 from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
 
@@ -192,9 +193,14 @@ class Room(BaseModel, BaseConfigurableModel):
         self.is_active = False
         self.ended_at = timezone.now()
         self.ended_by = end_by
+
         if tags is not None:
             self.tags.add(*tags)
+
         self.save()
+
+        if self.queue and self.queue.sector.project.use_queue_priority_routing:
+            start_queue_priority_routing.delay(self.queue.id)
 
     def request_callback(self, room_data: dict):
         if self.callback_url is None:
