@@ -9,7 +9,6 @@ from chats.apps.api.utils import create_contact, create_user_and_token
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.projects.models.models import RoomRoutingType
 from chats.apps.queues.models import Queue, QueueAuthorization
-from chats.apps.queues.services import QueueRouterService
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorAuthorization
 
