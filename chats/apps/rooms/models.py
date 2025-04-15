@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 from datetime import timedelta
 
@@ -18,6 +19,9 @@ from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTCl
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
+
+
+logger = logging.getLogger(__name__)
 
 
 class Room(BaseModel, BaseConfigurableModel):
@@ -200,6 +204,10 @@ class Room(BaseModel, BaseConfigurableModel):
         self.save()
 
         if self.queue:
+            logger.info(
+                "Calling start_queue_priority_routing for room %s when closing it",
+                self.id,
+            )
             start_queue_priority_routing(self.queue)
 
     def request_callback(self, room_data: dict):
