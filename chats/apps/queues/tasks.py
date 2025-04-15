@@ -5,11 +5,11 @@ from chats.celery import app
 
 
 @app.task
-def route_queue_rooms(queue_id: UUID):
+def route_queue_rooms(queue_uuid: UUID):
     """
     Route rooms to available agents for a queue in a project
     configured to use queue priority routing.
     """
-    queue = Queue.objects.get(id=queue_id)
+    queue = Queue.objects.get(uuid=queue_uuid)
 
     QueueRouterService(queue).route_rooms()
