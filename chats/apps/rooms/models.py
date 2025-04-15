@@ -18,7 +18,7 @@ from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTCl
 from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
 from chats.core.models import BaseConfigurableModel
-from chats.apps.projects.usecases.status_service import InServiceStatusTracker
+from chats.apps.projects.usecases.status_service import InServiceStatusTracker, InServiceStatusService
 
 
 class Room(BaseModel, BaseConfigurableModel):
@@ -117,58 +117,51 @@ class Room(BaseModel, BaseConfigurableModel):
         Args:
             is_new: Boolean indicando se é uma sala nova
         """
-        # Verificar diretamente se a sala já tinha um usuário antes deste save
-        if not hasattr(self, '_original_user'):
-            self._original_user = None
+        from chats.apps.projects.usecases.status_service import InServiceStatusService
         
+        # Obter valores relevantes
         old_user = self._original_user
         new_user = self.user
         
-        print(f"DEBUG - is_new: {is_new}")
-        print(f"DEBUG - old_user: {old_user}")
-        print(f"DEBUG - tracker previous user: {self.tracker.previous('user')}")
-        print(f"DEBUG - new_user: {new_user}")
+        # Obter o projeto da sala
+        project = None
+        if self.queue and hasattr(self.queue, 'sector'):
+            sector = self.queue.sector
+            if sector and hasattr(sector, 'project'):
+                project = sector.project
         
-        # Verificar se o status ativo mudou
-        old_is_active = None if is_new else self.tracker.previous('is_active')
-        
-        # Obter o projeto a partir da fila
-        project = getattr(self.queue, 'sector', None)
-        if project:
-            project = getattr(project, 'project', None)
-            
         if not project:
             return  # Se não encontrar projeto, não faz nada
         
-        # Se for uma sala nova com um usuário atribuído
-        if is_new and new_user:
-            InServiceStatusTracker.safe_update_room_count(new_user, project, "assigned")
+        # Caso prioritário: Sala fechada
+        if hasattr(self, '__original_is_active') and self.__original_is_active is True and self.is_active is False:
+            if old_user:
+                InServiceStatusService.room_closed(old_user, project)
             return
         
-        # Se não for uma sala nova, verificar as alterações
-        # Caso 1: Usuário foi atribuído a uma sala que não tinha usuário
+        # Casos de atribuição de sala
+        
+        # Caso 1: Sala nova com usuário atribuído
+        if is_new and new_user:
+            InServiceStatusService.room_assigned(new_user, project)
+            return
+        
+        # Caso 2: Usuário adicionado a uma sala existente
         if old_user is None and new_user is not None:
-            print("entrou no caso 1")
-            InServiceStatusTracker.safe_update_room_count(new_user, project, "assigned")
+            InServiceStatusService.room_assigned(new_user, project)
+            return
         
-        # Caso 2: Usuário foi alterado de um agente para outro
-        elif old_user is not None and new_user is not None and old_user != new_user:
-            print("entrou no caso 2")
-            # Remover sala do agente anterior
-            InServiceStatusTracker.safe_update_room_count(old_user, project, "closed")
-            # Adicionar sala ao novo agente
-            InServiceStatusTracker.safe_update_room_count(new_user, project, "assigned")
+        # Caso 3: Transferência entre agentes
+        if old_user is not None and new_user is not None and old_user != new_user:
+            InServiceStatusService.room_closed(old_user, project)
+            InServiceStatusService.room_assigned(new_user, project)
+            return
         
-        # Caso 3: Usuário foi removido da sala (transferência para fila)
-        elif old_user is not None and new_user is None:
-            print("entrou no caso 3")
-            InServiceStatusTracker.safe_update_room_count(old_user, project, "closed")
-        
-        if self.__original_is_active is True and self.is_active is False and self.user:
-            print("PRIORITÁRIO: Sala fechada")
-            InServiceStatusTracker.safe_update_room_count(self.user, project, "closed")
-            return  # Importante: sair da função após tratar o fechamento
-    
+        # Caso 4: Usuário removido da sala
+        if old_user is not None and new_user is None:
+            InServiceStatusService.room_closed(old_user, project)
+            return
+
     def save(self, *args, **kwargs) -> None:
         if self.__original_is_active is False:
             raise ValidationError({"detail": _("Closed rooms cannot receive updates")})
@@ -256,15 +249,37 @@ class Room(BaseModel, BaseConfigurableModel):
             .exclude(user__isnull=True, contact__isnull=True)
             .order_by("-created_on")[:5]
         )
-
+    
     def close(self, tags: list = [], end_by: str = ""):
+        """Fecha uma sala e atualiza o status do agente"""
+        from chats.apps.projects.usecases.status_service import InServiceStatusService
+
+        # Salvar o usuário atual antes de modificar o objeto
+        user_before_close = self.user
+        is_active_before_close = self.is_active
+        
+        # Aplicar as mudanças ao objeto
         self.is_active = False
         self.ended_at = timezone.now()
         self.ended_by = end_by
         if tags is not None:
             self.tags.add(*tags)
+        
+        # Salvar as mudanças
         self.save()
         
+        # Atualizar status somente se sala estava ativa e tinha um agente
+        if is_active_before_close and user_before_close:
+            # Obter o projeto da sala
+            project = None
+            if self.queue and hasattr(self.queue, 'sector'):
+                sector = self.queue.sector
+                if sector and hasattr(sector, 'project'):
+                    project = sector.project
+            
+            if project:
+                # Atualizar status do agente - deve ser feito após o save
+                InServiceStatusService.room_closed(user_before_close, project)
 
     def request_callback(self, room_data: dict):
         if self.callback_url is None:
