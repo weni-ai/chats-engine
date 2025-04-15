@@ -54,14 +54,21 @@ class QueueRouterService:
             )
             return
 
-        rooms_to_route = rooms[:available_agents_count]
+        rooms_routed = 0
 
-        for room in rooms_to_route:
-            room.user = self.queue.available_agents.first()
+        for room in rooms:
+            agent = self.queue.available_agents.first()
+
+            if not agent:
+                break
+
+            room.user = agent
             room.save()
+
+            rooms_routed += 1
 
         logger.info(
             "%s rooms routed for queue %s, ending routing",
-            len(rooms_to_route),
+            rooms_routed,
             self.queue.uuid,
         )
