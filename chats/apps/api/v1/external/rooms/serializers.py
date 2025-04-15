@@ -17,7 +17,6 @@ from chats.apps.msgs.models import Message, MessageMedia
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import close_room
-from chats.apps.projects.usecases.status_service import InServiceStatusTracker
 
 
 def get_active_room_flow_start(contact, flow_uuid, project):
