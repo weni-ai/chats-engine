@@ -20,6 +20,7 @@ from chats.utils.websockets import send_channels_group
 from .permission_managers import UserPermissionsManager
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 # Create your models here.
 
@@ -581,6 +582,7 @@ class CustomStatus(BaseModel):
         ]
 
     def save(self, *args, **kwargs):
+        print("save custom status")
         # Verificar se é novo ou alteração
         is_new = self._state.adding
         original_is_active = None
@@ -608,18 +610,22 @@ class CustomStatus(BaseModel):
                 # Continuar com o save original
                 result = super().save(*args, **kwargs)
                 
-                # Novo código para gerenciar In-Service
-                if self.user and self.project and (is_new or original_is_active != self.is_active):
-                    # Importação tardia para evitar circularidade
+                # Registrar log para rastreamento
+                logger.info(f"CustomStatus.save: is_new={is_new}, user={self.user}, status={self.status_type}, active={self.is_active}")
+                
+                # Notificar serviço após salvar
+                if self.user and self.project and self.status_type:
                     from chats.apps.projects.usecases.status_service import InServiceStatusService
-                    
-                    # Notificar o serviço sobre a mudança de status
-                    InServiceStatusService.handle_status_change(
-                        self.user,
-                        self.project,
-                        self.status_type,
-                        self.is_active
-                    )
+                    try:
+                        InServiceStatusService.handle_status_change(
+                            self.user, 
+                            self.project,
+                            self.status_type,
+                            self.is_active
+                        )
+                        logger.info("handle_status_change chamado com sucesso")
+                    except Exception as e:
+                        logger.error(f"Erro ao chamar handle_status_change: {e}")
                     
                 return result
         except IntegrityError as error:
