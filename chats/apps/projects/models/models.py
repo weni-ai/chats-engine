@@ -9,6 +9,7 @@ from django.db.models import Q, UniqueConstraint
 from django.utils.translation import gettext_lazy as _
 from requests.exceptions import JSONDecodeError
 from timezone_field import TimeZoneField
+from django.utils import timezone
 
 import logging
 
@@ -584,18 +585,8 @@ class CustomStatus(BaseModel):
         ]
 
     def save(self, *args, **kwargs):
-        print("save custom status")
-        # Verificar se é novo ou alteração
+        # Verificar se é novo 
         is_new = self._state.adding
-        original_is_active = None
-        
-        # Se não for novo, buscar estado atual no banco
-        if not is_new:
-            try:
-                original = CustomStatus.objects.get(pk=self.pk)
-                original_is_active = original.is_active
-            except CustomStatus.DoesNotExist:
-                pass
         
         # Lógica existente
         if self.status_type:
@@ -603,35 +594,45 @@ class CustomStatus(BaseModel):
 
         try:
             with transaction.atomic():
-                # Lógica existente - garante unicidade
+                # Capturar referência ao status In-Service ANTES de desativá-lo
+                in_service_status = None
+                if self.is_active and self.user and hasattr(self.status_type, 'name') and self.status_type.name != "In-Service":
+                    from chats.apps.projects.usecases.status_service import InServiceStatusService
+                    status_type = InServiceStatusService.get_or_create_status_type(self.project)
+                    in_service_status = CustomStatus.objects.select_for_update().filter(
+                        user=self.user, 
+                        project=self.project, 
+                        status_type=status_type,
+                        is_active=True
+                    ).first()
+                
+                # Aplicar a constraint de único status ativo
                 if self.is_active and self.user:
                     CustomStatus.objects.filter(
                         user=self.user, project=self.project, is_active=True
                     ).exclude(pk=self.pk).update(is_active=False)
 
-                # Continuar com o save original
+                # Salvar o status
                 result = super().save(*args, **kwargs)
                 
-                # Registrar log para rastreamento
-                print(f"CustomStatus.save: is_new={is_new}, user={self.user}, status={self.status_type}, active={self.is_active}")
-                
-                # Notificar serviço após salvar
+                # Chamar handle_status_change COM o status In-Service capturado anteriormente
                 if self.user and self.project and self.status_type:
                     from chats.apps.projects.usecases.status_service import InServiceStatusService
                     try:
-                        print(f"DEBUG - Antes de chamar handle_status_change: type={self.status_type.name if hasattr(self.status_type, 'name') else 'N/A'}")
+                        if in_service_status:
+                            # Calcular diretamente o tempo se encontramos um In-Service ativo
+                            service_duration = timezone.now() - in_service_status.created_on
+                            in_service_status.break_time = int(service_duration.total_seconds())
+                            in_service_status.save(update_fields=['break_time'])
+                        
                         InServiceStatusService.handle_status_change(
                             self.user, 
                             self.project,
                             self.status_type,
                             self.is_active
                         )
-                        print(f"DEBUG - Início de handle_status_change: status={self.status_type.name if hasattr(self.status_type, 'name') else 'N/A'}")
-                        print(f"DEBUG - Comparação: status_pk={self.status_type.pk}, service_pk={self.project.custom_statuses.filter(name=self.status_type.name).first().pk}")
-                        print(f"DEBUG - São iguais? {self.status_type.pk == self.project.custom_statuses.filter(name=self.status_type.name).first().pk}")
-                        print("handle_status_change chamado com sucesso")
                     except Exception as e:
-                        print(f"Erro ao chamar handle_status_change: {e}")
+                        print(f"Erro ao processar status: {e}")
                     
                 return result
         except IntegrityError as error:
