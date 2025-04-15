@@ -17,9 +17,10 @@ from rest_framework.exceptions import ValidationError
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
-from chats.apps.projects.models.models import RoomRoutingType
-from chats.core.models import BaseModel
+from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
+
+from chats.apps.projects.models.models import RoomRoutingType
 
 
 if TYPE_CHECKING:
@@ -27,7 +28,7 @@ if TYPE_CHECKING:
     from chats.apps.projects.models.models import Project
 
 
-class Room(BaseModel):
+class Room(BaseModel, BaseConfigurableModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.__original_is_active = self.is_active
