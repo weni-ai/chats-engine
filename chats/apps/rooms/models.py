@@ -206,7 +206,7 @@ class Room(BaseModel, BaseConfigurableModel):
         if self.queue:
             logger.info(
                 "Calling start_queue_priority_routing for room %s when closing it",
-                self.id,
+                self.uuid,
             )
             start_queue_priority_routing(self.queue)
 
