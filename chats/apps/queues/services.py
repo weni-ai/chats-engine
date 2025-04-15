@@ -29,7 +29,9 @@ class QueueRouterService:
 
         logger.info("Start routing rooms for queue %s", self.queue.uuid)
 
-        rooms = Room.objects.filter(queue=self.queue).order_by("created_on")
+        rooms = Room.objects.filter(
+            queue=self.queue, is_active=True, user__isnull=True
+        ).order_by("created_on")
 
         if not rooms.exists():
             logger.info(

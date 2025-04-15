@@ -57,16 +57,31 @@ class QueueRouterServiceTestCase(TestCase):
     def test_route_rooms_when_queue_is_empty(self, mock_logger):
         self.service.route_rooms()
 
-        # Verify that the logger was called with the expected messages
-        mock_logger.info.assert_any_call(
-            "Start routing rooms for queue %s", self.queue.uuid
-        )
         mock_logger.info.assert_any_call(
             "No rooms to route for queue %s, ending routing", self.queue.uuid
         )
 
     @patch("chats.apps.queues.services.logger")
-    def test_route_rooms_when_no_agents_are_available(self, mock_logger):
+    def test_route_rooms_when_agents_are_offline(self, mock_logger):
+        self.agent_1.project_permissions.update(status="OFFLINE")
+        self.agent_2.project_permissions.update(status="OFFLINE")
+
+        self.assertEqual(self.queue.online_agents.count(), 0)
+        self.assertEqual(self.queue.available_agents.count(), 0)
+
+        Room.objects.create(
+            queue=self.queue,
+            user=None,
+        )
+
+        self.service.route_rooms()
+
+        mock_logger.info.assert_any_call(
+            "No available agents for queue %s, ending routing", self.queue.uuid
+        )
+
+    @patch("chats.apps.queues.services.logger")
+    def test_route_rooms_when_agents_are_online_but_not_available(self, mock_logger):
         self.assertEqual(self.queue.online_agents.count(), 2)
         self.assertEqual(self.queue.available_agents.count(), 2)
 
@@ -81,9 +96,13 @@ class QueueRouterServiceTestCase(TestCase):
 
         self.assertEqual(self.queue.available_agents.count(), 0)
 
+        Room.objects.create(
+            queue=self.queue,
+            user=None,
+        )
+
         self.service.route_rooms()
 
-        # Verify that the logger was called with the expected messages
         mock_logger.info.assert_any_call(
             "No available agents for queue %s, ending routing", self.queue.uuid
         )
