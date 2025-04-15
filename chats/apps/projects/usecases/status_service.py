@@ -1,11 +1,28 @@
-# Versão simples e confiável para chats/apps/projects/usecases/status_service.py
-
 from django.db import transaction
 from django.utils import timezone
 import logging
+from chats.apps.projects.models.models import CustomStatus
+from django.contrib.auth import get_user_model
+from django.db.models import Count
+from chats.apps.projects.models.models import Project
 
 logger = logging.getLogger(__name__)
 
+class InServiceStatusTracker:
+    """Classe mantida para compatibilidade com código existente."""
+    
+    @classmethod
+    def room_assigned(cls, user, project):
+        return InServiceStatusService.room_assigned(user, project)
+    
+    @classmethod
+    def room_closed(cls, user, project):
+        return InServiceStatusService.room_closed(user, project)
+    
+    @classmethod
+    def sync_agent_status(cls, user, project):
+        return InServiceStatusService.sync_agent_status(user, project)
+    
 class InServiceStatusService:
     """
     Serviço simplificado para gerenciar o status 'In-Service' dos agentes.
@@ -18,7 +35,6 @@ class InServiceStatusService:
     def get_or_create_status_type(cls, project):
         """Obtém ou cria o tipo de status In-Service"""
         from chats.apps.projects.models.models import CustomStatusType
-        
         status_type, created = CustomStatusType.objects.get_or_create(
             name=cls.STATUS_NAME,
             project=project,
@@ -33,7 +49,8 @@ class InServiceStatusService:
         Registra a atribuição de uma sala a um agente.
         Cria um status In-Service se for a primeira sala.
         """
-        from chats.apps.rooms.models import Room
+        # Importação tardia dentro do método
+        from chats.apps.rooms.models import Room  
         from chats.apps.projects.models.models import CustomStatus
         
         if not user or not project:
@@ -75,10 +92,7 @@ class InServiceStatusService:
         """
         Registra o fechamento de uma sala.
         Finaliza o status In-Service se não houver mais salas.
-        """
-        from chats.apps.rooms.models import Room
-        from chats.apps.projects.models.models import CustomStatus
-        
+        """        
         if not user or not project:
             return
             
@@ -115,10 +129,7 @@ class InServiceStatusService:
         Agenda sincronização periódica de todos os agentes ativos.
         Ideal para rodar como uma tarefa Celery agendada.
         """
-        from chats.apps.rooms.models import Room
-        from django.contrib.auth import get_user_model
-        from django.db.models import Count
-        from chats.apps.projects.models.models import Project
+
         
         User = get_user_model()
         
@@ -144,11 +155,7 @@ class InServiceStatusService:
         """
         Sincroniza o status do agente com o estado real das salas.
         Útil para corrigir inconsistências.
-        """
-        from chats.apps.rooms.models import Room
-        from chats.apps.projects.models.models import CustomStatus, Project
-        from django.contrib.auth import get_user_model
-        
+        """        
         User = get_user_model()
         
         # Normalizar parâmetros
