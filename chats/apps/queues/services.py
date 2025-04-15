@@ -27,7 +27,7 @@ class QueueRouterService:
         rooms = Room.objects.filter(queue=self.queue).order_by("created_on")
 
         if not rooms.exists():
-            logger.info("No rooms to route for queue %s", self.queue.id)
+            logger.info("No rooms to route for queue %s, ending routing", self.queue.id)
             return
 
         available_agents = self.queue.available_agents.all()
@@ -40,7 +40,9 @@ class QueueRouterService:
         )
 
         if available_agents_count == 0:
-            logger.info("No available agents for queue %s", self.queue.id)
+            logger.info(
+                "No available agents for queue %s, ending routing", self.queue.id
+            )
             return
 
         rooms_to_route = rooms[:available_agents_count]
@@ -53,4 +55,8 @@ class QueueRouterService:
             room.user = agent
             room.save()
 
-        logger.info("%s rooms routed for queue %s", len(rooms_to_route), self.queue.id)
+        logger.info(
+            "%s rooms routed for queue %s, ending routing",
+            len(rooms_to_route),
+            self.queue.id,
+        )
