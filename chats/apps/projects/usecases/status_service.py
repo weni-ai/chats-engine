@@ -189,7 +189,7 @@ class InServiceStatusService:
                 if in_service_status:
                     service_duration = timezone.now() - in_service_status.created_on
                     in_service_status.is_active = False
-                    in_service_status.break_time += int(service_duration.total_seconds())
+                    in_service_status.break_time + int(service_duration.total_seconds())
                     in_service_status.save(update_fields=['is_active', 'break_time'])
                     logger.info(f"Status In-Service pausado devido a outro status para usuário {user.pk}")
             else:

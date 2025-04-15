@@ -613,21 +613,25 @@ class CustomStatus(BaseModel):
                 result = super().save(*args, **kwargs)
                 
                 # Registrar log para rastreamento
-                logger.info(f"CustomStatus.save: is_new={is_new}, user={self.user}, status={self.status_type}, active={self.is_active}")
+                print(f"CustomStatus.save: is_new={is_new}, user={self.user}, status={self.status_type}, active={self.is_active}")
                 
                 # Notificar serviço após salvar
                 if self.user and self.project and self.status_type:
                     from chats.apps.projects.usecases.status_service import InServiceStatusService
                     try:
+                        print(f"DEBUG - Antes de chamar handle_status_change: type={self.status_type.name if hasattr(self.status_type, 'name') else 'N/A'}")
                         InServiceStatusService.handle_status_change(
                             self.user, 
                             self.project,
                             self.status_type,
                             self.is_active
                         )
-                        logger.info("handle_status_change chamado com sucesso")
+                        print(f"DEBUG - Início de handle_status_change: status={self.status_type.name if hasattr(self.status_type, 'name') else 'N/A'}")
+                        print(f"DEBUG - Comparação: status_pk={self.status_type.pk}, service_pk={self.project.custom_statuses.filter(name=self.status_type.name).first().pk}")
+                        print(f"DEBUG - São iguais? {self.status_type.pk == self.project.custom_statuses.filter(name=self.status_type.name).first().pk}")
+                        print("handle_status_change chamado com sucesso")
                     except Exception as e:
-                        logger.error(f"Erro ao chamar handle_status_change: {e}")
+                        print(f"Erro ao chamar handle_status_change: {e}")
                     
                 return result
         except IntegrityError as error:
