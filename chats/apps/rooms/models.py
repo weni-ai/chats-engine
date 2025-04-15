@@ -18,7 +18,7 @@ from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTCl
 from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
 from chats.core.models import BaseConfigurableModel
-from chats.apps.projects.usecases.status_service import InServiceStatusTracker, InServiceStatusService
+from chats.apps.projects.usecases.status_service import InServiceStatusService
 
 
 class Room(BaseModel, BaseConfigurableModel):
@@ -117,7 +117,6 @@ class Room(BaseModel, BaseConfigurableModel):
         Args:
             is_new: Boolean indicando se é uma sala nova
         """
-        from chats.apps.projects.usecases.status_service import InServiceStatusService
         
         # Obter valores relevantes
         old_user = self._original_user
@@ -252,8 +251,6 @@ class Room(BaseModel, BaseConfigurableModel):
     
     def close(self, tags: list = [], end_by: str = ""):
         """Fecha uma sala e atualiza o status do agente"""
-        from chats.apps.projects.usecases.status_service import InServiceStatusService
-
         # Salvar o usuário atual antes de modificar o objeto
         user_before_close = self.user
         is_active_before_close = self.is_active
