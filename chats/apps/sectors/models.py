@@ -5,7 +5,9 @@ from django.db import models
 from django.db.models import Count, F, Q, Value
 from django.db.models.functions import Concat
 from django.utils.translation import gettext_lazy as _
+from model_utils.fields import FieldTracker
 
+from chats.apps.queues.utils import start_queue_priority_routing
 from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
 from chats.utils.websockets import send_channels_group
 
@@ -40,6 +42,8 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
     can_edit_custom_fields = models.BooleanField(
         _("Can edit custom fields?"), default=False
     )
+
+    tracker = FieldTracker(fields=["rooms_limit"])
 
     objects = SectorManager()
 
@@ -235,6 +239,25 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
     def is_manager(self, user):
         perm = self.get_permission(user=user)
         return perm.is_admin or self.authorizations.filter(permission=perm).exists()
+
+    def save(self, *args, **kwargs):
+        # Detecting if the rooms limit has increased.
+        # If so, we need to trigger the queue priority routing for all queues in the sector,
+        # to distribute the rooms among the available agents.
+        should_trigger_queue_priority_routing = False
+
+        if (
+            self.project.use_queue_priority_routing
+            and self.tracker.has_changed("rooms_limit")
+            and self.rooms_limit > self.tracker.previous("rooms_limit")
+        ):
+            should_trigger_queue_priority_routing = True
+
+        super().save(*args, **kwargs)
+
+        if should_trigger_queue_priority_routing:
+            for queue in self.queues.all():
+                start_queue_priority_routing(queue)
 
     def delete(self):
         super().delete()
