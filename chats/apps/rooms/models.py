@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 from datetime import timedelta
 
@@ -15,8 +16,12 @@ from requests.exceptions import RequestException
 from rest_framework.exceptions import ValidationError
 
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
+from chats.apps.queues.utils import start_queue_priority_routing
 from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
+
+
+logger = logging.getLogger(__name__)
 
 
 class Room(BaseModel, BaseConfigurableModel):
@@ -192,9 +197,18 @@ class Room(BaseModel, BaseConfigurableModel):
         self.is_active = False
         self.ended_at = timezone.now()
         self.ended_by = end_by
+
         if tags is not None:
             self.tags.add(*tags)
+
         self.save()
+
+        if self.queue:
+            logger.info(
+                "Calling start_queue_priority_routing for room %s when closing it",
+                self.uuid,
+            )
+            start_queue_priority_routing(self.queue)
 
     def request_callback(self, room_data: dict):
         if self.callback_url is None:

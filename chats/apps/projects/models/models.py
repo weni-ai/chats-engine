@@ -217,6 +217,10 @@ class Project(BaseConfigurableModel, BaseModel):
             project_permissions__status="ONLINE",
         )
 
+    @property
+    def use_queue_priority_routing(self):
+        return self.room_routing_type == RoomRoutingType.QUEUE_PRIORITY
+
     def get_sectors(self, user, custom_filters: dict = {}):
         user_permission = self.get_permission(user)
         sectors = self.sectors.all()
