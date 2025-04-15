@@ -93,6 +93,7 @@ class InServiceStatusService:
         Registra o fechamento de uma sala.
         Finaliza o status In-Service se não houver mais salas.
         """        
+        from chats.apps.rooms.models import Room 
         if not user or not project:
             return
             
@@ -129,8 +130,7 @@ class InServiceStatusService:
         Agenda sincronização periódica de todos os agentes ativos.
         Ideal para rodar como uma tarefa Celery agendada.
         """
-
-        
+        from chats.apps.rooms.models import Room 
         User = get_user_model()
         
         # Encontrar todos os pares usuário-projeto com salas ativas
@@ -155,7 +155,8 @@ class InServiceStatusService:
         """
         Sincroniza o status do agente com o estado real das salas.
         Útil para corrigir inconsistências.
-        """        
+        """ 
+        from chats.apps.rooms.models import Room
         User = get_user_model()
         
         # Normalizar parâmetros
