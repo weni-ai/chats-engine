@@ -581,17 +581,47 @@ class CustomStatus(BaseModel):
         ]
 
     def save(self, *args, **kwargs):
+        # Verificar se é novo ou alteração
+        is_new = self._state.adding
+        original_is_active = None
+        
+        # Se não for novo, buscar estado atual no banco
+        if not is_new:
+            try:
+                original = CustomStatus.objects.get(pk=self.pk)
+                original_is_active = original.is_active
+            except CustomStatus.DoesNotExist:
+                pass
+        
+        # Lógica existente
         if self.status_type:
             self.project = self.status_type.project
 
         try:
             with transaction.atomic():
+                # Lógica existente - garante unicidade
                 if self.is_active and self.user:
                     CustomStatus.objects.filter(
                         user=self.user, project=self.project, is_active=True
                     ).exclude(pk=self.pk).update(is_active=False)
 
-                super().save(*args, **kwargs)
+                # Continuar com o save original
+                result = super().save(*args, **kwargs)
+                
+                # Novo código para gerenciar In-Service
+                if self.user and self.project and (is_new or original_is_active != self.is_active):
+                    # Importação tardia para evitar circularidade
+                    from chats.apps.projects.usecases.status_service import InServiceStatusService
+                    
+                    # Notificar o serviço sobre a mudança de status
+                    InServiceStatusService.handle_status_change(
+                        self.user,
+                        self.project,
+                        self.status_type,
+                        self.is_active
+                    )
+                    
+                return result
         except IntegrityError as error:
             if "unique_active_custom_status_per_user_project" in str(error):
                 raise ValidationError(
