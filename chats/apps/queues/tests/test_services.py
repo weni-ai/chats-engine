@@ -53,6 +53,20 @@ class QueueRouterServiceTestCase(TestCase):
                 role=QueueAuthorization.ROLE_AGENT,
             )
 
+    def test_cannot_initialize_service_when_the_project_routing_type_is_not_queue_priority(
+        self,
+    ):
+        self.project.room_routing_type = RoomRoutingType.GENERAL
+        self.project.save()
+
+        with self.assertRaises(ValueError) as context:
+            QueueRouterService(self.queue)
+
+        self.assertEqual(
+            str(context.exception),
+            "Queue priority routing is not enabled for this project",
+        )
+
     @patch("chats.apps.queues.services.logger")
     def test_route_rooms_when_queue_is_empty(self, mock_logger):
         self.service.route_rooms()
