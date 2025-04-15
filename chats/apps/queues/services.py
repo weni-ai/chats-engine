@@ -1,6 +1,6 @@
 import logging
-from queue import Queue
 
+from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 
 logger = logging.getLogger(__name__)
