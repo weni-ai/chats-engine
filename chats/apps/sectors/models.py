@@ -1,3 +1,4 @@
+import logging
 import pendulum
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
@@ -5,7 +6,7 @@ from django.db import models
 from django.db.models import Count, F, Q, Value
 from django.db.models.functions import Concat
 from django.utils.translation import gettext_lazy as _
-from model_utils.fields import FieldTracker
+from model_utils import FieldTracker
 
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
@@ -14,6 +15,8 @@ from chats.utils.websockets import send_channels_group
 from .sector_managers import SectorManager
 
 User = get_user_model()
+
+logger = logging.getLogger(__name__)
 
 
 class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
@@ -256,6 +259,11 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         super().save(*args, **kwargs)
 
         if should_trigger_queue_priority_routing:
+            logger.info(
+                "Rooms limit increased for sector %s (%s), triggering queue priority routing",
+                self.name,
+                self.pk,
+            )
             for queue in self.queues.all():
                 start_queue_priority_routing(queue)
 
