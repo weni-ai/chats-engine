@@ -163,10 +163,9 @@ class InServiceStatusService:
         # Obter o tipo de status In-Service
         in_service_type = cls.get_or_create_status_type(project)
         
-        # Ignorar mudanças no próprio status In-Service
-        if status_type.pk == in_service_type.pk:
+        # Ignorar mudanças no próprio status In-Service - verificar por nome é mais seguro
+        if status_type.name == cls.STATUS_NAME:
             return
-            
         # Verificar com SELECT FOR UPDATE para evitar race conditions
         with transaction.atomic():
             # Verificar salas ativas
@@ -185,12 +184,12 @@ class InServiceStatusService:
             ).first()
             
             if is_active:
-                # Se qualquer outro status foi ativado, pausar o In-Service
-                if in_service_status:
-                    service_duration = timezone.now() - in_service_status.created_on
-                    in_service_status.is_active = False
-                    in_service_status.break_time + int(service_duration.total_seconds())
-                    in_service_status.save(update_fields=['is_active', 'break_time'])
+                    # Se qualquer outro status foi ativado, pausar o In-Service
+                    if in_service_status:
+                        service_duration = timezone.now() - in_service_status.created_on
+                        in_service_status.is_active = False
+                        in_service_status.break_time = int(service_duration.total_seconds())  # AQUI ERA O ERRO
+                        in_service_status.save(update_fields=['is_active', 'break_time'])
                     logger.info(f"Status In-Service pausado devido a outro status para usuário {user.pk}")
             else:
                 # Se um status foi desativado, verificar se tem outras prioridades
