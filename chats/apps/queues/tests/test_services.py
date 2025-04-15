@@ -117,6 +117,9 @@ class QueueRouterServiceTestCase(TestCase):
             user=self.agent_1,
         )
 
+        # Agent 1 is online but not available anymore,
+        # because there is a room already assigned to this agent
+        # and the rooms limit is 1
         self.assertEqual(self.queue.available_agents.count(), 1)
 
         room = Room.objects.create(
