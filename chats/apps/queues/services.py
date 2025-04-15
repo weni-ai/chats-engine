@@ -1,9 +1,12 @@
 import logging
+from typing import TYPE_CHECKING
 
-from chats.apps.queues.models import Queue
-from chats.apps.rooms.models import Room
 
 logger = logging.getLogger(__name__)
+
+
+if TYPE_CHECKING:
+    from chats.apps.queues.models import Queue
 
 
 class QueueRouterService:
@@ -22,6 +25,8 @@ class QueueRouterService:
         """
         Route rooms to available agents.
         """
+        from chats.apps.rooms.models import Room
+
         logger.info("Start routing rooms for queue %s", self.queue.id)
 
         rooms = Room.objects.filter(queue=self.queue).order_by("created_on")
