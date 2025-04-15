@@ -14,18 +14,18 @@ def start_queue_priority_routing(queue: Queue):
     if not queue.sector.project.use_queue_priority_routing:
         logger.info(
             "Skipping route_queue_rooms for queue %s because project is not configured to use priority routing",
-            queue.id,
+            queue.uuid,
         )
         return
 
     if not settings.USE_CELERY:
         logger.info(
             "Calling route_queue_rooms for queue %s synchronously because celery is disabled",
-            queue.id,
+            queue.uuid,
         )
-        route_queue_rooms(queue.id)
+        route_queue_rooms(queue.uuid)
 
         return
 
-    logger.info("Calling route_queue_rooms for queue %s asynchronously", queue.id)
-    route_queue_rooms.delay(queue.id)
+    logger.info("Calling route_queue_rooms for queue %s asynchronously", queue.uuid)
+    route_queue_rooms.delay(queue.uuid)
