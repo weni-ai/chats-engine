@@ -29,6 +29,7 @@ from chats.apps.api.v1.rooms.serializers import (
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.msgs.models import Message
 from chats.apps.queues.models import Queue
+from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import (
     close_room,
@@ -423,6 +424,8 @@ class RoomViewset(
                     room.user = user
                     room.save()
 
+                    start_queue_priority_routing(room.queue)
+
                     create_room_feedback_message(room, feedback, method="rt")
                     if old_user:
                         room.notify_user("update", user=old_user)
@@ -451,6 +454,8 @@ class RoomViewset(
                     room.user = None
                     room.queue = queue
                     room.save()
+
+                    start_queue_priority_routing(queue)
 
                     create_room_feedback_message(room, feedback, method="rt")
                     room.notify_user("update", user=transfer_user)
