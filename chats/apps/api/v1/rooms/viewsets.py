@@ -455,11 +455,11 @@ class RoomViewset(
                     room.queue = queue
                     room.save()
 
-                    start_queue_priority_routing(queue)
-
                     create_room_feedback_message(room, feedback, method="rt")
                     room.notify_user("update", user=transfer_user)
                     room.notify_queue("update")
+
+                start_queue_priority_routing(queue)
 
         except Exception as error:
             return Response(
