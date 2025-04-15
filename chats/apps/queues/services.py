@@ -56,12 +56,8 @@ class QueueRouterService:
 
         rooms_to_route = rooms[:available_agents_count]
 
-        available_agents = list(available_agents)
-
         for room in rooms_to_route:
-            agent = available_agents.pop(0)
-
-            room.user = agent
+            room.user = self.queue.available_agents.first()
             room.save()
 
         logger.info(
