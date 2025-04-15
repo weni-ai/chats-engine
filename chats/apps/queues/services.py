@@ -15,7 +15,7 @@ class QueueRouterService:
     the project is configured to use queue priority routing.
     """
 
-    def __init__(self, queue: Queue):
+    def __init__(self, queue: "Queue"):
         self.queue = queue
 
         if not self.queue.sector.project.use_queue_priority_routing:
