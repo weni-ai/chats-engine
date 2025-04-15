@@ -1,4 +1,5 @@
 from datetime import timedelta
+import logging
 
 from django.conf import settings
 from django.db import transaction
@@ -42,6 +43,9 @@ from chats.apps.rooms.views import (
 from django.utils.timezone import make_aware
 from datetime import datetime
 from chats.apps.projects.usecases.send_room_info import RoomInfoUseCase
+
+
+logger = logging.getLogger(__name__)
 
 
 class RoomViewset(
@@ -393,10 +397,13 @@ class RoomViewset(
 
         user_email = request.query_params.get("user_email")
         queue_uuid = request.query_params.get("queue_uuid")
-        user_request = request.query_params.get("user_request")
+        user_request = request.user or request.query_params.get("user_request")
 
-        if not (user_email or queue_uuid):
-            return None
+        if not user_email and not queue_uuid:
+            return Response(
+                {"error": "user_email or queue_uuid is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
             if user_email:
@@ -415,7 +422,9 @@ class RoomViewset(
                             },
                             status=status.HTTP_400_BAD_REQUEST,
                         )
+
                     transfer_user = verify_user_room(room, user_request)
+
                     feedback = create_transfer_json(
                         action="transfer",
                         from_=transfer_user,
@@ -424,6 +433,11 @@ class RoomViewset(
                     room.user = user
                     room.save()
 
+                    logger.info(
+                        "Starting queue priority routing for room %s from bulk transfer to user %s",
+                        room.uuid,
+                        user.email,
+                    )
                     start_queue_priority_routing(room.queue)
 
                     create_room_feedback_message(room, feedback, method="rt")
@@ -459,7 +473,12 @@ class RoomViewset(
                     room.notify_user("update", user=transfer_user)
                     room.notify_queue("update")
 
-                start_queue_priority_routing(queue)
+                    logger.info(
+                        "Starting queue priority routing for room %s from bulk transfer to queue %s",
+                        room.uuid,
+                        queue.uuid,
+                    )
+                    start_queue_priority_routing(queue)
 
         except Exception as error:
             return Response(
