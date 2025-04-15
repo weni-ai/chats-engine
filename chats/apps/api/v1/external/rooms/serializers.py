@@ -110,7 +110,7 @@ def get_room_user(
 
         logger.info(
             "Calling start_queue_priority_routing for queue %s from get_room_user because the queue is not empty",
-            queue.id,
+            queue.uuid,
         )
         start_queue_priority_routing(queue)
 
