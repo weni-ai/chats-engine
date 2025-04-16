@@ -67,26 +67,25 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         if self.permission:
             # Only set status as OFFLINE if there are no other active connections
             logger.info(
-                f"Checking if {self.connection_id} has other active connections"
+                "User %s has been disconnected from connection %s. "
+                "Checking if they have other other active connections",
+                self.user.email,
+                self.connection_id,
             )
             has_other_connections = await self.has_other_active_connections()
             if not has_other_connections:
                 logger.info(
-                    f"Connection ID: {self.connection_id} has no other active connections, setting status to OFFLINE"
+                    "User %s has no other active connections, setting status to OFFLINE",
+                    self.user.email,
                 )
                 await self.set_user_status("OFFLINE")
             else:
                 logger.info(
-                    f"Connection ID: {self.connection_id} has other active connections, not setting status to OFFLINE"
+                    "User %s has other active connections, not setting status to OFFLINE",
+                    self.user.email,
                 )
 
     async def set_connection_check_response(self, connection_id: str, response: bool):
-        logger.info(
-            "Connection ID: %s setting connection check response for %s to %s",
-            self.connection_id,
-            connection_id,
-            response,
-        )
         self.cache.set(
             f"connection_check_response_{connection_id}", str(response), ex=10
         )
@@ -181,14 +180,16 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         if event.get("action") == "connection_check":
             # If this is a connection check message and it's not from our own channel
             logger.info(
-                "Connection ID: %s received connection check from %s",
+                "Connection ID: %s received connection check from %s to check if user %s has other active connections",
                 self.connection_id,
                 event["content"].get("connection_id"),
+                event["content"].get("user_email"),
             )
             if event["content"].get("connection_id") != str(self.connection_id):
                 logger.info(
-                    "Connection ID: %s sending connection check response",
+                    "Connection ID: %s sending connection check response to user %s",
                     self.connection_id,
+                    event["content"].get("user_email"),
                 )
                 # Send response through the channel layer
                 await self.channel_layer.group_send(
@@ -197,15 +198,18 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                         "type": "notify",
                         "action": "connection_check_response",
                         "content": {
-                            "connection_id": event["content"].get("connection_id")
+                            "connection_id": event["content"].get("connection_id"),
+                            "user_email": self.user.email,
                         },
                     },
                 )
         elif event.get("action") == "connection_check_response":
             # Handle the response by setting the flag
             logger.info(
-                "Connection ID: %s received connection check response",
+                "Connection ID: %s received connection check response from %s to check if user %s has other active connections",
                 self.connection_id,
+                event["content"].get("connection_id"),
+                event["content"].get("user_email"),
             )
             await self.set_connection_check_response(
                 connection_id=event["content"].get("connection_id"), response=True
@@ -249,8 +253,9 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         )
 
         logger.info(
-            "Connection ID: %s sent connection check",
+            "Connection ID: %s sent connection check to user %s to check if they have other active connections",
             self.connection_id,
+            self.user.email,
         )
 
         # Wait a short time for responses
@@ -259,9 +264,10 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         check_response = bool(await self.get_connection_check_response())
 
         logger.info(
-            "Connection ID: %s got response: %s",
+            "Connection ID: %s got response: %s from user %s to check if they have other active connections",
             self.connection_id,
             check_response,
+            self.user.email,
         )
 
         # If we got a response, there are other active connections
