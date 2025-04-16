@@ -250,6 +250,9 @@ class ProjectPermission(
     status = models.CharField(
         _("User Status"), max_length=10, choices=STATUS_CHOICES, default=STATUS_OFFLINE
     )
+    last_seen_online = models.DateTimeField(
+        _("Last seen online"), null=True, blank=True
+    )
 
     first_access = models.BooleanField(
         _("Is it the first access of user?"), default=True
