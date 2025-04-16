@@ -106,7 +106,7 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         """
         room = self.get_object()
 
-        if room.project_uuid != self.request.auth.project:
+        if self.request.auth and room.project_uuid != self.request.auth.project:
             return self.permission_denied(
                 request,
                 message="Ticketer token permission failed on room project",
