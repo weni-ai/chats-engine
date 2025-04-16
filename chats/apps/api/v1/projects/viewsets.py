@@ -14,6 +14,7 @@ from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
+from django.utils import timezone
 
 from chats.apps.api.utils import ensure_timezone
 from chats.apps.api.v1.internal.projects.serializers import (
@@ -53,6 +54,7 @@ from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import create_room_feedback_message
 from chats.apps.sectors.models import Sector
+from chats.apps.projects.usecases.status_service import InServiceStatusService
 
 
 class ProjectViewset(
@@ -688,6 +690,26 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                 raise serializers.ValidationError(
                     {"status": "Can't update user status in project."}
                 )
+            # CASO O USUARIO ESTEJA IN SERVICE, CALCULAR O TEMPO E SALVAR AO CRIAR UM
+            # NOVO STATUS
+            # NOVA LÓGICA: Verificar e encerrar status In-Service
+            in_service_type = InServiceStatusService.get_or_create_status_type(project)
+            
+            # Procurar por status In-Service ativo
+            in_service_status = CustomStatus.objects.filter(
+                user=user,
+                status_type=in_service_type,
+                is_active=True,
+                project=project
+            ).first()
+            
+            # Se encontrou, calcular e salvar o tempo
+            if in_service_status:
+                service_duration = timezone.now() - in_service_status.created_on
+                in_service_status.is_active = False
+                in_service_status.break_time = int(service_duration.total_seconds())
+                in_service_status.save(update_fields=['is_active', 'break_time'])
+
             serializer.save(user=user)
 
     @decorators.action(detail=False, methods=["get"])
@@ -756,6 +778,32 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                     instance.break_time = break_time
                     instance.is_active = False
                     instance.save()
+
+                    room_count = Room.objects.filter(
+                        user=instance.user,
+                        queue__sector__project=instance.status_type.project,
+                        is_active=True
+                    ).count()
+                    
+                    # Verificar se tem status de prioridade
+                    has_other_priority = InServiceStatusService.has_priority_status(
+                        instance.user, 
+                        instance.status_type.project
+                    )
+                    
+                    # Se tem salas ativas e não tem outros status prioritários, recriar In-Service
+                    if room_count > 0 and not has_other_priority:
+                        in_service_type = InServiceStatusService.get_or_create_status_type(
+                            instance.status_type.project
+                        )
+                        
+                        CustomStatus.objects.create(
+                            user=instance.user,
+                            status_type=in_service_type,
+                            is_active=True,
+                            project=instance.status_type.project,
+                            break_time=0
+                        )
 
                     return Response(
                         {"detail": "CustomStatus updated successfully."},
