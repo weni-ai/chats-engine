@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.authtoken.models import Token
@@ -106,7 +108,8 @@ class RoomsExternalTests(APITestCase):
     def setUp(self) -> None:
         self.queue_1 = Queue.objects.get(uuid="f2519480-7e58-4fc4-9894-9ab1769e29cf")
 
-    def test_create_external_room(self):
+    @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
+    def test_create_external_room(self, mock_is_attending):
         url = reverse("external_rooms-list")
         client = self.client
         client.credentials(
@@ -125,7 +128,8 @@ class RoomsExternalTests(APITestCase):
         response = client.post(url, data=data, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-    def test_create_external_room_with_external_uuid(self):
+    @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
+    def test_create_external_room_with_external_uuid(self, mock_is_attending):
         url = reverse("external_rooms-list")
         client = self.client
         client.credentials(
@@ -150,7 +154,8 @@ class RoomsExternalTests(APITestCase):
             "aec9f84e-3dcd-11ed-b878-0242ac190012",
         )
 
-    def test_create_external_room_editing_contact(self):
+    @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
+    def test_create_external_room_editing_contact(self, mock_is_attending):
         url = reverse("external_rooms-list")
         client = self.client
         client.credentials(

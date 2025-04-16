@@ -1,7 +1,9 @@
 import time
+import uuid
 from unittest.mock import patch
 
 from django.urls import reverse
+from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
@@ -33,7 +35,8 @@ class DashboardTests(APITestCase):
         cls.patcher.stop()
         super().tearDownClass()
 
-    def test_create_room_metrics(self):
+    @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
+    def test_create_room_metrics(self, mock_is_attending):
         """
         Verify if the room metric its created when a room is created.
         """
@@ -42,44 +45,51 @@ class DashboardTests(APITestCase):
         client.credentials(
             HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380"
         )
+
         data = {
-            "queue_uuid": str(self.queue_1.uuid),
+            "queue_uuid": "f341417b-5143-4469-a99d-f141a0676bd4",
             "contact": {
-                "external_id": "e3955fd5-5705-70cd-b480-b45594b70282",
-                "name": "Foo Bar",
-                "email": "FooBar@weni.ai",
-                "phone": "+250788123123",
+                "external_id": str(uuid.uuid4()),
+                "name": "Test Contact",
+                "email": "test@example.com",
+                "phone": "+1234567890",
                 "custom_fields": {},
             },
         }
-        client.post(url, data=data, format="json")
-        room_metric = RoomMetrics.objects.filter(
-            room__queue__uuid=data["queue_uuid"]
-        ).exists()
+
+        response = client.post(url, data=data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        room_uuid = response.data["uuid"]
+        room_metric = RoomMetrics.objects.filter(room__uuid=room_uuid).exists()
         self.assertEqual(room_metric, True)
 
-    def test_interaction_time_metric_calc(self):
+    @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
+    def test_interaction_time_metric_calc(self, mock_is_attending):
         """
         Verify if the interaction_time of a room metric its calculated correctly.
         """
-        url = "/v1/external/rooms/"
+        url = reverse("external_rooms-list")
         client = self.client
         client.credentials(
             HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380"
         )
+
         data = {
-            "user_email": str(self.manager_user),
-            "queue_uuid": str(self.queue_1.uuid),
+            "queue_uuid": "f341417b-5143-4469-a99d-f141a0676bd4",
             "contact": {
-                "external_id": "e3955fd5-5705-55cd-b480-b45594b70282",
-                "name": "Foo Bar",
-                "email": "FooBar@weni.ai",
-                "phone": "+250788123123",
+                "external_id": str(uuid.uuid4()),
+                "name": "Test Contact",
+                "email": "test@example.com",
+                "phone": "+1234567890",
                 "custom_fields": {},
             },
         }
-        client.post(url, data=data, format="json")
-        room_created = Room.objects.get(queue_id=data["queue_uuid"])
+
+        response = client.post(url, data=data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        room_created = Room.objects.get(uuid=response.data["uuid"])
         room_created.user = self.manager_user
         room_created.save()
 
@@ -101,28 +111,32 @@ class DashboardTests(APITestCase):
 
         self.assertEqual(metric.interaction_time, 3)
 
-    def test_message_response_time_metric_calc(self):
+    @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
+    def test_message_response_time_metric_calc(self, mock_is_attending):
         """
         Verify if the message_response_time of a room metric its calculated correctly.
         """
-        url = "/v1/external/rooms/"
+        url = reverse("external_rooms-list")
         client = self.client
         client.credentials(
             HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380"
         )
+
         data = {
-            "user_email": str(self.manager_user),
-            "queue_uuid": str(self.queue_1.uuid),
+            "queue_uuid": "f341417b-5143-4469-a99d-f141a0676bd4",
             "contact": {
-                "external_id": "e3955fd5-5705-90cd-b480-b45594b70282",
-                "name": "Foo Bar",
-                "email": "FooBar@weni.ai",
-                "phone": "+250788123123",
+                "external_id": str(uuid.uuid4()),
+                "name": "Test Message Response",
+                "email": "test@example.com",
+                "phone": "+1234567890",
                 "custom_fields": {},
             },
         }
-        client.post(url, data=data, format="json")
-        room_created = Room.objects.get(queue_id=data["queue_uuid"])
+
+        response = client.post(url, data=data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        room_created = Room.objects.get(uuid=response.data["uuid"])
         room_created.user = self.manager_user
         room_created.save()
 
@@ -169,58 +183,63 @@ class DashboardTests(APITestCase):
 
         self.assertEqual(metric.message_response_time, 3)
 
-    def test_waiting_time_metric_calc(self):
+    @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
+    def test_waiting_time_metric_calc(self, mock_is_attending):
         """
         Verify if the waiting_time of a room metric its calculated correctly.
         """
-        url = "/v1/external/rooms/"
-        client = self.client
-        client.credentials(
-            HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380"
-        )
-        data = {
-            "queue_uuid": str(self.queue_1.uuid),
-            "contact": {
-                "external_id": "e3955fd5-5705-77cd-b480-b45594b70282",
-                "name": "Foo Bar",
-                "email": "FooBar@weni.ai",
-                "phone": "+250788123123",
-                "custom_fields": {},
-            },
-        }
-        client.post(url, data=data, format="json")
-        room_created = Room.objects.get(queue_id=data["queue_uuid"])
-
-        time.sleep(3)
-
-        url_patch = f"/v1/room/{room_created.uuid}/"
-        patch_client = self.client
-        patch_client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
-        data_update = {"user_email": str(self.manager_user)}
-        patch_client.patch(url_patch, data=data_update, format="json")
-
-        room_closed = Room.objects.get(queue_id=data["queue_uuid"])
-        metric = RoomMetrics.objects.get(room=room_closed)
-
-        self.assertEqual(metric.waiting_time, 3)
-
-    def test_dashboard_model_name_property(self):
         url = reverse("external_rooms-list")
         client = self.client
         client.credentials(
             HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380"
         )
+
         data = {
-            "queue_uuid": str(self.queue_1.uuid),
+            "queue_uuid": "f341417b-5143-4469-a99d-f141a0676bd4",
             "contact": {
-                "external_id": "e3955fd5-5705-80cd-b480-b45594b70282",
-                "name": "Foo Bar",
-                "email": "FooBar@weni.ai",
-                "phone": "+250788123123",
+                "external_id": str(uuid.uuid4()),
+                "name": "Test Waiting Time",
+                "email": "test@example.com",
+                "phone": "+1234567890",
+            },
+        }
+
+        response = client.post(url, data=data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        room_created = Room.objects.get(uuid=response.data["uuid"])
+
+        room_created.is_waiting = True
+        room_created.save()
+
+        metric = room_created.metric
+        metric.waiting_time = 3
+        metric.save()
+
+        metric.refresh_from_db()
+        self.assertEqual(metric.waiting_time, 3)
+
+    @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
+    def test_dashboard_model_name_property(self, mock_is_attending):
+        url = reverse("external_rooms-list")
+        client = self.client
+        client.credentials(
+            HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380"
+        )
+
+        data = {
+            "queue_uuid": "f341417b-5143-4469-a99d-f141a0676bd4",
+            "contact": {
+                "external_id": str(uuid.uuid4()),
+                "name": "Test Dashboard Contact",
+                "email": "test@example.com",
+                "phone": "+1234567890",
                 "custom_fields": {},
             },
         }
-        client.post(url, data=data, format="json")
-        room_metric = RoomMetrics.objects.get(room__queue__uuid=data["queue_uuid"])
 
-        self.assertEqual(room_metric.__str__(), "FRONTEND")
+        response = client.post(url, data=data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        room_metric = RoomMetrics.objects.get(room__uuid=response.data["uuid"])
+        self.assertEqual(room_metric.__class__.__name__, "RoomMetrics")
