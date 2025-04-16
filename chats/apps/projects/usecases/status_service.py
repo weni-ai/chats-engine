@@ -190,11 +190,11 @@ class InServiceStatusService:
                         in_service_status.is_active = False
                         in_service_status.break_time = int(service_duration.total_seconds())  # AQUI ERA O ERRO
                         in_service_status.save(update_fields=['is_active', 'break_time'])
-                    logger.info(f"Status In-Service pausado devido a outro status para usuário {user.pk}")
+                    print(f"Status In-Service pausado devido a outro status para usuário {user.pk}")
             else:
                 # Se um status foi desativado, verificar se tem outras prioridades
                 has_other_priority = cls.has_priority_status(user, project)
-                
+                print(f"Status desativado: {status_type.name}, has_other_priority={has_other_priority}, room_count={room_count}")
                 # Se não tem outros status ativos e tem salas, reativar In-Service
                 if not has_other_priority and room_count > 0:
                     CustomStatus.objects.create(
@@ -204,7 +204,7 @@ class InServiceStatusService:
                         project=project,
                         break_time=0
                     )
-                    logger.info(f"Status In-Service recriado após fim de outro status para usuário {user.pk}")
+                    print(f"Status In-Service recriado após fim de outro status para usuário {user.pk}")
     
     @classmethod
     @transaction.atomic
