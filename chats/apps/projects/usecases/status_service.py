@@ -169,7 +169,7 @@ class InServiceStatusService:
         # Verificar com SELECT FOR UPDATE para evitar race conditions
         with transaction.atomic():
             # Verificar salas ativas
-            room_count = Room.objects.select_for_update().filter(
+            room_count = Room.objects.filter(
                 user=user,
                 queue__sector__project=project,
                 is_active=True
