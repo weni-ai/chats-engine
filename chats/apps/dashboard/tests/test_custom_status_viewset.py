@@ -1,5 +1,4 @@
 from datetime import timedelta
-
 import pytz
 from django.test import TestCase
 from django.utils import timezone
@@ -8,6 +7,12 @@ from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from chats.apps.accounts.models import User
+from chats.apps.projects.models import (
+    Project,
+    CustomStatusType,
+    CustomStatus,
+    ProjectPermission,
+)
 from chats.apps.api.v1.projects.viewsets import CustomStatusViewSet
 from chats.apps.projects.models import (
     CustomStatus,
@@ -92,7 +97,6 @@ class TestCustomStatusViewSet(TestCase):
 
     def test_close_status_not_last_active(self):
         """Testa tentativa de fechar um status que não é o último ativo"""
-        # Criar um status mais recente (necessário para o teste)
         CustomStatus.objects.create(
             user=self.user, status_type=self.status_type, is_active=True, break_time=0
         )

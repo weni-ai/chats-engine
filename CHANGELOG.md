@@ -1,8 +1,20 @@
+# 3.18.2
+## Add
+  - Add whatsapp external_id on messages
+## Fix
+  - Queue list endpoint permissions, to avoid returning queues from projects in which users do not have authorization.
+
+# 3.18.1
+## Add
+   - Custom status support for agent status serialization in API responses
+   - Enhanced agent status information in dashboard interfaces
+   - Additional status details for better operational monitoring
+
 # 3.18.0
 ## Add
    - implemented batch processing for message creation during room initialization, enhanced rooms with relevant project metadata and context information.
    - change version ubuntu-20.04 to ubuntu-latest ci.yaml
-     
+
 # 3.17.6
 ## Add
   - transaction atomicity to the create method of the RoomFlowViewSet
@@ -10,11 +22,9 @@
   - project details permissions, to ensure that users can only view projects they are authorized to access
   - update ticket on flows call, removing celery task
 
-
 # 3.17.5
 ## Add
   - "ignore_close_rooms_on_flow_start" experimental project flag verification to allow active rooms to remain open when receiving a new ticket for the same contact in the same project
-
 
 # 3.17.4
 ## Add
