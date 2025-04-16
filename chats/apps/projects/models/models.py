@@ -1,7 +1,11 @@
 from django.contrib.auth import get_user_model
-from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
-from django.db import models
-from django.db.models import Q
+from django.core.exceptions import (
+    MultipleObjectsReturned,
+    ObjectDoesNotExist,
+    ValidationError,
+)
+from django.db import IntegrityError, models, transaction
+from django.db.models import Q, UniqueConstraint
 from django.utils.translation import gettext_lazy as _
 from requests.exceptions import JSONDecodeError
 from timezone_field import TimeZoneField
@@ -500,3 +504,97 @@ class ContactGroupFlowReference(BaseModel):
     @property
     def project(self):
         return self.flow_start.project
+
+
+class CustomStatusType(BaseModel):
+    name = models.CharField(max_length=255)
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE, related_name="custom_statuses"
+    )
+    is_deleted = models.BooleanField(default=False)
+
+    def delete(self, *args, **kwargs):
+        self.is_deleted = True
+        self.save(update_fields=["is_deleted"])
+
+    def save(self, *args, **kwargs):
+        if not self.pk:
+            with transaction.atomic():
+                existing_count = (
+                    CustomStatusType.objects.select_for_update()
+                    .filter(project=self.project, is_deleted=False)
+                    .count()
+                )
+                if existing_count > 10:
+                    raise ValidationError(
+                        "A project can have a maximum of 10 custom statuses."
+                    )
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name
+
+    def get_permission(self, user):
+        try:
+            return self.project.permissions.get(user=user)
+        except ProjectPermission.DoesNotExist:
+            return None
+
+    class Meta:
+        constraints = [
+            UniqueConstraint(
+                fields=["name", "project"],
+                condition=Q(is_deleted=False),
+                name="unique_custom_status",
+            )
+        ]
+
+
+class CustomStatus(BaseModel):
+    user = models.ForeignKey(
+        "accounts.User",
+        related_name="user_custom_status",
+        verbose_name=_("user"),
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        to_field="email",
+    )
+    status_type = models.ForeignKey(
+        "CustomStatusType", on_delete=models.CASCADE, to_field="uuid"
+    )
+    is_active = models.BooleanField(default=True)
+    break_time = models.PositiveIntegerField(_("Custom status timming"), default=0)
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        null=True,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "project"],
+                condition=models.Q(is_active=True),
+                name="unique_active_custom_status_per_user_project",
+            )
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.status_type:
+            self.project = self.status_type.project
+
+        try:
+            with transaction.atomic():
+                if self.is_active and self.user:
+                    CustomStatus.objects.filter(
+                        user=self.user, project=self.project, is_active=True
+                    ).exclude(pk=self.pk).update(is_active=False)
+
+                super().save(*args, **kwargs)
+        except IntegrityError as error:
+            if "unique_active_custom_status_per_user_project" in str(error):
+                raise ValidationError(
+                    "you can't have more than one active status per project."
+                )
+            raise

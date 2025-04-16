@@ -52,3 +52,12 @@ def verify_user_room(room, user_request):
     if room.user:
         return room.user
     return user_request
+
+
+def ensure_timezone(dt, tz):
+    if dt.tzinfo is None:
+        try:
+            return tz.localize(dt)
+        except AttributeError:
+            return dt.replace(tzinfo=tz)
+    return dt
