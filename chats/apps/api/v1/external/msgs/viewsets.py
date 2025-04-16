@@ -43,6 +43,7 @@ class MessageFlowViewset(
                 message="Ticketer token permission failed on room project",
                 code=403,
             )
+        serializer.is_valid(raise_exception=True)
         instance = serializer.save()
         instance.notify_room("create")
         room = instance.room

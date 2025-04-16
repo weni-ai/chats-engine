@@ -1,3 +1,4 @@
+from unittest.mock import patch
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -392,7 +393,9 @@ class RoomsAgentExternalTests(APITestCase):
 
         return client.patch(url, data=data, format="json")
 
-    def test_add_agent_to_queued_room(self):
+    @patch("chats.apps.rooms.models.FlowRESTClient.update_ticket_assignee")
+    def test_add_agent_to_queued_room(self, mock_update_ticket_assignee):
+        mock_update_ticket_assignee.return_value = None
         data = {
             "agent": "foobar@chats.weni.ai",  # agent on the project
         }
