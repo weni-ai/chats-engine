@@ -146,66 +146,7 @@ class InServiceStatusService:
                 status.save(update_fields=['is_active', 'break_time'])
                 logger.info(f"Status In-Service finalizado para usuário {user.pk} no projeto {project.pk}")
 
-    @classmethod
-    def handle_status_change(cls, user, project, status_type, is_active):
-        """
-        Gerencia mudanças de status - quando um agente entra ou sai de qualquer status
-        
-        Args:
-            user: O usuário que mudou de status
-            project: O projeto associado
-            status_type: O tipo de status alterado
-            is_active: Se o status foi ativado (True) ou desativado (False)
-        """
-        from chats.apps.rooms.models import Room
-        from chats.apps.projects.models.models import CustomStatus
-        
-        # Obter o tipo de status In-Service
-        in_service_type = cls.get_or_create_status_type(project)
-        
-        # Ignorar mudanças no próprio status In-Service - verificar por nome é mais seguro
-        if status_type.name == cls.STATUS_NAME:
-            return
-        # Verificar com SELECT FOR UPDATE para evitar race conditions
-        with transaction.atomic():
-            # Verificar salas ativas
-            room_count = Room.objects.filter(
-                user=user,
-                queue__sector__project=project,
-                is_active=True
-            ).count()
-            
-            # Status In-Service atual
-            in_service_status = CustomStatus.objects.select_for_update().filter(
-                user=user,
-                status_type=in_service_type,
-                is_active=True,
-                project=project
-            ).first()
-            
-            if is_active:
-                    # Se qualquer outro status foi ativado, pausar o In-Service
-                    if in_service_status:
-                        service_duration = timezone.now() - in_service_status.created_on
-                        in_service_status.is_active = False
-                        in_service_status.break_time = int(service_duration.total_seconds())  # AQUI ERA O ERRO
-                        in_service_status.save(update_fields=['is_active', 'break_time'])
-                    print(f"Status In-Service pausado devido a outro status para usuário {user.pk}")
-            else:
-                # Se um status foi desativado, verificar se tem outras prioridades
-                has_other_priority = cls.has_priority_status(user, project)
-                print(f"Status desativado: {status_type.name}, has_other_priority={has_other_priority}, room_count={room_count}")
-                # Se não tem outros status ativos e tem salas, reativar In-Service
-                if not has_other_priority and room_count > 0:
-                    CustomStatus.objects.create(
-                        user=user,
-                        status_type=in_service_type,
-                        is_active=True,
-                        project=project,
-                        break_time=0
-                    )
-                    print(f"Status In-Service recriado após fim de outro status para usuário {user.pk}")
-    
+   
     @classmethod
     @transaction.atomic
     def sync_agent_status(cls, user, project):

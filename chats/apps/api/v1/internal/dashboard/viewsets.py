@@ -28,6 +28,10 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         """Agent metrics for the project or the sector"""
         project = self.get_object()
         params = request.query_params.dict()
+
+        print("filtros", params)
+        print("request", request.query_params.getlist("sector"))
+        
         filters = Filters(
             start_date=params.get("start_date"),
             end_date=params.get("end_date"),
