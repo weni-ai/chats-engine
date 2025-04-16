@@ -256,16 +256,16 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         # Wait a short time for responses
         await asyncio.sleep(1)
 
-        response = await self.get_connection_check_response()
+        check_response = bool(await self.get_connection_check_response())
 
         logger.info(
             "Connection ID: %s got response: %s",
             self.connection_id,
-            response,
+            check_response,
         )
 
         # If we got a response, there are other active connections
-        return bool(response)
+        return check_response
 
     async def load_queues(self, *args, **kwargs):
         """Enter queue notification groups"""
