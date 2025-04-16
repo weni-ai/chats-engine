@@ -1,17 +1,17 @@
 import json
+import asyncio
 import uuid
-
+import logging
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 
-from chats.apps.api.websockets.rooms.cache import CacheClient
-from chats.apps.projects.models.models import ProjectPermission
+from chats.core.cache import CacheClient
 
 
-CONNECTION_CACHE_TTL = 60  # 1 minute
+logger = logging.getLogger(__name__)
 
 
 class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
@@ -21,7 +21,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.cache_client = CacheClient()
+        self.cache = CacheClient()
 
     async def connect(self, *args, **kwargs):
         """
@@ -32,6 +32,8 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         # Are they logged in?
         close = False
         self.permission = None
+        self.connection_id = uuid.uuid4()
+        self.connection_check_response = False
 
         try:
             self.user = self.scope["user"]
@@ -44,7 +46,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         else:
             # Accept the connection
             try:
-                self.permission: ProjectPermission = await self.get_permission()
+                self.permission = await self.get_permission()
             except ObjectDoesNotExist:
                 close = True
             if close:
@@ -53,10 +55,6 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 await self.accept()
                 await self.load_queues()
                 await self.load_user()
-
-                # Register the connection
-                await self.register_connection()
-
                 self.last_ping = timezone.now()
 
     async def disconnect(self, *args, **kwargs):
@@ -66,52 +64,35 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             except AssertionError:
                 pass
 
-        # Unregister the connection
-        await self.unregister_connection()
-
-        conn_count = await self.get_connections_count()
-
-        if conn_count == 0:
-            if self.permission:
+        if self.permission:
+            # Only set status as OFFLINE if there are no other active connections
+            logger.info(
+                f"Checking if {self.connection_id} has other active connections"
+            )
+            has_other_connections = await self.has_other_active_connections()
+            if not has_other_connections:
+                logger.info(
+                    f"Connection ID: {self.connection_id} has no other active connections, setting status to OFFLINE"
+                )
                 await self.set_user_status("OFFLINE")
+            else:
+                logger.info(
+                    f"Connection ID: {self.connection_id} has other active connections, not setting status to OFFLINE"
+                )
 
-    async def get_cache_pattern(self):
-        return "agent_room_connection:%s:%s"
-
-    async def get_connection_id(self):
-        if not (connection_id := getattr(self, "connection_id", None)):
-            connection_id = str(uuid.uuid4())
-
-            setattr(self, "connection_id", connection_id)
-
-        return connection_id
-
-    async def get_cache_key(self):
-        return await self.get_cache_pattern() % (
-            self.permission.pk,
-            await self.get_connection_id(),
+    async def set_connection_check_response(self, connection_id: str, response: bool):
+        logger.info(
+            "Connection ID: %s setting connection check response for %s to %s",
+            self.connection_id,
+            connection_id,
+            response,
+        )
+        self.cache.set(
+            f"connection_check_response_{connection_id}", str(response), ex=10
         )
 
-    async def register_connection(self):
-        cache_key = await self.get_cache_key()
-
-        self.cache_client.set(
-            cache_key,
-            self.channel_name,
-            ex=CONNECTION_CACHE_TTL,
-        )
-
-        await self.update_last_seen()
-
-        return cache_key
-
-    async def unregister_connection(self):
-        cache_key = await self.get_cache_key()
-        self.cache_client.delete(cache_key)
-
-    async def get_connections_count(self):
-        cache_key = await self.get_cache_pattern() % (self.permission.pk, "*")
-        return len(self.cache_client.get_list(cache_key))
+    async def get_connection_check_response(self):
+        return self.cache.get(f"connection_check_response_{self.connection_id}")
 
     async def receive_json(self, payload):
         """
@@ -119,7 +100,6 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         for us and pass it as the first argument.
         """
         # Messages will have a "command" key we can switch on
-
         command_name = payload.get("type", None)
         if command_name == "notify":
             await self.notify(payload["content"])
@@ -127,15 +107,8 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             command = getattr(self, payload["action"])
             await command(payload["content"])
         elif command_name == "ping":
-            # Renew the connection cache
-            await self.register_connection()
-
             self.last_ping = timezone.now()
-            await self.send_json(
-                {
-                    "type": "pong",
-                }
-            )
+            await self.send_json({"type": "pong"})
 
     # METHODS
 
@@ -204,8 +177,41 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
 
     # SUBSCRIPTIONS
     async def notify(self, event):
-        """ """
-        await self.send_json(event)
+        """Handle notifications including connection checks"""
+        if event.get("action") == "connection_check":
+            # If this is a connection check message and it's not from our own channel
+            logger.info(
+                "Connection ID: %s received connection check from %s",
+                self.connection_id,
+                event["content"].get("connection_id"),
+            )
+            if event["content"].get("connection_id") != str(self.connection_id):
+                logger.info(
+                    "Connection ID: %s sending connection check response",
+                    self.connection_id,
+                )
+                # Send response through the channel layer
+                await self.channel_layer.group_send(
+                    f"permission_{self.permission.pk}",
+                    {
+                        "type": "notify",
+                        "action": "connection_check_response",
+                        "content": {
+                            "connection_id": event["content"].get("connection_id")
+                        },
+                    },
+                )
+        elif event.get("action") == "connection_check_response":
+            # Handle the response by setting the flag
+            logger.info(
+                "Connection ID: %s received connection check response",
+                self.connection_id,
+            )
+            await self.set_connection_check_response(
+                connection_id=event["content"].get("connection_id"), response=True
+            )
+        else:
+            await self.send_json(event)
 
     # SYNC HELPER FUNCTIONS
 
@@ -217,12 +223,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         self.permission.notify_user("update", "system")
 
     @database_sync_to_async
-    def update_last_seen(self):
-        self.permission.last_seen_online = timezone.now()
-        self.permission.save(update_fields=["last_seen_online"])
-
-    @database_sync_to_async
-    def get_permission(self) -> ProjectPermission:
+    def get_permission(self):
         return self.user.project_permissions.get(project__uuid=self.project)
 
     @database_sync_to_async
@@ -230,6 +231,41 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         """ """
         self.queues = self.permission.queue_ids
         return self.queues
+
+    async def has_other_active_connections(self):
+        """
+        Check if there are other active connections for this user's permission
+        """
+        group_name = f"permission_{self.permission.pk}"
+
+        # Send a check message to the group
+        await self.channel_layer.group_send(
+            group_name,
+            {
+                "type": "notify",
+                "action": "connection_check",
+                "content": {"connection_id": str(self.connection_id)},
+            },
+        )
+
+        logger.info(
+            "Connection ID: %s sent connection check",
+            self.connection_id,
+        )
+
+        # Wait a short time for responses
+        await asyncio.sleep(1)
+
+        response = await self.get_connection_check_response()
+
+        logger.info(
+            "Connection ID: %s got response: %s",
+            self.connection_id,
+            response,
+        )
+
+        # If we got a response, there are other active connections
+        return bool(response)
 
     async def load_queues(self, *args, **kwargs):
         """Enter queue notification groups"""
