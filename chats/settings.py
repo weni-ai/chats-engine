@@ -427,3 +427,10 @@ WEBSOCKET_RETRY_SLEEP = env.int("WEBSOCKET_RETRY_SLEEP", default=0.5)
 # CLOSE ROOM RETRY
 MAX_RETRIES = env.int("WS_MESSAGE_RETRIES", default=3)
 RETRY_DELAY_SECONDS = env.int("WS_MESSAGE_RETRIES", default=0.5)
+
+# GrowthBook Settings
+GROWTHBOOK_ENABLED = env.bool("GROWTHBOOK_ENABLED", default=False)
+GROWTHBOOK_API_HOST = env.str(
+    "GROWTHBOOK_API_HOST", default="https://cdn.growthbook.io"
+)
+GROWTHBOOK_CLIENT_KEY = env.str("GROWTHBOOK_CLIENT_KEY", default=None)
