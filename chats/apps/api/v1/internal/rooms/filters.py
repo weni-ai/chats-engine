@@ -23,10 +23,9 @@ class RoomFilter(filters.FilterSet):
         required=True,
         method="filter_project",
     )
-    sector = filters.CharFilter(
-        field_name="sector",
+    sector = filters.BaseInFilter(
+        field_name="queue__sector",
         required=False,
-        method="filter_sector",
     )
     agent = filters.CharFilter(
         field_name="user",
@@ -56,9 +55,6 @@ class RoomFilter(filters.FilterSet):
 
     def filter_project(self, queryset, name, value):
         return queryset.filter(queue__sector__project=value)
-
-    def filter_sector(self, queryset, name, value):
-        return queryset.filter(queue__sector=value)
 
     def filter_contact(self, queryset, name, value):
         return queryset.filter(
