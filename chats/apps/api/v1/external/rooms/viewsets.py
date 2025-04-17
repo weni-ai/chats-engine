@@ -1,3 +1,5 @@
+from functools import cached_property
+
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, transaction
@@ -11,6 +13,7 @@ from rest_framework.response import Response
 
 from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
+    get_auth_class,
 )
 from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.external.rooms.serializers import (
@@ -18,6 +21,7 @@ from chats.apps.api.v1.external.rooms.serializers import (
     RoomListSerializer,
     RoomMetricsSerializer,
 )
+from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import (
@@ -65,11 +69,17 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
     model = Room
     queryset = Room.objects.all()
     serializer_class = RoomFlowSerializer
-    permission_classes = [
-        IsAdminPermission,
-    ]
     lookup_field = "uuid"
-    authentication_classes = [ProjectAdminAuthentication]
+
+    @cached_property
+    def authentication_classes(self):
+        return get_auth_class(self.request)
+
+    @cached_property
+    def permission_classes(self):
+        if self.request.auth:
+            return [IsAdminPermission]
+        return [ModuleHasPermission]
 
     @action(detail=True, methods=["PUT", "PATCH"], url_name="close")
     def close(
@@ -96,7 +106,11 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         """
         room = self.get_object()
 
-        if room.project_uuid != self.request.auth.project:
+        if (
+            self.request.auth
+            and hasattr(self.request.auth, "project")
+            and room.project_uuid != self.request.auth.project
+        ):
             return self.permission_denied(
                 request,
                 message="Ticketer token permission failed on room project",
@@ -129,7 +143,12 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         validated_data = serializer.validated_data
         queue_or_sector = validated_data.get("queue") or validated_data.get("sector")
         project = queue_or_sector.project
-        if str(project.pk) != self.request.auth.project:
+
+        if (
+            self.request.auth
+            and hasattr(self.request.auth, "project")
+            and str(project.pk) != self.request.auth.project
+        ):
             self.permission_denied(
                 self.request,
                 message="Ticketer token permission failed on room project",
