@@ -4,6 +4,7 @@ from uuid import UUID
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from django_redis import get_redis_connection
+from mozilla_django_oidc.contrib.drf import OIDCAuthentication
 from rest_framework import exceptions
 from rest_framework.authentication import TokenAuthentication, get_authorization_header
 from mozilla_django_oidc.contrib.drf import OIDCAuthentication
@@ -102,7 +103,4 @@ def get_auth_class(request):
         UUID(token)
         return [ProjectAdminAuthentication]
     except ValueError:
-        print("token")
-        print(token)
-
         return [TOKEN_AUTHENTICATION_CLASS]

@@ -36,12 +36,19 @@ class MessageFlowViewset(
             return [IsAdminPermission]
         return [ModuleHasPermission]
 
-    def create(self, request, *args, **kwargs):
-        is_batch = isinstance(request.data, list)
-        if not is_batch:
-            return super().create(request, *args, **kwargs)
-
-        serializer = self.get_serializer(data=request.data, many=True)
+    def perform_create(self, serializer):
+        validated_data = serializer.validated_data
+        room = validated_data.get("room")
+        if (
+            self.request.auth
+            and hasattr(self.request.auth, "project")
+            and room.project_uuid != self.request.auth.project
+        ):
+            self.permission_denied(
+                self.request,
+                message="Ticketer token permission failed on room project",
+                code=403,
+            )
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
