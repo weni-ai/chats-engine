@@ -73,6 +73,9 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
 
     @cached_property
     def authentication_classes(self):
+        print("request.headers")
+        print(self.request.headers)
+
         return get_auth_class(self.request)
 
     @cached_property
