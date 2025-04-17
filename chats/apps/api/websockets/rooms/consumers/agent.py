@@ -1,4 +1,7 @@
 import json
+import asyncio
+import uuid
+import logging
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
@@ -6,11 +9,27 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 
+from chats.core.cache import CacheClient
+
+
+USE_WS_CONNECTION_CHECK = getattr(settings, "USE_WS_CONNECTION_CHECK", False)
+CONNECTION_CHECK_CACHE_PREFIX = "connection_check_response_"
+CONNECTION_CHECK_WAIT_TIME = 1
+CONNECTION_CHECK_TIMEOUT = 1
+CONNECTION_CHECK_CACHE_TTL = 10
+
+
+logger = logging.getLogger(__name__)
+
 
 class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
     """
     Agent side of the chat
     """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.cache = CacheClient()
 
     async def connect(self, *args, **kwargs):
         """
@@ -21,6 +40,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         # Are they logged in?
         close = False
         self.permission = None
+        self.connection_id = uuid.uuid4()
 
         try:
             self.user = self.scope["user"]
@@ -52,9 +72,50 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 pass
 
         if self.permission:
-            await self.set_user_status(
-                "OFFLINE"
-            )  # What if the user has two or more channels connected?
+            if USE_WS_CONNECTION_CHECK:
+                # Only set status as OFFLINE if there are no other active connections
+                logger.info(
+                    "User %s has been disconnected from connection %s. "
+                    "Checking if they have other other active connections",
+                    self.user.email,
+                    self.connection_id,
+                )
+
+                has_other_connections = await self.has_other_active_connections()
+                if not has_other_connections:
+                    logger.info(
+                        "User %s has no other active connections, setting status to OFFLINE",
+                        self.user.email,
+                    )
+                    await self.set_user_status("OFFLINE")
+                else:
+                    logger.info(
+                        "User %s has other active connections, not setting status to OFFLINE",
+                        self.user.email,
+                    )
+
+            else:
+                logger.info(
+                    "WS Connection Check is disabled, setting %s status to OFFLINE",
+                    self.user.email,
+                )
+                await self.set_user_status("OFFLINE")
+
+    async def set_connection_check_response(self, connection_id: str, response: bool):
+        self.cache.set(
+            f"{CONNECTION_CHECK_CACHE_PREFIX}{connection_id}",
+            str(response),
+            ex=CONNECTION_CHECK_CACHE_TTL,
+        )
+
+    async def get_connection_check_response(self):
+        key = f"{CONNECTION_CHECK_CACHE_PREFIX}{self.connection_id}"
+        response = self.cache.get(key)
+
+        if response is not None:
+            self.cache.delete(key)
+
+        return response
 
     async def receive_json(self, payload):
         """
@@ -62,7 +123,6 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         for us and pass it as the first argument.
         """
         # Messages will have a "command" key we can switch on
-
         command_name = payload.get("type", None)
         if command_name == "notify":
             await self.notify(payload["content"])
@@ -140,8 +200,47 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
 
     # SUBSCRIPTIONS
     async def notify(self, event):
-        """ """
-        await self.send_json(event)
+        """Handle notifications including connection checks"""
+        if event.get("action") == "connection_check":
+            # If this is a connection check message and it's not from our own channel
+            logger.info(
+                "Connection ID: %s received connection check from %s to check if user %s has other active connections",
+                self.connection_id,
+                event["content"].get("connection_id"),
+                event["content"].get("user_email"),
+            )
+            if event["content"].get("connection_id") != str(self.connection_id):
+                logger.info(
+                    "Connection ID: %s sending connection check response to user %s",
+                    self.connection_id,
+                    event["content"].get("user_email"),
+                )
+                # Send response through the channel layer
+                await self.channel_layer.group_send(
+                    f"permission_{self.permission.pk}",
+                    {
+                        "type": "notify",
+                        "action": "connection_check_response",
+                        "content": {
+                            "connection_id": event["content"].get("connection_id"),
+                            "user_email": self.user.email,
+                        },
+                    },
+                )
+        elif event.get("action") == "connection_check_response":
+            # Handle the response by setting the flag
+            logger.info(
+                "Connection ID: %s received connection check response "
+                "from %s to check if user %s has other active connections",
+                self.connection_id,
+                event["content"].get("connection_id"),
+                event["content"].get("user_email"),
+            )
+            await self.set_connection_check_response(
+                connection_id=event["content"].get("connection_id"), response=True
+            )
+        else:
+            await self.send_json(event)
 
     # SYNC HELPER FUNCTIONS
 
@@ -161,6 +260,50 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         """ """
         self.queues = self.permission.queue_ids
         return self.queues
+
+    async def has_other_active_connections(self):
+        """
+        Check if there are other active connections for this user's permission
+        """
+        group_name = f"permission_{self.permission.pk}"
+
+        # Send a check message to the group
+        await self.channel_layer.group_send(
+            group_name,
+            {
+                "type": "notify",
+                "action": "connection_check",
+                "content": {"connection_id": str(self.connection_id)},
+            },
+        )
+
+        logger.info(
+            "Connection ID: %s sent connection check to user %s to check if they have other active connections",
+            self.connection_id,
+            self.user.email,
+        )
+
+        # Wait a short time for responses
+        await asyncio.sleep(CONNECTION_CHECK_WAIT_TIME)
+
+        # Wait a short time for responses
+        try:
+            check_response = await asyncio.wait_for(
+                self.get_connection_check_response(),
+                timeout=CONNECTION_CHECK_TIMEOUT,
+            )
+        except asyncio.TimeoutError:
+            logger.warning("Connection check timed out for user %s", self.user.email)
+
+        logger.info(
+            "Connection ID: %s got response: %s from user %s to check if they have other active connections",
+            self.connection_id,
+            check_response,
+            self.user.email,
+        )
+
+        # If we got a response, there are other active connections
+        return check_response
 
     async def load_queues(self, *args, **kwargs):
         """Enter queue notification groups"""
