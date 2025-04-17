@@ -92,7 +92,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
 
             else:
                 logger.info(
-                    "WS Connection Check is disabled, setting status to OFFLINE",
+                    "WS Connection Check is disabled, setting %s status to OFFLINE",
                     self.user.email,
                 )
                 await self.set_user_status("OFFLINE")
