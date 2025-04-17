@@ -6,8 +6,14 @@ from django.utils.translation import gettext_lazy as _
 from django_redis import get_redis_connection
 from rest_framework import exceptions
 from rest_framework.authentication import TokenAuthentication, get_authorization_header
+from mozilla_django_oidc.contrib.drf import OIDCAuthentication
 
 from chats.apps.projects.models import ProjectPermission
+
+
+TOKEN_AUTHENTICATION_CLASS = (
+    OIDCAuthentication if settings.OIDC_ENABLED else TokenAuthentication
+)
 
 
 class ProjectAdminDTO:
@@ -99,4 +105,4 @@ def get_auth_class(request):
         print("token")
         print(token)
 
-        return [TokenAuthentication]
+        return [TOKEN_AUTHENTICATION_CLASS]
