@@ -13,6 +13,10 @@ from chats.core.cache import CacheClient
 
 
 USE_WS_CONNECTION_CHECK = getattr(settings, "USE_WS_CONNECTION_CHECK", False)
+CONNECTION_CHECK_PREFIX = "connection_check_response_"
+CONNECTION_CHECK_TIMEOUT = getattr(settings, "CONNECTION_CHECK_TIMEOUT", 1)
+CONNECTION_CHECK_WAIT_TIME = getattr(settings, "CONNECTION_CHECK_WAIT_TIME", 1)
+CONNECTION_CHECK_CACHE_TTL = getattr(settings, "CONNECTION_CHECK_CACHE_TTL", 10)
 
 
 logger = logging.getLogger(__name__)
@@ -100,11 +104,18 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
 
     async def set_connection_check_response(self, connection_id: str, response: bool):
         self.cache.set(
-            f"connection_check_response_{connection_id}", str(response), ex=10
+            f"{CONNECTION_CHECK_PREFIX}{connection_id}",
+            str(response),
+            ex=CONNECTION_CHECK_CACHE_TTL,
         )
 
     async def get_connection_check_response(self):
-        return self.cache.get(f"connection_check_response_{self.connection_id}")
+        response = self.cache.get(f"{CONNECTION_CHECK_PREFIX}{self.connection_id}")
+
+        if response:
+            self.cache.delete(f"{CONNECTION_CHECK_PREFIX}{self.connection_id}")
+
+        return response
 
     async def receive_json(self, payload):
         """
@@ -273,9 +284,16 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         )
 
         # Wait a short time for responses
-        await asyncio.sleep(1)
+        await asyncio.sleep(CONNECTION_CHECK_WAIT_TIME)
 
-        check_response = bool(await self.get_connection_check_response())
+        # Wait a short time for responses
+        try:
+            check_response = await asyncio.wait_for(
+                self.get_connection_check_response(),
+                timeout=CONNECTION_CHECK_TIMEOUT,
+            )
+        except asyncio.TimeoutError:
+            logger.warning("Connection check timed out for user %s", self.user.email)
 
         logger.info(
             "Connection ID: %s got response: %s from user %s to check if they have other active connections",
