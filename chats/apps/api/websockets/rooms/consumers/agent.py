@@ -2,6 +2,7 @@ import json
 import asyncio
 import uuid
 import logging
+
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from django.conf import settings
@@ -218,7 +219,8 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         elif event.get("action") == "connection_check_response":
             # Handle the response by setting the flag
             logger.info(
-                "Connection ID: %s received connection check response from %s to check if user %s has other active connections",
+                "Connection ID: %s received connection check response "
+                "from %s to check if user %s has other active connections",
                 self.connection_id,
                 event["content"].get("connection_id"),
                 event["content"].get("user_email"),
