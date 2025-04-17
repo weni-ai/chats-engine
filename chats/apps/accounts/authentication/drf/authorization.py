@@ -96,4 +96,7 @@ def get_auth_class(request):
         UUID(token)
         return [ProjectAdminAuthentication]
     except ValueError:
+        print("token")
+        print(token)
+
         return [TokenAuthentication]
