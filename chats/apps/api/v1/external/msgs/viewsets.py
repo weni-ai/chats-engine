@@ -50,11 +50,11 @@ class MessageFlowViewset(
                 code=403,
             )
         serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        headers = self.get_success_headers(serializer.data)
-        return Response(
-            serializer.data, status=status.HTTP_201_CREATED, headers=headers
-        )
+        instance = serializer.save()
+        instance.notify_room("create")
+        room = instance.room
+        if room.user is None and instance.contact:
+            room.trigger_default_message()
 
     def perform_update(self, serializer):
         instance = serializer.save()
