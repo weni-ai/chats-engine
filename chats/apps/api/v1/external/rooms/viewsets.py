@@ -80,7 +80,7 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
 
     @cached_property
     def permission_classes(self):
-        if self.request.auth:
+        if self.request.auth and hasattr(self.request.auth, "project"):
             return [IsAdminPermission]
         return [ModuleHasPermission]
 
