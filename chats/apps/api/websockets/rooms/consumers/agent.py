@@ -109,12 +109,11 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         )
 
     async def get_connection_check_response(self):
-        response = self.cache.get(
-            f"{CONNECTION_CHECK_CACHE_PREFIX}{self.connection_id}"
-        )
+        key = f"{CONNECTION_CHECK_CACHE_PREFIX}{self.connection_id}"
+        response = self.cache.get(key)
 
-        if response:
-            self.cache.delete(f"{CONNECTION_CHECK_CACHE_PREFIX}{self.connection_id}")
+        if response is not None:
+            self.cache.delete(key)
 
         return response
 
