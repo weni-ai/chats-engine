@@ -13,10 +13,10 @@ from chats.core.cache import CacheClient
 
 
 USE_WS_CONNECTION_CHECK = getattr(settings, "USE_WS_CONNECTION_CHECK", False)
-CONNECTION_CHECK_PREFIX = "connection_check_response_"
-CONNECTION_CHECK_TIMEOUT = getattr(settings, "CONNECTION_CHECK_TIMEOUT", 1)
-CONNECTION_CHECK_WAIT_TIME = getattr(settings, "CONNECTION_CHECK_WAIT_TIME", 1)
-CONNECTION_CHECK_CACHE_TTL = getattr(settings, "CONNECTION_CHECK_CACHE_TTL", 10)
+CONNECTION_CHECK_CACHE_PREFIX = "connection_check_response_"
+CONNECTION_CHECK_WAIT_TIME = 1
+CONNECTION_CHECK_TIMEOUT = 1
+CONNECTION_CHECK_CACHE_TTL = 10
 
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,6 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         close = False
         self.permission = None
         self.connection_id = uuid.uuid4()
-        self.connection_check_response = False
 
         try:
             self.user = self.scope["user"]
@@ -104,16 +103,18 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
 
     async def set_connection_check_response(self, connection_id: str, response: bool):
         self.cache.set(
-            f"{CONNECTION_CHECK_PREFIX}{connection_id}",
+            f"{CONNECTION_CHECK_CACHE_PREFIX}{connection_id}",
             str(response),
             ex=CONNECTION_CHECK_CACHE_TTL,
         )
 
     async def get_connection_check_response(self):
-        response = self.cache.get(f"{CONNECTION_CHECK_PREFIX}{self.connection_id}")
+        response = self.cache.get(
+            f"{CONNECTION_CHECK_CACHE_PREFIX}{self.connection_id}"
+        )
 
         if response:
-            self.cache.delete(f"{CONNECTION_CHECK_PREFIX}{self.connection_id}")
+            self.cache.delete(f"{CONNECTION_CHECK_CACHE_PREFIX}{self.connection_id}")
 
         return response
 
