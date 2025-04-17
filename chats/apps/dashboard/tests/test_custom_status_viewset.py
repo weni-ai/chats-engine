@@ -1,4 +1,5 @@
 from datetime import timedelta
+
 import pytz
 from django.test import TestCase
 from django.utils import timezone
@@ -7,12 +8,6 @@ from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from chats.apps.accounts.models import User
-from chats.apps.projects.models import (
-    Project,
-    CustomStatusType,
-    CustomStatus,
-    ProjectPermission,
-)
 from chats.apps.api.v1.projects.viewsets import CustomStatusViewSet
 from chats.apps.projects.models import (
     CustomStatus,
@@ -146,4 +141,3 @@ class TestCustomStatusViewSet(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("Invalid end_time format", response.data["detail"])
         self.assertIn("Invalid end_time format", response.data["detail"])
-
