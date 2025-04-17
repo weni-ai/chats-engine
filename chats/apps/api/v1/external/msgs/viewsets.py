@@ -56,52 +56,6 @@ class MessageFlowViewset(
             serializer.data, status=status.HTTP_201_CREATED, headers=headers
         )
 
-    def perform_create(self, serializer):
-        if isinstance(serializer.validated_data, list):
-            # Verifica permissões para todos os rooms no batch
-            for validated_data in serializer.validated_data:
-                room = validated_data.get("room")
-                if self.request.auth and room.project_uuid != self.request.auth.project:
-                    self.permission_denied(
-                        self.request,
-                        message="Ticketer token permission failed on room project",
-                        code=403,
-                    )
-
-            # Usa o método create do serializer que já suporta batch
-            instances = serializer.save()
-
-            # Processa notificações e trigger_default_message para cada mensagem
-            rooms_processed = set()
-            for instance in instances:
-                room = instance.room
-                if room and room.uuid not in rooms_processed:
-                    room.notify_room("create")
-                    rooms_processed.add(room.uuid)
-
-                    if room.user is None and instance.contact:
-                        room.trigger_default_message()
-
-            return instances
-        else:
-            # Caso de mensagem única
-            validated_data = serializer.validated_data
-            room = validated_data.get("room")
-            if self.request.auth and room.project_uuid != self.request.auth.project:
-                self.permission_denied(
-                    self.request,
-                    message="Ticketer token permission failed on room project",
-                    code=403,
-                )
-            serializer.is_valid(raise_exception=True)
-            instance = serializer.save()
-            instance.notify_room("create")
-
-            if instance.room.user is None and instance.contact:
-                instance.room.trigger_default_message()
-
-            return instance
-
     def perform_update(self, serializer):
         instance = serializer.save()
         instance.notify_room("update")
