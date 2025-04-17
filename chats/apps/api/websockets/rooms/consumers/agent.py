@@ -72,15 +72,15 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 pass
 
         if self.permission:
-            # Only set status as OFFLINE if there are no other active connections
-            logger.info(
-                "User %s has been disconnected from connection %s. "
-                "Checking if they have other other active connections",
-                self.user.email,
-                self.connection_id,
-            )
-
             if USE_WS_CONNECTION_CHECK:
+                # Only set status as OFFLINE if there are no other active connections
+                logger.info(
+                    "User %s has been disconnected from connection %s. "
+                    "Checking if they have other other active connections",
+                    self.user.email,
+                    self.connection_id,
+                )
+
                 has_other_connections = await self.has_other_active_connections()
                 if not has_other_connections:
                     logger.info(
