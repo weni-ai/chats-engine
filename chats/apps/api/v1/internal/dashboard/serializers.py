@@ -13,10 +13,10 @@ class DashboardAgentsSerializer(serializers.Serializer):
             "url": f"chats:dashboard/view-mode/{obj.get('email', '')}",
             "type": "internal",
         }
-    
+
     def get_status(self, obj):
         custom_status_list = obj.get("custom_status") or []
-        
+
         if custom_status_list:
             for status_item in custom_status_list:
                 print(f"DEBUG - Custom status item: {status_item}")
@@ -25,16 +25,13 @@ class DashboardAgentsSerializer(serializers.Serializer):
                 is_active = status_item.get("is_active", False)
 
                 if status_type != "In-Service" and is_active:
-                    return {
-                        "status": "orange",
-                        "label": status_type
-                    }
-        
+                    return {"status": "orange", "label": status_type}
+
         if obj.get("status") == "ONLINE":
             return {"status": "green", "label": None}
         elif obj.get("status") == "OFFLINE":
             return {"status": "gray", "label": None}
-        
+
         return {"status": "gray", "label": None}
 
     def get_agent(self, obj):
@@ -57,7 +54,7 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
 
     def get_status(self, obj):
         custom_status_list = obj.get("custom_status") or []
-        
+
         if custom_status_list:
             for status_item in custom_status_list:
                 print(f"DEBUG - Custom status item: {status_item}")
@@ -66,16 +63,13 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
                 is_active = status_item.get("is_active", False)
 
                 if status_type != "In-Service" and is_active:
-                    return {
-                        "status": "orange",
-                        "label": status_type
-                    }
-        
+                    return {"status": "orange", "label": status_type}
+
         if obj.get("status") == "ONLINE":
             return {"status": "green", "label": None}
         elif obj.get("status") == "OFFLINE":
             return {"status": "gray", "label": None}
-        
+
         return {"status": "gray", "label": None}
 
     def get_agent(self, obj):

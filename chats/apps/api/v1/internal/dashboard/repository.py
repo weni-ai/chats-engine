@@ -1,13 +1,11 @@
-from django.db.models import Count, OuterRef, Q, Subquery, F
+from django.contrib.postgres.aggregates import JSONBAgg
+from django.contrib.postgres.fields import JSONField
+from django.db.models import Count, F, OuterRef, Q, Subquery
+from django.db.models.functions import JSONObject
 from django.utils import timezone
 
 from chats.apps.accounts.models import User
 from chats.apps.projects.models import ProjectPermission
-
-from django.db.models.functions import JSONObject
-from django.contrib.postgres.aggregates import JSONBAgg
-from django.contrib.postgres.fields import JSONField
-
 from chats.apps.projects.models.models import CustomStatus
 
 from .dto import Filters
@@ -95,7 +93,7 @@ class AgentRepository:
                     JSONObject(
                         status_type=F("status_type__name"),
                         break_time=F("break_time"),
-                        is_active=F("is_active")
+                        is_active=F("is_active"),
                     )
                 )
             )
@@ -177,7 +175,7 @@ class AgentRepository:
                     JSONObject(
                         status_type=F("status_type__name"),
                         break_time=F("break_time"),
-                        is_active=F("is_active")
+                        is_active=F("is_active"),
                     )
                 )
             )
@@ -194,22 +192,30 @@ class AgentRepository:
 
         # Filtros para os agentes baseados na hierarquia setor -> fila
         agents_filter = {}
-        
+
         # Caso 1: Tem fila e setor - filtra agentes que estão na fila específica que pertence ao setor
         if filters.queue and filters.sector:
-            agents_filter["project_permissions__queue_authorizations__queue"] = filters.queue
-            agents_filter["project_permissions__queue_authorizations__queue__sector"] = filters.sector
+            agents_filter["project_permissions__queue_authorizations__queue"] = (
+                filters.queue
+            )
+            agents_filter[
+                "project_permissions__queue_authorizations__queue__sector"
+            ] = filters.sector
         # Caso 2: Tem apenas fila - filtra agentes que estão na fila específica
         elif filters.queue:
-            agents_filter["project_permissions__queue_authorizations__queue"] = filters.queue
+            agents_filter["project_permissions__queue_authorizations__queue"] = (
+                filters.queue
+            )
         # Caso 3: Tem apenas setor - filtra agentes que estão em qualquer fila do setor
         elif filters.sector:
-            agents_filter["project_permissions__queue_authorizations__queue__sector"] = filters.sector
+            agents_filter[
+                "project_permissions__queue_authorizations__queue__sector"
+            ] = filters.sector
 
         # Aplica os filtros específicos de fila/setor, se houver
         if agents_filter:
             agents_query = agents_query.filter(**agents_filter).distinct()
-            
+
         agents_query = (
             agents_query.filter(project_permissions__project=project, is_active=True)
             .annotate(

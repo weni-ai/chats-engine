@@ -9,13 +9,16 @@ class SetMsgExternalIdUseCase:
             try:
                 message = Message.objects.select_for_update().get(uuid=msg_uuid)
                 message.external_id = external_id
-                message.save(update_fields=['external_id'])
+                message.save(update_fields=["external_id"])
                 return
             except Message.DoesNotExist:
                 try:
-                    message_media = MessageMedia.objects.select_for_update().get(uuid=msg_uuid)
-                    message_media.message.external_id = external_id
-                    message_media.save(update_fields=['external_id'])
+                    message_media = MessageMedia.objects.select_for_update().get(
+                        uuid=msg_uuid
+                    )
+                    message = message_media.message
+                    message.external_id = external_id
+                    message.save(update_fields=["external_id"])
                 except MessageMedia.DoesNotExist:
                     return
             except Exception as e:
