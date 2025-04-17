@@ -11,6 +11,9 @@ from django.utils import timezone
 from chats.core.cache import CacheClient
 
 
+USE_WS_CONNECTION_CHECK = getattr(settings, "USE_WS_CONNECTION_CHECK", False)
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -72,18 +75,27 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 self.user.email,
                 self.connection_id,
             )
-            has_other_connections = await self.has_other_active_connections()
-            if not has_other_connections:
+
+            if USE_WS_CONNECTION_CHECK:
+                has_other_connections = await self.has_other_active_connections()
+                if not has_other_connections:
+                    logger.info(
+                        "User %s has no other active connections, setting status to OFFLINE",
+                        self.user.email,
+                    )
+                    await self.set_user_status("OFFLINE")
+                else:
+                    logger.info(
+                        "User %s has other active connections, not setting status to OFFLINE",
+                        self.user.email,
+                    )
+
+            else:
                 logger.info(
-                    "User %s has no other active connections, setting status to OFFLINE",
+                    "WS Connection Check is disabled, setting status to OFFLINE",
                     self.user.email,
                 )
                 await self.set_user_status("OFFLINE")
-            else:
-                logger.info(
-                    "User %s has other active connections, not setting status to OFFLINE",
-                    self.user.email,
-                )
 
     async def set_connection_check_response(self, connection_id: str, response: bool):
         self.cache.set(
