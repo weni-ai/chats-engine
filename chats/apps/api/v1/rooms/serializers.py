@@ -5,6 +5,7 @@ from rest_framework import serializers
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactRelationsSerializer
+from chats.apps.api.v1.msgs.serializers import MessageSerializer
 from chats.apps.api.v1.queues.serializers import QueueSerializer
 from chats.apps.api.v1.sectors.serializers import DetailSectorTagSerializer
 from chats.apps.queues.models import Queue
@@ -79,10 +80,13 @@ class RoomSerializer(serializers.ModelSerializer):
         last_message = (
             room.messages.order_by("-created_on")
             .exclude(user__isnull=True, contact__isnull=True)
-            .exclude(text="")
             .first()
         )
-        return "" if last_message is None else last_message.text
+
+        if not last_message:
+            return None
+
+        return MessageSerializer(last_message).data
 
     def get_can_edit_custom_fields(self, room: Room):
         return room.queue.sector.can_edit_custom_fields
