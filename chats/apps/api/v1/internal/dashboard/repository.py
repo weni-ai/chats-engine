@@ -134,11 +134,25 @@ class AgentRepository:
         rooms_filter = {}
         closed_rooms = {}
         opened_rooms = {}
+        agents_filter = {}
 
         if filters.queue:
             rooms_filter["rooms__queue"] = filters.queue
+            agents_filter[
+                "project_permissions__queue_authorizations__queue"
+            ] = filters.queue
         elif filters.sector:
             rooms_filter["rooms__queue__sector"] = filters.sector
+            agents_filter[
+                "project_permissions__queue_authorizations__queue__sector__in"
+            ] = filters.sector
+        elif filters.queue and filters.sector:
+            agents_filter[
+                "project_permissions__queue_authorizations__queue"
+            ] = filters.queue
+            agents_filter[
+                "project_permissions__queue_authorizations__queue__sector__in"
+            ] = filters.sector
         else:
             rooms_filter["rooms__queue__sector__project"] = project
 
@@ -189,6 +203,9 @@ class AgentRepository:
             agents_query = agents_query.exclude(email__endswith="weni.ai")
         if filters.agent:
             agents_query = agents_query.filter(email=filters.agent)
+
+        if agents_filter:
+            agents_query = agents_query.filter(**agents_filter).distinct()
 
         agents_query = (
             agents_query.filter(project_permissions__project=project, is_active=True)
