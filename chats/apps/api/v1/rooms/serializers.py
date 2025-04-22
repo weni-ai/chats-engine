@@ -97,7 +97,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
     contact = serializers.SerializerMethodField()
     queue = serializers.SerializerMethodField()
     unread_msgs = serializers.IntegerField(required=False, default=0)
-    last_message = serializers.CharField(read_only=True, source="last_message_text")
+    last_message = serializers.SerializerMethodField()
     is_waiting = serializers.BooleanField()
     is_24h_valid = serializers.BooleanField(
         default=True, source="is_24h_valid_computed"
@@ -158,6 +158,15 @@ class ListRoomSerializer(serializers.ModelSerializer):
 
     def get_can_edit_custom_fields(self, room: Room):
         return room.queue.sector.can_edit_custom_fields
+
+    def get_last_message(self, room: Room):
+        last_message = (
+            room.messages.order_by("-created_on")
+            .exclude(user__isnull=True, contact__isnull=True)
+            .first()
+        )
+
+        return MessageSerializer(last_message).data
 
 
 class TransferRoomSerializer(serializers.ModelSerializer):
