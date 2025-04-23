@@ -1,13 +1,11 @@
-from django.db.models import Count, OuterRef, Q, Subquery, F
+from django.contrib.postgres.aggregates import JSONBAgg
+from django.contrib.postgres.fields import JSONField
+from django.db.models import Count, F, OuterRef, Q, Subquery
+from django.db.models.functions import JSONObject
 from django.utils import timezone
 
 from chats.apps.accounts.models import User
 from chats.apps.projects.models import ProjectPermission
-
-from django.db.models.functions import JSONObject
-from django.contrib.postgres.aggregates import JSONBAgg
-from django.contrib.postgres.fields import JSONField
-
 from chats.apps.projects.models.models import CustomStatus
 
 from .dto import Filters
@@ -49,10 +47,10 @@ class AgentRepository:
             # - Agents that are linked to rooms related to the sector
             #   (even if they don't have authorization to the sector anymore)
 
-            rooms_filter["rooms__queue__sector"] = filters.sector
+            rooms_filter["rooms__queue__sector__in"] = filters.sector
             agents_filters &= Q(
-                project_permissions__sector_authorizations__sector=filters.sector
-            ) | Q(rooms__queue__sector=filters.sector)
+                project_permissions__sector_authorizations__sector__in=filters.sector
+            ) | Q(rooms__queue__sector__in=filters.sector)
         else:
             rooms_filter["rooms__queue__sector__project"] = project
         if filters.tag:
