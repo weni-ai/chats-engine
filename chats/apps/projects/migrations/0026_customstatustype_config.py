@@ -15,4 +15,4 @@ class Migration(migrations.Migration):
             name="config",
             field=models.JSONField(blank=True, null=True, verbose_name="config"),
         ),
-    ] 
+    ]
