@@ -18,7 +18,6 @@ from rest_framework.exceptions import ValidationError
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
-from chats.apps.queues.utils import start_queue_priority_routing
 from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
 from chats.core.models import BaseConfigurableModel
@@ -295,13 +294,6 @@ class Room(BaseModel, BaseConfigurableModel):
             if project:
                 # Atualizar status do agente - deve ser feito após o save
                 InServiceStatusService.room_closed(user_before_close, project)
-
-        if self.queue:
-            logger.info(
-                "Calling start_queue_priority_routing for room %s when closing it",
-                self.uuid,
-            )
-            start_queue_priority_routing(self.queue)
 
     def request_callback(self, room_data: dict):
         if self.callback_url is None:
