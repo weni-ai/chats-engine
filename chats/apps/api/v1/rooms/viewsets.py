@@ -151,7 +151,6 @@ class RoomViewset(
             status=status.HTTP_200_OK,
         )
 
-    @transaction.atomic
     @action(detail=True, methods=["PUT", "PATCH"], url_name="close")
     def close(
         self, request, *args, **kwargs
@@ -160,11 +159,16 @@ class RoomViewset(
         Close a room, setting the ended_at date and turning the is_active flag as false
         """
         # Add send room notification to the channels group
-        instance = self.get_object()
+        instance: Room = self.get_object()
 
         tags = request.data.get("tags", None)
-        instance.close(tags, "agent")
+
+        with transaction.atomic():
+            instance.close(tags, "agent")
+
+        instance.refresh_from_db()
         serialized_data = RoomSerializer(instance=instance)
+
         instance.notify_queue("close", callback=True)
         instance.notify_user("close")
 
@@ -175,6 +179,13 @@ class RoomViewset(
 
         room_client = RoomInfoUseCase()
         room_client.get_room(instance)
+
+        if instance.queue:
+            logger.info(
+                "Calling start_queue_priority_routing for room %s when closing it",
+                instance.uuid,
+            )
+            start_queue_priority_routing(instance.queue)
 
         return Response(serialized_data.data, status=status.HTTP_200_OK)
 

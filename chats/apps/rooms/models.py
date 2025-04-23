@@ -203,13 +203,6 @@ class Room(BaseModel, BaseConfigurableModel):
 
         self.save()
 
-        if self.queue:
-            logger.info(
-                "Calling start_queue_priority_routing for room %s when closing it",
-                self.uuid,
-            )
-            start_queue_priority_routing(self.queue)
-
     def request_callback(self, room_data: dict):
         if self.callback_url is None:
             return None
