@@ -40,6 +40,24 @@ class TemplateType(BaseSoftDeleteModel, BaseModel):
         verbose_name_plural = "TemplateTypes"
 
 
+class RoomRoutingType(models.TextChoices):
+    """
+    GENERAL: Agents can select rooms from the queue.
+    If agents are online and have not reached the limit of rooms,
+    new rooms are routed to them, despite rooms waiting in the queue.
+
+    QUEUE_PRIORITY: Rooms are routed based on the queue priority,
+    with new rooms being added to the end of the queue, even if agents
+    are online and have not reached the limit of rooms.
+    They cannot select the room from the queue.
+    When an agent becomes available, the system will assign
+    the oldest room in the queue to them.
+    """
+
+    GENERAL = "GENERAL"
+    QUEUE_PRIORITY = "QUEUE_PRIORITY"
+
+
 class Project(BaseConfigurableModel, BaseModel):
     DATE_FORMAT_DAY_FIRST = "D"
     DATE_FORMAT_MONTH_FIRST = "M"
@@ -69,6 +87,17 @@ class Project(BaseConfigurableModel, BaseModel):
         blank=True,
     )
     org = models.CharField(_("org uuid"), max_length=50, null=True, blank=True)
+    room_routing_type = models.CharField(
+        _("Room routing type"),
+        max_length=50,
+        null=True,
+        blank=True,
+        choices=RoomRoutingType.choices,
+        default=RoomRoutingType.GENERAL,
+        help_text=_(
+            "Whether to route rooms using the queue priority or general routing"
+        ),
+    )
 
     class Meta:
         verbose_name = _("Project")
