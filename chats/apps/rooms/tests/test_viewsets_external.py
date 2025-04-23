@@ -236,9 +236,14 @@ class RoomsQueuePriorityExternalTests(APITestCase):
 
         return client.post(url, data=data, format="json")
 
+    @patch("chats.apps.api.v1.external.rooms.serializers.start_queue_priority_routing")
+    @patch("chats.apps.api.v1.external.rooms.serializers.logger")
     def test_create_room_with_queue_priority_when_queue_is_empty_and_no_user_is_online(
         self,
+        mock_logger,
+        mock_start_queue_priority_routing,
     ):
+        mock_start_queue_priority_routing.return_value = None
         data = {
             "queue_uuid": str(self.queue.uuid),
             "contact": {
@@ -255,9 +260,18 @@ class RoomsQueuePriorityExternalTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertIsNone(response.data.get("user"))
 
+        mock_start_queue_priority_routing.assert_not_called()
+        mock_logger.assert_not_called()
+
+    @patch("chats.apps.api.v1.external.rooms.serializers.start_queue_priority_routing")
+    @patch("chats.apps.api.v1.external.rooms.serializers.logger")
     def test_create_room_with_queue_priority_when_queue_is_empty_and_user_is_online(
         self,
+        mock_logger,
+        mock_start_queue_priority_routing,
     ):
+        mock_start_queue_priority_routing.return_value = None
+
         user = User.objects.create(
             email="user@email.com",
         )
@@ -280,9 +294,18 @@ class RoomsQueuePriorityExternalTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data.get("user").get("email"), user.email)
 
+        mock_start_queue_priority_routing.assert_not_called()
+        mock_logger.assert_not_called()
+
+    @patch("chats.apps.api.v1.external.rooms.serializers.start_queue_priority_routing")
+    @patch("chats.apps.api.v1.external.rooms.serializers.logger")
     def test_create_room_with_queue_priority_when_user_is_online_but_queue_is_not_empty(
         self,
+        mock_logger,
+        mock_start_queue_priority_routing,
     ):
+        mock_start_queue_priority_routing.return_value = None
+
         user = User.objects.create(
             email="user@email.com",
         )
@@ -328,6 +351,12 @@ class RoomsQueuePriorityExternalTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertIsNone(response.data.get("user"))
+
+        mock_start_queue_priority_routing.assert_called_once_with(self.queue)
+        mock_logger.info.assert_any_call(
+            "Calling start_queue_priority_routing for queue %s from get_room_user because the queue is not empty",
+            self.queue.uuid,
+        )
 
 
 class RoomsFlowStartExternalTests(APITestCase):

@@ -1,7 +1,12 @@
+from datetime import time
+from unittest.mock import patch
 from django.db import IntegrityError
+from django.test import TestCase
 from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
+from chats.apps.projects.models.models import Project, RoomRoutingType
+from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 
@@ -176,3 +181,61 @@ class PropertyTests(APITestCase):
             self.sector_auth.permission.user
         )
         self.assertTrue(self.sector_auth.permission.pk, permission_returned.pk)
+
+
+class TestSectorSave(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(
+            name="Test Project",
+            room_routing_type=RoomRoutingType.QUEUE_PRIORITY,
+        )
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=1,
+            work_start=time(hour=5, minute=0),
+            work_end=time(hour=23, minute=59),
+        )
+        self.queue = Queue.objects.create(
+            name="Test Queue",
+            sector=self.sector,
+        )
+
+    @patch("chats.apps.sectors.models.start_queue_priority_routing")
+    @patch("chats.apps.sectors.models.logger")
+    def test_start_queue_priority_routing_when_rooms_limit_is_increased(
+        self,
+        mock_logger,
+        mock_start_queue_priority_routing,
+    ):
+        mock_start_queue_priority_routing.return_value = None
+
+        self.sector.rooms_limit = 2
+        self.sector.save()
+
+        mock_start_queue_priority_routing.assert_called_once_with(self.queue)
+
+        mock_logger.info.assert_called_once_with(
+            "Rooms limit increased for sector %s (%s), triggering queue priority routing",
+            self.sector.name,
+            self.sector.pk,
+        )
+
+    @patch("chats.apps.sectors.models.start_queue_priority_routing")
+    def test_start_queue_priority_routing_when_rooms_limit_is_decreased(
+        self,
+        mock_start_queue_priority_routing,
+    ):
+        self.sector.rooms_limit = 0
+        self.sector.save()
+
+        mock_start_queue_priority_routing.assert_not_called()
+
+    @patch("chats.apps.sectors.models.start_queue_priority_routing")
+    def test_start_queue_priority_routing_when_rooms_limit_is_not_changed(
+        self,
+        mock_start_queue_priority_routing,
+    ):
+        self.sector.save()
+
+        mock_start_queue_priority_routing.assert_not_called()
