@@ -1,3 +1,10 @@
+# 3.18.3
+## Add
+  - Support to filter by multiple sectors in human service dashboard.
+## Fix
+  - Alters the agents status (online / offline) logic when disconnecting from websocket, to consider multiple connections and avoid setting the status as offline when disconnecting from only one of them.
+  - Alters some unit tests to eliminate inconsistencies and failures caused by relying on specific time intervals during testing.
+    
 # 3.18.2
 ## Add
   - Add whatsapp external_id on messages
