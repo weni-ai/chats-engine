@@ -38,7 +38,8 @@ def start_queue_priority_routing_for_all_queues_in_project(project: Project):
     """
     if not project.use_queue_priority_routing:
         logger.info(
-            "Skipping start_queue_priority_routing_for_all_queues_in_project for project %s because it is not configured to use priority routing",
+            "Skipping start_queue_priority_routing_for_all_queues_in_project for project %s "
+            "because it is not configured to use priority routing",
             project.uuid,
         )
         return
