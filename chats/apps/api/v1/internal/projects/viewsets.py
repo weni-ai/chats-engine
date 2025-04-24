@@ -116,12 +116,12 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
                 instance.status = ProjectPermission.STATUS_ONLINE
                 instance.save()
 
-                start_queue_priority_routing_for_all_queues_in_project(instance.project)
-
             elif user_status.lower() == "offline":
                 instance.status = ProjectPermission.STATUS_OFFLINE
                 instance.save()
             instance.notify_user("update")
+
+            start_queue_priority_routing_for_all_queues_in_project(instance.project)
 
         elif request.method == "GET":
             project_uuid = request.query_params.get("project")
