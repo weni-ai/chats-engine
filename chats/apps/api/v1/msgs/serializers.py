@@ -185,6 +185,7 @@ class MessageSerializer(BaseMessageSerializer):
     """Serializer for the messages endpoint"""
 
     media = MessageMediaSimpleSerializer(many=True, required=False)
+    replied_message = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ChatMessage
@@ -198,6 +199,8 @@ class MessageSerializer(BaseMessageSerializer):
             "seen",
             "media",
             "created_on",
+            "metadata",
+            "replied_message",
         ]
         read_only_fields = [
             "uuid",
@@ -205,6 +208,57 @@ class MessageSerializer(BaseMessageSerializer):
             "created_on",
             "contact",
         ]
+
+    def get_replied_message(self, obj):
+        if (
+            not obj.metadata
+            or not isinstance(obj.metadata, dict)
+            or "context" not in obj.metadata
+        ):
+            return None
+
+        context = obj.metadata.get("context")
+        if not context or not isinstance(context, dict) or "id" not in context:
+            return None
+
+        try:
+            replied_id = context.get("id")
+            replied_msg = ChatMessage.objects.get(uuid=replied_id)
+
+            result = {
+                "uuid": str(replied_msg.uuid),
+                "text": replied_msg.text or "",
+            }
+
+            media_items = replied_msg.medias.all()
+            if media_items.exists():
+                media_data = []
+                for media in media_items:
+                    media_data.append(
+                        {
+                            "content_type": media.content_type,
+                            "message": str(media.message.uuid),
+                            "url": media.url,
+                            "created_on": media.created_on,
+                        }
+                    )
+                result["media"] = media_data
+
+            if replied_msg.user:
+                result["user"] = {
+                    "uuid": str(replied_msg.user.uuid),
+                    "name": replied_msg.user.get_full_name(),
+                }
+
+            if replied_msg.contact:
+                result["contact"] = {
+                    "uuid": str(replied_msg.contact.uuid),
+                    "name": replied_msg.contact.name,
+                }
+
+            return result
+        except ChatMessage.DoesNotExist:
+            return None
 
 
 class MessageWSSerializer(MessageSerializer):
