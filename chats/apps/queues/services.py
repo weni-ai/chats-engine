@@ -65,6 +65,8 @@ class QueueRouterService:
             room.user = agent
             room.save()
 
+            room.notify_user("update")
+
             rooms_routed += 1
 
         logger.info(
