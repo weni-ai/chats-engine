@@ -1,3 +1,5 @@
+from datetime import time
+from unittest.mock import patch
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
@@ -5,6 +7,7 @@ from rest_framework.test import APITestCase
 
 from chats.apps.api.utils import create_contact, create_user_and_token
 from chats.apps.projects.models import Project, ProjectPermission
+from chats.apps.projects.models.models import RoomRoutingType
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorAuthorization
@@ -331,3 +334,108 @@ class RoomsManagerTests(APITestCase):
         room.refresh_from_db()
         self.assertEquals(response.status_code, status.HTTP_200_OK)
         self.assertEquals(room.user, self.agent_2)
+
+
+class RoomsBulkTransferTestCase(APITestCase):
+    def setUp(self) -> None:
+        self.project = Project.objects.create(
+            name="Test Project",
+            room_routing_type=RoomRoutingType.QUEUE_PRIORITY,
+        )
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=1,
+            work_start=time(hour=5, minute=0),
+            work_end=time(hour=23, minute=59),
+        )
+        self.queue = Queue.objects.create(
+            name="Test Queue",
+            sector=self.sector,
+        )
+
+        self.agent_1 = User.objects.create(
+            email="test_agent_1@example.com",
+        )
+        self.agent_2 = User.objects.create(
+            email="test_agent_2@example.com",
+        )
+
+        for agent in [self.agent_1, self.agent_2]:
+            perm = ProjectPermission.objects.create(
+                project=self.project,
+                user=agent,
+                role=ProjectPermission.ROLE_ADMIN,
+                status="ONLINE",
+            )
+            QueueAuthorization.objects.create(
+                queue=self.queue,
+                permission=perm,
+                role=QueueAuthorization.ROLE_AGENT,
+            )
+
+        self.room = Room.objects.create(
+            queue=self.queue,
+            user=self.agent_1,
+        )
+
+        self.client.force_authenticate(user=self.agent_1)
+
+    @patch("chats.apps.api.v1.rooms.viewsets.start_queue_priority_routing")
+    @patch("chats.apps.api.v1.rooms.viewsets.logger")
+    def test_bulk_transfer_to_user(
+        self, mock_logger, mock_start_queue_priority_routing
+    ):
+        mock_start_queue_priority_routing.return_value = None
+
+        url = reverse("room-bulk_transfer")
+
+        response = self.client.patch(
+            url,
+            data={
+                "rooms_list": [self.room.uuid],
+            },
+            format="json",
+            QUERY_STRING=f"user_email={self.agent_2.email}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        mock_start_queue_priority_routing.assert_called_once()
+        mock_logger.info.assert_called_once_with(
+            "Starting queue priority routing for room %s from bulk transfer to user %s",
+            self.room.uuid,
+            self.agent_2.email,
+        )
+
+    @patch("chats.apps.api.v1.rooms.viewsets.start_queue_priority_routing")
+    @patch("chats.apps.api.v1.rooms.viewsets.logger")
+    def test_bulk_transfer_to_queue(
+        self, mock_logger, mock_start_queue_priority_routing
+    ):
+        mock_start_queue_priority_routing.return_value = None
+
+        url = reverse("room-bulk_transfer")
+
+        new_queue = Queue.objects.create(
+            name="New Queue",
+            sector=self.sector,
+        )
+
+        response = self.client.patch(
+            url,
+            data={
+                "rooms_list": [self.room.uuid],
+            },
+            format="json",
+            QUERY_STRING=f"queue_uuid={new_queue.uuid}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        mock_start_queue_priority_routing.assert_called_once()
+        mock_logger.info.assert_called_once_with(
+            "Starting queue priority routing for room %s from bulk transfer to queue %s",
+            self.room.uuid,
+            new_queue.uuid,
+        )
