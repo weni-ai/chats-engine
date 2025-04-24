@@ -46,7 +46,6 @@ class AgentRepository:
             #   (even if they were never assigned to a room from the sector)
             # - Agents that are linked to rooms related to the sector
             #   (even if they don't have authorization to the sector anymore)
-            print("filtro de setores", filters.sector)
             rooms_filter["rooms__queue__sector__in"] = filters.sector
             agents_filters &= Q(
                 project_permissions__sector_authorizations__sector__in=filters.sector
@@ -134,11 +133,27 @@ class AgentRepository:
         rooms_filter = {}
         closed_rooms = {}
         opened_rooms = {}
+        agents_filter = {}
 
-        if filters.queue:
+        if filters.queue and filters.sector:
             rooms_filter["rooms__queue"] = filters.queue
+            rooms_filter["rooms__queue__sector__in"] = filters.sector
+            agents_filter["project_permissions__queue_authorizations__queue"] = (
+                filters.queue
+            )
+            agents_filter[
+                "project_permissions__queue_authorizations__queue__sector__in"
+            ] = filters.sector
+        elif filters.queue:
+            rooms_filter["rooms__queue"] = filters.queue
+            agents_filter["project_permissions__queue_authorizations__queue"] = (
+                filters.queue
+            )
         elif filters.sector:
-            rooms_filter["rooms__queue__sector"] = filters.sector
+            rooms_filter["rooms__queue__sector__in"] = filters.sector
+            agents_filter[
+                "project_permissions__queue_authorizations__queue__sector__in"
+            ] = filters.sector
         else:
             rooms_filter["rooms__queue__sector__project"] = project
 
@@ -190,29 +205,6 @@ class AgentRepository:
         if filters.agent:
             agents_query = agents_query.filter(email=filters.agent)
 
-        # Filtros para os agentes baseados na hierarquia setor -> fila
-        agents_filter = {}
-
-        # Caso 1: Tem fila e setor - filtra agentes que estão na fila específica que pertence ao setor
-        if filters.queue and filters.sector:
-            agents_filter["project_permissions__queue_authorizations__queue"] = (
-                filters.queue
-            )
-            agents_filter[
-                "project_permissions__queue_authorizations__queue__sector"
-            ] = filters.sector
-        # Caso 2: Tem apenas fila - filtra agentes que estão na fila específica
-        elif filters.queue:
-            agents_filter["project_permissions__queue_authorizations__queue"] = (
-                filters.queue
-            )
-        # Caso 3: Tem apenas setor - filtra agentes que estão em qualquer fila do setor
-        elif filters.sector:
-            agents_filter[
-                "project_permissions__queue_authorizations__queue__sector"
-            ] = filters.sector
-
-        # Aplica os filtros específicos de fila/setor, se houver
         if agents_filter:
             agents_query = agents_query.filter(**agents_filter).distinct()
 

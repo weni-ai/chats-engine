@@ -24,8 +24,8 @@ class RoomFilter(filters.FilterSet):
         method="filter_project",
     )
     sector = filters.BaseInFilter(
+        field_name="queue__sector",
         required=False,
-        method="filter_sector",
     )
     agent = filters.CharFilter(
         field_name="user",

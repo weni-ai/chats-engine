@@ -1,19 +1,20 @@
-from datetime import datetime, timedelta
-from django.test import TestCase
-from rest_framework.test import APIRequestFactory, force_authenticate
-from django.utils import timezone
+from datetime import timedelta
+
 import pytz
-from rest_framework.request import Request
+from django.test import TestCase
+from django.utils import timezone
 from rest_framework.parsers import JSONParser
+from rest_framework.request import Request
+from rest_framework.test import APIRequestFactory, force_authenticate
 
 from chats.apps.accounts.models import User
+from chats.apps.api.v1.projects.viewsets import CustomStatusViewSet
 from chats.apps.projects.models import (
-    Project,
-    CustomStatusType,
     CustomStatus,
+    CustomStatusType,
+    Project,
     ProjectPermission,
 )
-from chats.apps.api.v1.projects.viewsets import CustomStatusViewSet
 
 
 class TestCustomStatusViewSet(TestCase):
@@ -57,7 +58,6 @@ class TestCustomStatusViewSet(TestCase):
 
     def test_last_status_without_active_status(self):
         """Testa o retorno quando não há status ativo"""
-
         CustomStatus.objects.all().update(is_active=False)
 
         request = self.factory.get("/custom-status/last-status/")
@@ -92,8 +92,7 @@ class TestCustomStatusViewSet(TestCase):
 
     def test_close_status_not_last_active(self):
         """Testa tentativa de fechar um status que não é o último ativo"""
-
-        newer_status = CustomStatus.objects.create(
+        CustomStatus.objects.create(
             user=self.user, status_type=self.status_type, is_active=True, break_time=0
         )
 
@@ -140,4 +139,5 @@ class TestCustomStatusViewSet(TestCase):
         response = self.viewset.close_status(request, pk=self.custom_status.pk)
 
         self.assertEqual(response.status_code, 400)
+        self.assertIn("Invalid end_time format", response.data["detail"])
         self.assertIn("Invalid end_time format", response.data["detail"])

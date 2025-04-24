@@ -12,6 +12,9 @@ from rest_framework.response import Response
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.api.v1.internal.projects import serializers
 from chats.apps.projects.models import Project, ProjectPermission
+from chats.apps.queues.utils import (
+    start_queue_priority_routing_for_all_queues_in_project,
+)
 from chats.core.views import persist_keycloak_user_by_email
 
 User = get_user_model()
@@ -112,6 +115,9 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
             if user_status.lower() == "online":
                 instance.status = ProjectPermission.STATUS_ONLINE
                 instance.save()
+
+                start_queue_priority_routing_for_all_queues_in_project(instance.project)
+
             elif user_status.lower() == "offline":
                 instance.status = ProjectPermission.STATUS_OFFLINE
                 instance.save()

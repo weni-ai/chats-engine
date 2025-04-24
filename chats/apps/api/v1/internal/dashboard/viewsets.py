@@ -62,7 +62,7 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
             start_date=params.get("start_date"),
             end_date=params.get("end_date"),
             agent=params.get("agent"),
-            sector=params.get("sector"),
+            sector=request.query_params.getlist("sector"),
             tag=params.get("tags"),
             queue=params.get("queue"),
             user_request=params.get("user_request", ""),
@@ -72,9 +72,7 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         agents_service = AgentsService()
         agents_data = agents_service.get_agents_custom_status(filters, project)
         agents = DashboardCustomAgentStatusSerializer(
-            agents_data,
-            many=True,
-            context={"project": project}
+            agents_data, many=True, context={"project": project}
         )
 
         return Response({"results": agents.data}, status.HTTP_200_OK)
