@@ -1,4 +1,6 @@
 from functools import cached_property
+import logging
+
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, transaction
@@ -34,6 +36,9 @@ from chats.apps.rooms.views import (
 )
 
 from .filters import RoomFilter, RoomMetricsFilter
+
+
+logger = logging.getLogger(__name__)
 
 
 def add_user_or_queue_to_room(instance, request):
@@ -99,6 +104,13 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
             return Response(serialized_data.data, status=status.HTTP_200_OK)
 
         close_room(str(instance.pk))
+
+        if instance.queue:
+            logger.info(
+                "Calling start_queue_priority_routing for room %s when closing it",
+                instance.uuid,
+            )
+            start_queue_priority_routing(instance.queue)
         return Response(serialized_data.data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["POST"])
