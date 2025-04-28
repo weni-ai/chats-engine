@@ -209,7 +209,10 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 event["content"].get("connection_id"),
                 event["content"].get("user_email"),
             )
-            if event["content"].get("connection_id") != str(self.connection_id):
+            if (
+                event["content"].get("connection_id") != str(self.connection_id)
+                and event["content"].get("user_email") == self.user.email
+            ):
                 logger.info(
                     "Connection ID: %s sending connection check response to user %s",
                     self.connection_id,
@@ -273,7 +276,10 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             {
                 "type": "notify",
                 "action": "connection_check",
-                "content": {"connection_id": str(self.connection_id)},
+                "content": {
+                    "connection_id": str(self.connection_id),
+                    "user_email": self.user.email,
+                },
             },
         )
 
