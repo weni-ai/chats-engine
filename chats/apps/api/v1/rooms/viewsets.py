@@ -33,6 +33,7 @@ from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.msgs.models import Message
 from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
+from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import (
     close_room,
@@ -252,7 +253,9 @@ class RoomViewset(
 
         # Create a message with the transfer data and Send to the room group
         # TODO separate create message in a function
-        create_room_feedback_message(instance, feedback, method="rt")
+        create_room_feedback_message(
+            instance, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+        )
 
         if old_user is None and user:  # queued > agent
             instance.notify_queue("update")
@@ -353,7 +356,9 @@ class RoomViewset(
             "old": old_custom_field_value,
             "new": new_custom_field_value,
         }
-        create_room_feedback_message(room, feedback, method="ecf")
+        create_room_feedback_message(
+            room, feedback, method=RoomFeedbackMethods.EDIT_CUSTOM_FIELDS
+        )
 
         return Response(
             {"Detail": "Custom Field edited with success"},
@@ -399,7 +404,9 @@ class RoomViewset(
         room.transfer_history = feedback
         room.save()
 
-        create_room_feedback_message(room, feedback, method="rt")
+        create_room_feedback_message(
+            room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+        )
         room.notify_queue("update")
         room.update_ticket()
 
@@ -466,7 +473,9 @@ class RoomViewset(
                     )
                     start_queue_priority_routing(room.queue)
 
-                    create_room_feedback_message(room, feedback, method="rt")
+                    create_room_feedback_message(
+                        room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+                    )
                     if old_user:
                         room.notify_user("update", user=old_user)
                     else:
@@ -501,7 +510,9 @@ class RoomViewset(
                     room.transfer_history = feedback
                     room.save()
 
-                    create_room_feedback_message(room, feedback, method="rt")
+                    create_room_feedback_message(
+                        room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+                    )
                     room.notify_user("update", user=transfer_user)
                     room.notify_queue("update")
 
