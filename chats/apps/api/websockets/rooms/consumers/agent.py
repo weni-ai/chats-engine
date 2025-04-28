@@ -273,7 +273,10 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             {
                 "type": "notify",
                 "action": "connection_check",
-                "content": {"connection_id": str(self.connection_id)},
+                "content": {
+                    "connection_id": str(self.connection_id),
+                    "user_email": self.user.email,
+                },
             },
         )
 
