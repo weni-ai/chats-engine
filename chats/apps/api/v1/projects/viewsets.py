@@ -50,6 +50,7 @@ from chats.apps.projects.models import (
     ProjectPermission,
 )
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
+from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import create_room_feedback_message
 from chats.apps.sectors.models import Sector
@@ -366,7 +367,9 @@ class ProjectViewset(
         chats_flow_start.save()
         feedback = {"name": chats_flow_start.name}
         if chats_flow_start.room:
-            create_room_feedback_message(room, feedback, method="fs")
+            create_room_feedback_message(
+                room, feedback, method=RoomFeedbackMethods.FLOW_START
+            )
             room.notify_room("update")
         return Response(flow_start, status.HTTP_200_OK)
 
@@ -518,11 +521,7 @@ class ProjectViewset(
         try:
             project_uuid = request.query_params.get("project")
 
-            if not (
-                project := self.get_queryset()
-                .filter(uuid=project_uuid)
-                .first()
-            ):
+            if not (project := self.get_queryset().filter(uuid=project_uuid).first()):
                 return Response(
                     {"project": "Project not found"}, status.HTTP_404_NOT_FOUND
                 )
