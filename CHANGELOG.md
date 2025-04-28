@@ -1,3 +1,7 @@
+# 3.18.4
+## Add
+  - Full object on the last_message field on Rooms' data, to include media
+
 # 3.18.3
 ## Add
   - Support to filter by multiple sectors in human service dashboard.
