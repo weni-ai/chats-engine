@@ -7,6 +7,7 @@ omit =
     marketplace/settings.py
     *tests/*
     */chats/apps/api/v1/internal/rest_clients/*
+    chats/settings.py
 
 [report]
 fail_under = 75
