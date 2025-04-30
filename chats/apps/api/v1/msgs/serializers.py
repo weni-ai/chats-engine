@@ -210,6 +210,9 @@ class MessageSerializer(BaseMessageSerializer):
         ]
 
     def get_replied_message(self, obj):
+        if obj.metadata is None:
+            return None
+        
         context = obj.metadata.get("context", {})
         if not context or not isinstance(context, dict) or "id" not in context:
             return None
