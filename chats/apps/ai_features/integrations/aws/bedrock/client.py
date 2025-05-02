@@ -1,10 +1,13 @@
 import json
-
+import logging
 import boto3
 from botocore.exceptions import ClientError
 from django.conf import settings
 
 from chats.apps.ai_features.integrations.base_client import BaseClient
+
+
+logger = logging.getLogger(__name__)
 
 
 class BedrockClient(BaseClient):
@@ -34,5 +37,5 @@ class BedrockClient(BaseClient):
             return response_body.get("content")[0].get("text")
 
         except (ClientError, Exception) as e:
-            print(f"ERROR: Can't invoke '{self.model_id}'. Reason: {e}")
-            exit(1)
+            logger.error("ERROR: Can't invoke '%s'. Reason: %s", self.model_id, e)
+            raise e
