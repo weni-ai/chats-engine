@@ -2,6 +2,7 @@ import json
 
 import boto3
 from botocore.exceptions import ClientError
+from django.conf import settings
 
 from chats.apps.ai_features.integrations.base_client import BaseClient
 
@@ -14,7 +15,7 @@ class BedrockClient(BaseClient):
     def __init__(self, model_id: str):
         self.client = boto3.client(
             "bedrock-runtime",
-            region_name="us-east-1",  # TODO: make this configurable, use env variable
+            region_name=settings.AWS_BEDROCK_REGION_NAME,
         )
         self.model_id = model_id
 
