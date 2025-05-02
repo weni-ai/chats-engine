@@ -20,14 +20,14 @@ class MessageStatusConsumer(EDAConsumer):
         print(f"[MessageStatusConsumer] - Consuming a message. Body: {message.body}")
         body = JSONParser.parse(message.body)
 
-        if body.get("message_id"):
+        if (message_id := body.get("message_id")) and (
+            message_status := body.get("message_status")
+        ):
             update_message_usecase = UpdateStatusMessageUseCase()
-            update_message_usecase.update_status_message(
-                body["message_id"], body["message_status"]
-            )
+            update_message_usecase.update_status_message(message_id, message_status)
         else:
             print(
-                "[MessageStatusConsumer] - Skipping message. 'message_id' is missing or empty."
+                "[MessageStatusConsumer] - Skipping message. 'message_id' and/or 'message_status' is missing or empty."
             )
 
         channel.basic_ack(message.delivery_tag)
