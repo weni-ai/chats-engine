@@ -4,13 +4,13 @@ import boto3
 from botocore.exceptions import ClientError
 from django.conf import settings
 
-from chats.apps.ai_features.integrations.base_client import BaseClient
+from chats.apps.ai_features.integrations.base_client import BaseAIPlatformClient
 
 
 logger = logging.getLogger(__name__)
 
 
-class BedrockClient(BaseClient):
+class BedrockClient(BaseAIPlatformClient):
     """
     Bedrock client for AWS Bedrock.
     """
