@@ -1,3 +1,5 @@
+import uuid
+
 from channels.db import database_sync_to_async
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
@@ -19,6 +21,7 @@ class ManagerAgentRoomConsumer(AgentRoomConsumer):
         # Are they logged in?
         close = False
         self.permission = None
+        self.connection_id = uuid.uuid4()
         UserModel = None
 
         try:
