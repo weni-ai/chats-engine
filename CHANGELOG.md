@@ -1,3 +1,7 @@
+# 3.18.6
+## Fix
+  - Add connection id to ManagerAgentRoomConsumer
+
 # 3.18.5
 ## Add
   - Internal authentication for rooms, chat history and new messages creation
