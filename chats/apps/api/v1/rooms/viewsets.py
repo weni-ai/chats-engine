@@ -61,7 +61,7 @@ class RoomViewset(
     filterset_class = room_filters.RoomFilter
     search_fields = ["contact__name", "urn", "protocol", "service_chat"]
     ordering_fields = "__all__"
-    ordering = ["user", "-last_interaction"]
+    ordering = ["user", "-last_interaction", "created_on"]
 
     def get_permissions(self):
         permission_classes = [permissions.IsAuthenticated]
