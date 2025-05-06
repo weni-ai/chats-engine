@@ -1,4 +1,5 @@
 import json
+import logging
 import time
 from datetime import timedelta
 from typing import TYPE_CHECKING
@@ -26,6 +27,9 @@ from chats.apps.projects.models.models import RoomRoutingType
 if TYPE_CHECKING:
     from chats.apps.queues.models import Queue
     from chats.apps.projects.models.models import Project
+
+
+logger = logging.getLogger(__name__)
 
 
 class Room(BaseModel, BaseConfigurableModel):
@@ -201,8 +205,10 @@ class Room(BaseModel, BaseConfigurableModel):
         self.is_active = False
         self.ended_at = timezone.now()
         self.ended_by = end_by
+
         if tags is not None:
             self.tags.add(*tags)
+
         self.save()
 
     def request_callback(self, room_data: dict):
