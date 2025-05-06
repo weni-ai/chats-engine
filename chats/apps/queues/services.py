@@ -72,7 +72,7 @@ class QueueRouterService:
             room.save()
 
             room.notify_user("update")
-            room.notify_room("update")
+            room.notify_queue("update")
 
             feedback = create_transfer_json(
                 action="auto_assign_from_queue",
