@@ -4,6 +4,7 @@ from django.core.exceptions import (
     ObjectDoesNotExist,
     ValidationError,
 )
+from django.conf import settings
 from django.db import IntegrityError, models, transaction
 from django.db.models import Q, UniqueConstraint
 from django.utils.translation import gettext_lazy as _
@@ -201,6 +202,23 @@ class Project(BaseConfigurableModel, BaseModel):
         return sectors.filter(
             Q(sector_auth_filter | queue_auth_filter), **custom_filters
         ).distinct()
+
+    @property
+    def has_chats_summary(self):
+        """
+        Checks if the chat summary feature is enabled for this project.
+
+        The feature is enabled if:
+        1. `settings.AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS` is True, or
+        2. The project-specific configuration "has_chats_summary" is True.
+
+        Returns:
+            bool: True if chat summary is enabled, False otherwise.
+        """
+        if settings.AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS:
+            return True
+
+        return self.get_config("has_chats_summary", False)
 
 
 class ProjectPermission(

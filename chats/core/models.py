@@ -9,15 +9,12 @@ from chats.utils.websockets import send_channels_group
 
 class WebSocketsNotifiableMixin:
     @property
-    def serialized_ws_data(self) -> dict:
-        ...
+    def serialized_ws_data(self) -> dict: ...
 
     @property
-    def notification_groups(self) -> list:
-        ...
+    def notification_groups(self) -> list: ...
 
-    def get_action(self, action: str) -> str:
-        ...
+    def get_action(self, action: str) -> str: ...
 
     def notify(self, action: str, groups: list = [], content: dict = {}) -> None:
         if "." not in action:
@@ -78,6 +75,13 @@ class BaseConfigurableModel(models.Model):
 
     class Meta:
         abstract = True
+
+    def get_config(self, key: str, default: any = None) -> any:
+        """
+        Get a config value from the config field
+        """
+        config = self.config or {}
+        return config.get(key, default)
 
 
 class BaseIntegrationConfigurableModel(models.Model):
