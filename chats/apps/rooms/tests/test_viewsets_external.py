@@ -3,14 +3,17 @@ from unittest.mock import patch
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+from rest_framework.response import Response
+from chats.apps.contacts.models import Contact
+from chats.apps.projects.models.models import Project, RoomRoutingType
+from chats.apps.queues.models import Queue, User
+from chats.apps.rooms.models import Room
+from chats.apps.sectors.models import Sector
 from unittest import mock
-from chats.apps.accounts.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.models import Permission
 
 from chats.apps.api.utils import create_user_and_token
-from chats.apps.queues.models import Queue
-from chats.apps.rooms.models import Room
 
 
 class RoomsExternalTests(APITestCase):
@@ -215,6 +218,120 @@ class RoomsExternalTests(APITestCase):
 
         response = self._close_room(token, room.uuid)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class RoomsQueuePriorityExternalTests(APITestCase):
+    def setUp(self) -> None:
+        self.project = Project.objects.create(
+            room_routing_type=RoomRoutingType.QUEUE_PRIORITY,
+            timezone="America/Sao_Paulo",
+        )
+        self.sector = Sector.objects.create(
+            project=self.project, rooms_limit=1, work_start="00:00", work_end="23:59"
+        )
+        self.queue = Queue.objects.create(sector=self.sector)
+
+    def create_room(self, data: dict) -> Response:
+        url = reverse("external_rooms-list")
+        client = self.client
+        client.credentials(
+            HTTP_AUTHORIZATION=f"Bearer {self.project.external_token.uuid}"
+        )
+
+        return client.post(url, data=data, format="json")
+
+    def test_create_room_with_queue_priority_when_queue_is_empty_and_no_user_is_online(
+        self,
+    ):
+        data = {
+            "queue_uuid": str(self.queue.uuid),
+            "contact": {
+                "external_id": "e3955fd5-5705-55cd-b480-b45594b70282",
+                "name": "kallil",
+                "email": "kallil@email.com",
+                "phone": "+5511985543332",
+                "urn": "whatsapp:5521917078266?auth=eyJhbGciOiAiSFM",
+                "custom_fields": {},
+            },
+        }
+        response = self.create_room(data)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(response.data.get("user"))
+
+    def test_create_room_with_queue_priority_when_queue_is_empty_and_user_is_online(
+        self,
+    ):
+        user = User.objects.create(
+            email="user@email.com",
+        )
+        permission = self.project.permissions.create(user=user, status="ONLINE")
+        self.queue.authorizations.create(permission=permission, role=1)
+
+        data = {
+            "queue_uuid": str(self.queue.uuid),
+            "contact": {
+                "external_id": "e3955fd5-5705-55cd-b480-b45594b70282",
+                "name": "kallil",
+                "email": "kallil@email.com",
+                "phone": "+5511985543332",
+                "urn": "whatsapp:5521917078266?auth=eyJhbGciOiAiSFM",
+                "custom_fields": {},
+            },
+        }
+        response = self.create_room(data)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data.get("user").get("email"), user.email)
+
+    def test_create_room_with_queue_priority_when_user_is_online_but_queue_is_not_empty(
+        self,
+    ):
+        user = User.objects.create(
+            email="user@email.com",
+        )
+        permission = self.project.permissions.create(user=user, status="ONLINE")
+        self.queue.authorizations.create(permission=permission, role=1)
+
+        Room.objects.create(
+            queue=self.queue,
+            contact=Contact.objects.create(
+                external_id="e3955fd5-5705-55cd-b480-b45594b70282",
+            ),
+            user=user,
+            is_active=True,
+        )
+
+        # Room in waiting in the queue
+        Room.objects.create(
+            queue=self.queue,
+            contact=Contact.objects.create(
+                external_id="e581f4c4-5a3d-47f3-bdc6-158efd6062b5",
+            ),
+            is_active=True,
+        )
+
+        current_queue_size = self.queue.rooms.filter(
+            is_active=True, user__isnull=True
+        ).count()
+
+        self.assertEqual(current_queue_size, 1)
+
+        data = {
+            "queue_uuid": str(self.queue.uuid),
+            "contact": {
+                "external_id": "8b411ef7-46b2-414b-9ee0-6732301b257b",
+                "name": "kallil",
+                "email": "kallil@email.com",
+                "phone": "+5511985543332",
+                "urn": "whatsapp:5521917078266?auth=eyJhbGciOiAiSFM",
+                "custom_fields": {},
+            },
+        }
+        response = self.create_room(data)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(response.data.get("user"))
 
 
 class RoomsFlowStartExternalTests(APITestCase):
