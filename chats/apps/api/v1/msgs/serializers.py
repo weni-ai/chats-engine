@@ -218,7 +218,7 @@ class MessageSerializer(BaseMessageSerializer):
             return None
 
         try:
-            replied_id = context.get("id")
+            replied_id = context.get("uuid")
             replied_msg = ChatMessage.objects.get(uuid=replied_id)
 
             result = {
