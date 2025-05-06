@@ -1,3 +1,7 @@
+# 3.18.7
+## Add
+  - New rooms routing, to distribute rooms to agents based on queue priority
+
 # 3.18.6
 ## Fix
   - Add connection id to ManagerAgentRoomConsumer
