@@ -1,14 +1,18 @@
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
-from rest_framework.test import APITestCase
 from rest_framework.response import Response
+from rest_framework.test import APITestCase
 from chats.apps.api.utils import create_contact, create_user_and_token
 from chats.apps.contacts.models import Contact
 from chats.apps.projects.models import Project, ProjectPermission
+from chats.apps.projects.models.models import RoomRoutingType
+from chats.apps.projects.tests.decorators import with_project_permission
 from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.queues.tests.decorators import with_queue_authorization
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorAuthorization
+from chats.apps.sectors.tests.decorators import with_sector_authorization
 
 User = get_user_model()
 
@@ -418,3 +422,105 @@ class TestRoomsViewSet(APITestCase):
         self.assertEqual(
             response.json().get("results")[1].get("uuid"), str(room_1.uuid)
         )
+
+
+class RoomPickTests(APITestCase):
+    def setUp(self) -> None:
+        self.project = Project.objects.create()
+        self.sector = Sector.objects.create(
+            project=self.project, rooms_limit=10, work_start="05:00", work_end="23:00"
+        )
+        self.queue = Queue.objects.create(sector=self.sector)
+        self.room = Room.objects.create(queue=self.queue)
+
+        self.user = User.objects.create(email="test@example.com")
+
+        self.client.force_authenticate(user=self.user)
+
+    def pick_room_from_queue(self) -> Response:
+        url = reverse("room-pick_queue_room", kwargs={"pk": str(self.room.pk)})
+
+        return self.client.patch(url)
+
+    def test_cannot_pick_room_from_queue_without_project_permission(self):
+        response = self.pick_room_from_queue()
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data["detail"].code, "permission_denied")
+
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
+    def test_cannot_pick_room_if_room_is_not_queued(self):
+        self.room.user = User.objects.create(email="test2@example.com")
+        self.room.save(update_fields=["user"])
+
+        response = self.pick_room_from_queue()
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["detail"].code, "room_is_not_queued")
+
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
+    def test_can_pick_room_if_room_is_queued_as_admin(self):
+        self.room.queue = self.queue
+        self.room.save()
+
+        response = self.pick_room_from_queue()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    @with_project_permission(role=ProjectPermission.ROLE_ATTENDANT)
+    def test_cannot_pick_room_as_attendant_without_queue_authorization(self):
+        self.room.queue = self.queue
+        self.room.save()
+
+        response = self.pick_room_from_queue()
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data["detail"].code, "permission_denied")
+
+    @with_project_permission(role=ProjectPermission.ROLE_ATTENDANT)
+    @with_queue_authorization(role=QueueAuthorization.ROLE_AGENT)
+    def test_can_pick_room_as_attendant_with_queue_authorization(self):
+        self.room.queue = self.queue
+        self.room.save()
+
+        response = self.pick_room_from_queue()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    @with_project_permission(role=ProjectPermission.ROLE_ATTENDANT)
+    @with_queue_authorization(role=QueueAuthorization.ROLE_AGENT)
+    def test_cannot_pick_room_if_routing_type_is_queue_priority_and_user_is_not_project_admin_or_sector_manager(
+        self,
+    ):
+        self.project.room_routing_type = RoomRoutingType.QUEUE_PRIORITY
+        self.project.save(update_fields=["room_routing_type"])
+
+        response = self.pick_room_from_queue()
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(
+            response.data["detail"].code, "user_is_not_project_admin_or_sector_manager"
+        )
+
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
+    def test_can_pick_room_if_project_routing_type_is_queue_priority_and_user_is_project_admin(
+        self,
+    ):
+        self.project.room_routing_type = RoomRoutingType.QUEUE_PRIORITY
+        self.project.save(update_fields=["room_routing_type"])
+
+        response = self.pick_room_from_queue()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    @with_project_permission(role=ProjectPermission.ROLE_ATTENDANT)
+    @with_sector_authorization(role=SectorAuthorization.ROLE_MANAGER)
+    def test_can_pick_room_if_project_routing_type_is_queue_priority_and_user_has_sector_manager_role(
+        self,
+    ):
+        self.project.room_routing_type = RoomRoutingType.QUEUE_PRIORITY
+        self.project.save(update_fields=["room_routing_type"])
+
+        response = self.pick_room_from_queue()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)

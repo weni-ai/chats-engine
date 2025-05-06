@@ -1,6 +1,7 @@
 import json
 import time
 from datetime import timedelta
+from typing import TYPE_CHECKING
 
 import requests
 import sentry_sdk
@@ -14,9 +15,17 @@ from model_utils import FieldTracker
 from requests.exceptions import RequestException
 from rest_framework.exceptions import ValidationError
 
+from chats.apps.accounts.models import User
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
+
+from chats.apps.projects.models.models import RoomRoutingType
+
+
+if TYPE_CHECKING:
+    from chats.apps.queues.models import Queue
+    from chats.apps.projects.models.models import Project
 
 
 class Room(BaseModel, BaseConfigurableModel):
@@ -338,3 +347,27 @@ class Room(BaseModel, BaseConfigurableModel):
     def update_ticket(self):
         if self.ticket_uuid and self.user:
             FlowRESTClient().update_ticket_assignee(self.ticket_uuid, self.user.email)
+
+    def can_pick_queue(self, user: User) -> bool:
+        """
+        Checks if a user can pick a room from the queue.
+
+        If the project's routing type is QUEUE_PRIORITY, only project admins and sector managers can pick rooms.
+        Otherwise, any user with queue access can pick rooms.
+
+        Args:
+            user (User): The user attempting to pick from queue
+
+        Returns:
+            bool: Whether the user can pick from queue
+        """
+        queue: "Queue" = self.queue
+        project: "Project" = self.queue.sector.project
+
+        if not project.room_routing_type == RoomRoutingType.QUEUE_PRIORITY:
+            return True
+
+        is_project_admin = project.is_admin(user)
+        is_sector_manager = queue.sector.is_manager(user)
+
+        return is_project_admin or is_sector_manager
