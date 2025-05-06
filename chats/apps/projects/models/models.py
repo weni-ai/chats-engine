@@ -215,10 +215,9 @@ class Project(BaseConfigurableModel, BaseModel):
         Returns:
             bool: True if chat summary is enabled, False otherwise.
         """
-        if settings.AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS:
-            return True
-
-        return self.get_config("has_chats_summary", False)
+        return settings.AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS or self.get_config(
+            "has_chats_summary", False
+        )
 
 
 class ProjectPermission(
