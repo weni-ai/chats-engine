@@ -1,4 +1,5 @@
 from datetime import time
+import json
 from unittest.mock import patch
 from django.test import TestCase
 
@@ -9,6 +10,7 @@ from chats.apps.projects.models.models import (
 )
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.queues.services import QueueRouterService
+from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
 from chats.apps.accounts.models import User
@@ -34,10 +36,14 @@ class QueueRouterServiceTestCase(TestCase):
         self.service = QueueRouterService(self.queue)
 
         self.agent_1 = User.objects.create(
-            email="test_agent_1@example.com",
+            email="mirosmar@example.com",
+            first_name="Mirosmar",
+            last_name="José de Camargo",
         )
         self.agent_2 = User.objects.create(
-            email="test_agent_2@example.com",
+            email="welson@example.com",
+            first_name="Welson",
+            last_name="David de Camargo",
         )
 
         for agent in [self.agent_1, self.agent_2]:
@@ -152,3 +158,23 @@ class QueueRouterServiceTestCase(TestCase):
         room.refresh_from_db()
 
         self.assertEqual(room.user, self.agent_2)
+
+        self.assertEqual(room.messages.count(), 1)
+
+        try:
+            message_text = json.loads(room.messages.first().text)
+        except json.JSONDecodeError:
+            self.fail("Message text is not a valid JSON")
+
+        self.assertEqual(message_text.get("method"), RoomFeedbackMethods.ROOM_TRANSFER)
+        self.assertEqual(
+            message_text.get("content", {}).get("action"), "auto_assign_from_queue"
+        )
+        self.assertEqual(
+            message_text.get("content", {}).get("from"),
+            {"type": "queue", "name": self.queue.name},
+        )
+        self.assertEqual(
+            message_text.get("content", {}).get("to"),
+            {"type": "user", "name": self.agent_2.name},
+        )
