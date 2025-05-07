@@ -1,3 +1,4 @@
+from chats.apps.api.utils import calculate_in_service_time
 from rest_framework import serializers
 
 
@@ -45,7 +46,8 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
     closed = serializers.IntegerField(allow_null=True, required=False)
     status = serializers.SerializerMethodField()
     custom_status = serializers.SerializerMethodField()
-
+    in_service_time = serializers.SerializerMethodField()
+    
     def get_link(self, obj):
         return {
             "url": f"chats:dashboard/view-mode/{obj.get('email', '')}",
@@ -98,3 +100,6 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
         ]
 
         return result
+
+    def get_in_service_time(self, obj):
+        return calculate_in_service_time(obj.get("custom_status"))

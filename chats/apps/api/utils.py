@@ -1,6 +1,9 @@
 import uuid
 from typing import List
 
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
+
 from rest_framework.authtoken.models import Token
 
 from chats.apps.accounts.models import User
@@ -61,3 +64,18 @@ def ensure_timezone(dt, tz):
         except AttributeError:
             return dt.replace(tzinfo=tz)
     return dt
+
+def calculate_in_service_time(custom_status_list):
+    total = 0
+    now = timezone.now()
+    for status in custom_status_list or []:
+        if status["status_type"] == "In-Service":
+            if status["is_active"]:
+                created_on = status.get("created_on")
+                if created_on:
+                    created_on_dt = parse_datetime(created_on)
+                    if created_on_dt:
+                        total += int((now - created_on_dt).total_seconds())
+            else:
+                total += status.get("break_time", 0)
+    return total
