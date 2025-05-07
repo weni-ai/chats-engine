@@ -1,3 +1,7 @@
+# 3.18.8
+## Add
+  - New field in room serializer, config.
+
 # 3.18.7
 ## Add
   - New rooms routing, to distribute rooms to agents based on queue priority
