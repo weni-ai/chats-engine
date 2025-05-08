@@ -27,11 +27,12 @@ class ModuleHasPermission(permissions.BasePermission):
 
         try:
             cached_value = redis_connection.get(cache_key).decode()
-        except Exception:
-            LOGGER.info(
+        except Exception as e:
+            LOGGER.error(
                 "An error occurred while getting the cached value for user %s",
                 request.user.email,
             )
+            LOGGER.error(e)
             cached_value = None
 
         if cached_value is not None and cached_value == "true":
