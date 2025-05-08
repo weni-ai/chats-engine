@@ -40,7 +40,12 @@ class Message(BaseModelWithManualCreatedOn):
         _("External ID"), max_length=200, blank=True, null=True
     )
     metadata = models.JSONField(
-        _("message metadata"), blank=True, null=True, default=dict
+        _("message metadata"), blank=True, null=True, default=dict)
+
+    status = models.JSONField(
+        _("message status"),
+        blank=True,
+        null=True,
     )
 
     class Meta:
