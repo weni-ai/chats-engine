@@ -11,6 +11,9 @@ class ModuleHasPermission(permissions.BasePermission):
     cache_ttl = settings.INTERNAL_CLIENTS_PERM_CACHE_TTL
 
     def has_permission(self, request, view):  # pragma: no cover
+        if request.user.is_anonymous:
+            return False
+
         redis_connection = get_redis_connection()
 
         LOGGER.info(
