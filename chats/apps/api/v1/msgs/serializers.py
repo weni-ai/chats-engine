@@ -214,7 +214,7 @@ class MessageSerializer(BaseMessageSerializer):
             return None
         
         context = obj.metadata.get("context", {})
-        if not context or not isinstance(context, dict) or "id" not in context:
+        if not context or not isinstance(context, dict) or "uuid" not in context:
             return None
 
         try:
