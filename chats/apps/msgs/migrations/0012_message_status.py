@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("msgs", "0009_message_external_id"),
+        ("msgs", "0011_alter_message_metadata"),
     ]
 
     operations = [
