@@ -30,6 +30,7 @@ def check_module_permission(claims, user):
 class WeniOIDCAuthenticationBackend(OIDCAuthenticationBackend):
     cache_token = settings.OIDC_CACHE_TOKEN
     cache_ttl = settings.OIDC_CACHE_TTL
+    internal_token_cache_ttl = settings.OIDC_INTERNAL_TOKEN_CACHE_TTL
 
     def get_userinfo(self, access_token, *args):
         if not self.cache_token:
@@ -43,7 +44,17 @@ class WeniOIDCAuthenticationBackend(OIDCAuthenticationBackend):
             return json.loads(userinfo)
 
         userinfo = super().get_userinfo(access_token, *args)
-        redis_connection.set(access_token, json.dumps(userinfo), self.cache_ttl)
+
+        can_communicate_internally = userinfo.get("can_communicate_internally", False)
+
+        # Internal clients tokens have a longer cache time
+        cache_ttl = (
+            self.internal_token_cache_ttl
+            if can_communicate_internally
+            else self.cache_ttl
+        )
+
+        redis_connection.set(access_token, json.dumps(userinfo), cache_ttl)
 
         return userinfo
 
