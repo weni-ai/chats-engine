@@ -15,7 +15,9 @@ class ModuleHasPermission(permissions.BasePermission):
             return True
 
         has_perm = request.user.has_perm("accounts.can_communicate_internally")
-        redis_connection.set(cache_key, has_perm, self.cache_ttl)
+
+        if has_perm:
+            redis_connection.set(cache_key, has_perm, self.cache_ttl)
 
         return has_perm
 
