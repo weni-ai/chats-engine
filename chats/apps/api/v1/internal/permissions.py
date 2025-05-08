@@ -17,7 +17,7 @@ class ModuleHasPermission(permissions.BasePermission):
         try:
             cached_value = redis_connection.get(cache_key).decode()
         except Exception:
-            cache_key = None
+            cached_value = None
 
         if cached_value is not None and cached_value == "true":
             return True
