@@ -32,7 +32,7 @@ class ModuleHasPermission(permissions.BasePermission):
                 "An error occurred while getting the cached value for user %s",
                 request.user.email,
             )
-            cache_key = None
+            cached_value = None
 
         if cached_value is not None and cached_value == "true":
             LOGGER.info(
