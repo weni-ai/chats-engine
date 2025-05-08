@@ -13,14 +13,14 @@ class ModuleHasPermission(permissions.BasePermission):
         redis_connection = get_redis_connection()
 
         cache_key = f"internal_client_perm:{request.user.id}"
+        cached_value = redis_connection.get(cache_key)
 
-        try:
-            cached_value = redis_connection.get(cache_key).decode()
-        except Exception:
-            cached_value = None
+        if cached_value is not None:
+            if isinstance(cached_value, bytes):
+                cached_value = cached_value.decode()
 
-        if cached_value is not None and cached_value == "true":
-            return True
+            if cached_value == "true":
+                return True
 
         has_perm = request.user.has_perm("accounts.can_communicate_internally")
 
