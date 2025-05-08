@@ -24,7 +24,11 @@ class ModuleHasPermission(permissions.BasePermission):
         LOGGER.info("Getting cached value for user %s", request.user.email)
 
         cache_key = f"internal_client_perm:{request.user.id}"
-        cached_value = redis_connection.get(cache_key)
+
+        try:
+            cached_value = redis_connection.get(cache_key).decode()
+        except Exception:
+            cache_key = None
 
         if cached_value is not None and cached_value == "true":
             LOGGER.info(
