@@ -44,7 +44,8 @@ class WeniOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         userinfo = redis_connection.get(access_token)
 
         if userinfo is not None:
-            LOGGER.info("Cached user info found for user %s", userinfo.get("email"))
+            email = json.loads(userinfo).get("email")
+            LOGGER.info("Cached user info found for user %s", email)
             return json.loads(userinfo)
 
         LOGGER.info("Cached info not found, getting user info from keycloak")
