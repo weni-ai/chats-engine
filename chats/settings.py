@@ -309,6 +309,9 @@ OIDC_CACHE_TOKEN = env.bool(
 OIDC_CACHE_TTL = env.int(
     "OIDC_CACHE_TTL", default=600
 )  # Time-to-live for cached user tokens (default: 600 seconds).
+OIDC_INTERNAL_TOKEN_CACHE_TTL = env.int(
+    "OIDC_INTERNAL_TOKEN_CACHE_TTL", default=(60 * 60 * 6)
+)  # Time-to-live for cached user tokens (default: 6 hours).
 
 
 CONNECT_API_URL = env.str("CONNECT_API_URL", default="")
