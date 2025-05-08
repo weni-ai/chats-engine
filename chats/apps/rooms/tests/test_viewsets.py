@@ -348,19 +348,19 @@ class TestRoomsViewSet(APITestCase):
             user=self.user,
             project=self.project,
             role=ProjectPermission.ROLE_ATTENDANT,
-	)
+        )
         self.sector = Sector.objects.create(
             name="Test Sector",
             project=self.project,
-	    rooms_limit=10,
+            rooms_limit=10,
             work_start="09:00",
             work_end="18:00",
-	)
+        )
         self.queue = Queue.objects.create(
             name="Test Queue",
             sector=self.sector,
         )
-	self.queue_permission = QueueAuthorization.objects.create(
+        self.queue_permission = QueueAuthorization.objects.create(
             permission=self.project_permission,
             queue=self.queue,
             role=QueueAuthorization.ROLE_AGENT,

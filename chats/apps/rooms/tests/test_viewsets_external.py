@@ -30,6 +30,62 @@ class RoomsExternalTests(APITestCase):
 
         return client.post(url, data=data, format="json")
 
+    def _close_room(self, token: str, room_id: str):
+        url = reverse("external_rooms-close", kwargs={"uuid": room_id})
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+        return client.put(url, format="json")
+
+    @mock.patch(
+        "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
+    )
+    def test_create_external_room_with_internal_token(self, mock_get_userinfo):
+        # Mock the userinfo response
+        mock_get_userinfo.return_value = {
+            "sub": "test_user",
+            "email": "test_user@example.com",
+            "preferred_username": "test_user",
+            "given_name": "Test",
+            "family_name": "User",
+        }
+
+        user, token = create_user_and_token("test_user")
+
+        permission, created = Permission.objects.get_or_create(
+            codename="can_communicate_internally",
+            content_type=ContentType.objects.get_for_model(User),
+        )
+        user.user_permissions.add(permission)
+        self.client.force_authenticate(user)
+
+        data = {
+            "queue_uuid": str(self.queue_1.uuid),
+            "contact": {
+                "external_id": "e3955fd5-5705-60cd-b480-b45594b70282",
+                "name": "Foo Bar",
+                "email": "FooBar@weni.ai",
+                "phone": "+250788123123",
+                "custom_fields": {},
+            },
+        }
+
+        response = self._create_room(token, data)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_cannot_create_room_with_token_without_can_communicate_internally_perm(
+        self,
+    ):
+        user, token = create_user_and_token("test_user")
+        self.client.force_authenticate(user)
+
+        data = {
+            "queue_uuid": str(self.queue_1.uuid),
+        }
+        response = self._create_room(token, data)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
     def test_create_external_room(self, mock_is_attending):
         """
