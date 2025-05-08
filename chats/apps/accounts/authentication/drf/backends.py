@@ -33,7 +33,10 @@ class WeniOIDCAuthenticationBackend(OIDCAuthenticationBackend):
     internal_token_cache_ttl = settings.OIDC_INTERNAL_TOKEN_CACHE_TTL
 
     def get_userinfo(self, access_token, *args):
+        LOGGER.info("Getting user info for access token")
+
         if not self.cache_token:
+            LOGGER.info("Not using cache for the get user info operation")
             return super().get_userinfo(access_token, *args)
 
         redis_connection = get_redis_connection()
@@ -41,17 +44,33 @@ class WeniOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         userinfo = redis_connection.get(access_token)
 
         if userinfo is not None:
+            LOGGER.info("Cached user info found for user %s", userinfo.get("email"))
             return json.loads(userinfo)
 
+        LOGGER.info("Cached info not found, getting user info from keycloak")
         userinfo = super().get_userinfo(access_token, *args)
 
+        LOGGER.info(
+            "User %s info fetched from keycloak, checking if it has can_communicate_internally",
+            userinfo.get("email"),
+        )
         can_communicate_internally = userinfo.get("can_communicate_internally", False)
+
+        LOGGER.info(
+            "User %s has can_communicate_internally: %s",
+            userinfo.get("email"),
+            can_communicate_internally,
+        )
 
         # Internal clients tokens have a longer cache time
         cache_ttl = (
             self.internal_token_cache_ttl
             if can_communicate_internally
             else self.cache_ttl
+        )
+
+        LOGGER.info(
+            "Setting cache for user %s with ttl %s", userinfo.get("email"), cache_ttl
         )
 
         redis_connection.set(access_token, json.dumps(userinfo), cache_ttl)
