@@ -7,6 +7,12 @@ from chats.utils.websockets import send_channels_group
 class MessageStatusNotifier:
     @classmethod
     def notify_status_update(cls, message_uuid, message_status, permission_pk):
+        print("chegou no notify_status_update")
+        print("--------------------------------")
+        print(f"message_uuid: {message_uuid}")
+        print(f"message_status: {message_status}")
+        print(f"permission_pk: {permission_pk}")
+        print("--------------------------------")
         send_channels_group(
             group_name=f"permission_{permission_pk}",
             call_type="notify",
@@ -16,6 +22,11 @@ class MessageStatusNotifier:
 
     @classmethod
     def find_and_notify_for_message(cls, message_id, message_status):
+        print("chegou no find_and_notify_for_message")
+        print("--------------------------------")
+        print(f"message_id: {message_id}")
+        print(f"message_status: {message_status}")
+        print("--------------------------------")
         message_data = (
             Message.objects.filter(
                 external_id=message_id, room__is_active=True, room__user__isnull=False
@@ -28,15 +39,30 @@ class MessageStatusNotifier:
             )
             .first()
         )
+        print("depois de procurar a mensagem")
+        print("--------------------------------")
+        print(f"message_data: {message_data}")
+        print("--------------------------------")
 
         if message_data:
+            print("depois de verificar se a mensagem existe")   
+            print("--------------------------------")
             uuid, permission_pk = message_data
+            print("depois de pegar o uuid e o permission_pk")
+            print("--------------------------------")
             cls.notify_status_update(uuid, message_status, permission_pk)
+            print("depois de notificar o status da mensagem")
+            print("--------------------------------")
             return True
         return False
 
     @classmethod
     def find_and_notify_for_media(cls, message_id, message_status):
+        print("chegou no find_and_notify_for_media")
+        print("--------------------------------")
+        print(f"message_id: {message_id}")
+        print(f"message_status: {message_status}")
+        print("--------------------------------")
         media_data = (
             MessageMedia.objects.filter(
                 external_id=message_id,
@@ -53,20 +79,38 @@ class MessageStatusNotifier:
             )
             .first()
         )
-
+        print("depois de procurar a media") 
+        print("--------------------------------")
+        print(f"media_data: {media_data}")
+        print("--------------------------------")
         if media_data:
+            print("depois de verificar se a media existe")
+            print("--------------------------------")
             uuid, permission_pk = media_data
+            print("depois de pegar o uuid e o permission_pk")
+            print("--------------------------------")
             cls.notify_status_update(uuid, message_status, permission_pk)
+            print("depois de notificar o status da media")
+            print("--------------------------------")
             return True
         return False
 
 
 class UpdateStatusMessageUseCase:
     def update_status_message(self, message_id, message_status):
+        print("chegou no update_status_message")
+        print("--------------------------------")
+        print(f"message_id: {message_id}")
+        print(f"message_status: {message_status}")
+        print("--------------------------------")
         rows_updated = Message.objects.filter(external_id=message_id).update(
             status=message_status
         )
         if rows_updated > 0:
+            print("depois de atualizar a mensagem")
+            print("--------------------------------")
+            print("dado enviado", message_id, message_status)
+            print("--------------------------------")
             MessageStatusNotifier.find_and_notify_for_message(
                 message_id, message_status
             )
@@ -74,6 +118,6 @@ class UpdateStatusMessageUseCase:
 
         media_rows_updated = MessageMedia.objects.filter(external_id=message_id).update(
             message__status=message_status
-        )
+        )       
         if media_rows_updated > 0:
             MessageStatusNotifier.find_and_notify_for_media(message_id, message_status)

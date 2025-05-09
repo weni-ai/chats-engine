@@ -201,6 +201,7 @@ class MessageSerializer(BaseMessageSerializer):
             "created_on",
             "metadata",
             "replied_message",
+            "status",
         ]
         read_only_fields = [
             "uuid",
