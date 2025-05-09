@@ -2,7 +2,6 @@ import hmac
 import json
 import time
 
-from django.conf import settings
 from django.http import HttpRequest
 from django.test import TestCase, override_settings
 from rest_framework.exceptions import AuthenticationFailed
