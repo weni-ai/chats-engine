@@ -1,3 +1,15 @@
+# 3.18.8
+## Add
+  - New field in room serializer, config.
+
+# 3.18.7
+## Add
+  - New rooms routing, to distribute rooms to agents based on queue priority
+
+# 3.18.6
+## Fix
+  - Add connection id to ManagerAgentRoomConsumer
+
 # 3.18.5
 ## Add
   - Internal authentication for rooms, chat history and new messages creation

@@ -1,3 +1,4 @@
+import logging
 from functools import cached_property
 
 from django.conf import settings
@@ -23,6 +24,8 @@ from chats.apps.api.v1.external.rooms.serializers import (
 )
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.dashboard.models import RoomMetrics
+from chats.apps.queues.utils import start_queue_priority_routing
+from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import (
     close_room,
@@ -34,6 +37,9 @@ from chats.apps.rooms.views import (
 )
 
 from .filters import RoomFilter, RoomMetricsFilter
+
+
+logger = logging.getLogger(__name__)
 
 
 def add_user_or_queue_to_room(instance, request):
@@ -60,7 +66,9 @@ def add_user_or_queue_to_room(instance, request):
     instance.transfer_history = feedback
     instance.save()
     # Create a message with the transfer data and Send to the room group
-    create_room_feedback_message(instance, feedback, method="rt")
+    create_room_feedback_message(
+        instance, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+    )
 
     return instance
 
@@ -96,6 +104,13 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
             return Response(serialized_data.data, status=status.HTTP_200_OK)
 
         close_room(str(instance.pk))
+
+        if instance.queue:
+            logger.info(
+                "Calling start_queue_priority_routing for room %s when closing it",
+                instance.uuid,
+            )
+            start_queue_priority_routing(instance.queue)
         return Response(serialized_data.data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["POST"])
@@ -253,7 +268,9 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
         room.notify_queue("update")
         room.update_ticket()
 
-        create_room_feedback_message(room, feedback, method="rt")
+        create_room_feedback_message(
+            room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+        )
 
         time = timezone.now() - modified_on
         room_metric = RoomMetrics.objects.get_or_create(room=room)[0]
@@ -313,7 +330,9 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
             "new": new_custom_field_value,
         }
 
-        create_room_feedback_message(room, feedback, method="ecf")
+        create_room_feedback_message(
+            room, feedback, method=RoomFeedbackMethods.EDIT_CUSTOM_FIELDS
+        )
 
         return Response(
             {"Detail": "Custom Field edited with success"},
