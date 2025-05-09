@@ -1,5 +1,4 @@
 from rest_framework import routers
-from rest_framework.routers import DefaultRouter
 
 from chats.apps.api.v1.accounts.viewsets import LoginViewset, UserDataViewset
 from chats.apps.api.v1.contacts.viewsets import ContactViewset
