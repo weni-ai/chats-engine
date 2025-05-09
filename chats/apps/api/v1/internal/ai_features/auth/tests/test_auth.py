@@ -172,3 +172,42 @@ class AIFeaturesAuthenticationTests(TestCase):
             auth.authenticate(request)
 
         self.assertEqual(str(context.exception), "Timestamp is too old")
+
+    def test_authenticate_safe_method(self):
+        """Test authentication succeeds for safe methods"""
+        # Create a mock request with safe method
+        request = HttpRequest()
+        request._body = self.body
+        request.method = "GET"
+        request.headers = {
+            self.signature_header_name: self.valid_signature,
+            self.timestamp_header_name: self.timestamp,
+        }
+
+        auth = AIFeaturesAuthentication()
+        auth.authenticate(request)
+
+        request.method = "HEAD"
+        auth.authenticate(request)
+
+        request.method = "OPTIONS"
+        auth.authenticate(request)
+
+    def test_authenticate_invalid_timestamp_for_safe_method(self):
+        """Test authentication fails for safe methods with invalid timestamp"""
+        # Create a mock request with old timestamp
+        old_timestamp = str(int(time.time()) - 301)  # 301 seconds old
+        request = HttpRequest()
+        request._body = self.body
+        request.method = "GET"
+        request.headers = {
+            self.signature_header_name: self.valid_signature,
+            self.timestamp_header_name: old_timestamp,
+        }
+
+        auth = AIFeaturesAuthentication()
+
+        with self.assertRaises(AuthenticationFailed) as context:
+            auth.authenticate(request)
+
+        self.assertEqual(str(context.exception), "Timestamp is too old")

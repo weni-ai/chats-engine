@@ -4,6 +4,7 @@ import time
 from django.conf import settings
 from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.permissions import SAFE_METHODS
 
 
 def verify_signature(secret: str, signature: str, message):
@@ -50,6 +51,12 @@ class AIFeaturesAuthentication(BaseAuthentication):
             raise AuthenticationFailed("No timestamp found")
 
         verify_timestamp(timestamp)
+
+        if request.method in SAFE_METHODS:
+            message = str(timestamp)
+        else:
+            message = f"{request.body}+{timestamp}"
+
         message = f"{request.body}+{timestamp}"
 
         if not verify_signature(
