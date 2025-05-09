@@ -1,6 +1,5 @@
 from rest_framework import routers
 from rest_framework.routers import DefaultRouter
-from django.urls import path
 
 from chats.apps.api.v1.accounts.viewsets import LoginViewset, UserDataViewset
 from chats.apps.api.v1.contacts.viewsets import ContactViewset
@@ -20,7 +19,6 @@ from chats.apps.api.v1.groups_sectors.viewsets import (
     GroupSectorAuthorizationViewset,
     GroupSectorViewset,
 )
-from chats.apps.api.v1.internal.ai_features.views import FeaturePromptsView
 from chats.apps.api.v1.internal.dashboard.viewsets import InternalDashboardViewset
 from chats.apps.api.v1.internal.projects import viewsets as project_internal_views
 from chats.apps.api.v1.internal.rooms.viewsets import InternalListRoomsViewSet
@@ -167,13 +165,6 @@ router.register(
     "internal/rooms",
     InternalListRoomsViewSet,
     basename="room_internal",
-)
-router.urls.append(
-    path(
-        "internal/ai_features/prompts/",
-        FeaturePromptsView.as_view(),
-        name="ai_features_prompts",
-    )
 )
 
 # External

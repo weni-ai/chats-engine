@@ -55,9 +55,13 @@ class AIFeaturesAuthentication(BaseAuthentication):
         if request.method in SAFE_METHODS:
             message = str(timestamp)
         else:
-            message = f"{request.body}+{timestamp}"
+            body = (
+                request.body.decode()
+                if isinstance(request.body, bytes)
+                else request.body
+            )
 
-        message = f"{request.body}+{timestamp}"
+            message = f"{body}{timestamp}"
 
         if not verify_signature(
             settings.AI_FEATURES_PROMPTS_API_SECRET,
@@ -66,4 +70,13 @@ class AIFeaturesAuthentication(BaseAuthentication):
         ):
             raise AuthenticationFailed("Invalid signature")
 
-        verify_timestamp(timestamp)
+        # Return None to indicate authentication succeeded but no user is associated
+        return (None, None)
+
+    def authenticate_header(self, request):
+        """
+        Return a string to be used as the WWW-Authenticate header in a
+        401 Unauthorized response, or None if the authentication scheme
+        should return 403 Forbidden responses.
+        """
+        return "X-Weni-Signature X-Timestamp"
