@@ -36,6 +36,24 @@ class TemplateType(BaseSoftDeleteModel, BaseModel):
         verbose_name_plural = "TemplateTypes"
 
 
+class RoomRoutingType(models.TextChoices):
+    """
+    GENERAL: Agents can select rooms from the queue.
+    If agents are online and have not reached the limit of rooms,
+    new rooms are routed to them, despite rooms waiting in the queue.
+
+    QUEUE_PRIORITY: Rooms are routed based on the queue priority,
+    with new rooms being added to the end of the queue, even if agents
+    are online and have not reached the limit of rooms.
+    They cannot select the room from the queue.
+    When an agent becomes available, the system will assign
+    the oldest room in the queue to them.
+    """
+
+    GENERAL = "GENERAL"
+    QUEUE_PRIORITY = "QUEUE_PRIORITY"
+
+
 class Project(BaseConfigurableModel, BaseModel):
     DATE_FORMAT_DAY_FIRST = "D"
     DATE_FORMAT_MONTH_FIRST = "M"
@@ -65,6 +83,17 @@ class Project(BaseConfigurableModel, BaseModel):
         blank=True,
     )
     org = models.CharField(_("org uuid"), max_length=50, null=True, blank=True)
+    room_routing_type = models.CharField(
+        _("Room routing type"),
+        max_length=50,
+        null=True,
+        blank=True,
+        choices=RoomRoutingType.choices,
+        default=RoomRoutingType.GENERAL,
+        help_text=_(
+            "Whether to route rooms using the queue priority or general routing"
+        ),
+    )
 
     class Meta:
         verbose_name = _("Project")
@@ -188,6 +217,10 @@ class Project(BaseConfigurableModel, BaseModel):
             project_permissions__status="ONLINE",
         )
 
+    @property
+    def use_queue_priority_routing(self):
+        return self.room_routing_type == RoomRoutingType.QUEUE_PRIORITY
+
     def get_sectors(self, user, custom_filters: dict = {}):
         user_permission = self.get_permission(user)
         sectors = self.sectors.all()
@@ -201,6 +234,11 @@ class Project(BaseConfigurableModel, BaseModel):
         return sectors.filter(
             Q(sector_auth_filter | queue_auth_filter), **custom_filters
         ).distinct()
+
+    def is_admin(self, user):
+        return self.permissions.filter(
+            user=user, role=ProjectPermission.ROLE_ADMIN
+        ).exists()
 
 
 class ProjectPermission(

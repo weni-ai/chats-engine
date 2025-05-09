@@ -18,9 +18,17 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Project
-        fields = ["name", "date_format", "timezone", "config", "org"]
+        fields = [
+            "name",
+            "date_format",
+            "timezone",
+            "config",
+            "org",
+            "room_routing_type",
+        ]
         read_only_fields = [
             "timezone",
+            "room_routing_type",
         ]
 
     def get_config(self, project: Project):

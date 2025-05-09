@@ -1,3 +1,4 @@
+import logging
 from typing import Dict, List
 
 import pendulum
@@ -14,9 +15,14 @@ from chats.apps.api.v1.sectors.serializers import TagSimpleSerializer
 from chats.apps.contacts.models import Contact
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.msgs.models import Message, MessageMedia
+from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
+from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import close_room
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_active_room_flow_start(contact, flow_uuid, project):
@@ -63,7 +69,7 @@ def get_room_user(
     groups: List[Dict[str, str]],
     is_created: bool,
     flow_uuid,
-    project,
+    project: Project,
 ):
     # User that started the flow, if any
     reference_filter = [group["uuid"] for group in groups]
@@ -89,12 +95,32 @@ def get_room_user(
         if linked_user is not None and linked_user.is_online:
             return linked_user.user
 
-    # Online user on the queue
-    if not user:
-        return queue.available_agents.first() or None
-    permission = project.permissions.filter(user=user, status="ONLINE").exists()
+    if user and project.permissions.filter(user=user, status="ONLINE").exists():
+        return user
 
-    return user if permission else None
+    if project.use_queue_priority_routing:
+        current_queue_size = queue.rooms.filter(
+            is_active=True, user__isnull=True
+        ).count()
+
+        if current_queue_size == 0:
+            # If the queue is empty, the available user with the least number
+            # of rooms will be selected, if any.
+            return queue.available_agents.first()
+
+        logger.info(
+            "Calling start_queue_priority_routing for queue %s from get_room_user because the queue is not empty",
+            queue.uuid,
+        )
+        start_queue_priority_routing(queue)
+
+        # If the queue is not empty, the room must stay in the queue,
+        # so that, when a agent becomes available, the first room in the queue
+        # will be assigned to the them. This logic is not done here.
+        return None
+
+    # General room routing type
+    return queue.available_agents.first() or None
 
 
 class RoomListSerializer(serializers.ModelSerializer):

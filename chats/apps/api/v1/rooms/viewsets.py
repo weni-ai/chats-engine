@@ -1,12 +1,15 @@
 from datetime import timedelta
+import logging
 
 from django.conf import settings
 from django.db import transaction
 from django.db.models import BooleanField, Case, Count, Max, OuterRef, Q, Subquery, When
-from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
+from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.filters import OrderingFilter
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -29,6 +32,8 @@ from chats.apps.api.v1.rooms.serializers import (
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.msgs.models import Message
 from chats.apps.queues.models import Queue
+from chats.apps.queues.utils import start_queue_priority_routing
+from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import (
     close_room,
@@ -41,6 +46,9 @@ from chats.apps.rooms.views import (
 from django.utils.timezone import make_aware
 from datetime import datetime
 from chats.apps.projects.usecases.send_room_info import RoomInfoUseCase
+
+
+logger = logging.getLogger(__name__)
 
 
 class RoomViewset(
@@ -59,7 +67,7 @@ class RoomViewset(
     filterset_class = room_filters.RoomFilter
     search_fields = ["contact__name", "urn", "protocol", "service_chat"]
     ordering_fields = "__all__"
-    ordering = ["user", "-last_interaction"]
+    ordering = ["user", "-last_interaction", "created_on"]
 
     def get_permissions(self):
         permission_classes = [permissions.IsAuthenticated]
@@ -146,7 +154,6 @@ class RoomViewset(
             status=status.HTTP_200_OK,
         )
 
-    @transaction.atomic
     @action(detail=True, methods=["PUT", "PATCH"], url_name="close")
     def close(
         self, request, *args, **kwargs
@@ -155,11 +162,16 @@ class RoomViewset(
         Close a room, setting the ended_at date and turning the is_active flag as false
         """
         # Add send room notification to the channels group
-        instance = self.get_object()
+        instance: Room = self.get_object()
 
         tags = request.data.get("tags", None)
-        instance.close(tags, "agent")
+
+        with transaction.atomic():
+            instance.close(tags, "agent")
+
+        instance.refresh_from_db()
         serialized_data = RoomSerializer(instance=instance)
+
         instance.notify_queue("close", callback=True)
         instance.notify_user("close")
 
@@ -170,6 +182,13 @@ class RoomViewset(
 
         room_client = RoomInfoUseCase()
         room_client.get_room(instance)
+
+        if instance.queue:
+            logger.info(
+                "Calling start_queue_priority_routing for room %s when closing it",
+                instance.uuid,
+            )
+            start_queue_priority_routing(instance.queue)
 
         return Response(serialized_data.data, status=status.HTTP_200_OK)
 
@@ -233,7 +252,9 @@ class RoomViewset(
 
         # Create a message with the transfer data and Send to the room group
         # TODO separate create message in a function
-        create_room_feedback_message(instance, feedback, method="rt")
+        create_room_feedback_message(
+            instance, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+        )
 
         if old_user is None and user:  # queued > agent
             instance.notify_queue("update")
@@ -334,7 +355,9 @@ class RoomViewset(
             "old": old_custom_field_value,
             "new": new_custom_field_value,
         }
-        create_room_feedback_message(room, feedback, method="ecf")
+        create_room_feedback_message(
+            room, feedback, method=RoomFeedbackMethods.EDIT_CUSTOM_FIELDS
+        )
 
         return Response(
             {"Detail": "Custom Field edited with success"},
@@ -349,14 +372,20 @@ class RoomViewset(
         url_name="pick_queue_room",
     )
     def pick_queue_room(self, request, *args, **kwargs):
-        room = self.get_object()
-        if room.user:
-            return Response(
-                {"detail": "Room is not queued"},
-                status=status.HTTP_400_BAD_REQUEST,
+        room: Room = self.get_object()
+        user: User = request.user
+
+        if not room.can_pick_queue(user):
+            raise PermissionDenied(
+                detail=_("User does not have permission to pick this room"),
+                code="user_is_not_project_admin_or_sector_manager",
             )
 
-        user = User.objects.get(email=self.request.GET.get("user_email"))
+        if room.user:
+            raise ValidationError(
+                {"detail": _("Room is not queued")}, code="room_is_not_queued"
+            )
+
         action = "pick"
         feedback = create_transfer_json(
             action=action,
@@ -374,12 +403,14 @@ class RoomViewset(
         room.transfer_history = feedback
         room.save()
 
-        create_room_feedback_message(room, feedback, method="rt")
+        create_room_feedback_message(
+            room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+        )
         room.notify_queue("update")
         room.update_ticket()
 
         return Response(
-            {"detail": "Room picked successfully"}, status=status.HTTP_200_OK
+            {"detail": _("Room picked successfully")}, status=status.HTTP_200_OK
         )
 
     @action(
@@ -392,10 +423,13 @@ class RoomViewset(
 
         user_email = request.query_params.get("user_email")
         queue_uuid = request.query_params.get("queue_uuid")
-        user_request = request.query_params.get("user_request")
+        user_request = request.user or request.query_params.get("user_request")
 
-        if not (user_email or queue_uuid):
-            return None
+        if not user_email and not queue_uuid:
+            return Response(
+                {"error": "user_email or queue_uuid is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
             if user_email:
@@ -414,7 +448,9 @@ class RoomViewset(
                             },
                             status=status.HTTP_400_BAD_REQUEST,
                         )
+
                     transfer_user = verify_user_room(room, user_request)
+
                     feedback = create_transfer_json(
                         action="transfer",
                         from_=transfer_user,
@@ -423,7 +459,16 @@ class RoomViewset(
                     room.user = user
                     room.save()
 
-                    create_room_feedback_message(room, feedback, method="rt")
+                    logger.info(
+                        "Starting queue priority routing for room %s from bulk transfer to user %s",
+                        room.uuid,
+                        user.email,
+                    )
+                    start_queue_priority_routing(room.queue)
+
+                    create_room_feedback_message(
+                        room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+                    )
                     if old_user:
                         room.notify_user("update", user=old_user)
                     else:
@@ -452,9 +497,18 @@ class RoomViewset(
                     room.queue = queue
                     room.save()
 
-                    create_room_feedback_message(room, feedback, method="rt")
+                    create_room_feedback_message(
+                        room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+                    )
                     room.notify_user("update", user=transfer_user)
                     room.notify_queue("update")
+
+                    logger.info(
+                        "Starting queue priority routing for room %s from bulk transfer to queue %s",
+                        room.uuid,
+                        queue.uuid,
+                    )
+                    start_queue_priority_routing(queue)
 
         except Exception as error:
             return Response(
