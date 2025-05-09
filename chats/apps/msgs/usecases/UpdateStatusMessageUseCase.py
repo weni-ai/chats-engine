@@ -22,38 +22,37 @@ class MessageStatusNotifier:
 
     @classmethod
     def find_and_notify_for_message(cls, message_id, message_status):
-        print("chegou no find_and_notify_for_message")
-        print("--------------------------------")
-        print(f"message_id: {message_id}")
-        print(f"message_status: {message_status}")
-        print("--------------------------------")
-        message_data = (
-            Message.objects.filter(
-                external_id=message_id, room__is_active=True, room__user__isnull=False
-            )
-            .values_list("uuid", "room__user__project_permissions__pk")
-            .filter(
-                room__user__project_permissions__project=models.F(
-                    "room__queue__sector__project"
-                )
-            )
-            .first()
-        )
-        print("depois de procurar a mensagem")
-        print("--------------------------------")
-        print(f"message_data: {message_data}")
-        print("--------------------------------")
-
-        if message_data:
-            print("depois de verificar se a mensagem existe")   
+        # Primeiro obtemos apenas a mensagem
+        message = Message.objects.filter(
+            external_id=message_id, 
+            room__is_active=True, 
+            room__user__isnull=False
+        ).first()
+        print("mensagem", message)
+        
+        if message and message.room and message.room.user:
+            # Buscamos diretamente o projeto da sala
+            print("chegou no if message and message.room and message.room.user")
             print("--------------------------------")
-            uuid, permission_pk = message_data
-            print("depois de pegar o uuid e o permission_pk")
+            project = message.room.project
+            print("project", project)
             print("--------------------------------")
-            cls.notify_status_update(uuid, message_status, permission_pk)
-            print("depois de notificar o status da mensagem")
-            print("--------------------------------")
-            return True
+            if project:
+                # Buscamos a permissão específica para este usuário neste projeto
+                print("chegou no if project")
+                print("--------------------------------")
+                permission = message.room.user.project_permissions.filter(
+                    project=project
+                ).first()
+                print("permission", permission)
+                print("--------------------------------")
+                if permission:
+                    cls.notify_status_update(
+                        message.uuid, 
+                        message.status, 
+                        permission.pk
+                    )
+                    return True
         return False
 
     @classmethod
