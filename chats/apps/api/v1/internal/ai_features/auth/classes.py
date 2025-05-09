@@ -5,21 +5,10 @@ from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 
 
-def verify_signature(signature_header_name: str, secret: str, headers: dict, body):
+def verify_signature(secret: str, signature: str, body):
     """
     Verify the signature of the request.
     """
-
-    if signature_header_name not in headers:
-        return False
-
-    # get the v1 signature from the header
-    signature_from_header = {
-        k: v
-        for k, v in [
-            pair.split("=") for pair in headers[signature_header_name].split(",")
-        ]
-    }["v1"]
 
     # Run HMAC-SHA256 on the request body using the configured signing secret
     valid_signature = hmac.new(
@@ -27,7 +16,7 @@ def verify_signature(signature_header_name: str, secret: str, headers: dict, bod
     ).hexdigest()
 
     # use constant time string comparison to prevent timing attacks
-    return hmac.compare_digest(valid_signature, signature_from_header)
+    return hmac.compare_digest(valid_signature, signature)
 
 
 class AIFeaturesAuthentication(BaseAuthentication):
@@ -38,10 +27,14 @@ class AIFeaturesAuthentication(BaseAuthentication):
     def authenticate(self, request):
         signature_header_name = "X-Weni-Signature"
 
+        signature = request.headers.get(signature_header_name)
+
+        if not signature:
+            raise AuthenticationFailed("No signature found")
+
         if not verify_signature(
-            signature_header_name,
             settings.AI_FEATURES_PROMPTS_API_SECRET,
-            request.headers,
+            signature,
             request.body,
         ):
             raise AuthenticationFailed("Invalid signature")
