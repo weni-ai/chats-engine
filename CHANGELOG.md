@@ -1,3 +1,9 @@
+# 3.18.9
+## Add
+  - Cache in ModuleHasPermission, to decrease the volume of calls to the database to check weather a internal user has the can_communicate_internally flag,
+  as this shouldn't change often.
+  - Increase the time for internal users (only) access token cache from 10 minutes to 6 hours.
+
 # 3.18.8
 ## Add
   - New field in room serializer, config.
