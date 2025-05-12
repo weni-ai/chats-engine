@@ -17,11 +17,9 @@ class MessageStatusNotifier:
     @classmethod
     def find_and_notify_for_message(cls, message_id, message_status):
         message = Message.objects.filter(
-            external_id=message_id, 
-            room__is_active=True, 
-            room__user__isnull=False
+            external_id=message_id, room__is_active=True, room__user__isnull=False
         ).first()
-        
+
         if message and message.room and message.room.user:
             project = message.room.project
             if project:
@@ -30,9 +28,7 @@ class MessageStatusNotifier:
                 ).first()
                 if permission:
                     cls.notify_status_update(
-                        message.uuid, 
-                        message.status, 
-                        permission.pk
+                        message.uuid, message.status, permission.pk
                     )
                     return True
         return False
@@ -75,6 +71,6 @@ class UpdateStatusMessageUseCase:
 
         media_rows_updated = MessageMedia.objects.filter(external_id=message_id).update(
             message__status=message_status
-        )       
+        )
         if media_rows_updated > 0:
             MessageStatusNotifier.find_and_notify_for_media(message_id, message_status)
