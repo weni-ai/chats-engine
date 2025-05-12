@@ -32,10 +32,23 @@ class ModuleHasPermission(permissions.BasePermission):
         cached_value = redis_connection.get(cache_key)
 
         if cached_value is not None:
+            LOGGER.info(
+                "Cached value found for user %s. Using cached value: %s",
+                request.user.email,
+                cached_value,
+            )
             if isinstance(cached_value, bytes):
+                LOGGER.info(
+                    "Cached value is bytes. Decoding for user %s",
+                    request.user.email,
+                )
                 cached_value = cached_value.decode()
 
             if cached_value == "true":
+                LOGGER.info(
+                    "User %s has permission to communicate internally. Returning True",
+                    request.user.email,
+                )
                 return True
 
         LOGGER.info(
