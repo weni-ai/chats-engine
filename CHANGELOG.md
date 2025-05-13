@@ -1,6 +1,7 @@
 # 3.18.10
 ## Add
   - billing notification when creating new rooms.
+  - new config field in room serializer
 
 # 3.18.9
 ## Add
