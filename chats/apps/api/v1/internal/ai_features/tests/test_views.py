@@ -13,13 +13,14 @@ from chats.apps.ai_features.models import FeaturePrompt
 
 class BaseFeaturePromptsViewTests(APITestCase):
     def setUp(self):
-        FeaturePrompt.objects.create(
-            feature="example",
-            model="example",
-            settings={"test": "test"},
-            prompt="Test Prompt",
-            version=1,
-        )
+        for i in range(1, 3):
+            FeaturePrompt.objects.create(
+                feature="example",
+                model="example",
+                settings={"test": "test"},
+                prompt="Test Prompt",
+                version=i,
+            )
 
     def get_feature_prompts(self) -> Response:
         url = reverse("ai_features_prompts")
@@ -54,6 +55,7 @@ class FeaturePromptsViewTests(BaseFeaturePromptsViewTests):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]["feature"], "example")
+        self.assertEqual(response.data[0]["version"], 2)
 
     @override_settings(AI_FEATURES_PROMPTS_API_SECRET="test_secret")
     def test_get_feature_prompts_with_invalid_signature(self):
@@ -90,7 +92,7 @@ class FeaturePromptsViewTests(BaseFeaturePromptsViewTests):
             "model": "example",
             "settings": {"test": "test"},
             "prompt": "Test Prompt",
-            "version": 2,
+            "version": 3,
         }
 
         timestamp = str(int(time.time()))
@@ -117,7 +119,7 @@ class FeaturePromptsViewTests(BaseFeaturePromptsViewTests):
             "model": "example",
             "settings": {"test": "test"},
             "prompt": "Test Prompt",
-            "version": 2,
+            "version": 3,
         }
 
         timestamp = str(int(time.time()))
