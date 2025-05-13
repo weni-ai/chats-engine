@@ -39,7 +39,10 @@ class RoomsExternalTests(APITestCase):
     @mock.patch(
         "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
     )
-    def test_create_external_room_with_internal_token(self, mock_get_userinfo):
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    def test_create_external_room_with_internal_token(
+        self, mock_get_room, mock_get_userinfo
+    ):
         # Mock the userinfo response
         mock_get_userinfo.return_value = {
             "sub": "test_user",
@@ -48,6 +51,7 @@ class RoomsExternalTests(APITestCase):
             "given_name": "Test",
             "family_name": "User",
         }
+        mock_get_room.return_value = None
 
         user, token = create_user_and_token("test_user")
 
