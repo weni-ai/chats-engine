@@ -10,7 +10,7 @@ class RoomInfoUseCase:
     def __init__(self):
         self._rooms_client = RoomsInfoMixin()
 
-    def get_room(self, room: Room):
+    def get_room(self, room: "Room"):
         room = {
             "uuid": str(room.uuid),
             "project_uuid": str(room.project.uuid),
