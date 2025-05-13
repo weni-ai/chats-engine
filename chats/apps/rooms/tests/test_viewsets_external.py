@@ -112,6 +112,7 @@ class RoomsExternalTests(APITestCase):
         room = Room.objects.get(uuid=response.data.get("uuid"))
 
         mock_get_room.assert_called_once_with(room)
+        self.assertTrue(room.is_billing_notified)
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
