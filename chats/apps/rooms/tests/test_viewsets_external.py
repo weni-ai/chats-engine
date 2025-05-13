@@ -86,10 +86,12 @@ class RoomsExternalTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
-    def test_create_external_room(self, mock_is_attending):
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    def test_create_external_room(self, mock_get_room, mock_is_attending):
         """
         Verify if the endpoint for create external room it is working correctly.
         """
+        mock_get_room.return_value = None
         data = {
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
@@ -104,10 +106,14 @@ class RoomsExternalTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
-    def test_create_external_room_with_external_uuid(self, mock_is_attending):
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    def test_create_external_room_with_external_uuid(
+        self, mock_get_room, mock_is_attending
+    ):
         """
         Verify if the endpoint for create external room it is working correctly, passing custom fields.
         """
+        mock_get_room.return_value = None
         data = {
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
@@ -127,10 +133,14 @@ class RoomsExternalTests(APITestCase):
         )
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
-    def test_create_external_room_editing_contact(self, mock_is_attending):
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    def test_create_external_room_editing_contact(
+        self, mock_get_room, mock_is_attending
+    ):
         """
         Verify if the endpoint for edit external room it is working correctly.
         """
+        mock_get_room.return_value = None
         data = {
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
@@ -158,7 +168,9 @@ class RoomsExternalTests(APITestCase):
         self.assertEqual(response.data["contact"]["custom_fields"]["job"], "streamer")
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
-    def test_is_anon_true_wont_save_urn(self, mock_is_attending):
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    def test_is_anon_true_wont_save_urn(self, mock_get_room, mock_is_attending):
+        mock_get_room.return_value = None
         data = {
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
