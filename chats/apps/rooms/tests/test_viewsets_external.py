@@ -254,11 +254,16 @@ class RoomsQueuePriorityExternalTests(APITestCase):
 
     @patch("chats.apps.api.v1.external.rooms.serializers.start_queue_priority_routing")
     @patch("chats.apps.api.v1.external.rooms.serializers.logger")
+    @mock.patch(
+        "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
+    )
     def test_create_room_with_queue_priority_when_queue_is_empty_and_no_user_is_online(
         self,
+        mock_get_userinfo,
         mock_logger,
         mock_start_queue_priority_routing,
     ):
+        mock_get_userinfo.return_value = None
         mock_start_queue_priority_routing.return_value = None
         data = {
             "queue_uuid": str(self.queue.uuid),
@@ -281,11 +286,16 @@ class RoomsQueuePriorityExternalTests(APITestCase):
 
     @patch("chats.apps.api.v1.external.rooms.serializers.start_queue_priority_routing")
     @patch("chats.apps.api.v1.external.rooms.serializers.logger")
+    @mock.patch(
+        "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
+    )
     def test_create_room_with_queue_priority_when_queue_is_empty_and_user_is_online(
         self,
+        mock_get_userinfo,
         mock_logger,
         mock_start_queue_priority_routing,
     ):
+        mock_get_userinfo.return_value = None
         mock_start_queue_priority_routing.return_value = None
 
         user = User.objects.create(
@@ -315,11 +325,16 @@ class RoomsQueuePriorityExternalTests(APITestCase):
 
     @patch("chats.apps.api.v1.external.rooms.serializers.start_queue_priority_routing")
     @patch("chats.apps.api.v1.external.rooms.serializers.logger")
+    @mock.patch(
+        "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
+    )
     def test_create_room_with_queue_priority_when_user_is_online_but_queue_is_not_empty(
         self,
+        mock_get_userinfo,
         mock_logger,
         mock_start_queue_priority_routing,
     ):
+        mock_get_userinfo.return_value = None
         mock_start_queue_priority_routing.return_value = None
 
         user = User.objects.create(
@@ -413,7 +428,9 @@ class RoomsFlowStartExternalTests(APITestCase):
         return client.post(url, data=data, format="json")
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
-    def test_create_room_with_flow_start(self, mock_is_attending):
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    def test_create_room_with_flow_start(self, mock_get_room, mock_is_attending):
+        mock_get_room.return_value = None
         flow_start = self.room_flowstart
         data = {
             "queue_uuid": str(self.queue_1.pk),
@@ -432,7 +449,11 @@ class RoomsFlowStartExternalTests(APITestCase):
         self.assertTrue(flow_start.is_deleted)
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
-    def test_create_room_with_deleted_flow_start(self, mock_is_attending):
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    def test_create_room_with_deleted_flow_start(
+        self, mock_get_room, mock_is_attending
+    ):
+        mock_get_room.return_value = None
         flow_start = self.room_flowstart
         flow_start.is_deleted = True
         flow_start.save()
@@ -457,9 +478,11 @@ class RoomsFlowStartExternalTests(APITestCase):
         )
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_room_with_contact_flow_start_with_offline_user(
-        self, mock_is_attending
+        self, mock_get_room, mock_is_attending
     ):
+        mock_get_room.return_value = None
         data = {
             "queue_uuid": str(self.queue_1.pk),
             "contact": {
@@ -477,9 +500,11 @@ class RoomsFlowStartExternalTests(APITestCase):
         )
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_room_with_contact_flow_start_with_online_user(
-        self, mock_is_attending
+        self, mock_get_room, mock_is_attending
     ):
+        mock_get_room.return_value = None
         permission = self.permission
         permission.status = "ONLINE"
         permission.save()
@@ -501,9 +526,11 @@ class RoomsFlowStartExternalTests(APITestCase):
         )
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_room_with_group_flow_start_with_online_user(
-        self, mock_is_attending
+        self, mock_get_room, mock_is_attending
     ):
+        mock_get_room.return_value = None
         permission = self.permission
         permission.status = "ONLINE"
         permission.save()
@@ -533,9 +560,11 @@ class RoomsFlowStartExternalTests(APITestCase):
         )
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_room_with_group_flow_start_with_offline_user(
-        self, mock_is_attending
+        self, mock_get_room, mock_is_attending
     ):
+        mock_get_room.return_value = None
         data = {
             "queue_uuid": str(self.queue_1.pk),
             "contact": {
@@ -669,7 +698,11 @@ class RoomsRoutingExternalTests(APITestCase):
         return client.post(url, data=data, format="json")
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
-    def test_create_external_room_can_open_offline(self, mock_is_attending):
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    def test_create_external_room_can_open_offline(
+        self, mock_get_room, mock_is_attending
+    ):
+        mock_get_room.return_value = None
         data = {
             "queue_uuid": "8590ad29-5629-448c-bfb6-1bfd5219b8ec",
             "contact": {
