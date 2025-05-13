@@ -18,6 +18,7 @@ from rest_framework.exceptions import ValidationError
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
+from chats.apps.projects.usecases.send_room_info import RoomInfoUseCase
 from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
 
@@ -105,6 +106,23 @@ class Room(BaseModel, BaseConfigurableModel):
     )
 
     tracker = FieldTracker(fields=["user"])
+
+    @property
+    def is_billing_notified(self) -> bool:
+        """
+        Returns True if the room has been billed
+        """
+        return self.get_config("is_billing_notified", False)
+
+    def notify_billing(self):
+        """
+        Notify the billing system that the room has been billed
+        """
+        room_client = RoomInfoUseCase()
+        room_client.get_room(self)
+
+        self.set_config("is_billing_notified", True)
+        self.save()
 
     class Meta:
         verbose_name = _("Room")

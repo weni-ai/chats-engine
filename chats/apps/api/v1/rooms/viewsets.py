@@ -180,8 +180,8 @@ class RoomViewset(
 
         close_room(str(instance.pk))
 
-        room_client = RoomInfoUseCase()
-        room_client.get_room(instance)
+        if not instance.is_billing_notified:
+            instance.notify_billing()
 
         if instance.queue:
             logger.info(
