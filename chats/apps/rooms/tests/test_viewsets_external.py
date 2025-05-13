@@ -36,6 +36,9 @@ class RoomsExternalTests(APITestCase):
 
         return client.put(url, format="json")
 
+    @mock.patch(
+        "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
+    )
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_external_room_with_internal_token(
         self, mock_get_room, mock_get_userinfo
