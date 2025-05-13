@@ -1,5 +1,9 @@
+from typing import TYPE_CHECKING
 from chats.apps.api.v1.internal.eda_clients.billing_client import RoomsInfoMixin
-from chats.apps.rooms.models import Room
+
+
+if TYPE_CHECKING:
+    from chats.apps.rooms.models import Room
 
 
 class RoomInfoUseCase:
