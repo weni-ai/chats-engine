@@ -81,9 +81,6 @@ class HistoryRoomFilter(filters.FilterSet):
             Q(queue__in=queue_ids) | Q(user=user, queue__sector__project=value)
         )
 
-    def filter_sector(self, queryset, name, value):
-        return queryset
-
     def filter_tags(self, queryset, name, value):
         if not value:
             return queryset
@@ -91,5 +88,3 @@ class HistoryRoomFilter(filters.FilterSet):
         values = value.split(",")
         return queryset.filter(tags__name__in=values).distinct()
 
-    def filter_contact(self, queryset, name, value):
-        return queryset
