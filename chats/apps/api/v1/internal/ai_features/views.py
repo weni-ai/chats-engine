@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
@@ -12,6 +14,8 @@ from chats.apps.api.v1.internal.ai_features.serializers import (
     FeaturePromptWriteSerializer,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class FeaturePromptsView(APIView):
     """
@@ -25,6 +29,8 @@ class FeaturePromptsView(APIView):
         """
         Create a new feature prompt.
         """
+
+        logger.info(f"Creating new feature prompt: {request.data}")
 
         serializer = FeaturePromptWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
