@@ -45,7 +45,6 @@ from chats.apps.rooms.views import (
 )
 from django.utils.timezone import make_aware
 from datetime import datetime
-from chats.apps.projects.usecases.send_room_info import RoomInfoUseCase
 
 
 logger = logging.getLogger(__name__)
