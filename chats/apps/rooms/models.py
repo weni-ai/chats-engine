@@ -118,11 +118,15 @@ class Room(BaseModel, BaseConfigurableModel):
         """
         Notify the billing system and set the is_billing_notified flag to True
         """
+        logger.info("Notifying billing for room %s...", self.pk)
         room_client = RoomInfoUseCase()
         room_client.get_room(self)
 
         self.set_config("is_billing_notified", True)
-        self.save()
+        logger.info(
+            "Billing notified for room %s. Setting is_billing_notified to True",
+            self.pk,
+        )
 
     class Meta:
         verbose_name = _("Room")
