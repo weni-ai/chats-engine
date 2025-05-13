@@ -50,8 +50,6 @@ class HistoryRoomViewset(ReadOnlyModelViewSet):
         if self.request.GET.get("basic", None):
             return queryset.only("uuid", "ended_at")
 
-        return queryset.filter(is_active=False, ended_at__isnull=False)
-
     def get_permissions(self):
         permission_classes = self.permission_classes
 
