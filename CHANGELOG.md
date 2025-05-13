@@ -1,3 +1,7 @@
+# 3.18.10
+## Add
+  - billing notification when creating new rooms.
+
 # 3.18.9
 ## Add
   - Cache in ModuleHasPermission, to decrease the volume of calls to the database to check weather a internal user has the can_communicate_internally flag,
