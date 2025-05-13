@@ -5,10 +5,10 @@ on:
   # Triggers the workflow on push or pull request events but only for the main branch
   push:
     branches:
-      - '**'
+      - "**"
   pull_request:
     branches:
-      - '**'
+      - "**"
 env:
   SECRET_KEY: "SK"
   DEBUG: true
@@ -16,11 +16,11 @@ env:
   USE_WENI_FLOWS: false
   PROMETHEUS_AUTH_TOKEN: "aaaa"
   UNPERMITTED_AUDIO_TYPES: "WebM,audio/mpeg3,audio/mpeg,mp3"
+  AI_FEATURES_PROMPTS_API_SECRET: "123"
   USE_EDA: true
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     services:
@@ -47,34 +47,34 @@ jobs:
           --health-retries 5
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-    - name: Set up Python 3.8
-      uses: actions/setup-python@v2
-      with:
-        python-version: 3.8
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
 
-    - name: Install dependencies
-      run: |
-        pip install --upgrade pip poetry
-        poetry config virtualenvs.create false --local
-        poetry install
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip poetry
+          poetry config virtualenvs.create false --local
+          poetry install
 
-    - name: Run migrations
-      run: python manage.py migrate
+      - name: Run migrations
+        run: python manage.py migrate
 
-    - name: run flake8
-      run: flake8
+      - name: run flake8
+        run: flake8
 
-    - name: run black
-      run: black .
+      - name: run black
+        run: black .
 
-    - name: run isort
-      run: isort .
+      - name: run isort
+        run: isort .
 
-    - name: Run tests
-      run: coverage run manage.py test --verbosity=2 --noinput
+      - name: Run tests
+        run: coverage run manage.py test --verbosity=2 --noinput
 
-    - name: Coverage report
-      run: coverage report -m
+      - name: Coverage report
+        run: coverage report -m
