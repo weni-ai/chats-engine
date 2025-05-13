@@ -109,6 +109,10 @@ class RoomsExternalTests(APITestCase):
         response = self._create_room("f3ce543e-d77e-4508-9140-15c95752a380", data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
+        room = Room.objects.get(uuid=response.data.get("uuid"))
+
+        mock_get_room.assert_called_once_with(room)
+
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_external_room_with_external_uuid(
