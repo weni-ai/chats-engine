@@ -36,9 +36,6 @@ class RoomsExternalTests(APITestCase):
 
         return client.put(url, format="json")
 
-    @mock.patch(
-        "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
-    )
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_external_room_with_internal_token(
         self, mock_get_room, mock_get_userinfo
@@ -205,7 +202,9 @@ class RoomsExternalTests(APITestCase):
     @mock.patch(
         "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
     )
-    def test_close_room_with_internal_token(self, mock_get_userinfo):
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    def test_close_room_with_internal_token(self, mock_get_room, mock_get_userinfo):
+        mock_get_room.return_value = None
         room = Room.objects.create(queue=self.queue_1)
         mock_get_userinfo.return_value = {
             "sub": "test_user",
@@ -258,16 +257,14 @@ class RoomsQueuePriorityExternalTests(APITestCase):
 
     @patch("chats.apps.api.v1.external.rooms.serializers.start_queue_priority_routing")
     @patch("chats.apps.api.v1.external.rooms.serializers.logger")
-    @mock.patch(
-        "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
-    )
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_room_with_queue_priority_when_queue_is_empty_and_no_user_is_online(
         self,
-        mock_get_userinfo,
+        mock_get_room,
         mock_logger,
         mock_start_queue_priority_routing,
     ):
-        mock_get_userinfo.return_value = None
+        mock_get_room.return_value = None
         mock_start_queue_priority_routing.return_value = None
         data = {
             "queue_uuid": str(self.queue.uuid),
@@ -290,16 +287,14 @@ class RoomsQueuePriorityExternalTests(APITestCase):
 
     @patch("chats.apps.api.v1.external.rooms.serializers.start_queue_priority_routing")
     @patch("chats.apps.api.v1.external.rooms.serializers.logger")
-    @mock.patch(
-        "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
-    )
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_room_with_queue_priority_when_queue_is_empty_and_user_is_online(
         self,
-        mock_get_userinfo,
+        mock_get_room,
         mock_logger,
         mock_start_queue_priority_routing,
     ):
-        mock_get_userinfo.return_value = None
+        mock_get_room.return_value = None
         mock_start_queue_priority_routing.return_value = None
 
         user = User.objects.create(
@@ -329,16 +324,14 @@ class RoomsQueuePriorityExternalTests(APITestCase):
 
     @patch("chats.apps.api.v1.external.rooms.serializers.start_queue_priority_routing")
     @patch("chats.apps.api.v1.external.rooms.serializers.logger")
-    @mock.patch(
-        "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
-    )
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_room_with_queue_priority_when_user_is_online_but_queue_is_not_empty(
         self,
-        mock_get_userinfo,
+        mock_get_room,
         mock_logger,
         mock_start_queue_priority_routing,
     ):
-        mock_get_userinfo.return_value = None
+        mock_get_room.return_value = None
         mock_start_queue_priority_routing.return_value = None
 
         user = User.objects.create(
