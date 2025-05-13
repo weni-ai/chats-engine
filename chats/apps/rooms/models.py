@@ -116,7 +116,7 @@ class Room(BaseModel, BaseConfigurableModel):
 
     def notify_billing(self):
         """
-        Notify the billing system that the room has been billed
+        Notify the billing system and set the is_billing_notified flag to True
         """
         room_client = RoomInfoUseCase()
         room_client.get_room(self)
