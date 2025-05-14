@@ -39,3 +39,7 @@ class HistorySummary(BaseModel):
 
     def __str__(self):
         return f"{self.room.pk} - {self.status}"
+
+    def update_status(self, status: HistorySummaryStatus):
+        self.status = status
+        self.save(update_fields=["status"])

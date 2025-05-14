@@ -1,4 +1,8 @@
+import logging
 from typing import TYPE_CHECKING
+
+from sentry_sdk import capture_message
+from chats.apps.ai_features.history_summary.models import HistorySummaryStatus
 from chats.apps.ai_features.integrations.base_client import BaseAIPlatformClient
 from chats.apps.ai_features.models import FeaturePrompt
 
@@ -8,6 +12,10 @@ if TYPE_CHECKING:
 
     from chats.apps.rooms.models import Room
     from chats.apps.msgs.models import Message
+    from chats.apps.ai_features.history_summary.models import HistorySummary
+
+
+logger = logging.getLogger(__name__)
 
 
 class HistorySummaryService:
@@ -34,7 +42,9 @@ class HistorySummaryService:
 
         return prompt
 
-    def generate_summary(self, room: "Room") -> str:
+    def generate_summary(
+        self, room: "Room", history_summary: "HistorySummary"
+    ) -> "HistorySummary":
         """
         Generate a summary of the history of a room.
         """
@@ -43,10 +53,22 @@ class HistorySummaryService:
         model_id = feature_prompt.model
         prompt_text = feature_prompt.prompt
 
-        if "{conversation}" not in prompt_text:
-            raise ValueError("Prompt text needs to have a {conversation} placeholder")
+        history_summary.update_status(HistorySummaryStatus.PROCESSING)
 
-        messages: QuerySet["Message"] = room.messages.all()
+        if "{conversation}" not in prompt_text:
+            history_summary.update_status(HistorySummaryStatus.UNAVAILABLE)
+            logger.error(
+                "History summary prompt text needs to have a {conversation} placeholder. Room: %s",
+                room.uuid,
+            )
+            capture_message(
+                "History summary prompt text needs to have a {conversation} placeholder. Room: %s"
+                % room.uuid,
+                level="error",
+            )
+            return None
+
+        messages: QuerySet["Message"] = room.messages.all().select_related("contact")
 
         conversation_text = ""
 
@@ -68,6 +90,12 @@ class HistorySummaryService:
         for setting, value in feature_prompt.settings.items():
             request_body[setting] = value
 
-        summary = self.integration_client_class(model_id).generate_text(request_body)
+        summary_text = self.integration_client_class(model_id).generate_text(
+            request_body
+        )
 
-        return summary
+        history_summary.summary = summary_text
+        history_summary.update_status(HistorySummaryStatus.DONE)
+        history_summary.save()
+
+        return history_summary
