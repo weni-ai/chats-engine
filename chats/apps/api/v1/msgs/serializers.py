@@ -225,12 +225,12 @@ class MessageSerializer(BaseMessageSerializer):
             return None
         
         context = obj.metadata.get("context", {})
-        if not context or not isinstance(context, dict) or "uuid" not in context:
+        if not context or not isinstance(context, dict) or "id" not in context:
             return None
 
         try:
-            replied_id = context.get("uuid")
-            replied_msg = ChatMessage.objects.get(uuid=replied_id)
+            replied_id = context.get("id")
+            replied_msg = ChatMessage.objects.get(external_id=replied_id)
 
             result = {
                 "uuid": str(replied_msg.uuid),
