@@ -76,6 +76,29 @@ class MsgFlowSerializer(serializers.ModelSerializer):
             print("Metadata not found in attrs!")
         return super().validate(attrs)
 
+    def to_internal_value(self, data):
+        print("\n\n===== RAW REQUEST DATA =====")
+        print("Raw data type:", type(data))
+        print("Raw data:", data)
+        if 'metadata' in data:
+            print("Raw metadata type:", type(data['metadata']))
+            print("Raw metadata:", data['metadata'])
+        else:
+            print("Metadata not found in raw data!")
+        print("===== END RAW REQUEST DATA =====\n\n")
+        
+        result = super().to_internal_value(data)
+        
+        print("\n\n===== AFTER to_internal_value =====")
+        print("Result:", result)
+        if 'metadata' in result:
+            print("Metadata in result:", result['metadata'])
+        else:
+            print("Metadata not found in result!")
+        print("===== END AFTER to_internal_value =====\n\n")
+        
+        return result
+
     def create(self, validated_data):
         # Adicione este log no início do método
         print("\n\n===== CREATE METHOD DATA =====")
