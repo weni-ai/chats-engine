@@ -114,6 +114,7 @@ class BaseMessageSerializer(serializers.ModelSerializer):
     text = serializers.CharField(
         required=False, allow_null=True, allow_blank=True, default=""
     )
+    metadata = serializers.JSONField(required=False, allow_null=True)
 
     class Meta:
         model = ChatMessage
@@ -126,6 +127,7 @@ class BaseMessageSerializer(serializers.ModelSerializer):
             "text",
             "seen",
             "created_on",
+            "metadata",
         ]
         read_only_fields = [
             "uuid",
@@ -133,6 +135,14 @@ class BaseMessageSerializer(serializers.ModelSerializer):
             "created_on",
             "contact",
         ]
+
+    def validate(self, attrs):
+        print("Validated data:", attrs)  # Isso vai mostrar os dados validados no console
+        if 'metadata' in attrs:
+            print("Metadata found:", attrs['metadata'])
+        else:
+            print("Metadata not found in attrs!")
+        return super().validate(attrs)
 
     def create(self, validated_data):
         room = validated_data.get("room")

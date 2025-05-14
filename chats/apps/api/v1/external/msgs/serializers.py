@@ -32,6 +32,7 @@ class MsgFlowSerializer(serializers.ModelSerializer):
         required=False, allow_null=True, allow_blank=True, default=""
     )
     external_id = serializers.CharField(required=False, allow_null=True)
+    metadata = serializers.JSONField(required=False, allow_null=True)
     # Read
     media = MessageMediaSerializer(required=False, many=True, read_only=True)
     contact = ContactRelationsSerializer(many=False, required=False, read_only=True)
@@ -49,6 +50,7 @@ class MsgFlowSerializer(serializers.ModelSerializer):
             "attachments",
             "created_on",
             "external_id",
+            "metadata",
             # Read
             "user",
             "contact",
@@ -66,10 +68,47 @@ class MsgFlowSerializer(serializers.ModelSerializer):
         if "created_on" in attrs and attrs["created_on"] is None:
             # defaults to current time and date
             attrs.pop("created_on")
-
+            
+        print("Validated data:", attrs)  # Isso vai mostrar os dados validados no console
+        if 'metadata' in attrs:
+            print("Metadata found:", attrs['metadata'])
+        else:
+            print("Metadata not found in attrs!")
         return super().validate(attrs)
 
+    def to_internal_value(self, data):
+        print("\n\n===== RAW REQUEST DATA =====")
+        print("Raw data type:", type(data))
+        print("Raw data:", data)
+        if 'metadata' in data:
+            print("Raw metadata type:", type(data['metadata']))
+            print("Raw metadata:", data['metadata'])
+        else:
+            print("Metadata not found in raw data!")
+        print("===== END RAW REQUEST DATA =====\n\n")
+        
+        result = super().to_internal_value(data)
+        
+        print("\n\n===== AFTER to_internal_value =====")
+        print("Result:", result)
+        if 'metadata' in result:
+            print("Metadata in result:", result['metadata'])
+        else:
+            print("Metadata not found in result!")
+        print("===== END AFTER to_internal_value =====\n\n")
+        
+        return result
+
     def create(self, validated_data):
+        # Adicione este log no início do método
+        print("\n\n===== CREATE METHOD DATA =====")
+        print("validated_data:", validated_data)
+        if 'metadata' in validated_data:
+            print("Metadata found in create:", validated_data['metadata'])
+        else:
+            print("Metadata not found in create!")
+        print("===== END CREATE METHOD DATA =====\n\n")
+        
         direction = validated_data.pop("direction")
         medias = validated_data.pop("attachments")
         room = validated_data.get("room")

@@ -35,6 +35,17 @@ class MessageFlowViewset(
         return [ModuleHasPermission]
 
     def perform_create(self, serializer):
+        # Adicionando logs para verificar os dados brutos da requisição
+        print("\n\n===== REQUEST DATA IN PERFORM_CREATE =====")
+        print("Request data:", self.request.data)
+        if 'metadata' in self.request.data:
+            print("Metadata in request:", self.request.data['metadata'])
+            print("Metadata type:", type(self.request.data['metadata']))
+        else:
+            print("Metadata not found in request!")
+        print("===== END REQUEST DATA IN PERFORM_CREATE =====\n\n")
+        
+        # Código original
         validated_data = serializer.validated_data
         room = validated_data.get("room")
         if (
