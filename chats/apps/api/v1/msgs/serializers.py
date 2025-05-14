@@ -253,7 +253,7 @@ class MessageSerializer(BaseMessageSerializer):
 
             if replied_msg.user:
                 result["user"] = {
-                    "uuid": str(replied_msg.user.uuid),
+                    "uuid": str(replied_msg.user.pk),
                     "name": replied_msg.user.get_full_name(),
                 }
 
