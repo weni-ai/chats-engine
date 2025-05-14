@@ -114,6 +114,7 @@ class BaseMessageSerializer(serializers.ModelSerializer):
     text = serializers.CharField(
         required=False, allow_null=True, allow_blank=True, default=""
     )
+    metadata = serializers.JSONField(required=False, allow_null=True)
 
     class Meta:
         model = ChatMessage
@@ -126,6 +127,7 @@ class BaseMessageSerializer(serializers.ModelSerializer):
             "text",
             "seen",
             "created_on",
+            "metadata",
         ]
         read_only_fields = [
             "uuid",
