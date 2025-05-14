@@ -1,4 +1,5 @@
 from datetime import datetime
+
 from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
 from rest_framework import serializers
 
@@ -35,6 +36,7 @@ class RoomSerializer(serializers.ModelSerializer):
     flowstart_data = serializers.SerializerMethodField()
     last_interaction = serializers.DateTimeField(read_only=True)
     can_edit_custom_fields = serializers.SerializerMethodField()
+    config = serializers.JSONField(required=False, read_only=True)
 
     class Meta:
         model = Room
@@ -102,7 +104,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
     is_24h_valid = serializers.BooleanField(
         default=True, source="is_24h_valid_computed"
     )
-
+    config = serializers.JSONField(required=False, read_only=True)
     last_interaction = serializers.DateTimeField(read_only=True)
     can_edit_custom_fields = serializers.SerializerMethodField()
     is_active = serializers.BooleanField(default=True)
@@ -126,6 +128,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
             "protocol",
             "service_chat",
             "is_active",
+            "config",
         ]
 
     def get_user(self, room: Room):

@@ -83,6 +83,14 @@ class BaseConfigurableModel(models.Model):
         config = self.config or {}
         return config.get(key, default)
 
+    def set_config(self, key: str, value: any):
+        """
+        Set a config value in the config field
+        """
+        self.config = self.config or {}
+        self.config[key] = value
+        self.save(update_fields=["config"])
+
 
 class BaseIntegrationConfigurableModel(models.Model):
     integration_config = models.JSONField(
