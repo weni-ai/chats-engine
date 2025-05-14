@@ -46,7 +46,6 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
     closed = serializers.IntegerField(allow_null=True, required=False)
     status = serializers.SerializerMethodField()
     custom_status = serializers.SerializerMethodField()
-    in_service_time = serializers.SerializerMethodField()
     
     def get_link(self, obj):
         return {
@@ -79,7 +78,6 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
 
     def get_custom_status(self, obj):
         custom_status_list = obj.get("custom_status") or []
-
         project = self.context.get("project")
         all_status_types = project.custom_statuses.filter(is_deleted=False).values_list(
             "name", flat=True
@@ -94,12 +92,13 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
                 if status_type in status_dict:
                     status_dict[status_type] += break_time
 
-        result = [
-            {"status_type": status_type, "break_time": break_time}
-            for status_type, break_time in status_dict.items()
-        ]
+        in_service_time = calculate_in_service_time(obj.get("custom_status"))
+
+        result = []
+        for status_type, break_time in status_dict.items():
+            item = {"status_type": status_type, "break_time": break_time}
+            if status_type == "In-Service":
+                item["in_service_time"] = in_service_time
+            result.append(item)
 
         return result
-
-    def get_in_service_time(self, obj):
-        return calculate_in_service_time(obj.get("custom_status"))
