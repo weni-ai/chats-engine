@@ -109,7 +109,9 @@ class RoomsExternalTests(APITestCase):
         self.queue_1 = Queue.objects.get(uuid="f2519480-7e58-4fc4-9894-9ab1769e29cf")
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
-    def test_create_external_room(self, mock_is_attending):
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    def test_create_external_room(self, mock_get_room, mock_is_attending):
+        mock_get_room.return_value = None
         url = reverse("external_rooms-list")
         client = self.client
         client.credentials(
@@ -129,7 +131,11 @@ class RoomsExternalTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
-    def test_create_external_room_with_external_uuid(self, mock_is_attending):
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    def test_create_external_room_with_external_uuid(
+        self, mock_get_room, mock_is_attending
+    ):
+        mock_get_room.return_value = None
         url = reverse("external_rooms-list")
         client = self.client
         client.credentials(
@@ -155,7 +161,11 @@ class RoomsExternalTests(APITestCase):
         )
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
-    def test_create_external_room_editing_contact(self, mock_is_attending):
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    def test_create_external_room_editing_contact(
+        self, mock_get_room, mock_is_attending
+    ):
+        mock_get_room.return_value = None
         url = reverse("external_rooms-list")
         client = self.client
         client.credentials(

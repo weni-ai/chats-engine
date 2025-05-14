@@ -631,3 +631,81 @@ class RoomsBulkTransferTestCase(APITestCase):
             self.room.uuid,
             new_queue.uuid,
         )
+
+
+class CloseRoomTestCase(APITestCase):
+    def setUp(self):
+        self.project = Project.objects.create(
+            name="Test Project",
+            room_routing_type=RoomRoutingType.QUEUE_PRIORITY,
+        )
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=1,
+            work_start=time(hour=5, minute=0),
+            work_end=time(hour=23, minute=59),
+        )
+        self.queue = Queue.objects.create(
+            name="Test Queue",
+            sector=self.sector,
+        )
+        self.agent = User.objects.create(
+            email="test_agent_1@example.com",
+        )
+
+        perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=self.agent,
+            role=ProjectPermission.ROLE_ADMIN,
+            status="ONLINE",
+        )
+        QueueAuthorization.objects.create(
+            queue=self.queue,
+            permission=perm,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        self.room = Room.objects.create(
+            queue=self.queue,
+            user=self.agent,
+        )
+
+        self.client.force_authenticate(user=self.agent)
+
+    def close_room(self, room_pk: str) -> Response:
+        url = reverse("room-close", kwargs={"pk": room_pk})
+
+        return self.client.patch(url)
+
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    def test_close_room_when_billing_was_not_previously_notified(self, mock_get_room):
+        mock_get_room.return_value = None
+
+        self.assertFalse(self.room.is_billing_notified)
+
+        response = self.close_room(self.room.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.is_active, False)
+        mock_get_room.assert_called_once_with(self.room)
+        self.assertTrue(self.room.is_billing_notified)
+
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    def test_close_room_when_billing_was_previously_notified(self, mock_get_room):
+        mock_get_room.return_value = None
+
+        self.room.set_config("is_billing_notified", True)
+        self.room.save(update_fields=["config"])
+        self.assertTrue(self.room.is_billing_notified)
+
+        response = self.close_room(self.room.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.is_active, False)
+
+        mock_get_room.assert_not_called()

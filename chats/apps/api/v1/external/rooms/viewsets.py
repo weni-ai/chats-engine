@@ -178,7 +178,7 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
                 message="Ticketer token permission failed on room project",
                 code=403,
             )
-        room = serializer.save()
+        room: Room = serializer.save()
         if room.flowstarts.exists():
             instance = room
             notification_type = "update"
@@ -190,6 +190,8 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
 
         notification_method = getattr(instance, f"notify_{notify_level}")
         notification_method(notification_type)
+
+        room.notify_billing()
 
     def perform_update(self, serializer):
         serializer.save()

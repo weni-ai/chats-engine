@@ -45,8 +45,6 @@ from chats.apps.rooms.views import (
 )
 from django.utils.timezone import make_aware
 from datetime import datetime
-from chats.apps.projects.usecases.send_room_info import RoomInfoUseCase
-from chats.apps.projects.usecases.status_service import InServiceStatusTracker
 
 
 logger = logging.getLogger(__name__)
@@ -181,8 +179,8 @@ class RoomViewset(
 
         close_room(str(instance.pk))
 
-        room_client = RoomInfoUseCase()
-        room_client.get_room(instance)
+        if not instance.is_billing_notified:
+            instance.notify_billing()
 
         if instance.queue:
             logger.info(
@@ -457,10 +455,10 @@ class RoomViewset(
                         from_=transfer_user,
                         to=user,
                     )
-                    
+
                     # Garantir que _original_user seja configurado para o usuário atual
                     room._original_user = room.user
-                    
+
                     # Definir o novo usuário e salvar
                     room.user = user
                     room.transfer_history = feedback
@@ -500,10 +498,10 @@ class RoomViewset(
                         from_=transfer_user,
                         to=queue,
                     )
-                    
+
                     # Garantir que _original_user seja configurado para o usuário atual
                     room._original_user = room.user
-                    
+
                     # Definir o novo usuário (None) e fila, depois salvar
                     room.user = None
                     room.queue = queue
