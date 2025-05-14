@@ -40,7 +40,7 @@ class RoomsReportService:
         logger.info("Generating report for project %s", self.project.uuid)
 
         rooms = (
-            Room.objects.filter(project=self.project, **filters)
+            Room.objects.filter(queue__sector__project=self.project, **filters)
             .order_by("created_on")
             .select_related("user", "contact", "queue", "queue__sector")
         )
