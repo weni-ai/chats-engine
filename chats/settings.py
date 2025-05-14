@@ -312,7 +312,13 @@ OIDC_CACHE_TOKEN = env.bool(
 OIDC_CACHE_TTL = env.int(
     "OIDC_CACHE_TTL", default=600
 )  # Time-to-live for cached user tokens (default: 600 seconds).
+OIDC_INTERNAL_TOKEN_CACHE_TTL = env.int(
+    "OIDC_INTERNAL_TOKEN_CACHE_TTL", default=(60 * 60 * 6)
+)  # Time-to-live for cached user tokens (default: 6 hours).
 
+INTERNAL_CLIENTS_PERM_CACHE_TTL = env.int(
+    "INTERNAL_CLIENTS_PERM_CACHE_TTL", default=600
+)  # Time-to-live for cached user permissions (default: 600 seconds).
 
 CONNECT_API_URL = env.str("CONNECT_API_URL", default="")
 USE_CONNECT_V2 = env.bool("USE_CONNECT_V2", default=False)
@@ -435,3 +441,7 @@ RETRY_DELAY_SECONDS = env.int("WS_MESSAGE_RETRIES", default=0.5)
 # AI Features
 
 AI_FEATURES_PROMPTS_API_SECRET = env.str("AI_FEATURES_PROMPTS_API_SECRET")
+
+AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS = env.bool(
+    "AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS", default=False
+)

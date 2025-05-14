@@ -45,7 +45,6 @@ from chats.apps.rooms.views import (
 )
 from django.utils.timezone import make_aware
 from datetime import datetime
-from chats.apps.projects.usecases.send_room_info import RoomInfoUseCase
 
 
 logger = logging.getLogger(__name__)
@@ -180,8 +179,8 @@ class RoomViewset(
 
         close_room(str(instance.pk))
 
-        room_client = RoomInfoUseCase()
-        room_client.get_room(instance)
+        if not instance.is_billing_notified:
+            instance.notify_billing()
 
         if instance.queue:
             logger.info(
