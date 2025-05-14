@@ -60,7 +60,7 @@ class RoomsReportService:
         # Hardcoded in portuguese for now
         writer.writerow(
             [
-                "UUID",
+                "Identificador da sala",
                 "Cliente",
                 "Número do cliente",
                 "Data da entrada",
@@ -79,6 +79,7 @@ class RoomsReportService:
 
             writer.writerow(
                 [
+                    room.uuid,
                     room.contact.name,
                     phone_number,
                     room.created_on,
