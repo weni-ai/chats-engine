@@ -4,7 +4,6 @@ import csv
 import io
 from datetime import datetime
 from django.db import models
-from django.core.mail import send_mail
 from django.conf import settings
 
 from chats.apps.projects.models.models import Project
