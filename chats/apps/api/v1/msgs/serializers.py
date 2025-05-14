@@ -136,6 +136,14 @@ class BaseMessageSerializer(serializers.ModelSerializer):
             "contact",
         ]
 
+    def validate(self, attrs):
+        print("Validated data:", attrs)  # Isso vai mostrar os dados validados no console
+        if 'metadata' in attrs:
+            print("Metadata found:", attrs['metadata'])
+        else:
+            print("Metadata not found in attrs!")
+        return super().validate(attrs)
+
     def create(self, validated_data):
         room = validated_data.get("room")
         if room.is_waiting is True:
