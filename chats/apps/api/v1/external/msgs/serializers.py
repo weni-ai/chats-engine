@@ -68,10 +68,24 @@ class MsgFlowSerializer(serializers.ModelSerializer):
         if "created_on" in attrs and attrs["created_on"] is None:
             # defaults to current time and date
             attrs.pop("created_on")
-
+            
+        print("Validated data:", attrs)  # Isso vai mostrar os dados validados no console
+        if 'metadata' in attrs:
+            print("Metadata found:", attrs['metadata'])
+        else:
+            print("Metadata not found in attrs!")
         return super().validate(attrs)
 
     def create(self, validated_data):
+        # Adicione este log no início do método
+        print("\n\n===== CREATE METHOD DATA =====")
+        print("validated_data:", validated_data)
+        if 'metadata' in validated_data:
+            print("Metadata found in create:", validated_data['metadata'])
+        else:
+            print("Metadata not found in create!")
+        print("===== END CREATE METHOD DATA =====\n\n")
+        
         direction = validated_data.pop("direction")
         medias = validated_data.pop("attachments")
         room = validated_data.get("room")
