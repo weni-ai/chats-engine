@@ -68,36 +68,49 @@ class HistorySummaryService:
             )
             return None
 
-        messages: QuerySet["Message"] = room.messages.all().select_related("contact")
+        try:
+            messages: QuerySet["Message"] = room.messages.all().select_related(
+                "contact"
+            )
 
-        conversation_text = ""
+            conversation_text = ""
 
-        for message in messages:
-            is_contact = message.contact is not None
-            sender = "contact" if is_contact else "agent"
+            for message in messages:
+                is_contact = message.contact is not None
+                sender = "contact" if is_contact else "agent"
 
-            conversation_text += f"<{sender}>: {message.text}\n"
+                conversation_text += f"<{sender}>: {message.text}\n"
 
-        prompt_text = prompt_text.format(conversation=conversation_text)
+            prompt_text = prompt_text.format(conversation=conversation_text)
 
-        request_body = {
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [{"type": "text", "text": prompt_text}],
-                }
-            ],
-        }
+            request_body = {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [{"type": "text", "text": prompt_text}],
+                    }
+                ],
+            }
 
-        for setting, value in feature_prompt.settings.items():
-            request_body[setting] = value
+            for setting, value in feature_prompt.settings.items():
+                request_body[setting] = value
 
-        summary_text = self.integration_client_class(model_id).generate_text(
-            request_body
-        )
+            summary_text = self.integration_client_class(model_id).generate_text(
+                request_body
+            )
 
-        history_summary.summary = summary_text
-        history_summary.update_status(HistorySummaryStatus.DONE)
-        history_summary.save()
+            history_summary.summary = summary_text
+            history_summary.update_status(HistorySummaryStatus.DONE)
+            history_summary.save()
+
+        except Exception as e:
+            history_summary.update_status(HistorySummaryStatus.UNAVAILABLE)
+            logger.error(
+                "Error generating history summary for room %s: %s", room.uuid, e
+            )
+            capture_message(
+                "Error generating history summary for room %s: %s" % (room.uuid, e),
+                level="error",
+            )
 
         return history_summary
