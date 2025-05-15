@@ -53,6 +53,13 @@ class RoomsReportService:
 
         return f"rooms_report_{self.project.uuid}"
 
+    def is_generating_report(self) -> bool:
+        """
+        Check if a report is already being generated.
+        """
+
+        return self.cache_client.get(self.get_cache_key())
+
     def generate_report(self, filters: dict, recipient_email: str) -> str:
         """
         Generate a rooms report and send it to the email address provided.
