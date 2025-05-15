@@ -605,6 +605,7 @@ class RoomsReportViewSet(APIView):
         """
         project_uuid = request.auth.project
         project = Project.objects.get(uuid=project_uuid)
+
         service = self.service(project)
 
         if service.is_generating_report():
