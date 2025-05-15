@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
+from django.utils import timezone
 from rest_framework import serializers
 
 from chats.apps.accounts.models import User
@@ -291,3 +292,41 @@ class RoomHistorySummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = HistorySummary
         fields = ["status", "summary"]
+
+
+class RoomsReportFiltersSerializer(serializers.Serializer):
+    """
+    Filters for the rooms report.
+    """
+
+    created_on__gte = serializers.DateTimeField(required=True)
+    created_on__lte = serializers.DateTimeField(required=False)
+
+    def validate(self, attrs):
+        created_on__gte = attrs.get("created_on__gte")
+        created_on__lte = attrs.get("created_on__lte")
+
+        if created_on__gte and created_on__lte:
+            if created_on__gte > created_on__lte:
+                raise serializers.ValidationError(
+                    "created_on__gte must be before created_on__lte"
+                )
+
+        start = created_on__gte
+        end = created_on__lte or timezone.now()
+
+        period = (end - start).days
+
+        if period > 90:
+            raise serializers.ValidationError("Period must be less than 90 days")
+
+        return super().validate(attrs)
+
+
+class RoomsReportSerializer(serializers.Serializer):
+    """
+    Serializer for the rooms report.
+    """
+
+    recipient_email = serializers.EmailField(required=True)
+    filters = RoomsReportFiltersSerializer(required=True)

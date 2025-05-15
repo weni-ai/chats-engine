@@ -14,8 +14,11 @@ from rest_framework.filters import OrderingFilter
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
+from rest_framework.views import APIView
 
-
+from chats.apps.accounts.authentication.drf.authorization import (
+    ProjectAdminAuthentication,
+)
 from chats.apps.accounts.models import User
 from chats.apps.ai_features.history_summary.models import HistorySummary
 from chats.apps.api.utils import verify_user_room
@@ -29,14 +32,18 @@ from chats.apps.api.v1.rooms.serializers import (
     RoomInfoSerializer,
     RoomMessageStatusSerializer,
     RoomSerializer,
+    RoomsReportSerializer,
     TransferRoomSerializer,
 )
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.msgs.models import Message
+from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
+from chats.apps.rooms.services import RoomsReportService
+from chats.apps.rooms.tasks import generate_rooms_report
 from chats.apps.rooms.views import (
     close_room,
     create_room_feedback_message,
@@ -605,3 +612,50 @@ class RoomViewset(
         serializer = RoomHistorySummarySerializer(history_summary)
 
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class RoomsReportViewSet(APIView):
+    """
+    Viewset for generating rooms reports.
+    """
+
+    authentication_classes = [ProjectAdminAuthentication]
+    service = RoomsReportService
+
+    def post(self, request: Request, *args, **kwargs) -> Response:
+        """
+        Generate a rooms report and send it to the email address provided.
+        """
+        if not request.auth:
+            return Response(
+                {"detail": "Authentication required."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        project_uuid = request.auth.project
+        project = Project.objects.get(uuid=project_uuid)
+
+        service = self.service(project)
+
+        if service.is_generating_report():
+            return Response(
+                {
+                    "detail": "A report is already being generated for this project. Please wait for it to finish."
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
+        serializer = RoomsReportSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        recipient_email = serializer.validated_data.get("recipient_email")
+        rooms_filters = serializer.validated_data.get("filters")
+
+        generate_rooms_report.delay(project.uuid, rooms_filters, recipient_email)
+
+        return Response(
+            {
+                "detail": "The report will be sent to the email address provided when it's ready."
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )

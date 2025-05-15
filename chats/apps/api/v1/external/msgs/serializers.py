@@ -32,6 +32,7 @@ class MsgFlowSerializer(serializers.ModelSerializer):
         required=False, allow_null=True, allow_blank=True, default=""
     )
     external_id = serializers.CharField(required=False, allow_null=True)
+    metadata = serializers.JSONField(required=False, allow_null=True)
     # Read
     media = MessageMediaSerializer(required=False, many=True, read_only=True)
     contact = ContactRelationsSerializer(many=False, required=False, read_only=True)
@@ -49,6 +50,7 @@ class MsgFlowSerializer(serializers.ModelSerializer):
             "attachments",
             "created_on",
             "external_id",
+            "metadata",
             # Read
             "user",
             "contact",
