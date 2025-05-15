@@ -622,7 +622,7 @@ class RoomsReportViewSet(APIView):
         recipient_email = serializer.validated_data.get("recipient_email")
         rooms_filters = serializer.validated_data.get("filters")
 
-        generate_rooms_report.delay(project.uuid, recipient_email, rooms_filters)
+        generate_rooms_report.delay(project.uuid, rooms_filters, recipient_email)
 
         return Response(
             {
