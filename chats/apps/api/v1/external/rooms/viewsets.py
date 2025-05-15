@@ -143,7 +143,7 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         serializer = RoomFlowSerializer()
         serializer.process_message_history(room, messages_data)
 
-        if room.queue.sector.project.ai_features_enabled and room.messages.exists():
+        if room.queue.sector.project.has_chats_summary and room.messages.exists():
             generate_history_summary.delay(room.uuid)
 
         return Response(status=status.HTTP_201_CREATED)
@@ -197,7 +197,7 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
 
         room.notify_billing()
 
-        if room.queue.sector.project.ai_features_enabled and room.messages.exists():
+        if room.queue.sector.project.has_chats_summary and room.messages.exists():
             generate_history_summary.delay(room.uuid)
 
     def perform_update(self, serializer):
