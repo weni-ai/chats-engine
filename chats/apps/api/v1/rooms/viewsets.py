@@ -14,8 +14,11 @@ from rest_framework.filters import OrderingFilter
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
+from rest_framework.views import APIView
 
-
+from chats.apps.accounts.authentication.drf.authorization import (
+    ProjectAdminAuthentication,
+)
 from chats.apps.accounts.models import User
 from chats.apps.api.utils import verify_user_room
 from chats.apps.api.v1 import permissions as api_permissions
@@ -27,6 +30,7 @@ from chats.apps.api.v1.rooms.serializers import (
     RoomInfoSerializer,
     RoomMessageStatusSerializer,
     RoomSerializer,
+    RoomsReportSerializer,
     TransferRoomSerializer,
 )
 from chats.apps.dashboard.models import RoomMetrics
@@ -35,6 +39,7 @@ from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
+from chats.apps.rooms.tasks import generate_rooms_report
 from chats.apps.rooms.views import (
     close_room,
     create_room_feedback_message,
@@ -581,4 +586,30 @@ class RoomViewset(
 
         return Response(
             RoomInfoSerializer(rooms, many=True).data, status=status.HTTP_200_OK
+        )
+
+
+class RoomsReportViewset(APIView):
+    """
+    Viewset for generating rooms reports.
+    """
+
+    authentication_classes = [ProjectAdminAuthentication]
+
+    def post(self, request: Request, *args, **kwargs) -> Response:
+        project = request.auth.project
+
+        serializer = RoomsReportSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        recipient_email = serializer.validated_data.get("recipient_email")
+        rooms_filters = serializer.validated_data.get("filters")
+
+        generate_rooms_report.delay(project.uuid, recipient_email, rooms_filters)
+
+        return Response(
+            {
+                "detail": "The report will be sent to the email address provided when it's ready."
+            },
+            status=status.HTTP_202_ACCEPTED,
         )
