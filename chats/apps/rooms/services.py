@@ -142,7 +142,7 @@ class RoomsReportService:
                 time_taken,
             )
 
-            if settings.EMAIL_HOST:
+            if settings.SEND_EMAILS:
                 logger.info(
                     "Sending rooms report for project %s via email to %s",
                     self.project.uuid,

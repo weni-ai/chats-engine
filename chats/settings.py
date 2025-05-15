@@ -438,9 +438,11 @@ RETRY_DELAY_SECONDS = env.int("WS_MESSAGE_RETRIES", default=0.5)
 
 # Email
 
-EMAIL_HOST = env.str("EMAIL_HOST", default=None)
+SEND_EMAILS = env.bool("SEND_EMAILS", default=False)
 
-if EMAIL_HOST:
+
+if SEND_EMAILS:
+    EMAIL_HOST = env.str("EMAIL_HOST", default=None)
     DEFAULT_FROM_EMAIL = env.str("DEFAULT_FROM_EMAIL")
     SERVER_EMAIL = env.str("SERVER_EMAIL")
 
