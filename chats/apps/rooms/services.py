@@ -146,8 +146,10 @@ class RoomsReportService:
                 subject = (
                     f"Relatório de salas do projeto {self.project.uuid} - {timestamp}"
                 )
-                message = f"O relatório de salas do projeto {self.project.uuid} está pronto e foi anexado a este email."
-                # Send email with CSV attachment
+                message = (
+                    f"O relatório de salas do projeto {self.project.uuid} "
+                    "está pronto e foi anexado a este email."
+                )
 
                 email = EmailMessage(
                     subject=subject,
