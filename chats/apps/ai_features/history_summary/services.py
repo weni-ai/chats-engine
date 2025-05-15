@@ -78,6 +78,8 @@ class HistorySummaryService:
 
             conversation_text += f"<{sender}>: {message.text}\n"
 
+        prompt_text = prompt_text.format(conversation=conversation_text)
+
         request_body = {
             "messages": [
                 {
