@@ -74,9 +74,9 @@ class RoomsReportService:
         )
 
         start_time = time.time()
+        output = None
 
         try:
-
             rooms = (
                 Room.objects.filter(queue__sector__project=self.project, **filters)
                 .order_by("created_on")
@@ -131,7 +131,6 @@ class RoomsReportService:
 
             # Get CSV content
             csv_content = output.getvalue()
-            output.close()
 
             end_time = time.time()
             time_taken = int(end_time - start_time)
@@ -178,6 +177,7 @@ class RoomsReportService:
             capture_message(e)
 
         finally:
-            output.close()
+            if output is not None:
+                output.close()
 
         self.cache_client.delete(self.get_cache_key())
