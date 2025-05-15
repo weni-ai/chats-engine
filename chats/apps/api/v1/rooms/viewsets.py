@@ -35,6 +35,7 @@ from chats.apps.api.v1.rooms.serializers import (
 )
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.msgs.models import Message
+from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.choices import RoomFeedbackMethods
@@ -614,7 +615,9 @@ class RoomsReportViewSet(APIView):
         """
         Generate a rooms report and send it to the email address provided.
         """
-        project = request.auth.project
+        project_uuid = request.auth.project
+        project = Project.objects.get(uuid=project_uuid)
+
         service = self.service(project)
 
         if service.is_generating_report():
