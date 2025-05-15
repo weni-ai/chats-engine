@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     "chats.apps.feature_version",
     "chats.core",
     "chats.apps.ai_features",
+    "chats.apps.ai_features.history_summary",
     # third party apps
     "channels",
     "drf_yasg",
@@ -441,6 +442,10 @@ RETRY_DELAY_SECONDS = env.int("WS_MESSAGE_RETRIES", default=0.5)
 # AI Features
 
 AI_FEATURES_PROMPTS_API_SECRET = env.str("AI_FEATURES_PROMPTS_API_SECRET")
+AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS = env.bool(
+    "AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS", default=False
+)
+
 
 # Email
 
