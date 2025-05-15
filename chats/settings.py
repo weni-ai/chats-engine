@@ -454,3 +454,8 @@ if SEND_EMAILS:
     EMAIL_HOST_PASSWORD = env.str("EMAIL_HOST_PASSWORD")
     EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL")
     EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS")
+# AI features related settings
+
+AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS = env.bool(
+    "AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS", default=False
+)
