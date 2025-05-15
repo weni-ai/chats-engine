@@ -39,6 +39,7 @@ from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
+from chats.apps.rooms.services import RoomsReportService
 from chats.apps.rooms.tasks import generate_rooms_report
 from chats.apps.rooms.views import (
     close_room,
@@ -595,12 +596,22 @@ class RoomsReportViewSet(APIView):
     """
 
     authentication_classes = [ProjectAdminAuthentication]
+    service = RoomsReportService
 
     def post(self, request: Request, *args, **kwargs) -> Response:
         """
         Generate a rooms report and send it to the email address provided.
         """
         project = request.auth.project
+        service = self.service(project)
+
+        if service.is_generating_report():
+            return Response(
+                {
+                    "detail": "A report is already being generated for this project. Please wait for it to finish."
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
 
         serializer = RoomsReportSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
