@@ -434,3 +434,20 @@ USE_WS_CONNECTION_CHECK = env.bool("USE_WS_CONNECTION_CHECK", default=False)
 # CLOSE ROOM RETRY
 MAX_RETRIES = env.int("WS_MESSAGE_RETRIES", default=3)
 RETRY_DELAY_SECONDS = env.int("WS_MESSAGE_RETRIES", default=0.5)
+
+
+# Email
+
+SEND_EMAILS = env.bool("SEND_EMAILS", default=False)
+
+
+if SEND_EMAILS:
+    EMAIL_HOST = env.str("EMAIL_HOST", default=None)
+    DEFAULT_FROM_EMAIL = env.str("DEFAULT_FROM_EMAIL")
+    SERVER_EMAIL = env.str("SERVER_EMAIL")
+
+    EMAIL_PORT = env.int("EMAIL_PORT")
+    EMAIL_HOST_USER = env.str("EMAIL_HOST_USER")
+    EMAIL_HOST_PASSWORD = env.str("EMAIL_HOST_PASSWORD")
+    EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL")
+    EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS")
