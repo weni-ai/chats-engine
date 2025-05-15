@@ -13,8 +13,10 @@ from chats.apps.projects.tests.decorators import with_project_permission
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.queues.tests.decorators import with_queue_authorization
 from chats.apps.rooms.models import Room
+from chats.apps.rooms.services import RoomsReportService
 from chats.apps.sectors.models import Sector, SectorAuthorization
 from chats.apps.sectors.tests.decorators import with_sector_authorization
+from chats.core.cache import CacheClient
 
 User = get_user_model()
 
@@ -709,3 +711,82 @@ class CloseRoomTestCase(APITestCase):
         self.assertEqual(self.room.is_active, False)
 
         mock_get_room.assert_not_called()
+
+
+class RoomsReportTestCase(APITestCase):
+    def setUp(self):
+        self.project = Project.objects.create(
+            name="Test Project",
+        )
+        self.cache_client = CacheClient()
+        self.service = RoomsReportService(self.project)
+
+    def tearDown(self):
+        self.cache_client.delete(self.service.get_cache_key())
+
+    def generate_report(self, data: dict) -> Response:
+        url = reverse("rooms_report")
+
+        return self.client.post(url, data=data, format="json")
+
+    def test_cannot_generate_report_auth(self):
+        response = self.generate_report({})
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_cannot_generate_report_without_required_fields(self):
+        self.client.credentials(
+            HTTP_AUTHORIZATION="Bearer " + str(self.project.external_token.uuid)
+        )
+
+        response = self.generate_report({})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["recipient_email"][0].code, "required")
+        self.assertEqual(response.data["filters"][0].code, "required")
+
+    def test_cannot_generate_report_without_required_filters(self):
+        self.client.credentials(
+            HTTP_AUTHORIZATION="Bearer " + str(self.project.external_token.uuid)
+        )
+
+        body = {
+            "recipient_email": "test@example.com",
+            "filters": {},
+        }
+
+        response = self.generate_report(body)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["filters"]["created_on__gte"][0].code, "required"
+        )
+
+    def test_cannot_generate_report_when_report_is_already_generating(self):
+        self.client.credentials(
+            HTTP_AUTHORIZATION="Bearer " + str(self.project.external_token.uuid)
+        )
+        self.cache_client.set(self.service.get_cache_key(), "true")
+
+        response = self.generate_report({})
+
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+    @patch("chats.apps.api.v1.rooms.viewsets.generate_rooms_report")
+    def test_generate_report(self, mock_generate_rooms_report):
+        mock_generate_rooms_report.delay.return_value = None
+        self.client.credentials(
+            HTTP_AUTHORIZATION="Bearer " + str(self.project.external_token.uuid)
+        )
+
+        body = {
+            "recipient_email": "test@example.com",
+            "filters": {
+                "created_on__gte": "2021-01-01",
+                "created_on__lte": "2021-01-01",
+            },
+        }
+
+        response = self.generate_report(body)
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)

@@ -603,6 +603,12 @@ class RoomsReportViewSet(APIView):
         """
         Generate a rooms report and send it to the email address provided.
         """
+        if not request.auth:
+            return Response(
+                {"detail": "Authentication required."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
         project_uuid = request.auth.project
         project = Project.objects.get(uuid=project_uuid)
 
