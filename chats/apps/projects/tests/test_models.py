@@ -1,4 +1,5 @@
 from django.db import IntegrityError
+from django.test import override_settings
 from rest_framework.test import APITestCase
 
 from chats.apps.projects.models import Project, ProjectPermission
@@ -101,3 +102,98 @@ class PropertyTests(APITestCase):
         """
         user_permission = self.project_permission.is_manager(sector=self.sector)
         self.assertEqual(user_permission, True)
+
+    @override_settings(AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS=False)
+    def test_has_chats_summary_when_flag_is_not_in_config_and_not_enabled_for_all_projects(
+        self,
+    ):
+        """
+        Verify that `has_chats_summary` returns `False` when the global setting
+        `AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS` is `False` and the project
+        config does not explicitly set `has_chats_summary`.
+        """
+        project = Project.objects.create(
+            name="Test Project",
+        )
+
+        self.assertEqual(project.has_chats_summary, False)
+
+    @override_settings(AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS=False)
+    def test_has_chats_summary_when_flag_is_in_config_and_is_false_when_flag_is_not_enabled_for_all_projects(
+        self,
+    ):
+        """
+        Verify that `has_chats_summary` returns `False` when the global setting
+        `AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS` is `False` and the project
+        config explicitly sets `has_chats_summary` to `False`.
+        """
+
+        project = Project.objects.create(
+            name="Test Project",
+            config={"has_chats_summary": False},
+        )
+
+        self.assertEqual(project.has_chats_summary, False)
+
+    @override_settings(AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS=False)
+    def test_has_chats_summary_when_flag_is_in_config_and_is_true_when_flag_is_not_enabled_for_all_projects(
+        self,
+    ):
+        """
+        Verify that `has_chats_summary` returns `True` when the global setting
+        `AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS` is `False` and the project
+        config explicitly sets `has_chats_summary` to `True`.
+        """
+        project = Project.objects.create(
+            name="Test Project",
+            config={"has_chats_summary": True},
+        )
+
+        self.assertEqual(project.has_chats_summary, True)
+
+    @override_settings(AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS=True)
+    def test_has_chats_summary_when_flag_is_not_in_config_and_flag_is_enabled_for_all_projects(
+        self,
+    ):
+        """
+        Verify that `has_chats_summary` returns `True` when the global setting
+        `AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS` is `True` and the project
+        config does not explicitly set `has_chats_summary`.
+        """
+        project = Project.objects.create(
+            name="Test Project",
+        )
+
+        self.assertEqual(project.has_chats_summary, True)
+
+    @override_settings(AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS=True)
+    def test_has_chats_summary_when_flag_is_in_config_and_is_true_when_flag_is_enabled_for_all_projects(
+        self,
+    ):
+        """
+        Verify that `has_chats_summary` returns `True` when the global setting
+        `AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS` is `True` and the project
+        config explicitly sets `has_chats_summary` to `True`.
+        """
+        project = Project.objects.create(
+            name="Test Project",
+            config={"has_chats_summary": True},
+        )
+
+        self.assertEqual(project.has_chats_summary, True)
+
+    @override_settings(AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS=True)
+    def test_has_chats_summary_when_flag_is_in_config_and_is_false_when_flag_is_enabled_for_all_projects(
+        self,
+    ):
+        """
+        Verify that `has_chats_summary` returns `True` when the global setting
+        `AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS` is `True` and the project
+        config explicitly sets `has_chats_summary` to `False`.
+        """
+        project = Project.objects.create(
+            name="Test Project",
+            config={"has_chats_summary": False},
+        )
+
+        self.assertEqual(project.has_chats_summary, True)
