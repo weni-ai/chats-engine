@@ -51,7 +51,7 @@ class RoomsReportService:
         Get the cache key for the rooms report.
         """
 
-        return f"rooms_report_{self.project.uuid}"
+        return f"rooms_report_{self.project}"
 
     def is_generating_report(self) -> bool:
         """
