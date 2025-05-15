@@ -32,7 +32,7 @@ class HistorySummaryService:
         Get the prompt for the history summary feature.
         """
         prompt = (
-            FeaturePrompt.objects.filter(name=self.feature_name)
+            FeaturePrompt.objects.filter(feature=self.feature_name)
             .order_by("version")
             .last()
         )
