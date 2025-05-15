@@ -597,6 +597,9 @@ class RoomsReportViewset(APIView):
     authentication_classes = [ProjectAdminAuthentication]
 
     def post(self, request: Request, *args, **kwargs) -> Response:
+        """
+        Generate a rooms report and send it to the email address provided.
+        """
         project = request.auth.project
 
         serializer = RoomsReportSerializer(data=request.data)
