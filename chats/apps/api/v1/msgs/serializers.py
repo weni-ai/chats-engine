@@ -114,6 +114,7 @@ class BaseMessageSerializer(serializers.ModelSerializer):
     text = serializers.CharField(
         required=False, allow_null=True, allow_blank=True, default=""
     )
+    metadata = serializers.JSONField(required=False, allow_null=True)
 
     class Meta:
         model = ChatMessage
@@ -126,6 +127,7 @@ class BaseMessageSerializer(serializers.ModelSerializer):
             "text",
             "seen",
             "created_on",
+            "metadata",
         ]
         read_only_fields = [
             "uuid",
@@ -210,13 +212,16 @@ class MessageSerializer(BaseMessageSerializer):
         ]
 
     def get_replied_message(self, obj):
+        if obj.metadata is None:
+            return None
+
         context = obj.metadata.get("context", {})
         if not context or not isinstance(context, dict) or "id" not in context:
             return None
 
         try:
             replied_id = context.get("id")
-            replied_msg = ChatMessage.objects.get(uuid=replied_id)
+            replied_msg = ChatMessage.objects.get(external_id=replied_id)
 
             result = {
                 "uuid": str(replied_msg.uuid),
@@ -239,8 +244,8 @@ class MessageSerializer(BaseMessageSerializer):
 
             if replied_msg.user:
                 result["user"] = {
-                    "uuid": str(replied_msg.user.uuid),
-                    "name": replied_msg.user.get_full_name(),
+                    "uuid": str(replied_msg.user.pk),
+                    "name": replied_msg.user.full_name,
                 }
 
             if replied_msg.contact:
