@@ -14,13 +14,9 @@ logger = logging.getLogger(__name__)
 
 
 @app.task
-def generate_history_summary(room_uuid: UUID):
-    room = Room.objects.get(uuid=room_uuid)
-
-    history_summary = HistorySummary.objects.create(
-        room=room,
-        status=HistorySummaryStatus.PENDING,
-    )
+def generate_history_summary(history_summary_uuid: UUID):
+    history_summary = HistorySummary.objects.get(uuid=history_summary_uuid)
+    room = history_summary.room
 
     # For now, we only support Bedrock
     # That's why is hardcoded here
