@@ -5,6 +5,10 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.test import APITestCase
+from chats.apps.ai_features.history_summary.models import (
+    HistorySummary,
+    HistorySummaryStatus,
+)
 from chats.apps.api.utils import create_contact, create_user_and_token
 from chats.apps.contacts.models import Contact
 from chats.apps.projects.models import Project, ProjectPermission
@@ -709,3 +713,56 @@ class CloseRoomTestCase(APITestCase):
         self.assertEqual(self.room.is_active, False)
 
         mock_get_room.assert_not_called()
+
+
+class RoomHistorySummaryTestCase(APITestCase):
+    def setUp(self) -> None:
+        self.project = Project.objects.create(
+            name="Test Project",
+            room_routing_type=RoomRoutingType.QUEUE_PRIORITY,
+        )
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=1,
+            work_start=time(hour=5, minute=0),
+            work_end=time(hour=23, minute=59),
+        )
+        self.queue = Queue.objects.create(
+            name="Test Queue",
+            sector=self.sector,
+        )
+        self.room = Room.objects.create(
+            queue=self.queue,
+        )
+        self.user = User.objects.create(
+            email="test_user@example.com",
+        )
+
+        self.project.permissions.create(
+            user=self.user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+
+        self.client.force_authenticate(user=self.user)
+
+    def get_room_history_summary(self, room_pk: str) -> Response:
+        url = reverse("room-room-summary", kwargs={"pk": room_pk})
+        return self.client.get(url)
+
+    def test_get_room_history_summary_when_no_summary_exists(self):
+        response = self.get_room_history_summary(self.room.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_get_room_history_summary_when_summary_exists(self):
+        history_summary = HistorySummary.objects.create(
+            room=self.room,
+            status=HistorySummaryStatus.DONE,
+            summary="Test summary",
+        )
+        response = self.get_room_history_summary(self.room.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], history_summary.status)
+        self.assertEqual(response.data["summary"], history_summary.summary)
