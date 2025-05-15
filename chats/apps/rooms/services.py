@@ -131,5 +131,3 @@ class RoomsReportService:
                 self.project.uuid,
                 recipient_email,
             )
-
-        return csv_content
