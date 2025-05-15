@@ -1,8 +1,10 @@
 from unittest import TestCase, mock
 import json
+import amqp
 
 from chats.apps.projects.consumers.dead_letter_consumer import DeadLetterConsumer
 from chats.apps.event_driven.consumers import pyamqp_call_dlx_when_error, EDAConsumer
+from chats.apps.projects.consumers.template_type_consumer import TemplateTypeConsumer
 from chats.apps.event_driven.signals import message_started, message_finished
 
 class TestEDAConsumer(TestCase):
@@ -221,3 +223,76 @@ class TestDeadLetterConsumer(TestCase):
 
         self.mock_message.channel.basic_ack.assert_called_once_with("test_delivery_tag")
         self.mock_message.channel.basic_reject.assert_not_called()
+
+class TestTemplateTypeConsumer(TestCase):
+    def setUp(self):
+        self.mock_channel = mock.Mock()
+        self.mock_message = mock.Mock(spec=amqp.Message)
+        self.mock_message.channel = self.mock_channel
+        self.mock_message.delivery_tag = "test_delivery_tag"
+        self.mock_message.body = json.dumps({"name": "test_template_type"}).encode()
+
+    @mock.patch('chats.apps.projects.consumers.template_type_consumer.TemplateTypeCreation')
+    @mock.patch('chats.apps.projects.consumers.template_type_consumer.JSONParser.parse')
+    def test_consume_success(self, mock_json_parser, mock_template_type_creation):
+        """
+        Tests successful message consumption
+        """
+        # Setup mocks
+        parsed_body = {"name": "test_template_type"}
+        mock_json_parser.return_value = parsed_body
+        
+        mock_creation_instance = mock.Mock()
+        mock_template_type_creation.return_value = mock_creation_instance
+
+        # Execute consumer
+        TemplateTypeConsumer.consume(self.mock_message)
+
+        # Verify calls
+        mock_json_parser.assert_called_once_with(self.mock_message.body)
+        mock_template_type_creation.assert_called_once_with(config=parsed_body)
+        mock_creation_instance.create.assert_called_once()
+        self.mock_channel.basic_ack.assert_called_once_with("test_delivery_tag")
+
+    @mock.patch('chats.apps.projects.consumers.template_type_consumer.TemplateTypeCreation')
+    @mock.patch('chats.apps.projects.consumers.template_type_consumer.JSONParser.parse')
+    def test_consume_json_parser_error(self, mock_json_parser, mock_template_type_creation):
+        """
+        Tests behavior when JSONParser raises an exception
+        """
+        # Setup JSONParser to raise an exception
+        mock_json_parser.side_effect = Exception("Invalid JSON")
+
+        # Execute consumer
+        # The decorator should handle the exception and reject the message
+        TemplateTypeConsumer.consume(self.mock_message)
+
+        # Verify behavior
+        mock_json_parser.assert_called_once_with(self.mock_message.body)
+        mock_template_type_creation.assert_not_called()
+        self.mock_channel.basic_ack.assert_not_called()
+
+    @mock.patch('chats.apps.projects.consumers.template_type_consumer.TemplateTypeCreation')
+    @mock.patch('chats.apps.projects.consumers.template_type_consumer.JSONParser.parse')
+    def test_consume_template_creation_error(self, mock_json_parser, mock_template_type_creation):
+        """
+        Tests behavior when TemplateTypeCreation raises an exception
+        """
+        # Setup mocks
+        parsed_body = {"name": "test_template_type"}
+        mock_json_parser.return_value = parsed_body
+        
+        mock_creation_instance = mock.Mock()
+        mock_creation_instance.create.side_effect = Exception("Creation error")
+        mock_template_type_creation.return_value = mock_creation_instance
+
+        # Execute consumer
+        # The decorator should handle the exception and reject the message
+        TemplateTypeConsumer.consume(self.mock_message)
+
+        # Verify behavior
+        mock_json_parser.assert_called_once_with(self.mock_message.body)
+        mock_template_type_creation.assert_called_once_with(config=parsed_body)
+        mock_creation_instance.create.assert_called_once()
+        self.mock_channel.basic_ack.assert_not_called()
+        
