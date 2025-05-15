@@ -1,5 +1,5 @@
 from uuid import UUID
-from celery import app
+from chats.celery import app
 import logging
 
 from chats.apps.ai_features.history_summary.models import (
