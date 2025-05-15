@@ -211,7 +211,7 @@ class MessageSerializer(BaseMessageSerializer):
             "contact",
         ]
 
-    def get_replied_message(self):
+    def get_replied_message(self, obj):
         return None
 
 

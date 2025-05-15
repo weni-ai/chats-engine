@@ -74,7 +74,8 @@ class RoomsExternalTests(APITestCase):
         }
 
         response = self._create_room(token, data)
-
+        import pdb
+        pdb.set_trace() 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_cannot_create_room_with_token_without_can_communicate_internally_perm(
