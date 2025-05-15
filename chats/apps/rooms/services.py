@@ -149,12 +149,10 @@ class RoomsReportService:
                     recipient_email,
                 )
 
-                timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-                subject = (
-                    f"Relatório de salas do projeto {self.project.uuid} - {timestamp}"
-                )
+                dt = datetime.now().strftime("%d/%m/%Y_%H-%M-%S")
+                subject = f"Relatório de salas do projeto {self.project.name} - {dt}"
                 message = (
-                    f"O relatório de salas do projeto {self.project.uuid} "
+                    f"O relatório de salas do projeto {self.project.name} "
                     "está pronto e foi anexado a este email."
                 )
 
