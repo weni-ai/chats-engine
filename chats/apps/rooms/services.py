@@ -177,4 +177,7 @@ class RoomsReportService:
             )
             capture_message(e)
 
+        finally:
+            output.close()
+
         self.cache_client.delete(self.get_cache_key())
