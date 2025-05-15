@@ -601,7 +601,7 @@ class RoomViewset(
         )
 
 
-class RoomsReportViewset(APIView):
+class RoomsReportViewSet(APIView):
     """
     Viewset for generating rooms reports.
     """
