@@ -1,5 +1,6 @@
 from uuid import UUID
 from celery import app
+import logging
 
 from chats.apps.ai_features.history_summary.models import (
     HistorySummary,
@@ -8,6 +9,8 @@ from chats.apps.ai_features.history_summary.models import (
 from chats.apps.ai_features.history_summary.services import HistorySummaryService
 from chats.apps.ai_features.integrations.factories import AIModelPlatformClientFactory
 from chats.apps.rooms.models import Room
+
+logger = logging.getLogger(__name__)
 
 
 @app.task
