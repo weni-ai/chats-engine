@@ -749,7 +749,7 @@ class RoomHistorySummaryTestCase(APITestCase):
         self.client.force_authenticate(user=self.user)
 
     def get_room_history_summary(self, room_pk: str) -> Response:
-        url = reverse("room-room-summary", kwargs={"pk": room_pk})
+        url = reverse("room-chats-summary", kwargs={"pk": room_pk})
         return self.client.get(url)
 
     def test_get_room_history_summary_when_no_summary_exists(self):
