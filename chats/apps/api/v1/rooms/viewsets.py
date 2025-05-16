@@ -604,8 +604,8 @@ class RoomViewset(
             RoomInfoSerializer(rooms, many=True).data, status=status.HTTP_200_OK
         )
 
-    @action(detail=True, methods=["get"], url_path="room-summary")
-    def room_summary(self, request: Request, pk=None) -> Response:
+    @action(detail=True, methods=["get"], url_path="chats-summary")
+    def chats_summary(self, request: Request, pk=None) -> Response:
         """
         Get the history summary for a room.
         """
