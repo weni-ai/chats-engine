@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("projects", "0026_customstatustype_config"),
+        ("projects", "0025_alter_customstatustype_unique_together"),
     ]
 
     operations = [
