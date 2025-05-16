@@ -20,7 +20,10 @@ from chats.apps.ai_features.history_summary.models import (
     HistorySummary,
     HistorySummaryStatus,
 )
-from chats.apps.ai_features.history_summary.tasks import generate_history_summary
+from chats.apps.ai_features.history_summary.tasks import (
+    cancel_history_summary_generation,
+    generate_history_summary,
+)
 from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.external.rooms.serializers import (
     RoomFlowSerializer,
@@ -204,6 +207,11 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
 
             if room.messages.exists():
                 generate_history_summary.delay(history_summary.uuid)
+
+            else:
+                cancel_history_summary_generation.apply_async(
+                    args=[history_summary.uuid], countdown=30
+                )  # 30 seconds delay
 
     def perform_update(self, serializer):
         serializer.save()
