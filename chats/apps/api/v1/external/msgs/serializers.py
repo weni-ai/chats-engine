@@ -1,6 +1,7 @@
 from django.utils.translation import gettext_lazy as _
 from rest_framework import exceptions, serializers
 
+from chats.apps.api.utils import create_reply_index
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactRelationsSerializer
 from chats.apps.api.v1.msgs.serializers import MessageMediaSerializer
@@ -99,4 +100,5 @@ class MsgFlowSerializer(serializers.ModelSerializer):
             elif not was_24h_valid:
                 room.notify_room("update")
 
+        create_reply_index(msg)
         return msg
