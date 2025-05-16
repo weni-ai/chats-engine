@@ -8,6 +8,7 @@ from rest_framework import exceptions, serializers
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactSerializer
+from chats.apps.msgs.models import ChatMessageReplyIndex
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
 
@@ -212,7 +213,48 @@ class MessageSerializer(BaseMessageSerializer):
         ]
 
     def get_replied_message(self, obj):
-        return None
+        if obj.metadata is None:
+            return None
+
+        context = obj.metadata.get("context", {})
+        if not context or not isinstance(context, dict) or "id" not in context:
+            return None
+
+        try:
+            replied_id = context.get("id")
+            replied_msg = ChatMessageReplyIndex.objects.get(external_id=replied_id)
+
+            result = {
+                "uuid": str(replied_msg.message.uuid),
+                "text": replied_msg.message.text or "",
+            }
+            media_items = replied_msg.message.medias.all()
+            if media_items.exists():
+                media_data = []
+                for media in media_items:
+                    media_data.append(
+                        {
+                            "content_type": media.content_type,
+                            "message": str(media.message.uuid),
+                            "url": media.url,
+                            "created_on": media.created_on,
+                        }
+                    )
+                result["media"] = media_data
+
+                result["user"] = {
+                    "uuid": str(replied_msg.message.user.uuid),
+                    "name": replied_msg.message.user.full_name,
+                }
+
+                result["contact"] = {
+                    "uuid": str(replied_msg.message.contact.uuid),
+                    "name": replied_msg.message.contact.name,
+                }
+
+            return result
+        except ChatMessage.DoesNotExist:
+            return None
 
 
 class MessageWSSerializer(MessageSerializer):

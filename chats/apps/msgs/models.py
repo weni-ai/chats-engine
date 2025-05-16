@@ -179,3 +179,16 @@ class MessageMedia(BaseModelWithManualCreatedOn):
     @property
     def project(self):
         return self.message.project
+
+
+class ChatMessageReplyIndex(BaseModelWithManualCreatedOn):
+    external_id = models.CharField(
+        _("External ID"), max_length=255, unique=True, db_index=True
+    )
+    message = models.ForeignKey(
+        "Message", on_delete=models.CASCADE, related_name="reply_indexes"
+    )
+
+    class Meta:
+        verbose_name = "Chat Message Reply Index"
+        verbose_name_plural = "Chat Message Reply Indexes"

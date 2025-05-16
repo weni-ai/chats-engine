@@ -84,6 +84,12 @@ class TestMessageModel(TestCase):
         }
         msg = Message.objects.create(room=self.room, metadata=metadata)
 
+        from chats.apps.msgs.models import ChatMessageReplyIndex
+
+        ChatMessageReplyIndex.objects.create(
+            external_id="123e4567-e89b-12d3-a456-426614174000", message=msg
+        )
+
         serialized_data = msg.serialized_ws_data
         self.assertIn("metadata", serialized_data)
         self.assertEqual(serialized_data["metadata"], metadata)
