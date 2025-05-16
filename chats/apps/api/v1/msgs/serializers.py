@@ -137,9 +137,11 @@ class BaseMessageSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, attrs):
-        print("Validated data:", attrs)  # Isso vai mostrar os dados validados no console
-        if 'metadata' in attrs:
-            print("Metadata found:", attrs['metadata'])
+        print(
+            "Validated data:", attrs
+        )  # Isso vai mostrar os dados validados no console
+        if "metadata" in attrs:
+            print("Metadata found:", attrs["metadata"])
         else:
             print("Metadata not found in attrs!")
         return super().validate(attrs)
@@ -223,7 +225,7 @@ class MessageSerializer(BaseMessageSerializer):
     def get_replied_message(self, obj):
         if obj.metadata is None:
             return None
-        
+
         context = obj.metadata.get("context", {})
         if not context or not isinstance(context, dict) or "id" not in context:
             return None
