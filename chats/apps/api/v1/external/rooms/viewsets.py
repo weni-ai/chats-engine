@@ -17,7 +17,7 @@ from chats.apps.accounts.authentication.drf.authorization import (
     get_auth_class,
 )
 from chats.apps.ai_features.history_summary.models import HistorySummary
-from chats.apps.ai_features.tasks import generate_history_summary
+from chats.apps.ai_features.history_summary.tasks import generate_history_summary
 from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.external.rooms.serializers import (
     RoomFlowSerializer,
