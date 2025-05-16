@@ -166,7 +166,6 @@ router.register(
     basename="room_internal",
 )
 
-
 # External
 router.register("external/msgs", MessageFlowViewset, basename="external_message")
 router.register("external/rooms", RoomFlowViewSet, basename="external_rooms")
