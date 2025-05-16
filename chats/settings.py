@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     "chats.apps.feature_version",
     "chats.core",
     "chats.apps.ai_features",
+    "chats.apps.ai_features.history_summary",
     # third party apps
     "channels",
     "drf_yasg",
@@ -203,8 +204,8 @@ if USE_S3:
 
     DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
 
-    AWS_ACCESS_KEY_ID = env.str("AWS_ACCESS_KEY_ID")
-    AWS_SECRET_ACCESS_KEY = env.str("AWS_SECRET_ACCESS_KEY")
+    AWS_ACCESS_KEY_ID = env.str("AWS_ACCESS_KEY_ID", default="")
+    AWS_SECRET_ACCESS_KEY = env.str("AWS_SECRET_ACCESS_KEY", default="")
 
     AWS_STORAGE_BUCKET_NAME = env.str("AWS_STORAGE_BUCKET_NAME")
 
@@ -437,7 +438,6 @@ USE_WS_CONNECTION_CHECK = env.bool("USE_WS_CONNECTION_CHECK", default=False)
 # CLOSE ROOM RETRY
 MAX_RETRIES = env.int("WS_MESSAGE_RETRIES", default=3)
 RETRY_DELAY_SECONDS = env.int("WS_MESSAGE_RETRIES", default=0.5)
-
 
 # Email
 
