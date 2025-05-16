@@ -191,10 +191,11 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
 
         room.notify_billing()
 
-        if room.queue.sector.project.has_chats_summary and room.messages.exists():
+        if room.queue.sector.project.has_chats_summary:
             history_summary = HistorySummary.objects.create(room=room)
 
-            generate_history_summary.delay(history_summary.uuid)
+            if room.messages.exists():
+                generate_history_summary.delay(history_summary.uuid)
 
     def perform_update(self, serializer):
         serializer.save()
