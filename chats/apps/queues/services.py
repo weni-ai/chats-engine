@@ -28,10 +28,6 @@ class QueueRouterService:
         Route rooms to available agents.
         """
         from chats.apps.rooms.models import Room
-        from chats.apps.rooms.views import (
-            create_room_feedback_message,
-            create_transfer_json,
-        )
         from chats.apps.queues.utils import create_room_assigned_from_queue_feedback
 
         logger.info("Start routing rooms for queue %s", self.queue.uuid)
