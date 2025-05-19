@@ -1,8 +1,6 @@
 import logging
 from typing import TYPE_CHECKING
 
-from chats.apps.rooms.choices import RoomFeedbackMethods
-
 
 logger = logging.getLogger(__name__)
 
