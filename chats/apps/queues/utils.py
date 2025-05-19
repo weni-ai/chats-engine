@@ -1,10 +1,18 @@
 import logging
+from typing import TYPE_CHECKING
 from django.conf import settings
 from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.queues.tasks import route_queue_rooms
+from chats.apps.rooms.choices import RoomFeedbackMethods
+from chats.apps.rooms.views import create_room_feedback_message, create_transfer_json
 
 logger = logging.getLogger(__name__)
+
+
+if TYPE_CHECKING:
+    from chats.apps.rooms.models import Room
+    from chats.apps.users.models import User
 
 
 def start_queue_priority_routing(queue: Queue):
@@ -53,3 +61,18 @@ def start_queue_priority_routing_for_all_queues_in_project(project: Project):
 
     for queue in queues:
         start_queue_priority_routing(queue)
+
+
+def create_room_assigned_from_queue_feedback(room: "Room", user: "User"):
+    """
+    Create a feedback message for a room assigned from a queue.
+    """
+    feedback = create_transfer_json(
+        action="auto_assign_from_queue",
+        from_=room.queue,
+        to=user,
+    )
+
+    create_room_feedback_message(
+        room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+    )

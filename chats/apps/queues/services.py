@@ -32,6 +32,7 @@ class QueueRouterService:
             create_room_feedback_message,
             create_transfer_json,
         )
+        from chats.apps.queues.utils import create_room_assigned_from_queue_feedback
 
         logger.info("Start routing rooms for queue %s", self.queue.uuid)
 
@@ -74,15 +75,7 @@ class QueueRouterService:
             room.notify_user("update")
             room.notify_queue("update")
 
-            feedback = create_transfer_json(
-                action="auto_assign_from_queue",
-                from_=self.queue,
-                to=agent,
-            )
-
-            create_room_feedback_message(
-                room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
-            )
+            create_room_assigned_from_queue_feedback(room, agent)
 
             rooms_routed += 1
 
