@@ -314,11 +314,7 @@ class ProjectViewset(
     def start_flow(self, request, *args, **kwargs):
         project = self.get_object()
         serializer = ProjectFlowStartSerializer(data=request.data)
-        if serializer.is_valid() is False:
-            return Response(
-                {"Detail": "Invalid data."},
-                status.HTTP_400_BAD_REQUEST,
-            )
+        serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         flow = data.get("flow", None)
 
