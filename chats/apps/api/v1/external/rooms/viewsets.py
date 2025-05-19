@@ -32,7 +32,10 @@ from chats.apps.api.v1.external.rooms.serializers import (
 )
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.dashboard.models import RoomMetrics
-from chats.apps.queues.utils import start_queue_priority_routing
+from chats.apps.queues.utils import (
+    create_room_assigned_from_queue_feedback,
+    start_queue_priority_routing,
+)
 from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import (
@@ -208,6 +211,9 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
 
         notification_method = getattr(instance, f"notify_{notify_level}")
         notification_method(notification_type)
+
+        if instance.user:
+            create_room_assigned_from_queue_feedback(instance, instance.user)
 
         room.notify_billing()
 
