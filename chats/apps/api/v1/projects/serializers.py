@@ -81,7 +81,9 @@ class ProjectFlowStartSerializer(serializers.Serializer):
         trim_whitespace=True,
     )
     params = serializers.JSONField(required=False)
-    contact_name = serializers.CharField(required=False)
+    contact_name = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True
+    )
 
 
 class ListFlowStartSerializer(serializers.ModelSerializer):
