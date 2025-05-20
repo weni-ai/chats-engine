@@ -1,6 +1,14 @@
-# 3.18.12
+# 3.18.14
+## Fix:
+  - Allow null and blank contact names in flow starts
+
+# 3.18.13
 ## Fix
   - set contact_name as optional for flow start
+
+# 3.18.12
+## Fix
+  - hide replied message until the query is optimized
 
 # 3.18.11
 ## Add
