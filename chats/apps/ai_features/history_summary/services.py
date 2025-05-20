@@ -1,6 +1,7 @@
 import logging
 from typing import TYPE_CHECKING
 
+from django.db.models import Q
 from sentry_sdk import capture_message
 from chats.apps.ai_features.history_summary.models import HistorySummaryStatus
 from chats.apps.ai_features.integrations.base_client import BaseAIPlatformClient
@@ -69,9 +70,9 @@ class HistorySummaryService:
             return None
 
         try:
-            messages: QuerySet["Message"] = room.messages.all().select_related(
-                "contact"
-            )
+            messages: QuerySet["Message"] = room.messages.filter(
+                Q(user__isnull=False) | Q(contact__isnull=False)
+            ).select_related("contact", "user")
 
             conversation_text = ""
 

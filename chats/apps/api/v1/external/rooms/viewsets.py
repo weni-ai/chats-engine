@@ -147,7 +147,12 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         serializer = RoomFlowSerializer()
         serializer.process_message_history(room, messages_data)
 
-        if room.queue.sector.project.has_chats_summary and room.messages.exists():
+        if (
+            room.queue.sector.project.has_chats_summary
+            and room.messages.filter(
+                Q(user__isnull=False) | Q(contact__isnull=False)
+            ).exists()
+        ):
             if not (
                 history_summary := HistorySummary.objects.filter(
                     room=room, status=HistorySummaryStatus.PENDING
@@ -205,7 +210,9 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         if room.queue.sector.project.has_chats_summary:
             history_summary = HistorySummary.objects.create(room=room)
 
-            if room.messages.exists():
+            if room.messages.filter(
+                Q(user__isnull=False) | Q(contact__isnull=False)
+            ).exists():
                 generate_history_summary.delay(history_summary.uuid)
 
             else:
