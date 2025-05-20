@@ -16,7 +16,7 @@ def calculate_response_time(room: "Room") -> int:
     """
     messages: QuerySet["Message"] = room.messages.filter(
         Q(user__isnull=False) | Q(contact__isnull=False)
-    )
+    ).order_by("created_on")
 
     if not messages.exists():
         return 0
