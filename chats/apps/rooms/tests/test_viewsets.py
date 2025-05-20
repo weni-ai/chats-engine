@@ -755,7 +755,9 @@ class RoomHistorySummaryTestCase(APITestCase):
     def test_get_room_history_summary_when_no_summary_exists(self):
         response = self.get_room_history_summary(self.room.uuid)
 
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], HistorySummaryStatus.UNAVAILABLE)
+        self.assertEqual(response.data["summary"], None)
 
     def test_get_room_history_summary_when_summary_exists(self):
         history_summary = HistorySummary.objects.create(

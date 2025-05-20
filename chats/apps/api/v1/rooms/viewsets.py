@@ -20,7 +20,10 @@ from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
 )
 from chats.apps.accounts.models import User
-from chats.apps.ai_features.history_summary.models import HistorySummary
+from chats.apps.ai_features.history_summary.models import (
+    HistorySummary,
+    HistorySummaryStatus,
+)
 from chats.apps.api.utils import verify_user_room
 from chats.apps.api.v1 import permissions as api_permissions
 from chats.apps.api.v1.internal.rest_clients.openai_rest_client import OpenAIClient
@@ -617,8 +620,8 @@ class RoomViewset(
 
         if not history_summary:
             return Response(
-                {"detail": "No history summary found for this room"},
-                status=status.HTTP_404_NOT_FOUND,
+                {"status": HistorySummaryStatus.UNAVAILABLE, "summary": None},
+                status=status.HTTP_200_OK,
             )
 
         serializer = RoomHistorySummarySerializer(history_summary)
