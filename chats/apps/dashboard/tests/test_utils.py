@@ -2,8 +2,6 @@ from datetime import timedelta
 
 from django.test import TestCase
 
-# from django.utils import timezone as django_timezone # Removed as it's no longer used
-
 from chats.apps.accounts.models import User
 from chats.apps.contacts.models import Contact
 from chats.apps.dashboard.utils import calculate_response_time
