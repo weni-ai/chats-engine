@@ -1,3 +1,7 @@
+# 3.18.12
+## Fix
+  - set contact_name as optional for flow start
+
 # 3.18.11
 ## Add
   - new feature to see what messages are responded in chats.
