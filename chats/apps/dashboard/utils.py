@@ -14,8 +14,11 @@ def calculate_response_time(room: "Room") -> int:
     """
     Calculate the average response time for a room.
     """
+    room_creation_time = room.created_on
+
     messages: QuerySet["Message"] = room.messages.filter(
-        Q(user__isnull=False) | Q(contact__isnull=False)
+        (Q(user__isnull=False) | Q(contact__isnull=False))
+        & Q(created_on__gte=room_creation_time)
     ).order_by("created_on")
 
     if not messages.exists():
@@ -24,12 +27,12 @@ def calculate_response_time(room: "Room") -> int:
     total_response_time_sum = timedelta(0)
     agent_responses_count = 0
 
-    last_contact_message = None
+    last_time = room_creation_time
     last_message_was_from_agent = False
 
     for message in messages:
         if message.contact:
-            last_contact_message = message
+            last_time = message.created_on
             last_message_was_from_agent = False
             continue
 
@@ -39,10 +42,9 @@ def calculate_response_time(room: "Room") -> int:
 
             last_message_was_from_agent = True
 
-            if last_contact_message:
-                response_duration = message.created_on - last_contact_message.created_on
-                total_response_time_sum += response_duration
-                agent_responses_count += 1
+            response_duration = message.created_on - last_time
+            total_response_time_sum += response_duration
+            agent_responses_count += 1
 
     if agent_responses_count == 0:
         return 0

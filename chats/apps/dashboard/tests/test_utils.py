@@ -1,7 +1,8 @@
 from datetime import timedelta
 
 from django.test import TestCase
-from django.utils import timezone as django_timezone
+
+# from django.utils import timezone as django_timezone # Removed as it's no longer used
 
 from chats.apps.accounts.models import User
 from chats.apps.contacts.models import Contact
@@ -27,7 +28,7 @@ class CalculateResponseTimeTests(TestCase):
         )
         self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
         self.room = Room.objects.create(contact=self.contact, queue=self.queue)
-        self.now = django_timezone.now()
+        self.now = self.room.created_on
 
     def _create_message(self, sender, text, created_on_offset_seconds):
         return Message.objects.create(
@@ -52,6 +53,9 @@ class CalculateResponseTimeTests(TestCase):
         self.assertEqual(calculate_response_time(self.room), 0)
 
     def test_alternating_messages(self):
+        # Message before the room was created (should be ignored)
+        self._create_message("contact", "Hello", -100)
+
         # Contact sends a message
         self._create_message("contact", "Hello", 0)
         # Agent responds after 30 seconds
@@ -156,4 +160,4 @@ class CalculateResponseTimeTests(TestCase):
         self._create_message("contact", "Hi", 10)
         self._create_message("agent", "How can I help?", 10 + 40)  # Response time = 40
 
-        self.assertEqual(calculate_response_time(self.room), 40)
+        self.assertEqual(calculate_response_time(self.room), 20)
