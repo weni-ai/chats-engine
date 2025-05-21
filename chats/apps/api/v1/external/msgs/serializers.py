@@ -137,5 +137,4 @@ class MsgFlowSerializer(serializers.ModelSerializer):
             elif not was_24h_valid:
                 room.notify_room("update")
 
-        create_reply_index(msg)
         return msg
