@@ -5,6 +5,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from chats.apps.accounts.models import User
+from chats.apps.ai_features.history_summary.models import HistorySummary
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactRelationsSerializer
 from chats.apps.api.v1.msgs.serializers import MessageSerializer
@@ -285,6 +286,12 @@ class RoomInfoSerializer(serializers.ModelSerializer):
             return first_user_message.created_on
 
         return None
+
+
+class RoomHistorySummarySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = HistorySummary
+        fields = ["status", "summary"]
 
 
 class RoomsReportFiltersSerializer(serializers.Serializer):

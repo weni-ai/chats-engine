@@ -14,7 +14,7 @@ class HistorySummaryStatus(models.TextChoices):
     PENDING = "PENDING"
     PROCESSING = "PROCESSING"
     DONE = "DONE"
-    UNAVAILABLE = "UNAVAILABLE "
+    UNAVAILABLE = "UNAVAILABLE"
 
 
 class HistorySummary(BaseModel):
