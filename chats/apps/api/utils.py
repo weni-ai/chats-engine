@@ -10,7 +10,7 @@ from chats.apps.accounts.models import User
 from chats.apps.api.v1.dashboard.dto import RoomData
 from chats.apps.api.v1.dashboard.serializers import DashboardRoomSerializer
 from chats.apps.contacts.models import Contact
-from chats.apps.msgs.models import Message as ChatMessage
+from chats.apps.msgs.models import ChatMessageReplyIndex, Message
 
 
 def create_user_and_token(nickname: str = "fake"):
@@ -22,7 +22,7 @@ def create_user_and_token(nickname: str = "fake"):
 def create_message(text, room, user=None, contact=None):
     if user == contact:
         return None
-    return ChatMessage.objects.create(room=room, text=text, user=user, contact=contact)
+    return Message.objects.create(room=room, text=text, user=user, contact=contact)
 
 
 def create_contact(
@@ -65,6 +65,7 @@ def ensure_timezone(dt, tz):
             return dt.replace(tzinfo=tz)
     return dt
 
+<<<<<<< HEAD
 def calculate_in_service_time(custom_status_list):
     total = 0
     now = timezone.now()
@@ -79,3 +80,22 @@ def calculate_in_service_time(custom_status_list):
             else:
                 total += status.get("break_time", 0)
     return total
+=======
+
+def create_reply_index(message: Message):
+    if not message.metadata:
+        return
+
+    context = message.metadata.get("context", {})
+    if not context:
+        return
+
+    replied_external_id = context.get("id")
+    if not replied_external_id:
+        return
+
+    ChatMessageReplyIndex.objects.update_or_create(
+        external_id=replied_external_id,
+        message=message,
+    )
+>>>>>>> feature/message-response-model
