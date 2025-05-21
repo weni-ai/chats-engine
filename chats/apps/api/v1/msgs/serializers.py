@@ -233,7 +233,10 @@ class MessageSerializer(BaseMessageSerializer):
 
         try:
             replied_id = context.get("id")
-            replied_msg = ChatMessageReplyIndex.objects.get(external_id=replied_id)
+            try:
+                replied_msg = ChatMessageReplyIndex.objects.get(external_id=replied_id)
+            except ChatMessageReplyIndex.DoesNotExist:
+                pass
 
             result = {
                 "uuid": str(replied_msg.message.uuid),
@@ -253,15 +256,15 @@ class MessageSerializer(BaseMessageSerializer):
                     )
                 result["media"] = media_data
 
-                result["user"] = {
-                    "uuid": str(replied_msg.message.user.uuid),
-                    "name": replied_msg.message.user.full_name,
-                }
+            result["user"] = {
+                "uuid": str(replied_msg.message.user.uuid),
+                "name": replied_msg.message.user.full_name,
+            }
 
-                result["contact"] = {
-                    "uuid": str(replied_msg.message.contact.uuid),
-                    "name": replied_msg.message.contact.name,
-                }
+            result["contact"] = {
+                "uuid": str(replied_msg.message.contact.uuid),
+                "name": replied_msg.message.contact.name,
+            }
 
             return result
         except ChatMessage.DoesNotExist:
