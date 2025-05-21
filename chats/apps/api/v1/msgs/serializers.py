@@ -235,6 +235,8 @@ class MessageSerializer(BaseMessageSerializer):
             replied_id = context.get("id")
             try:
                 replied_msg = ChatMessageReplyIndex.objects.get(external_id=replied_id)
+                print("replied_msg", replied_msg.message.uuid)
+                print("replied_msg", replied_msg.message.text)
             except ChatMessageReplyIndex.DoesNotExist:
                 return None
 
