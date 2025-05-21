@@ -16,6 +16,7 @@ class AgentRepository:
         self.model = User.objects
 
     def get_agents_data(self, filters: Filters, project):
+        print("agents_data filters", filters)
         tz = project.timezone
         initial_datetime = (
             timezone.now()
