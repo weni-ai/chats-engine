@@ -65,7 +65,6 @@ def ensure_timezone(dt, tz):
             return dt.replace(tzinfo=tz)
     return dt
 
-<<<<<<< HEAD
 def calculate_in_service_time(custom_status_list):
     total = 0
     now = timezone.now()
@@ -80,7 +79,6 @@ def calculate_in_service_time(custom_status_list):
             else:
                 total += status.get("break_time", 0)
     return total
-=======
 
 def create_reply_index(message: Message):
     if not message.metadata:
@@ -98,4 +96,3 @@ def create_reply_index(message: Message):
         external_id=replied_external_id,
         message=message,
     )
->>>>>>> feature/message-response-model
