@@ -255,16 +255,18 @@ class MessageSerializer(BaseMessageSerializer):
                         }
                     )
                 result["media"] = media_data
-
-            result["user"] = {
-                "uuid": str(replied_msg.message.user.uuid),
-                "name": replied_msg.message.user.full_name,
-            }
-
-            result["contact"] = {
-                "uuid": str(replied_msg.message.contact.uuid),
-                "name": replied_msg.message.contact.name,
-            }
+            
+            if replied_msg.message.user:
+                result["user"] = {
+                    "uuid": str(replied_msg.message.user.uuid),
+                    "name": replied_msg.message.user.full_name,
+                }
+                
+            if replied_msg.message.contact:
+                result["contact"] = {
+                    "uuid": str(replied_msg.message.contact.uuid),
+                    "name": replied_msg.message.contact.name,
+                }
 
             return result
         except ChatMessage.DoesNotExist:
