@@ -81,18 +81,8 @@ def calculate_in_service_time(custom_status_list):
     return total
 
 def create_reply_index(message: Message):
-    if not message.metadata:
-        return
-
-    context = message.metadata.get("context", {})
-    if not context:
-        return
-
-    replied_external_id = context.get("id")
-    if not replied_external_id:
-        return
-
-    ChatMessageReplyIndex.objects.update_or_create(
-        external_id=replied_external_id,
-        message=message,
-    )
+    if message.external_id:
+        ChatMessageReplyIndex.objects.update_or_create(
+            external_id=message.external_id,
+            message=message,
+        )
