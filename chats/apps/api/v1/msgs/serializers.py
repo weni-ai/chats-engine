@@ -236,7 +236,7 @@ class MessageSerializer(BaseMessageSerializer):
             try:
                 replied_msg = ChatMessageReplyIndex.objects.get(external_id=replied_id)
             except ChatMessageReplyIndex.DoesNotExist:
-                pass
+                return None
 
             result = {
                 "uuid": str(replied_msg.message.uuid),

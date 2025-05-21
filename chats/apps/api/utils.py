@@ -3,6 +3,7 @@ from typing import List
 
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+
 from rest_framework.authtoken.models import Token
 
 from chats.apps.accounts.models import User
@@ -64,7 +65,6 @@ def ensure_timezone(dt, tz):
             return dt.replace(tzinfo=tz)
     return dt
 
-
 def calculate_in_service_time(custom_status_list):
     total = 0
     now = timezone.now()
@@ -80,9 +80,9 @@ def calculate_in_service_time(custom_status_list):
                 total += status.get("break_time", 0)
     return total
 
-
 def create_reply_index(message: Message):
-    ChatMessageReplyIndex.objects.update_or_create(
-        external_id=message.external_id,
-        message=message,
-    )
+    if message.external_id:
+        ChatMessageReplyIndex.objects.update_or_create(
+            external_id=message.external_id,
+            message=message,
+        )
