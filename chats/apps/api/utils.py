@@ -7,7 +7,7 @@ from chats.apps.accounts.models import User
 from chats.apps.api.v1.dashboard.dto import RoomData
 from chats.apps.api.v1.dashboard.serializers import DashboardRoomSerializer
 from chats.apps.contacts.models import Contact
-from chats.apps.msgs.models import Message as ChatMessage
+from chats.apps.msgs.models import ChatMessageReplyIndex, Message
 
 
 def create_user_and_token(nickname: str = "fake"):
@@ -19,7 +19,7 @@ def create_user_and_token(nickname: str = "fake"):
 def create_message(text, room, user=None, contact=None):
     if user == contact:
         return None
-    return ChatMessage.objects.create(room=room, text=text, user=user, contact=contact)
+    return Message.objects.create(room=room, text=text, user=user, contact=contact)
 
 
 def create_contact(
@@ -61,3 +61,11 @@ def ensure_timezone(dt, tz):
         except AttributeError:
             return dt.replace(tzinfo=tz)
     return dt
+
+
+def create_reply_index(message: Message):
+    if message.external_id:
+        ChatMessageReplyIndex.objects.update_or_create(
+            external_id=message.external_id,
+            message=message,
+        )
