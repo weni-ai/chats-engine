@@ -127,6 +127,8 @@ class AgentRepository:
             )
         )
 
+        print("agents_query.query", agents_query.query)
+
         return agents_query
 
     def get_agents_custom_status(self, filters: Filters, project):
