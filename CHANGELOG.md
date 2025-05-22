@@ -1,3 +1,9 @@
+# 3.19.0
+## Add
+  - New feature to show message replies in chats.
+## Fix
+  - Agents' closed and opened rooms count on internal dashboard metrics
+
 # 3.18.14
 ## Fix:
   - Allow null and blank contact names in flow starts
