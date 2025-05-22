@@ -62,11 +62,21 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
 
     @property
     def online_agents(self):
-        return self.agents.filter(
+        # Filtra agentes online
+        agents = self.agents.filter(
             project_permissions__status="ONLINE",
             project_permissions__project=self.sector.project,
             project_permissions__queue_authorizations__queue=self,
             project_permissions__queue_authorizations__role=1,
+        )
+
+        # remove agents that have active custom status other than in service
+        return agents.exclude(
+            models.Q(
+                user_custom_status__is_active=True,
+                user_custom_status__project=self.sector.project,
+            )
+            & ~models.Q(user_custom_status__status_type__name__iexact="In-service")
         )  # TODO: Set this variable to ProjectPermission.STATUS_ONLINE
 
     @property
