@@ -1,7 +1,8 @@
 # 3.19.0
 ## Add
   - New feature to show message replies in chats.
-  - 'Status' field to ProjectSerializer for project status management.
+## Fix
+  - Agents' closed and opened rooms count on internal dashboard metrics
 
 # 3.18.14
 ## Fix:
