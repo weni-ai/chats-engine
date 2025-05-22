@@ -103,13 +103,13 @@ class AgentRepository:
 
         agents_query = (
             agents_query.filter(agents_filters)
+            .distinct()
             .annotate(
                 status=Subquery(project_permission_subquery),
                 closed=Count("rooms", filter=Q(**closed_rooms, **rooms_filter)),
                 opened=Count("rooms", filter=Q(**opened_rooms, **rooms_filter)),
                 custom_status=custom_status_subquery,
             )
-            .distinct()
             .values(
                 "first_name",
                 "last_name",
