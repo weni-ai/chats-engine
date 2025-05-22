@@ -16,7 +16,6 @@ class AgentRepository:
         self.model = User.objects
 
     def get_agents_data(self, filters: Filters, project):
-        print("agents_data filters", filters)
         tz = project.timezone
         initial_datetime = (
             timezone.now()
@@ -47,8 +46,6 @@ class AgentRepository:
             #   (even if they were never assigned to a room from the sector)
             # - Agents that are linked to rooms related to the sector
             #   (even if they don't have authorization to the sector anymore)
-            print("sector", filters.sector)
-            print("sector type", type(filters.sector))
             rooms_filter["rooms__queue__sector__in"] = filters.sector
             agents_filters &= Q(
                 project_permissions__sector_authorizations__sector__in=filters.sector
@@ -103,10 +100,6 @@ class AgentRepository:
             output_field=JSONField(),
         )
 
-        print("closed_rooms", closed_rooms)
-        print("opened_rooms", opened_rooms)
-        print("rooms_filter", rooms_filter)
-
         agents_query = (
             agents_query.filter(agents_filters)
             .annotate(
@@ -134,8 +127,6 @@ class AgentRepository:
                 "custom_status",
             )
         )
-
-        print("agents_query.query", agents_query.query)
 
         return agents_query
 
