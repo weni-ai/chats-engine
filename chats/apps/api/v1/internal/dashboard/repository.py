@@ -231,6 +231,7 @@ class AgentRepository:
                     distinct=True,
                     filter=Q(**opened_rooms, **rooms_filter),
                 ),
+                custom_status=custom_status_subquery,
             )
             .values(
                 "first_name",
