@@ -103,13 +103,21 @@ class AgentRepository:
 
         agents_query = (
             agents_query.filter(agents_filters)
-            .distinct()
             .annotate(
                 status=Subquery(project_permission_subquery),
-                closed=Count("rooms", filter=Q(**closed_rooms, **rooms_filter)),
-                opened=Count("rooms", filter=Q(**opened_rooms, **rooms_filter)),
+                closed=Count(
+                    "rooms__uuid",
+                    distinct=True,
+                    filter=Q(**closed_rooms, **rooms_filter),
+                ),
+                opened=Count(
+                    "rooms__uuid",
+                    distinct=True,
+                    filter=Q(**opened_rooms, **rooms_filter),
+                ),
                 custom_status=custom_status_subquery,
             )
+            .distinct()
             .values(
                 "first_name",
                 "last_name",
@@ -213,9 +221,16 @@ class AgentRepository:
             agents_query.filter(project_permissions__project=project, is_active=True)
             .annotate(
                 status=Subquery(project_permission_queryset),
-                closed=Count("rooms", filter=Q(**closed_rooms, **rooms_filter)),
-                opened=Count("rooms", filter=Q(**opened_rooms, **rooms_filter)),
-                custom_status=custom_status_subquery,
+                closed=Count(
+                    "rooms__uuid",
+                    distinct=True,
+                    filter=Q(**closed_rooms, **rooms_filter),
+                ),
+                opened=Count(
+                    "rooms__uuid",
+                    distinct=True,
+                    filter=Q(**opened_rooms, **rooms_filter),
+                ),
             )
             .values(
                 "first_name",
