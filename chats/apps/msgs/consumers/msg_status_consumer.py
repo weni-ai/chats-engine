@@ -21,7 +21,7 @@ class MessageStatusConsumer(EDAConsumer):
         body = JSONParser.parse(message.body)
 
         if (message_id := body.get("message_id")) and (
-            message_status := body.get("message_status")
+            message_status := body.get("status")
         ):
             update_message_usecase = UpdateStatusMessageUseCase()
             update_message_usecase.update_status_message(message_id, message_status)
