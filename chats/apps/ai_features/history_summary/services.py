@@ -102,6 +102,7 @@ class HistorySummaryService:
 
             history_summary.summary = summary_text
             history_summary.update_status(HistorySummaryStatus.DONE)
+            history_summary.feature_prompt = feature_prompt
             history_summary.save()
 
         except Exception as e:
