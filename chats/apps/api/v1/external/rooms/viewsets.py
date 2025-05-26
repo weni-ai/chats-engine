@@ -420,29 +420,31 @@ class ExternalListWithPaginationRoomsViewSet(viewsets.ReadOnlyModelViewSet):
         Override to add next e previous links
         """
         queryset = self.filter_queryset(self.get_queryset())
-        
+
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             response = self.get_paginated_response(serializer.data)
-            
-            limit = int(request.query_params.get('limit', self.pagination_class.default_limit))
-            offset = int(request.query_params.get('offset', 0))
+
+            limit = int(
+                request.query_params.get("limit", self.pagination_class.default_limit)
+            )
+            offset = int(request.query_params.get("offset", 0))
             total_count = queryset.count()
-            
-            base_url = request.build_absolute_uri().split('?')[0]
+
+            base_url = request.build_absolute_uri().split("?")[0]
             query_params = request.query_params.copy()
-            
+
             if (offset + limit) < total_count:
-                query_params['offset'] = offset + limit
-                query_params['limit'] = limit
-                response.data['next'] = f"{base_url}?{query_params.urlencode()}"
-            
+                query_params["offset"] = offset + limit
+                query_params["limit"] = limit
+                response.data["next"] = f"{base_url}?{query_params.urlencode()}"
+
             if offset > 0:
-                query_params['offset'] = max(0, offset - limit)
-                query_params['limit'] = limit
-                response.data['previous'] = f"{base_url}?{query_params.urlencode()}"
-            
+                query_params["offset"] = max(0, offset - limit)
+                query_params["limit"] = limit
+                response.data["previous"] = f"{base_url}?{query_params.urlencode()}"
+
             return response
 
         serializer = self.get_serializer(queryset, many=True)
