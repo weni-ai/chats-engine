@@ -417,7 +417,7 @@ class ExternalListWithPaginationRoomsViewSet(viewsets.ReadOnlyModelViewSet):
 
     def list(self, request, *args, **kwargs):
         """
-        Override para adicionar next e previous links
+        Override to add next e previous links
         """
         queryset = self.filter_queryset(self.get_queryset())
         
