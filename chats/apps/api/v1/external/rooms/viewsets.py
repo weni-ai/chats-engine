@@ -402,7 +402,7 @@ class ExternalListWithPaginationRoomsViewSet(viewsets.ReadOnlyModelViewSet):
         "user__email",
         "urn",
     ]
-    filterset_class = RoomFilter
+    filterset_class = RoomMetricsFilter
 
     pagination_class = LimitOffsetPagination
     pagination_class.default_limit = 10
@@ -414,6 +414,39 @@ class ExternalListWithPaginationRoomsViewSet(viewsets.ReadOnlyModelViewSet):
             .get_queryset()
             .filter(queue__sector__project=self.request.auth.project)
         )
+
+    def list(self, request, *args, **kwargs):
+        """
+        Override para adicionar next e previous links
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            response = self.get_paginated_response(serializer.data)
+            
+            limit = int(request.query_params.get('limit', self.pagination_class.default_limit))
+            offset = int(request.query_params.get('offset', 0))
+            total_count = queryset.count()
+            
+            base_url = request.build_absolute_uri().split('?')[0]
+            query_params = request.query_params.copy()
+            
+            if (offset + limit) < total_count:
+                query_params['offset'] = offset + limit
+                query_params['limit'] = limit
+                response.data['next'] = f"{base_url}?{query_params.urlencode()}"
+            
+            if offset > 0:
+                query_params['offset'] = max(0, offset - limit)
+                query_params['limit'] = limit
+                response.data['previous'] = f"{base_url}?{query_params.urlencode()}"
+            
+            return response
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     @action(detail=False, methods=["GET"], url_name="count")
     def count(self, request, *args, **kwargs):
