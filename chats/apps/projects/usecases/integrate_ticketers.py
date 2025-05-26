@@ -26,12 +26,10 @@ class IntegratedTicketers:
                     "config": {
                         "project_auth": str(sector.external_token.pk),
                         "sector_uuid": str(sector.uuid),
-                        "project_uuid":str(secundary_project.uuid),
-                        "project_name_origin":secundary_project.name
                     },
                 }
-                flows_client = FlowRESTClient()
-                response = flows_client.create_ticketer(**content)
+                connect = ConnectRESTClient()
+                response = connect.create_ticketer(**content)
 
                 if response.status_code not in [
                     status.HTTP_200_OK,
@@ -83,8 +81,6 @@ class IntegratedTicketers:
                 "config": {
                     "project_auth": str(sector.external_token.pk),
                     "sector_uuid": str(sector.uuid),
-                    "project_uuid":str(sector.project.uuid),
-                    "project_name_origin":sector.project.name
                 },
             }
             connect = ConnectRESTClient()
