@@ -1,3 +1,16 @@
+#3.19.2
+# Add
+  - new list rooms endpoint with limit and offset
+
+#3.19.1
+# Add
+  - Agents data filters
+
+#3.19.0
+# Fix
+  - Message index for external id
+  - Removing from online_agents, agents that have custom status
+
 # 3.18.14
 ## Fix:
   - Allow null and blank contact names in flow starts
