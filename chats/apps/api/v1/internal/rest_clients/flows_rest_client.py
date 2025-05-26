@@ -166,6 +166,18 @@ class FlowsContactsAndGroupsMixin:
 
 
 class FlowsSectorMixin:
+    def create_ticketer(self, project_uuid: str, name: str, config: dict):
+        url = f"{self.base_url}/api/v2/internals/ticketers/"
+        body = {
+            "org": project_uuid,
+            "ticketer_type": settings.FLOWS_TICKETER_TYPE,
+            "name": name,
+            "config": config,
+        }
+
+        response = requests.post(url=url, headers=self.headers, json=body, timeout=120)
+        return response
+
     def destroy_sector(
         self,
         sector_uuid: str,
