@@ -1,4 +1,5 @@
 import io
+import logging
 
 import magic
 from django.conf import settings
@@ -11,6 +12,8 @@ from chats.apps.api.v1.contacts.serializers import ContactSerializer
 from chats.apps.msgs.models import ChatMessageReplyIndex
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
+
+LOGGER = logging.getLogger(__name__)
 
 """
 TODO: Refactor these serializers into less classes
@@ -257,13 +260,13 @@ class MessageSerializer(BaseMessageSerializer):
                         }
                     )
                 result["media"] = media_data
-            
+
             if replied_msg.message.user:
                 result["user"] = {
                     "uuid": str(replied_msg.message.user.pk),
                     "name": replied_msg.message.user.full_name,
                 }
-                
+
             if replied_msg.message.contact:
                 result["contact"] = {
                     "uuid": str(replied_msg.message.contact.uuid),

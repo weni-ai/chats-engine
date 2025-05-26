@@ -65,6 +65,7 @@ def ensure_timezone(dt, tz):
             return dt.replace(tzinfo=tz)
     return dt
 
+
 def calculate_in_service_time(custom_status_list):
     total = 0
     now = timezone.now()
@@ -79,6 +80,7 @@ def calculate_in_service_time(custom_status_list):
             else:
                 total += status.get("break_time", 0)
     return total
+
 
 def create_reply_index(message: Message):
     if message.external_id:

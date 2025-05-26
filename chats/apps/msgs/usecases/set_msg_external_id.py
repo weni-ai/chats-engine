@@ -1,5 +1,6 @@
 from django.db import transaction
 
+from chats.apps.api.utils import create_reply_index
 from chats.apps.msgs.models import Message, MessageMedia
 from chats.apps.api.utils import create_reply_index
 
