@@ -1,6 +1,6 @@
 from django.db import models
 
-from chats.apps.msgs.models import Message, MessageMedia
+from chats.apps.msgs.models import Message, MessageMedia, ChatMessageReplyIndex
 from chats.utils.websockets import send_channels_group
 
 
@@ -15,11 +15,7 @@ class MessageStatusNotifier:
         )
 
     @classmethod
-    def find_and_notify_for_message(cls, message_id, message_status):
-        message = Message.objects.filter(
-            external_id=message_id, room__is_active=True, room__user__isnull=False
-        ).first()
-
+    def notify_for_message(cls, message, message_status):
         if message and message.room and message.room.user:
             project = message.room.project
             if project:
@@ -28,49 +24,21 @@ class MessageStatusNotifier:
                 ).first()
                 if permission:
                     cls.notify_status_update(
-                        message.uuid, message.status, permission.pk
+                        message.uuid, message_status, permission.pk
                     )
                     return True
-        return False
-
-    @classmethod
-    def find_and_notify_for_media(cls, message_id, message_status):
-        media_data = (
-            MessageMedia.objects.filter(
-                external_id=message_id,
-                message__room__is_active=True,
-                message__room__user__isnull=False,
-            )
-            .values_list(
-                "message__uuid", "message__room__user__project_permissions__pk"
-            )
-            .filter(
-                message__room__user__project_permissions__project=models.F(
-                    "message__room__queue__sector__project"
-                )
-            )
-            .first()
-        )
-        if media_data:
-            uuid, permission_pk = media_data
-            cls.notify_status_update(uuid, message_status, permission_pk)
-            return True
         return False
 
 
 class UpdateStatusMessageUseCase:
     def update_status_message(self, message_id, message_status):
-        rows_updated = Message.objects.filter(external_id=message_id).update(
-            status=message_status
-        )
-        if rows_updated > 0:
-            MessageStatusNotifier.find_and_notify_for_message(
-                message_id, message_status
-            )
-            return
-
-        media_rows_updated = MessageMedia.objects.filter(external_id=message_id).update(
-            message__status=message_status
-        )
-        if media_rows_updated > 0:
-            MessageStatusNotifier.find_and_notify_for_media(message_id, message_status)
+        try:
+            reply_index = ChatMessageReplyIndex.objects.get(external_id=message_id)
+            message = reply_index.message
+            
+            message.status = message_status
+            message.save(update_fields=['status'])
+            MessageStatusNotifier.notify_for_message(message, message_status)
+            
+        except ChatMessageReplyIndex.DoesNotExist:
+            print(f"Message with external_id {message_id} not found in ChatMessageReplyIndex")
