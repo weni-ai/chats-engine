@@ -1,3 +1,7 @@
+# 3.18.15
+## Add:
+  - Indicator to show that a room was assigned to a user when the room is created
+
 # 3.18.14
 ## Fix:
   - Allow null and blank contact names in flow starts
