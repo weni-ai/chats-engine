@@ -1,3 +1,7 @@
+# 3.19.3
+## Add:
+  - Indicator to show that a room was assigned to a user when the room is created
+
 # 3.19.2
 # Add
   - new list rooms endpoint with limit and offset
