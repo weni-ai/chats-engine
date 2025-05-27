@@ -88,7 +88,7 @@ class HistorySummaryService:
                     }
                 )
 
-            conversation_text = json.dumps(messages)
+            conversation_text = json.dumps(conversation)
 
             prompt_text = prompt_text.format(conversation=conversation_text)
 
