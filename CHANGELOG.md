@@ -1,3 +1,7 @@
+# 3.19.4
+## Add:
+  - Default blank value for AWS credentials
+
 # 3.19.3
 ## Add:
   - Indicator to show that a room was assigned to a user when the room is created
