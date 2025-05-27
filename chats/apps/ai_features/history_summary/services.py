@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import TYPE_CHECKING
 
@@ -74,13 +75,20 @@ class HistorySummaryService:
                 Q(user__isnull=False) | Q(contact__isnull=False)
             ).select_related("contact", "user")
 
-            conversation_text = ""
+            conversation = []
 
             for message in messages:
                 is_contact = message.contact is not None
                 sender = "contact" if is_contact else "agent"
 
-                conversation_text += f"<{sender}>: {message.text}\n"
+                conversation.append(
+                    {
+                        "sender": sender,
+                        "text": message.text,
+                    }
+                )
+
+            conversation_text = json.dumps(messages)
 
             prompt_text = prompt_text.format(conversation=conversation_text)
 
