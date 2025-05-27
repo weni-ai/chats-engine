@@ -1,3 +1,5 @@
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import IsAuthenticated
@@ -15,7 +17,10 @@ from .permissions import CanRetrieveRoomHistory
 
 
 class HistoryRoomViewset(ReadOnlyModelViewSet):
-    queryset = Room.objects.all()
+    queryset = Room.objects.select_related(
+        "user", "contact", "queue", "queue__sector"
+    ).prefetch_related("tags")
+
     serializer_class = RoomHistorySerializer
     filter_backends = [
         DjangoFilterBackend,
@@ -34,6 +39,16 @@ class HistoryRoomViewset(ReadOnlyModelViewSet):
         "service_chat",
     ]
     ordering = ["-ended_at"]
+
+    @method_decorator(cache_page(60 * 5))
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        if self.request.GET.get("basic", None):
+            return queryset.only("uuid", "ended_at")
 
     def get_permissions(self):
         permission_classes = self.permission_classes
