@@ -27,6 +27,13 @@ class Contact(BaseModel):
     class Meta:
         verbose_name = _("Contact")
         verbose_name_plural = _("Contacts")
+        indexes = [
+            models.Index(
+                fields=["external_id"],
+                name="contact_external_id_idx",
+                condition=models.Q(external_id__isnull=False),
+            ),
+        ]
 
     def __str__(self):
         return str(self.name)
@@ -98,9 +105,8 @@ class Contact(BaseModel):
             & Q(queue__sector__project__permissions__role=1)
         )
         is_user_assigned_to_room = Q(user=user)
-        check_admin_manager_agent_role_filter = Q(
-            filter_project_uuid
-            & (is_sector_manager | is_project_admin | is_user_assigned_to_room)
+        check_admin_manager_agent_role_filter = filter_project_uuid & (
+            is_sector_manager | is_project_admin | is_user_assigned_to_room
         )
 
         rooms_check = self.rooms.filter(
