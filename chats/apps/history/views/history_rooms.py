@@ -9,7 +9,7 @@ from chats.apps.rooms.models import Room
 
 from ..filters.rooms_filter import HistoryRoomFilter
 from ..serializers.rooms import (
-    RoomBasicSerializer,
+    RoomBasicValuesSerializer,
     RoomDetailSerializer,
     RoomHistorySerializer,
 )
@@ -45,7 +45,7 @@ class HistoryRoomViewset(ReadOnlyModelViewSet):
 
     def get_queryset(self):
         if self.request.GET.get("basic", None):
-            return Room.objects.only("uuid", "ended_at")
+            return Room.objects.values("uuid", "ended_at")
         
         return super().get_queryset()
 
@@ -58,7 +58,7 @@ class HistoryRoomViewset(ReadOnlyModelViewSet):
 
     def get_serializer_class(self):
         if self.request.GET.get("basic", None):
-            return RoomBasicSerializer
+            return RoomBasicValuesSerializer
         if self.action == "retrieve":
             return RoomDetailSerializer
         return super().get_serializer_class()

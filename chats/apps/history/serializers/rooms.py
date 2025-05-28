@@ -44,6 +44,14 @@ class RoomHistorySerializer(serializers.ModelSerializer):
         ]
 
 
+class RoomBasicValuesSerializer(serializers.Serializer):
+    """
+    Serializer otimizado para trabalhar com values() - performance máxima
+    """
+    uuid = serializers.UUIDField()
+    ended_at = serializers.DateTimeField()
+
+
 class RoomBasicSerializer(serializers.ModelSerializer):
     class Meta:
         model = Room
