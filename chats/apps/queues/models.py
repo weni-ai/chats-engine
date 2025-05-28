@@ -134,7 +134,7 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         )
         return queue_auth
 
-    def get_available_agent_for_queue(self):
+    def get_available_agent(self):
         """
         Get an available agent for a queue, based on the number of active rooms.
 
