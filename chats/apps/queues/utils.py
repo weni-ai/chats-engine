@@ -1,4 +1,5 @@
 import logging
+import random
 from typing import TYPE_CHECKING
 from django.conf import settings
 from chats.apps.projects.models.models import Project
@@ -80,3 +81,31 @@ def create_room_assigned_from_queue_feedback(room: "Room", user: "User"):
     create_room_feedback_message(
         room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
     )
+
+
+def get_available_agent_for_queue(queue: Queue):
+    """
+    Get an available agent for a queue, based on the number of active rooms.
+
+    If the active rooms count is the same for different agents,
+    a random agent, among the ones with the rooms count, is returned.
+    """
+    agents = list(queue.available_agents)
+
+    if not agents:
+        return None
+
+    routing_option = queue.sector.project.routing_option
+    field_name = (
+        "active_and_day_closed_rooms"
+        if routing_option == "general"
+        else "active_rooms_count"
+    )
+
+    min_rooms_count = min(getattr(agent, field_name) for agent in agents)
+
+    eligible_agents = [
+        agent for agent in agents if getattr(agent, field_name) == min_rooms_count
+    ]
+
+    return random.choice(eligible_agents)
