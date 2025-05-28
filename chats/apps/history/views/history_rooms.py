@@ -40,15 +40,14 @@ class HistoryRoomViewset(ReadOnlyModelViewSet):
     ]
     ordering = ["-ended_at"]
 
-    @method_decorator(cache_page(60 * 5))
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
     def get_queryset(self):
-        queryset = super().get_queryset()
-
         if self.request.GET.get("basic", None):
-            return queryset.only("uuid", "ended_at")
+            return Room.objects.only("uuid", "ended_at")
+        
+        return super().get_queryset()
 
     def get_permissions(self):
         permission_classes = self.permission_classes
