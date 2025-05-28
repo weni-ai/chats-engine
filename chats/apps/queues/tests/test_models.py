@@ -318,6 +318,15 @@ class TestQueueGetAvailableAgent(TestCase):
         self.assertEqual(available_agent, self.agent_3)
 
     def test_get_available_agent_returns_random_agent_if_rooms_count_is_equal(self):
+        # Ensure the project uses a routing option that relies on active_rooms_count
+        # (i.e., not "general") for this test's logic to be consistent.
+        # We assume 'least_active' or any other non-'general' value will suffice.
+        if self.queue.sector.project.routing_option == "general":
+            self.queue.sector.project.routing_option = (
+                "least_active"  # Or any other appropriate value
+            )
+            self.queue.sector.project.save()
+
         for i in range(3):
             # Agent 1 has 3 active rooms
             Room.objects.create(user=self.agent_1, queue=self.queue, is_active=True)
@@ -330,5 +339,25 @@ class TestQueueGetAvailableAgent(TestCase):
             # Agent 3 has 2 active rooms
             Room.objects.create(user=self.agent_3, queue=self.queue, is_active=True)
 
-        available_agent = self.queue.get_available_agent()
-        self.assertIn(available_agent, [self.agent_2, self.agent_3])
+        num_trials = 100
+        picked_agents_results = []
+        for _ in range(num_trials):
+            available_agent = self.queue.get_available_agent()
+            self.assertIsNotNone(
+                available_agent, "get_available_agent should return an agent."
+            )
+            self.assertIn(available_agent, [self.agent_2, self.agent_3])
+            picked_agents_results.append(available_agent)
+
+        # Verify that both eligible agents were picked at least once over the trials.
+        picked_agents_set = set(picked_agents_results)
+        self.assertIn(
+            self.agent_2,
+            picked_agents_set,
+            "Agent 2 was never picked, suggesting non-random selection.",
+        )
+        self.assertIn(
+            self.agent_3,
+            picked_agents_set,
+            "Agent 3 was never picked, suggesting non-random selection.",
+        )
