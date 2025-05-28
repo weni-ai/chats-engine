@@ -14,6 +14,10 @@ class Migration(migrations.Migration):
     operations = [
         AddIndexConcurrently(
             model_name="contact",
-            index=models.Index(fields=["external_id"], name="contact_external_id_idx"),
+            index=models.Index(
+                fields=["external_id"],
+                name="contact_external_id_idx",
+                condition=models.Q(external_id__isnull=False),
+            ),
         ),
     ]
