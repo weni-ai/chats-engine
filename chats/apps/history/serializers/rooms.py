@@ -27,7 +27,7 @@ class ContactOptimizedSerializer(serializers.ModelSerializer):
 
 class RoomHistorySerializer(serializers.ModelSerializer):
     user = UserNameSerializer(many=False, read_only=True)
-    contact = ContactOptimizedSerializer(read_only=True, source="contact")
+    contact = ContactOptimizedSerializer(read_only=True)
     tags = TagSimpleSerializer(many=True, read_only=True)
 
     class Meta:
@@ -44,13 +44,9 @@ class RoomHistorySerializer(serializers.ModelSerializer):
         ]
 
 
-class RoomBasicSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Room
-        fields = [
-            "uuid",
-            "ended_at",
-        ]
+class RoomBasicValuesSerializer(serializers.Serializer):
+    uuid = serializers.UUIDField()
+    ended_at = serializers.DateTimeField()
 
 
 class RoomDetailSerializer(serializers.ModelSerializer):

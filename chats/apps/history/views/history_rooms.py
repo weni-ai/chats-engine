@@ -1,5 +1,3 @@
-from django.utils.decorators import method_decorator
-from django.views.decorators.cache import cache_page
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import IsAuthenticated
@@ -9,7 +7,7 @@ from chats.apps.rooms.models import Room
 
 from ..filters.rooms_filter import HistoryRoomFilter
 from ..serializers.rooms import (
-    RoomBasicSerializer,
+    RoomBasicValuesSerializer,
     RoomDetailSerializer,
     RoomHistorySerializer,
 )
@@ -40,15 +38,14 @@ class HistoryRoomViewset(ReadOnlyModelViewSet):
     ]
     ordering = ["-ended_at"]
 
-    @method_decorator(cache_page(60 * 5))
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
     def get_queryset(self):
-        queryset = super().get_queryset()
-
         if self.request.GET.get("basic", None):
-            return queryset.only("uuid", "ended_at")
+            return Room.objects.values("uuid", "ended_at")
+
+        return super().get_queryset()
 
     def get_permissions(self):
         permission_classes = self.permission_classes
@@ -59,7 +56,7 @@ class HistoryRoomViewset(ReadOnlyModelViewSet):
 
     def get_serializer_class(self):
         if self.request.GET.get("basic", None):
-            return RoomBasicSerializer
+            return RoomBasicValuesSerializer
         if self.action == "retrieve":
             return RoomDetailSerializer
         return super().get_serializer_class()
