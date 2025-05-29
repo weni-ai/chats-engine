@@ -1,3 +1,7 @@
+# 3.19.5
+## Add:
+  - Chats history optimizations.
+     
 # 3.19.4
 ## Add:
   - Default blank value for AWS credentials
