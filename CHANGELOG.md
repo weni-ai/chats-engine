@@ -1,3 +1,24 @@
+# 3.19.4
+## Add:
+  - Default blank value for AWS credentials
+
+# 3.19.3
+## Add:
+  - Indicator to show that a room was assigned to a user when the room is created
+
+# 3.19.2
+# Add
+  - new list rooms endpoint with limit and offset
+
+# 3.19.1
+# Add
+  - Agents data filters
+
+# 3.19.0
+# Fix
+  - Message index for external id
+  - Removing from online_agents, agents that have custom status
+
 # 3.18.14
 ## Fix:
   - Allow null and blank contact names in flow starts

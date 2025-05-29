@@ -301,6 +301,7 @@ class RoomsReportFiltersSerializer(serializers.Serializer):
 
     created_on__gte = serializers.DateTimeField(required=True)
     created_on__lte = serializers.DateTimeField(required=False)
+    tags = serializers.ListField(required=False, child=serializers.UUIDField())
 
     def validate(self, attrs):
         created_on__gte = attrs.get("created_on__gte")
@@ -319,6 +320,9 @@ class RoomsReportFiltersSerializer(serializers.Serializer):
 
         if period > 90:
             raise serializers.ValidationError("Period must be less than 90 days")
+
+        if tags := attrs.pop("tags", None):
+            attrs["tags__in"] = tags
 
         return super().validate(attrs)
 

@@ -831,6 +831,44 @@ class RoomsReportTestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
 
+    def test_cannot_generate_report_when_tags_filter_is_not_a_list(self):
+        self.client.credentials(
+            HTTP_AUTHORIZATION="Bearer " + str(self.project.external_token.uuid)
+        )
+
+        body = {
+            "recipient_email": "test@example.com",
+            "filters": {
+                "created_on__gte": "2021-01-01",
+                "created_on__lte": "2021-01-01",
+                "tags": "invalid-tags-filter",
+            },
+        }
+
+        response = self.generate_report(body)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["filters"]["tags"][0].code, "not_a_list")
+
+    def test_cannot_generate_report_with_invalid_tag_in_tags_list(self):
+        self.client.credentials(
+            HTTP_AUTHORIZATION="Bearer " + str(self.project.external_token.uuid)
+        )
+
+        body = {
+            "recipient_email": "test@example.com",
+            "filters": {
+                "created_on__gte": "2021-01-01",
+                "created_on__lte": "2021-01-01",
+                "tags": ["invalid-tag"],
+            },
+        }
+
+        response = self.generate_report(body)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["filters"]["tags"][0][0].code, "invalid")
+
     @patch("chats.apps.api.v1.rooms.viewsets.generate_rooms_report")
     def test_generate_report(self, mock_generate_rooms_report):
         mock_generate_rooms_report.delay.return_value = None
