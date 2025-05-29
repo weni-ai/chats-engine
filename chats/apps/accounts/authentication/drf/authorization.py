@@ -88,10 +88,12 @@ class ProjectAdminAuthentication(TokenAuthentication):
             return self._authenticate_credentials(key)
         redis_connection = get_redis_connection()
 
+        print("key", key)
         cache_authorization = redis_connection.get(key)
 
         if cache_authorization is not None:
             cache_authorization = json.loads(cache_authorization)
+            print("cache_authorization", cache_authorization)
             authorization = ProjectAdminDTO(**cache_authorization)
             return (authorization.user_email, authorization)
 
