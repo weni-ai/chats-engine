@@ -87,4 +87,3 @@ class HistoryRoomFilter(filters.FilterSet):
 
         values = value.split(",")
         return queryset.filter(tags__name__in=values).distinct()
-
