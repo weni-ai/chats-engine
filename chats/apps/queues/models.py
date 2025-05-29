@@ -115,25 +115,6 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
 
         return online_agents.order_by("active_rooms_count")
 
-    def is_agent(self, user):
-        return self.authorizations.filter(permission__user=user).exists()
-
-    def get_or_create_user_authorization(self, user):
-        queue_auth, created = self.authorizations.get_or_create(permission__user=user)
-        return queue_auth
-
-    def set_queue_authorization(self, user, role: int):
-        queue_auth, created = self.authorizations.get_or_create(
-            permission__user=user, role=role
-        )
-        return queue_auth
-
-    def set_user_authorization(self, permission, role: int):
-        queue_auth, created = self.authorizations.get_or_create(
-            permission=permission, role=role
-        )
-        return queue_auth
-
     def get_available_agent(self):
         """
         Get an available agent for a queue, based on the number of active rooms.
@@ -160,6 +141,25 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         ]
 
         return random.choice(eligible_agents)
+
+    def is_agent(self, user):
+        return self.authorizations.filter(permission__user=user).exists()
+
+    def get_or_create_user_authorization(self, user):
+        queue_auth, created = self.authorizations.get_or_create(permission__user=user)
+        return queue_auth
+
+    def set_queue_authorization(self, user, role: int):
+        queue_auth, created = self.authorizations.get_or_create(
+            permission__user=user, role=role
+        )
+        return queue_auth
+
+    def set_user_authorization(self, permission, role: int):
+        queue_auth, created = self.authorizations.get_or_create(
+            permission=permission, role=role
+        )
+        return queue_auth
 
     @property
     def project(self):
