@@ -19,7 +19,13 @@ TOKEN_AUTHENTICATION_CLASS = (
 
 class ProjectAdminDTO:
     def __init__(
-        self, pk: str, project: str, user_email: str, user_first_name: str, role: int
+        self,
+        pk: str,
+        project: str,
+        user_email: str,
+        user_first_name: str,
+        role: int,
+        **kwargs
     ) -> None:
         self.pk = pk
         self.project = project
