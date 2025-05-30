@@ -27,6 +27,13 @@ class Contact(BaseModel):
     class Meta:
         verbose_name = _("Contact")
         verbose_name_plural = _("Contacts")
+        indexes = [
+            models.Index(
+                fields=["external_id"],
+                name="contact_external_id_idx",
+                condition=models.Q(external_id__isnull=False),
+            ),
+        ]
 
     def __str__(self):
         return str(self.name)
