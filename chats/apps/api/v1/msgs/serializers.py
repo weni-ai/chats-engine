@@ -225,7 +225,12 @@ class MessageSerializer(BaseMessageSerializer):
 
         try:
             replied_id = context.get("id")
-            replied_msg = ChatMessageReplyIndex.objects.get(external_id=replied_id)
+            replied_msg = ChatMessageReplyIndex.objects.filter(
+                external_id=replied_id
+            ).first()
+
+            if not replied_msg:
+                return None
 
             result = {
                 "uuid": str(replied_msg.message.uuid),
