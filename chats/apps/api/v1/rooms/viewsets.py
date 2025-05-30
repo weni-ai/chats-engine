@@ -1,20 +1,21 @@
-from datetime import timedelta
 import logging
+from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.db import transaction
 from django.db.models import BooleanField, Case, Count, Max, OuterRef, Q, Subquery, When
-from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
+from django.utils.timezone import make_aware
 from django.utils.translation import gettext_lazy as _
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.filters import OrderingFilter
 from rest_framework.request import Request
 from rest_framework.response import Response
-from rest_framework.viewsets import GenericViewSet
 from rest_framework.views import APIView
+from rest_framework.viewsets import GenericViewSet
 
 from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
@@ -50,9 +51,6 @@ from chats.apps.rooms.views import (
     update_custom_fields,
     update_flows_custom_fields,
 )
-from django.utils.timezone import make_aware
-from datetime import datetime
-
 
 logger = logging.getLogger(__name__)
 
@@ -220,13 +218,17 @@ class RoomViewset(
         if user:
             if old_instance.user is None:
                 time = timezone.now() - old_instance.modified_on
-                room_metric = RoomMetrics.objects.get_or_create(room=instance)[0]
+                room_metric = RoomMetrics.objects.select_related("room").get_or_create(
+                    room=instance
+                )[0]
                 room_metric.waiting_time += time.total_seconds()
                 room_metric.queued_count += 1
                 room_metric.save()
             else:
                 # Get the room metric from instance and update the transfer_count value.
-                room_metric = RoomMetrics.objects.get_or_create(room=instance)[0]
+                room_metric = RoomMetrics.objects.select_related("room").get_or_create(
+                    room=instance
+                )[0]
                 room_metric.transfer_count += 1
                 room_metric.save()
 
@@ -249,7 +251,9 @@ class RoomViewset(
             ):  # if it is only a queue transfer from a user, need to reset the user field
                 instance.user = None
 
-            room_metric = RoomMetrics.objects.get_or_create(room=instance)[0]
+            room_metric = RoomMetrics.objects.select_related("room").get_or_create(
+                room=instance
+            )[0]
             room_metric.transfer_count += 1
             room_metric.save()
 
@@ -400,7 +404,9 @@ class RoomViewset(
         )
 
         time = timezone.now() - room.modified_on
-        room_metric = RoomMetrics.objects.get_or_create(room=room)[0]
+        room_metric = RoomMetrics.objects.select_related("room").get_or_create(
+            room=room
+        )[0]
         room_metric.waiting_time += time.total_seconds()
         room_metric.queued_count += 1
         room_metric.save()
@@ -425,8 +431,9 @@ class RoomViewset(
         url_name="bulk_transfer",
     )
     def bulk_transfer(self, request, pk=None):
-        rooms_list = Room.objects.filter(uuid__in=request.data.get("rooms_list"))
-
+        rooms_list = Room.objects.filter(
+            uuid__in=request.data.get("rooms_list")
+        ).select_related("user", "queue__sector__project")
         user_email = request.query_params.get("user_email")
         queue_uuid = request.query_params.get("queue_uuid")
         user_request = request.user or request.query_params.get("user_request")
