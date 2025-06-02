@@ -451,3 +451,7 @@ if SEND_EMAILS:
     EMAIL_HOST_PASSWORD = env.str("EMAIL_HOST_PASSWORD")
     EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL")
     EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS")
+
+
+# Pin rooms
+MAX_ROOM_PINS_LIMIT = env.int("MAX_ROOM_PINS_LIMIT", default=3)

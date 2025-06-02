@@ -1,11 +1,14 @@
 import uuid
 
+from django.conf import settings
 from django.db import IntegrityError
+from django.core.exceptions import PermissionDenied
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
+from chats.apps.rooms.exceptions import MaxPinRoomLimitReachedError
 from chats.apps.rooms.models import Room
 
 
@@ -54,3 +57,60 @@ class TestRoomModel(TestCase):
 
         room.refresh_from_db()
         self.assertNotEqual(room.user_assigned_at, previous_user_assigned_at)
+
+    def test_pin_room(self):
+        user = User.objects.create(email="a@user.com")
+        room = Room.objects.create(user=user)
+
+        self.assertEqual(room.pins.count(), 0)
+
+        room.pin(user)
+        self.assertEqual(room.pins.count(), 1)
+
+        pin = room.pins.first()
+        self.assertEqual(pin.user, user)
+
+        room.pin(user)
+        # Should not raise an error or add a new pin
+        self.assertEqual(room.pins.count(), 1)
+        self.assertEqual(room.pins.first(), pin)
+
+    def test_pin_room_limit_reached(self):
+        user = User.objects.create(email="a@user.com")
+
+        for i in range(settings.MAX_ROOM_PINS_LIMIT):
+            room = Room.objects.create(user=user)
+
+            room.pin(user)
+
+        room = Room.objects.create()
+
+        with self.assertRaises(MaxPinRoomLimitReachedError):
+            room.pin(user)
+
+    def test_pin_room_user_not_assigned(self):
+        room = Room.objects.create()
+        user = User.objects.create(email="a@user.com")
+
+        with self.assertRaises(PermissionDenied):
+            room.pin(user)
+
+    def test_unpin_room(self):
+        user = User.objects.create(email="a@user.com")
+        room = Room.objects.create(user=user)
+
+        room.pin(user)
+        self.assertEqual(room.pins.count(), 1)
+
+        pin = room.pins.first()
+        self.assertEqual(pin.user, user)
+
+        room.unpin(user)
+        self.assertEqual(room.pins.count(), 0)
+
+    def test_unpin_room_user_not_assigned(self):
+        room = Room.objects.create()
+        user = User.objects.create(email="a@user.com")
+
+        with self.assertRaises(PermissionDenied):
+            room.unpin(user)

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import requests
 import sentry_sdk
 from django.conf import settings
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.utils import timezone
@@ -19,6 +19,7 @@ from rest_framework.exceptions import ValidationError
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.projects.usecases.send_room_info import RoomInfoUseCase
+from chats.apps.rooms.exceptions import MaxPinRoomLimitReachedError
 from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
 
@@ -399,3 +400,58 @@ class Room(BaseModel, BaseConfigurableModel):
         is_sector_manager = queue.sector.is_manager(user)
 
         return is_project_admin or is_sector_manager
+
+    def pin(self, user: User):
+        """
+        Pins a room for a user.
+        """
+
+        if self.pins.filter(user=user).exists():
+            return
+
+        if RoomPin.objects.filter(user=user).count() >= settings.MAX_ROOM_PINS_LIMIT:
+            raise MaxPinRoomLimitReachedError
+
+        if self.user != user:
+            raise PermissionDenied
+
+        return RoomPin.objects.create(room=self, user=user)
+
+    def unpin(self, user: User):
+        """
+        Unpins a room for a user.
+        """
+        if self.user != user:
+            raise PermissionDenied
+
+        return self.pins.filter(user=user).delete()
+
+
+class RoomPin(BaseModel):
+    """
+    A room pin is a record of a user pinning a room.
+    """
+
+    room = models.ForeignKey(
+        "rooms.Room",
+        related_name="pins",
+        verbose_name=_("room"),
+        on_delete=models.CASCADE,
+    )
+    user = models.ForeignKey(
+        "accounts.User",
+        related_name="room_pins",
+        verbose_name=_("user"),
+        on_delete=models.CASCADE,
+    )
+    created_on = models.DateTimeField(_("created on"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Room Pin")
+        verbose_name_plural = _("Room Pins")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["room", "user"],
+                name="unique_room_user_room_pin",
+            )
+        ]
