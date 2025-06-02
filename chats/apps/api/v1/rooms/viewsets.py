@@ -44,7 +44,7 @@ from chats.apps.rooms.exceptions import (
     MaxPinRoomLimitReachedError,
     RoomIsNotActiveError,
 )
-from chats.apps.rooms.models import Room
+from chats.apps.rooms.models import Room, RoomPin
 from chats.apps.rooms.services import RoomsReportService
 from chats.apps.rooms.tasks import generate_rooms_report
 from chats.apps.rooms.views import (
@@ -132,6 +132,35 @@ class RoomViewset(
         elif "list" in self.action:
             return ListRoomSerializer
         return super().get_serializer_class()
+
+    def list(self, request, *args, **kwargs):
+        pins = RoomPin.objects.filter(user=request.user)
+        pinned_rooms = Room.objects.filter(pk__in=pins.values_list("room", flat=True))
+
+        rooms_pks_query = self.filter_queryset(self.get_queryset())
+        queryset = (
+            Room.objects.filter(pk__in=rooms_pks_query | pinned_rooms)
+            .annotate(
+                is_pinned=Case(
+                    When(pk__in=pinned_rooms, then=True),
+                    default=False,
+                    output_field=BooleanField(),
+                )
+            )
+            .order_by("-is_pinned")
+        )
+
+        page = self.paginate_queryset(queryset)
+
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            data = self.get_paginated_response(serializer.data)
+
+            return data
+
+        serializer = self.get_serializer(queryset, many=True)
+
+        return Response(serializer.data)
 
     @action(
         detail=True,

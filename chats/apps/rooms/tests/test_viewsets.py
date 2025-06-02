@@ -430,6 +430,30 @@ class TestRoomsViewSet(APITestCase):
             response.json().get("results")[1].get("uuid"), str(room_1.uuid)
         )
 
+    def test_room_order_with_pin(self):
+        room_1 = Room.objects.create(
+            queue=self.queue,
+            contact=Contact.objects.create(),
+        )
+        room_2 = Room.objects.create(
+            queue=self.queue,
+            contact=Contact.objects.create(),
+        )
+
+        RoomPin.objects.create(room=room_2, user=self.user)
+
+        response = self.list_rooms(
+            filters={"project": str(self.project.uuid), "ordering": "-created_on"}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.json().get("results")[0].get("uuid"), str(room_2.uuid)
+        )
+        self.assertEqual(
+            response.json().get("results")[1].get("uuid"), str(room_1.uuid)
+        )
+
 
 class RoomPickTests(APITestCase):
     def setUp(self) -> None:
