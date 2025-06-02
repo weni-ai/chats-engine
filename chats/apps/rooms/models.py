@@ -147,12 +147,13 @@ class Room(BaseModel, BaseConfigurableModel):
         if self.__original_is_active is False:
             raise ValidationError({"detail": _("Closed rooms cannot receive updates")})
 
-        if (
-            self.user
-            and not self.user_assigned_at
-            or (self.pk and self.tracker.has_changed("user"))
-        ):
+        user_has_changed = self.pk and self.tracker.has_changed("user")
+
+        if self.user and not self.user_assigned_at or user_has_changed:
             self.user_assigned_at = timezone.now()
+
+        if user_has_changed:
+            self.clear_pins()
 
         return super().save(*args, **kwargs)
 
@@ -425,6 +426,12 @@ class Room(BaseModel, BaseConfigurableModel):
             raise PermissionDenied
 
         return self.pins.filter(user=user).delete()
+
+    def clear_pins(self):
+        """
+        Clears all pins for a room.
+        """
+        return self.pins.all().delete()
 
 
 class RoomPin(BaseModel):

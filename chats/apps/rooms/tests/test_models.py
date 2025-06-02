@@ -114,3 +114,37 @@ class TestRoomModel(TestCase):
 
         with self.assertRaises(PermissionDenied):
             room.unpin(user)
+
+    def test_clear_pins(self):
+        user = User.objects.create(email="a@user.com")
+        room = Room.objects.create(user=user)
+
+        room.pin(user)
+        self.assertEqual(room.pins.count(), 1)
+
+        room.clear_pins()
+        self.assertEqual(room.pins.count(), 0)
+
+    def test_change_user_clears_pins(self):
+        user = User.objects.create(email="a@user.com")
+        room = Room.objects.create(user=user)
+
+        room.pin(user)
+        self.assertEqual(room.pins.count(), 1)
+
+        room.user = User.objects.create(email="b@user.com")
+        room.save()
+
+        self.assertEqual(room.pins.count(), 0)
+
+    def test_remove_user_clears_pins(self):
+        user = User.objects.create(email="a@user.com")
+        room = Room.objects.create(user=user)
+
+        room.pin(user)
+        self.assertEqual(room.pins.count(), 1)
+
+        room.user = None
+        room.save()
+
+        self.assertEqual(room.pins.count(), 0)
