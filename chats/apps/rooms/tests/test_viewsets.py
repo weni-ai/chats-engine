@@ -439,6 +439,10 @@ class TestRoomsViewSet(APITestCase):
             queue=self.queue,
             contact=Contact.objects.create(),
         )
+        room_3 = Room.objects.create(
+            queue=self.queue,
+            contact=Contact.objects.create(),
+        )
 
         RoomPin.objects.create(room=room_2, user=self.user)
 
@@ -452,6 +456,9 @@ class TestRoomsViewSet(APITestCase):
         )
         self.assertEqual(
             response.json().get("results")[1].get("uuid"), str(room_1.uuid)
+        )
+        self.assertEqual(
+            response.json().get("results")[2].get("uuid"), str(room_3.uuid)
         )
 
 
