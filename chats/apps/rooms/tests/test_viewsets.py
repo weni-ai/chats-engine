@@ -795,7 +795,21 @@ class RoomsReportTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
 
 
-class RoomPinTestCase(APITestCase):
+class BaseRoomPinTestCase(APITestCase):
+    def pin_room(self, room_pk: str, data: dict) -> Response:
+        url = reverse("room-pin", kwargs={"pk": room_pk})
+
+        return self.client.post(url, data=data, format="json")
+
+
+class TestRoomPinAnonymousUser(BaseRoomPinTestCase):
+    def test_cannot_pin_room_when_user_is_not_authenticated(self):
+        response = self.pin_room("123", {"status": True})
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class TestRoomPinAuthenticatedUser(BaseRoomPinTestCase):
     def setUp(self):
         self.project = Project.objects.create(
             name="Test Project",
@@ -816,11 +830,6 @@ class RoomPinTestCase(APITestCase):
         )
 
         self.client.force_authenticate(user=self.agent)
-
-    def pin_room(self, room_pk: str, data: dict) -> Response:
-        url = reverse("room-pin", kwargs={"pk": room_pk})
-
-        return self.client.post(url, data=data, format="json")
 
     def test_pin_room(self):
         room = Room.objects.create(
