@@ -27,6 +27,7 @@ from chats.apps.api.v1.msgs.serializers import ChatCompletionSerializer
 from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1.rooms.serializers import (
     ListRoomSerializer,
+    PinRoomSerializer,
     RoomInfoSerializer,
     RoomMessageStatusSerializer,
     RoomSerializer,
@@ -39,6 +40,10 @@ from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.choices import RoomFeedbackMethods
+from chats.apps.rooms.exceptions import (
+    MaxPinRoomLimitReachedError,
+    RoomIsNotActiveError,
+)
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.services import RoomsReportService
 from chats.apps.rooms.tasks import generate_rooms_report
@@ -589,6 +594,36 @@ class RoomViewset(
         return Response(
             RoomInfoSerializer(rooms, many=True).data, status=status.HTTP_200_OK
         )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_name="pin",
+        url_path="pin",
+        serializer_class=PinRoomSerializer,
+    )
+    def pin(self, request: Request, pk=None) -> Response:
+        serializer = PinRoomSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        room: Room = self.get_object()
+        user: User = request.user
+
+        method = (
+            room.pin if serializer.validated_data.get("status") is True else room.unpin
+        )
+
+        try:
+            method(user)
+        except (
+            MaxPinRoomLimitReachedError,
+            RoomIsNotActiveError,
+        ) as e:
+            raise ValidationError(e.to_dict(), code=e.code) from e
+        except PermissionDenied as e:
+            return Response({"detail": str(e)}, status=status.HTTP_403_FORBIDDEN)
+
+        return Response(status=status.HTTP_200_OK)
 
 
 class RoomsReportViewSet(APIView):

@@ -1,10 +1,13 @@
 from datetime import time
 from unittest.mock import patch
+
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.test import APITestCase
+
 from chats.apps.api.utils import create_contact, create_user_and_token
 from chats.apps.contacts.models import Contact
 from chats.apps.projects.models import Project, ProjectPermission
@@ -12,7 +15,7 @@ from chats.apps.projects.models.models import RoomRoutingType
 from chats.apps.projects.tests.decorators import with_project_permission
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.queues.tests.decorators import with_queue_authorization
-from chats.apps.rooms.models import Room
+from chats.apps.rooms.models import Room, RoomPin
 from chats.apps.rooms.services import RoomsReportService
 from chats.apps.sectors.models import Sector, SectorAuthorization
 from chats.apps.sectors.tests.decorators import with_sector_authorization
@@ -790,3 +793,92 @@ class RoomsReportTestCase(APITestCase):
         response = self.generate_report(body)
 
         self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+
+
+class RoomPinTestCase(APITestCase):
+    def setUp(self):
+        self.project = Project.objects.create(
+            name="Test Project",
+        )
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=1,
+            work_start=time(hour=5, minute=0),
+            work_end=time(hour=23, minute=59),
+        )
+        self.queue = Queue.objects.create(
+            name="Test Queue",
+            sector=self.sector,
+        )
+        self.agent = User.objects.create(
+            email="test_agent_1@example.com",
+        )
+
+        self.client.force_authenticate(user=self.agent)
+
+    def pin_room(self, room_pk: str, data: dict) -> Response:
+        url = reverse("room-pin", kwargs={"pk": room_pk})
+
+        return self.client.post(url, data=data, format="json")
+
+    def test_pin_room(self):
+        room = Room.objects.create(
+            queue=self.queue,
+            user=self.agent,
+        )
+
+        response = self.pin_room(room.uuid, {"status": True})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_cannot_pin_room_when_room_is_not_active(self):
+        room = Room.objects.create(
+            queue=self.queue,
+            user=self.agent,
+        )
+        room.close()
+        response = self.pin_room(room.uuid, {"status": True})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["code"], "room_is_not_active")
+
+    def test_cannot_pin_room_when_max_pin_limit_reached(self):
+        for _ in range(settings.MAX_ROOM_PINS_LIMIT):
+            room = Room.objects.create(
+                queue=self.queue,
+                user=self.agent,
+            )
+            RoomPin.objects.create(room=room, user=self.agent)
+
+        room = Room.objects.create(
+            queue=self.queue,
+            user=self.agent,
+        )
+        response = self.pin_room(room.uuid, {"status": True})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["code"], "max_pin_limit")
+
+    def test_cannot_pin_room_when_user_is_not_assigned(self):
+        room = Room.objects.create(
+            queue=self.queue,
+        )
+        response = self.pin_room(room.uuid, {"status": True})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_unpin_room(self):
+        room = Room.objects.create(
+            queue=self.queue,
+            user=self.agent,
+        )
+        response = self.pin_room(room.uuid, {"status": False})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_cannot_unpin_room_when_user_is_not_assigned(self):
+        room = Room.objects.create(
+            queue=self.queue,
+        )
+        response = self.pin_room(room.uuid, {"status": False})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

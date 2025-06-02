@@ -8,7 +8,10 @@ from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
-from chats.apps.rooms.exceptions import MaxPinRoomLimitReachedError
+from chats.apps.rooms.exceptions import (
+    MaxPinRoomLimitReachedError,
+    RoomIsNotActiveError,
+)
 from chats.apps.rooms.models import Room
 
 
@@ -93,6 +96,14 @@ class TestRoomModel(TestCase):
         user = User.objects.create(email="a@user.com")
 
         with self.assertRaises(PermissionDenied):
+            room.pin(user)
+
+    def test_pin_room_is_not_active(self):
+        user = User.objects.create(email="a@user.com")
+        room = Room.objects.create(user=user)
+        room.close()
+
+        with self.assertRaises(RoomIsNotActiveError):
             room.pin(user)
 
     def test_unpin_room(self):

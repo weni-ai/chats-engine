@@ -323,3 +323,12 @@ class RoomsReportSerializer(serializers.Serializer):
 
     recipient_email = serializers.EmailField(required=True)
     filters = RoomsReportFiltersSerializer(required=True)
+
+
+class PinRoomSerializer(serializers.Serializer):
+    """
+    Serializer for the pin room.
+    """
+
+    # True to pin, False to unpin
+    status = serializers.BooleanField(required=True)
