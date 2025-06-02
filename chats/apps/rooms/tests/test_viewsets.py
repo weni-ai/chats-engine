@@ -455,10 +455,10 @@ class TestRoomsViewSet(APITestCase):
             response.json().get("results")[0].get("uuid"), str(room_2.uuid)
         )
         self.assertEqual(
-            response.json().get("results")[1].get("uuid"), str(room_1.uuid)
+            response.json().get("results")[1].get("uuid"), str(room_3.uuid)
         )
         self.assertEqual(
-            response.json().get("results")[2].get("uuid"), str(room_3.uuid)
+            response.json().get("results")[2].get("uuid"), str(room_1.uuid)
         )
 
 

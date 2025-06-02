@@ -135,28 +135,39 @@ class RoomViewset(
 
     def list(self, request, *args, **kwargs):
         pins = RoomPin.objects.filter(user=request.user)
-        pinned_rooms = Room.objects.filter(pk__in=pins.values_list("room", flat=True))
+        pinned_rooms_qs = Room.objects.filter(
+            pk__in=pins.values_list("room__pk", flat=True)
+        )
 
         rooms_pks_query = self.filter_queryset(self.get_queryset())
-        queryset = (
-            Room.objects.filter(pk__in=rooms_pks_query | pinned_rooms)
-            .annotate(
-                is_pinned=Case(
-                    When(pk__in=pinned_rooms, then=True),
-                    default=False,
-                    output_field=BooleanField(),
-                )
-            )
-            .order_by("-is_pinned")
+
+        secondary_sort_fields = list(rooms_pks_query.query.order_by)
+
+        if not secondary_sort_fields and isinstance(self.ordering, (list, tuple)):
+            secondary_sort_fields = list(self.ordering)
+
+        base_queryset_for_annotation = Room.objects.filter(
+            pk__in=rooms_pks_query | pinned_rooms_qs
         )
+
+        annotated_queryset = base_queryset_for_annotation.annotate(
+            is_pinned=Case(
+                When(pk__in=pinned_rooms_qs, then=True),
+                default=False,
+                output_field=BooleanField(),
+            )
+        )
+
+        if secondary_sort_fields:
+            queryset = annotated_queryset.order_by("-is_pinned", *secondary_sort_fields)
+        else:
+            queryset = annotated_queryset.order_by("-is_pinned")
 
         page = self.paginate_queryset(queryset)
 
         if page is not None:
             serializer = self.get_serializer(page, many=True)
-            data = self.get_paginated_response(serializer.data)
-
-            return data
+            return self.get_paginated_response(serializer.data)
 
         serializer = self.get_serializer(queryset, many=True)
 
