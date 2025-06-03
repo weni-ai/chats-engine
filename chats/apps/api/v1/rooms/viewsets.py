@@ -134,55 +134,48 @@ class RoomViewset(
         return super().get_serializer_class()
 
     def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
         project = request.query_params.get("project")
 
         if not project:
-            queryset = self.filter_queryset(self.get_queryset())
+            filtered_qs = self.filter_queryset(qs)
+            return self._get_paginated_response(filtered_qs)
 
+        pins = RoomPin.objects.filter(
+            user=request.user, room__queue__sector__project=project
+        )
+        pinned_rooms = Room.objects.filter(
+            pk__in=pins.values_list("room__pk", flat=True)
+        )
+
+        filtered_qs = self.filter_queryset(qs)
+        room_ids = set(filtered_qs.values_list("pk", flat=True)) | set(
+            pinned_rooms.values_list("pk", flat=True)
+        )
+
+        secondary_sort = list(filtered_qs.query.order_by or self.ordering or [])
+
+        annotated_qs = qs.filter(pk__in=room_ids).annotate(
+            is_pinned=Case(
+                When(pk__in=pinned_rooms, then=True),
+                default=False,
+                output_field=BooleanField(),
+            )
+        )
+
+        if secondary_sort:
+            annotated_qs = annotated_qs.order_by("-is_pinned", *secondary_sort)
         else:
-            pins = RoomPin.objects.filter(
-                user=request.user, room__queue__sector__project=project
-            )
-            pinned_rooms_qs = Room.objects.filter(
-                pk__in=pins.values_list("room__pk", flat=True)
-            )
+            annotated_qs = annotated_qs.order_by("-is_pinned")
 
-            rooms_pks_query = self.filter_queryset(self.get_queryset())
+        return self._get_paginated_response(annotated_qs)
 
-            secondary_sort_fields = list(rooms_pks_query.query.order_by)
-
-            if not secondary_sort_fields and isinstance(self.ordering, (list, tuple)):
-                secondary_sort_fields = list(self.ordering)
-
-            base_queryset_for_annotation = self.get_queryset().filter(
-                pk__in=rooms_pks_query | pinned_rooms_qs
-            )
-
-            annotated_queryset = base_queryset_for_annotation.annotate(
-                is_pinned=Case(
-                    When(pk__in=pinned_rooms_qs, then=True),
-                    default=False,
-                    output_field=BooleanField(),
-                )
-            )
-
-            # Order by pinned rooms first, then by secondary sort fields
-            # So that pinned rooms are always at the top of the list
-            if secondary_sort_fields:
-                queryset = annotated_queryset.order_by(
-                    "-is_pinned", *secondary_sort_fields
-                )
-            else:
-                queryset = annotated_queryset.order_by("-is_pinned")
-
+    def _get_paginated_response(self, queryset):
         page = self.paginate_queryset(queryset)
-
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             return self.get_paginated_response(serializer.data)
-
         serializer = self.get_serializer(queryset, many=True)
-
         return Response(serializer.data)
 
     @action(
