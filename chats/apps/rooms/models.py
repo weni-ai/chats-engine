@@ -19,7 +19,10 @@ from rest_framework.exceptions import ValidationError
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.projects.usecases.send_room_info import RoomInfoUseCase
-from chats.apps.rooms.exceptions import MaxPinRoomLimitReachedError
+from chats.apps.rooms.exceptions import (
+    MaxPinRoomLimitReachedError,
+    RoomIsNotActiveError,
+)
 from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
 
@@ -415,6 +418,9 @@ class Room(BaseModel, BaseConfigurableModel):
 
         if self.user != user:
             raise PermissionDenied
+
+        if not self.is_active:
+            raise RoomIsNotActiveError
 
         return RoomPin.objects.create(room=self, user=user)
 
