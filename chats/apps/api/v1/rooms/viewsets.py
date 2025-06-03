@@ -170,11 +170,9 @@ class RoomViewset(
         else:
             annotated_qs = annotated_qs.order_by("-is_pinned")
 
-        return self._get_paginated_response(annotated_qs)
+        return self.paginate_queryset(annotated_qs)
 
     def _get_paginated_response(self, queryset):
-        from rest_framework.pagination import LimitOffsetPagination
-
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
