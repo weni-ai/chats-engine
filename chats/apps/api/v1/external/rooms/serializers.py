@@ -21,7 +21,6 @@ from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import close_room
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -117,6 +116,9 @@ def get_room_user(
         # If the queue is not empty, the room must stay in the queue,
         # so that, when a agent becomes available, the first room in the queue
         # will be assigned to the them. This logic is not done here.
+        return None
+
+    if queue.rooms.filter(is_active=True, user__isnull=True).exists():
         return None
 
     # General room routing type
