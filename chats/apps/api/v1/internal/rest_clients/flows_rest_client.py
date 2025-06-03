@@ -169,7 +169,7 @@ class FlowsSectorMixin:
     def create_ticketer(self, project_uuid: str, name: str, config: dict):
         url = f"{self.base_url}/api/v2/internals/ticketers/"
         body = {
-            "org": project_uuid,
+            "project": project_uuid,
             "ticketer_type": settings.FLOWS_TICKETER_TYPE,
             "name": name,
             "config": config,
