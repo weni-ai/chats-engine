@@ -83,8 +83,8 @@ class IntegratedTicketers:
                     "sector_uuid": str(sector.uuid),
                 },
             }
-            connect = ConnectRESTClient()
-            response = connect.create_ticketer(**content)
+            flows_client = FlowRESTClient()
+            response = flows_client.create_ticketer(**content)
             if response.status_code not in [
                 status.HTTP_200_OK,
                 status.HTTP_201_CREATED,
