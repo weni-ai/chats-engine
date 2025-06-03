@@ -134,36 +134,46 @@ class RoomViewset(
         return super().get_serializer_class()
 
     def list(self, request, *args, **kwargs):
-        pins = RoomPin.objects.filter(user=request.user)
-        pinned_rooms_qs = Room.objects.filter(
-            pk__in=pins.values_list("room__pk", flat=True)
-        )
+        project = request.query_params.get("project")
 
-        rooms_pks_query = self.filter_queryset(self.get_queryset())
+        if not project:
+            queryset = self.filter_queryset(self.get_queryset())
 
-        secondary_sort_fields = list(rooms_pks_query.query.order_by)
-
-        if not secondary_sort_fields and isinstance(self.ordering, (list, tuple)):
-            secondary_sort_fields = list(self.ordering)
-
-        base_queryset_for_annotation = self.get_queryset().filter(
-            pk__in=rooms_pks_query | pinned_rooms_qs
-        )
-
-        annotated_queryset = base_queryset_for_annotation.annotate(
-            is_pinned=Case(
-                When(pk__in=pinned_rooms_qs, then=True),
-                default=False,
-                output_field=BooleanField(),
-            )
-        )
-
-        # Order by pinned rooms first, then by secondary sort fields
-        # So that pinned rooms are always at the top of the list
-        if secondary_sort_fields:
-            queryset = annotated_queryset.order_by("-is_pinned", *secondary_sort_fields)
         else:
-            queryset = annotated_queryset.order_by("-is_pinned")
+            pins = RoomPin.objects.filter(
+                user=request.user, room__queue__sector__project=project
+            )
+            pinned_rooms_qs = Room.objects.filter(
+                pk__in=pins.values_list("room__pk", flat=True)
+            )
+
+            rooms_pks_query = self.filter_queryset(self.get_queryset())
+
+            secondary_sort_fields = list(rooms_pks_query.query.order_by)
+
+            if not secondary_sort_fields and isinstance(self.ordering, (list, tuple)):
+                secondary_sort_fields = list(self.ordering)
+
+            base_queryset_for_annotation = self.get_queryset().filter(
+                pk__in=rooms_pks_query | pinned_rooms_qs
+            )
+
+            annotated_queryset = base_queryset_for_annotation.annotate(
+                is_pinned=Case(
+                    When(pk__in=pinned_rooms_qs, then=True),
+                    default=False,
+                    output_field=BooleanField(),
+                )
+            )
+
+            # Order by pinned rooms first, then by secondary sort fields
+            # So that pinned rooms are always at the top of the list
+            if secondary_sort_fields:
+                queryset = annotated_queryset.order_by(
+                    "-is_pinned", *secondary_sort_fields
+                )
+            else:
+                queryset = annotated_queryset.order_by("-is_pinned")
 
         page = self.paginate_queryset(queryset)
 
