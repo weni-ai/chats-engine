@@ -435,31 +435,57 @@ class TestRoomsViewSet(APITestCase):
             queue=self.queue,
             contact=Contact.objects.create(),
         )
+
         room_2 = Room.objects.create(
             queue=self.queue,
             contact=Contact.objects.create(),
         )
+        RoomPin.objects.create(room=room_2, user=self.user)
+
         room_3 = Room.objects.create(
             queue=self.queue,
             contact=Contact.objects.create(),
         )
 
-        RoomPin.objects.create(room=room_2, user=self.user)
+        queue = Queue.objects.create(
+            name="Test Queue",
+            sector=Sector.objects.create(
+                name="Test Sector",
+                project=Project.objects.create(name="Test Project"),
+                rooms_limit=10,
+                work_start="09:00",
+                work_end="18:00",
+            ),
+        )
+        QueueAuthorization.objects.create(
+            permission=ProjectPermission.objects.create(
+                user=self.user,
+                project=queue.sector.project,
+                role=ProjectPermission.ROLE_ATTENDANT,
+            ),
+            queue=queue,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        # This room should not be in the list because it's from a different project
+        room_4 = Room.objects.create(
+            queue=queue,
+            contact=Contact.objects.create(),
+        )
+        RoomPin.objects.create(room=room_4, user=self.user)
 
         response = self.list_rooms(
             filters={"project": str(self.project.uuid), "ordering": "-created_on"}
         )
 
+        rooms_uuids = [room["uuid"] for room in response.json().get("results")]
+
+        self.assertNotIn(str(room_4.uuid), rooms_uuids)
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(
-            response.json().get("results")[0].get("uuid"), str(room_2.uuid)
-        )
-        self.assertEqual(
-            response.json().get("results")[1].get("uuid"), str(room_3.uuid)
-        )
-        self.assertEqual(
-            response.json().get("results")[2].get("uuid"), str(room_1.uuid)
-        )
+        self.assertEqual(rooms_uuids[0], str(room_2.uuid))
+        self.assertEqual(rooms_uuids[1], str(room_3.uuid))
+        self.assertEqual(rooms_uuids[2], str(room_1.uuid))
 
 
 class RoomPickTests(APITestCase):

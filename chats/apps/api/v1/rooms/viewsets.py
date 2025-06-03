@@ -158,6 +158,8 @@ class RoomViewset(
             )
         )
 
+        # Order by pinned rooms first, then by secondary sort fields
+        # So that pinned rooms are always at the top of the list
         if secondary_sort_fields:
             queryset = annotated_queryset.order_by("-is_pinned", *secondary_sort_fields)
         else:
