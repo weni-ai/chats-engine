@@ -3,12 +3,31 @@ from rest_framework import serializers
 from chats.apps.api.v1.accounts.serializers import UserNameSerializer
 from chats.apps.api.v1.contacts.serializers import ContactSimpleSerializer
 from chats.apps.api.v1.sectors.serializers import TagSimpleSerializer
+from chats.apps.contacts.models import Contact
 from chats.apps.rooms.models import Room
+
+
+class ContactOptimizedSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Contact
+        fields = ["uuid", "name", "external_id"]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        room = self.context.get("parent", {}).get("room")
+
+        if room and room.protocol:
+            if room.service_chat:
+                data["name"] = f"{room.service_chat} | {room.protocol} | {data['name']}"
+            else:
+                data["name"] = f"{data['name']} | {room.protocol}"
+
+        return data
 
 
 class RoomHistorySerializer(serializers.ModelSerializer):
     user = UserNameSerializer(many=False, read_only=True)
-    contact = serializers.SerializerMethodField()
+    contact = ContactOptimizedSerializer(read_only=True)
     tags = TagSimpleSerializer(many=True, read_only=True)
 
     class Meta:
@@ -24,25 +43,10 @@ class RoomHistorySerializer(serializers.ModelSerializer):
             "service_chat",
         ]
 
-    def get_contact(self, obj):
-        contact_data = ContactSimpleSerializer(obj.contact).data
-        if obj.protocol and obj.service_chat:
-            contact_data[
-                "name"
-            ] = f"{obj.service_chat} | {obj.protocol} | {contact_data['name']}"
-        elif obj.protocol:
-            contact_data["name"] = f"{contact_data['name']} | {obj.protocol}"
 
-        return contact_data
-
-
-class RoomBasicSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Room
-        fields = [
-            "uuid",
-            "ended_at",
-        ]
+class RoomBasicValuesSerializer(serializers.Serializer):
+    uuid = serializers.UUIDField()
+    ended_at = serializers.DateTimeField()
 
 
 class RoomDetailSerializer(serializers.ModelSerializer):
