@@ -478,14 +478,24 @@ class TestRoomsViewSet(APITestCase):
             filters={"project": str(self.project.uuid), "ordering": "-created_on"}
         )
 
-        rooms_uuids = [room["uuid"] for room in response.json().get("results")]
+        self.assertIn("max_pin_limit", response.data)
+        self.assertEqual(
+            response.data.get("max_pin_limit"), settings.MAX_ROOM_PINS_LIMIT
+        )
+
+        results = response.data.get("results")
+        rooms_uuids = [room["uuid"] for room in results]
 
         self.assertNotIn(str(room_4.uuid), rooms_uuids)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(rooms_uuids[0], str(room_2.uuid))
+        self.assertEqual(results[0].get("is_pinned"), True)
+
         self.assertEqual(rooms_uuids[1], str(room_3.uuid))
+        self.assertEqual(results[1].get("is_pinned"), False)
         self.assertEqual(rooms_uuids[2], str(room_1.uuid))
+        self.assertEqual(results[2].get("is_pinned"), False)
 
 
 class RoomPickTests(APITestCase):

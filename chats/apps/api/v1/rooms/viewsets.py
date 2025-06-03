@@ -25,6 +25,7 @@ from chats.apps.api.v1 import permissions as api_permissions
 from chats.apps.api.v1.internal.rest_clients.openai_rest_client import OpenAIClient
 from chats.apps.api.v1.msgs.serializers import ChatCompletionSerializer
 from chats.apps.api.v1.rooms import filters as room_filters
+from chats.apps.api.v1.rooms.pagination import RoomListPagination
 from chats.apps.api.v1.rooms.serializers import (
     ListRoomSerializer,
     PinRoomSerializer,
@@ -79,6 +80,7 @@ class RoomViewset(
     search_fields = ["contact__name", "urn", "protocol", "service_chat"]
     ordering_fields = "__all__"
     ordering = ["user", "-last_interaction", "created_on"]
+    pagination_class = RoomListPagination
 
     def get_permissions(self):
         permission_classes = [permissions.IsAuthenticated]
@@ -171,6 +173,8 @@ class RoomViewset(
         return self._get_paginated_response(annotated_qs)
 
     def _get_paginated_response(self, queryset):
+        from rest_framework.pagination import LimitOffsetPagination
+
         page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = self.get_serializer(page, many=True)

@@ -109,6 +109,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
     last_interaction = serializers.DateTimeField(read_only=True)
     can_edit_custom_fields = serializers.SerializerMethodField()
     is_active = serializers.BooleanField(default=True)
+    is_pinned = serializers.BooleanField(required=False, read_only=True)
 
     class Meta:
         model = Room
@@ -130,6 +131,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
             "service_chat",
             "is_active",
             "config",
+            "is_pinned",
         ]
 
     def get_user(self, room: Room):
