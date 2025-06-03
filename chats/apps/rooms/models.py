@@ -413,7 +413,12 @@ class Room(BaseModel, BaseConfigurableModel):
         if self.pins.filter(user=user).exists():
             return
 
-        if RoomPin.objects.filter(user=user).count() >= settings.MAX_ROOM_PINS_LIMIT:
+        if (
+            RoomPin.objects.filter(
+                user=user, room__queue__sector__project=self.queue.sector.project
+            ).count()
+            >= settings.MAX_ROOM_PINS_LIMIT
+        ):
             raise MaxPinRoomLimitReachedError
 
         if self.user != user:
