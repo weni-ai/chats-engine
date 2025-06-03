@@ -146,7 +146,7 @@ class RoomViewset(
         if not secondary_sort_fields and isinstance(self.ordering, (list, tuple)):
             secondary_sort_fields = list(self.ordering)
 
-        base_queryset_for_annotation = Room.objects.filter(
+        base_queryset_for_annotation = self.get_queryset().filter(
             pk__in=rooms_pks_query | pinned_rooms_qs
         )
 
