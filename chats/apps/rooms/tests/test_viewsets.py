@@ -470,7 +470,11 @@ class TestRoomsViewSet(APITestCase):
 
         # Call your list endpoint
         response = self.list_rooms(
-            filters={"project": str(self.project.uuid), "ordering": "-created_on"}
+            filters={
+                "project": str(self.project.uuid),
+                "is_active": True,
+                "ordering": "-created_on",
+            }
         )
 
         # Assertions unchanged...

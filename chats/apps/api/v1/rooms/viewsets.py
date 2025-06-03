@@ -153,8 +153,12 @@ class RoomViewset(
     def list(self, request, *args, **kwargs):
         qs = self.get_queryset()
         project = request.query_params.get("project")
+        is_active = request.query_params.get("is_active", None)
 
-        if not project:
+        if isinstance(is_active, str):
+            is_active = is_active.lower() == "true"
+
+        if not project or is_active is False:
             filtered_qs = self.filter_queryset(qs)
             return self._get_paginated_response(filtered_qs)
 
