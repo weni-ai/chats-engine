@@ -74,15 +74,18 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
             )
             SectorTag.objects.create(name="Atendimento encerrado", sector=sector)
 
-            connect_client = ConnectRESTClient()
-            response_sector = connect_client.create_ticketer(
-                project_uuid=str(instance.uuid),
-                name=sector.name,
-                config={
-                    "project_auth": str(sector.external_token.pk),
-                    "sector_uuid": str(sector.uuid),
-                },
-            )
+            flows_client = FlowRESTClient()
+
+            if settings.USE_WENI_FLOWS:
+                response_sector = flows_client.create_ticketer(
+                    project_uuid=str(instance.uuid),
+                    name=sector.name,
+                    config={
+                        "project_auth": str(sector.external_token.pk),
+                        "sector_uuid": str(sector.uuid),
+                    },
+                )
+
             self._ticketer_data = {
                 "uuid": response_sector.json().get("uuid"),
                 "name": sector.name,
