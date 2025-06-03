@@ -198,3 +198,13 @@ class TestRoomModel(TestCase):
         room.save()
 
         self.assertEqual(room.pins.count(), 0)
+
+    def test_close_room_clears_pins(self):
+        user = User.objects.create(email="a@user.com")
+        room = Room.objects.create(user=user, queue=self.queue)
+
+        room.pin(user)
+        self.assertEqual(room.pins.count(), 1)
+
+        room.close()
+        self.assertEqual(room.pins.count(), 0)
