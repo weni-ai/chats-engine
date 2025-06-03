@@ -4,6 +4,8 @@ from unittest.mock import patch
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from datetime import timedelta
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.test import APITestCase
@@ -431,21 +433,14 @@ class TestRoomsViewSet(APITestCase):
         )
 
     def test_room_order_with_pin(self):
-        room_1 = Room.objects.create(
-            queue=self.queue,
-            contact=Contact.objects.create(),
-        )
+        # Create rooms
+        room_1 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
+        room_2 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
+        room_3 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
+        room_4 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
 
-        room_2 = Room.objects.create(
-            queue=self.queue,
-            contact=Contact.objects.create(),
-        )
+        RoomPin.objects.create(room=room_3, user=self.user)
         RoomPin.objects.create(room=room_2, user=self.user)
-
-        room_3 = Room.objects.create(
-            queue=self.queue,
-            contact=Contact.objects.create(),
-        )
 
         queue = Queue.objects.create(
             name="Test Queue",
@@ -467,17 +462,16 @@ class TestRoomsViewSet(APITestCase):
             role=QueueAuthorization.ROLE_AGENT,
         )
 
-        # This room should not be in the list because it's from a different project
-        room_4 = Room.objects.create(
-            queue=queue,
-            contact=Contact.objects.create(),
-        )
-        RoomPin.objects.create(room=room_4, user=self.user)
+        # Room from a different project, should be excluded
+        room_5 = Room.objects.create(queue=queue, contact=Contact.objects.create())
+        RoomPin.objects.create(room=room_5, user=self.user)
 
+        # Call your list endpoint
         response = self.list_rooms(
             filters={"project": str(self.project.uuid), "ordering": "-created_on"}
         )
 
+        # Assertions unchanged...
         self.assertIn("max_pin_limit", response.data)
         self.assertEqual(
             response.data.get("max_pin_limit"), settings.MAX_ROOM_PINS_LIMIT
@@ -486,16 +480,20 @@ class TestRoomsViewSet(APITestCase):
         results = response.data.get("results")
         rooms_uuids = [room["uuid"] for room in results]
 
-        self.assertNotIn(str(room_4.uuid), rooms_uuids)
-
+        self.assertNotIn(str(room_5.uuid), rooms_uuids)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
         self.assertEqual(rooms_uuids[0], str(room_2.uuid))
         self.assertEqual(results[0].get("is_pinned"), True)
 
         self.assertEqual(rooms_uuids[1], str(room_3.uuid))
-        self.assertEqual(results[1].get("is_pinned"), False)
-        self.assertEqual(rooms_uuids[2], str(room_1.uuid))
+        self.assertEqual(results[1].get("is_pinned"), True)
+
+        self.assertEqual(rooms_uuids[2], str(room_4.uuid))
         self.assertEqual(results[2].get("is_pinned"), False)
+
+        self.assertEqual(rooms_uuids[3], str(room_1.uuid))
+        self.assertEqual(results[3].get("is_pinned"), False)
 
 
 class RoomPickTests(APITestCase):
