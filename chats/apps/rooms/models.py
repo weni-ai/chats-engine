@@ -307,6 +307,8 @@ class Room(BaseModel, BaseConfigurableModel):
         if tags is not None:
             self.tags.add(*tags)
 
+        self.clear_pins()
+
         self.save()
 
         # Atualizar status somente se sala estava ativa e tinha um agente
@@ -499,7 +501,9 @@ class Room(BaseModel, BaseConfigurableModel):
 
         if (
             RoomPin.objects.filter(
-                user=user, room__queue__sector__project=self.queue.sector.project
+                user=user,
+                room__queue__sector__project=self.queue.sector.project,
+                room__is_active=True,
             ).count()
             >= settings.MAX_ROOM_PINS_LIMIT
         ):
