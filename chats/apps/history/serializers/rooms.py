@@ -48,6 +48,7 @@ class RoomBasicValuesSerializer(serializers.Serializer):
     """
     Serializer otimizado para trabalhar com values() - performance máxima
     """
+
     uuid = serializers.UUIDField()
     ended_at = serializers.DateTimeField()
 

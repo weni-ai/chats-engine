@@ -32,6 +32,7 @@ from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1.rooms.serializers import (
     ListRoomSerializer,
     RoomHistorySummarySerializer,
+    PinRoomSerializer,
     RoomInfoSerializer,
     RoomMessageStatusSerializer,
     RoomSerializer,
@@ -44,7 +45,11 @@ from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.choices import RoomFeedbackMethods
-from chats.apps.rooms.models import Room
+from chats.apps.rooms.exceptions import (
+    MaxPinRoomLimitReachedError,
+    RoomIsNotActiveError,
+)
+from chats.apps.rooms.models import Room, RoomPin
 from chats.apps.rooms.services import RoomsReportService
 from chats.apps.rooms.tasks import generate_rooms_report
 from chats.apps.rooms.views import (
@@ -132,6 +137,51 @@ class RoomViewset(
         elif "list" in self.action:
             return ListRoomSerializer
         return super().get_serializer_class()
+
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        project = request.query_params.get("project")
+
+        if not project:
+            filtered_qs = self.filter_queryset(qs)
+            return self._get_paginated_response(filtered_qs)
+
+        pins = RoomPin.objects.filter(
+            user=request.user, room__queue__sector__project=project
+        )
+        pinned_rooms = Room.objects.filter(
+            pk__in=pins.values_list("room__pk", flat=True)
+        )
+
+        filtered_qs = self.filter_queryset(qs)
+        room_ids = set(filtered_qs.values_list("pk", flat=True)) | set(
+            pinned_rooms.values_list("pk", flat=True)
+        )
+
+        secondary_sort = list(filtered_qs.query.order_by or self.ordering or [])
+
+        annotated_qs = qs.filter(pk__in=room_ids).annotate(
+            is_pinned=Case(
+                When(pk__in=pinned_rooms, then=True),
+                default=False,
+                output_field=BooleanField(),
+            )
+        )
+
+        if secondary_sort:
+            annotated_qs = annotated_qs.order_by("-is_pinned", *secondary_sort)
+        else:
+            annotated_qs = annotated_qs.order_by("-is_pinned")
+
+        return self._get_paginated_response(annotated_qs)
+
+    def _get_paginated_response(self, queryset):
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     @action(
         detail=True,
@@ -627,6 +677,36 @@ class RoomViewset(
         serializer = RoomHistorySummarySerializer(history_summary)
 
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_name="pin",
+        url_path="pin",
+        serializer_class=PinRoomSerializer,
+    )
+    def pin(self, request: Request, pk=None) -> Response:
+        serializer = PinRoomSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        room: Room = self.get_object()
+        user: User = request.user
+
+        method = (
+            room.pin if serializer.validated_data.get("status") is True else room.unpin
+        )
+
+        try:
+            method(user)
+        except (
+            MaxPinRoomLimitReachedError,
+            RoomIsNotActiveError,
+        ) as e:
+            raise ValidationError(e.to_dict(), code=e.code) from e
+        except PermissionDenied as e:
+            return Response({"detail": str(e)}, status=status.HTTP_403_FORBIDDEN)
+
+        return Response(status=status.HTTP_200_OK)
 
 
 class RoomsReportViewSet(APIView):
