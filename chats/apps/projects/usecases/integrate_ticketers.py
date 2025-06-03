@@ -1,8 +1,5 @@
 from rest_framework import exceptions, status
 
-from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
-    ConnectRESTClient,
-)
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.projects.models import Project
 from chats.apps.queues.models import Queue
