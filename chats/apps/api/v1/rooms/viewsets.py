@@ -3,7 +3,17 @@ import logging
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import BooleanField, Case, Count, Max, OuterRef, Q, Subquery, When
+from django.db.models import (
+    BooleanField,
+    Case,
+    Count,
+    Max,
+    OuterRef,
+    Q,
+    Subquery,
+    When,
+    DateTimeField,
+)
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -25,6 +35,7 @@ from chats.apps.api.v1 import permissions as api_permissions
 from chats.apps.api.v1.internal.rest_clients.openai_rest_client import OpenAIClient
 from chats.apps.api.v1.msgs.serializers import ChatCompletionSerializer
 from chats.apps.api.v1.rooms import filters as room_filters
+from chats.apps.api.v1.rooms.pagination import RoomListPagination
 from chats.apps.api.v1.rooms.serializers import (
     ListRoomSerializer,
     PinRoomSerializer,
@@ -44,7 +55,7 @@ from chats.apps.rooms.exceptions import (
     MaxPinRoomLimitReachedError,
     RoomIsNotActiveError,
 )
-from chats.apps.rooms.models import Room
+from chats.apps.rooms.models import Room, RoomPin
 from chats.apps.rooms.services import RoomsReportService
 from chats.apps.rooms.tasks import generate_rooms_report
 from chats.apps.rooms.views import (
@@ -79,6 +90,7 @@ class RoomViewset(
     search_fields = ["contact__name", "urn", "protocol", "service_chat"]
     ordering_fields = "__all__"
     ordering = ["user", "-last_interaction", "created_on"]
+    pagination_class = RoomListPagination
 
     def get_permissions(self):
         permission_classes = [permissions.IsAuthenticated]
@@ -132,6 +144,75 @@ class RoomViewset(
         elif "list" in self.action:
             return ListRoomSerializer
         return super().get_serializer_class()
+
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        project = request.query_params.get("project")
+        is_active = request.query_params.get("is_active", None)
+
+        if isinstance(is_active, str):
+            is_active = is_active.lower() == "true"
+
+        if not project or is_active is False:
+            filtered_qs = self.filter_queryset(qs)
+            return self._get_paginated_response(filtered_qs)
+
+        # Get pins for the user within the project
+        pins = RoomPin.objects.filter(
+            user=request.user, room__queue__sector__project=project
+        )
+
+        pinned_rooms = Room.objects.filter(
+            pk__in=pins.values_list("room__pk", flat=True)
+        )
+
+        filtered_qs = self.filter_queryset(qs)
+        room_ids = set(filtered_qs.values_list("pk", flat=True)) | set(
+            pinned_rooms.values_list("pk", flat=True)
+        )
+
+        secondary_sort = list(filtered_qs.query.order_by or self.ordering or [])
+
+        # Subquery to get the created_on of the pin for each room (or None)
+        pin_created_on_subquery = (
+            RoomPin.objects.filter(
+                user=request.user,
+                room=OuterRef("pk"),
+                room__queue__sector__project=project,
+            )
+            .order_by("-created_on")
+            .values("created_on")[:1]
+        )
+
+        annotated_qs = qs.filter(pk__in=room_ids).annotate(
+            is_pinned=Case(
+                When(pk__in=pinned_rooms, then=True),
+                default=False,
+                output_field=BooleanField(),
+            ),
+            pin_created_on=Subquery(
+                pin_created_on_subquery, output_field=DateTimeField()
+            ),
+        )
+
+        if secondary_sort:
+            # Order pinned rooms first, then by pin_created_on (descending),
+            # then the rest ordered by secondary_sort
+            annotated_qs = annotated_qs.order_by(
+                "-is_pinned", "-pin_created_on", *secondary_sort
+            )
+        else:
+            annotated_qs = annotated_qs.order_by("-is_pinned", "-pin_created_on")
+
+        return self._get_paginated_response(annotated_qs)
+
+    def _get_paginated_response(self, queryset):
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     @action(
         detail=True,
