@@ -902,7 +902,7 @@ class TestRoomPinAuthenticatedUser(BaseRoomPinTestCase):
 
         response = self.pin_room(room.uuid, {"status": True})
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
     def test_cannot_pin_room_when_room_is_not_active(self):
         room = Room.objects.create(
@@ -946,7 +946,7 @@ class TestRoomPinAuthenticatedUser(BaseRoomPinTestCase):
         )
         response = self.pin_room(room.uuid, {"status": False})
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
     def test_cannot_unpin_room_when_user_is_not_assigned(self):
         room = Room.objects.create(
