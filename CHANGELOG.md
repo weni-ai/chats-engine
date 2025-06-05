@@ -1,3 +1,7 @@
+# 3.20.2
+## Add
+  - Direct call to the Flows' API to create ticketers, instead of calling Connect's
+
 # 3.20.1
 ## Add
   - Index to external_id in contacts table
