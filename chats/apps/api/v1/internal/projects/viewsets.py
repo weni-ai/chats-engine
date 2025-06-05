@@ -68,7 +68,7 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
                 status.HTTP_400_BAD_REQUEST,
             )
 
-    def put(
+    def update(
         self, request, *args, **kwargs
     ):  # TODO: GAMBIARRA ALERT! MOVE THIS LOGIC TO THE SERIALIZER or somewhere else
         qs = self.queryset

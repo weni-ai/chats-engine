@@ -309,7 +309,7 @@ class TestProjectPermissionViewSetAsAuthenticatedUser(BaseTestProjectPermissionV
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     @with_internal_auth
-    @override_settings(OIDC_ENABLED=True)
+    @override_settings(OIDC_ENABLED=False)
     @patch(
         "chats.apps.api.v1.internal.projects.viewsets.persist_keycloak_user_by_email"
     )
@@ -319,9 +319,8 @@ class TestProjectPermissionViewSetAsAuthenticatedUser(BaseTestProjectPermissionV
             "user": self.user.email,
             "role": ProjectPermission.ROLE_ATTENDANT,
         }
-        with self.assertRaises(IntegrityError):
-            self.update(str(self.permission.uuid), data)
-        mock_persist_keycloak.assert_not_called()
+        response = self.update(str(self.permission.uuid), data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_cannot_destroy_permission_without_internal_auth(self):
         response = self.destroy(self.permission.uuid)
