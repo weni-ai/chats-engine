@@ -329,6 +329,7 @@ class TestProjectPermissionViewSetAsAuthenticatedUser(BaseTestProjectPermissionV
 
     @with_internal_auth
     def test_destroy_permission(self):
+        self.assertEqual(ProjectPermission.objects.count(), 1)
         response = self.destroy(self.permission.uuid)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(ProjectPermission.objects.count(), 0)
