@@ -9,7 +9,7 @@ from chats.apps.api.v1.internal.dashboard.serializers import (
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.projects.models import Project
 
-from .dto import Filters
+from .dto import Filters, should_exclude_admin_domains
 from .service import AgentsService
 
 
@@ -36,7 +36,7 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
             tag=params.get("tags"),
             queue=params.get("queue"),
             user_request=params.get("user_request", ""),
-            is_weni_admin=(True if "weni.ai" in params.get("user_request") else False),
+            is_weni_admin=should_exclude_admin_domains(params.get("user_request", "")),
         )
 
         agents_service = AgentsService()
@@ -62,7 +62,7 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
             tag=params.get("tags"),
             queue=params.get("queue"),
             user_request=params.get("user_request", ""),
-            is_weni_admin=(True if "weni.ai" in params.get("user_request") else False),
+            is_weni_admin=should_exclude_admin_domains(params.get("user_request", "")),
         )
 
         agents_service = AgentsService()
