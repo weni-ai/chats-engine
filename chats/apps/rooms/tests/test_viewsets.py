@@ -634,6 +634,28 @@ class RoomsBulkTransferTestCase(APITestCase):
             new_queue.uuid,
         )
 
+    def test_cannot_transfer_rooms_from_another_project(self):
+        another_project = Project.objects.create(
+            name="Another Project",
+        )
+        self.sector.project = another_project
+        self.sector.save()
+
+        response = self.client.patch(
+            reverse("room-bulk_transfer"),
+            data={
+                "rooms_list": [self.room.uuid],
+            },
+            format="json",
+            QUERY_STRING=f"user_email={self.agent_2.email}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["error"],
+            f"User {self.agent_2.email} has no permission on the project {another_project.name} <{another_project.uuid}>",
+        )
+
 
 class CloseRoomTestCase(APITestCase):
     def setUp(self):
