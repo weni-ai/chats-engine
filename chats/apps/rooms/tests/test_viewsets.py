@@ -635,10 +635,10 @@ class RoomsBulkTransferTestCase(APITestCase):
         )
 
     def test_cannot_transfer_rooms_from_another_project(self):
-        another_project = Project.objects.create(
+        p = Project.objects.create(
             name="Another Project",
         )
-        self.sector.project = another_project
+        self.sector.project = p
         self.sector.save()
 
         response = self.client.patch(
@@ -653,7 +653,7 @@ class RoomsBulkTransferTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(
             response.data["error"],
-            f"User {self.agent_2.email} has no permission on the project {another_project.name} <{another_project.uuid}>",
+            f"User {self.agent_2.email} has no permission on the project {p.name} <{p.uuid}>",
         )
 
 

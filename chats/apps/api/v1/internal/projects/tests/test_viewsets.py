@@ -5,7 +5,6 @@ from rest_framework import status
 from unittest.mock import patch, MagicMock
 from django.core.cache import cache
 from django.test import override_settings
-from django.db import IntegrityError
 
 from chats.apps.accounts.tests.decorators import with_internal_auth
 from chats.apps.projects.models.models import Project, User, ProjectPermission
