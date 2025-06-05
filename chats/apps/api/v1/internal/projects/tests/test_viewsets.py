@@ -1,0 +1,161 @@
+from django.urls import reverse
+from rest_framework.test import APITestCase
+from rest_framework.response import Response
+from rest_framework import status
+from unittest.mock import patch, MagicMock
+from django.core.cache import cache
+
+from chats.apps.accounts.tests.decorators import with_internal_auth
+from chats.apps.projects.models.models import Project, User
+
+
+class BaseTestProjectViewSet(APITestCase):
+    def retrieve(self, project_uuid: str) -> Response:
+        url = reverse("project_internal-detail", kwargs={"uuid": project_uuid})
+        return self.client.get(url)
+
+    def list(self) -> Response:
+        url = reverse("project_internal-list")
+        return self.client.get(url)
+
+    def create(self, data: dict) -> Response:
+        url = reverse("project_internal-list")
+        return self.client.post(url, data, format="json")
+
+    def update(self, project_uuid: str, data: dict) -> Response:
+        url = reverse("project_internal-detail", kwargs={"uuid": project_uuid})
+        return self.client.put(url, data, format="json")
+
+    def partial_update(self, project_uuid: str, data: dict) -> Response:
+        url = reverse("project_internal-detail", kwargs={"uuid": project_uuid})
+        return self.client.patch(url, data, format="json")
+
+    def destroy(self, project_uuid: str) -> Response:
+        url = reverse("project_internal-detail", kwargs={"uuid": project_uuid})
+        return self.client.delete(url)
+
+
+class TestProjectViewSetAsAnonymousUser(BaseTestProjectViewSet):
+    def test_retrieve_project_as_anonymous_user(self):
+        response = self.retrieve("123")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_list_projects_as_anonymous_user(self):
+        response = self.list()
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_create_project_as_anonymous_user(self):
+        response = self.create({"name": "test"})
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_update_project_as_anonymous_user(self):
+        response = self.update("123", {"name": "test"})
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_partial_update_project_as_anonymous_user(self):
+        response = self.partial_update("123", {"name": "test"})
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_destroy_project_as_anonymous_user(self):
+        response = self.destroy("123")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class TestProjectViewSetAsAuthenticatedUser(BaseTestProjectViewSet):
+    def setUp(self):
+        self.project = Project.objects.create(name="Test Project")
+        self.user = User.objects.create(email="testuser@test.com")
+
+        self.client.force_authenticate(self.user)
+
+    def tearDown(self):
+        cache.clear()
+
+    def test_cannot_retrieve_project_without_internal_communication_permission(self):
+        response = self.retrieve(self.project.uuid)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    @with_internal_auth
+    def test_retrieve_project(self):
+        response = self.retrieve(self.project.uuid)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_cannot_list_projects_without_internal_communication_permission(self):
+        response = self.list()
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    @with_internal_auth
+    def test_list_projects(self):
+        response = self.list()
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["results"]), 1)
+
+    def test_cannot_create_project_without_internal_communication_permission(self):
+        response = self.create({"name": "New Project"})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    @with_internal_auth
+    def test_create_project(self):
+        response = self.create({"name": "New Project", "timezone": "UTC"})
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Project.objects.count(), 2)
+
+    @with_internal_auth
+    @patch("chats.apps.api.v1.internal.projects.serializers.FlowRESTClient")
+    @patch("chats.apps.api.v1.internal.projects.serializers.ConnectRESTClient")
+    def test_create_project_from_template(self, mock_connect_client, mock_flow_client):
+        mock_connect_client.return_value.create_ticketer.return_value = MagicMock(
+            status_code=status.HTTP_201_CREATED, json=lambda: {"uuid": "some-uuid"}
+        )
+        mock_flow_client.return_value.create_queue.return_value = MagicMock(
+            status_code=status.HTTP_201_CREATED
+        )
+
+        data = {
+            "name": "Template Project",
+            "timezone": "UTC",
+            "is_template": True,
+            "user_email": self.user.email,
+        }
+        response = self.create(data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Project.objects.count(), 2)
+        new_project = Project.objects.get(name="Template Project")
+        self.assertTrue(new_project.sectors.exists())
+        self.assertTrue(new_project.sectors.first().queues.exists())
+
+    def test_cannot_update_project_without_internal_communication_permission(self):
+        response = self.update(self.project.uuid, {"name": "Updated Name"})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    @with_internal_auth
+    def test_update_project(self):
+        response = self.update(
+            self.project.uuid, {"name": "Updated Name", "timezone": "UTC"}
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.name, "Updated Name")
+
+    def test_cannot_partial_update_project_without_internal_communication_permission(
+        self,
+    ):
+        response = self.partial_update(self.project.uuid, {"name": "Updated Name"})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    @with_internal_auth
+    def test_partial_update_project(self):
+        response = self.partial_update(self.project.uuid, {"name": "Updated Name"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.name, "Updated Name")
+
+    def test_cannot_destroy_project_without_internal_communication_permission(self):
+        response = self.destroy(self.project.uuid)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    @with_internal_auth
+    def test_destroy_project(self):
+        response = self.destroy(self.project.uuid)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(Project.objects.count(), 0)
