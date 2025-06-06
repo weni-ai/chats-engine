@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.db import models
 
-from chats.apps.msgs.models import Message, MessageMedia, ChatMessageReplyIndex
+from chats.apps.msgs.models import ChatMessageReplyIndex, Message, MessageMedia
 from chats.utils.websockets import send_channels_group
 
 
@@ -36,14 +36,16 @@ class UpdateStatusMessageUseCase:
         try:
             reply_index = ChatMessageReplyIndex.objects.get(external_id=message_id)
             message = reply_index.message
-            
+
             project_uuid = str(message.room.project.uuid)
             if project_uuid not in settings.MESSAGE_STATUS_UPDATE_ENABLED_PROJECTS:
                 return
-            
+
             message.status = message_status
-            message.save(update_fields=['status'])
+            message.save(update_fields=["status"])
             MessageStatusNotifier.notify_for_message(message, message_status)
-            
+
         except ChatMessageReplyIndex.DoesNotExist:
-            print(f"Message with external_id {message_id} not found in ChatMessageReplyIndex")
+            print(
+                f"Message with external_id {message_id} not found in ChatMessageReplyIndex"
+            )
