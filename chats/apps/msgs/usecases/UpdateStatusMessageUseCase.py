@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 from chats.apps.msgs.models import Message, MessageMedia, ChatMessageReplyIndex
@@ -35,6 +36,10 @@ class UpdateStatusMessageUseCase:
         try:
             reply_index = ChatMessageReplyIndex.objects.get(external_id=message_id)
             message = reply_index.message
+            
+            project_uuid = str(message.room.project.uuid)
+            if project_uuid not in settings.MESSAGE_STATUS_UPDATE_ENABLED_PROJECTS:
+                return
             
             message.status = message_status
             message.save(update_fields=['status'])
