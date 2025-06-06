@@ -1,5 +1,5 @@
-from django.test import TestCase
 from django.db import transaction
+from django.test import TestCase
 
 from chats.apps.msgs.models import Message, MessageMedia
 from chats.apps.msgs.usecases.set_msg_external_id import SetMsgExternalIdUseCase
@@ -19,9 +19,9 @@ class TestSetMsgExternalIdUseCase(TestCase):
         """
         external_id = "123456"
         self.use_case.execute(self.message.uuid, external_id)
-        
+
         self.message.refresh_from_db()
-        
+
         self.assertEqual(self.message.external_id, external_id)
 
     def test_set_external_id_for_message_media(self):
@@ -30,9 +30,9 @@ class TestSetMsgExternalIdUseCase(TestCase):
         """
         external_id = "789012"
         self.use_case.execute(self.message_media.uuid, external_id)
-        
+
         self.message.refresh_from_db()
-        
+
         self.assertEqual(self.message.external_id, external_id)
 
     def test_set_external_id_nonexistent_message(self):
@@ -41,7 +41,7 @@ class TestSetMsgExternalIdUseCase(TestCase):
         """
         nonexistent_uuid = "00000000-0000-0000-0000-000000000000"
         external_id = "123456"
-        
+
         self.use_case.execute(nonexistent_uuid, external_id)
 
     def test_set_external_id_transaction_rollback(self):

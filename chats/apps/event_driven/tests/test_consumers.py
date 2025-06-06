@@ -1,11 +1,13 @@
-from unittest import TestCase, mock
 import json
+from unittest import TestCase, mock
+
 import amqp
 
+from chats.apps.event_driven.consumers import EDAConsumer, pyamqp_call_dlx_when_error
+from chats.apps.event_driven.signals import message_finished, message_started
 from chats.apps.projects.consumers.dead_letter_consumer import DeadLetterConsumer
-from chats.apps.event_driven.consumers import pyamqp_call_dlx_when_error, EDAConsumer
 from chats.apps.projects.consumers.template_type_consumer import TemplateTypeConsumer
-from chats.apps.event_driven.signals import message_started, message_finished
+
 
 class TestEDAConsumer(TestCase):
     def setUp(self):
@@ -41,6 +43,7 @@ class TestEDAConsumer(TestCase):
         """
         Tests if the consume method is called
         """
+
         class TestConsumer(EDAConsumer):
             def consume(self, message):
                 self.consume_called = True
@@ -63,16 +66,17 @@ class TestPyamqpCallDlxWhenError(TestCase):
         """
         Tests the decorator when there is no error
         """
+
         @pyamqp_call_dlx_when_error(
             routing_key="test",
             default_exchange="test_exchange",
-            consumer_name="test_consumer"
+            consumer_name="test_consumer",
         )
         def test_consumer(message):
             return "success"
 
         result = test_consumer(self.mock_message)
-        
+
         self.assertEqual(result, "success")
         self.mock_message.channel.basic_reject.assert_not_called()
 
@@ -80,16 +84,17 @@ class TestPyamqpCallDlxWhenError(TestCase):
         """
         Tests the decorator when there is an error
         """
+
         @pyamqp_call_dlx_when_error(
             routing_key="test",
             default_exchange="test_exchange",
-            consumer_name="test_consumer"
+            consumer_name="test_consumer",
         )
         def test_consumer(message):
             raise Exception("test error")
 
         test_consumer(self.mock_message)
-        
+
         self.mock_message.channel.basic_reject.assert_called_once_with(
             "test_delivery_tag", requeue=False
         )
@@ -99,20 +104,21 @@ class TestPyamqpCallDlxWhenError(TestCase):
         Tests the decorator when there is an error and there is a callback exchange
         """
         self.mock_message.headers = {"callback_exchange": "custom_exchange"}
-        
+
         @pyamqp_call_dlx_when_error(
             routing_key="test",
             default_exchange="test_exchange",
-            consumer_name="test_consumer"
+            consumer_name="test_consumer",
         )
         def test_consumer(message):
             raise Exception("test error")
 
         test_consumer(self.mock_message)
-        
+
         self.mock_message.channel.basic_reject.assert_called_once_with(
             "test_delivery_tag", requeue=False
         )
+
 
 class TestDeadLetterConsumer(TestCase):
     def setUp(self):
@@ -120,12 +126,10 @@ class TestDeadLetterConsumer(TestCase):
         self.mock_message.channel = mock.Mock()
         self.mock_message.delivery_tag = "test_delivery_tag"
         self.mock_message.body = json.dumps({"test": "data"}).encode()
-        self.mock_message.headers = {
-            "x-first-death-queue": "test_queue"
-        }
+        self.mock_message.headers = {"x-first-death-queue": "test_queue"}
 
-    @mock.patch('chats.apps.projects.consumers.dead_letter_consumer.DeadLetterHandler')
-    @mock.patch('chats.apps.projects.consumers.dead_letter_consumer.basic_publish')
+    @mock.patch("chats.apps.projects.consumers.dead_letter_consumer.DeadLetterHandler")
+    @mock.patch("chats.apps.projects.consumers.dead_letter_consumer.basic_publish")
     def test_consume_success(self, mock_basic_publish, mock_handler):
         """
         Tests successful message consumption
@@ -136,8 +140,7 @@ class TestDeadLetterConsumer(TestCase):
         DeadLetterConsumer.consume(self.mock_message)
 
         mock_handler.assert_called_once_with(
-            message=self.mock_message,
-            dead_letter_content={"test": "data"}
+            message=self.mock_message, dead_letter_content={"test": "data"}
         )
         mock_handler_instance.execute.assert_called_once()
 
@@ -146,14 +149,14 @@ class TestDeadLetterConsumer(TestCase):
             content={"test": "data"},
             exchange="",
             routing_key="test_queue",
-            headers=self.mock_message.headers
+            headers=self.mock_message.headers,
         )
 
         self.mock_message.channel.basic_ack.assert_called_once_with("test_delivery_tag")
         self.mock_message.channel.basic_reject.assert_not_called()
 
-    @mock.patch('chats.apps.projects.consumers.dead_letter_consumer.DeadLetterHandler')
-    @mock.patch('chats.apps.projects.consumers.dead_letter_consumer.basic_publish')
+    @mock.patch("chats.apps.projects.consumers.dead_letter_consumer.DeadLetterHandler")
+    @mock.patch("chats.apps.projects.consumers.dead_letter_consumer.basic_publish")
     def test_consume_handler_error(self, mock_basic_publish, mock_handler):
         """
         Tests behavior when handler raises an exception
@@ -165,8 +168,7 @@ class TestDeadLetterConsumer(TestCase):
         DeadLetterConsumer.consume(self.mock_message)
 
         mock_handler.assert_called_once_with(
-            message=self.mock_message,
-            dead_letter_content={"test": "data"}
+            message=self.mock_message, dead_letter_content={"test": "data"}
         )
 
         self.mock_message.channel.basic_reject.assert_called_once_with(
@@ -176,13 +178,13 @@ class TestDeadLetterConsumer(TestCase):
 
         mock_basic_publish.assert_not_called()
 
-    @mock.patch('chats.apps.projects.consumers.dead_letter_consumer.DeadLetterHandler')
-    @mock.patch('chats.apps.projects.consumers.dead_letter_consumer.basic_publish')
+    @mock.patch("chats.apps.projects.consumers.dead_letter_consumer.DeadLetterHandler")
+    @mock.patch("chats.apps.projects.consumers.dead_letter_consumer.basic_publish")
     def test_consume_invalid_json(self, mock_basic_publish, mock_handler):
         """
         Tests behavior when JSON is invalid
         """
-        self.mock_message.body = b'invalid json'
+        self.mock_message.body = b"invalid json"
 
         DeadLetterConsumer.consume(self.mock_message)
 
@@ -195,8 +197,8 @@ class TestDeadLetterConsumer(TestCase):
 
         mock_basic_publish.assert_not_called()
 
-    @mock.patch('chats.apps.projects.consumers.dead_letter_consumer.DeadLetterHandler')
-    @mock.patch('chats.apps.projects.consumers.dead_letter_consumer.basic_publish')
+    @mock.patch("chats.apps.projects.consumers.dead_letter_consumer.DeadLetterHandler")
+    @mock.patch("chats.apps.projects.consumers.dead_letter_consumer.basic_publish")
     def test_consume_missing_queue_header(self, mock_basic_publish, mock_handler):
         """
         Tests behavior when the x-first-death-queue header is missing
@@ -209,8 +211,7 @@ class TestDeadLetterConsumer(TestCase):
         DeadLetterConsumer.consume(self.mock_message)
 
         mock_handler.assert_called_once_with(
-            message=self.mock_message,
-            dead_letter_content={"test": "data"}
+            message=self.mock_message, dead_letter_content={"test": "data"}
         )
 
         mock_basic_publish.assert_called_once_with(
@@ -218,11 +219,12 @@ class TestDeadLetterConsumer(TestCase):
             content={"test": "data"},
             exchange="",
             routing_key=None,
-            headers={}
+            headers={},
         )
 
         self.mock_message.channel.basic_ack.assert_called_once_with("test_delivery_tag")
         self.mock_message.channel.basic_reject.assert_not_called()
+
 
 class TestTemplateTypeConsumer(TestCase):
     def setUp(self):
@@ -232,8 +234,10 @@ class TestTemplateTypeConsumer(TestCase):
         self.mock_message.delivery_tag = "test_delivery_tag"
         self.mock_message.body = json.dumps({"name": "test_template_type"}).encode()
 
-    @mock.patch('chats.apps.projects.consumers.template_type_consumer.TemplateTypeCreation')
-    @mock.patch('chats.apps.projects.consumers.template_type_consumer.JSONParser.parse')
+    @mock.patch(
+        "chats.apps.projects.consumers.template_type_consumer.TemplateTypeCreation"
+    )
+    @mock.patch("chats.apps.projects.consumers.template_type_consumer.JSONParser.parse")
     def test_consume_success(self, mock_json_parser, mock_template_type_creation):
         """
         Tests successful message consumption
@@ -241,7 +245,7 @@ class TestTemplateTypeConsumer(TestCase):
         # Setup mocks
         parsed_body = {"name": "test_template_type"}
         mock_json_parser.return_value = parsed_body
-        
+
         mock_creation_instance = mock.Mock()
         mock_template_type_creation.return_value = mock_creation_instance
 
@@ -254,9 +258,13 @@ class TestTemplateTypeConsumer(TestCase):
         mock_creation_instance.create.assert_called_once()
         self.mock_channel.basic_ack.assert_called_once_with("test_delivery_tag")
 
-    @mock.patch('chats.apps.projects.consumers.template_type_consumer.TemplateTypeCreation')
-    @mock.patch('chats.apps.projects.consumers.template_type_consumer.JSONParser.parse')
-    def test_consume_json_parser_error(self, mock_json_parser, mock_template_type_creation):
+    @mock.patch(
+        "chats.apps.projects.consumers.template_type_consumer.TemplateTypeCreation"
+    )
+    @mock.patch("chats.apps.projects.consumers.template_type_consumer.JSONParser.parse")
+    def test_consume_json_parser_error(
+        self, mock_json_parser, mock_template_type_creation
+    ):
         """
         Tests behavior when JSONParser raises an exception
         """
@@ -272,16 +280,20 @@ class TestTemplateTypeConsumer(TestCase):
         mock_template_type_creation.assert_not_called()
         self.mock_channel.basic_ack.assert_not_called()
 
-    @mock.patch('chats.apps.projects.consumers.template_type_consumer.TemplateTypeCreation')
-    @mock.patch('chats.apps.projects.consumers.template_type_consumer.JSONParser.parse')
-    def test_consume_template_creation_error(self, mock_json_parser, mock_template_type_creation):
+    @mock.patch(
+        "chats.apps.projects.consumers.template_type_consumer.TemplateTypeCreation"
+    )
+    @mock.patch("chats.apps.projects.consumers.template_type_consumer.JSONParser.parse")
+    def test_consume_template_creation_error(
+        self, mock_json_parser, mock_template_type_creation
+    ):
         """
         Tests behavior when TemplateTypeCreation raises an exception
         """
         # Setup mocks
         parsed_body = {"name": "test_template_type"}
         mock_json_parser.return_value = parsed_body
-        
+
         mock_creation_instance = mock.Mock()
         mock_creation_instance.create.side_effect = Exception("Creation error")
         mock_template_type_creation.return_value = mock_creation_instance
@@ -295,4 +307,3 @@ class TestTemplateTypeConsumer(TestCase):
         mock_template_type_creation.assert_called_once_with(config=parsed_body)
         mock_creation_instance.create.assert_called_once()
         self.mock_channel.basic_ack.assert_not_called()
-        

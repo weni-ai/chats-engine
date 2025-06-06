@@ -1,16 +1,17 @@
-from django.test import TestCase
-from django.contrib.auth.models import AnonymousUser
-from rest_framework.test import APIRequestFactory, force_authenticate
-from rest_framework.request import Request
-from unittest import mock
 from datetime import time
+from unittest import mock
 
-from chats.apps.api.v1.msgs.permissions import MessagePermission, MessageMediaPermission
-from chats.apps.rooms.models import Room
-from chats.apps.queues.models import Queue
-from chats.apps.sectors.models import Sector
-from chats.apps.projects.models import Project, ProjectPermission
+from django.contrib.auth.models import AnonymousUser
+from django.test import TestCase
+from rest_framework.request import Request
+from rest_framework.test import APIRequestFactory, force_authenticate
+
 from chats.apps.accounts.models import User
+from chats.apps.api.v1.msgs.permissions import MessageMediaPermission, MessagePermission
+from chats.apps.projects.models import Project, ProjectPermission
+from chats.apps.queues.models import Queue
+from chats.apps.rooms.models import Room
+from chats.apps.sectors.models import Sector
 
 
 class TestMessagePermission(TestCase):
@@ -21,7 +22,7 @@ class TestMessagePermission(TestCase):
             email="test@example.com",
             password="testpass123",
             first_name="Test",
-            last_name="User"
+            last_name="User",
         )
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
@@ -29,24 +30,22 @@ class TestMessagePermission(TestCase):
             project=self.project,
             rooms_limit=10,
             work_start=time(9, 0),  # 9:00 AM
-            work_end=time(18, 0),   # 6:00 PM
+            work_end=time(18, 0),  # 6:00 PM
         )
         self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
         self.room = Room.objects.create(queue=self.queue, user=self.user)
         self.project_permission = ProjectPermission.objects.create(
-            user=self.user,
-            project=self.project,
-            role=1
+            user=self.user, project=self.project, role=1
         )
 
     def test_has_permission_list_success(self):
         """
         Tests listing permission when user has access
         """
-        request = self.factory.get(f'/api/v1/msgs/?room={self.room.uuid}')
+        request = self.factory.get(f"/api/v1/msgs/?room={self.room.uuid}")
         force_authenticate(request, user=self.user)
         request = Request(request)
-        view = mock.Mock(action='list')
+        view = mock.Mock(action="list")
 
         result = self.permission.has_permission(request, view)
         self.assertTrue(result)
@@ -55,10 +54,10 @@ class TestMessagePermission(TestCase):
         """
         Tests listing permission by project when user has access
         """
-        request = self.factory.get(f'/api/v1/msgs/?project={self.project.uuid}')
+        request = self.factory.get(f"/api/v1/msgs/?project={self.project.uuid}")
         force_authenticate(request, user=self.user)
         request = Request(request)
-        view = mock.Mock(action='list')
+        view = mock.Mock(action="list")
 
         result = self.permission.has_permission(request, view)
         self.assertTrue(result)
@@ -71,29 +70,24 @@ class TestMessagePermission(TestCase):
             email="other@example.com",
             password="testpass123",
             first_name="Other",
-            last_name="User"
-        )
-        
-        ProjectPermission.objects.create(
-            user=other_user,
-            project=self.project,
-            role=0
+            last_name="User",
         )
 
-        request = self.factory.get(f'/api/v1/msgs/?room={self.room.uuid}')
+        ProjectPermission.objects.create(user=other_user, project=self.project, role=0)
+
+        request = self.factory.get(f"/api/v1/msgs/?room={self.room.uuid}")
         force_authenticate(request, user=other_user)
         request = Request(request)
-        view = mock.Mock(action='list')
+        view = mock.Mock(action="list")
 
         result = self.permission.has_permission(request, view)
         self.assertFalse(result)
-
 
     def test_has_object_permission_success(self):
         """
         Tests object permission when user is room owner
         """
-        request = self.factory.get('/api/v1/msgs/1/')
+        request = self.factory.get("/api/v1/msgs/1/")
         force_authenticate(request, user=self.user)
         request = Request(request)
         message = mock.Mock(room=self.room)
@@ -105,7 +99,7 @@ class TestMessagePermission(TestCase):
         """
         Tests object permission with anonymous user
         """
-        request = self.factory.get('/api/v1/msgs/1/')
+        request = self.factory.get("/api/v1/msgs/1/")
         request = Request(request)
         request.user = AnonymousUser()
         message = mock.Mock(room=self.room)
@@ -122,7 +116,7 @@ class TestMessageMediaPermission(TestCase):
             email="test@example.com",
             password="testpass123",
             first_name="Test",
-            last_name="User"
+            last_name="User",
         )
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
@@ -135,19 +129,17 @@ class TestMessageMediaPermission(TestCase):
         self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
         self.room = Room.objects.create(queue=self.queue, user=self.user)
         self.project_permission = ProjectPermission.objects.create(
-            user=self.user,
-            project=self.project,
-            role=1
+            user=self.user, project=self.project, role=1
         )
 
     def test_has_permission_list_room_success(self):
         """
         Tests listing permission by room when user has access
         """
-        request = self.factory.get(f'/api/v1/msgs/media/?room={self.room.uuid}')
+        request = self.factory.get(f"/api/v1/msgs/media/?room={self.room.uuid}")
         force_authenticate(request, user=self.user)
         request = Request(request)
-        view = mock.Mock(action='list')
+        view = mock.Mock(action="list")
 
         result = self.permission.has_permission(request, view)
         self.assertTrue(result)
@@ -156,10 +148,10 @@ class TestMessageMediaPermission(TestCase):
         """
         Tests listing permission by project when user has access
         """
-        request = self.factory.get(f'/api/v1/msgs/media/?project={self.project.uuid}')
+        request = self.factory.get(f"/api/v1/msgs/media/?project={self.project.uuid}")
         force_authenticate(request, user=self.user)
         request = Request(request)
-        view = mock.Mock(action='list')
+        view = mock.Mock(action="list")
 
         result = self.permission.has_permission(request, view)
         self.assertTrue(result)
@@ -172,19 +164,15 @@ class TestMessageMediaPermission(TestCase):
             email="other@example.com",
             password="testpass123",
             first_name="Other",
-            last_name="User"
-        )
-        
-        ProjectPermission.objects.create(
-            user=other_user,
-            project=self.project,
-            role=0
+            last_name="User",
         )
 
-        request = self.factory.get(f'/api/v1/msgs/media/?room={self.room.uuid}')
+        ProjectPermission.objects.create(user=other_user, project=self.project, role=0)
+
+        request = self.factory.get(f"/api/v1/msgs/media/?room={self.room.uuid}")
         force_authenticate(request, user=other_user)
         request = Request(request)
-        view = mock.Mock(action='list')
+        view = mock.Mock(action="list")
 
         result = self.permission.has_permission(request, view)
         self.assertFalse(result)
@@ -193,7 +181,7 @@ class TestMessageMediaPermission(TestCase):
         """
         Tests object permission when user is room owner
         """
-        request = self.factory.get('/api/v1/msgs/media/1/')
+        request = self.factory.get("/api/v1/msgs/media/1/")
         force_authenticate(request, user=self.user)
         request = Request(request)
         obj = mock.Mock(message=mock.Mock(room=self.room))
@@ -205,7 +193,7 @@ class TestMessageMediaPermission(TestCase):
         """
         Tests object permission with anonymous user
         """
-        request = self.factory.get('/api/v1/msgs/media/1/')
+        request = self.factory.get("/api/v1/msgs/media/1/")
         request = Request(request)
         request.user = AnonymousUser()
         obj = mock.Mock(message=mock.Mock(room=self.room))
