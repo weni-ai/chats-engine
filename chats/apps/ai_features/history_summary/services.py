@@ -108,8 +108,12 @@ class HistorySummaryService:
                 request_body
             )
 
-            history_summary.summary = summary_text
-            history_summary.update_status(HistorySummaryStatus.DONE)
+            if "<no_summary_available>" in summary_text:
+                history_summary.update_status(HistorySummaryStatus.UNAVAILABLE)
+            else:
+                history_summary.summary = summary_text
+                history_summary.update_status(HistorySummaryStatus.DONE)
+
             history_summary.feature_prompt = feature_prompt
             history_summary.save()
 
