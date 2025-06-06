@@ -23,4 +23,4 @@ class InterfaceTests(SimpleTestCase):
     def test_rooms_data_repository_concrete(self):
         repo = DummyRoomsRepo()
         self.assertEqual(repo.get_cache_key(None), "key")
-        self.assertEqual(repo.get_rooms_data(None), []) 
+        self.assertEqual(repo.get_rooms_data(None), [])

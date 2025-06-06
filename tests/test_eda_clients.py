@@ -1,4 +1,5 @@
 from unittest import mock
+
 from django.test import SimpleTestCase
 
 from chats.apps.api.v1.internal.eda_clients.billing_client import RoomsInfoMixin
@@ -44,7 +45,9 @@ class RoomsInfoMixinTests(SimpleTestCase):
 
 
 class FlowsQueueMixinTests(SimpleTestCase):
-    @mock.patch("chats.apps.api.v1.internal.eda_clients.flows_eda_client.EventDrivenAPP")
+    @mock.patch(
+        "chats.apps.api.v1.internal.eda_clients.flows_eda_client.EventDrivenAPP"
+    )
     def test_request_queue_publishes_message(self, mock_app):
         # Arrange
         mixin = DummyQueueMixin()
@@ -62,7 +65,9 @@ class FlowsQueueMixinTests(SimpleTestCase):
 
 
 class FlowsTicketerMixinTests(SimpleTestCase):
-    @mock.patch("chats.apps.api.v1.internal.eda_clients.flows_eda_client.EventDrivenAPP")
+    @mock.patch(
+        "chats.apps.api.v1.internal.eda_clients.flows_eda_client.EventDrivenAPP"
+    )
     def test_request_ticketer_publishes_message(self, mock_app):
         # Arrange
         mixin = DummyTicketerMixin()
@@ -76,4 +81,4 @@ class FlowsTicketerMixinTests(SimpleTestCase):
             content={"b": 2},
             exchange=mixin.base_ticketer_exchange,
             headers={"callback_exchange": mock.ANY},
-        ) 
+        )
