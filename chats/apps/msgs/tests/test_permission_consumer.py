@@ -25,7 +25,10 @@ class TestProjectPermissionConsumer(TestCase):
         mock_instance = mock.Mock()
         mock_use_case.return_value = mock_instance
 
-        self.mock_message.body = b'{"project": "test_project", "user": "test_user", "role": "admin", "action": "create"}'
+        self.mock_message.body = (
+            b'{"project": "test_project", "user": "test_user", '
+            b'"role": "admin", "action": "create"}'
+        )
 
         ProjectPermissionConsumer.consume(self.mock_message)
 
@@ -43,7 +46,10 @@ class TestProjectPermissionConsumer(TestCase):
         mock_instance = mock.Mock()
         mock_use_case.return_value = mock_instance
 
-        self.mock_message.body = b'{"project": "test_project", "user": "test_user", "role": "admin", "action": "update"}'
+        self.mock_message.body = (
+            b'{"project": "test_project", "user": "test_user", '
+            b'"role": "admin", "action": "update"}'
+        )
 
         ProjectPermissionConsumer.consume(self.mock_message)
 
@@ -61,7 +67,10 @@ class TestProjectPermissionConsumer(TestCase):
         mock_instance = mock.Mock()
         mock_use_case.return_value = mock_instance
 
-        self.mock_message.body = b'{"project": "test_project", "user": "test_user", "role": "admin", "action": "delete"}'
+        self.mock_message.body = (
+            b'{"project": "test_project", "user": "test_user", '
+            b'"role": "admin", "action": "delete"}'
+        )
 
         ProjectPermissionConsumer.consume(self.mock_message)
 
@@ -111,7 +120,10 @@ class TestProjectPermissionConsumer(TestCase):
         mock_use_case.return_value = mock_instance
         mock_instance.create_permission.side_effect = Exception("Erro no use case")
 
-        self.mock_message.body = b'{"project": "test_project", "user": "test_user", "role": "admin", "action": "create"}'
+        self.mock_message.body = (
+            b'{"project": "test_project", "user": "test_user", '
+            b'"role": "admin", "action": "create"}'
+        )
 
         ProjectPermissionConsumer.consume(self.mock_message)
 
