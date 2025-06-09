@@ -110,6 +110,14 @@ class HistorySummaryService:
 
             if "<no_summary_available>" in summary_text:
                 history_summary.update_status(HistorySummaryStatus.UNAVAILABLE)
+                reason = summary_text.replace("<no_summary_available>", "").replace(
+                    "</no_summary_available>", ""
+                )
+                logger.info(
+                    "A summary could not be generated for room %s. The reason provided by the AI was: %s",
+                    room.uuid,
+                    reason,
+                )
             else:
                 history_summary.summary = summary_text
                 history_summary.update_status(HistorySummaryStatus.DONE)
