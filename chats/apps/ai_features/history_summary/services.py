@@ -77,13 +77,11 @@ class HistorySummaryService:
 
             conversation_text = json.dumps(conversation)
 
-            system_prompt = prompt_text.split("{conversation}")[0].strip()
-
             request_body = {
                 "messages": [
                     {
                         "role": "system",
-                        "content": [{"type": "text", "text": system_prompt}],
+                        "content": [{"type": "text", "text": prompt_text}],
                     },
                     {
                         "role": "user",
