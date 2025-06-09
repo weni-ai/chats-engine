@@ -57,19 +57,6 @@ class HistorySummaryService:
 
         history_summary.update_status(HistorySummaryStatus.PROCESSING)
 
-        if "{conversation}" not in prompt_text:
-            history_summary.update_status(HistorySummaryStatus.UNAVAILABLE)
-            logger.error(
-                "History summary prompt text needs to have a {conversation} placeholder. Room: %s",
-                room.uuid,
-            )
-            capture_message(
-                "History summary prompt text needs to have a {conversation} placeholder. Room: %s"
-                % room.uuid,
-                level="error",
-            )
-            return None
-
         try:
             messages: QuerySet["Message"] = room.messages.filter(
                 Q(user__isnull=False) | Q(contact__isnull=False)
@@ -90,14 +77,21 @@ class HistorySummaryService:
 
             conversation_text = json.dumps(conversation)
 
-            prompt_text = prompt_text.format(conversation=conversation_text)
-
             request_body = {
                 "messages": [
                     {
                         "role": "system",
                         "content": [{"type": "text", "text": prompt_text}],
-                    }
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": f"Here is the conversation: {conversation_text}",
+                            }
+                        ],
+                    },
                 ],
             }
 
