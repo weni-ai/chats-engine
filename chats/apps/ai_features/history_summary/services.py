@@ -80,8 +80,10 @@ class HistorySummaryService:
             request_body = {
                 "messages": [
                     {
-                        "role": "system",
-                        "content": [{"type": "text", "text": prompt_text}],
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": f"System prompt: {prompt_text}"}
+                        ],
                     },
                     {
                         "role": "user",
