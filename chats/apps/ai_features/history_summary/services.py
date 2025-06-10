@@ -76,11 +76,9 @@ class HistorySummaryService:
             ).select_related("contact", "user")
 
             conversation = []
-
             for message in messages:
                 is_contact = message.contact is not None
                 sender = "user" if is_contact else "agent"
-
                 conversation.append(
                     {
                         "sender": sender,
@@ -89,8 +87,6 @@ class HistorySummaryService:
                 )
 
             conversation_text = json.dumps(conversation, ensure_ascii=False)
-            prompt_text = prompt_text.format(conversation=conversation_text)
-
             prompt_text = prompt_text.format(conversation=conversation_text)
 
             request_body = {
