@@ -1,4 +1,5 @@
 import json
+import traceback
 import logging
 from typing import TYPE_CHECKING
 
@@ -137,7 +138,10 @@ class HistorySummaryService:
         except Exception as e:
             history_summary.update_status(HistorySummaryStatus.UNAVAILABLE)
             logger.error(
-                "Error generating history summary for room %s: %s", room.uuid, e
+                "Error generating history summary for room %s: %s\n%s",
+                room.uuid,
+                e,
+                traceback.format_exc(),
             )
             capture_message(
                 "Error generating history summary for room %s: %s" % (room.uuid, e),
