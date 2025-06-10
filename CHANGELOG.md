@@ -1,3 +1,14 @@
+# 3.20.4
+## Add
+   - Adding imported history url field in contact model and rooms serializers.
+
+# 3.20.3
+## Fix
+  - Remove generic errors from discussions, project permissions and bulk transfer endpoints
+## Add
+  - Tests for project and project permissions internal viewsets and increase the test coverage
+    for bulk transfer
+
 # 3.20.2
 ## Add
   - Direct call to the Flows' API to create ticketers, instead of calling Connect's
