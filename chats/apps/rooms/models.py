@@ -398,3 +398,9 @@ class Room(BaseModel, BaseConfigurableModel):
         is_sector_manager = queue.sector.is_manager(user)
 
         return is_project_admin or is_sector_manager
+
+    @property
+    def imported_history_url(self):
+        if self.contact and self.contact.imported_history_url:
+            return self.contact.imported_history_url
+        return None
