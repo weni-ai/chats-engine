@@ -87,7 +87,7 @@ class HistorySummaryService:
                         "content": [
                             {
                                 "type": "text",
-                                "text": f"Here is the conversation:\n{conversation_text}",
+                                "text": f"{conversation_text}",
                             }
                         ],
                     },
