@@ -38,6 +38,7 @@ class RoomSerializer(serializers.ModelSerializer):
     last_interaction = serializers.DateTimeField(read_only=True)
     can_edit_custom_fields = serializers.SerializerMethodField()
     config = serializers.JSONField(required=False, read_only=True)
+    imported_history_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -51,6 +52,7 @@ class RoomSerializer(serializers.ModelSerializer):
             "is_24h_valid",
             "last_interaction",
             "can_edit_custom_fields",
+            "imported_history_url",
         ]
 
     def get_is_24h_valid(self, room: Room) -> bool:
@@ -94,6 +96,11 @@ class RoomSerializer(serializers.ModelSerializer):
     def get_can_edit_custom_fields(self, room: Room):
         return room.queue.sector.can_edit_custom_fields
 
+    def get_imported_history_url(self, room: Room):
+        if room.contact and hasattr(room.contact, "imported_history_url"):
+            return room.contact.imported_history_url
+        return None
+
 
 class ListRoomSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
@@ -109,6 +116,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
     last_interaction = serializers.DateTimeField(read_only=True)
     can_edit_custom_fields = serializers.SerializerMethodField()
     is_active = serializers.BooleanField(default=True)
+    imported_history_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -130,6 +138,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
             "service_chat",
             "is_active",
             "config",
+            "imported_history_url",
         ]
 
     def get_user(self, room: Room):
@@ -172,6 +181,11 @@ class ListRoomSerializer(serializers.ModelSerializer):
 
         return MessageSerializer(last_message).data
 
+    def get_imported_history_url(self, room: Room):
+        if room.contact and hasattr(room.contact, "imported_history_url"):
+            return room.contact.imported_history_url
+        return None
+
 
 class TransferRoomSerializer(serializers.ModelSerializer):
     user = UserSerializer(many=False, required=False, read_only=True)
@@ -190,6 +204,7 @@ class TransferRoomSerializer(serializers.ModelSerializer):
     contact = ContactRelationsSerializer(many=False, required=False, read_only=True)
     tags = DetailSectorTagSerializer(many=True, required=False, read_only=True)
     linked_user = serializers.SerializerMethodField()
+    imported_history_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -207,6 +222,7 @@ class TransferRoomSerializer(serializers.ModelSerializer):
             "ended_by",
             "urn",
             "linked_user",
+            "imported_history_url",
         ]
 
         extra_kwargs = {
@@ -220,6 +236,12 @@ class TransferRoomSerializer(serializers.ModelSerializer):
             return room.contact.get_linked_user(room.queue.sector.project).full_name
         except AttributeError:
             return ""
+
+    def get_imported_history_url(self, room: Room):
+        """Retorna a URL do histórico importado do contato"""
+        if room.contact and hasattr(room.contact, "imported_history_url"):
+            return room.contact.imported_history_url
+        return None
 
 
 class RoomContactSerializer(serializers.ModelSerializer):

@@ -23,6 +23,9 @@ class Contact(BaseModel):
         blank=True,
         null=True,
     )
+    imported_history_url = models.TextField(
+        _("Imported History URL"), null=True, blank=True, default=""
+    )
 
     class Meta:
         verbose_name = _("Contact")
