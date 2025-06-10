@@ -35,5 +35,5 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         # Exclude rooms with imported_room in config
         return super().get_queryset().exclude(
-            config__imported_room__isnull=False
+            config__imported_room=True
         )
