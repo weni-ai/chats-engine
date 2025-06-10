@@ -23,6 +23,9 @@ class Contact(BaseModel):
         blank=True,
         null=True,
     )
+    imported_history_url = models.TextField(
+        _("Imported History URL"), null=True, blank=True, default=""
+    )
 
     class Meta:
         verbose_name = _("Contact")
@@ -105,8 +108,9 @@ class Contact(BaseModel):
             & Q(queue__sector__project__permissions__role=1)
         )
         is_user_assigned_to_room = Q(user=user)
-        check_admin_manager_agent_role_filter = filter_project_uuid & (
-            is_sector_manager | is_project_admin | is_user_assigned_to_room
+        check_admin_manager_agent_role_filter = Q(
+            filter_project_uuid
+            & (is_sector_manager | is_project_admin | is_user_assigned_to_room)
         )
 
         rooms_check = self.rooms.filter(

@@ -273,3 +273,127 @@ class PropertyTests(QueueSetUpMixin, APITestCase):
         Verify if the property for get if user can list its returning the correct value.
         """
         self.assertEqual(self.agent_auth.can_list, True)
+
+
+class TestQueueGetAvailableAgent(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="Test chat Project 1")
+        self.sector = Sector.objects.create(
+            name="Test chat Sector 1",
+            project=self.project,
+            rooms_limit=5,
+            work_start="08:00:00",
+            work_end="17:00:00",
+        )
+        self.queue = Queue.objects.create(name="Q1", sector=self.sector)
+
+        self.agent_1 = create_user("agent1")
+        self.agent_2 = create_user("agent2")
+        self.agent_3 = create_user("agent3")
+
+        for agent in [self.agent_1, self.agent_2, self.agent_3]:
+            agent.project_permissions.create(
+                project=self.project,
+                role=ProjectPermission.ROLE_ATTENDANT,
+                status="ONLINE",
+            )
+            self.queue.authorizations.create(
+                permission=agent.project_permissions.first()
+            )
+
+    def test_get_available_agent_returns_agent_with_least_rooms(self):
+        for i in range(3):
+            # Agent 1 has 3 active rooms
+            Room.objects.create(user=self.agent_1, queue=self.queue, is_active=True)
+
+        for i in range(2):
+            # Agent 2 has 2 active rooms
+            Room.objects.create(user=self.agent_2, queue=self.queue, is_active=True)
+
+        for i in range(1):
+            # Agent 3 has 1 active room
+            Room.objects.create(user=self.agent_3, queue=self.queue, is_active=True)
+
+        available_agent = self.queue.get_available_agent()
+        self.assertEqual(available_agent, self.agent_3)
+
+    def test_get_available_agent_returns_random_agent_if_rooms_count_is_equal(self):
+        for i in range(3):
+            # Agent 1 has 3 active rooms
+            Room.objects.create(user=self.agent_1, queue=self.queue, is_active=True)
+
+        for i in range(2):
+            # Agent 2 has 2 active rooms
+            Room.objects.create(user=self.agent_2, queue=self.queue, is_active=True)
+
+        for i in range(2):
+            # Agent 3 has 2 active rooms
+            Room.objects.create(user=self.agent_3, queue=self.queue, is_active=True)
+
+        num_trials = 100
+        picked_agents_results = []
+        for _ in range(num_trials):
+            available_agent = self.queue.get_available_agent()
+            self.assertIsNotNone(
+                available_agent, "get_available_agent should return an agent."
+            )
+            self.assertIn(available_agent, [self.agent_2, self.agent_3])
+            picked_agents_results.append(available_agent)
+
+        # Verify that both eligible agents were picked at least once over the trials.
+        picked_agents_set = set(picked_agents_results)
+        self.assertIn(
+            self.agent_2,
+            picked_agents_set,
+            "Agent 2 was never picked, suggesting non-random selection.",
+        )
+        self.assertIn(
+            self.agent_3,
+            picked_agents_set,
+            "Agent 3 was never picked, suggesting non-random selection.",
+        )
+
+    def test_get_available_agent_returns_random_agent_if_rooms_count_is_equal_for_general_routing_option(
+        self,
+    ):
+        self.project.config = {"routing_option": "general"}
+        self.project.save()
+
+        for i in range(4):
+            # Agent 1 has 3 active rooms
+            Room.objects.create(user=self.agent_1, queue=self.queue, is_active=True)
+
+        for i in range(2):
+            # Agent 2 has 2 active rooms
+            Room.objects.create(user=self.agent_2, queue=self.queue, is_active=True)
+
+        # Agent 2 has 1 closed room
+        r = Room.objects.create(user=self.agent_2, queue=self.queue)
+        r.close()
+
+        for i in range(3):
+            # Agent 3 has 3 active rooms
+            Room.objects.create(user=self.agent_3, queue=self.queue, is_active=True)
+
+        num_trials = 100
+        picked_agents_results = []
+        for _ in range(num_trials):
+            available_agent = self.queue.get_available_agent()
+            self.assertIsNotNone(
+                available_agent, "get_available_agent should return an agent."
+            )
+            self.assertIn(available_agent, [self.agent_2, self.agent_3])
+            picked_agents_results.append(available_agent)
+
+        # Verify that both eligible agents were picked at least once over the trials.
+        picked_agents_set = set(picked_agents_results)
+        self.assertIn(
+            self.agent_2,
+            picked_agents_set,
+            "Agent 2 was never picked, suggesting non-random selection.",
+        )
+        self.assertIn(
+            self.agent_3,
+            picked_agents_set,
+            "Agent 3 was never picked, suggesting non-random selection.",
+        )

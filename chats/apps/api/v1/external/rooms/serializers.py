@@ -105,7 +105,7 @@ def get_room_user(
         if current_queue_size == 0:
             # If the queue is empty, the available user with the least number
             # of rooms will be selected, if any.
-            return queue.available_agents.first()
+            return queue.get_available_agent()
 
         logger.info(
             "Calling start_queue_priority_routing for queue %s from get_room_user because the queue is not empty",
@@ -122,7 +122,7 @@ def get_room_user(
         return None
 
     # General room routing type
-    return queue.available_agents.first() or None
+    return queue.get_available_agent()
 
 
 class RoomListSerializer(serializers.ModelSerializer):

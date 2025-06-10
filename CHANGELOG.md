@@ -1,3 +1,20 @@
+# 3.20.2
+## Add
+  - Direct call to the Flows' API to create ticketers, instead of calling Connect's
+
+# 3.20.1
+## Add
+  - Index to external_id in contacts table
+
+# 3.20.0
+## Add
+  - Method to randomize available agents ordering for repeated active rooms count
+  - Tags field and filter to rooms report
+
+## Fix
+  - Exiting the retry loop when flows returns true
+  - Optimizations using selected/prefetch related
+
 # 3.19.5
 ## Add:
   - Chats history optimizations.

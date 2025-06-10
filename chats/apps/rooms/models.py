@@ -18,6 +18,7 @@ from rest_framework.exceptions import ValidationError
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
+from chats.apps.projects.models.models import RoomRoutingType
 from chats.apps.projects.usecases.send_room_info import RoomInfoUseCase
 from chats.apps.rooms.exceptions import (
     MaxPinRoomLimitReachedError,
@@ -28,12 +29,9 @@ from chats.utils.websockets import send_channels_group
 from chats.core.models import BaseConfigurableModel
 from chats.apps.projects.usecases.status_service import InServiceStatusService
 
-from chats.apps.projects.models.models import RoomRoutingType
-
-
 if TYPE_CHECKING:
-    from chats.apps.queues.models import Queue
     from chats.apps.projects.models.models import Project
+    from chats.apps.queues.models import Queue
 
 
 logger = logging.getLogger(__name__)
@@ -348,6 +346,7 @@ class Room(BaseModel, BaseConfigurableModel):
                     return None
                 else:
                     response.raise_for_status()
+                    return None
 
             except RequestException:
                 if attempt < settings.MAX_RETRIES - 1:
