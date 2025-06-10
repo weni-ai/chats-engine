@@ -88,9 +88,8 @@ class HistorySummaryService:
                     }
                 )
 
-            conversation_text = "\n".join(
-                f"{msg['sender']}: {msg['text']}" for msg in conversation
-            )
+            conversation_text = json.dumps(conversation, ensure_ascii=False)
+            prompt_text = prompt_text.format(conversation=conversation_text)
 
             prompt_text = prompt_text.format(conversation=conversation_text)
 
