@@ -26,6 +26,9 @@ class AgentRepository:
         closed_rooms = {}
         opened_rooms = {}
 
+        # Add filter to exclude imported rooms
+        rooms_filter["rooms__config__imported_room__isnull"] = True
+
         agents_filters = Q(project_permissions__project=project) & Q(is_active=True)
 
         if filters.queue:
@@ -143,6 +146,9 @@ class AgentRepository:
         closed_rooms = {}
         opened_rooms = {}
         agents_filter = {}
+
+        # Add filter to exclude imported rooms
+        rooms_filter["rooms__config__imported_room__isnull"] = True
 
         if filters.queue and filters.sector:
             rooms_filter["rooms__queue"] = filters.queue
