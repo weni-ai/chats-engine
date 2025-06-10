@@ -24,7 +24,7 @@ class Contact(BaseModel):
         null=True,
     )
     imported_history_url = models.TextField(
-        _("Imported History URL"), null=True, blank=True, default=""
+        _("Imported History URL"), null=False, blank=True, default=""
     )
 
     class Meta:
