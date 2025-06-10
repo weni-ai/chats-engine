@@ -55,6 +55,19 @@ class HistorySummaryService:
         model_id = feature_prompt.model
         prompt_text = feature_prompt.prompt
 
+        if "{conversation}" not in prompt_text:
+            history_summary.update_status(HistorySummaryStatus.UNAVAILABLE)
+            logger.error(
+                "History summary prompt text needs to have a {conversation} placeholder. Room: %s",
+                room.uuid,
+            )
+            capture_message(
+                "History summary prompt text needs to have a {conversation} placeholder. Room: %s"
+                % room.uuid,
+                level="error",
+            )
+            return None
+
         history_summary.update_status(HistorySummaryStatus.PROCESSING)
 
         try:
@@ -79,30 +92,46 @@ class HistorySummaryService:
                 f"{msg['sender']}: {msg['text']}" for msg in conversation
             )
 
+            prompt_text = prompt_text.format(conversation=conversation_text)
+
             request_body = {
-                "system": prompt_text,
                 "messages": [
                     {
                         "role": "user",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": f"{conversation_text}",
-                            }
-                        ],
-                    },
+                        "content": [{"type": "text", "text": prompt_text}],
+                    }
                 ],
             }
 
             for setting, value in feature_prompt.settings.items():
                 request_body[setting] = value
 
+            logger.info(
+                "History summary request body for room %s: %s",
+                room.uuid,
+                json.dumps(request_body),
+            )
+
             summary_text = self.integration_client_class(model_id).generate_text(
                 request_body
             )
 
+            logger.info(
+                "Response from AI for room %s: %s",
+                room.uuid,
+                summary_text,
+            )
+
             if "<no_summary_available>" in summary_text:
                 history_summary.update_status(HistorySummaryStatus.UNAVAILABLE)
+                reason = summary_text.replace("<no_summary_available>", "").replace(
+                    "</no_summary_available>", ""
+                )
+                logger.info(
+                    "A summary could not be generated for room %s. The reason provided by the AI was: %s",
+                    room.uuid,
+                    reason,
+                )
             else:
                 history_summary.summary = summary_text
                 history_summary.update_status(HistorySummaryStatus.DONE)
