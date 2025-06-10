@@ -95,6 +95,12 @@ class HistorySummaryService:
             for setting, value in feature_prompt.settings.items():
                 request_body[setting] = value
 
+            logger.info(
+                "History summary request body for room %s: %s",
+                room.uuid,
+                json.dumps(request_body),
+            )
+
             summary_text = self.integration_client_class(model_id).generate_text(
                 request_body
             )
