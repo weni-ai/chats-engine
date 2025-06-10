@@ -68,7 +68,7 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
                 status.HTTP_400_BAD_REQUEST,
             )
 
-    def put(
+    def update(
         self, request, *args, **kwargs
     ):  # TODO: GAMBIARRA ALERT! MOVE THIS LOGIC TO THE SERIALIZER or somewhere else
         qs = self.queryset
@@ -134,16 +134,12 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
         )
 
     def delete(self, request):
-        try:
-            user_permission = ProjectPermission.objects.get(
-                project_id=request.data["project"], user=request.data["user"]
-            )
-            user_permission.delete()
-            return Response(
-                status.HTTP_204_NO_CONTENT,
-            )
-        except Exception as error:
-            return Response(
-                {"error": f"{type(error)}: {error}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+        permission = get_object_or_404(
+            ProjectPermission,
+            project_id=request.data["project"],
+            user=request.data["user"],
+        )
+        permission.delete()
+        return Response(
+            status.HTTP_204_NO_CONTENT,
+        )
