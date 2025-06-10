@@ -66,7 +66,7 @@ class HistorySummaryService:
 
             for message in messages:
                 is_contact = message.contact is not None
-                sender = "contact" if is_contact else "agent"
+                sender = "user" if is_contact else "agent"
 
                 conversation.append(
                     {
@@ -75,7 +75,9 @@ class HistorySummaryService:
                     }
                 )
 
-            conversation_text = json.dumps(conversation)
+            conversation_text = "\n".join(
+                f"{msg['sender']}: {msg['text']}" for msg in conversation
+            )
 
             request_body = {
                 "system": prompt_text,
@@ -85,7 +87,7 @@ class HistorySummaryService:
                         "content": [
                             {
                                 "type": "text",
-                                "text": f"Here is the conversation: {conversation_text}",
+                                "text": f"Here is the conversation:\n{conversation_text}",
                             }
                         ],
                     },
