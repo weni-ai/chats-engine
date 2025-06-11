@@ -43,6 +43,15 @@ class RoomHistorySerializer(serializers.ModelSerializer):
             "service_chat",
         ]
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        contact_serializer = ContactOptimizedSerializer(
+            instance.contact, context={"parent": {"room": instance}}
+        )
+        data["contact"] = contact_serializer.data
+
+        return data
+
 
 class RoomBasicValuesSerializer(serializers.Serializer):
     uuid = serializers.UUIDField()
