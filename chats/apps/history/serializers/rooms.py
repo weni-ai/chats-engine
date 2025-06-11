@@ -43,6 +43,10 @@ class RoomHistorySerializer(serializers.ModelSerializer):
             "service_chat",
         ]
 
+    def to_representation(self, instance):
+        self.fields["contact"].context.update({"parent": {"room": instance}})
+        return super().to_representation(instance)
+
 
 class RoomBasicValuesSerializer(serializers.Serializer):
     uuid = serializers.UUIDField()
