@@ -49,7 +49,7 @@ class RoomHistorySerializer(serializers.ModelSerializer):
             instance.contact, context={"parent": {"room": instance}}
         )
         data["contact"] = contact_serializer.data
-        
+
         return data
 
 
