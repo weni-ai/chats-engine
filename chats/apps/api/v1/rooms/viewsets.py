@@ -614,23 +614,64 @@ class RoomViewset(
                     room.transfer_history = feedback
                     room.save()
 
-                    create_room_feedback_message(
-                        room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
-                    )
+                transfer_user = verify_user_room(room, user_request)
+
+                feedback = create_transfer_json(
+                    action="transfer",
+                    from_=transfer_user,
+                    to=user,
+                )
+                room.user = user
+                room.save()
+
+                logger.info(
+                    "Starting queue priority routing for room %s from bulk transfer to user %s",
+                    room.uuid,
+                    user.email,
+                )
+                start_queue_priority_routing(room.queue)
+
+                create_room_feedback_message(
+                    room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+                )
+                if old_user:
+                    room.notify_user("update", user=old_user)
+                else:
                     room.notify_user("update", user=transfer_user)
-                    room.notify_queue("update")
+                room.notify_user("update")
 
-                    logger.info(
-                        "Starting queue priority routing for room %s from bulk transfer to queue %s",
-                        room.uuid,
-                        queue.uuid,
+                room.update_ticket()
+
+        if queue_uuid:
+            queue = Queue.objects.get(uuid=queue_uuid)
+            for room in rooms_list:
+                if queue.project != room.project:
+                    return Response(
+                        {"error": "Cannot transfer rooms from a project to another"},
+                        status=status.HTTP_400_BAD_REQUEST,
                     )
-                    start_queue_priority_routing(queue)
+                transfer_user = verify_user_room(room, user_request)
+                feedback = create_transfer_json(
+                    action="transfer",
+                    from_=transfer_user,
+                    to=queue,
+                )
+                room.user = None
+                room.queue = queue
+                room.save()
 
-        except Exception as error:
-            return Response(
-                {"error": {error}}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+                create_room_feedback_message(
+                    room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+                )
+                room.notify_user("update", user=transfer_user)
+                room.notify_queue("update")
+
+                logger.info(
+                    "Starting queue priority routing for room %s from bulk transfer to queue %s",
+                    room.uuid,
+                    queue.uuid,
+                )
+                start_queue_priority_routing(queue)
 
         return Response(
             {"success": "Mass transfer completed"},

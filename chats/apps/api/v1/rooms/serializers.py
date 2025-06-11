@@ -39,7 +39,11 @@ class RoomSerializer(serializers.ModelSerializer):
     last_interaction = serializers.DateTimeField(read_only=True)
     can_edit_custom_fields = serializers.SerializerMethodField()
     config = serializers.JSONField(required=False, read_only=True)
+<<<<<<< HEAD
     imported_history_url = serializers.SerializerMethodField()
+=======
+    imported_history_url = serializers.CharField(read_only=True, default="")
+>>>>>>> feature/sefaz-history-bug
 
     class Meta:
         model = Room
@@ -117,8 +121,12 @@ class ListRoomSerializer(serializers.ModelSerializer):
     last_interaction = serializers.DateTimeField(read_only=True)
     can_edit_custom_fields = serializers.SerializerMethodField()
     is_active = serializers.BooleanField(default=True)
+<<<<<<< HEAD
     is_pinned = serializers.BooleanField(required=False, read_only=True)
     imported_history_url = serializers.SerializerMethodField()
+=======
+    imported_history_url = serializers.CharField(read_only=True, default="")
+>>>>>>> feature/sefaz-history-bug
 
     class Meta:
         model = Room
@@ -140,7 +148,10 @@ class ListRoomSerializer(serializers.ModelSerializer):
             "service_chat",
             "is_active",
             "config",
+<<<<<<< HEAD
             "is_pinned",
+=======
+>>>>>>> feature/sefaz-history-bug
             "imported_history_url",
         ]
 
@@ -207,7 +218,11 @@ class TransferRoomSerializer(serializers.ModelSerializer):
     contact = ContactRelationsSerializer(many=False, required=False, read_only=True)
     tags = DetailSectorTagSerializer(many=True, required=False, read_only=True)
     linked_user = serializers.SerializerMethodField()
+<<<<<<< HEAD
     imported_history_url = serializers.SerializerMethodField()
+=======
+    imported_history_url = serializers.CharField(read_only=True, default="")
+>>>>>>> feature/sefaz-history-bug
 
     class Meta:
         model = Room

@@ -276,6 +276,12 @@ class Room(BaseModel, BaseConfigurableModel):
         if not day_validation.exists():
             return self.created_on > timezone.now() - timedelta(days=1)
         return True
+    
+    @property
+    def imported_history_url(self):
+        if self.contact and self.contact.imported_history_url:
+            return self.contact.imported_history_url
+        return None
 
     @property
     def serialized_ws_data(self):
@@ -560,3 +566,4 @@ class RoomPin(BaseModel):
                 name="unique_room_user_room_pin",
             )
         ]
+
