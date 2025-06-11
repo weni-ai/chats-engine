@@ -44,8 +44,13 @@ class RoomHistorySerializer(serializers.ModelSerializer):
         ]
 
     def to_representation(self, instance):
-        self.fields["contact"].context.update({"parent": {"room": instance}})
-        return super().to_representation(instance)
+        data = super().to_representation(instance)
+        contact_serializer = ContactOptimizedSerializer(
+            instance.contact, context={"parent": {"room": instance}}
+        )
+        data["contact"] = contact_serializer.data
+        
+        return data
 
 
 class RoomBasicValuesSerializer(serializers.Serializer):
