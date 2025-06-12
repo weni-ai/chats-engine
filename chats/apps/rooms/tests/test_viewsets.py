@@ -430,6 +430,71 @@ class TestRoomsViewSet(APITestCase):
             response.json().get("results")[1].get("uuid"), str(room_1.uuid)
         )
 
+    def test_room_order_with_pin(self):
+        # Create rooms
+        room_1 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
+        room_2 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
+        room_3 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
+        room_4 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
+
+        RoomPin.objects.create(room=room_3, user=self.user)
+        RoomPin.objects.create(room=room_2, user=self.user)
+
+        queue = Queue.objects.create(
+            name="Test Queue",
+            sector=Sector.objects.create(
+                name="Test Sector",
+                project=Project.objects.create(name="Test Project"),
+                rooms_limit=10,
+                work_start="09:00",
+                work_end="18:00",
+            ),
+        )
+        QueueAuthorization.objects.create(
+            permission=ProjectPermission.objects.create(
+                user=self.user,
+                project=queue.sector.project,
+                role=ProjectPermission.ROLE_ATTENDANT,
+            ),
+            queue=queue,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        # Room from a different project, should be excluded
+        room_5 = Room.objects.create(queue=queue, contact=Contact.objects.create())
+        RoomPin.objects.create(room=room_5, user=self.user)
+
+        response = self.list_rooms(
+            filters={
+                "project": str(self.project.uuid),
+                "is_active": True,
+                "ordering": "-created_on",
+            }
+        )
+
+        self.assertIn("max_pin_limit", response.data)
+        self.assertEqual(
+            response.data.get("max_pin_limit"), settings.MAX_ROOM_PINS_LIMIT
+        )
+
+        results = response.data.get("results")
+        rooms_uuids = [room["uuid"] for room in results]
+
+        self.assertNotIn(str(room_5.uuid), rooms_uuids)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertEqual(rooms_uuids[0], str(room_2.uuid))
+        self.assertEqual(results[0].get("is_pinned"), True)
+
+        self.assertEqual(rooms_uuids[1], str(room_3.uuid))
+        self.assertEqual(results[1].get("is_pinned"), True)
+
+        self.assertEqual(rooms_uuids[2], str(room_4.uuid))
+        self.assertEqual(results[2].get("is_pinned"), False)
+
+        self.assertEqual(rooms_uuids[3], str(room_1.uuid))
+        self.assertEqual(results[3].get("is_pinned"), False)
+
 
 class RoomPickTests(APITestCase):
     def setUp(self) -> None:
