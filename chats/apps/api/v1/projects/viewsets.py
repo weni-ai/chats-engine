@@ -778,13 +778,13 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                     in_service_type = InServiceStatusService.get_or_create_status_type(
                         instance.status_type.project
                     )
-                    
                     CustomStatus.objects.create(
                         user=instance.user,
                         status_type=in_service_type,
                         is_active=True,
                         project=instance.status_type.project,
-                        break_time=0
+                        break_time=0,
+                        created_on=end_time
                     )
 
                 return Response(

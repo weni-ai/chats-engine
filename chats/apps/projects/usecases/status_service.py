@@ -139,12 +139,13 @@ class InServiceStatusService:
             ).first()
             
             if status:
-                # Calcular duração e finalizar status
-                service_duration = timezone.now() - status.created_on
+                # Usar timestamp preciso para o cálculo
+                end_time = timezone.now()
+                service_duration = end_time - status.created_on
                 status.is_active = False
                 status.break_time = int(service_duration.total_seconds())
                 status.save(update_fields=['is_active', 'break_time'])
-                logger.info(f"Status In-Service finalizado para usuário {user.pk} no projeto {project.pk}")
+                logger.debug(f"Closed in-service status: {status.break_time} seconds")
 
    
     @classmethod
