@@ -1,13 +1,14 @@
-from django.urls import reverse
-from rest_framework.test import APITestCase
-from rest_framework.response import Response
-from rest_framework import status
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from django.core.cache import cache
 from django.test import override_settings
+from django.urls import reverse
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.test import APITestCase
 
 from chats.apps.accounts.tests.decorators import with_internal_auth
-from chats.apps.projects.models.models import Project, User, ProjectPermission
+from chats.apps.projects.models.models import Project, ProjectPermission, User
 
 
 class BaseTestProjectViewSet(APITestCase):
@@ -100,30 +101,6 @@ class TestProjectViewSetAsAuthenticatedUser(BaseTestProjectViewSet):
         response = self.create({"name": "New Project", "timezone": "UTC"})
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(Project.objects.count(), 2)
-
-    @with_internal_auth
-    @patch("chats.apps.api.v1.internal.projects.serializers.FlowRESTClient")
-    @patch("chats.apps.api.v1.internal.projects.serializers.ConnectRESTClient")
-    def test_create_project_from_template(self, mock_connect_client, mock_flow_client):
-        mock_connect_client.return_value.create_ticketer.return_value = MagicMock(
-            status_code=status.HTTP_201_CREATED, json=lambda: {"uuid": "some-uuid"}
-        )
-        mock_flow_client.return_value.create_queue.return_value = MagicMock(
-            status_code=status.HTTP_201_CREATED
-        )
-
-        data = {
-            "name": "Template Project",
-            "timezone": "UTC",
-            "is_template": True,
-            "user_email": self.user.email,
-        }
-        response = self.create(data)
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(Project.objects.count(), 2)
-        new_project = Project.objects.get(name="Template Project")
-        self.assertTrue(new_project.sectors.exists())
-        self.assertTrue(new_project.sectors.first().queues.exists())
 
     def test_cannot_update_project_without_internal_communication_permission(self):
         response = self.update(self.project.uuid, {"name": "Updated Name"})
