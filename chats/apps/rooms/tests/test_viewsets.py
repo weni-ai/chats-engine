@@ -468,7 +468,6 @@ class TestRoomsViewSet(APITestCase):
         room_5 = Room.objects.create(queue=queue, contact=Contact.objects.create())
         RoomPin.objects.create(room=room_5, user=self.user)
 
-        # Call your list endpoint
         response = self.list_rooms(
             filters={
                 "project": str(self.project.uuid),
@@ -477,7 +476,6 @@ class TestRoomsViewSet(APITestCase):
             }
         )
 
-        # Assertions unchanged...
         self.assertIn("max_pin_limit", response.data)
         self.assertEqual(
             response.data.get("max_pin_limit"), settings.MAX_ROOM_PINS_LIMIT

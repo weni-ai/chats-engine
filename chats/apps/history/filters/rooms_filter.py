@@ -70,16 +70,17 @@ class HistoryRoomFilter(filters.FilterSet):
                 contact__external_id__in=contacts_blocklist
             )
 
-        if (
-            user_permission.is_admin is False
-            and project.agents_can_see_queue_history is False
-        ):
-            return base_queryset.filter(user=user, queue__sector__project=value)
+        base_queryset = base_queryset.filter(queue__sector__project=value)
 
-        queue_ids = user_permission.queue_ids
-        return base_queryset.filter(
-            Q(queue__in=queue_ids) | Q(user=user, queue__sector__project=value)
-        )
+        if user_permission.is_admin is False:
+            if project.agents_can_see_queue_history is False:
+                return base_queryset.filter(user=user)
+
+            return base_queryset.filter(
+                Q(queue__in=user_permission.queue_ids) | Q(user=user)
+            )
+
+        return base_queryset
 
     def filter_tags(self, queryset, name, value):
         if not value:
