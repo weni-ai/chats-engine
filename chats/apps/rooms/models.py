@@ -19,7 +19,10 @@ from rest_framework.exceptions import ValidationError
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.projects.usecases.send_room_info import RoomInfoUseCase
-from chats.apps.rooms.exceptions import MaxPinRoomLimitReachedError
+from chats.apps.rooms.exceptions import (
+    MaxPinRoomLimitReachedError,
+    RoomIsNotActiveError,
+)
 from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
 
@@ -233,6 +236,8 @@ class Room(BaseModel, BaseConfigurableModel):
         if tags is not None:
             self.tags.add(*tags)
 
+        self.clear_pins()
+
         self.save()
 
     def request_callback(self, room_data: dict):
@@ -410,11 +415,21 @@ class Room(BaseModel, BaseConfigurableModel):
         if self.pins.filter(user=user).exists():
             return
 
-        if RoomPin.objects.filter(user=user).count() >= settings.MAX_ROOM_PINS_LIMIT:
+        if (
+            RoomPin.objects.filter(
+                user=user,
+                room__queue__sector__project=self.queue.sector.project,
+                room__is_active=True,
+            ).count()
+            >= settings.MAX_ROOM_PINS_LIMIT
+        ):
             raise MaxPinRoomLimitReachedError
 
         if self.user != user:
             raise PermissionDenied
+
+        if not self.is_active:
+            raise RoomIsNotActiveError
 
         return RoomPin.objects.create(room=self, user=user)
 
