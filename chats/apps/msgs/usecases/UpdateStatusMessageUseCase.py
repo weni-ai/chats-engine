@@ -36,6 +36,9 @@ class UpdateStatusMessageUseCase:
             reply_index = ChatMessageReplyIndex.objects.get(external_id=message_id)
             message = reply_index.message
 
+            if message.status == "read":
+                return
+
             if not message.room or not message.room.project:
                 return
 
@@ -48,6 +51,4 @@ class UpdateStatusMessageUseCase:
             MessageStatusNotifier.notify_for_message(message, message_status)
 
         except ChatMessageReplyIndex.DoesNotExist:
-            print(
-                f"Message with external_id {message_id} not found in ChatMessageReplyIndex"
-            )
+            return
