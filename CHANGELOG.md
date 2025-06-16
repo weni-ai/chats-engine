@@ -1,6 +1,7 @@
 # 3.21.0
 ## Add
   - Adding pin chats feature
+  - Adding message status feature
 ## Fix
   - Allow admins to view full rooms history
 
