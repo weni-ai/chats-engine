@@ -1,6 +1,11 @@
+# 3.20.5
+## Add
+  - New method for calculating the response time of closed rooms
+  - Getting the room correctly in contact optimized serializer
+
 # 3.20.4
 ## Add
-   - Adding imported history url field in contact model and rooms serializers.
+  - Adding imported history url field in contact model and rooms serializers.
 
 # 3.20.3
 ## Fix
