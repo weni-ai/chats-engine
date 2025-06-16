@@ -452,6 +452,10 @@ if SEND_EMAILS:
     EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL")
     EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS")
 
+
+# Pin rooms
+MAX_ROOM_PINS_LIMIT = env.int("MAX_ROOM_PINS_LIMIT", default=3)
+
 # Message Status Update Feature Flag
 MESSAGE_STATUS_UPDATE_ENABLED_PROJECTS = env.list(
     "MESSAGE_STATUS_UPDATE_ENABLED_PROJECTS", default=[]

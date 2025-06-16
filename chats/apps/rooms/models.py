@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import requests
 import sentry_sdk
 from django.conf import settings
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.utils import timezone
@@ -20,6 +20,10 @@ from chats.apps.accounts.models import User
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.projects.models.models import RoomRoutingType
 from chats.apps.projects.usecases.send_room_info import RoomInfoUseCase
+from chats.apps.rooms.exceptions import (
+    MaxPinRoomLimitReachedError,
+    RoomIsNotActiveError,
+)
 from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
 
@@ -144,12 +148,13 @@ class Room(BaseModel, BaseConfigurableModel):
         if self.__original_is_active is False:
             raise ValidationError({"detail": _("Closed rooms cannot receive updates")})
 
-        if (
-            self.user
-            and not self.user_assigned_at
-            or (self.pk and self.tracker.has_changed("user"))
-        ):
+        user_has_changed = self.pk and self.tracker.has_changed("user")
+
+        if self.user and not self.user_assigned_at or user_has_changed:
             self.user_assigned_at = timezone.now()
+
+        if user_has_changed:
+            self.clear_pins()
 
         return super().save(*args, **kwargs)
 
@@ -228,6 +233,8 @@ class Room(BaseModel, BaseConfigurableModel):
 
         if tags is not None:
             self.tags.add(*tags)
+
+        self.clear_pins()
 
         self.save()
 
@@ -404,3 +411,74 @@ class Room(BaseModel, BaseConfigurableModel):
         if self.contact and self.contact.imported_history_url:
             return self.contact.imported_history_url
         return None
+
+    def pin(self, user: User):
+        """
+        Pins a room for a user.
+        """
+
+        if self.pins.filter(user=user).exists():
+            return
+
+        if (
+            RoomPin.objects.filter(
+                user=user,
+                room__queue__sector__project=self.queue.sector.project,
+                room__is_active=True,
+            ).count()
+            >= settings.MAX_ROOM_PINS_LIMIT
+        ):
+            raise MaxPinRoomLimitReachedError
+
+        if self.user != user:
+            raise PermissionDenied
+
+        if not self.is_active:
+            raise RoomIsNotActiveError
+
+        return RoomPin.objects.create(room=self, user=user)
+
+    def unpin(self, user: User):
+        """
+        Unpins a room for a user.
+        """
+        if self.user != user:
+            raise PermissionDenied
+
+        return self.pins.filter(user=user).delete()
+
+    def clear_pins(self):
+        """
+        Clears all pins for a room.
+        """
+        return self.pins.all().delete()
+
+
+class RoomPin(BaseModel):
+    """
+    A room pin is a record of a user pinning a room.
+    """
+
+    room = models.ForeignKey(
+        "rooms.Room",
+        related_name="pins",
+        verbose_name=_("room"),
+        on_delete=models.CASCADE,
+    )
+    user = models.ForeignKey(
+        "accounts.User",
+        related_name="room_pins",
+        verbose_name=_("user"),
+        on_delete=models.CASCADE,
+    )
+    created_on = models.DateTimeField(_("created on"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Room Pin")
+        verbose_name_plural = _("Room Pins")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["room", "user"],
+                name="unique_room_user_room_pin",
+            )
+        ]

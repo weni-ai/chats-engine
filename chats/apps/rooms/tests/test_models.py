@@ -1,12 +1,21 @@
 import uuid
 
+from django.conf import settings
 from django.db import IntegrityError
+from django.core.exceptions import PermissionDenied
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
+from chats.apps.projects.models.models import Project
+from chats.apps.queues.models import Queue
+from chats.apps.rooms.exceptions import (
+    MaxPinRoomLimitReachedError,
+    RoomIsNotActiveError,
+)
 from chats.apps.rooms.models import Room
+from chats.apps.sectors.models import Sector
 
 
 class ConstraintTests(APITestCase):
@@ -25,8 +34,22 @@ class ConstraintTests(APITestCase):
 
 
 class TestRoomModel(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(
+            name="Test Queue",
+            sector=self.sector,
+        )
+
     def test_user_assigned_at_field(self):
-        room = Room.objects.create()
+        room = Room.objects.create(queue=self.queue)
 
         self.assertIsNone(room.user_assigned_at)
 
@@ -54,3 +77,134 @@ class TestRoomModel(TestCase):
 
         room.refresh_from_db()
         self.assertNotEqual(room.user_assigned_at, previous_user_assigned_at)
+
+    def test_pin_room(self):
+        user = User.objects.create(email="a@user.com")
+        room = Room.objects.create(user=user, queue=self.queue)
+
+        self.assertEqual(room.pins.count(), 0)
+
+        room.pin(user)
+        self.assertEqual(room.pins.count(), 1)
+
+        pin = room.pins.first()
+        self.assertEqual(pin.user, user)
+
+        room.pin(user)
+        # Should not raise an error or add a new pin
+        self.assertEqual(room.pins.count(), 1)
+        self.assertEqual(room.pins.first(), pin)
+
+        queue_2 = Queue.objects.create(
+            sector=Sector.objects.create(
+                project=Project.objects.create(),
+                rooms_limit=10,
+                work_start="09:00",
+                work_end="18:00",
+            ),
+        )
+
+        for i in range(settings.MAX_ROOM_PINS_LIMIT):
+            room = Room.objects.create(
+                user=user,
+                queue=queue_2,
+            )
+            room.pin(user)
+
+        room = Room.objects.create(user=user, queue=self.queue)
+
+        # Should not raise an error because the limit is not reached
+        # since the previous rooms are from a different project
+        room.pin(user)
+
+    def test_pin_room_limit_reached(self):
+        user = User.objects.create(email="a@user.com")
+
+        for i in range(settings.MAX_ROOM_PINS_LIMIT):
+            room = Room.objects.create(user=user, queue=self.queue)
+
+            room.pin(user)
+
+        room = Room.objects.create(queue=self.queue)
+
+        with self.assertRaises(MaxPinRoomLimitReachedError):
+            room.pin(user)
+
+    def test_pin_room_user_not_assigned(self):
+        room = Room.objects.create(queue=self.queue)
+        user = User.objects.create(email="a@user.com")
+
+        with self.assertRaises(PermissionDenied):
+            room.pin(user)
+
+    def test_pin_room_is_not_active(self):
+        user = User.objects.create(email="a@user.com")
+        room = Room.objects.create(user=user, queue=self.queue)
+        room.close()
+
+        with self.assertRaises(RoomIsNotActiveError):
+            room.pin(user)
+
+    def test_unpin_room(self):
+        user = User.objects.create(email="a@user.com")
+        room = Room.objects.create(user=user, queue=self.queue)
+
+        room.pin(user)
+        self.assertEqual(room.pins.count(), 1)
+
+        pin = room.pins.first()
+        self.assertEqual(pin.user, user)
+
+        room.unpin(user)
+        self.assertEqual(room.pins.count(), 0)
+
+    def test_unpin_room_user_not_assigned(self):
+        room = Room.objects.create(queue=self.queue)
+        user = User.objects.create(email="a@user.com")
+
+        with self.assertRaises(PermissionDenied):
+            room.unpin(user)
+
+    def test_clear_pins(self):
+        user = User.objects.create(email="a@user.com")
+        room = Room.objects.create(user=user, queue=self.queue)
+
+        room.pin(user)
+        self.assertEqual(room.pins.count(), 1)
+
+        room.clear_pins()
+        self.assertEqual(room.pins.count(), 0)
+
+    def test_change_user_clears_pins(self):
+        user = User.objects.create(email="a@user.com")
+        room = Room.objects.create(user=user, queue=self.queue)
+
+        room.pin(user)
+        self.assertEqual(room.pins.count(), 1)
+
+        room.user = User.objects.create(email="b@user.com")
+        room.save()
+
+        self.assertEqual(room.pins.count(), 0)
+
+    def test_remove_user_clears_pins(self):
+        user = User.objects.create(email="a@user.com")
+        room = Room.objects.create(user=user, queue=self.queue)
+
+        room.pin(user)
+        self.assertEqual(room.pins.count(), 1)
+
+        room.user = None
+        room.save()
+
+        self.assertEqual(room.pins.count(), 0)
+
+    def test_close_room_clears_pins(self):
+        user = User.objects.create(email="a@user.com")
+        room = Room.objects.create(user=user, queue=self.queue)
+
+        room.pin(user)
+        self.assertEqual(room.pins.count(), 1)
+
+        room.close()
+        self.assertEqual(room.pins.count(), 0)
