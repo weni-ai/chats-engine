@@ -90,26 +90,8 @@ class HistorySummaryService:
             conversation_text = json.dumps(conversation, ensure_ascii=False)
             prompt_text = prompt_text.format(conversation=conversation_text)
 
-            request_body = {
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [{"type": "text", "text": prompt_text}],
-                    }
-                ],
-            }
-
-            for setting, value in feature_prompt.settings.items():
-                request_body[setting] = value
-
-            logger.info(
-                "History summary request body for room %s: %s",
-                room.uuid,
-                json.dumps(request_body),
-            )
-
             summary_text = self.integration_client_class(model_id).generate_text(
-                request_body
+                feature_prompt.settings, prompt_text
             )
 
             logger.info(
