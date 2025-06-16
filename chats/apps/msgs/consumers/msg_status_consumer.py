@@ -23,6 +23,9 @@ class MessageStatusConsumer(EDAConsumer):
         if (message_id := body.get("message_id")) and (
             message_status := body.get("status")
         ):
+            if message_status == "read":
+                return
+
             update_message_usecase = UpdateStatusMessageUseCase()
             update_message_usecase.update_status_message(message_id, message_status)
         else:

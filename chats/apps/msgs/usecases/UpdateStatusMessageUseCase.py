@@ -48,6 +48,4 @@ class UpdateStatusMessageUseCase:
             MessageStatusNotifier.notify_for_message(message, message_status)
 
         except ChatMessageReplyIndex.DoesNotExist:
-            print(
-                f"Message with external_id {message_id} not found in ChatMessageReplyIndex"
-            )
+            return
