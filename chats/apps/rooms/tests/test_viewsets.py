@@ -491,21 +491,6 @@ class RoomPickTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    @with_project_permission(role=ProjectPermission.ROLE_ATTENDANT)
-    @with_queue_authorization(role=QueueAuthorization.ROLE_AGENT)
-    def test_cannot_pick_room_if_routing_type_is_queue_priority_and_user_is_not_project_admin_or_sector_manager(
-        self,
-    ):
-        self.project.room_routing_type = RoomRoutingType.QUEUE_PRIORITY
-        self.project.save(update_fields=["room_routing_type"])
-
-        response = self.pick_room_from_queue()
-
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(
-            response.data["detail"].code, "user_is_not_project_admin_or_sector_manager"
-        )
-
     @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
     def test_can_pick_room_if_project_routing_type_is_queue_priority_and_user_is_project_admin(
         self,

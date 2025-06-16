@@ -385,12 +385,6 @@ class RoomViewset(
         room: Room = self.get_object()
         user: User = request.user
 
-        if not room.can_pick_queue(user):
-            raise PermissionDenied(
-                detail=_("User does not have permission to pick this room"),
-                code="user_is_not_project_admin_or_sector_manager",
-            )
-
         if room.user:
             raise ValidationError(
                 {"detail": _("Room is not queued")}, code="room_is_not_queued"
