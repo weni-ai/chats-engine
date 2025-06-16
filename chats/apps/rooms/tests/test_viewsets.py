@@ -1,10 +1,13 @@
 from datetime import time
 from unittest.mock import patch
+
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.test import APITestCase
+
 from chats.apps.api.utils import create_contact, create_user_and_token
 from chats.apps.contacts.models import Contact
 from chats.apps.projects.models import Project, ProjectPermission
@@ -12,7 +15,7 @@ from chats.apps.projects.models.models import RoomRoutingType
 from chats.apps.projects.tests.decorators import with_project_permission
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.queues.tests.decorators import with_queue_authorization
-from chats.apps.rooms.models import Room
+from chats.apps.rooms.models import Room, RoomPin
 from chats.apps.rooms.services import RoomsReportService
 from chats.apps.sectors.models import Sector, SectorAuthorization
 from chats.apps.sectors.tests.decorators import with_sector_authorization
@@ -426,6 +429,71 @@ class TestRoomsViewSet(APITestCase):
         self.assertEqual(
             response.json().get("results")[1].get("uuid"), str(room_1.uuid)
         )
+
+    def test_room_order_with_pin(self):
+        # Create rooms
+        room_1 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
+        room_2 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
+        room_3 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
+        room_4 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
+
+        RoomPin.objects.create(room=room_3, user=self.user)
+        RoomPin.objects.create(room=room_2, user=self.user)
+
+        queue = Queue.objects.create(
+            name="Test Queue",
+            sector=Sector.objects.create(
+                name="Test Sector",
+                project=Project.objects.create(name="Test Project"),
+                rooms_limit=10,
+                work_start="09:00",
+                work_end="18:00",
+            ),
+        )
+        QueueAuthorization.objects.create(
+            permission=ProjectPermission.objects.create(
+                user=self.user,
+                project=queue.sector.project,
+                role=ProjectPermission.ROLE_ATTENDANT,
+            ),
+            queue=queue,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        # Room from a different project, should be excluded
+        room_5 = Room.objects.create(queue=queue, contact=Contact.objects.create())
+        RoomPin.objects.create(room=room_5, user=self.user)
+
+        response = self.list_rooms(
+            filters={
+                "project": str(self.project.uuid),
+                "is_active": True,
+                "ordering": "-created_on",
+            }
+        )
+
+        self.assertIn("max_pin_limit", response.data)
+        self.assertEqual(
+            response.data.get("max_pin_limit"), settings.MAX_ROOM_PINS_LIMIT
+        )
+
+        results = response.data.get("results")
+        rooms_uuids = [room["uuid"] for room in results]
+
+        self.assertNotIn(str(room_5.uuid), rooms_uuids)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertEqual(rooms_uuids[0], str(room_2.uuid))
+        self.assertEqual(results[0].get("is_pinned"), True)
+
+        self.assertEqual(rooms_uuids[1], str(room_3.uuid))
+        self.assertEqual(results[1].get("is_pinned"), True)
+
+        self.assertEqual(rooms_uuids[2], str(room_4.uuid))
+        self.assertEqual(results[2].get("is_pinned"), False)
+
+        self.assertEqual(rooms_uuids[3], str(room_1.uuid))
+        self.assertEqual(results[3].get("is_pinned"), False)
 
 
 class RoomPickTests(APITestCase):
@@ -850,3 +918,101 @@ class RoomsReportTestCase(APITestCase):
         response = self.generate_report(body)
 
         self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+
+
+class BaseRoomPinTestCase(APITestCase):
+    def pin_room(self, room_pk: str, data: dict) -> Response:
+        url = reverse("room-pin", kwargs={"pk": room_pk})
+
+        return self.client.post(url, data=data, format="json")
+
+
+class TestRoomPinAnonymousUser(BaseRoomPinTestCase):
+    def test_cannot_pin_room_when_user_is_not_authenticated(self):
+        response = self.pin_room("123", {"status": True})
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class TestRoomPinAuthenticatedUser(BaseRoomPinTestCase):
+    def setUp(self):
+        self.project = Project.objects.create(
+            name="Test Project",
+        )
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=1,
+            work_start=time(hour=5, minute=0),
+            work_end=time(hour=23, minute=59),
+        )
+        self.queue = Queue.objects.create(
+            name="Test Queue",
+            sector=self.sector,
+        )
+        self.agent = User.objects.create(
+            email="test_agent_1@example.com",
+        )
+
+        self.client.force_authenticate(user=self.agent)
+
+    def test_pin_room(self):
+        room = Room.objects.create(
+            queue=self.queue,
+            user=self.agent,
+        )
+
+        response = self.pin_room(room.uuid, {"status": True})
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_cannot_pin_room_when_room_is_not_active(self):
+        room = Room.objects.create(
+            queue=self.queue,
+            user=self.agent,
+        )
+        room.close()
+        response = self.pin_room(room.uuid, {"status": True})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["code"], "room_is_not_active")
+
+    def test_cannot_pin_room_when_max_pin_limit_reached(self):
+        for _ in range(settings.MAX_ROOM_PINS_LIMIT):
+            room = Room.objects.create(
+                queue=self.queue,
+                user=self.agent,
+            )
+            RoomPin.objects.create(room=room, user=self.agent)
+
+        room = Room.objects.create(
+            queue=self.queue,
+            user=self.agent,
+        )
+        response = self.pin_room(room.uuid, {"status": True})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["code"], "max_pin_limit")
+
+    def test_cannot_pin_room_when_user_is_not_assigned(self):
+        room = Room.objects.create(
+            queue=self.queue,
+        )
+        response = self.pin_room(room.uuid, {"status": True})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_unpin_room(self):
+        room = Room.objects.create(
+            queue=self.queue,
+            user=self.agent,
+        )
+        response = self.pin_room(room.uuid, {"status": False})
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_cannot_unpin_room_when_user_is_not_assigned(self):
+        room = Room.objects.create(
+            queue=self.queue,
+        )
+        response = self.pin_room(room.uuid, {"status": False})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
