@@ -236,6 +236,8 @@ class Room(BaseModel, BaseConfigurableModel):
         if tags is not None:
             self.tags.add(*tags)
 
+        self.clear_pins()
+
         self.save()
 
     def request_callback(self, room_data: dict):
@@ -413,7 +415,14 @@ class Room(BaseModel, BaseConfigurableModel):
         if self.pins.filter(user=user).exists():
             return
 
-        if RoomPin.objects.filter(user=user).count() >= settings.MAX_ROOM_PINS_LIMIT:
+        if (
+            RoomPin.objects.filter(
+                user=user,
+                room__queue__sector__project=self.queue.sector.project,
+                room__is_active=True,
+            ).count()
+            >= settings.MAX_ROOM_PINS_LIMIT
+        ):
             raise MaxPinRoomLimitReachedError
 
         if self.user != user:

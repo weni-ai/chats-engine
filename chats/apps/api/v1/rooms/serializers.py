@@ -11,7 +11,7 @@ from chats.apps.api.v1.msgs.serializers import MessageSerializer
 from chats.apps.api.v1.queues.serializers import QueueSerializer
 from chats.apps.api.v1.sectors.serializers import DetailSectorTagSerializer
 from chats.apps.queues.models import Queue
-from chats.apps.rooms.models import Room
+from chats.apps.rooms.models import Room, RoomPin
 
 
 class RoomMessageStatusSerializer(serializers.Serializer):
@@ -109,6 +109,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
     last_interaction = serializers.DateTimeField(read_only=True)
     can_edit_custom_fields = serializers.SerializerMethodField()
     is_active = serializers.BooleanField(default=True)
+    is_pinned = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -130,6 +131,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
             "service_chat",
             "is_active",
             "config",
+            "is_pinned",
         ]
 
     def get_user(self, room: Room):
@@ -171,6 +173,14 @@ class ListRoomSerializer(serializers.ModelSerializer):
         )
 
         return MessageSerializer(last_message).data
+
+    def get_is_pinned(self, room: Room) -> bool:
+        request = self.context.get("request")
+
+        if not request:
+            return False
+
+        return RoomPin.objects.filter(room=room, user=request.user).exists()
 
 
 class TransferRoomSerializer(serializers.ModelSerializer):
