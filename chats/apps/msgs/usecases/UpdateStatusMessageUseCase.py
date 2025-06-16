@@ -36,6 +36,9 @@ class UpdateStatusMessageUseCase:
             reply_index = ChatMessageReplyIndex.objects.get(external_id=message_id)
             message = reply_index.message
 
+            if not message.room or not message.room.project:
+                return
+
             project_uuid = str(message.room.project.uuid)
             if project_uuid not in settings.MESSAGE_STATUS_UPDATE_ENABLED_PROJECTS:
                 return
