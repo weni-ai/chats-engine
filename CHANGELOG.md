@@ -1,3 +1,9 @@
+# 3.21.0
+## Add
+  - Adding pin chats feature
+## Fix
+  - Allow admins to view full rooms history
+
 # 3.20.5
 ## Add
   - New method for calculating the response time of closed rooms
