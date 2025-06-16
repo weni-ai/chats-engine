@@ -1,6 +1,8 @@
 import logging
 from typing import TYPE_CHECKING
+
 from django.conf import settings
+
 from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.queues.tasks import route_queue_rooms
@@ -80,3 +82,23 @@ def create_room_assigned_from_queue_feedback(room: "Room", user: "User"):
     create_room_feedback_message(
         room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
     )
+
+
+def get_room_count_by_status(queryset, room_status):
+    if room_status == "ongoing":
+        return queryset.filter(user__isnull=False, is_waiting=False).count()
+    elif room_status == "waiting":
+        return queryset.filter(user__isnull=True, is_waiting=False).count()
+    elif room_status == "flow_start":
+        return queryset.filter(is_waiting=True).count()
+    return queryset.count()
+
+
+def apply_room_status_filter(queryset, room_status):
+    if room_status == "ongoing":
+        return queryset.filter(user__isnull=False, is_waiting=False)
+    elif room_status == "waiting":
+        return queryset.filter(user__isnull=True, is_waiting=False)
+    elif room_status == "flow_start":
+        return queryset.filter(is_waiting=True)
+    return queryset
