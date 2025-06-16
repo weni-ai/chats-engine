@@ -36,6 +36,9 @@ class UpdateStatusMessageUseCase:
             reply_index = ChatMessageReplyIndex.objects.get(external_id=message_id)
             message = reply_index.message
 
+            if message.status == "read":
+                return
+
             if not message.room or not message.room.project:
                 return
 
