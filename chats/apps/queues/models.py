@@ -1,3 +1,4 @@
+import random
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
@@ -113,6 +114,33 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
             return online_agents.order_by("active_and_day_closed_rooms")
 
         return online_agents.order_by("active_rooms_count")
+
+    def get_available_agent(self):
+        """
+        Get an available agent for a queue, based on the number of active rooms.
+
+        If the active rooms count is the same for different agents,
+        a random agent, among the ones with the rooms count, is returned.
+        """
+        agents = list(self.available_agents)
+
+        if not agents:
+            return None
+
+        routing_option = self.sector.project.routing_option
+        field_name = (
+            "active_and_day_closed_rooms"
+            if routing_option == "general"
+            else "active_rooms_count"
+        )
+
+        min_rooms_count = min(getattr(agent, field_name) for agent in agents)
+
+        eligible_agents = [
+            agent for agent in agents if getattr(agent, field_name) == min_rooms_count
+        ]
+
+        return random.choice(eligible_agents)
 
     def is_agent(self, user):
         return self.authorizations.filter(permission__user=user).exists()

@@ -38,6 +38,7 @@ class RoomSerializer(serializers.ModelSerializer):
     last_interaction = serializers.DateTimeField(read_only=True)
     can_edit_custom_fields = serializers.SerializerMethodField()
     config = serializers.JSONField(required=False, read_only=True)
+    imported_history_url = serializers.CharField(read_only=True, default="")
 
     class Meta:
         model = Room
@@ -51,6 +52,7 @@ class RoomSerializer(serializers.ModelSerializer):
             "is_24h_valid",
             "last_interaction",
             "can_edit_custom_fields",
+            "imported_history_url",
         ]
 
     def get_is_24h_valid(self, room: Room) -> bool:
@@ -109,6 +111,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
     last_interaction = serializers.DateTimeField(read_only=True)
     can_edit_custom_fields = serializers.SerializerMethodField()
     is_active = serializers.BooleanField(default=True)
+    imported_history_url = serializers.CharField(read_only=True, default="")
 
     class Meta:
         model = Room
@@ -130,6 +133,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
             "service_chat",
             "is_active",
             "config",
+            "imported_history_url",
         ]
 
     def get_user(self, room: Room):
@@ -190,6 +194,7 @@ class TransferRoomSerializer(serializers.ModelSerializer):
     contact = ContactRelationsSerializer(many=False, required=False, read_only=True)
     tags = DetailSectorTagSerializer(many=True, required=False, read_only=True)
     linked_user = serializers.SerializerMethodField()
+    imported_history_url = serializers.CharField(read_only=True, default="")
 
     class Meta:
         model = Room
@@ -207,6 +212,7 @@ class TransferRoomSerializer(serializers.ModelSerializer):
             "ended_by",
             "urn",
             "linked_user",
+            "imported_history_url",
         ]
 
         extra_kwargs = {
@@ -294,6 +300,7 @@ class RoomsReportFiltersSerializer(serializers.Serializer):
 
     created_on__gte = serializers.DateTimeField(required=True)
     created_on__lte = serializers.DateTimeField(required=False)
+    tags = serializers.ListField(required=False, child=serializers.UUIDField())
 
     def validate(self, attrs):
         created_on__gte = attrs.get("created_on__gte")
@@ -312,6 +319,9 @@ class RoomsReportFiltersSerializer(serializers.Serializer):
 
         if period > 90:
             raise serializers.ValidationError("Period must be less than 90 days")
+
+        if tags := attrs.pop("tags", None):
+            attrs["tags__in"] = tags
 
         return super().validate(attrs)
 

@@ -634,6 +634,28 @@ class RoomsBulkTransferTestCase(APITestCase):
             new_queue.uuid,
         )
 
+    def test_cannot_transfer_rooms_from_another_project(self):
+        p = Project.objects.create(
+            name="Another Project",
+        )
+        self.sector.project = p
+        self.sector.save()
+
+        response = self.client.patch(
+            reverse("room-bulk_transfer"),
+            data={
+                "rooms_list": [self.room.uuid],
+            },
+            format="json",
+            QUERY_STRING=f"user_email={self.agent_2.email}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["error"],
+            f"User {self.agent_2.email} has no permission on the project {p.name} <{p.uuid}>",
+        )
+
 
 class CloseRoomTestCase(APITestCase):
     def setUp(self):
@@ -771,6 +793,44 @@ class RoomsReportTestCase(APITestCase):
         response = self.generate_report({})
 
         self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+
+    def test_cannot_generate_report_when_tags_filter_is_not_a_list(self):
+        self.client.credentials(
+            HTTP_AUTHORIZATION="Bearer " + str(self.project.external_token.uuid)
+        )
+
+        body = {
+            "recipient_email": "test@example.com",
+            "filters": {
+                "created_on__gte": "2021-01-01",
+                "created_on__lte": "2021-01-01",
+                "tags": "invalid-tags-filter",
+            },
+        }
+
+        response = self.generate_report(body)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["filters"]["tags"][0].code, "not_a_list")
+
+    def test_cannot_generate_report_with_invalid_tag_in_tags_list(self):
+        self.client.credentials(
+            HTTP_AUTHORIZATION="Bearer " + str(self.project.external_token.uuid)
+        )
+
+        body = {
+            "recipient_email": "test@example.com",
+            "filters": {
+                "created_on__gte": "2021-01-01",
+                "created_on__lte": "2021-01-01",
+                "tags": ["invalid-tag"],
+            },
+        }
+
+        response = self.generate_report(body)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["filters"]["tags"][0][0].code, "invalid")
 
     @patch("chats.apps.api.v1.rooms.viewsets.generate_rooms_report")
     def test_generate_report(self, mock_generate_rooms_report):

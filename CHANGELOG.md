@@ -1,3 +1,36 @@
+# 3.20.5
+## Add
+  - New method for calculating the response time of closed rooms
+  - Getting the room correctly in contact optimized serializer
+
+# 3.20.4
+## Add
+  - Adding imported history url field in contact model and rooms serializers.
+
+# 3.20.3
+## Fix
+  - Remove generic errors from discussions, project permissions and bulk transfer endpoints
+## Add
+  - Tests for project and project permissions internal viewsets and increase the test coverage
+    for bulk transfer
+
+# 3.20.2
+## Add
+  - Direct call to the Flows' API to create ticketers, instead of calling Connect's
+
+# 3.20.1
+## Add
+  - Index to external_id in contacts table
+
+# 3.20.0
+## Add
+  - Method to randomize available agents ordering for repeated active rooms count
+  - Tags field and filter to rooms report
+
+## Fix
+  - Exiting the retry loop when flows returns true
+  - Optimizations using selected/prefetch related
+
 # 3.19.5
 ## Add:
   - Chats history optimizations.
