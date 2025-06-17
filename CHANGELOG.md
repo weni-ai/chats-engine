@@ -1,3 +1,7 @@
+# 3.21.4
+## Add
+  - Add missing PermissionDenied import from rooms viewset
+
 # 3.21.3
 ## Remove
   - User role permission checking to pick rooms with queue priority routing
