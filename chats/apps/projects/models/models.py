@@ -544,7 +544,7 @@ class ContactGroupFlowReference(BaseModel):
         return self.flow_start.project
 
 
-class CustomStatusType(BaseModel):
+class CustomStatusType(BaseModel, BaseConfigurableModel):
     name = models.CharField(max_length=255)
     project = models.ForeignKey(
         Project, on_delete=models.CASCADE, related_name="custom_statuses"
@@ -560,7 +560,11 @@ class CustomStatusType(BaseModel):
             with transaction.atomic():
                 existing_count = (
                     CustomStatusType.objects.select_for_update()
-                    .filter(project=self.project, is_deleted=False)
+                    .filter(
+                        project=self.project,
+                        is_deleted=False,
+                        config__created_by_system__isnull=True,
+                    )
                     .count()
                 )
                 if existing_count > 10:
@@ -624,10 +628,9 @@ class CustomStatus(BaseModel):
 
         try:
             with transaction.atomic():
-                if self.is_active and self.user:
-                    CustomStatus.objects.filter(
-                        user=self.user, project=self.project, is_active=True
-                    ).exclude(pk=self.pk).update(is_active=False)
+                CustomStatus.objects.select_for_update().filter(
+                    user=self.user, project=self.project, is_active=True
+                ).update(is_active=False)
 
                 super().save(*args, **kwargs)
         except IntegrityError as error:

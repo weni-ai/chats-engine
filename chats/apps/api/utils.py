@@ -1,6 +1,9 @@
+import logging
 import uuid
 from typing import List
 
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from rest_framework.authtoken.models import Token
 
 from chats.apps.accounts.models import User
@@ -8,6 +11,8 @@ from chats.apps.api.v1.dashboard.dto import RoomData
 from chats.apps.api.v1.dashboard.serializers import DashboardRoomSerializer
 from chats.apps.contacts.models import Contact
 from chats.apps.msgs.models import ChatMessageReplyIndex, Message
+
+logger = logging.getLogger(__name__)
 
 
 def create_user_and_token(nickname: str = "fake"):
@@ -69,3 +74,33 @@ def create_reply_index(message: Message):
             external_id=message.external_id,
             message=message,
         )
+
+
+def calculate_in_service_time(custom_status_list):
+    total = 0
+    current_tz = timezone.get_current_timezone()
+    now = timezone.now()
+
+    logger.debug(f"Calculating in-service time at {now}")
+
+    for status in custom_status_list or []:
+        if status["status_type"] == "In-Service":
+            if status["is_active"]:
+                created_on = status.get("created_on")
+                if created_on:
+                    created_on_dt = parse_datetime(created_on)
+                    if created_on_dt:
+                        created_on_dt = ensure_timezone(created_on_dt, current_tz)
+                        now_tz = ensure_timezone(now, current_tz)
+                        period = int((now_tz - created_on_dt).total_seconds())
+                        logger.debug(
+                            f"Active period: {period} seconds (from {created_on_dt} to {now_tz})"
+                        )
+                        total += period
+            else:
+                break_time = status.get("break_time", 0)
+                logger.debug(f"Break time: {break_time} seconds")
+                total += break_time
+
+    logger.debug(f"Total in-service time: {total} seconds")
+    return total
