@@ -628,9 +628,10 @@ class CustomStatus(BaseModel):
 
         try:
             with transaction.atomic():
-                CustomStatus.objects.select_for_update().filter(
-                    user=self.user, project=self.project, is_active=True
-                ).update(is_active=False)
+                if self.is_active and self.user:
+                    CustomStatus.objects.select_for_update().filter(
+                        user=self.user, project=self.project, is_active=True
+                    ).exclude(pk=self.pk).update(is_active=False)
 
                 super().save(*args, **kwargs)
         except IntegrityError as error:
