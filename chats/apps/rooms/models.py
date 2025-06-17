@@ -222,8 +222,6 @@ class Room(BaseModel, BaseConfigurableModel):
         # Atualizar o status dos agentes após salvar
         self._update_agent_service_status(is_new)
 
-        return super().save(*args, **kwargs)
-
     def get_permission(self, user):
         try:
             return self.queue.get_permission(user)
