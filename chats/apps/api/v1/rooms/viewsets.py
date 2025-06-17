@@ -20,7 +20,7 @@ from django.utils.timezone import make_aware
 from django.utils.translation import gettext_lazy as _
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.filters import OrderingFilter
 from rest_framework.request import Request
 from rest_framework.response import Response
