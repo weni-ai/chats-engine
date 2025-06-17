@@ -1,6 +1,14 @@
-# 3.21.1
+# 3.21.3
 ## Remove
   - User role permission checking to pick rooms with queue priority routing
+
+# 3.21.2
+## Fix
+  - Remove unnecessary message status checking when updating the status
+
+# 3.21.1
+## Fix
+  - Verify message_status before try to update message
 
 # 3.21.0
 ## Add
