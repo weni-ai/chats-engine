@@ -76,7 +76,7 @@ def create_reply_index(message: Message):
         )
 
 
-def calculate_in_service_time(custom_status_list):
+def calculate_in_service_time(custom_status_list, user_status=None):
     total = 0
     current_tz = timezone.get_current_timezone()
     now = timezone.now()
@@ -85,7 +85,7 @@ def calculate_in_service_time(custom_status_list):
 
     for status in custom_status_list or []:
         if status["status_type"] == "In-Service":
-            if status["is_active"]:
+            if status["is_active"] and user_status != "OFFLINE":
                 created_on = status.get("created_on")
                 if created_on:
                     created_on_dt = parse_datetime(created_on)

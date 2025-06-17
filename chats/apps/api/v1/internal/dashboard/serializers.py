@@ -109,4 +109,7 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
         return result
 
     def get_in_service_time(self, obj):
-        return calculate_in_service_time(obj.get("custom_status"))
+        return calculate_in_service_time(
+            obj.get("custom_status"),
+            user_status=obj.get("status")
+        )
