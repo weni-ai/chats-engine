@@ -77,49 +77,26 @@ def create_reply_index(message: Message):
 
 
 def calculate_in_service_time(custom_status_list):
-    """
-    Calculate total in-service time from a list of status changes.
-    Accumulates all in-service periods and break times.
-    """
-    if not custom_status_list:
-        return 0
-
     total = 0
     current_tz = timezone.get_current_timezone()
     now = timezone.now()
 
     logger.debug(f"Calculating in-service time at {now}")
 
-    # Sort statuses by created_on to ensure chronological processing
-    valid_statuses = [s for s in custom_status_list if s.get("created_on")]
-    if not valid_statuses:
-        logger.warning("No valid status entries found with created_on timestamps")
-        return 0
-
-    sorted_statuses = sorted(
-        valid_statuses,
-        key=lambda x: parse_datetime(x["created_on"]) or timezone.now(),
-        reverse=True
-    )
-
-    # Process all statuses
-    for status in sorted_statuses:
+    for status in custom_status_list or []:
         if status["status_type"] == "In-Service":
             if status["is_active"]:
                 created_on = status.get("created_on")
                 if created_on:
-                    try:
-                        created_on_dt = parse_datetime(created_on)
-                        if created_on_dt:
-                            created_on_dt = ensure_timezone(created_on_dt, current_tz)
-                            now_tz = ensure_timezone(now, current_tz)
-                            period = int((now_tz - created_on_dt).total_seconds())
-                            logger.debug(
-                                f"Active period: {period} seconds (from {created_on_dt} to {now_tz})"
-                            )
-                            total += period
-                    except (ValueError, TypeError) as e:
-                        logger.error(f"Error parsing created_on timestamp: {e}")
+                    created_on_dt = parse_datetime(created_on)
+                    if created_on_dt:
+                        created_on_dt = ensure_timezone(created_on_dt, current_tz)
+                        now_tz = ensure_timezone(now, current_tz)
+                        period = int((now_tz - created_on_dt).total_seconds())
+                        logger.debug(
+                            f"Active period: {period} seconds (from {created_on_dt} to {now_tz})"
+                        )
+                        total += period
             else:
                 break_time = status.get("break_time", 0)
                 logger.debug(f"Break time: {break_time} seconds")
