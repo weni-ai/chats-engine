@@ -1,3 +1,7 @@
+# 3.21.1
+## Remove
+  - User role permission checking to pick rooms with queue priority routing
+
 # 3.21.0
 ## Add
   - Adding pin chats feature
