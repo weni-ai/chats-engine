@@ -139,8 +139,6 @@ class Room(BaseModel, BaseConfigurableModel):
         Args:
             is_new: Boolean indicando se é uma sala nova
         """
-        logger.info(f"🔍 DEBUG: _update_agent_service_status chamado, is_new={is_new}")
-        
         # Obter valores relevantes
         old_user = self._original_user
         new_user = self.user
@@ -153,21 +151,7 @@ class Room(BaseModel, BaseConfigurableModel):
                 project = sector.project
 
         if not project:
-            logger.info(f"🔍 DEBUG: Não encontrou projeto, retornando")
             return  # Se não encontrar projeto, não faz nada
-
-        # Caso prioritário: Sala fechada
-        if (
-            hasattr(self, "__original_is_active")
-            and self.__original_is_active is True
-            and self.is_active is False
-        ):
-            logger.info(f"🔍 DEBUG: Sala foi fechada, chamando room_closed para user={old_user}")
-            if old_user:
-                InServiceStatusService.room_closed(old_user, project)
-            return
-
-        # Casos de atribuição de sala
 
         # Caso 1: Sala nova com usuário atribuído
         if is_new and new_user:
@@ -189,7 +173,7 @@ class Room(BaseModel, BaseConfigurableModel):
         if old_user is not None and new_user is None:
             InServiceStatusService.room_closed(old_user, project)
             return
-        
+
     class Meta:
         verbose_name = _("Room")
         verbose_name_plural = _("Rooms")
@@ -218,10 +202,10 @@ class Room(BaseModel, BaseConfigurableModel):
 
         # Capturar o estado anterior para comparação
         is_new = self._state.adding
-
+        
         # Salvar o objeto primeiro
         super().save(*args, **kwargs)
-
+        
         # Atualizar o status dos agentes após salvar
         self._update_agent_service_status(is_new)
 
@@ -295,7 +279,11 @@ class Room(BaseModel, BaseConfigurableModel):
 
     def close(self, tags: list = [], end_by: str = ""):
         """Fecha uma sala e atualiza o status do agente"""
-        # Aplicar as mudanças ao objeto
+        from chats.apps.projects.usecases.status_service import InServiceStatusService
+        
+        print(f"🔍 DEBUG close(): user={self.user}, is_active={self.is_active}")
+        
+        # Aplicar as mudanças ao objeto PRIMEIRO
         self.is_active = False
         self.ended_at = timezone.now()
         self.ended_by = end_by
@@ -304,11 +292,27 @@ class Room(BaseModel, BaseConfigurableModel):
             self.tags.add(*tags)
 
         self.clear_pins()
-
-        # O save() irá automaticamente chamar _update_agent_service_status()
-        # que detectará a mudança de is_active=True para False e chamará
-        # InServiceStatusService.room_closed() se necessário
+        
+        # Salvar a sala como inativa
         self.save()
+        
+        # AGORA chamar room_closed, quando a sala já está inativa no banco
+        if self.user:
+            project = None
+            if self.queue and hasattr(self.queue, "sector"):
+                sector = self.queue.sector
+                if sector and hasattr(sector, "project"):
+                    project = sector.project
+            
+            print(f"🔍 DEBUG close(): project={project}")
+            
+            if project:
+                print(f"🔍 DEBUG close(): Chamando InServiceStatusService.room_closed")
+                InServiceStatusService.room_closed(self.user, project)
+            else:
+                print(f"🔍 DEBUG close(): project é None, não chama room_closed")
+        else:
+            print(f"🔍 DEBUG close(): user é None, não chama room_closed")
 
     def request_callback(self, room_data: dict):
         if self.callback_url is None:

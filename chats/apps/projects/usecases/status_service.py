@@ -113,10 +113,10 @@ class InServiceStatusService:
         from chats.apps.projects.models.models import CustomStatus
         from chats.apps.rooms.models import Room
 
-        logger.info(f" DEBUG: room_closed chamado para user={user}, project={project}")
-
+        print(f"🔍 DEBUG room_closed: INÍCIO - user={user}, project={project}")
+        
         if not user or not project:
-            logger.info(f" DEBUG: room_closed retornando porque user ou project é None")
+            print(f"🔍 DEBUG room_closed: user ou project é None, retornando")
             return
 
         status_type = cls.get_or_create_status_type(project)
@@ -127,7 +127,7 @@ class InServiceStatusService:
             .count()
         )
         
-        logger.info(f"DEBUG: room_count após fechar sala = {room_count}")
+        print(f"🔍 DEBUG room_closed: room_count = {room_count}")
 
         if room_count == 0:
             status = (
@@ -139,7 +139,7 @@ class InServiceStatusService:
             )
 
             if status:
-                logger.info(f" DEBUG: Finalizando In-Service status")
+                print(f"🔍 DEBUG room_closed: Encontrou In-Service ativo, finalizando...")
                 project_tz = project.timezone
                 end_time = timezone.now().astimezone(project_tz)
                 created_on = status.created_on.astimezone(project_tz)
@@ -147,11 +147,11 @@ class InServiceStatusService:
                 status.is_active = False
                 status.break_time = int(service_duration.total_seconds())
                 status.save(update_fields=["is_active", "break_time"])
-                logger.info(f" DEBUG: In-Service finalizado com break_time = {status.break_time} seconds")
+                print(f"🔍 DEBUG room_closed: In-Service finalizado com sucesso")
             else:
-                logger.info(f"DEBUG: Não encontrou In-Service ativo para finalizar")
+                print(f"🔍 DEBUG room_closed: Não encontrou In-Service ativo")
         else:
-            logger.info(f"DEBUG: Ainda tem {room_count} salas ativas, não finaliza In-Service")
+            print(f"🔍 DEBUG room_closed: Ainda tem {room_count} salas ativas")
 
     @classmethod
     @transaction.atomic
