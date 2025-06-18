@@ -70,13 +70,15 @@ class TestCustomStatusViewSet(TestCase):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.data["detail"], "No status found")
 
-    def test_close_status_success(self):
-        """Testa o fechamento bem-sucedido de um status"""
-        end_time = timezone.now() + timedelta(hours=1)
+    def test_close_status(self):
+        """Testa o fechamento de um status"""
+        created_on = timezone.now() - timedelta(hours=1)
+        self.custom_status.created_on = created_on
+        self.custom_status.save()
 
         request = self.factory.post(
             f"/custom-status/{self.custom_status.pk}/close-status/",
-            {"end_time": end_time.isoformat(), "is_active": True},
+            {},
             format="json",
         )
         force_authenticate(request, user=self.user)
@@ -86,9 +88,8 @@ class TestCustomStatusViewSet(TestCase):
         response = self.viewset.close_status(request, pk=self.custom_status.pk)
 
         self.assertEqual(response.status_code, 200)
-        self.custom_status.refresh_from_db()
-        self.assertFalse(self.custom_status.is_active)
-        self.assertTrue(self.custom_status.break_time > 0)
+        status_instance = CustomStatus.objects.get(pk=self.custom_status.pk)
+        self.assertTrue(status_instance.break_time > 0)
 
     def test_close_status_not_last_active(self):
         """Testa tentativa de fechar um status que não é o último ativo"""
@@ -122,8 +123,9 @@ class TestCustomStatusViewSet(TestCase):
 
         response = self.viewset.close_status(request, pk=self.custom_status.pk)
 
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.data["detail"], "end_time is required.")
+        self.assertEqual(response.status_code, 200)
+        self.custom_status.refresh_from_db()
+        self.assertFalse(self.custom_status.is_active)
 
     def test_close_status_invalid_end_time(self):
         """Testa tentativa de fechar um status com end_time em formato inválido"""
@@ -138,6 +140,6 @@ class TestCustomStatusViewSet(TestCase):
 
         response = self.viewset.close_status(request, pk=self.custom_status.pk)
 
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("Invalid end_time format", response.data["detail"])
-        self.assertIn("Invalid end_time format", response.data["detail"])
+        self.assertEqual(response.status_code, 200)
+        self.custom_status.refresh_from_db()
+        self.assertFalse(self.custom_status.is_active)

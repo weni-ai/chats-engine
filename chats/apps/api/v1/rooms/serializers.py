@@ -140,8 +140,8 @@ class ListRoomSerializer(serializers.ModelSerializer):
             "service_chat",
             "is_active",
             "config",
-            "is_pinned",
             "imported_history_url",
+            "is_pinned",
         ]
 
     def get_user(self, room: Room):

@@ -1,6 +1,8 @@
 from chats.apps.api.utils import calculate_in_service_time
 from rest_framework import serializers
 
+from chats.apps.api.utils import calculate_in_service_time
+
 
 class DashboardAgentsSerializer(serializers.Serializer):
     link = serializers.SerializerMethodField()
@@ -20,7 +22,6 @@ class DashboardAgentsSerializer(serializers.Serializer):
 
         if custom_status_list:
             for status_item in custom_status_list:
-                print(f"DEBUG - Custom status item: {status_item}")
                 status_type = status_item.get("status_type")
                 break_time = status_item.get("break_time", 0)
                 is_active = status_item.get("is_active", False)
@@ -46,7 +47,8 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
     closed = serializers.IntegerField(allow_null=True, required=False)
     status = serializers.SerializerMethodField()
     custom_status = serializers.SerializerMethodField()
-    
+    in_service_time = serializers.SerializerMethodField()
+
     def get_link(self, obj):
         return {
             "url": f"chats:dashboard/view-mode/{obj.get('email', '')}",
@@ -58,7 +60,6 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
 
         if custom_status_list:
             for status_item in custom_status_list:
-                print(f"DEBUG - Custom status item: {status_item}")
                 status_type = status_item.get("status_type")
                 break_time = status_item.get("break_time", 0)
                 is_active = status_item.get("is_active", False)
@@ -78,19 +79,10 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
 
     def get_custom_status(self, obj):
         custom_status_list = obj.get("custom_status") or []
-        
-        # DEBUG: Ver EXATAMENTE quais registros chegaram
-        in_service_records = [s for s in custom_status_list if s.get("status_type") == "In-Service"]
-        
-        print(f"=== DEBUG {obj.get('email')} ===")
-        print(f"Total registros In-Service recebidos: {len(in_service_records)}")
-        for i, record in enumerate(in_service_records):
-            print(f"  {i+1}. break_time: {record.get('break_time')}, is_active: {record.get('is_active')}")
-        
-        in_service_time = calculate_in_service_time(custom_status_list)
-        print(f"Tempo calculado: {in_service_time} segundos = {in_service_time/60:.1f} minutos")
-        print("=== FIM DEBUG ===")
-        
+        user_status = obj.get("status")
+
+        in_service_time = calculate_in_service_time(custom_status_list, user_status)
+
         project = self.context.get("project")
         all_status_types = project.custom_statuses.filter(is_deleted=False).values_list(
             "name", flat=True
@@ -118,3 +110,8 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
         ]
 
         return result
+
+    def get_in_service_time(self, obj):
+        return calculate_in_service_time(
+            obj.get("custom_status"), user_status=obj.get("status")
+        )

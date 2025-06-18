@@ -1,10 +1,10 @@
 import json
-from datetime import datetime
 
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import transaction
 from django.db.models import CharField, Value
 from django.db.models.functions import Concat
+from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
@@ -16,7 +16,6 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 from django.utils import timezone
 
-from chats.apps.api.utils import ensure_timezone
 from chats.apps.api.v1.internal.projects.serializers import (
     CheckAccessReadSerializer,
     ProjectPermissionReadSerializer,
@@ -51,11 +50,15 @@ from chats.apps.projects.models import (
     ProjectPermission,
 )
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
+from chats.apps.projects.usecases.status_service import InServiceStatusService
 from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import create_room_feedback_message
 from chats.apps.sectors.models import Sector
 from chats.apps.projects.usecases.status_service import InServiceStatusService
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ProjectViewset(
@@ -603,7 +606,7 @@ class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
 
 
 class CustomStatusTypeViewSet(viewsets.ModelViewSet):
-    queryset = CustomStatusType.objects.all() 
+    queryset = CustomStatusType.objects.all()
     serializer_class = CustomStatusTypeSerializer
     permission_classes = [
         IsAuthenticated,
@@ -613,10 +616,9 @@ class CustomStatusTypeViewSet(viewsets.ModelViewSet):
     filterset_class = CustomStatusTypeFilterSet
 
     def get_queryset(self):
-            return CustomStatusType.objects.filter(
-                is_deleted=False,
-                config__created_by_system__isnull=True
-            )
+        return CustomStatusType.objects.filter(
+            is_deleted=False, config__created_by_system__isnull=True
+        )
 
     def perform_create(self, serializer):
         return serializer.save()
@@ -685,27 +687,28 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                 raise serializers.ValidationError(
                     {"status": "Can't update user status in project."}
                 )
-            
+
             in_service_type = InServiceStatusService.get_or_create_status_type(project)
             in_service_status = CustomStatus.objects.filter(
-                user=user,
-                status_type=in_service_type,
-                is_active=True,
-                project=project
+                user=user, status_type=in_service_type, is_active=True, project=project
             ).first()
-            
+
             if in_service_status:
                 service_duration = timezone.now() - in_service_status.created_on
                 in_service_status.is_active = False
                 in_service_status.break_time = int(service_duration.total_seconds())
-                in_service_status.save(update_fields=['is_active', 'break_time'])
-                
+                in_service_status.save(update_fields=["is_active", "break_time"])
+
             serializer.save(user=user)
 
     @decorators.action(detail=False, methods=["get"])
     def last_status(self, request):
         last_status = (
-            CustomStatus.objects.filter(user=request.user, is_active=True, status_type__config__created_by_system__isnull=True)
+            CustomStatus.objects.filter(
+                user=request.user,
+                is_active=True,
+                status_type__config__created_by_system__isnull=True,
+            )
             .order_by("-created_on")
             .first()
         )
@@ -715,8 +718,11 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def close_status(self, request, pk=None):
+        print("🔍 DEBUG: close_status foi chamado!")
+
         try:
             instance = CustomStatus.objects.get(pk=pk)
+            print(f"🔍 DEBUG: close_status chamado para {instance.user}")
 
             last_active_status = (
                 CustomStatus.objects.filter(
@@ -753,7 +759,7 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                 project_tz = instance.status_type.project.timezone
                 local_created_on = instance.created_on.astimezone(project_tz)
                 local_end_time = end_time.astimezone(project_tz)
-                
+
                 break_time = int((local_end_time - local_created_on).total_seconds())
 
                 instance.break_time = break_time
@@ -764,17 +770,39 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                 room_count = Room.objects.filter(
                     user=instance.user,
                     queue__sector__project=instance.status_type.project,
-                    is_active=True
+                    is_active=True,
                 ).count()
 
                 # Verificar se tem status de prioridade
                 has_other_priority = InServiceStatusService.has_priority_status(
-                    instance.user, 
-                    instance.status_type.project
+                    instance.user, instance.status_type.project
                 )
 
-                # Se tem salas ativas e não tem outros status prioritários, recriar In-Service
-                if room_count > 0 and not has_other_priority:
+                print(f"🔍 DEBUG: room_count = {room_count}")
+                print(f"🔍 DEBUG: has_other_priority = {has_other_priority}")
+                print(
+                    f"🔍 DEBUG: Condição seria: {room_count > 0 and not has_other_priority}"
+                )
+
+                # Verificar se o usuário está ONLINE
+                user_status = ProjectPermission.objects.get(
+                    user=instance.user, project=instance.status_type.project
+                ).status
+
+                print(f"🔍 DEBUG: user_status = {user_status}")
+
+                # Se tem salas ativas, não tem outros status prioritários E está ONLINE, recriar In-Service
+                if (
+                    room_count > 0
+                    and not has_other_priority
+                    and user_status == "ONLINE"
+                ):
+                    print(f"🔍 DEBUG: Recriando In-Service!")
+                    print(f"🔍 DEBUG: Recriando In-Service para {instance.user}")
+                    print(f"🔍 DEBUG: room_count = {room_count}")
+                    print(f"🔍 DEBUG: has_other_priority = {has_other_priority}")
+                    print(f"🔍 DEBUG: project = {instance.status_type.project.name}")
+
                     in_service_type = InServiceStatusService.get_or_create_status_type(
                         instance.status_type.project
                     )
@@ -784,7 +812,7 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                         is_active=True,
                         project=instance.status_type.project,
                         break_time=0,
-                        created_on=end_time
+                        created_on=end_time,
                     )
 
                 return Response(

@@ -29,6 +29,8 @@ from chats.utils.websockets import send_channels_group
 from chats.core.models import BaseConfigurableModel
 from chats.apps.projects.usecases.status_service import InServiceStatusService
 
+from chats.apps.projects.usecases.status_service import InServiceStatusService
+
 if TYPE_CHECKING:
     from chats.apps.projects.models.models import Project
     from chats.apps.queues.models import Queue
@@ -132,6 +134,60 @@ class Room(BaseModel, BaseConfigurableModel):
             "Billing notified for room %s. Setting is_billing_notified to True",
             self.pk,
         )
+
+    def _update_agent_service_status(self, is_new):
+        """
+        Atualiza o status 'In-Service' dos agentes baseado nas mudanças na sala
+        Args:
+            is_new: Boolean indicando se é uma sala nova
+        """
+
+        # Obter valores relevantes
+        old_user = self._original_user
+        new_user = self.user
+
+        # Obter o projeto da sala
+        project = None
+        if self.queue and hasattr(self.queue, "sector"):
+            sector = self.queue.sector
+            if sector and hasattr(sector, "project"):
+                project = sector.project
+
+        if not project:
+            return  # Se não encontrar projeto, não faz nada
+
+        # Caso prioritário: Sala fechada
+        if (
+            hasattr(self, "__original_is_active")
+            and self.__original_is_active is True
+            and self.is_active is False
+        ):
+            if old_user:
+                InServiceStatusService.room_closed(old_user, project)
+            return
+
+        # Casos de atribuição de sala
+
+        # Caso 1: Sala nova com usuário atribuído
+        if is_new and new_user:
+            InServiceStatusService.room_assigned(new_user, project)
+            return
+
+        # Caso 2: Usuário adicionado a uma sala existente
+        if old_user is None and new_user is not None:
+            InServiceStatusService.room_assigned(new_user, project)
+            return
+
+        # Caso 3: Transferência entre agentes
+        if old_user is not None and new_user is not None and old_user != new_user:
+            InServiceStatusService.room_closed(old_user, project)
+            InServiceStatusService.room_assigned(new_user, project)
+            return
+
+        # Caso 4: Usuário removido da sala
+        if old_user is not None and new_user is None:
+            InServiceStatusService.room_closed(old_user, project)
+            return
 
     class Meta:
         verbose_name = _("Room")
@@ -276,7 +332,7 @@ class Room(BaseModel, BaseConfigurableModel):
         if not day_validation.exists():
             return self.created_on > timezone.now() - timedelta(days=1)
         return True
-    
+
     @property
     def imported_history_url(self):
         if self.contact and self.contact.imported_history_url:
@@ -299,10 +355,6 @@ class Room(BaseModel, BaseConfigurableModel):
 
     def close(self, tags: list = [], end_by: str = ""):
         """Fecha uma sala e atualiza o status do agente"""
-        # Salvar o usuário atual antes de modificar o objeto
-        user_before_close = self.user
-        is_active_before_close = self.is_active
-
         # Aplicar as mudanças ao objeto
         self.is_active = False
         self.ended_at = timezone.now()
@@ -313,20 +365,10 @@ class Room(BaseModel, BaseConfigurableModel):
 
         self.clear_pins()
 
+        # O save() irá automaticamente chamar _update_agent_service_status()
+        # que detectará a mudança de is_active=True para False e chamará
+        # InServiceStatusService.room_closed() se necessário
         self.save()
-
-        # Atualizar status somente se sala estava ativa e tinha um agente
-        if is_active_before_close and user_before_close:
-            # Obter o projeto da sala
-            project = None
-            if self.queue and hasattr(self.queue, "sector"):
-                sector = self.queue.sector
-                if sector and hasattr(sector, "project"):
-                    project = sector.project
-
-            if project:
-                # Atualizar status do agente - deve ser feito após o save
-                InServiceStatusService.room_closed(user_before_close, project)
 
     def request_callback(self, room_data: dict):
         if self.callback_url is None:
@@ -496,6 +538,12 @@ class Room(BaseModel, BaseConfigurableModel):
 
         return is_project_admin or is_sector_manager
 
+    @property
+    def imported_history_url(self):
+        if self.contact and self.contact.imported_history_url:
+            return self.contact.imported_history_url
+        return None
+
     def pin(self, user: User):
         """
         Pins a room for a user.
@@ -566,4 +614,3 @@ class RoomPin(BaseModel):
                 name="unique_room_user_room_pin",
             )
         ]
-

@@ -581,7 +581,11 @@ class CustomStatusType(BaseModel, BaseConfigurableModel):
             with transaction.atomic():
                 existing_count = (
                     CustomStatusType.objects.select_for_update()
-                    .filter(project=self.project, is_deleted=False, config__created_by_system__isnull=True)
+                    .filter(
+                        project=self.project,
+                        is_deleted=False,
+                        config__created_by_system__isnull=True,
+                    )
                     .count()
                 )
                 if existing_count > 10:
@@ -646,7 +650,7 @@ class CustomStatus(BaseModel):
         try:
             with transaction.atomic():
                 if self.is_active and self.user:
-                    CustomStatus.objects.filter(
+                    CustomStatus.objects.select_for_update().filter(
                         user=self.user, project=self.project, is_active=True
                     ).exclude(pk=self.pk).update(is_active=False)
 

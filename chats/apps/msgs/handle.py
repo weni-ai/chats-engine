@@ -1,6 +1,6 @@
 from amqp.channel import Channel
 
-from chats.apps.msgs.consumers import MsgConsumer, MessageStatusConsumer
+from chats.apps.msgs.consumers import MessageStatusConsumer, MsgConsumer
 
 
 def handle_consumers(channel: Channel) -> None:

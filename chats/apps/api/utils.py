@@ -1,3 +1,4 @@
+import logging
 import uuid
 from typing import List
 
@@ -12,7 +13,6 @@ from chats.apps.api.v1.dashboard.serializers import DashboardRoomSerializer
 from chats.apps.contacts.models import Contact
 from chats.apps.msgs.models import ChatMessageReplyIndex, Message
 
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -70,16 +70,24 @@ def ensure_timezone(dt, tz):
     return dt
 
 
-def calculate_in_service_time(custom_status_list):
+def create_reply_index(message: Message):
+    if message.external_id:
+        ChatMessageReplyIndex.objects.update_or_create(
+            external_id=message.external_id,
+            message=message,
+        )
+
+
+def calculate_in_service_time(custom_status_list, user_status=None):
     total = 0
     current_tz = timezone.get_current_timezone()
     now = timezone.now()
-    
+
     logger.debug(f"Calculating in-service time at {now}")
-    
+
     for status in custom_status_list or []:
         if status["status_type"] == "In-Service":
-            if status["is_active"]:
+            if status["is_active"] and user_status == "ONLINE":
                 created_on = status.get("created_on")
                 if created_on:
                     created_on_dt = parse_datetime(created_on)
@@ -87,20 +95,14 @@ def calculate_in_service_time(custom_status_list):
                         created_on_dt = ensure_timezone(created_on_dt, current_tz)
                         now_tz = ensure_timezone(now, current_tz)
                         period = int((now_tz - created_on_dt).total_seconds())
-                        logger.debug(f"Active period: {period} seconds (from {created_on_dt} to {now_tz})")
+                        logger.debug(
+                            f"Live active period: {period} seconds (from {created_on_dt} to {now_tz})"
+                        )
                         total += period
-            else:
+            elif not status["is_active"]:
                 break_time = status.get("break_time", 0)
-                logger.debug(f"Break time: {break_time} seconds")
+                logger.debug(f"Accumulated break time: {break_time} seconds")
                 total += break_time
-    
+
     logger.debug(f"Total in-service time: {total} seconds")
     return total
-
-
-def create_reply_index(message: Message):
-    if message.external_id:
-        ChatMessageReplyIndex.objects.update_or_create(
-            external_id=message.external_id,
-            message=message,
-        )

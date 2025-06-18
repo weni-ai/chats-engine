@@ -42,6 +42,11 @@ class Message(BaseModelWithManualCreatedOn):
     metadata = models.JSONField(
         _("message metadata"), blank=True, null=True, default=dict
     )
+    status = models.JSONField(
+        _("message status"),
+        blank=True,
+        null=True,
+    )
 
     status = models.JSONField(
         _("message status"),
