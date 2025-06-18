@@ -780,8 +780,16 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                 print(f"🔍 DEBUG: has_other_priority = {has_other_priority}")
                 print(f"🔍 DEBUG: Condição seria: {room_count > 0 and not has_other_priority}")
                 
-                # Se tem salas ativas e não tem outros status prioritários, recriar In-Service
-                if room_count > 0 and not has_other_priority:
+                # Verificar se o usuário está ONLINE
+                user_status = ProjectPermission.objects.get(
+                    user=instance.user, 
+                    project=instance.status_type.project
+                ).status
+
+                print(f"🔍 DEBUG: user_status = {user_status}")
+
+                # Se tem salas ativas, não tem outros status prioritários E está ONLINE, recriar In-Service
+                if room_count > 0 and not has_other_priority and user_status == "ONLINE":
                     print(f"🔍 DEBUG: Recriando In-Service!")
                     print(f"🔍 DEBUG: Recriando In-Service para {instance.user}")
                     print(f"🔍 DEBUG: room_count = {room_count}")
