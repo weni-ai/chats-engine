@@ -113,7 +113,10 @@ class InServiceStatusService:
         from chats.apps.projects.models.models import CustomStatus
         from chats.apps.rooms.models import Room
 
+        logger.info(f" DEBUG: room_closed chamado para user={user}, project={project}")
+
         if not user or not project:
+            logger.info(f" DEBUG: room_closed retornando porque user ou project é None")
             return
 
         status_type = cls.get_or_create_status_type(project)
@@ -123,6 +126,8 @@ class InServiceStatusService:
             .filter(user=user, queue__sector__project=project, is_active=True)
             .count()
         )
+        
+        logger.info(f"DEBUG: room_count após fechar sala = {room_count}")
 
         if room_count == 0:
             status = (
@@ -134,6 +139,7 @@ class InServiceStatusService:
             )
 
             if status:
+                logger.info(f" DEBUG: Finalizando In-Service status")
                 project_tz = project.timezone
                 end_time = timezone.now().astimezone(project_tz)
                 created_on = status.created_on.astimezone(project_tz)
@@ -141,7 +147,11 @@ class InServiceStatusService:
                 status.is_active = False
                 status.break_time = int(service_duration.total_seconds())
                 status.save(update_fields=["is_active", "break_time"])
-                logger.debug(f"Closed in-service status: {status.break_time} seconds")
+                logger.info(f" DEBUG: In-Service finalizado com break_time = {status.break_time} seconds")
+            else:
+                logger.info(f"DEBUG: Não encontrou In-Service ativo para finalizar")
+        else:
+            logger.info(f"DEBUG: Ainda tem {room_count} salas ativas, não finaliza In-Service")
 
     @classmethod
     @transaction.atomic

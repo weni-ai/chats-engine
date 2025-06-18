@@ -139,7 +139,8 @@ class Room(BaseModel, BaseConfigurableModel):
         Args:
             is_new: Boolean indicando se é uma sala nova
         """
-
+        logger.info(f"🔍 DEBUG: _update_agent_service_status chamado, is_new={is_new}")
+        
         # Obter valores relevantes
         old_user = self._original_user
         new_user = self.user
@@ -152,6 +153,7 @@ class Room(BaseModel, BaseConfigurableModel):
                 project = sector.project
 
         if not project:
+            logger.info(f"🔍 DEBUG: Não encontrou projeto, retornando")
             return  # Se não encontrar projeto, não faz nada
 
         # Caso prioritário: Sala fechada
@@ -160,6 +162,7 @@ class Room(BaseModel, BaseConfigurableModel):
             and self.__original_is_active is True
             and self.is_active is False
         ):
+            logger.info(f"🔍 DEBUG: Sala foi fechada, chamando room_closed para user={old_user}")
             if old_user:
                 InServiceStatusService.room_closed(old_user, project)
             return
