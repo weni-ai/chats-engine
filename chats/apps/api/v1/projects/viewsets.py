@@ -54,6 +54,9 @@ from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import create_room_feedback_message
 from chats.apps.sectors.models import Sector
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ProjectViewset(
@@ -772,6 +775,11 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
 
                 # Se tem salas ativas e não tem outros status prioritários, recriar In-Service
                 if room_count > 0 and not has_other_priority:
+                    logger.info(f"🔍 DEBUG: Recriando In-Service para {instance.user}")
+                    logger.info(f"🔍 DEBUG: room_count = {room_count}")
+                    logger.info(f"🔍 DEBUG: has_other_priority = {has_other_priority}")
+                    logger.info(f"🔍 DEBUG: project = {instance.status_type.project.name}")
+                    
                     in_service_type = InServiceStatusService.get_or_create_status_type(
                         instance.status_type.project
                     )
