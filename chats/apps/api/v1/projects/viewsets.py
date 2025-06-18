@@ -718,7 +718,9 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
     def close_status(self, request, pk=None):
         try:
             instance = CustomStatus.objects.get(pk=pk)
-
+            
+            logger.info(f"🔍 DEBUG: close_status chamado para {instance.user}")
+            
             last_active_status = (
                 CustomStatus.objects.filter(
                     user=instance.user,
@@ -767,14 +769,19 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                     queue__sector__project=instance.status_type.project,
                     is_active=True,
                 ).count()
-
+                
                 # Verificar se tem status de prioridade
                 has_other_priority = InServiceStatusService.has_priority_status(
                     instance.user, instance.status_type.project
                 )
-
+                
+                logger.info(f"🔍 DEBUG: room_count = {room_count}")
+                logger.info(f"🔍 DEBUG: has_other_priority = {has_other_priority}")
+                logger.info(f"🔍 DEBUG: Condição seria: {room_count > 0 and not has_other_priority}")
+                
                 # Se tem salas ativas e não tem outros status prioritários, recriar In-Service
                 if room_count > 0 and not has_other_priority:
+                    logger.info(f"🔍 DEBUG: Recriando In-Service!")
                     logger.info(f"🔍 DEBUG: Recriando In-Service para {instance.user}")
                     logger.info(f"🔍 DEBUG: room_count = {room_count}")
                     logger.info(f"🔍 DEBUG: has_other_priority = {has_other_priority}")
