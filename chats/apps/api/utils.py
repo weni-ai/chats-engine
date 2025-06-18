@@ -85,7 +85,7 @@ def calculate_in_service_time(custom_status_list, user_status=None):
 
     for status in custom_status_list or []:
         if status["status_type"] == "In-Service":
-            if status["is_active"] or user_status != "OFFLINE":
+            if status["is_active"] and user_status == "ONLINE":
                 created_on = status.get("created_on")
                 if created_on:
                     created_on_dt = parse_datetime(created_on)
@@ -94,12 +94,12 @@ def calculate_in_service_time(custom_status_list, user_status=None):
                         now_tz = ensure_timezone(now, current_tz)
                         period = int((now_tz - created_on_dt).total_seconds())
                         logger.debug(
-                            f"Active period: {period} seconds (from {created_on_dt} to {now_tz})"
+                            f"Live active period: {period} seconds (from {created_on_dt} to {now_tz})"
                         )
                         total += period
-            else:
+            elif not status["is_active"]:
                 break_time = status.get("break_time", 0)
-                logger.debug(f"Break time: {break_time} seconds")
+                logger.debug(f"Accumulated break time: {break_time} seconds")
                 total += break_time
 
     logger.debug(f"Total in-service time: {total} seconds")

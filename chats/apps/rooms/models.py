@@ -292,10 +292,6 @@ class Room(BaseModel, BaseConfigurableModel):
 
     def close(self, tags: list = [], end_by: str = ""):
         """Fecha uma sala e atualiza o status do agente"""
-        # Salvar o usuário atual antes de modificar o objeto
-        user_before_close = self.user
-        is_active_before_close = self.is_active
-
         # Aplicar as mudanças ao objeto
         self.is_active = False
         self.ended_at = timezone.now()
@@ -306,20 +302,10 @@ class Room(BaseModel, BaseConfigurableModel):
 
         self.clear_pins()
 
+        # O save() irá automaticamente chamar _update_agent_service_status()
+        # que detectará a mudança de is_active=True para False e chamará
+        # InServiceStatusService.room_closed() se necessário
         self.save()
-
-        # Atualizar status somente se sala estava ativa e tinha um agente
-        if is_active_before_close and user_before_close:
-            # Obter o projeto da sala
-            project = None
-            if self.queue and hasattr(self.queue, "sector"):
-                sector = self.queue.sector
-                if sector and hasattr(sector, "project"):
-                    project = sector.project
-
-            if project:
-                # Atualizar status do agente - deve ser feito após o save
-                InServiceStatusService.room_closed(user_before_close, project)
 
     def request_callback(self, room_data: dict):
         if self.callback_url is None:
