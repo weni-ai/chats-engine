@@ -77,8 +77,9 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
 
     def get_custom_status(self, obj):
         custom_status_list = obj.get("custom_status") or []
+        user_status = obj.get("status")
 
-        in_service_time = calculate_in_service_time(custom_status_list)
+        in_service_time = calculate_in_service_time(custom_status_list, user_status)
 
         project = self.context.get("project")
         all_status_types = project.custom_statuses.filter(is_deleted=False).values_list(
