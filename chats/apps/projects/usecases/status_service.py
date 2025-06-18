@@ -86,18 +86,22 @@ class InServiceStatusService:
             .first()
         )
 
-        if room_count >= 1:
-            if not in_service_status and not has_priority:
-                CustomStatus.objects.create(
-                    user=user,
-                    status_type=status_type,
-                    is_active=True,
-                    project=project,
-                    break_time=0,
-                )
-                logger.info(
-                    f"Status In-Service criado para usuário {user.pk} no projeto {project.pk}"
-                )
+        # Verificar se o usuário está ONLINE
+        from chats.apps.projects.models import ProjectPermission
+        user_status = ProjectPermission.objects.get(user=user, project=project).status
+
+        # Só criar In-Service se tem salas, não tem status ativo, não tem prioridade E está ONLINE
+        if room_count >= 1 and not in_service_status and not has_priority and user_status == "ONLINE":
+            CustomStatus.objects.create(
+                user=user,
+                status_type=status_type,
+                is_active=True,
+                project=project,
+                break_time=0,
+            )
+            logger.info(
+                f"Status In-Service criado para usuário {user.pk} no projeto {project.pk}"
+            )
 
     @classmethod
     @transaction.atomic
