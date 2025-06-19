@@ -16,6 +16,9 @@ from chats.apps.queues.utils import (
     start_queue_priority_routing_for_all_queues_in_project,
 )
 from chats.core.views import persist_keycloak_user_by_email
+from chats.apps.projects.usecases.status_service import InServiceStatusService
+from chats.apps.rooms.models import Room
+from chats.apps.projects.models import CustomStatus
 
 User = get_user_model()
 
@@ -115,6 +118,42 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
             if user_status.lower() == "online":
                 instance.status = ProjectPermission.STATUS_ONLINE
                 instance.save()
+                
+                # Verificar se deve recriar In-Service
+                # Verificar se tem salas ativas
+                room_count = Room.objects.filter(
+                    user=instance.user,
+                    queue__sector__project=instance.project,
+                    is_active=True,
+                ).count()
+                
+                # Verificar se tem status de prioridade
+                has_other_priority = InServiceStatusService.has_priority_status(
+                    instance.user, instance.project
+                )
+                
+                # Se tem salas e não tem outros status prioritários, criar In-Service
+                if room_count > 0 and not has_other_priority:
+                    in_service_type = InServiceStatusService.get_or_create_status_type(
+                        instance.project
+                    )
+                    
+                    # Verificar se já não existe um In-Service ativo
+                    existing_in_service = CustomStatus.objects.filter(
+                        user=instance.user,
+                        status_type=in_service_type,
+                        is_active=True,
+                        project=instance.project
+                    ).exists()
+                    
+                    if not existing_in_service:
+                        CustomStatus.objects.create(
+                            user=instance.user,
+                            status_type=in_service_type,
+                            is_active=True,
+                            project=instance.project,
+                            break_time=0,
+                        )
 
             elif user_status.lower() == "offline":
                 instance.status = ProjectPermission.STATUS_OFFLINE

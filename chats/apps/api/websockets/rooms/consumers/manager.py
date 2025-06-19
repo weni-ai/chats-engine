@@ -64,6 +64,21 @@ class ManagerAgentRoomConsumer(AgentRoomConsumer):
             except AssertionError:
                 pass
 
+        # Finalizar In-Service se necessário
+        await self.finalize_in_service_if_needed()
+
+    @database_sync_to_async
+    def finalize_in_service_if_needed(self):
+        from chats.apps.projects.usecases.status_service import InServiceStatusService
+        from chats.apps.projects.models.models import ProjectPermission
+
+        try:
+            permission = ProjectPermission.objects.get(user=self.user, project_id=self.project)
+            if permission.status == ProjectPermission.STATUS_ONLINE:
+                InServiceStatusService.room_closed(self.user, permission.project)
+        except ProjectPermission.DoesNotExist:
+            pass
+
     @database_sync_to_async
     def check_is_manager(self):
         return self.permission.is_manager(any_sector=True)
