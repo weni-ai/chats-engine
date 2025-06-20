@@ -77,7 +77,7 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
                 user_custom_status__is_active=True,
                 user_custom_status__project=self.sector.project,
             )
-            & ~models.Q(user_custom_status__status_type__name__exact="In-service")
+            & ~models.Q(user_custom_status__status_type__name__iexact="In-service")
         )  # TODO: Set this variable to ProjectPermission.STATUS_ONLINE
 
     @property
