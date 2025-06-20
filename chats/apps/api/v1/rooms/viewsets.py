@@ -55,7 +55,11 @@ from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.msgs.models import Message
 from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
-from chats.apps.queues.utils import start_queue_priority_routing
+from chats.apps.queues.utils import (
+    apply_room_status_filter,
+    get_room_count_by_status,
+    start_queue_priority_routing,
+)
 from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.exceptions import (
     MaxPinRoomLimitReachedError,
@@ -744,6 +748,23 @@ class RoomViewset(
             return Response({"detail": str(e)}, status=status.HTTP_403_FORBIDDEN)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        room_status = request.query_params.get("room_status")
+
+        queryset = apply_room_status_filter(queryset, room_status)
+        custom_count = get_room_count_by_status(queryset, room_status)
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            response = self.get_paginated_response(serializer.data)
+            response.data["count"] = custom_count
+            return response
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 class RoomsReportViewSet(APIView):
