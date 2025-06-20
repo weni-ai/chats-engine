@@ -8,7 +8,7 @@ from chats.apps.accounts.models import User
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.projects.models.models import CustomStatus
 
-from .dto import Filters
+from .dto import Filters, get_admin_domains_exclude_filter
 
 
 class AgentRepository:
@@ -76,7 +76,7 @@ class AgentRepository:
 
         agents_query = self.model
         if not filters.is_weni_admin:
-            agents_query = agents_query.exclude(email__endswith="weni.ai")
+            agents_query = agents_query.exclude(get_admin_domains_exclude_filter())
 
         if filters.agent:
             agents_query = agents_query.filter(email=filters.agent)
@@ -210,7 +210,7 @@ class AgentRepository:
         agents_query = self.model.all()
 
         if not filters.is_weni_admin:
-            agents_query = agents_query.exclude(email__endswith="weni.ai")
+            agents_query = agents_query.exclude(get_admin_domains_exclude_filter())
         if filters.agent:
             agents_query = agents_query.filter(email=filters.agent)
 

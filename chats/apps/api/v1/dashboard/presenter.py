@@ -8,6 +8,7 @@ from chats.apps.projects.models import ProjectPermission
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
+from .dto import EXCLUDED_DOMAINS
 
 
 def get_export_data(project, filter):
@@ -208,9 +209,15 @@ def get_agents_data(project, filter):
     else:
         rooms_filter["user__rooms__queue__sector__project"] = project
         closed_rooms["user__rooms__queue__sector__project"] = project
+
+    # Criar filtro para excluir múltiplos domínios
+    exclude_filter = Q()
+    for domain in EXCLUDED_DOMAINS:
+        exclude_filter |= Q(user__email__icontains=domain)
+
     queue_auth = (
         ProjectPermission.objects.filter(**permission_filter)
-        .exclude(user__email__icontains="weni")
+        .exclude(exclude_filter)
         .values(Name=F("user__first_name"))
         .annotate(
             opened_rooms=Count(
