@@ -9,7 +9,8 @@ from chats.apps.api.v1.internal.dashboard.serializers import (
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.projects.models import Project
 
-from .dto import Filters, should_exclude_admin_domains
+from .dto import Filters
+from chats.apps.api.v1.dashboard.dto import should_exclude_admin_domains
 from .service import AgentsService
 
 

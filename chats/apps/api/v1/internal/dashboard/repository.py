@@ -8,7 +8,8 @@ from chats.apps.accounts.models import User
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.projects.models.models import CustomStatus
 
-from .dto import Filters, get_admin_domains_exclude_filter
+from .dto import Filters
+from chats.apps.api.v1.dashboard.dto import get_admin_domains_exclude_filter
 
 
 class AgentRepository:
