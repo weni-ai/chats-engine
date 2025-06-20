@@ -86,18 +86,28 @@ class InServiceStatusService:
             .first()
         )
 
-        if room_count >= 1:
-            if not in_service_status and not has_priority:
-                CustomStatus.objects.create(
-                    user=user,
-                    status_type=status_type,
-                    is_active=True,
-                    project=project,
-                    break_time=0,
-                )
-                logger.info(
-                    f"Status In-Service criado para usuário {user.pk} no projeto {project.pk}"
-                )
+        # Verificar se o usuário está ONLINE
+        from chats.apps.projects.models import ProjectPermission
+
+        user_status = ProjectPermission.objects.get(user=user, project=project).status
+
+        # Só criar In-Service se tem salas, não tem status ativo, não tem prioridade E está ONLINE
+        if (
+            room_count >= 1
+            and not in_service_status
+            and not has_priority
+            and user_status == "ONLINE"
+        ):
+            CustomStatus.objects.create(
+                user=user,
+                status_type=status_type,
+                is_active=True,
+                project=project,
+                break_time=0,
+            )
+            logger.info(
+                f"Status In-Service criado para usuário {user.pk} no projeto {project.pk}"
+            )
 
     @classmethod
     @transaction.atomic
@@ -109,7 +119,10 @@ class InServiceStatusService:
         from chats.apps.projects.models.models import CustomStatus
         from chats.apps.rooms.models import Room
 
+        print(f"🔍 DEBUG room_closed: INÍCIO - user={user}, project={project}")
+
         if not user or not project:
+            print(f"🔍 DEBUG room_closed: user ou project é None, retornando")
             return
 
         status_type = cls.get_or_create_status_type(project)
@@ -119,6 +132,8 @@ class InServiceStatusService:
             .filter(user=user, queue__sector__project=project, is_active=True)
             .count()
         )
+
+        print(f"🔍 DEBUG room_closed: room_count = {room_count}")
 
         if room_count == 0:
             status = (
@@ -130,6 +145,9 @@ class InServiceStatusService:
             )
 
             if status:
+                print(
+                    f"🔍 DEBUG room_closed: Encontrou In-Service ativo, finalizando..."
+                )
                 project_tz = project.timezone
                 end_time = timezone.now().astimezone(project_tz)
                 created_on = status.created_on.astimezone(project_tz)
@@ -137,7 +155,11 @@ class InServiceStatusService:
                 status.is_active = False
                 status.break_time = int(service_duration.total_seconds())
                 status.save(update_fields=["is_active", "break_time"])
-                logger.debug(f"Closed in-service status: {status.break_time} seconds")
+                print(f"🔍 DEBUG room_closed: In-Service finalizado com sucesso")
+            else:
+                print(f"🔍 DEBUG room_closed: Não encontrou In-Service ativo")
+        else:
+            print(f"🔍 DEBUG room_closed: Ainda tem {room_count} salas ativas")
 
     @classmethod
     @transaction.atomic

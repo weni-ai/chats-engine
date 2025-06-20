@@ -688,6 +688,7 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                     {"status": "Can't update user status in project."}
                 )
 
+            # SEMPRE finalizar In-Service quando vai para OFFLINE (igual à pausa)
             in_service_type = InServiceStatusService.get_or_create_status_type(project)
             in_service_status = CustomStatus.objects.filter(
                 user=user, status_type=in_service_type, is_active=True, project=project
@@ -724,6 +725,11 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
             instance = CustomStatus.objects.get(pk=pk)
             print(f"🔍 DEBUG: close_status chamado para {instance.user}")
 
+            print(f"🔍 DEBUG: request.data = {request.data}")
+            print(
+                f"🔍 DEBUG: is_active do request = {request.data.get('is_active', 'NÃO ENVIADO')}"
+            )
+
             last_active_status = (
                 CustomStatus.objects.filter(
                     user=instance.user,
@@ -745,6 +751,9 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
             with transaction.atomic():
                 end_time = timezone.now()
                 is_active = request.data.get("is_active", False)
+
+                print(f"🔍 DEBUG: is_active = {is_active}")
+                print(f"🔍 DEBUG: request.data = {request.data}")
 
                 if is_active:
                     updated_rows = ProjectPermission.objects.filter(
@@ -773,7 +782,7 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                     is_active=True,
                 ).count()
 
-                # Verificar se tem status de prioridade
+                # Verificar se tem status de prioridade (DEPOIS de fechar o status atual)
                 has_other_priority = InServiceStatusService.has_priority_status(
                     instance.user, instance.status_type.project
                 )
