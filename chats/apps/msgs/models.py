@@ -5,10 +5,12 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
+from sentry_sdk import ignore_errors
 
 from chats.core.models import BaseModelWithManualCreatedOn
 from chats.core.requests import get_request_session_with_retries
 
+ignore_errors(ValidationError)
 
 class Message(BaseModelWithManualCreatedOn):
     room = models.ForeignKey(
