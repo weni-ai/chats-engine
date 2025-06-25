@@ -2,10 +2,12 @@ import uuid
 from datetime import time
 from unittest.mock import patch
 from django.contrib.auth import get_user_model
+from django.utils.crypto import get_random_string
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.test import APITestCase
+
 from chats.apps.ai_features.history_summary.models import (
     HistorySummary,
     HistorySummaryStatus,
@@ -760,6 +762,13 @@ class RoomHistorySummaryTestCase(APITestCase):
 
         return self.client.post(url, data=data, format="json")
 
+    def create_history_summary(self, room: Room) -> HistorySummary:
+        return HistorySummary.objects.create(
+            room=room,
+            status=HistorySummaryStatus.DONE,
+            summary="Test summary",
+        )
+
     def test_get_room_history_summary_when_no_summary_exists(self):
         response = self.get_room_history_summary(self.room.uuid)
 
@@ -769,11 +778,8 @@ class RoomHistorySummaryTestCase(APITestCase):
         self.assertEqual(response.data["feedback"], {"liked": None})
 
     def test_get_room_history_summary_when_summary_exists(self):
-        history_summary = HistorySummary.objects.create(
-            room=self.room,
-            status=HistorySummaryStatus.DONE,
-            summary="Test summary",
-        )
+        history_summary = self.create_history_summary(self.room)
+
         response = self.get_room_history_summary(self.room.uuid)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -782,11 +788,7 @@ class RoomHistorySummaryTestCase(APITestCase):
         self.assertEqual(response.data["feedback"], {"liked": None})
 
     def test_get_room_history_summary_when_feedback_exists_and_liked_is_true(self):
-        history_summary = HistorySummary.objects.create(
-            room=self.room,
-            status=HistorySummaryStatus.DONE,
-            summary="Test summary",
-        )
+        history_summary = self.create_history_summary(self.room)
         history_summary.feedbacks.create(
             user=self.user,
             liked=True,
@@ -801,11 +803,7 @@ class RoomHistorySummaryTestCase(APITestCase):
         self.assertEqual(response.data["feedback"], {"liked": True})
 
     def test_get_room_history_summary_when_feedback_exists_and_liked_is_false(self):
-        history_summary = HistorySummary.objects.create(
-            room=self.room,
-            status=HistorySummaryStatus.DONE,
-            summary="Test summary",
-        )
+        history_summary = self.create_history_summary(self.room)
         history_summary.feedbacks.create(
             user=self.user,
             liked=False,
@@ -819,11 +817,7 @@ class RoomHistorySummaryTestCase(APITestCase):
         self.assertEqual(response.data["feedback"], {"liked": False})
 
     def test_get_room_history_summary_when_feedback_from_another_user_exists(self):
-        history_summary = HistorySummary.objects.create(
-            room=self.room,
-            status=HistorySummaryStatus.DONE,
-            summary="Test summary",
-        )
+        history_summary = self.create_history_summary(self.room)
         history_summary.feedbacks.create(
             user=User.objects.create(email="test_user_2@example.com"),
             liked=True,
@@ -838,11 +832,7 @@ class RoomHistorySummaryTestCase(APITestCase):
 
     @with_room_user
     def test_post_room_history_summary_feedback_with_liked_as_true(self):
-        history_summary = HistorySummary.objects.create(
-            room=self.room,
-            status=HistorySummaryStatus.DONE,
-            summary="Test summary",
-        )
+        history_summary = self.create_history_summary(self.room)
 
         self.assertFalse(history_summary.feedbacks.filter(user=self.user).exists())
 
@@ -861,11 +851,7 @@ class RoomHistorySummaryTestCase(APITestCase):
 
     @with_room_user
     def test_post_room_history_summary_feedback_with_liked_as_false(self):
-        history_summary = HistorySummary.objects.create(
-            room=self.room,
-            status=HistorySummaryStatus.DONE,
-            summary="Test summary",
-        )
+        history_summary = self.create_history_summary(self.room)
 
         self.assertFalse(history_summary.feedbacks.filter(user=self.user).exists())
 
@@ -884,11 +870,7 @@ class RoomHistorySummaryTestCase(APITestCase):
 
     @with_room_user
     def test_post_room_history_summary_feedback_with_text(self):
-        history_summary = HistorySummary.objects.create(
-            room=self.room,
-            status=HistorySummaryStatus.DONE,
-            summary="Test summary",
-        )
+        history_summary = self.create_history_summary(self.room)
 
         self.assertFalse(history_summary.feedbacks.filter(user=self.user).exists())
 
@@ -927,11 +909,7 @@ class RoomHistorySummaryTestCase(APITestCase):
     def test_post_room_history_summary_feedback_when_the_user_is_not_the_room_user(
         self,
     ):
-        history_summary = HistorySummary.objects.create(
-            room=self.room,
-            status=HistorySummaryStatus.DONE,
-            summary="Test summary",
-        )
+        history_summary = self.create_history_summary(self.room)
 
         self.assertFalse(history_summary.feedbacks.filter(user=self.user).exists())
 
@@ -941,6 +919,40 @@ class RoomHistorySummaryTestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(response.data["detail"].code, "user_is_not_the_room_user")
+
+        self.assertFalse(history_summary.feedbacks.filter(user=self.user).exists())
+
+    @with_room_user
+    def test_post_room_history_summary_feedback_when_user_already_gave_feedback(
+        self,
+    ):
+        history_summary = self.create_history_summary(self.room)
+
+        history_summary.feedbacks.create(
+            user=self.user,
+            liked=True,
+        )
+
+        response = self.post_room_history_summary_feedback(
+            self.room.uuid, {"liked": True}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["detail"].code, "user_already_gave_feedback")
+
+    @with_room_user
+    def test_post_room_history_summary_feedback_when_text_exceeds_max_length(
+        self,
+    ):
+        history_summary = self.create_history_summary(self.room)
+        self.assertFalse(history_summary.feedbacks.filter(user=self.user).exists())
+
+        response = self.post_room_history_summary_feedback(
+            self.room.uuid, {"liked": True, "text": get_random_string(length=151)}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["text"][0].code, "max_length")
 
         self.assertFalse(history_summary.feedbacks.filter(user=self.user).exists())
 

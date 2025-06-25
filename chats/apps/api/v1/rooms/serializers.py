@@ -314,7 +314,9 @@ class RoomHistorySummarySerializer(serializers.ModelSerializer):
 
 
 class RoomHistorySummaryFeedbackSerializer(serializers.ModelSerializer):
-    text = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    text = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True, max_length=150
+    )
 
     class Meta:
         model = HistorySummaryFeedback
