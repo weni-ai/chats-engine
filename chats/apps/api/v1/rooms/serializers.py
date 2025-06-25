@@ -5,7 +5,10 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from chats.apps.accounts.models import User
-from chats.apps.ai_features.history_summary.models import HistorySummary
+from chats.apps.ai_features.history_summary.models import (
+    HistorySummary,
+    HistorySummaryFeedback,
+)
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactRelationsSerializer
 from chats.apps.api.v1.msgs.serializers import MessageSerializer
@@ -321,9 +324,41 @@ class RoomInfoSerializer(serializers.ModelSerializer):
 
 
 class RoomHistorySummarySerializer(serializers.ModelSerializer):
+    feedback = serializers.SerializerMethodField()
+
     class Meta:
         model = HistorySummary
-        fields = ["status", "summary"]
+        fields = ["status", "summary", "feedback"]
+
+    def get_feedback(self, history_summary: HistorySummary) -> dict:
+        feedback = history_summary.feedbacks.filter(
+            user=self.context["request"].user
+        ).first()
+
+        if feedback:
+            return {
+                "liked": feedback.liked,
+            }
+
+        return {
+            "liked": None,
+        }
+
+
+class RoomHistorySummaryFeedbackSerializer(serializers.ModelSerializer):
+    text = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True, max_length=150
+    )
+
+    class Meta:
+        model = HistorySummaryFeedback
+        fields = ["liked", "text"]
+
+    def validate(self, attrs):
+        attrs["user"] = self.context["request"].user
+        attrs["history_summary"] = self.context["history_summary"]
+
+        return super().validate(attrs)
 
 
 class RoomsReportFiltersSerializer(serializers.Serializer):
