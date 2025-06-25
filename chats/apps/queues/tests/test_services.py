@@ -172,9 +172,14 @@ class QueueRouterServiceTestCase(TestCase):
         )
         self.assertEqual(
             message_text.get("content", {}).get("from"),
-            {"type": "queue", "name": self.queue.name},
+            {"type": "queue", "name": self.queue.name, "uuid": str(self.queue.uuid)},
         )
         self.assertEqual(
             message_text.get("content", {}).get("to"),
-            {"type": "user", "name": self.agent_2.name},
+            {
+                "type": "user",
+                "name": self.agent_2.name,
+                "email": self.agent_2.email,
+                "id": str(self.agent_2.id),
+            },
         )
