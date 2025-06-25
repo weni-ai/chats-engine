@@ -937,7 +937,7 @@ class RoomHistorySummaryTestCase(APITestCase):
             text="Test feedback",
         )
 
-        payload = {"liked": True, "text": "Test feedback 2"}
+        payload = {"liked": False, "text": "Test feedback 2"}
         response = self.post_room_history_summary_feedback(self.room.uuid, payload)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -948,6 +948,29 @@ class RoomHistorySummaryTestCase(APITestCase):
 
         self.assertEqual(feedback.liked, payload["liked"])
         self.assertEqual(feedback.text, payload["text"])
+
+    @with_room_user
+    def test_post_room_history_summary_feedback_when_user_already_gave_feedback_without_text(
+        self,
+    ):
+        history_summary = self.create_history_summary(self.room)
+        feedback = history_summary.feedbacks.create(
+            user=self.user,
+            liked=True,
+            text="Test feedback",
+        )
+
+        payload = {"liked": False}
+        response = self.post_room_history_summary_feedback(self.room.uuid, payload)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["liked"], payload["liked"])
+        self.assertIsNone(response.data["text"])
+
+        feedback.refresh_from_db()
+
+        self.assertEqual(feedback.liked, payload["liked"])
+        self.assertIsNone(feedback.text)
 
     @with_room_user
     def test_post_room_history_summary_feedback_when_text_exceeds_max_length(
