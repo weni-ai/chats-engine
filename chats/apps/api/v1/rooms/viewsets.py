@@ -655,6 +655,14 @@ class RoomViewset(
                 code="user_already_gave_feedback",
             )
 
+        if history_summary.status != HistorySummaryStatus.DONE:
+            raise ValidationError(
+                {
+                    "detail": "You can only give feedback when the history summary is done."
+                },
+                code="room_history_summary_not_done",
+            )
+
         serializer = RoomHistorySummaryFeedbackSerializer(
             data=request.data,
             context={"request": request, "history_summary": history_summary},

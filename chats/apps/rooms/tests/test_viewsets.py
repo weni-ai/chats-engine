@@ -762,10 +762,14 @@ class RoomHistorySummaryTestCase(APITestCase):
 
         return self.client.post(url, data=data, format="json")
 
-    def create_history_summary(self, room: Room) -> HistorySummary:
+    def create_history_summary(
+        self,
+        room: Room,
+        history_summary_status: HistorySummaryStatus = HistorySummaryStatus.DONE,
+    ) -> HistorySummary:
         return HistorySummary.objects.create(
             room=room,
-            status=HistorySummaryStatus.DONE,
+            status=history_summary_status,
             summary="Test summary",
         )
 
@@ -953,6 +957,57 @@ class RoomHistorySummaryTestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["text"][0].code, "max_length")
+
+        self.assertFalse(history_summary.feedbacks.filter(user=self.user).exists())
+
+    @with_room_user
+    def test_post_room_history_summary_feedback_when_history_summary_is_pending(
+        self,
+    ):
+        history_summary = self.create_history_summary(
+            self.room, HistorySummaryStatus.PENDING
+        )
+
+        response = self.post_room_history_summary_feedback(
+            self.room.uuid, {"liked": True}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["detail"].code, "room_history_summary_not_done")
+
+        self.assertFalse(history_summary.feedbacks.filter(user=self.user).exists())
+
+    @with_room_user
+    def test_post_room_history_summary_feedback_when_history_summary_is_processing(
+        self,
+    ):
+        history_summary = self.create_history_summary(
+            self.room, HistorySummaryStatus.PROCESSING
+        )
+
+        response = self.post_room_history_summary_feedback(
+            self.room.uuid, {"liked": True}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["detail"].code, "room_history_summary_not_done")
+
+        self.assertFalse(history_summary.feedbacks.filter(user=self.user).exists())
+
+    @with_room_user
+    def test_post_room_history_summary_feedback_when_history_summary_is_unavailable(
+        self,
+    ):
+        history_summary = self.create_history_summary(
+            self.room, HistorySummaryStatus.UNAVAILABLE
+        )
+
+        response = self.post_room_history_summary_feedback(
+            self.room.uuid, {"liked": True}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["detail"].code, "room_history_summary_not_done")
 
         self.assertFalse(history_summary.feedbacks.filter(user=self.user).exists())
 
