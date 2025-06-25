@@ -38,10 +38,10 @@ from chats.apps.queues.utils import (
 )
 from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
+from chats.apps.rooms.utils import create_transfer_json
 from chats.apps.rooms.views import (
     close_room,
     create_room_feedback_message,
-    create_transfer_json,
     get_editable_custom_fields_room,
     update_custom_fields,
     update_flows_custom_fields,
