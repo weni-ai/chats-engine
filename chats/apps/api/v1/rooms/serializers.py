@@ -358,6 +358,9 @@ class RoomHistorySummaryFeedbackSerializer(serializers.ModelSerializer):
         attrs["user"] = self.context["request"].user
         attrs["history_summary"] = self.context["history_summary"]
 
+        if not attrs.get("text"):
+            attrs["text"] = None
+
         return super().validate(attrs)
 
 

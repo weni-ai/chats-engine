@@ -1006,18 +1006,46 @@ class RoomHistorySummaryTestCase(APITestCase):
         self,
     ):
         history_summary = self.create_history_summary(self.room)
-
-        history_summary.feedbacks.create(
+        feedback = history_summary.feedbacks.create(
             user=self.user,
             liked=True,
+            text="Test feedback",
         )
 
-        response = self.post_room_history_summary_feedback(
-            self.room.uuid, {"liked": True}
+        payload = {"liked": False, "text": "Test feedback 2"}
+        response = self.post_room_history_summary_feedback(self.room.uuid, payload)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["liked"], payload["liked"])
+        self.assertEqual(response.data["text"], payload["text"])
+
+        feedback.refresh_from_db()
+
+        self.assertEqual(feedback.liked, payload["liked"])
+        self.assertEqual(feedback.text, payload["text"])
+
+    @with_room_user
+    def test_post_room_history_summary_feedback_when_user_already_gave_feedback_without_text(
+        self,
+    ):
+        history_summary = self.create_history_summary(self.room)
+        feedback = history_summary.feedbacks.create(
+            user=self.user,
+            liked=True,
+            text="Test feedback",
         )
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data["detail"].code, "user_already_gave_feedback")
+        payload = {"liked": False}
+        response = self.post_room_history_summary_feedback(self.room.uuid, payload)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["liked"], payload["liked"])
+        self.assertIsNone(response.data["text"])
+
+        feedback.refresh_from_db()
+
+        self.assertEqual(feedback.liked, payload["liked"])
+        self.assertIsNone(feedback.text)
 
     @with_room_user
     def test_post_room_history_summary_feedback_when_text_exceeds_max_length(
