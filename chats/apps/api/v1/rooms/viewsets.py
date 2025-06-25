@@ -649,12 +649,6 @@ class RoomViewset(
                 code="user_is_not_the_room_user",
             )
 
-        if history_summary.feedbacks.filter(user=request.user).exists():
-            raise ValidationError(
-                {"detail": "You have already given feedback for this room."},
-                code="user_already_gave_feedback",
-            )
-
         if history_summary.status != HistorySummaryStatus.DONE:
             raise ValidationError(
                 {
@@ -663,9 +657,18 @@ class RoomViewset(
                 code="room_history_summary_not_done",
             )
 
+        serializers_params = {
+            "data": request.data,
+            "context": {"request": request, "history_summary": history_summary},
+        }
+
+        if existing_feedback := history_summary.feedbacks.filter(
+            user=request.user
+        ).first():
+            serializers_params["instance"] = existing_feedback
+
         serializer = RoomHistorySummaryFeedbackSerializer(
-            data=request.data,
-            context={"request": request, "history_summary": history_summary},
+            **serializers_params,
         )
         serializer.is_valid(raise_exception=True)
         serializer.save()
