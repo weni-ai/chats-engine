@@ -5,7 +5,10 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from chats.apps.accounts.models import User
-from chats.apps.ai_features.history_summary.models import HistorySummary
+from chats.apps.ai_features.history_summary.models import (
+    HistorySummary,
+    HistorySummaryFeedback,
+)
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactRelationsSerializer
 from chats.apps.api.v1.msgs.serializers import MessageSerializer
@@ -292,6 +295,20 @@ class RoomHistorySummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = HistorySummary
         fields = ["status", "summary"]
+
+
+class RoomHistorySummaryFeedbackSerializer(serializers.ModelSerializer):
+    text = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+    class Meta:
+        model = HistorySummaryFeedback
+        fields = ["liked", "text"]
+
+    def validate(self, attrs):
+        attrs["user"] = self.context["request"].user
+        attrs["history_summary"] = self.context["history_summary"]
+
+        return super().validate(attrs)
 
 
 class RoomsReportFiltersSerializer(serializers.Serializer):

@@ -9,7 +9,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError, NotFound
 from rest_framework.filters import OrderingFilter
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -31,6 +31,7 @@ from chats.apps.api.v1.msgs.serializers import ChatCompletionSerializer
 from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1.rooms.serializers import (
     ListRoomSerializer,
+    RoomHistorySummaryFeedbackSerializer,
     RoomHistorySummarySerializer,
     RoomInfoSerializer,
     RoomMessageStatusSerializer,
@@ -613,6 +614,41 @@ class RoomViewset(
             )
 
         serializer = RoomHistorySummarySerializer(history_summary)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_name="chats-summary-feedback",
+        url_path="chats-summary/feedback",
+        serializer_class=RoomHistorySummaryFeedbackSerializer,
+    )
+    def chats_summary_feedback(self, request: Request, pk=None) -> Response:
+        """
+        Get the history summary for a room.
+        """
+        room = self.get_object()
+
+        history_summary = (
+            HistorySummary.objects.filter(room=room).order_by("created_on").last()
+        )
+
+        if not history_summary:
+            raise NotFound({"detail": "No history summary found for this room."})
+
+        if history_summary.room.user != request.user:
+            raise PermissionDenied(
+                {"detail": "You are not allowed to give feedback for this room."},
+                code="user_is_not_the_room_user",
+            )
+
+        serializer = RoomHistorySummaryFeedbackSerializer(
+            data=request.data,
+            context={"request": request, "history_summary": history_summary},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
 
         return Response(serializer.data, status=status.HTTP_200_OK)
 

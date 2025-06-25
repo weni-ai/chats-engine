@@ -64,7 +64,7 @@ class HistorySummaryFeedback(BaseModel):
         related_name="history_summary_feedbacks",
     )
     liked = models.BooleanField(_("Liked?"))
-    feedback = models.CharField(_("Feedback"), max_length=150, blank=True, null=True)
+    text = models.CharField(_("Text"), max_length=150, blank=True, null=True)
 
     class Meta:
         verbose_name = _("History Summary Feedback")

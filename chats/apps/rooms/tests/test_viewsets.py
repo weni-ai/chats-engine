@@ -1,3 +1,4 @@
+import uuid
 from datetime import time
 from unittest.mock import patch
 from django.contrib.auth import get_user_model
@@ -18,6 +19,7 @@ from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.queues.tests.decorators import with_queue_authorization
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.services import RoomsReportService
+from chats.apps.rooms.tests.decorators import with_room_user
 from chats.apps.sectors.models import Sector, SectorAuthorization
 from chats.apps.sectors.tests.decorators import with_sector_authorization
 from chats.core.cache import CacheClient
@@ -750,7 +752,13 @@ class RoomHistorySummaryTestCase(APITestCase):
 
     def get_room_history_summary(self, room_pk: str) -> Response:
         url = reverse("room-chats-summary", kwargs={"pk": room_pk})
+
         return self.client.get(url)
+
+    def post_room_history_summary_feedback(self, room_pk: str, data: dict) -> Response:
+        url = reverse("room-chats-summary-feedback", kwargs={"pk": room_pk})
+
+        return self.client.post(url, data=data, format="json")
 
     def test_get_room_history_summary_when_no_summary_exists(self):
         response = self.get_room_history_summary(self.room.uuid)
@@ -770,6 +778,114 @@ class RoomHistorySummaryTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["status"], history_summary.status)
         self.assertEqual(response.data["summary"], history_summary.summary)
+
+    @with_room_user
+    def test_post_room_history_summary_feedback_with_liked_as_true(self):
+        history_summary = HistorySummary.objects.create(
+            room=self.room,
+            status=HistorySummaryStatus.DONE,
+            summary="Test summary",
+        )
+
+        self.assertFalse(history_summary.feedbacks.filter(user=self.user).exists())
+
+        response = self.post_room_history_summary_feedback(
+            self.room.uuid, {"liked": True}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["liked"], True)
+
+        self.assertTrue(history_summary.feedbacks.filter(user=self.user).exists())
+        feedback = history_summary.feedbacks.filter(user=self.user).first()
+
+        self.assertEqual(feedback.liked, True)
+        self.assertEqual(feedback.text, None)
+
+    @with_room_user
+    def test_post_room_history_summary_feedback_with_liked_as_false(self):
+        history_summary = HistorySummary.objects.create(
+            room=self.room,
+            status=HistorySummaryStatus.DONE,
+            summary="Test summary",
+        )
+
+        self.assertFalse(history_summary.feedbacks.filter(user=self.user).exists())
+
+        response = self.post_room_history_summary_feedback(
+            self.room.uuid, {"liked": False}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["liked"], False)
+
+        self.assertTrue(history_summary.feedbacks.filter(user=self.user).exists())
+        feedback = history_summary.feedbacks.filter(user=self.user).first()
+
+        self.assertEqual(feedback.liked, False)
+        self.assertEqual(feedback.text, None)
+
+    @with_room_user
+    def test_post_room_history_summary_feedback_with_text(self):
+        history_summary = HistorySummary.objects.create(
+            room=self.room,
+            status=HistorySummaryStatus.DONE,
+            summary="Test summary",
+        )
+
+        self.assertFalse(history_summary.feedbacks.filter(user=self.user).exists())
+
+        response = self.post_room_history_summary_feedback(
+            self.room.uuid, {"liked": True, "text": "Test feedback"}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["liked"], True)
+        self.assertEqual(response.data["text"], "Test feedback")
+
+        self.assertTrue(history_summary.feedbacks.filter(user=self.user).exists())
+        feedback = history_summary.feedbacks.filter(user=self.user).first()
+
+        self.assertEqual(feedback.liked, True)
+        self.assertEqual(feedback.text, "Test feedback")
+
+    @with_room_user
+    def test_post_room_history_summary_feedback_when_the_room_does_not_exist(self):
+        response = self.post_room_history_summary_feedback(
+            uuid.uuid4(), {"liked": True}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    @with_room_user
+    def test_post_room_history_summary_feedback_when_the_history_summary_does_not_exist(
+        self,
+    ):
+        response = self.post_room_history_summary_feedback(
+            self.room.uuid, {"liked": True}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_post_room_history_summary_feedback_when_the_user_is_not_the_room_user(
+        self,
+    ):
+        history_summary = HistorySummary.objects.create(
+            room=self.room,
+            status=HistorySummaryStatus.DONE,
+            summary="Test summary",
+        )
+
+        self.assertFalse(history_summary.feedbacks.filter(user=self.user).exists())
+
+        response = self.post_room_history_summary_feedback(
+            self.room.uuid, {"liked": True}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data["detail"].code, "user_is_not_the_room_user")
+
+        self.assertFalse(history_summary.feedbacks.filter(user=self.user).exists())
 
 
 class RoomsReportTestCase(APITestCase):
