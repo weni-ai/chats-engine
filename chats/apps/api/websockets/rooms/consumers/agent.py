@@ -330,7 +330,6 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         try:
             permission = ProjectPermission.objects.get(user=self.user, project_id=self.project)
             if permission.status == ProjectPermission.STATUS_ONLINE:
-                # Verifica se há um status In-Service ativo
                 InServiceStatusService.room_closed(self.user, permission.project)
         except ProjectPermission.DoesNotExist:
             pass

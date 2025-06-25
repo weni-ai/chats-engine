@@ -8,6 +8,7 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from django.utils import timezone
 
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.api.v1.internal.projects import serializers
@@ -158,6 +159,26 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
             elif user_status.lower() == "offline":
                 instance.status = ProjectPermission.STATUS_OFFLINE
                 instance.save()
+                
+                # Verificar se tem status In-Service ativo
+                in_service_type = InServiceStatusService.get_or_create_status_type(instance.project)
+                in_service_status = CustomStatus.objects.filter(
+                    user=instance.user,
+                    status_type=in_service_type,
+                    is_active=True,
+                    project=instance.project
+                ).first()
+                
+                # Se encontrar um status In-Service ativo, finaliza ele
+                if in_service_status:
+                    project_tz = instance.project.timezone
+                    end_time = timezone.now().astimezone(project_tz)
+                    created_on = in_service_status.created_on.astimezone(project_tz)
+                    service_duration = end_time - created_on
+                    in_service_status.is_active = False
+                    in_service_status.break_time = int(service_duration.total_seconds())
+                    in_service_status.save(update_fields=["is_active", "break_time"])
+                
             instance.notify_user("update")
 
             start_queue_priority_routing_for_all_queues_in_project(instance.project)
