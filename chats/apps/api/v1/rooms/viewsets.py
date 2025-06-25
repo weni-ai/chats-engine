@@ -609,11 +609,17 @@ class RoomViewset(
 
         if not history_summary:
             return Response(
-                {"status": HistorySummaryStatus.UNAVAILABLE, "summary": None},
+                {
+                    "status": HistorySummaryStatus.UNAVAILABLE,
+                    "summary": None,
+                    "feedback": {"liked": None},
+                },
                 status=status.HTTP_200_OK,
             )
 
-        serializer = RoomHistorySummarySerializer(history_summary)
+        serializer = RoomHistorySummarySerializer(
+            history_summary, context={"request": request}
+        )
 
         return Response(serializer.data, status=status.HTTP_200_OK)
 

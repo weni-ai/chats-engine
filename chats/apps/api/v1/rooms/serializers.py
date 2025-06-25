@@ -292,9 +292,25 @@ class RoomInfoSerializer(serializers.ModelSerializer):
 
 
 class RoomHistorySummarySerializer(serializers.ModelSerializer):
+    feedback = serializers.SerializerMethodField()
+
     class Meta:
         model = HistorySummary
-        fields = ["status", "summary"]
+        fields = ["status", "summary", "feedback"]
+
+    def get_feedback(self, history_summary: HistorySummary) -> dict:
+        feedback = history_summary.feedbacks.filter(
+            user=self.context["request"].user
+        ).first()
+
+        if feedback:
+            return {
+                "liked": feedback.liked,
+            }
+
+        return {
+            "liked": None,
+        }
 
 
 class RoomHistorySummaryFeedbackSerializer(serializers.ModelSerializer):

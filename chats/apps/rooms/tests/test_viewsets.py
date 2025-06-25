@@ -766,6 +766,7 @@ class RoomHistorySummaryTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["status"], HistorySummaryStatus.UNAVAILABLE)
         self.assertEqual(response.data["summary"], None)
+        self.assertEqual(response.data["feedback"], {"liked": None})
 
     def test_get_room_history_summary_when_summary_exists(self):
         history_summary = HistorySummary.objects.create(
@@ -778,6 +779,44 @@ class RoomHistorySummaryTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["status"], history_summary.status)
         self.assertEqual(response.data["summary"], history_summary.summary)
+        self.assertEqual(response.data["feedback"], {"liked": None})
+
+    def test_get_room_history_summary_when_feedback_exists_and_liked_is_true(self):
+        history_summary = HistorySummary.objects.create(
+            room=self.room,
+            status=HistorySummaryStatus.DONE,
+            summary="Test summary",
+        )
+        history_summary.feedbacks.create(
+            user=self.user,
+            liked=True,
+        )
+
+        response = self.get_room_history_summary(self.room.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], history_summary.status)
+        self.assertEqual(response.data["summary"], history_summary.summary)
+        self.assertEqual(response.data["feedback"], {"liked": True})
+
+    def test_get_room_history_summary_when_feedback_exists_and_liked_is_false(self):
+        history_summary = HistorySummary.objects.create(
+            room=self.room,
+            status=HistorySummaryStatus.DONE,
+            summary="Test summary",
+        )
+        history_summary.feedbacks.create(
+            user=self.user,
+            liked=False,
+        )
+
+        response = self.get_room_history_summary(self.room.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], history_summary.status)
+        self.assertEqual(response.data["summary"], history_summary.summary)
+        self.assertEqual(response.data["feedback"], {"liked": False})
 
     @with_room_user
     def test_post_room_history_summary_feedback_with_liked_as_true(self):
