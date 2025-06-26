@@ -343,6 +343,7 @@ class RoomViewset(
             room_metric.transfer_count += 1
             room_metric.save()
 
+        instance.save()
         instance.add_transfer_to_history(feedback)
 
         # Create a message with the transfer data and Send to the room group
