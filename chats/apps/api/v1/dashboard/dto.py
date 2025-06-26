@@ -3,6 +3,33 @@ from dataclasses import dataclass
 from chats.apps.projects.models import Project, ProjectPermission
 
 
+EXCLUDED_DOMAINS = ["weni.ai", "vtex.com", "inspiria.studio"]
+
+
+def should_exclude_admin_domains(user_email: str) -> bool:
+    """
+    Verifica se o email do usuário pertence a algum dos domínios administrativos.
+    Retorna True se o usuário tem privilégios de admin (não deve ser excluído).
+    """
+    if not user_email:
+        return False
+
+    return any(domain in user_email for domain in EXCLUDED_DOMAINS)
+
+
+def get_admin_domains_exclude_filter():
+    """
+    Retorna um filtro Q para excluir usuários com domínios administrativos.
+    """
+    from django.db.models import Q
+
+    exclude_filter = Q()
+    for domain in EXCLUDED_DOMAINS:
+        exclude_filter |= Q(email__endswith=domain)
+
+    return exclude_filter
+
+
 @dataclass
 class Agent:
     first_name: str = None
