@@ -458,6 +458,14 @@ class Room(BaseModel, BaseConfigurableModel):
         """
         return self.pins.all().delete()
 
+    def add_transfer_to_history(self, transfer: dict):
+        """
+        Adds a transfer to the full transfer history.
+        """
+        self.full_transfer_history.append(transfer)
+        self.transfer_history = transfer  # legacy
+        self.save(update_fields=["full_transfer_history", "transfer_history"])
+
 
 class RoomPin(BaseModel):
     """
