@@ -269,6 +269,7 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
             from_="",
             to=room.user,
         )
+        room.save()
         room.add_transfer_to_history(feedback)
 
         room.notify_user("update", user=None)
