@@ -62,13 +62,13 @@ class InServiceStatusService:
         Records a room assignment to an agent.
         Creates an In-Service status if it's the first room and there's no other active status.
         """
+        from chats.apps.projects.models import ProjectPermission
         from chats.apps.projects.models.models import CustomStatus
         from chats.apps.rooms.models import Room
-        from chats.apps.projects.models import ProjectPermission
 
         if not user or not project:
             return
-        
+
         permission = ProjectPermission.objects.filter(
             user=user, project=project
         ).first()
