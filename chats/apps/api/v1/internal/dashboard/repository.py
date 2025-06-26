@@ -147,17 +147,17 @@ class AgentRepository:
         if filters.queue and filters.sector:
             rooms_filter["rooms__queue"] = filters.queue
             rooms_filter["rooms__queue__sector__in"] = filters.sector
-            agents_filter["project_permissions__queue_authorizations__queue"] = (
-                filters.queue
-            )
+            agents_filter[
+                "project_permissions__queue_authorizations__queue"
+            ] = filters.queue
             agents_filter[
                 "project_permissions__queue_authorizations__queue__sector__in"
             ] = filters.sector
         elif filters.queue:
             rooms_filter["rooms__queue"] = filters.queue
-            agents_filter["project_permissions__queue_authorizations__queue"] = (
-                filters.queue
-            )
+            agents_filter[
+                "project_permissions__queue_authorizations__queue"
+            ] = filters.queue
         elif filters.sector:
             rooms_filter["rooms__queue__sector__in"] = filters.sector
             agents_filter[
@@ -200,6 +200,7 @@ class AgentRepository:
                         status_type=F("status_type__name"),
                         break_time=F("break_time"),
                         is_active=F("is_active"),
+                        created_on=F("created_on"),
                     )
                 )
             )

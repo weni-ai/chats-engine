@@ -1,10 +1,11 @@
 import json
-from datetime import datetime
+import logging
 
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import transaction
 from django.db.models import CharField, Value
 from django.db.models.functions import Concat
+from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
@@ -15,7 +16,6 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
-from chats.apps.api.utils import ensure_timezone
 from chats.apps.api.v1.internal.projects.serializers import (
     CheckAccessReadSerializer,
     ProjectPermissionReadSerializer,
@@ -50,10 +50,13 @@ from chats.apps.projects.models import (
     ProjectPermission,
 )
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
+from chats.apps.projects.usecases.status_service import InServiceStatusService
 from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import create_room_feedback_message
 from chats.apps.sectors.models import Sector
+
+logger = logging.getLogger(__name__)
 
 
 class ProjectViewset(
@@ -601,7 +604,7 @@ class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
 
 
 class CustomStatusTypeViewSet(viewsets.ModelViewSet):
-    queryset = CustomStatusType.objects.filter(is_deleted=False)
+    queryset = CustomStatusType.objects.all()
     serializer_class = CustomStatusTypeSerializer
     permission_classes = [
         IsAuthenticated,
@@ -609,6 +612,11 @@ class CustomStatusTypeViewSet(viewsets.ModelViewSet):
     ]
     filter_backends = [DjangoFilterBackend]
     filterset_class = CustomStatusTypeFilterSet
+
+    def get_queryset(self):
+        return CustomStatusType.objects.filter(
+            is_deleted=False, config__created_by_system__isnull=True
+        )
 
     def perform_create(self, serializer):
         return serializer.save()
@@ -677,12 +685,28 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                 raise serializers.ValidationError(
                     {"status": "Can't update user status in project."}
                 )
+
+            in_service_type = InServiceStatusService.get_or_create_status_type(project)
+            in_service_status = CustomStatus.objects.filter(
+                user=user, status_type=in_service_type, is_active=True, project=project
+            ).first()
+
+            if in_service_status:
+                service_duration = timezone.now() - in_service_status.created_on
+                in_service_status.is_active = False
+                in_service_status.break_time = int(service_duration.total_seconds())
+                in_service_status.save(update_fields=["is_active", "break_time"])
+
             serializer.save(user=user)
 
     @decorators.action(detail=False, methods=["get"])
     def last_status(self, request):
         last_status = (
-            CustomStatus.objects.filter(user=request.user, is_active=True)
+            CustomStatus.objects.filter(
+                user=request.user,
+                is_active=True,
+                status_type__config__created_by_system__isnull=True,
+            )
             .order_by("-created_on")
             .first()
         )
@@ -714,48 +738,64 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                 )
 
             with transaction.atomic():
-                end_time_str = request.data.get("end_time")
+                end_time = timezone.now()
                 is_active = request.data.get("is_active", False)
 
-                if end_time_str is None:
-                    return Response(
-                        {"detail": "end_time is required."},
-                        status=status.HTTP_400_BAD_REQUEST,
+                if is_active:
+                    updated_rows = ProjectPermission.objects.filter(
+                        user=instance.user, project=instance.status_type.project
+                    ).update(status="ONLINE")
+
+                    if updated_rows == 0:
+                        raise serializers.ValidationError(
+                            {"status": "Can't update user status in project."}
+                        )
+
+                project_tz = instance.status_type.project.timezone
+                local_created_on = instance.created_on.astimezone(project_tz)
+                local_end_time = end_time.astimezone(project_tz)
+
+                break_time = int((local_end_time - local_created_on).total_seconds())
+
+                instance.break_time = break_time
+                instance.is_active = False
+                instance.save()
+
+                room_count = Room.objects.filter(
+                    user=instance.user,
+                    queue__sector__project=instance.status_type.project,
+                    is_active=True,
+                ).count()
+
+                has_other_priority = InServiceStatusService.has_priority_status(
+                    instance.user, instance.status_type.project
+                )
+
+                user_status = ProjectPermission.objects.get(
+                    user=instance.user, project=instance.status_type.project
+                ).status
+
+                if (
+                    room_count > 0
+                    and not has_other_priority
+                    and user_status == "ONLINE"
+                ):
+                    in_service_type = InServiceStatusService.get_or_create_status_type(
+                        instance.status_type.project
+                    )
+                    CustomStatus.objects.create(
+                        user=instance.user,
+                        status_type=in_service_type,
+                        is_active=True,
+                        project=instance.status_type.project,
+                        break_time=0,
+                        created_on=end_time,
                     )
 
-                try:
-                    if is_active:
-                        updated_rows = ProjectPermission.objects.filter(
-                            user=instance.user, project=instance.status_type.project
-                        ).update(status="ONLINE")
-
-                        if updated_rows == 0:
-                            raise serializers.ValidationError(
-                                {"status": "Can't update user status in project."}
-                            )
-
-                    end_time = datetime.fromisoformat(end_time_str)
-                    project_tz = instance.status_type.project.timezone
-
-                    end_time = ensure_timezone(end_time, project_tz)
-
-                    local_created_on = instance.created_on.astimezone(project_tz)
-                    break_time = int((end_time - local_created_on).total_seconds())
-
-                    instance.break_time = break_time
-                    instance.is_active = False
-                    instance.save()
-
-                    return Response(
-                        {"detail": "CustomStatus updated successfully."},
-                        status=status.HTTP_200_OK,
-                    )
-
-                except ValueError as error:
-                    return Response(
-                        {"detail": f"Invalid end_time format: {error}"},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
+                return Response(
+                    {"detail": "CustomStatus updated successfully."},
+                    status=status.HTTP_200_OK,
+                )
 
         except CustomStatus.DoesNotExist:
             return Response(
