@@ -43,6 +43,9 @@ class RoomSerializer(serializers.ModelSerializer):
     can_edit_custom_fields = serializers.SerializerMethodField()
     config = serializers.JSONField(required=False, read_only=True)
     imported_history_url = serializers.CharField(read_only=True, default="")
+    full_transfer_history = serializers.JSONField(
+        required=False, read_only=True, default=list
+    )
 
     class Meta:
         model = Room
@@ -57,6 +60,7 @@ class RoomSerializer(serializers.ModelSerializer):
             "last_interaction",
             "can_edit_custom_fields",
             "imported_history_url",
+            "full_transfer_history",
         ]
 
     def get_is_24h_valid(self, room: Room) -> bool:
