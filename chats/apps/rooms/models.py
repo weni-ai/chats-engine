@@ -12,6 +12,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django_redis import get_redis_connection
 from model_utils import FieldTracker
 from requests.exceptions import RequestException
 from rest_framework.exceptions import ValidationError
@@ -233,11 +234,19 @@ class Room(BaseModel, BaseConfigurableModel):
 
     def trigger_default_message(self):
         default_message = self.queue.default_message
-        if default_message:
-            sent_message = self.messages.create(
-                user=None, contact=None, text=default_message
-            )
-            sent_message.notify_room("create", True)
+        if not default_message:
+            return
+
+        cache_key = f"room_default_message:{self.pk}"
+
+        with get_redis_connection() as redis_connection:
+            if not redis_connection.set(cache_key, "1", ex=10, nx=True):
+                return
+
+        sent_message = self.messages.create(
+            user=None, contact=None, text=default_message
+        )
+        sent_message.notify_room("create", True)
 
     @property
     def is_24h_valid(self) -> bool:
