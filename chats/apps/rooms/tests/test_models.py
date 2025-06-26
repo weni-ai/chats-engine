@@ -221,6 +221,7 @@ class TestRoomModel(TestCase):
         )
         room.add_transfer_to_history(feedback)
         self.assertEqual(room.full_transfer_history, [feedback])
+        self.assertEqual(room.transfer_history, feedback)
 
         other_feedback = create_transfer_json(
             action="transfer",
@@ -229,3 +230,4 @@ class TestRoomModel(TestCase):
         )
         room.add_transfer_to_history(other_feedback)
         self.assertEqual(room.full_transfer_history, [feedback, other_feedback])
+        self.assertEqual(room.transfer_history, other_feedback)
