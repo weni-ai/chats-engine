@@ -491,6 +491,7 @@ class RoomViewset(
         room_metric.save()
 
         room.user = user
+        room.save()
         room.add_transfer_to_history(feedback)
 
         create_room_feedback_message(
