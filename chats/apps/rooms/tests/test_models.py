@@ -1,3 +1,4 @@
+import time
 import uuid
 
 from django.conf import settings
@@ -208,3 +209,35 @@ class TestRoomModel(TestCase):
 
         room.close()
         self.assertEqual(room.pins.count(), 0)
+
+    def test_add_to_queue_at_field(self):
+        user = User.objects.create(email="a@user.com")
+        room = Room.objects.create(queue=self.queue)
+
+        added_to_queue_at = room.added_to_queue_at
+
+        self.assertEqual(
+            added_to_queue_at.strftime("%Y-%m-%d %H:%M:%S"),
+            room.created_on.strftime("%Y-%m-%d %H:%M:%S"),
+        )
+
+        time.sleep(1)
+
+        room.user = user
+        room.save()
+
+        room.refresh_from_db()
+
+        # added_to_queue_at should not change
+        self.assertEqual(room.added_to_queue_at, added_to_queue_at)
+
+        time.sleep(1)
+
+        room.user = None
+        room.save()
+
+        room.refresh_from_db()
+
+        # added_to_queue_at should change when user is removed
+        # as, in practice, the room is added to the queue
+        self.assertNotEqual(room.added_to_queue_at, added_to_queue_at)

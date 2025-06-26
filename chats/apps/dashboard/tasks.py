@@ -17,6 +17,7 @@ def generate_metrics(room_uuid: UUID):
     metric_room = RoomMetrics.objects.get_or_create(room=room)[0]
     metric_room.message_response_time = calculate_response_time(room)
     metric_room.interaction_time = interaction_time.total_seconds()
+
     metric_room.save()
 
 

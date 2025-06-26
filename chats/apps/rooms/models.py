@@ -106,6 +106,9 @@ class Room(BaseModel, BaseConfigurableModel):
     user_assigned_at = models.DateTimeField(
         _("User assigned at"), null=True, blank=True
     )
+    added_to_queue_at = models.DateTimeField(
+        _("Added to queue at"), null=True, blank=True
+    )
 
     tracker = FieldTracker(fields=["user"])
 
@@ -148,10 +151,16 @@ class Room(BaseModel, BaseConfigurableModel):
         if self.__original_is_active is False:
             raise ValidationError({"detail": _("Closed rooms cannot receive updates")})
 
+        if self._state.adding:
+            self.added_to_queue_at = timezone.now()
+
         user_has_changed = self.pk and self.tracker.has_changed("user")
 
         if self.user and not self.user_assigned_at or user_has_changed:
             self.user_assigned_at = timezone.now()
+
+        if user_has_changed and not self.user:
+            self.added_to_queue_at = timezone.now()
 
         if user_has_changed:
             self.clear_pins()
