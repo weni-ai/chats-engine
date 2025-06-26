@@ -64,9 +64,19 @@ class InServiceStatusService:
         """
         from chats.apps.projects.models.models import CustomStatus
         from chats.apps.rooms.models import Room
+        from chats.apps.projects.models import ProjectPermission
 
         if not user or not project:
             return
+        
+        permission = ProjectPermission.objects.filter(
+            user=user, project=project
+        ).first()
+
+        if not permission:
+            return
+
+        user_status = permission.status
 
         status_type = cls.get_or_create_status_type(project)
 
@@ -83,10 +93,6 @@ class InServiceStatusService:
             .filter(user=user, status_type=status_type, is_active=True, project=project)
             .first()
         )
-
-        from chats.apps.projects.models import ProjectPermission
-
-        user_status = ProjectPermission.objects.get(user=user, project=project).status
 
         if (
             room_count >= 1
@@ -146,7 +152,7 @@ class InServiceStatusService:
             else:
                 logger.error("room_closed: Não encontrou In-Service ativo")
         else:
-            logger.error(f"DEBUG room_closed: Ainda tem {room_count} salas ativas")
+            logger.error(f"room_closed: Ainda tem {room_count} salas ativas")
 
     @classmethod
     @transaction.atomic
