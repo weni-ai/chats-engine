@@ -13,7 +13,7 @@ def should_exclude_admin_domains(user_email: str) -> bool:
     """
     if not user_email:
         return False
-    
+
     return any(domain in user_email for domain in EXCLUDED_DOMAINS)
 
 
@@ -22,11 +22,11 @@ def get_admin_domains_exclude_filter():
     Retorna um filtro Q para excluir usuários com domínios administrativos.
     """
     from django.db.models import Q
-    
+
     exclude_filter = Q()
     for domain in EXCLUDED_DOMAINS:
         exclude_filter |= Q(email__endswith=domain)
-    
+
     return exclude_filter
 
 
