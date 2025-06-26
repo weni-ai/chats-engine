@@ -1,4 +1,5 @@
 import json
+import logging
 
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import transaction
@@ -54,7 +55,6 @@ from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import create_room_feedback_message
 from chats.apps.sectors.models import Sector
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -686,7 +686,6 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                     {"status": "Can't update user status in project."}
                 )
 
-            # SEMPRE finalizar In-Service quando vai para OFFLINE (igual à pausa)
             in_service_type = InServiceStatusService.get_or_create_status_type(project)
             in_service_status = CustomStatus.objects.filter(
                 user=user, status_type=in_service_type, is_active=True, project=project
@@ -717,15 +716,9 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def close_status(self, request, pk=None):
-        print("🔍 DEBUG: close_status foi chamado!")
-        
         try:
             instance = CustomStatus.objects.get(pk=pk)
-            print(f"🔍 DEBUG: close_status chamado para {instance.user}")
-            
-            print(f"🔍 DEBUG: request.data = {request.data}")
-            print(f"🔍 DEBUG: is_active do request = {request.data.get('is_active', 'NÃO ENVIADO')}")
-            
+
             last_active_status = (
                 CustomStatus.objects.filter(
                     user=instance.user,
@@ -748,9 +741,6 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                 end_time = timezone.now()
                 is_active = request.data.get("is_active", False)
 
-                print(f"🔍 DEBUG: is_active = {is_active}")
-                print(f"🔍 DEBUG: request.data = {request.data}")
-
                 if is_active:
                     updated_rows = ProjectPermission.objects.filter(
                         user=instance.user, project=instance.status_type.project
@@ -771,38 +761,25 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                 instance.is_active = False
                 instance.save()
 
-                # Verificar se tem salas ativas
                 room_count = Room.objects.filter(
                     user=instance.user,
                     queue__sector__project=instance.status_type.project,
                     is_active=True,
                 ).count()
 
-                # Verificar se tem status de prioridade (DEPOIS de fechar o status atual)
                 has_other_priority = InServiceStatusService.has_priority_status(
                     instance.user, instance.status_type.project
                 )
-                
-                print(f"🔍 DEBUG: room_count = {room_count}")
-                print(f"🔍 DEBUG: has_other_priority = {has_other_priority}")
-                print(f"🔍 DEBUG: Condição seria: {room_count > 0 and not has_other_priority}")
-                
-                # Verificar se o usuário está ONLINE
+
                 user_status = ProjectPermission.objects.get(
-                    user=instance.user, 
-                    project=instance.status_type.project
+                    user=instance.user, project=instance.status_type.project
                 ).status
 
-                print(f"🔍 DEBUG: user_status = {user_status}")
-
-                # Se tem salas ativas, não tem outros status prioritários E está ONLINE, recriar In-Service
-                if room_count > 0 and not has_other_priority and user_status == "ONLINE":
-                    print(f"🔍 DEBUG: Recriando In-Service!")
-                    print(f"🔍 DEBUG: Recriando In-Service para {instance.user}")
-                    print(f"🔍 DEBUG: room_count = {room_count}")
-                    print(f"🔍 DEBUG: has_other_priority = {has_other_priority}")
-                    print(f"🔍 DEBUG: project = {instance.status_type.project.name}")
-                    
+                if (
+                    room_count > 0
+                    and not has_other_priority
+                    and user_status == "ONLINE"
+                ):
                     in_service_type = InServiceStatusService.get_or_create_status_type(
                         instance.status_type.project
                     )

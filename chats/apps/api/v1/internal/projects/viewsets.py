@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
+from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -8,18 +9,16 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from django.utils import timezone
 
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.api.v1.internal.projects import serializers
-from chats.apps.projects.models import Project, ProjectPermission
+from chats.apps.projects.models import CustomStatus, Project, ProjectPermission
+from chats.apps.projects.usecases.status_service import InServiceStatusService
 from chats.apps.queues.utils import (
     start_queue_priority_routing_for_all_queues_in_project,
 )
-from chats.core.views import persist_keycloak_user_by_email
-from chats.apps.projects.usecases.status_service import InServiceStatusService
 from chats.apps.rooms.models import Room
-from chats.apps.projects.models import CustomStatus
+from chats.core.views import persist_keycloak_user_by_email
 
 User = get_user_model()
 
@@ -119,34 +118,29 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
             if user_status.lower() == "online":
                 instance.status = ProjectPermission.STATUS_ONLINE
                 instance.save()
-                
-                # Verificar se deve recriar In-Service
-                # Verificar se tem salas ativas
+
                 room_count = Room.objects.filter(
                     user=instance.user,
                     queue__sector__project=instance.project,
                     is_active=True,
                 ).count()
-                
-                # Verificar se tem status de prioridade
+
                 has_other_priority = InServiceStatusService.has_priority_status(
                     instance.user, instance.project
                 )
-                
-                # Se tem salas e não tem outros status prioritários, criar In-Service
+
                 if room_count > 0 and not has_other_priority:
                     in_service_type = InServiceStatusService.get_or_create_status_type(
                         instance.project
                     )
-                    
-                    # Verificar se já não existe um In-Service ativo
+
                     existing_in_service = CustomStatus.objects.filter(
                         user=instance.user,
                         status_type=in_service_type,
                         is_active=True,
-                        project=instance.project
+                        project=instance.project,
                     ).exists()
-                    
+
                     if not existing_in_service:
                         CustomStatus.objects.create(
                             user=instance.user,
@@ -159,17 +153,17 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
             elif user_status.lower() == "offline":
                 instance.status = ProjectPermission.STATUS_OFFLINE
                 instance.save()
-                
-                # Verificar se tem status In-Service ativo
-                in_service_type = InServiceStatusService.get_or_create_status_type(instance.project)
+
+                in_service_type = InServiceStatusService.get_or_create_status_type(
+                    instance.project
+                )
                 in_service_status = CustomStatus.objects.filter(
                     user=instance.user,
                     status_type=in_service_type,
                     is_active=True,
-                    project=instance.project
+                    project=instance.project,
                 ).first()
-                
-                # Se encontrar um status In-Service ativo, finaliza ele
+
                 if in_service_status:
                     project_tz = instance.project.timezone
                     end_time = timezone.now().astimezone(project_tz)
@@ -178,7 +172,7 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
                     in_service_status.is_active = False
                     in_service_status.break_time = int(service_duration.total_seconds())
                     in_service_status.save(update_fields=["is_active", "break_time"])
-                
+
             instance.notify_user("update")
 
             start_queue_priority_routing_for_all_queues_in_project(instance.project)

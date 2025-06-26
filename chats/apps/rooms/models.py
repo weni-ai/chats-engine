@@ -20,14 +20,13 @@ from chats.apps.accounts.models import User
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.projects.models.models import RoomRoutingType
 from chats.apps.projects.usecases.send_room_info import RoomInfoUseCase
+from chats.apps.projects.usecases.status_service import InServiceStatusService
 from chats.apps.rooms.exceptions import (
     MaxPinRoomLimitReachedError,
     RoomIsNotActiveError,
 )
 from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
-
-from chats.apps.projects.usecases.status_service import InServiceStatusService
 
 if TYPE_CHECKING:
     from chats.apps.projects.models.models import Project
@@ -139,11 +138,9 @@ class Room(BaseModel, BaseConfigurableModel):
         Args:
             is_new: Boolean indicando se é uma sala nova
         """
-        # Obter valores relevantes
         old_user = self._original_user
         new_user = self.user
 
-        # Obter o projeto da sala
         project = None
         if self.queue and hasattr(self.queue, "sector"):
             sector = self.queue.sector
@@ -151,25 +148,21 @@ class Room(BaseModel, BaseConfigurableModel):
                 project = sector.project
 
         if not project:
-            return  # Se não encontrar projeto, não faz nada
+            return
 
-        # Caso 1: Sala nova com usuário atribuído
         if is_new and new_user:
             InServiceStatusService.room_assigned(new_user, project)
             return
 
-        # Caso 2: Usuário adicionado a uma sala existente
         if old_user is None and new_user is not None:
             InServiceStatusService.room_assigned(new_user, project)
             return
 
-        # Caso 3: Transferência entre agentes
         if old_user is not None and new_user is not None and old_user != new_user:
             InServiceStatusService.room_closed(old_user, project)
             InServiceStatusService.room_assigned(new_user, project)
             return
 
-        # Caso 4: Usuário removido da sala
         if old_user is not None and new_user is None:
             InServiceStatusService.room_closed(old_user, project)
             return
@@ -200,13 +193,10 @@ class Room(BaseModel, BaseConfigurableModel):
         if user_has_changed:
             self.clear_pins()
 
-        # Capturar o estado anterior para comparação
         is_new = self._state.adding
-        
-        # Salvar o objeto primeiro
+
         super().save(*args, **kwargs)
-        
-        # Atualizar o status dos agentes após salvar
+
         self._update_agent_service_status(is_new)
 
     def get_permission(self, user):
@@ -278,12 +268,8 @@ class Room(BaseModel, BaseConfigurableModel):
         )
 
     def close(self, tags: list = [], end_by: str = ""):
-        """Fecha uma sala e atualiza o status do agente"""
         from chats.apps.projects.usecases.status_service import InServiceStatusService
-        
-        print(f"🔍 DEBUG close(): user={self.user}, is_active={self.is_active}")
-        
-        # Aplicar as mudanças ao objeto PRIMEIRO
+
         self.is_active = False
         self.ended_at = timezone.now()
         self.ended_by = end_by
@@ -292,27 +278,17 @@ class Room(BaseModel, BaseConfigurableModel):
             self.tags.add(*tags)
 
         self.clear_pins()
-        
-        # Salvar a sala como inativa
+
         self.save()
-        
-        # AGORA chamar room_closed, quando a sala já está inativa no banco
+
         if self.user:
             project = None
             if self.queue and hasattr(self.queue, "sector"):
                 sector = self.queue.sector
                 if sector and hasattr(sector, "project"):
                     project = sector.project
-            
-            print(f"🔍 DEBUG close(): project={project}")
-            
             if project:
-                print(f"🔍 DEBUG close(): Chamando InServiceStatusService.room_closed")
                 InServiceStatusService.room_closed(self.user, project)
-            else:
-                print(f"🔍 DEBUG close(): project é None, não chama room_closed")
-        else:
-            print(f"🔍 DEBUG close(): user é None, não chama room_closed")
 
     def request_callback(self, room_data: dict):
         if self.callback_url is None:

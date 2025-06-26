@@ -44,7 +44,7 @@ class TestCustomStatusViewSet(TestCase):
         self.viewset = CustomStatusViewSet()
 
     def test_last_status_with_active_status(self):
-        """Testa o retorno do último status ativo do usuário"""
+        """Tests the return of user's last active status"""
         request = self.factory.get("/custom-status/last-status/")
         force_authenticate(request, user=self.user)
         request = Request(request)
@@ -57,7 +57,7 @@ class TestCustomStatusViewSet(TestCase):
         self.assertTrue(response.data["is_active"])
 
     def test_last_status_without_active_status(self):
-        """Testa o retorno quando não há status ativo"""
+        """Tests the return when there is no active status"""
         CustomStatus.objects.all().update(is_active=False)
 
         request = self.factory.get("/custom-status/last-status/")
@@ -71,7 +71,7 @@ class TestCustomStatusViewSet(TestCase):
         self.assertEqual(response.data["detail"], "No status found")
 
     def test_close_status(self):
-        """Testa o fechamento de um status"""
+        """Tests closing a status"""
         created_on = timezone.now() - timedelta(hours=1)
         self.custom_status.created_on = created_on
         self.custom_status.save()
@@ -92,7 +92,7 @@ class TestCustomStatusViewSet(TestCase):
         self.assertTrue(status_instance.break_time > 0)
 
     def test_close_status_not_last_active(self):
-        """Testa tentativa de fechar um status que não é o último ativo"""
+        """Tests attempt to close a status that is not the last active one"""
         CustomStatus.objects.create(
             user=self.user, status_type=self.status_type, is_active=True, break_time=0
         )
@@ -113,7 +113,7 @@ class TestCustomStatusViewSet(TestCase):
         self.assertIn("not the last active status", response.data["detail"])
 
     def test_close_status_missing_end_time(self):
-        """Testa tentativa de fechar um status sem fornecer end_time"""
+        """Tests attempt to close a status without providing end_time"""
         request = self.factory.post(
             f"/custom-status/{self.custom_status.pk}/close-status/", {}, format="json"
         )
@@ -128,7 +128,7 @@ class TestCustomStatusViewSet(TestCase):
         self.assertFalse(self.custom_status.is_active)
 
     def test_close_status_invalid_end_time(self):
-        """Testa tentativa de fechar um status com end_time em formato inválido"""
+        """Tests attempt to close a status with invalid end_time format"""
         request = self.factory.post(
             f"/custom-status/{self.custom_status.pk}/close-status/",
             {"end_time": "invalid-date-format"},

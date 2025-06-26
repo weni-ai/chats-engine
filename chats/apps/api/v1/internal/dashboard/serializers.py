@@ -47,7 +47,6 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
     custom_status = serializers.SerializerMethodField()
     in_service_time = serializers.SerializerMethodField()
 
-
     def get_link(self, obj):
         return {
             "url": f"chats:dashboard/view-mode/{obj.get('email', '')}",
@@ -86,10 +85,8 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
             "name", flat=True
         )
 
-        # Criar dicionário para os tempos acumulados de break_time
         status_dict = {status_type: 0 for status_type in all_status_types}
 
-        # Processar tempos de break_time para todos os status exceto In-Service
         if custom_status_list:
             for status_item in custom_status_list:
                 status_type = status_item.get("status_type")
@@ -97,11 +94,9 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
                 if status_type in status_dict and status_type != "In-Service":
                     status_dict[status_type] += break_time
 
-        # Definir o valor de In-Service com o tempo calculado
         if "In-Service" in status_dict:
             status_dict["In-Service"] = in_service_time
 
-        # Criar a lista de resultados
         result = [
             {"status_type": status_type, "break_time": break_time}
             for status_type, break_time in status_dict.items()
@@ -111,6 +106,5 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
 
     def get_in_service_time(self, obj):
         return calculate_in_service_time(
-            obj.get("custom_status"),
-            user_status=obj.get("status")
+            obj.get("custom_status"), user_status=obj.get("status")
         )

@@ -1,7 +1,7 @@
-import json
 import asyncio
-import uuid
+import json
 import logging
+import uuid
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
@@ -9,10 +9,9 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 
-from chats.core.cache import CacheClient
-from chats.apps.projects.usecases.status_service import InServiceStatusService
 from chats.apps.projects.models.models import ProjectPermission
-
+from chats.apps.projects.usecases.status_service import InServiceStatusService
+from chats.core.cache import CacheClient
 
 USE_WS_CONNECTION_CHECK = getattr(settings, "USE_WS_CONNECTION_CHECK", False)
 CONNECTION_CHECK_CACHE_PREFIX = "connection_check_response_"
@@ -328,7 +327,9 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
     @database_sync_to_async
     def finalize_in_service_if_needed(self):
         try:
-            permission = ProjectPermission.objects.get(user=self.user, project_id=self.project)
+            permission = ProjectPermission.objects.get(
+                user=self.user, project_id=self.project
+            )
             if permission.status == ProjectPermission.STATUS_ONLINE:
                 InServiceStatusService.room_closed(self.user, permission.project)
         except ProjectPermission.DoesNotExist:
