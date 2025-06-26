@@ -89,7 +89,12 @@ class Room(BaseModel, BaseConfigurableModel):
     is_active = models.BooleanField(_("is active?"), default=True)
     is_waiting = models.BooleanField(_("is waiting for answer?"), default=False)
 
+    # Legacy, only stores the last transfer
     transfer_history = models.JSONField(_("Transfer History"), null=True, blank=True)
+    # New, stores the full transfer history
+    full_transfer_history = models.JSONField(
+        _("Full Transfer History"), null=True, blank=True, default=list
+    )
 
     tags = models.ManyToManyField(
         "sectors.SectorTag",
