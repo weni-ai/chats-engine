@@ -6,6 +6,7 @@ from django.http import HttpResponse
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from chats.apps.api.v1.dashboard.presenter import get_export_data
 from chats.apps.api.v1.dashboard.repository import (
@@ -24,6 +25,7 @@ from chats.core.excel_storage import ExcelStorage
 
 from .dto import Filters, should_exclude_admin_domains
 from .service import AgentsService, RawDataService, RoomsDataService, SectorService
+from .presenter import ModelFieldsPresenter
 
 
 class DashboardLiveViewset(viewsets.GenericViewSet):
@@ -373,3 +375,13 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             data_frame_3.to_csv(response, index=False, mode="a", sep=";")
 
             return response
+
+
+class ModelFieldsViewSet(APIView):
+    """
+    Endpoint para retornar os campos disponíveis dos principais models do sistema.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        return Response(ModelFieldsPresenter.get_models_info())
