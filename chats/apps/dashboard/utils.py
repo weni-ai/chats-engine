@@ -5,8 +5,6 @@ from datetime import timedelta
 from django.db.models import Q
 from django.utils import timezone
 
-from chats.apps.dashboard.models import RoomMetrics
-
 logger = logging.getLogger(__name__)
 
 
