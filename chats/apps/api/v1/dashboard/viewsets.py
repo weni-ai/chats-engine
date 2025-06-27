@@ -22,7 +22,7 @@ from chats.apps.api.v1.permissions import HasDashboardAccess
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.core.excel_storage import ExcelStorage
 
-from .dto import Filters
+from .dto import Filters, should_exclude_admin_domains
 from .service import AgentsService, RawDataService, RoomsDataService, SectorService
 
 
@@ -56,9 +56,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             queue=params.get("queue"),
             user_request=user_permission,
             project=project,
-            is_weni_admin=(
-                True if request.user and "weni.ai" in request.user.email else False
-            ),
+            is_weni_admin=should_exclude_admin_domains(request.user.email if request.user else ""),
         )
 
         rooms_service = RoomsDataService(
@@ -85,9 +83,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=params.get("tag"),
             queue=params.get("queue"),
             user_request=request.user,
-            is_weni_admin=(
-                True if request.user and "weni.ai" in request.user.email else False
-            ),
+            is_weni_admin=should_exclude_admin_domains(request.user.email if request.user else ""),
         )
 
         agents_service = AgentsService()
@@ -120,9 +116,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=params.get("tag"),
             user_request=user_permission,
             project=project,
-            is_weni_admin=(
-                True if request.user and "weni.ai" in request.user.email else False
-            ),
+            is_weni_admin=should_exclude_admin_domains(request.user.email if request.user else ""),
         )
 
         sectors_service = SectorService()
@@ -152,9 +146,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=params.get("tag"),
             user_request=user_permission,
             project=project,
-            is_weni_admin=(
-                True if request.user and "weni.ai" in request.user.email else False
-            ),
+            is_weni_admin=should_exclude_admin_domains(request.user.email if request.user else ""),
         )
 
         raw_service = RawDataService()
@@ -248,9 +240,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=filter.get("tag"),
             user_request=user_permission,
             project=project,
-            is_weni_admin=(
-                True if request.user and "weni.ai" in request.user.email else False
-            ),
+            is_weni_admin=should_exclude_admin_domains(request.user.email if request.user else ""),
         )
 
         # Rooms Data

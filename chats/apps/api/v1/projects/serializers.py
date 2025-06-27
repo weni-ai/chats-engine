@@ -2,12 +2,12 @@ from rest_framework import serializers
 from timezone_field.rest_framework import TimeZoneSerializerField
 
 from chats.apps.projects.models import (
+    CustomStatus,
+    CustomStatusType,
     FlowStart,
     LinkContact,
     Project,
     ProjectPermission,
-    CustomStatusType,
-    CustomStatus,
 )
 from chats.apps.sectors.models import Sector
 
@@ -122,6 +122,11 @@ class CustomStatusTypeSerializer(serializers.ModelSerializer):
         model = CustomStatusType
         fields = ["uuid", "name", "project", "is_deleted"]
         read_only_fields = ["uuid", "is_deleted"]
+
+    def validate_name(self, name):
+        if name == "In-Service":
+            raise serializers.ValidationError("Invalid status name")
+        return name
 
 
 class CustomStatusSerializer(serializers.ModelSerializer):

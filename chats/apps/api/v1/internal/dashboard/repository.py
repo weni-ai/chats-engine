@@ -5,6 +5,7 @@ from django.db.models.functions import JSONObject
 from django.utils import timezone
 
 from chats.apps.accounts.models import User
+from chats.apps.api.v1.dashboard.dto import get_admin_domains_exclude_filter
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.projects.models.models import CustomStatus
 
@@ -77,7 +78,7 @@ class AgentRepository:
 
         agents_query = self.model
         if not filters.is_weni_admin:
-            agents_query = agents_query.exclude(email__endswith="weni.ai")
+            agents_query = agents_query.exclude(get_admin_domains_exclude_filter())
 
         if filters.agent:
             agents_query = agents_query.filter(email=filters.agent)
@@ -147,17 +148,17 @@ class AgentRepository:
         if filters.queue and filters.sector:
             rooms_filter["rooms__queue"] = filters.queue
             rooms_filter["rooms__queue__sector__in"] = filters.sector
-            agents_filter["project_permissions__queue_authorizations__queue"] = (
-                filters.queue
-            )
+            agents_filter[
+                "project_permissions__queue_authorizations__queue"
+            ] = filters.queue
             agents_filter[
                 "project_permissions__queue_authorizations__queue__sector__in"
             ] = filters.sector
         elif filters.queue:
             rooms_filter["rooms__queue"] = filters.queue
-            agents_filter["project_permissions__queue_authorizations__queue"] = (
-                filters.queue
-            )
+            agents_filter[
+                "project_permissions__queue_authorizations__queue"
+            ] = filters.queue
         elif filters.sector:
             rooms_filter["rooms__queue__sector__in"] = filters.sector
             agents_filter[
@@ -200,6 +201,7 @@ class AgentRepository:
                         status_type=F("status_type__name"),
                         break_time=F("break_time"),
                         is_active=F("is_active"),
+                        created_on=F("created_on"),
                     )
                 )
             )
@@ -210,7 +212,7 @@ class AgentRepository:
         agents_query = self.model.all()
 
         if not filters.is_weni_admin:
-            agents_query = agents_query.exclude(email__endswith="weni.ai")
+            agents_query = agents_query.exclude(get_admin_domains_exclude_filter())
         if filters.agent:
             agents_query = agents_query.filter(email=filters.agent)
 

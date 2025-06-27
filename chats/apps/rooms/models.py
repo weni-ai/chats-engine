@@ -12,6 +12,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django_redis import get_redis_connection
 from model_utils import FieldTracker
 from requests.exceptions import RequestException
 from rest_framework.exceptions import ValidationError
@@ -20,6 +21,7 @@ from chats.apps.accounts.models import User
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.projects.models.models import RoomRoutingType
 from chats.apps.projects.usecases.send_room_info import RoomInfoUseCase
+from chats.apps.projects.usecases.status_service import InServiceStatusService
 from chats.apps.rooms.exceptions import (
     MaxPinRoomLimitReachedError,
     RoomIsNotActiveError,
@@ -39,6 +41,7 @@ class Room(BaseModel, BaseConfigurableModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.__original_is_active = self.is_active
+        self._original_user = self.user
 
     user = models.ForeignKey(
         "accounts.User",
@@ -133,6 +136,41 @@ class Room(BaseModel, BaseConfigurableModel):
             self.pk,
         )
 
+    def _update_agent_service_status(self, is_new):
+        """
+        Atualiza o status 'In-Service' dos agentes baseado nas mudanças na sala
+        Args:
+            is_new: Boolean indicando se é uma sala nova
+        """
+        old_user = self._original_user
+        new_user = self.user
+
+        project = None
+        if self.queue and hasattr(self.queue, "sector"):
+            sector = self.queue.sector
+            if sector and hasattr(sector, "project"):
+                project = sector.project
+
+        if not project:
+            return
+
+        if is_new and new_user:
+            InServiceStatusService.room_assigned(new_user, project)
+            return
+
+        if old_user is None and new_user is not None:
+            InServiceStatusService.room_assigned(new_user, project)
+            return
+
+        if old_user is not None and new_user is not None and old_user != new_user:
+            InServiceStatusService.room_closed(old_user, project)
+            InServiceStatusService.room_assigned(new_user, project)
+            return
+
+        if old_user is not None and new_user is None:
+            InServiceStatusService.room_closed(old_user, project)
+            return
+
     class Meta:
         verbose_name = _("Room")
         verbose_name_plural = _("Rooms")
@@ -165,7 +203,11 @@ class Room(BaseModel, BaseConfigurableModel):
         if user_has_changed:
             self.clear_pins()
 
-        return super().save(*args, **kwargs)
+        is_new = self._state.adding
+
+        super().save(*args, **kwargs)
+
+        self._update_agent_service_status(is_new)
 
     def get_permission(self, user):
         try:
@@ -201,11 +243,19 @@ class Room(BaseModel, BaseConfigurableModel):
 
     def trigger_default_message(self):
         default_message = self.queue.default_message
-        if default_message:
-            sent_message = self.messages.create(
-                user=None, contact=None, text=default_message
-            )
-            sent_message.notify_room("create", True)
+        if not default_message:
+            return
+
+        cache_key = f"room_default_message:{self.pk}"
+
+        with get_redis_connection() as redis_connection:
+            if not redis_connection.set(cache_key, "1", ex=10, nx=True):
+                return
+
+        sent_message = self.messages.create(
+            user=None, contact=None, text=default_message
+        )
+        sent_message.notify_room("create", True)
 
     @property
     def is_24h_valid(self) -> bool:
@@ -236,6 +286,8 @@ class Room(BaseModel, BaseConfigurableModel):
         )
 
     def close(self, tags: list = [], end_by: str = ""):
+        from chats.apps.projects.usecases.status_service import InServiceStatusService
+
         self.is_active = False
         self.ended_at = timezone.now()
         self.ended_by = end_by
@@ -246,6 +298,15 @@ class Room(BaseModel, BaseConfigurableModel):
         self.clear_pins()
 
         self.save()
+
+        if self.user:
+            project = None
+            if self.queue and hasattr(self.queue, "sector"):
+                sector = self.queue.sector
+                if sector and hasattr(sector, "project"):
+                    project = sector.project
+            if project:
+                InServiceStatusService.room_closed(self.user, project)
 
     def request_callback(self, room_data: dict):
         if self.callback_url is None:
