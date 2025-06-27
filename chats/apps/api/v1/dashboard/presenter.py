@@ -4,6 +4,7 @@ import pendulum
 from django.db.models import Avg, Count, F, Q, Sum
 from django.utils import timezone
 from django.apps import apps
+from django.core.cache import cache
 
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.queues.models import Queue
@@ -305,8 +306,13 @@ class ModelFieldsPresenter:
     @staticmethod
     def get_models_info():
         """
-        Retorna informações sobre os campos de cada model
+        Return information about the fields of each model, with a 1 day cache.
         """
+        cache_key = 'model_fields_presenter_models_info'
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return cached_data
+
         models_info = {
             'sectors': ModelFieldsPresenter._get_model_fields('sectors', 'Sector'),
             'queues': ModelFieldsPresenter._get_model_fields('queues', 'Queue'),
@@ -315,12 +321,13 @@ class ModelFieldsPresenter:
             'sector_tags': ModelFieldsPresenter._get_model_fields('sectors', 'SectorTag'),
             'contacts': ModelFieldsPresenter._get_model_fields('contacts', 'Contact')
         }
+        cache.set(cache_key, models_info, timeout=86400)
         return models_info
 
     @staticmethod
     def _get_model_fields(app_label, model_name):
         """
-        Retorna informações sobre os campos de um model específico
+        Return information about the fields of a specific model
         """
         try:
             model = apps.get_model(app_label, model_name)
@@ -340,4 +347,4 @@ class ModelFieldsPresenter:
 
             return fields
         except LookupError:
-            return {'error': f'Model {model_name} não encontrado no app {app_label}'}
+            return {'error': f'Model {model_name} not found in app {app_label}'}
