@@ -93,6 +93,10 @@ class FlowsQueueMixin:
             headers=self.headers,
         )
 
+        if response.status_code == status.HTTP_404_NOT_FOUND:
+            url = f"{self.base_url}/api/v2/internals/ticketers/{sector_uuid}/queues/{uuid}/"
+            LOGGER.error("Queue %s not found on Flows. URL: %s", uuid, url)
+
         if response.status_code not in [
             status.HTTP_200_OK,
             status.HTTP_201_CREATED,
