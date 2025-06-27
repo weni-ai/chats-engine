@@ -1,10 +1,15 @@
 from datetime import timedelta
+import time
 
 from django.test import TestCase
 
 from chats.apps.accounts.models import User
 from chats.apps.contacts.models import Contact
-from chats.apps.dashboard.utils import calculate_response_time
+from chats.apps.dashboard.models import RoomMetrics
+from chats.apps.dashboard.utils import (
+    calculate_response_time,
+    calculate_last_queue_waiting_time,
+)
 from chats.apps.msgs.models import Message
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
@@ -159,3 +164,83 @@ class CalculateResponseTimeTests(TestCase):
         self._create_message("agent", "How can I help?", 10 + 40)  # Response time = 40
 
         self.assertEqual(calculate_response_time(self.room), 20)
+
+
+class CalculateWaitingTimeTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create(email="agent@example.com")
+        self.contact = Contact.objects.create()
+        self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            rooms_limit=1,
+            work_start="00:00:00",
+            work_end="23:59:59",
+            project=self.project,
+        )
+        self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
+        self.room = Room.objects.create(contact=self.contact, queue=self.queue)
+        self.metric = RoomMetrics.objects.get_or_create(room=self.room)[0]
+
+    def test_last_queue_waiting_time_when_room_is_created(self):
+        self.assertEqual(
+            self.room.added_to_queue_at.strftime("%Y-%m-%d %H:%M:%S"),
+            self.room.created_on.strftime("%Y-%m-%d %H:%M:%S"),
+        )
+
+    def test_last_queue_waiting_time_when_user_is_assigned(self):
+        self.assertEqual(
+            self.room.added_to_queue_at.strftime("%Y-%m-%d %H:%M:%S"),
+            self.room.created_on.strftime("%Y-%m-%d %H:%M:%S"),
+        )
+
+        time.sleep(1)
+        # Room spent 1 second in the queue
+
+        self.room.user = self.user
+        self.room.save()
+
+        self.room.refresh_from_db()
+
+        self.assertEqual(
+            self.room.added_to_queue_at.strftime("%Y-%m-%d %H:%M:%S"),
+            self.room.created_on.strftime("%Y-%m-%d %H:%M:%S"),
+        )
+
+        waiting_time = calculate_last_queue_waiting_time(self.room)
+
+        # Assert that the waiting time is 1 second
+        self.assertEqual(waiting_time, 1)
+
+        self.room.user = None
+        self.room.save()
+
+        time.sleep(2)
+        # Room spent 2 seconds in the queue
+
+        self.room.refresh_from_db()
+
+        waiting_time = calculate_last_queue_waiting_time(self.room)
+
+        # Assert that the waiting time is 2 seconds
+        self.assertEqual(waiting_time, 2)
+
+        # One more second before user is assigned
+        time.sleep(1)
+
+        self.room.user = self.user
+        self.room.save()
+
+        self.room.refresh_from_db()
+
+        waiting_time = calculate_last_queue_waiting_time(self.room)
+
+        # Assert that the waiting time is 3 seconds
+        self.assertEqual(waiting_time, 3)
+
+    def test_last_queue_waiting_time_when_room_is_ended_and_user_is_not_assigned(self):
+        # Room spent 1 second in the queue
+        time.sleep(1)
+        waiting_time = calculate_last_queue_waiting_time(self.room)
+
+        self.assertEqual(waiting_time, 1)
