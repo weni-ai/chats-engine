@@ -195,38 +195,52 @@ class CalculateWaitingTimeTests(TestCase):
         )
 
         time.sleep(1)
+        # Room spent 1 second in the queue
 
         self.room.user = self.user
         self.room.save()
 
         self.room.refresh_from_db()
 
-        self.assertNotEqual(
+        self.assertEqual(
             self.room.added_to_queue_at.strftime("%Y-%m-%d %H:%M:%S"),
             self.room.created_on.strftime("%Y-%m-%d %H:%M:%S"),
         )
 
         waiting_time = calculate_last_queue_waiting_time(self.room)
 
+        # Assert that the waiting time is 1 second
         self.assertEqual(waiting_time, 1)
 
         self.room.user = None
+        self.room.save()
+
+        time.sleep(2)
+        # Room spent 2 seconds in the queue
+
+        self.room.refresh_from_db()
+
+        waiting_time = calculate_last_queue_waiting_time(self.room)
+
+        # Assert that the waiting time is 2 seconds
+        self.assertEqual(waiting_time, 2)
+
+        # One more second before user is assigned
+        time.sleep(1)
+
+        self.room.user = self.user
         self.room.save()
 
         self.room.refresh_from_db()
 
         waiting_time = calculate_last_queue_waiting_time(self.room)
 
-        self.assertEqual(waiting_time, 1)
+        # Assert that the waiting time is 3 seconds
+        self.assertEqual(waiting_time, 3)
 
     def test_last_queue_waiting_time_when_room_is_ended_and_user_is_not_assigned(self):
-        self.room.user = None
-        self.room.save()
-
-        self.room.refresh_from_db()
-
+        # Room spent 1 second in the queue
         time.sleep(1)
-
         waiting_time = calculate_last_queue_waiting_time(self.room)
 
         self.assertEqual(waiting_time, 1)

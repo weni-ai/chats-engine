@@ -66,10 +66,7 @@ def calculate_last_queue_waiting_time(room: "Room"):
     Calculate waiting time for a room.
     """
 
-    if not room.added_to_queue_at or not room.user_assigned_at:
+    if not room.added_to_queue_at:
         return (timezone.now() - room.created_on).total_seconds()
 
-    if not room.user:
-        return (timezone.now() - room.added_to_queue_at).total_seconds()
-
-    return (room.user_assigned_at - room.added_to_queue_at).total_seconds()
+    return int((timezone.now() - room.added_to_queue_at).total_seconds())
