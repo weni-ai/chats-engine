@@ -33,6 +33,7 @@ from chats.apps.api.v1.projects.filters import (
 from chats.apps.api.v1.projects.serializers import (
     CustomStatusSerializer,
     CustomStatusTypeSerializer,
+    LastStatusQueryParamsSerializer,
     LinkContactSerializer,
     ListFlowStartSerializer,
     ListProjectUsersSerializer,
@@ -701,17 +702,23 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
 
     @decorators.action(detail=False, methods=["get"])
     def last_status(self, request):
+        serializer = LastStatusQueryParamsSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+
         last_status = (
             CustomStatus.objects.filter(
                 user=request.user,
                 is_active=True,
                 status_type__config__created_by_system__isnull=True,
+                status_type__project=serializer.validated_data["project_uuid"],
             )
             .order_by("-created_on")
             .first()
         )
+
         if last_status:
             return Response(CustomStatusSerializer(last_status).data)
+
         return Response({"detail": "No status found"}, status=404)
 
     @action(detail=True, methods=["post"])
