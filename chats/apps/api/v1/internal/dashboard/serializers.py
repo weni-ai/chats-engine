@@ -99,11 +99,9 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
                 if status_type in status_dict and status_type != "In-Service":
                     status_dict[status_type] += break_time
 
-        # Definir o valor de In-Service com o tempo calculado
         if "In-Service" in status_dict:
             status_dict["In-Service"] = in_service_time
 
-        # Criar a lista de resultados
         result = [
             {"status_type": status_type, "break_time": break_time}
             for status_type, break_time in status_dict.items()

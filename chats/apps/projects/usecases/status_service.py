@@ -9,8 +9,6 @@ logger = logging.getLogger(__name__)
 
 
 class InServiceStatusTracker:
-    """Classe mantida para compatibilidade com código existente."""
-
     @classmethod
     def room_assigned(cls, user, project):
         return InServiceStatusService.room_assigned(user, project)
@@ -26,15 +24,15 @@ class InServiceStatusTracker:
 
 class InServiceStatusService:
     """
-    Serviço para gerenciar o status 'In-Service' dos agentes.
-    Contabiliza o tempo de atendimento, pausando durante outros status.
+    Service to manage agents' 'In-Service' status.
+    Tracks service time, pausing during other statuses.
     """
 
     STATUS_NAME = "In-Service"
 
     @classmethod
     def get_or_create_status_type(cls, project):
-        """Obtém ou cria o tipo de status In-Service"""
+        """Gets or creates the In-Service status type"""
         from chats.apps.projects.models.models import CustomStatusType
 
         status_type, created = CustomStatusType.objects.get_or_create(
@@ -46,7 +44,7 @@ class InServiceStatusService:
 
     @classmethod
     def has_priority_status(cls, user, project):
-        """Verifica se o usuário está em algum status que não seja In-Service"""
+        """Checks if the user has any status other than In-Service"""
         from chats.apps.projects.models.models import CustomStatus
 
         in_service_type = cls.get_or_create_status_type(project)
@@ -61,14 +59,24 @@ class InServiceStatusService:
     @transaction.atomic
     def room_assigned(cls, user, project):
         """
-        Registra a atribuição de uma sala a um agente.
-        Cria um status In-Service se for a primeira sala e não houver outro status ativo.
+        Records a room assignment to an agent.
+        Creates an In-Service status if it's the first room and there's no other active status.
         """
+        from chats.apps.projects.models import ProjectPermission
         from chats.apps.projects.models.models import CustomStatus
         from chats.apps.rooms.models import Room
 
         if not user or not project:
             return
+
+        permission = ProjectPermission.objects.filter(
+            user=user, project=project
+        ).first()
+
+        if not permission:
+            return
+
+        user_status = permission.status
 
         status_type = cls.get_or_create_status_type(project)
 
@@ -86,12 +94,6 @@ class InServiceStatusService:
             .first()
         )
 
-        # Verificar se o usuário está ONLINE
-        from chats.apps.projects.models import ProjectPermission
-
-        user_status = ProjectPermission.objects.get(user=user, project=project).status
-
-        # Só criar In-Service se tem salas, não tem status ativo, não tem prioridade E está ONLINE
         if (
             room_count >= 1
             and not in_service_status
@@ -106,23 +108,20 @@ class InServiceStatusService:
                 break_time=0,
             )
             logger.info(
-                f"Status In-Service criado para usuário {user.pk} no projeto {project.pk}"
+                f"Status In-Service created for user {user.pk} in project {project.pk}"
             )
 
     @classmethod
     @transaction.atomic
     def room_closed(cls, user, project):
         """
-        Registra o fechamento de uma sala.
-        Finaliza o status In-Service se não houver mais salas.
+        Records a room closure.
+        Ends the In-Service status if there are no more rooms.
         """
         from chats.apps.projects.models.models import CustomStatus
         from chats.apps.rooms.models import Room
 
-        print(f"🔍 DEBUG room_closed: INÍCIO - user={user}, project={project}")
-
         if not user or not project:
-            print(f"🔍 DEBUG room_closed: user ou project é None, retornando")
             return
 
         status_type = cls.get_or_create_status_type(project)
@@ -132,8 +131,6 @@ class InServiceStatusService:
             .filter(user=user, queue__sector__project=project, is_active=True)
             .count()
         )
-
-        print(f"🔍 DEBUG room_closed: room_count = {room_count}")
 
         if room_count == 0:
             status = (
@@ -145,9 +142,6 @@ class InServiceStatusService:
             )
 
             if status:
-                print(
-                    f"🔍 DEBUG room_closed: Encontrou In-Service ativo, finalizando..."
-                )
                 project_tz = project.timezone
                 end_time = timezone.now().astimezone(project_tz)
                 created_on = status.created_on.astimezone(project_tz)
@@ -155,18 +149,17 @@ class InServiceStatusService:
                 status.is_active = False
                 status.break_time = int(service_duration.total_seconds())
                 status.save(update_fields=["is_active", "break_time"])
-                print(f"🔍 DEBUG room_closed: In-Service finalizado com sucesso")
             else:
-                print(f"🔍 DEBUG room_closed: Não encontrou In-Service ativo")
+                logger.error("room_closed: Não encontrou In-Service ativo")
         else:
-            print(f"🔍 DEBUG room_closed: Ainda tem {room_count} salas ativas")
+            logger.error(f"room_closed: Ainda tem {room_count} salas ativas")
 
     @classmethod
     @transaction.atomic
     def sync_agent_status(cls, user, project):
         """
-        Sincroniza o status do agente com o estado real das salas.
-        Útil para corrigir inconsistências.
+        Synchronizes the agent's status with the actual state of their rooms.
+        Useful for fixing inconsistencies.
         """
         from chats.apps.projects.models.models import CustomStatus, Project
         from chats.apps.rooms.models import Room
@@ -229,8 +222,8 @@ class InServiceStatusService:
     @classmethod
     def schedule_sync_for_all_agents(cls):
         """
-        Agenda sincronização periódica de todos os agentes ativos.
-        Ideal para rodar como uma tarefa Celery agendada.
+        Schedules periodic synchronization for all active agents.
+        Ideal to run as a scheduled Celery task.
         """
         from chats.apps.rooms.models import Room
 

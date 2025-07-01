@@ -5,6 +5,7 @@ from django.db.models.functions import JSONObject
 from django.utils import timezone
 
 from chats.apps.accounts.models import User
+from chats.apps.api.v1.dashboard.dto import get_admin_domains_exclude_filter
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.projects.models.models import CustomStatus
 
@@ -147,17 +148,17 @@ class AgentRepository:
         if filters.queue and filters.sector:
             rooms_filter["rooms__queue"] = filters.queue
             rooms_filter["rooms__queue__sector__in"] = filters.sector
-            agents_filter["project_permissions__queue_authorizations__queue"] = (
-                filters.queue
-            )
+            agents_filter[
+                "project_permissions__queue_authorizations__queue"
+            ] = filters.queue
             agents_filter[
                 "project_permissions__queue_authorizations__queue__sector__in"
             ] = filters.sector
         elif filters.queue:
             rooms_filter["rooms__queue"] = filters.queue
-            agents_filter["project_permissions__queue_authorizations__queue"] = (
-                filters.queue
-            )
+            agents_filter[
+                "project_permissions__queue_authorizations__queue"
+            ] = filters.queue
         elif filters.sector:
             rooms_filter["rooms__queue__sector__in"] = filters.sector
             agents_filter[

@@ -2,6 +2,7 @@ from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from chats.apps.api.v1.dashboard.dto import should_exclude_admin_domains
 from chats.apps.api.v1.internal.dashboard.serializers import (
     DashboardAgentsSerializer,
     DashboardCustomAgentStatusSerializer,

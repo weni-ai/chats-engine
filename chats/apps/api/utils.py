@@ -13,6 +13,8 @@ from chats.apps.api.v1.dashboard.serializers import DashboardRoomSerializer
 from chats.apps.contacts.models import Contact
 from chats.apps.msgs.models import ChatMessageReplyIndex, Message
 
+logger = logging.getLogger(__name__)
+
 
 logger = logging.getLogger(__name__)
 
