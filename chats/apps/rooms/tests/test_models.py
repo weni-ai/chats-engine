@@ -1,8 +1,8 @@
 import uuid
 
 from django.conf import settings
-from django.db import IntegrityError
 from django.core.exceptions import PermissionDenied
+from django.db import IntegrityError
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APITestCase
