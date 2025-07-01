@@ -89,7 +89,7 @@ class Project(BaseConfigurableModel, BaseModel):
         null=True,
         blank=True,
         choices=RoomRoutingType.choices,
-        default=RoomRoutingType.GENERAL,
+        default=RoomRoutingType.QUEUE_PRIORITY,
         help_text=_(
             "Whether to route rooms using the queue priority or general routing"
         ),
