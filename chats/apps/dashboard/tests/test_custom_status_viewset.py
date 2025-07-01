@@ -45,7 +45,9 @@ class TestCustomStatusViewSet(TestCase):
 
     def test_last_status_with_active_status(self):
         """Tests the return of user's last active status"""
-        request = self.factory.get("/custom-status/last-status/")
+        request = self.factory.get(
+            "/custom-status/last-status/", data={"project_uuid": self.project.uuid}
+        )
         force_authenticate(request, user=self.user)
         request = Request(request)
         request.user = self.user
@@ -60,7 +62,9 @@ class TestCustomStatusViewSet(TestCase):
         """Tests the return when there is no active status"""
         CustomStatus.objects.all().update(is_active=False)
 
-        request = self.factory.get("/custom-status/last-status/")
+        request = self.factory.get(
+            "/custom-status/last-status/", data={"project_uuid": self.project.uuid}
+        )
         force_authenticate(request, user=self.user)
         request = Request(request)
         request.user = self.user
