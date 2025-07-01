@@ -1,5 +1,10 @@
+from typing import TYPE_CHECKING
 from chats.apps.ai_features.integrations.base_client import BaseAIPlatformClient
 from chats.apps.ai_features.models import FeaturePrompt
+
+
+if TYPE_CHECKING:
+    from chats.apps.rooms.models import Room
 
 
 class ResponseSuggestionsService:
@@ -26,7 +31,7 @@ class ResponseSuggestionsService:
 
         return prompt
 
-    def get_response_suggestion(self) -> str:
+    def get_response_suggestion(self, room: "Room") -> str:
         """
         Get the response suggestion for the copilot feature.
         """
@@ -34,3 +39,7 @@ class ResponseSuggestionsService:
 
         model_id = feature_prompt.model
         prompt_text = feature_prompt.prompt
+
+        # TODO: Inject the conversation inside the prompt
+
+        messages = Room.objects.get(id=room.id).messages.order_by("created_at")
