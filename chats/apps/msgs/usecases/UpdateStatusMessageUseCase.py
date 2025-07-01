@@ -36,9 +36,6 @@ class UpdateStatusMessageUseCase:
             reply_index = ChatMessageReplyIndex.objects.get(external_id=message_id)
             message = reply_index.message
 
-            if message.status == "read":
-                return
-
             if not message.room or not message.room.project:
                 return
 
@@ -46,9 +43,28 @@ class UpdateStatusMessageUseCase:
             if project_uuid not in settings.MESSAGE_STATUS_UPDATE_ENABLED_PROJECTS:
                 return
 
-            message.status = message_status
-            message.save(update_fields=["status"])
-            MessageStatusNotifier.notify_for_message(message, message_status)
+            updated = False
+            update_fields = []
+
+            if message_status == "read":
+                if message.is_read != "read":
+                    message.is_read = "read"
+                    update_fields.append("is_read")
+                    updated = True
+            elif message_status == "delivered":
+                if message.is_delivered != "delivered":
+                    message.is_delivered = "delivered"
+                    update_fields.append("is_delivered")
+                    updated = True
+            else:
+                if message.status != message_status:
+                    message.status = message_status
+                    update_fields.append("status")
+                    updated = True
+
+            if updated:
+                message.save(update_fields=update_fields)
+                MessageStatusNotifier.notify_for_message(message, message_status)
 
         except ChatMessageReplyIndex.DoesNotExist:
             return
