@@ -1,3 +1,26 @@
+# 3.21.4
+## Add
+  - Add missing PermissionDenied import from rooms viewset
+
+# 3.21.3
+## Remove
+  - User role permission checking to pick rooms with queue priority routing
+
+# 3.21.2
+## Fix
+  - Remove unnecessary message status checking when updating the status
+
+# 3.21.1
+## Fix
+  - Verify message_status before try to update message
+
+# 3.21.0
+## Add
+  - Adding pin chats feature
+  - Adding message status feature
+## Fix
+  - Allow admins to view full rooms history
+
 # 3.20.5
 ## Add
   - New method for calculating the response time of closed rooms

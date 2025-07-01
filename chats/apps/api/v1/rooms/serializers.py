@@ -11,7 +11,7 @@ from chats.apps.api.v1.msgs.serializers import MessageSerializer
 from chats.apps.api.v1.queues.serializers import QueueSerializer
 from chats.apps.api.v1.sectors.serializers import DetailSectorTagSerializer
 from chats.apps.queues.models import Queue
-from chats.apps.rooms.models import Room
+from chats.apps.rooms.models import Room, RoomPin
 
 
 class RoomMessageStatusSerializer(serializers.Serializer):
@@ -39,6 +39,9 @@ class RoomSerializer(serializers.ModelSerializer):
     can_edit_custom_fields = serializers.SerializerMethodField()
     config = serializers.JSONField(required=False, read_only=True)
     imported_history_url = serializers.CharField(read_only=True, default="")
+    full_transfer_history = serializers.JSONField(
+        required=False, read_only=True, default=list
+    )
 
     class Meta:
         model = Room
@@ -53,6 +56,7 @@ class RoomSerializer(serializers.ModelSerializer):
             "last_interaction",
             "can_edit_custom_fields",
             "imported_history_url",
+            "full_transfer_history",
         ]
 
     def get_is_24h_valid(self, room: Room) -> bool:
@@ -112,6 +116,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
     can_edit_custom_fields = serializers.SerializerMethodField()
     is_active = serializers.BooleanField(default=True)
     imported_history_url = serializers.CharField(read_only=True, default="")
+    is_pinned = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -134,6 +139,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
             "is_active",
             "config",
             "imported_history_url",
+            "is_pinned",
         ]
 
     def get_user(self, room: Room):
@@ -175,6 +181,14 @@ class ListRoomSerializer(serializers.ModelSerializer):
         )
 
         return MessageSerializer(last_message).data
+
+    def get_is_pinned(self, room: Room) -> bool:
+        request = self.context.get("request")
+
+        if not request:
+            return False
+
+        return RoomPin.objects.filter(room=room, user=request.user).exists()
 
 
 class TransferRoomSerializer(serializers.ModelSerializer):
@@ -333,3 +347,12 @@ class RoomsReportSerializer(serializers.Serializer):
 
     recipient_email = serializers.EmailField(required=True)
     filters = RoomsReportFiltersSerializer(required=True)
+
+
+class PinRoomSerializer(serializers.Serializer):
+    """
+    Serializer for the pin room.
+    """
+
+    # True to pin, False to unpin
+    status = serializers.BooleanField(required=True)

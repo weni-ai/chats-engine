@@ -30,10 +30,10 @@ from chats.apps.queues.utils import (
 )
 from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
+from chats.apps.rooms.utils import create_transfer_json
 from chats.apps.rooms.views import (
     close_room,
     create_room_feedback_message,
-    create_transfer_json,
     get_editable_custom_fields_room,
     update_custom_fields,
     update_flows_custom_fields,
@@ -44,7 +44,7 @@ from .filters import RoomFilter, RoomMetricsFilter
 logger = logging.getLogger(__name__)
 
 
-def add_user_or_queue_to_room(instance, request):
+def add_user_or_queue_to_room(instance: Room, request):
     # TODO Separate this into smaller methods
     user = request.data.get("user_email")
     queue = request.data.get("queue_uuid")
@@ -65,8 +65,9 @@ def add_user_or_queue_to_room(instance, request):
             from_="",
             to=instance.queue,
         )
-    instance.transfer_history = feedback
-    instance.save()
+
+    instance.add_transfer_to_history(feedback)
+
     # Create a message with the transfer data and Send to the room group
     create_room_feedback_message(
         instance, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
@@ -268,8 +269,8 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
             from_="",
             to=room.user,
         )
-        room.transfer_history = feedback
         room.save()
+        room.add_transfer_to_history(feedback)
 
         room.notify_user("update", user=None)
         room.notify_queue("update")

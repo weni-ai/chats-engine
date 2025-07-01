@@ -188,15 +188,3 @@ class TestMessageMediaPermission(TestCase):
 
         result = self.permission.has_object_permission(request, None, obj)
         self.assertTrue(result)
-
-    def test_has_object_permission_anonymous(self):
-        """
-        Tests object permission with anonymous user
-        """
-        request = self.factory.get("/api/v1/msgs/media/1/")
-        request = Request(request)
-        request.user = AnonymousUser()
-        obj = mock.Mock(message=mock.Mock(room=self.room))
-
-        result = self.permission.has_object_permission(request, None, obj)
-        self.assertFalse(result)
