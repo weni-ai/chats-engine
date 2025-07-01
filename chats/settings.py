@@ -69,7 +69,7 @@ INSTALLED_APPS = [
     "chats.apps.feature_version",
     "chats.core",
     "chats.apps.ai_features",
-    "chats.apps.ai_features.copilot",
+    "chats.apps.ai_features.response_suggestions",
     # third party apps
     "channels",
     "drf_yasg",
