@@ -69,9 +69,7 @@ def create_room_assigned_from_queue_feedback(room: "Room", user: "User"):
     """
     Create a feedback message for a room assigned from a queue.
     """
-    from chats.apps.rooms.views import (
-        create_room_feedback_message,
-    )
+    from chats.apps.rooms.views import create_room_feedback_message
 
     feedback = create_transfer_json(
         action="auto_assign_from_queue",
@@ -82,23 +80,3 @@ def create_room_assigned_from_queue_feedback(room: "Room", user: "User"):
     create_room_feedback_message(
         room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
     )
-
-
-def get_room_count_by_status(queryset, room_status):
-    if room_status == "ongoing":
-        return queryset.filter(user__isnull=False, is_waiting=False).count()
-    elif room_status == "waiting":
-        return queryset.filter(user__isnull=True, is_waiting=False).count()
-    elif room_status == "flow_start":
-        return queryset.filter(is_waiting=True).count()
-    return queryset.count()
-
-
-def apply_room_status_filter(queryset, room_status):
-    if room_status == "ongoing":
-        return queryset.filter(user__isnull=False, is_waiting=False)
-    elif room_status == "waiting":
-        return queryset.filter(user__isnull=True, is_waiting=False)
-    elif room_status == "flow_start":
-        return queryset.filter(is_waiting=True)
-    return queryset

@@ -15,7 +15,7 @@ from chats.apps.rooms.exceptions import (
     RoomIsNotActiveError,
 )
 from chats.apps.rooms.models import Room
-from chats.apps.rooms.views import create_transfer_json
+from chats.apps.rooms.utils import create_transfer_json
 from chats.apps.sectors.models import Sector
 
 
