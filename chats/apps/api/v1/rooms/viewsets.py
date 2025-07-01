@@ -343,8 +343,8 @@ class RoomViewset(
             room_metric.transfer_count += 1
             room_metric.save()
 
-        instance.transfer_history = feedback
         instance.save()
+        instance.add_transfer_to_history(feedback)
 
         # Create a message with the transfer data and Send to the room group
         # TODO separate create message in a function
@@ -492,8 +492,8 @@ class RoomViewset(
         room_metric.save()
 
         room.user = user
-        room.transfer_history = feedback
         room.save()
+        room.add_transfer_to_history(feedback)
 
         create_room_feedback_message(
             room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
