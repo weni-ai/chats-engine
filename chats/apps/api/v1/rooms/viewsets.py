@@ -7,17 +7,17 @@ from django.db.models import (
     BooleanField,
     Case,
     Count,
+    DateTimeField,
     Max,
     OuterRef,
     Q,
     Subquery,
     When,
-    DateTimeField,
 )
-from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from django.utils.timezone import make_aware
 from django.utils.translation import gettext_lazy as _
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError, NotFound
@@ -57,11 +57,7 @@ from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
 from chats.apps.msgs.models import Message
 from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
-from chats.apps.queues.utils import (
-    apply_room_status_filter,
-    get_room_count_by_status,
-    start_queue_priority_routing,
-)
+from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.exceptions import (
     MaxPinRoomLimitReachedError,
@@ -807,23 +803,6 @@ class RoomViewset(
             return Response({"detail": str(e)}, status=status.HTTP_403_FORBIDDEN)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-    def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        room_status = request.query_params.get("room_status")
-
-        queryset = apply_room_status_filter(queryset, room_status)
-        custom_count = get_room_count_by_status(queryset, room_status)
-
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            response = self.get_paginated_response(serializer.data)
-            response.data["count"] = custom_count
-            return response
-
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
 
 
 class RoomsReportViewSet(APIView):
