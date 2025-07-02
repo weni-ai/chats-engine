@@ -20,6 +20,7 @@ from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import close_room
+from chats.apps.sectors.models import Sector
 
 logger = logging.getLogger(__name__)
 
@@ -276,7 +277,23 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         if "project_info" in attrs:
             attrs.pop("project_info")
 
-        return super().validate(attrs)
+        sector_uuid = attrs.get('sector_uuid')
+        
+        if not sector_uuid:
+            raise ValidationError("It is necessary to inform a queue or sector")
+        
+        try:
+            sector = Sector.objects.get(uuid=sector_uuid)
+        except Sector.DoesNotExist:
+            raise ValidationError("Sector not found")
+        
+        created_on = self.initial_data.get('created_on', timezone.now())
+        if isinstance(created_on, str):
+            created_on = pendulum.parse(created_on)
+
+        self.check_work_time_weekend(sector, created_on)
+
+        return attrs
 
     def create(self, validated_data):
         history_data = validated_data.pop("history", [])
@@ -376,6 +393,46 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             raise ValidationError(
                 {"detail": _("Contact cannot be done when agents are offline")}
             )
+        
+    def check_work_time_weekend(self, sector, created_on):
+        working_hours_config = sector.config.get('working_hours', {})
+        weekday = created_on.isoweekday()
+
+        # Só valida se for fim de semana (sábado=6, domingo=7)
+        if weekday in (6, 7):
+            # Se não há configuração de working_hours, não valida nada (permite criação)
+            if not working_hours_config:
+                return
+            
+            # Se open_in_weekends é False, não permite criação
+            if not working_hours_config.get('open_in_weekends', False):
+                raise ValidationError(
+                    {"detail": _("Contact cannot be done outside working hours")}
+                )
+            
+            # Se há configuração e está aberto no fim de semana
+            schedules = working_hours_config.get('schedules', {})
+            day_key = "saturday" if weekday == 6 else "sunday"
+            day_range = schedules.get(day_key, {})
+            current_time = created_on.time()
+            
+            # Verificar se os horários estão definidos
+            start_time_str = day_range.get('start')
+            end_time_str = day_range.get('end')
+            
+            # Se start ou end são None, significa que o setor não atende nesse dia
+            if start_time_str is None or end_time_str is None:
+                raise ValidationError(
+                    {"detail": _("Contact cannot be done outside working hours")}
+                )
+            
+            start_time = pendulum.parse(start_time_str).time()
+            end_time = pendulum.parse(end_time_str).time()
+            
+            if not (start_time <= current_time <= end_time):
+                raise ValidationError(
+                    {"detail": _("Contact cannot be done outside working hours")}
+                )
 
     def handle_urn(self, validated_data):
         is_anon = validated_data.pop("is_anon", False)
