@@ -1,10 +1,25 @@
+import json
 from typing import TYPE_CHECKING
+import logging
+
+from django.conf import settings
+from sentry_sdk import capture_message
+
 from chats.apps.ai_features.integrations.base_client import BaseAIPlatformClient
 from chats.apps.ai_features.models import FeaturePrompt
+
+logger = logging.getLogger(__name__)
 
 
 if TYPE_CHECKING:
     from chats.apps.rooms.models import Room
+
+
+# Number of messages to consider for the response suggestion
+# It will get the last CHATS_RESPONSE_SUGGESTIONS_MAX_MESSAGES messages from the room
+CHATS_RESPONSE_SUGGESTIONS_MAX_MESSAGES = (
+    settings.CHATS_RESPONSE_SUGGESTIONS_MAX_MESSAGES
+)
 
 
 class ResponseSuggestionsService:
@@ -31,7 +46,7 @@ class ResponseSuggestionsService:
 
         return prompt
 
-    def get_response_suggestion(self, room: "Room") -> str:
+    def get_response_suggestion(self, room: "Room") -> str | None:
         """
         Get the response suggestion for the copilot feature.
         """
@@ -40,6 +55,43 @@ class ResponseSuggestionsService:
         model_id = feature_prompt.model
         prompt_text = feature_prompt.prompt
 
-        # TODO: Inject the conversation inside the prompt
+        if "{conversation}" not in prompt_text:
+            logger.error(
+                "The prompt does not contain the {conversation} placeholder. Room %s",
+                room.id,
+            )
+            capture_message(
+                "The prompt does not contain the {conversation} placeholder. Room %s",
+                room.id,
+            )
+            return None
 
-        messages = Room.objects.get(id=room.id).messages.order_by("created_at")
+        messages = (
+            Room.objects.get(id=room.id)
+            .messages.filter(Q(user__isnull=False) | Q(contact__isnull=False))
+            .select_related("contact", "user")
+            .order_by("created_at")
+        )
+        messages_qty = messages.count()
+
+        if messages_qty == 0:
+            logger.info("No messages found in the room. Room %s", room.id)
+            return None
+
+        messages = messages[messages_qty - CHATS_RESPONSE_SUGGESTIONS_MAX_MESSAGES :]
+
+        conversation = []
+
+        for message in messages:
+            is_contact = message.contact is not None
+            sender = "user" if is_contact else "agent"
+
+            conversation.append(
+                {
+                    "sender": sender,
+                    "text": message.text,
+                }
+            )
+
+        conversation_text = json.dumps(conversation, ensure_ascii=False)
+        prompt_text = prompt_text.format(conversation=conversation_text)
