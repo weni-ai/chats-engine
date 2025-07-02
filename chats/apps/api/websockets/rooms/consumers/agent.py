@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import time
 import uuid
 
 from channels.db import database_sync_to_async
@@ -9,9 +10,18 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 
+from chats.apps.api.v1.prometheus.metrics import (
+    ws_active_connections,
+    ws_connection_duration,
+    ws_connections_total,
+    ws_disconnects_total,
+    ws_messages_received_total,
+)
 from chats.apps.projects.models.models import ProjectPermission
 from chats.apps.projects.usecases.status_service import InServiceStatusService
 from chats.core.cache import CacheClient
+
+logger = logging.getLogger(__name__)
 
 USE_WS_CONNECTION_CHECK = getattr(settings, "USE_WS_CONNECTION_CHECK", False)
 CONNECTION_CHECK_CACHE_PREFIX = "connection_check_response_"
@@ -19,11 +29,11 @@ CONNECTION_CHECK_WAIT_TIME = 1
 CONNECTION_CHECK_TIMEOUT = 1
 CONNECTION_CHECK_CACHE_TTL = 10
 
-
 logger = logging.getLogger(__name__)
 
 
 class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
+    CONSUMER_TYPE = "agent"
     """
     Agent side of the chat
     """
@@ -36,6 +46,13 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         """
         Called when the websocket is handshaking as part of initial connection.
         """
+        self._start_time = time.time()
+        try:
+            ws_connections_total.labels(consumer=self.CONSUMER_TYPE).inc()
+            ws_active_connections.labels(consumer=self.CONSUMER_TYPE).inc()
+        except Exception as e:
+            logger.warning(f"Error updating Prometheus metrics: {e}")
+
         self.added_groups = []
         self.user = None
         # Are they logged in?
@@ -66,6 +83,16 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 self.last_ping = timezone.now()
 
     async def disconnect(self, *args, **kwargs):
+        try:
+            ws_active_connections.labels(consumer=self.CONSUMER_TYPE).dec()
+            ws_disconnects_total.labels(consumer=self.CONSUMER_TYPE).inc()
+            if hasattr(self, "_start_time"):
+                ws_connection_duration.labels(consumer=self.CONSUMER_TYPE).observe(
+                    time.time() - self._start_time
+                )
+        except Exception as e:
+            logger.warning(f"Error updating Prometheus metrics: {e}")
+
         for group in set(self.added_groups):
             try:
                 await self.channel_layer.group_discard(group, self.channel_name)
@@ -125,6 +152,8 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         Called when we get a text frame. Channels will JSON-decode the payload
         for us and pass it as the first argument.
         """
+        ws_messages_received_total.labels(consumer=self.CONSUMER_TYPE).inc()
+
         # Messages will have a "command" key we can switch on
         command_name = payload.get("type", None)
         if command_name == "notify":
