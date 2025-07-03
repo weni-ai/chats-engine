@@ -279,7 +279,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         created_on = validated_data.get("created_on", timezone.now().time())
         
-        protocol = validated_data.get("protocol")
+        protocol = validated_data.pop("protocol", None)
         if protocol is None:
             protocol = validated_data.get("custom_fields", {}).pop("protocol", None)
         
