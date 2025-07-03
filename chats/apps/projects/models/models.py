@@ -94,6 +94,11 @@ class Project(BaseConfigurableModel, BaseModel):
             "Whether to route rooms using the queue priority or general routing"
         ),
     )
+    internal_flags = models.JSONField(
+        _("Internal flags"),
+        default=dict,
+        help_text=_("Internal flags for the project"),
+    )
 
     class Meta:
         verbose_name = _("Project")
@@ -195,6 +200,18 @@ class Project(BaseConfigurableModel, BaseModel):
             return token
         return self.set_chat_gpt_auth_token(user_login_token)
 
+    def get_internal_flag(self, flag_name: str) -> bool:
+        internal_flags = self.internal_flags or {}
+        return internal_flags.get(flag_name, False)
+
+    def set_internal_flag(self, flag_name: str, value: bool):
+        internal_flags = self.internal_flags or {}
+        internal_flags[flag_name] = value
+
+        self.internal_flags = internal_flags
+
+        self.save(update_fields=["internal_flags"])
+
     @property
     def admin_permissions(self):
         return self.permissions.filter(role=ProjectPermission.ROLE_ADMIN)
@@ -220,6 +237,10 @@ class Project(BaseConfigurableModel, BaseModel):
     @property
     def use_queue_priority_routing(self):
         return self.room_routing_type == RoomRoutingType.QUEUE_PRIORITY
+
+    @property
+    def is_copilot_active(self):
+        return self.get_internal_flag("is_copilot_active")
 
     def get_sectors(self, user, custom_filters: dict = {}):
         user_permission = self.get_permission(user)
