@@ -282,6 +282,8 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         created_on = self.initial_data.get('created_on', timezone.now())
         if isinstance(created_on, str):
             created_on = pendulum.parse(created_on)
+        else:
+            created_on = pendulum.instance(created_on)
         
         project_tz = pendulum.timezone(str(sector.project.timezone))
         if created_on.tzinfo is None:
