@@ -1,3 +1,12 @@
+# 3.22.3
+## Fix
+  - Online agents query to exclude correctly those who have an active custom status,
+  when not called "In-service"
+
+# 3.22.2
+## Add
+  - Automatic room distribution when closing a custom status
+
 # 3.22.1
 ## Add
   - Queue priority as default for all projects
