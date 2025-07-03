@@ -566,6 +566,7 @@ class RoomViewset(
                 else:
                     room.notify_user("update", user=transfer_user)
                 room.notify_user("update")
+                room.notify_queue("update")
 
                 room.update_ticket()
 
