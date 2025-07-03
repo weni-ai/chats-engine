@@ -212,6 +212,8 @@ if USE_S3:
     AWS_QUERYSTRING_AUTH = env.bool("AWS_QUERYSTRING_AUTH", default=True)
     AWS_S3_FILE_OVERWRITE = env.bool("AWS_S3_FILE_OVERWRITE", default=False)
 
+    AWS_BEDROCK_REGION_NAME = env.str("AWS_BEDROCK_REGION_NAME", default="us-east-1")
+
 else:
     MEDIA_URL = "/media/"
 
@@ -437,6 +439,9 @@ USE_WS_CONNECTION_CHECK = env.bool("USE_WS_CONNECTION_CHECK", default=False)
 MAX_RETRIES = env.int("WS_MESSAGE_RETRIES", default=3)
 RETRY_DELAY_SECONDS = env.int("WS_MESSAGE_RETRIES", default=0.5)
 
+# AI Features
+
+AI_FEATURES_PROMPTS_API_SECRET = env.str("AI_FEATURES_PROMPTS_API_SECRET")
 
 # Email
 
