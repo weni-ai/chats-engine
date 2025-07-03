@@ -36,6 +36,6 @@ class TestBedrockClient(TestCase):
             ],
         }
 
-        response = client.generate_text(request_body)
+        response = client.generate_text(request_body, prompt)
 
         self.assertEqual(response, mock_response_text)
