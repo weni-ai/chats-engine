@@ -147,3 +147,7 @@ class CustomStatusSerializer(serializers.ModelSerializer):
         ]
 
     break_time = serializers.IntegerField(required=False)
+
+
+class LastStatusQueryParamsSerializer(serializers.Serializer):
+    project_uuid = serializers.UUIDField(required=True)

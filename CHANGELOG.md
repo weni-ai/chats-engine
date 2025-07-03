@@ -1,3 +1,14 @@
+# 3.22.1
+## Add
+  - Queue priority as default for all projects
+  - New filters to use in chats chips
+## Fix
+  - Save user and queue identifiers in the feedback tag in rooms' history
+
+# 3.22.0
+## Add
+  - In service feature
+
 # 3.21.4
 ## Add
   - Add missing PermissionDenied import from rooms viewset

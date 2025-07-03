@@ -33,6 +33,7 @@ from chats.apps.api.v1.projects.filters import (
 from chats.apps.api.v1.projects.serializers import (
     CustomStatusSerializer,
     CustomStatusTypeSerializer,
+    LastStatusQueryParamsSerializer,
     LinkContactSerializer,
     ListFlowStartSerializer,
     ListProjectUsersSerializer,
@@ -51,6 +52,9 @@ from chats.apps.projects.models import (
 )
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.projects.usecases.status_service import InServiceStatusService
+from chats.apps.queues.utils import (
+    start_queue_priority_routing_for_all_queues_in_project,
+)
 from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import create_room_feedback_message
@@ -701,17 +705,23 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
 
     @decorators.action(detail=False, methods=["get"])
     def last_status(self, request):
+        serializer = LastStatusQueryParamsSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+
         last_status = (
             CustomStatus.objects.filter(
                 user=request.user,
                 is_active=True,
                 status_type__config__created_by_system__isnull=True,
+                status_type__project=serializer.validated_data["project_uuid"],
             )
             .order_by("-created_on")
             .first()
         )
+
         if last_status:
             return Response(CustomStatusSerializer(last_status).data)
+
         return Response({"detail": "No status found"}, status=404)
 
     @action(detail=True, methods=["post"])
@@ -736,6 +746,10 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+
+            start_queue_priority_routing_for_all_queues_in_project(
+                instance.status_type.project
+            )
 
             with transaction.atomic():
                 end_time = timezone.now()

@@ -1,10 +1,13 @@
 import logging
 from typing import TYPE_CHECKING
+
 from django.conf import settings
+
 from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.queues.tasks import route_queue_rooms
 from chats.apps.rooms.choices import RoomFeedbackMethods
+from chats.apps.rooms.utils import create_transfer_json
 
 logger = logging.getLogger(__name__)
 
@@ -66,10 +69,7 @@ def create_room_assigned_from_queue_feedback(room: "Room", user: "User"):
     """
     Create a feedback message for a room assigned from a queue.
     """
-    from chats.apps.rooms.views import (
-        create_room_feedback_message,
-        create_transfer_json,
-    )
+    from chats.apps.rooms.views import create_room_feedback_message
 
     feedback = create_transfer_json(
         action="auto_assign_from_queue",

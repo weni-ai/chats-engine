@@ -92,7 +92,12 @@ class Room(BaseModel, BaseConfigurableModel):
     is_active = models.BooleanField(_("is active?"), default=True)
     is_waiting = models.BooleanField(_("is waiting for answer?"), default=False)
 
+    # Legacy, only stores the last transfer
     transfer_history = models.JSONField(_("Transfer History"), null=True, blank=True)
+    # New, stores the full transfer history
+    full_transfer_history = models.JSONField(
+        _("Full Transfer History"), null=True, blank=True, default=list
+    )
 
     tags = models.ManyToManyField(
         "sectors.SectorTag",
@@ -513,6 +518,14 @@ class Room(BaseModel, BaseConfigurableModel):
         Clears all pins for a room.
         """
         return self.pins.all().delete()
+
+    def add_transfer_to_history(self, transfer: dict):
+        """
+        Adds a transfer to the full transfer history.
+        """
+        self.full_transfer_history.append(transfer)
+        self.transfer_history = transfer  # legacy
+        self.save(update_fields=["full_transfer_history", "transfer_history"])
 
 
 class RoomPin(BaseModel):
