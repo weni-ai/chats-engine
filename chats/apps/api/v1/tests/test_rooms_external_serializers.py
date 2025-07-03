@@ -1,24 +1,21 @@
-import pendulum
 import uuid
 from unittest.mock import patch
-from django.test import TestCase
-from django.utils import timezone
-from rest_framework.exceptions import ValidationError
 
-from chats.apps.projects.models.models import Project
-from chats.apps.sectors.models import Sector
-from chats.apps.queues.models import Queue
+import pendulum
+from django.test import TestCase
+
 from chats.apps.api.v1.external.rooms.serializers import RoomFlowSerializer
+from chats.apps.projects.models.models import Project
+from chats.apps.queues.models import Queue
+from chats.apps.sectors.models import Sector
 
 
 class TestRoomFlowSerializerWeekendValidation(TestCase):
     def setUp(self):
         self.project = Project.objects.create(
-            name="Test Project",
-            timezone="America/Sao_Paulo"
+            name="Test Project", timezone="America/Sao_Paulo"
         )
-        
-        # Criar setor com configuração de horários de trabalho
+
         self.sector = Sector.objects.create(
             name="Test Sector",
             project=self.project,
@@ -31,23 +28,18 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
                     "schedules": {
                         "weekdays": {"start": "09:00", "end": "17:00"},
                         "saturday": {"start": "09:00", "end": "15:00"},
-                        "sunday": {"start": None, "end": None}
-                    }
+                        "sunday": {"start": None, "end": None},
+                    },
                 }
-            }
-        )
-        
-        # Criar queue para o setor
-        self.queue = Queue.objects.create(
-            name="Test Queue",
-            sector=self.sector
+            },
         )
 
+        self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
+
     def test_weekend_validation_saturday_within_hours(self):
-        """Testa criação de sala no sábado dentro do horário permitido"""
-        # Sábado às 10:00 (dentro do horário 09:00-15:00)
+        """Test room creation on Saturday within allowed hours"""
         saturday_10am = pendulum.datetime(2023, 8, 26, 10, 0, 0, tz="America/Sao_Paulo")
-        
+
         data = {
             "sector_uuid": str(self.sector.uuid),
             "contact": {
@@ -57,7 +49,7 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
                 "phone": "+250788123123",
                 "urn": "tel:+250788123123",
                 "custom_fields": {"age": 30, "preferences": "chat"},
-                "groups": [{"uuid": "group-uuid-1", "name": "VIP Customers"}]
+                "groups": [{"uuid": "group-uuid-1", "name": "VIP Customers"}],
             },
             "created_on": saturday_10am.isoformat(),
             "custom_fields": {"country": "brazil", "mood": "happy", "priority": "high"},
@@ -65,18 +57,16 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
             "flow_uuid": "flow-uuid-12345",
             "is_anon": False,
             "project_info": {"uuid": str(self.project.uuid), "name": "My Project"},
-            "protocol": "1234567890"
+            "protocol": "1234567890",
         }
-        
+
         serializer = RoomFlowSerializer(data=data)
-        # Não deve levantar exceção pois está dentro do horário permitido
         self.assertTrue(serializer.is_valid())
 
     def test_weekend_validation_saturday_outside_hours(self):
-        """Testa criação de sala no sábado fora do horário permitido"""
-        # Sábado às 16:00 (fora do horário 09:00-15:00)
+        """Test room creation on Saturday outside allowed hours"""
         saturday_4pm = pendulum.datetime(2023, 8, 26, 16, 0, 0, tz="America/Sao_Paulo")
-        
+
         data = {
             "sector_uuid": str(self.sector.uuid),
             "contact": {
@@ -86,7 +76,7 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
                 "phone": "+250788123123",
                 "urn": "tel:+250788123123",
                 "custom_fields": {"age": 30, "preferences": "chat"},
-                "groups": [{"uuid": "group-uuid-1", "name": "VIP Customers"}]
+                "groups": [{"uuid": "group-uuid-1", "name": "VIP Customers"}],
             },
             "created_on": saturday_4pm.isoformat(),
             "custom_fields": {"country": "brazil", "mood": "happy", "priority": "high"},
@@ -94,19 +84,20 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
             "flow_uuid": "flow-uuid-12345",
             "is_anon": False,
             "project_info": {"uuid": str(self.project.uuid), "name": "My Project"},
-            "protocol": "1234567890"
+            "protocol": "1234567890",
         }
-        
+
         serializer = RoomFlowSerializer(data=data)
         self.assertFalse(serializer.is_valid())
         self.assertIn("detail", serializer.errors)
-        self.assertIn("Contact cannot be done outside working hours", str(serializer.errors))
+        self.assertIn(
+            "Contact cannot be done outside working hours", str(serializer.errors)
+        )
 
     def test_weekend_validation_sunday_closed(self):
-        """Testa criação de sala no domingo quando o setor não atende"""
-        # Domingo às 10:00 (setor não atende no domingo)
+        """Test room creation on Sunday when sector is closed"""
         sunday_10am = pendulum.datetime(2023, 8, 27, 10, 0, 0, tz="America/Sao_Paulo")
-        
+
         data = {
             "sector_uuid": str(self.sector.uuid),
             "contact": {
@@ -116,7 +107,7 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
                 "phone": "+250788123123",
                 "urn": "tel:+250788123123",
                 "custom_fields": {"age": 30, "preferences": "chat"},
-                "groups": [{"uuid": "group-uuid-1", "name": "VIP Customers"}]
+                "groups": [{"uuid": "group-uuid-1", "name": "VIP Customers"}],
             },
             "created_on": sunday_10am.isoformat(),
             "custom_fields": {"country": "brazil", "mood": "happy", "priority": "high"},
@@ -124,17 +115,18 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
             "flow_uuid": "flow-uuid-12345",
             "is_anon": False,
             "project_info": {"uuid": str(self.project.uuid), "name": "My Project"},
-            "protocol": "1234567890"
+            "protocol": "1234567890",
         }
-        
+
         serializer = RoomFlowSerializer(data=data)
         self.assertFalse(serializer.is_valid())
         self.assertIn("detail", serializer.errors)
-        self.assertIn("Contact cannot be done outside working hours", str(serializer.errors))
+        self.assertIn(
+            "Contact cannot be done outside working hours", str(serializer.errors)
+        )
 
     def test_weekend_validation_sector_not_open_weekends(self):
-        """Testa criação de sala no fim de semana quando o setor não atende"""
-        # Criar setor que não atende no fim de semana
+        """Test room creation on weekend when sector doesn't operate"""
         sector_no_weekend = Sector.objects.create(
             name="No Weekend Sector",
             project=self.project,
@@ -144,22 +136,15 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
             config={
                 "working_hours": {
                     "open_in_weekends": False,
-                    "schedules": {
-                        "weekdays": {"start": "09:00", "end": "17:00"}
-                    }
+                    "schedules": {"weekdays": {"start": "09:00", "end": "17:00"}},
                 }
-            }
+            },
         )
-        
-        # Criar queue para o setor
-        Queue.objects.create(
-            name="No Weekend Queue",
-            sector=sector_no_weekend
-        )
-        
-        # Sábado às 10:00
+
+        Queue.objects.create(name="No Weekend Queue", sector=sector_no_weekend)
+
         saturday_10am = pendulum.datetime(2023, 8, 26, 10, 0, 0, tz="America/Sao_Paulo")
-        
+
         data = {
             "sector_uuid": str(sector_no_weekend.uuid),
             "contact": {
@@ -169,7 +154,7 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
                 "phone": "+250788123123",
                 "urn": "tel:+250788123123",
                 "custom_fields": {"age": 30, "preferences": "chat"},
-                "groups": [{"uuid": "group-uuid-1", "name": "VIP Customers"}]
+                "groups": [{"uuid": "group-uuid-1", "name": "VIP Customers"}],
             },
             "created_on": saturday_10am.isoformat(),
             "custom_fields": {"country": "brazil", "mood": "happy", "priority": "high"},
@@ -177,17 +162,18 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
             "flow_uuid": "flow-uuid-12345",
             "is_anon": False,
             "project_info": {"uuid": str(self.project.uuid), "name": "My Project"},
-            "protocol": "1234567890"
+            "protocol": "1234567890",
         }
-        
+
         serializer = RoomFlowSerializer(data=data)
         self.assertFalse(serializer.is_valid())
         self.assertIn("detail", serializer.errors)
-        self.assertIn("Contact cannot be done outside working hours", str(serializer.errors))
+        self.assertIn(
+            "Contact cannot be done outside working hours", str(serializer.errors)
+        )
 
     def test_weekend_validation_sector_open_all_weekend(self):
-        """Testa criação de sala no fim de semana quando o setor atende 24h"""
-        # Criar setor que atende 24h no fim de semana
+        """Test room creation on weekend when sector operates 24h"""
         sector_24h_weekend = Sector.objects.create(
             name="24h Weekend Sector",
             project=self.project,
@@ -200,21 +186,16 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
                     "schedules": {
                         "weekdays": {"start": "09:00", "end": "17:00"},
                         "saturday": {"start": "00:00", "end": "23:59"},
-                        "sunday": {"start": "00:00", "end": "23:59"}
-                    }
+                        "sunday": {"start": "00:00", "end": "23:59"},
+                    },
                 }
-            }
+            },
         )
-        
-        # Criar queue para o setor
-        Queue.objects.create(
-            name="24h Weekend Queue",
-            sector=sector_24h_weekend
-        )
-        
-        # Domingo às 23:00
+
+        Queue.objects.create(name="24h Weekend Queue", sector=sector_24h_weekend)
+
         sunday_11pm = pendulum.datetime(2023, 8, 27, 23, 0, 0, tz="America/Sao_Paulo")
-        
+
         data = {
             "sector_uuid": str(sector_24h_weekend.uuid),
             "contact": {
@@ -224,7 +205,7 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
                 "phone": "+250788123123",
                 "urn": "tel:+250788123123",
                 "custom_fields": {"age": 30, "preferences": "chat"},
-                "groups": [{"uuid": "group-uuid-1", "name": "VIP Customers"}]
+                "groups": [{"uuid": "group-uuid-1", "name": "VIP Customers"}],
             },
             "created_on": sunday_11pm.isoformat(),
             "custom_fields": {"country": "brazil", "mood": "happy", "priority": "high"},
@@ -232,18 +213,16 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
             "flow_uuid": "flow-uuid-12345",
             "is_anon": False,
             "project_info": {"uuid": str(self.project.uuid), "name": "My Project"},
-            "protocol": "1234567890"
+            "protocol": "1234567890",
         }
-        
+
         serializer = RoomFlowSerializer(data=data)
-        # Deve ser válido pois o setor atende 24h no fim de semana
         self.assertTrue(serializer.is_valid())
 
     def test_weekend_validation_weekday_normal_hours(self):
-        """Testa criação de sala em dia útil (não deve ser afetada pela validação de fim de semana)"""
-        # Segunda-feira às 10:00
+        """Test room creation on weekday (should not be affected by weekend validation)"""
         monday_10am = pendulum.datetime(2023, 8, 28, 10, 0, 0, tz="America/Sao_Paulo")
-        
+
         data = {
             "sector_uuid": str(self.sector.uuid),
             "contact": {
@@ -253,7 +232,7 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
                 "phone": "+250788123123",
                 "urn": "tel:+250788123123",
                 "custom_fields": {"age": 30, "preferences": "chat"},
-                "groups": [{"uuid": "group-uuid-1", "name": "VIP Customers"}]
+                "groups": [{"uuid": "group-uuid-1", "name": "VIP Customers"}],
             },
             "created_on": monday_10am.isoformat(),
             "custom_fields": {"country": "brazil", "mood": "happy", "priority": "high"},
@@ -261,34 +240,27 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
             "flow_uuid": "flow-uuid-12345",
             "is_anon": False,
             "project_info": {"uuid": str(self.project.uuid), "name": "My Project"},
-            "protocol": "1234567890"
+            "protocol": "1234567890",
         }
-        
+
         serializer = RoomFlowSerializer(data=data)
-        # Deve ser válido pois é dia útil (a validação de fim de semana não se aplica)
         self.assertTrue(serializer.is_valid())
 
     def test_weekend_validation_sector_without_working_hours_config(self):
-        """Testa criação de sala quando o setor não tem configuração de horários"""
-        # Criar setor sem configuração de horários
+        """Test room creation when sector has no working hours configuration"""
         sector_no_config = Sector.objects.create(
             name="No Config Sector",
             project=self.project,
             rooms_limit=10,
             work_start="09:00",
             work_end="17:00",
-            config={}  # Sem configuração de working_hours
+            config={},
         )
-        
-        # Criar queue para o setor
-        Queue.objects.create(
-            name="No Config Queue",
-            sector=sector_no_config
-        )
-        
-        # Sábado às 10:00
+
+        Queue.objects.create(name="No Config Queue", sector=sector_no_config)
+
         saturday_10am = pendulum.datetime(2023, 8, 26, 10, 0, 0, tz="America/Sao_Paulo")
-        
+
         data = {
             "sector_uuid": str(sector_no_config.uuid),
             "contact": {
@@ -298,7 +270,7 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
                 "phone": "+250788123123",
                 "urn": "tel:+250788123123",
                 "custom_fields": {"age": 30, "preferences": "chat"},
-                "groups": [{"uuid": "group-uuid-1", "name": "VIP Customers"}]
+                "groups": [{"uuid": "group-uuid-1", "name": "VIP Customers"}],
             },
             "created_on": saturday_10am.isoformat(),
             "custom_fields": {"country": "brazil", "mood": "happy", "priority": "high"},
@@ -306,18 +278,16 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
             "flow_uuid": "flow-uuid-12345",
             "is_anon": False,
             "project_info": {"uuid": str(self.project.uuid), "name": "My Project"},
-            "protocol": "1234567890"
+            "protocol": "1234567890",
         }
-        
+
         serializer = RoomFlowSerializer(data=data)
-        # Deve ser válido pois não há configuração de fim de semana (não valida nada)
         self.assertTrue(serializer.is_valid())
 
     def test_weekend_validation_edge_case_saturday_start_time(self):
-        """Testa criação de sala no sábado exatamente no horário de início"""
-        # Sábado às 09:00 (exatamente no horário de início)
+        """Test room creation on Saturday exactly at start time"""
         saturday_9am = pendulum.datetime(2023, 8, 26, 9, 0, 0, tz="America/Sao_Paulo")
-        
+
         data = {
             "sector_uuid": str(self.sector.uuid),
             "contact": {
@@ -327,7 +297,7 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
                 "phone": "+250788123123",
                 "urn": "tel:+250788123123",
                 "custom_fields": {"age": 30, "preferences": "chat"},
-                "groups": [{"uuid": "group-uuid-1", "name": "VIP Customers"}]
+                "groups": [{"uuid": "group-uuid-1", "name": "VIP Customers"}],
             },
             "created_on": saturday_9am.isoformat(),
             "custom_fields": {"country": "brazil", "mood": "happy", "priority": "high"},
@@ -335,18 +305,16 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
             "flow_uuid": "flow-uuid-12345",
             "is_anon": False,
             "project_info": {"uuid": str(self.project.uuid), "name": "My Project"},
-            "protocol": "1234567890"
+            "protocol": "1234567890",
         }
-        
+
         serializer = RoomFlowSerializer(data=data)
-        # Deve ser válido pois está exatamente no horário de início
         self.assertTrue(serializer.is_valid())
 
     def test_weekend_validation_edge_case_saturday_end_time(self):
-        """Testa criação de sala no sábado exatamente no horário de fim"""
-        # Sábado às 15:00 (exatamente no horário de fim)
+        """Test room creation on Saturday exactly at end time"""
         saturday_3pm = pendulum.datetime(2023, 8, 26, 15, 0, 0, tz="America/Sao_Paulo")
-        
+
         data = {
             "sector_uuid": str(self.sector.uuid),
             "contact": {
@@ -356,7 +324,7 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
                 "phone": "+250788123123",
                 "urn": "tel:+250788123123",
                 "custom_fields": {"age": 30, "preferences": "chat"},
-                "groups": [{"uuid": "group-uuid-1", "name": "VIP Customers"}]
+                "groups": [{"uuid": "group-uuid-1", "name": "VIP Customers"}],
             },
             "created_on": saturday_3pm.isoformat(),
             "custom_fields": {"country": "brazil", "mood": "happy", "priority": "high"},
@@ -364,9 +332,8 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
             "flow_uuid": "flow-uuid-12345",
             "is_anon": False,
             "project_info": {"uuid": str(self.project.uuid), "name": "My Project"},
-            "protocol": "1234567890"
+            "protocol": "1234567890",
         }
-        
+
         serializer = RoomFlowSerializer(data=data)
-        # Deve ser válido pois está exatamente no horário de fim
-        self.assertTrue(serializer.is_valid()) 
+        self.assertTrue(serializer.is_valid())
