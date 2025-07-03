@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 import logging
 
 from django.conf import settings
+from django.db.models import Q
 from sentry_sdk import capture_message
 
 from chats.apps.ai_features.integrations.base_client import BaseAIPlatformClient
@@ -79,9 +80,8 @@ class ResponseSuggestionsService:
             return None
 
         try:
-            messages = messages[
-                messages_qty - CHATS_RESPONSE_SUGGESTIONS_MAX_MESSAGES :
-            ]
+            offset = messages_qty - CHATS_RESPONSE_SUGGESTIONS_MAX_MESSAGES
+            messages = messages[offset:]
 
             conversation = []
 
