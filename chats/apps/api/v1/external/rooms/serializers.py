@@ -302,7 +302,11 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         project = sector.project
 
         created_on = validated_data.get("created_on", timezone.now().time())
-        protocol = validated_data.get("custom_fields", {}).pop("protocol", None)
+        
+        protocol = validated_data.pop("protocol", None)
+        if protocol is None:
+            protocol = validated_data.get("custom_fields", {}).pop("protocol", None)
+        
         service_chat = validated_data.get("custom_fields", {}).pop(
             "service_chats", None
         )
