@@ -28,6 +28,22 @@ class RoomFilter(filters.FilterSet):
         help_text=_("Is active?"),
     )
 
+    room_status = filters.CharFilter(
+        field_name="room_status",
+        required=False,
+        method="filter_room_status",
+        help_text=_("Room status"),
+    )
+
+    def filter_room_status(self, queryset, name, value):
+        if value == "ongoing":
+            return queryset.filter(user__isnull=False, is_waiting=False)
+        elif value == "waiting":
+            return queryset.filter(user__isnull=True, is_waiting=False)
+        elif value == "flow_start":
+            return queryset.filter(is_waiting=True)
+        return queryset
+
     def filter_project(self, queryset, name, value):
         try:
             project_permission = self.request.user.project_permissions.get(

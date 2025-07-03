@@ -203,8 +203,8 @@ if USE_S3:
 
     DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
 
-    AWS_ACCESS_KEY_ID = env.str("AWS_ACCESS_KEY_ID")
-    AWS_SECRET_ACCESS_KEY = env.str("AWS_SECRET_ACCESS_KEY")
+    AWS_ACCESS_KEY_ID = env.str("AWS_ACCESS_KEY_ID", default="")
+    AWS_SECRET_ACCESS_KEY = env.str("AWS_SECRET_ACCESS_KEY", default="")
 
     AWS_STORAGE_BUCKET_NAME = env.str("AWS_STORAGE_BUCKET_NAME")
 
@@ -312,7 +312,13 @@ OIDC_CACHE_TOKEN = env.bool(
 OIDC_CACHE_TTL = env.int(
     "OIDC_CACHE_TTL", default=600
 )  # Time-to-live for cached user tokens (default: 600 seconds).
+OIDC_INTERNAL_TOKEN_CACHE_TTL = env.int(
+    "OIDC_INTERNAL_TOKEN_CACHE_TTL", default=(60 * 60 * 6)
+)  # Time-to-live for cached user tokens (default: 6 hours).
 
+INTERNAL_CLIENTS_PERM_CACHE_TTL = env.int(
+    "INTERNAL_CLIENTS_PERM_CACHE_TTL", default=600
+)  # Time-to-live for cached user permissions (default: 600 seconds).
 
 CONNECT_API_URL = env.str("CONNECT_API_URL", default="")
 USE_CONNECT_V2 = env.bool("USE_CONNECT_V2", default=False)
@@ -431,3 +437,29 @@ USE_WS_CONNECTION_CHECK = env.bool("USE_WS_CONNECTION_CHECK", default=False)
 # CLOSE ROOM RETRY
 MAX_RETRIES = env.int("WS_MESSAGE_RETRIES", default=3)
 RETRY_DELAY_SECONDS = env.int("WS_MESSAGE_RETRIES", default=0.5)
+
+
+# Email
+
+SEND_EMAILS = env.bool("SEND_EMAILS", default=False)
+
+
+if SEND_EMAILS:
+    EMAIL_HOST = env.str("EMAIL_HOST", default=None)
+    DEFAULT_FROM_EMAIL = env.str("DEFAULT_FROM_EMAIL")
+    SERVER_EMAIL = env.str("SERVER_EMAIL")
+
+    EMAIL_PORT = env.int("EMAIL_PORT")
+    EMAIL_HOST_USER = env.str("EMAIL_HOST_USER")
+    EMAIL_HOST_PASSWORD = env.str("EMAIL_HOST_PASSWORD")
+    EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL")
+    EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS")
+
+
+# Pin rooms
+MAX_ROOM_PINS_LIMIT = env.int("MAX_ROOM_PINS_LIMIT", default=3)
+
+# Message Status Update Feature Flag
+MESSAGE_STATUS_UPDATE_ENABLED_PROJECTS = env.list(
+    "MESSAGE_STATUS_UPDATE_ENABLED_PROJECTS", default=[]
+)

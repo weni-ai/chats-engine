@@ -1,6 +1,7 @@
 from django.utils.translation import gettext_lazy as _
 from rest_framework import exceptions, serializers
 
+from chats.apps.api.utils import create_reply_index
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactRelationsSerializer
 from chats.apps.api.v1.msgs.serializers import MessageMediaSerializer
@@ -32,6 +33,7 @@ class MsgFlowSerializer(serializers.ModelSerializer):
         required=False, allow_null=True, allow_blank=True, default=""
     )
     external_id = serializers.CharField(required=False, allow_null=True)
+    metadata = serializers.JSONField(required=False, allow_null=True)
     # Read
     media = MessageMediaSerializer(required=False, many=True, read_only=True)
     contact = ContactRelationsSerializer(many=False, required=False, read_only=True)
@@ -49,6 +51,7 @@ class MsgFlowSerializer(serializers.ModelSerializer):
             "attachments",
             "created_on",
             "external_id",
+            "metadata",
             # Read
             "user",
             "contact",
@@ -97,4 +100,5 @@ class MsgFlowSerializer(serializers.ModelSerializer):
             elif not was_24h_valid:
                 room.notify_room("update")
 
+        create_reply_index(msg)
         return msg

@@ -9,6 +9,7 @@ from chats.apps.api.v1.external.queues.viewsets import QueueFlowViewset
 from chats.apps.api.v1.external.rooms.viewsets import (
     CustomFieldsUserExternalViewSet,
     ExternalListRoomsViewSet,
+    ExternalListWithPaginationRoomsViewSet,
     RoomFlowViewSet,
     RoomMetricsViewSet,
     RoomUserExternalViewSet,
@@ -23,13 +24,13 @@ from chats.apps.api.v1.internal.projects import viewsets as project_internal_vie
 from chats.apps.api.v1.internal.rooms.viewsets import InternalListRoomsViewSet
 from chats.apps.api.v1.internal.users import viewsets as user_internal_views
 from chats.apps.api.v1.msgs.viewsets import MessageMediaViewset, MessageViewset
+from chats.apps.api.v1.orgs.viewsets import OrgProjectViewSet
 from chats.apps.api.v1.projects.viewsets import (
-    ProjectPermissionViewset,
-    ProjectViewset,
     CustomStatusTypeViewSet,
     CustomStatusViewSet,
+    ProjectPermissionViewset,
+    ProjectViewset,
 )
-from chats.apps.api.v1.orgs.viewsets import OrgProjectViewSet
 from chats.apps.api.v1.queues.viewsets import QueueAuthorizationViewset, QueueViewset
 from chats.apps.api.v1.quickmessages.viewsets import (
     QuickMessageViewset,
@@ -187,6 +188,11 @@ router.register(
     "external/list_rooms",
     ExternalListRoomsViewSet,
     basename="external_room_list",
+)
+router.register(
+    "external/list_rooms_with_pagination",
+    ExternalListWithPaginationRoomsViewSet,
+    basename="external_room_list_with_pagination",
 )
 router.register("external/sectors", SectorFlowViewset, basename="external_sector")
 router.register("external/queues", QueueFlowViewset, basename="external_queue")

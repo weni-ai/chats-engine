@@ -1,5 +1,4 @@
 from django.contrib.auth import get_user_model
-from django.db.utils import IntegrityError
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
 from rest_framework.permissions import IsAuthenticated
@@ -51,6 +50,14 @@ class DiscussionViewSet(
         return context
 
     def create(self, request, *args, **kwargs):
+        room = request.data.get("room")
+
+        if Discussion.objects.filter(room=room, is_active=True).exists():
+            return Response(
+                {"detail": "The room already have an open discussion."},
+                status.HTTP_409_CONFLICT,
+            )
+
         try:
             creation_data = self.get_serializer(data=request.data)
             creation_data.is_valid(raise_exception=True)
@@ -65,16 +72,6 @@ class DiscussionViewSet(
             return Response(
                 {"Detail": f"{err}"},
                 status.HTTP_400_BAD_REQUEST,
-            )
-        except IntegrityError:
-            return Response(
-                {"detail": "The room already have an open discussion."},
-                status.HTTP_409_CONFLICT,
-            )
-        except Exception as err:
-            return Response(
-                {"Detail": f"{err}"},
-                status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     def perform_create(self, serializer):

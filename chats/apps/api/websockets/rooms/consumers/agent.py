@@ -1,7 +1,7 @@
-import json
 import asyncio
-import uuid
+import json
 import logging
+import uuid
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
@@ -9,8 +9,9 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 
+from chats.apps.projects.models.models import ProjectPermission
+from chats.apps.projects.usecases.status_service import InServiceStatusService
 from chats.core.cache import CacheClient
-
 
 USE_WS_CONNECTION_CHECK = getattr(settings, "USE_WS_CONNECTION_CHECK", False)
 CONNECTION_CHECK_CACHE_PREFIX = "connection_check_response_"
@@ -88,6 +89,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                         self.user.email,
                     )
                     await self.set_user_status("OFFLINE")
+                    await self.finalize_in_service_if_needed()
                 else:
                     logger.info(
                         "User %s has other active connections, not setting status to OFFLINE",
@@ -100,6 +102,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                     self.user.email,
                 )
                 await self.set_user_status("OFFLINE")
+                await self.finalize_in_service_if_needed()
 
     async def set_connection_check_response(self, connection_id: str, response: bool):
         self.cache.set(
@@ -320,3 +323,14 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
     async def load_user(self, *args, **kwargs):
         """Enter user notification group"""
         await self.join({"name": "permission", "id": str(self.permission.pk)})
+
+    @database_sync_to_async
+    def finalize_in_service_if_needed(self):
+        try:
+            permission = ProjectPermission.objects.get(
+                user=self.user, project_id=self.project
+            )
+            if permission.status == ProjectPermission.STATUS_ONLINE:
+                InServiceStatusService.room_closed(self.user, permission.project)
+        except ProjectPermission.DoesNotExist:
+            pass
