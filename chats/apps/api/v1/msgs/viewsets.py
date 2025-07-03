@@ -23,7 +23,9 @@ class MessageViewset(
     mixins.UpdateModelMixin,
     viewsets.GenericViewSet,
 ):
-    queryset = ChatMessage.objects.all()
+    queryset = ChatMessage.objects.select_related(
+        "room", "user", "contact"
+    ).prefetch_related("medias")
     serializer_class = MessageSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = MessageFilter

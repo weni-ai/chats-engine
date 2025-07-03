@@ -39,6 +39,14 @@ class Message(BaseModelWithManualCreatedOn):
     external_id = models.CharField(
         _("External ID"), max_length=200, blank=True, null=True
     )
+    metadata = models.JSONField(
+        _("message metadata"), blank=True, null=True, default=dict
+    )
+    status = models.JSONField(
+        _("message status"),
+        blank=True,
+        null=True,
+    )
 
     class Meta:
         verbose_name = "Message"
@@ -176,3 +184,16 @@ class MessageMedia(BaseModelWithManualCreatedOn):
     @property
     def project(self):
         return self.message.project
+
+
+class ChatMessageReplyIndex(BaseModelWithManualCreatedOn):
+    external_id = models.CharField(
+        _("External ID"), max_length=255, unique=True, db_index=True
+    )
+    message = models.ForeignKey(
+        "Message", on_delete=models.CASCADE, related_name="reply_indexes"
+    )
+
+    class Meta:
+        verbose_name = "Chat Message Reply Index"
+        verbose_name_plural = "Chat Message Reply Indexes"

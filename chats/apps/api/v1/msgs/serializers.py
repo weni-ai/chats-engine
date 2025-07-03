@@ -1,4 +1,5 @@
 import io
+import logging
 
 import magic
 from django.conf import settings
@@ -8,8 +9,11 @@ from rest_framework import exceptions, serializers
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactSerializer
+from chats.apps.msgs.models import ChatMessageReplyIndex
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
+
+LOGGER = logging.getLogger(__name__)
 
 """
 TODO: Refactor these serializers into less classes
@@ -114,6 +118,7 @@ class BaseMessageSerializer(serializers.ModelSerializer):
     text = serializers.CharField(
         required=False, allow_null=True, allow_blank=True, default=""
     )
+    metadata = serializers.JSONField(required=False, allow_null=True)
 
     class Meta:
         model = ChatMessage
@@ -126,6 +131,7 @@ class BaseMessageSerializer(serializers.ModelSerializer):
             "text",
             "seen",
             "created_on",
+            "metadata",
         ]
         read_only_fields = [
             "uuid",
@@ -185,6 +191,7 @@ class MessageSerializer(BaseMessageSerializer):
     """Serializer for the messages endpoint"""
 
     media = MessageMediaSimpleSerializer(many=True, required=False)
+    replied_message = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ChatMessage
@@ -198,6 +205,9 @@ class MessageSerializer(BaseMessageSerializer):
             "seen",
             "media",
             "created_on",
+            "metadata",
+            "replied_message",
+            "status",
         ]
         read_only_fields = [
             "uuid",
@@ -205,6 +215,53 @@ class MessageSerializer(BaseMessageSerializer):
             "created_on",
             "contact",
         ]
+
+    def get_replied_message(self, obj):
+        if obj.metadata is None or obj.metadata == {}:
+            return None
+
+        context = obj.metadata.get("context", {})
+        if not context or context == {} or "id" not in context:
+            return None
+
+        try:
+            replied_id = context.get("id")
+            replied_msg = ChatMessageReplyIndex.objects.get(external_id=replied_id)
+
+            result = {
+                "uuid": str(replied_msg.message.uuid),
+                "text": replied_msg.message.text or "",
+            }
+            media_items = replied_msg.message.medias.all()
+            if media_items.exists():
+                media_data = []
+                for media in media_items:
+                    media_data.append(
+                        {
+                            "content_type": media.content_type,
+                            "message": str(media.message.uuid),
+                            "url": media.url,
+                            "created_on": media.created_on,
+                        }
+                    )
+                result["media"] = media_data
+
+            if replied_msg.message.user:
+                result["user"] = {
+                    "uuid": str(replied_msg.message.user.pk),
+                    "name": replied_msg.message.user.full_name,
+                }
+
+            if replied_msg.message.contact:
+                result["contact"] = {
+                    "uuid": str(replied_msg.message.contact.uuid),
+                    "name": replied_msg.message.contact.name,
+                }
+
+            return result
+        except Exception as error:
+            LOGGER.error("Error getting replied message: %s", error)
+            return None
 
 
 class MessageWSSerializer(MessageSerializer):

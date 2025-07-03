@@ -39,7 +39,10 @@ class RoomsExternalTests(APITestCase):
     @mock.patch(
         "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
     )
-    def test_create_external_room_with_internal_token(self, mock_get_userinfo):
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    def test_create_external_room_with_internal_token(
+        self, mock_get_room, mock_get_userinfo
+    ):
         # Mock the userinfo response
         mock_get_userinfo.return_value = {
             "sub": "test_user",
@@ -48,6 +51,7 @@ class RoomsExternalTests(APITestCase):
             "given_name": "Test",
             "family_name": "User",
         }
+        mock_get_room.return_value = None
 
         user, token = create_user_and_token("test_user")
 
@@ -70,7 +74,6 @@ class RoomsExternalTests(APITestCase):
         }
 
         response = self._create_room(token, data)
-
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     def test_cannot_create_room_with_token_without_can_communicate_internally_perm(
@@ -86,10 +89,12 @@ class RoomsExternalTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
-    def test_create_external_room(self, mock_is_attending):
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    def test_create_external_room(self, mock_get_room, mock_is_attending):
         """
         Verify if the endpoint for create external room it is working correctly.
         """
+        mock_get_room.return_value = None
         data = {
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
@@ -103,11 +108,20 @@ class RoomsExternalTests(APITestCase):
         response = self._create_room("f3ce543e-d77e-4508-9140-15c95752a380", data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
+        room = Room.objects.get(uuid=response.data.get("uuid"))
+
+        mock_get_room.assert_called_once_with(room)
+        self.assertTrue(room.is_billing_notified)
+
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
-    def test_create_external_room_with_external_uuid(self, mock_is_attending):
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    def test_create_external_room_with_external_uuid(
+        self, mock_get_room, mock_is_attending
+    ):
         """
         Verify if the endpoint for create external room it is working correctly, passing custom fields.
         """
+        mock_get_room.return_value = None
         data = {
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
@@ -127,10 +141,14 @@ class RoomsExternalTests(APITestCase):
         )
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
-    def test_create_external_room_editing_contact(self, mock_is_attending):
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    def test_create_external_room_editing_contact(
+        self, mock_get_room, mock_is_attending
+    ):
         """
         Verify if the endpoint for edit external room it is working correctly.
         """
+        mock_get_room.return_value = None
         data = {
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
@@ -158,7 +176,9 @@ class RoomsExternalTests(APITestCase):
         self.assertEqual(response.data["contact"]["custom_fields"]["job"], "streamer")
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
-    def test_is_anon_true_wont_save_urn(self, mock_is_attending):
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    def test_is_anon_true_wont_save_urn(self, mock_get_room, mock_is_attending):
+        mock_get_room.return_value = None
         data = {
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
@@ -189,7 +209,9 @@ class RoomsExternalTests(APITestCase):
     @mock.patch(
         "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
     )
-    def test_close_room_with_internal_token(self, mock_get_userinfo):
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    def test_close_room_with_internal_token(self, mock_get_room, mock_get_userinfo):
+        mock_get_room.return_value = None
         room = Room.objects.create(queue=self.queue_1)
         mock_get_userinfo.return_value = {
             "sub": "test_user",
@@ -242,11 +264,14 @@ class RoomsQueuePriorityExternalTests(APITestCase):
 
     @patch("chats.apps.api.v1.external.rooms.serializers.start_queue_priority_routing")
     @patch("chats.apps.api.v1.external.rooms.serializers.logger")
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_room_with_queue_priority_when_queue_is_empty_and_no_user_is_online(
         self,
+        mock_get_room,
         mock_logger,
         mock_start_queue_priority_routing,
     ):
+        mock_get_room.return_value = None
         mock_start_queue_priority_routing.return_value = None
         data = {
             "queue_uuid": str(self.queue.uuid),
@@ -269,11 +294,14 @@ class RoomsQueuePriorityExternalTests(APITestCase):
 
     @patch("chats.apps.api.v1.external.rooms.serializers.start_queue_priority_routing")
     @patch("chats.apps.api.v1.external.rooms.serializers.logger")
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_room_with_queue_priority_when_queue_is_empty_and_user_is_online(
         self,
+        mock_get_room,
         mock_logger,
         mock_start_queue_priority_routing,
     ):
+        mock_get_room.return_value = None
         mock_start_queue_priority_routing.return_value = None
 
         user = User.objects.create(
@@ -303,11 +331,14 @@ class RoomsQueuePriorityExternalTests(APITestCase):
 
     @patch("chats.apps.api.v1.external.rooms.serializers.start_queue_priority_routing")
     @patch("chats.apps.api.v1.external.rooms.serializers.logger")
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_room_with_queue_priority_when_user_is_online_but_queue_is_not_empty(
         self,
+        mock_get_room,
         mock_logger,
         mock_start_queue_priority_routing,
     ):
+        mock_get_room.return_value = None
         mock_start_queue_priority_routing.return_value = None
 
         user = User.objects.create(
@@ -401,7 +432,9 @@ class RoomsFlowStartExternalTests(APITestCase):
         return client.post(url, data=data, format="json")
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
-    def test_create_room_with_flow_start(self, mock_is_attending):
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    def test_create_room_with_flow_start(self, mock_get_room, mock_is_attending):
+        mock_get_room.return_value = None
         flow_start = self.room_flowstart
         data = {
             "queue_uuid": str(self.queue_1.pk),
@@ -420,7 +453,11 @@ class RoomsFlowStartExternalTests(APITestCase):
         self.assertTrue(flow_start.is_deleted)
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
-    def test_create_room_with_deleted_flow_start(self, mock_is_attending):
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    def test_create_room_with_deleted_flow_start(
+        self, mock_get_room, mock_is_attending
+    ):
+        mock_get_room.return_value = None
         flow_start = self.room_flowstart
         flow_start.is_deleted = True
         flow_start.save()
@@ -445,9 +482,11 @@ class RoomsFlowStartExternalTests(APITestCase):
         )
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_room_with_contact_flow_start_with_offline_user(
-        self, mock_is_attending
+        self, mock_get_room, mock_is_attending
     ):
+        mock_get_room.return_value = None
         data = {
             "queue_uuid": str(self.queue_1.pk),
             "contact": {
@@ -465,9 +504,11 @@ class RoomsFlowStartExternalTests(APITestCase):
         )
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_room_with_contact_flow_start_with_online_user(
-        self, mock_is_attending
+        self, mock_get_room, mock_is_attending
     ):
+        mock_get_room.return_value = None
         permission = self.permission
         permission.status = "ONLINE"
         permission.save()
@@ -489,9 +530,11 @@ class RoomsFlowStartExternalTests(APITestCase):
         )
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_room_with_group_flow_start_with_online_user(
-        self, mock_is_attending
+        self, mock_get_room, mock_is_attending
     ):
+        mock_get_room.return_value = None
         permission = self.permission
         permission.status = "ONLINE"
         permission.save()
@@ -521,9 +564,11 @@ class RoomsFlowStartExternalTests(APITestCase):
         )
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_room_with_group_flow_start_with_offline_user(
-        self, mock_is_attending
+        self, mock_get_room, mock_is_attending
     ):
+        mock_get_room.return_value = None
         data = {
             "queue_uuid": str(self.queue_1.pk),
             "contact": {
@@ -657,7 +702,11 @@ class RoomsRoutingExternalTests(APITestCase):
         return client.post(url, data=data, format="json")
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
-    def test_create_external_room_can_open_offline(self, mock_is_attending):
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    def test_create_external_room_can_open_offline(
+        self, mock_get_room, mock_is_attending
+    ):
+        mock_get_room.return_value = None
         data = {
             "queue_uuid": "8590ad29-5629-448c-bfb6-1bfd5219b8ec",
             "contact": {
