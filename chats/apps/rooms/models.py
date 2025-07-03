@@ -7,27 +7,31 @@ from typing import TYPE_CHECKING
 import requests
 import sentry_sdk
 from django.conf import settings
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django_redis import get_redis_connection
 from model_utils import FieldTracker
 from requests.exceptions import RequestException
 from rest_framework.exceptions import ValidationError
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
+from chats.apps.projects.models.models import RoomRoutingType
 from chats.apps.projects.usecases.send_room_info import RoomInfoUseCase
+from chats.apps.projects.usecases.status_service import InServiceStatusService
+from chats.apps.rooms.exceptions import (
+    MaxPinRoomLimitReachedError,
+    RoomIsNotActiveError,
+)
 from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
 
-from chats.apps.projects.models.models import RoomRoutingType
-
-
 if TYPE_CHECKING:
-    from chats.apps.queues.models import Queue
     from chats.apps.projects.models.models import Project
+    from chats.apps.queues.models import Queue
 
 
 logger = logging.getLogger(__name__)
@@ -37,6 +41,7 @@ class Room(BaseModel, BaseConfigurableModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.__original_is_active = self.is_active
+        self._original_user = self.user
 
     user = models.ForeignKey(
         "accounts.User",
@@ -87,7 +92,12 @@ class Room(BaseModel, BaseConfigurableModel):
     is_active = models.BooleanField(_("is active?"), default=True)
     is_waiting = models.BooleanField(_("is waiting for answer?"), default=False)
 
+    # Legacy, only stores the last transfer
     transfer_history = models.JSONField(_("Transfer History"), null=True, blank=True)
+    # New, stores the full transfer history
+    full_transfer_history = models.JSONField(
+        _("Full Transfer History"), null=True, blank=True, default=list
+    )
 
     tags = models.ManyToManyField(
         "sectors.SectorTag",
@@ -128,6 +138,41 @@ class Room(BaseModel, BaseConfigurableModel):
             self.pk,
         )
 
+    def _update_agent_service_status(self, is_new):
+        """
+        Atualiza o status 'In-Service' dos agentes baseado nas mudanças na sala
+        Args:
+            is_new: Boolean indicando se é uma sala nova
+        """
+        old_user = self._original_user
+        new_user = self.user
+
+        project = None
+        if self.queue and hasattr(self.queue, "sector"):
+            sector = self.queue.sector
+            if sector and hasattr(sector, "project"):
+                project = sector.project
+
+        if not project:
+            return
+
+        if is_new and new_user:
+            InServiceStatusService.room_assigned(new_user, project)
+            return
+
+        if old_user is None and new_user is not None:
+            InServiceStatusService.room_assigned(new_user, project)
+            return
+
+        if old_user is not None and new_user is not None and old_user != new_user:
+            InServiceStatusService.room_closed(old_user, project)
+            InServiceStatusService.room_assigned(new_user, project)
+            return
+
+        if old_user is not None and new_user is None:
+            InServiceStatusService.room_closed(old_user, project)
+            return
+
     class Meta:
         verbose_name = _("Room")
         verbose_name_plural = _("Rooms")
@@ -146,14 +191,19 @@ class Room(BaseModel, BaseConfigurableModel):
         if self.__original_is_active is False:
             raise ValidationError({"detail": _("Closed rooms cannot receive updates")})
 
-        if (
-            self.user
-            and not self.user_assigned_at
-            or (self.pk and self.tracker.has_changed("user"))
-        ):
+        user_has_changed = self.pk and self.tracker.has_changed("user")
+
+        if self.user and not self.user_assigned_at or user_has_changed:
             self.user_assigned_at = timezone.now()
 
-        return super().save(*args, **kwargs)
+        if user_has_changed:
+            self.clear_pins()
+
+        is_new = self._state.adding
+
+        super().save(*args, **kwargs)
+
+        self._update_agent_service_status(is_new)
 
     def get_permission(self, user):
         try:
@@ -189,11 +239,19 @@ class Room(BaseModel, BaseConfigurableModel):
 
     def trigger_default_message(self):
         default_message = self.queue.default_message
-        if default_message:
-            sent_message = self.messages.create(
-                user=None, contact=None, text=default_message
-            )
-            sent_message.notify_room("create", True)
+        if not default_message:
+            return
+
+        cache_key = f"room_default_message:{self.pk}"
+
+        with get_redis_connection() as redis_connection:
+            if not redis_connection.set(cache_key, "1", ex=10, nx=True):
+                return
+
+        sent_message = self.messages.create(
+            user=None, contact=None, text=default_message
+        )
+        sent_message.notify_room("create", True)
 
     @property
     def is_24h_valid(self) -> bool:
@@ -224,6 +282,8 @@ class Room(BaseModel, BaseConfigurableModel):
         )
 
     def close(self, tags: list = [], end_by: str = ""):
+        from chats.apps.projects.usecases.status_service import InServiceStatusService
+
         self.is_active = False
         self.ended_at = timezone.now()
         self.ended_by = end_by
@@ -231,7 +291,18 @@ class Room(BaseModel, BaseConfigurableModel):
         if tags is not None:
             self.tags.add(*tags)
 
+        self.clear_pins()
+
         self.save()
+
+        if self.user:
+            project = None
+            if self.queue and hasattr(self.queue, "sector"):
+                sector = self.queue.sector
+                if sector and hasattr(sector, "project"):
+                    project = sector.project
+            if project:
+                InServiceStatusService.room_closed(self.user, project)
 
     def request_callback(self, room_data: dict):
         if self.callback_url is None:
@@ -257,6 +328,7 @@ class Room(BaseModel, BaseConfigurableModel):
                     return None
                 else:
                     response.raise_for_status()
+                    return None
 
             except RequestException:
                 if attempt < settings.MAX_RETRIES - 1:
@@ -399,3 +471,88 @@ class Room(BaseModel, BaseConfigurableModel):
         is_sector_manager = queue.sector.is_manager(user)
 
         return is_project_admin or is_sector_manager
+
+    @property
+    def imported_history_url(self):
+        if self.contact and self.contact.imported_history_url:
+            return self.contact.imported_history_url
+        return None
+
+    def pin(self, user: User):
+        """
+        Pins a room for a user.
+        """
+
+        if self.pins.filter(user=user).exists():
+            return
+
+        if (
+            RoomPin.objects.filter(
+                user=user,
+                room__queue__sector__project=self.queue.sector.project,
+                room__is_active=True,
+            ).count()
+            >= settings.MAX_ROOM_PINS_LIMIT
+        ):
+            raise MaxPinRoomLimitReachedError
+
+        if self.user != user:
+            raise PermissionDenied
+
+        if not self.is_active:
+            raise RoomIsNotActiveError
+
+        return RoomPin.objects.create(room=self, user=user)
+
+    def unpin(self, user: User):
+        """
+        Unpins a room for a user.
+        """
+        if self.user != user:
+            raise PermissionDenied
+
+        return self.pins.filter(user=user).delete()
+
+    def clear_pins(self):
+        """
+        Clears all pins for a room.
+        """
+        return self.pins.all().delete()
+
+    def add_transfer_to_history(self, transfer: dict):
+        """
+        Adds a transfer to the full transfer history.
+        """
+        self.full_transfer_history.append(transfer)
+        self.transfer_history = transfer  # legacy
+        self.save(update_fields=["full_transfer_history", "transfer_history"])
+
+
+class RoomPin(BaseModel):
+    """
+    A room pin is a record of a user pinning a room.
+    """
+
+    room = models.ForeignKey(
+        "rooms.Room",
+        related_name="pins",
+        verbose_name=_("room"),
+        on_delete=models.CASCADE,
+    )
+    user = models.ForeignKey(
+        "accounts.User",
+        related_name="room_pins",
+        verbose_name=_("user"),
+        on_delete=models.CASCADE,
+    )
+    created_on = models.DateTimeField(_("created on"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("Room Pin")
+        verbose_name_plural = _("Room Pins")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["room", "user"],
+                name="unique_room_user_room_pin",
+            )
+        ]

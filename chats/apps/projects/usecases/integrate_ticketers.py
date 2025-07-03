@@ -1,8 +1,5 @@
 from rest_framework import exceptions, status
 
-from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
-    ConnectRESTClient,
-)
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.projects.models import Project
 from chats.apps.queues.models import Queue
@@ -28,8 +25,8 @@ class IntegratedTicketers:
                         "sector_uuid": str(sector.uuid),
                     },
                 }
-                connect = ConnectRESTClient()
-                response = connect.create_ticketer(**content)
+                flows_client = FlowRESTClient()
+                response = flows_client.create_ticketer(**content)
 
                 if response.status_code not in [
                     status.HTTP_200_OK,
@@ -83,8 +80,8 @@ class IntegratedTicketers:
                     "sector_uuid": str(sector.uuid),
                 },
             }
-            connect = ConnectRESTClient()
-            response = connect.create_ticketer(**content)
+            flows_client = FlowRESTClient()
+            response = flows_client.create_ticketer(**content)
             if response.status_code not in [
                 status.HTTP_200_OK,
                 status.HTTP_201_CREATED,
