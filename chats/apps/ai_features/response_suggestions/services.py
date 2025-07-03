@@ -77,8 +77,9 @@ class ResponseSuggestionsService:
             return None
 
         try:
-            offset = messages_qty - CHATS_RESPONSE_SUGGESTIONS_MAX_MESSAGES
-            messages = messages[offset:]
+            if messages_qty > CHATS_RESPONSE_SUGGESTIONS_MAX_MESSAGES:
+                offset = messages_qty - CHATS_RESPONSE_SUGGESTIONS_MAX_MESSAGES
+                messages = messages[offset:]
 
             conversation = []
 
