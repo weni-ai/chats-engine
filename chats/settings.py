@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     "chats.core",
     "chats.apps.ai_features",
     "chats.apps.ai_features.history_summary",
+    "chats.apps.ai_features.response_suggestions",
     # third party apps
     "channels",
     "drf_yasg",
@@ -439,6 +440,10 @@ USE_WS_CONNECTION_CHECK = env.bool("USE_WS_CONNECTION_CHECK", default=False)
 MAX_RETRIES = env.int("WS_MESSAGE_RETRIES", default=3)
 RETRY_DELAY_SECONDS = env.int("WS_MESSAGE_RETRIES", default=0.5)
 
+# AI Features
+
+AI_FEATURES_PROMPTS_API_SECRET = env.str("AI_FEATURES_PROMPTS_API_SECRET")
+
 # Email
 
 SEND_EMAILS = env.bool("SEND_EMAILS", default=False)
@@ -469,4 +474,9 @@ MAX_ROOM_PINS_LIMIT = env.int("MAX_ROOM_PINS_LIMIT", default=3)
 # Message Status Update Feature Flag
 MESSAGE_STATUS_UPDATE_ENABLED_PROJECTS = env.list(
     "MESSAGE_STATUS_UPDATE_ENABLED_PROJECTS", default=[]
+)
+
+# Response Suggestions
+CHATS_RESPONSE_SUGGESTIONS_MAX_MESSAGES = env.int(
+    "CHATS_RESPONSE_SUGGESTIONS_MAX_MESSAGES", default=20
 )

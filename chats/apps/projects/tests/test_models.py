@@ -197,3 +197,28 @@ class PropertyTests(APITestCase):
         )
 
         self.assertEqual(project.has_chats_summary, True)
+
+    def test_get_and_set_internal_flag(self):
+        self.assertEqual(self.project.internal_flags, {})
+        self.assertEqual(self.project.get_internal_flag("example"), False)
+
+        self.project.set_internal_flag("example", True)
+        self.assertEqual(self.project.internal_flags, {"example": True})
+        self.assertEqual(self.project.get_internal_flag("example"), True)
+
+    def test_is_copilot_active_when_flag_is_not_set(self):
+        self.assertEqual(self.project.internal_flags, {})
+        self.assertFalse(self.project.get_internal_flag("is_copilot_active"))
+        self.assertFalse(self.project.is_copilot_active)
+
+    def test_is_copilot_active_when_flag_is_set_as_false(self):
+        self.project.set_internal_flag("is_copilot_active", False)
+        self.assertEqual(self.project.internal_flags, {"is_copilot_active": False})
+        self.assertFalse(self.project.get_internal_flag("is_copilot_active"))
+        self.assertFalse(self.project.is_copilot_active)
+
+    def test_is_copilot_active_when_flag_is_set_as_true(self):
+        self.project.set_internal_flag("is_copilot_active", True)
+        self.assertEqual(self.project.internal_flags, {"is_copilot_active": True})
+        self.assertTrue(self.project.get_internal_flag("is_copilot_active"))
+        self.assertTrue(self.project.is_copilot_active)
