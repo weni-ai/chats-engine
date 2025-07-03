@@ -80,12 +80,8 @@ class TestResponseSuggestionsService(TestCase):
         with self.assertRaises(ValueError):
             self.service.get_prompt()
 
-    @patch("chats.apps.ai_features.response_suggestions.services.FeaturePrompt.objects")
-    def test_generate_response_suggestion_success(self, mock_feature_prompt_objects):
+    def test_generate_response_suggestion_success(self):
         # Setup mocks
-        mock_feature_prompt_objects.filter.return_value.order_by.return_value.last.return_value = (
-            self.feature_prompt
-        )
         self.mock_integration_client.generate_text.return_value = (
             "Test response suggestion"
         )
@@ -98,20 +94,14 @@ class TestResponseSuggestionsService(TestCase):
         self.mock_integration_client_class.assert_called_once_with("gpt-4")
         self.mock_integration_client.generate_text.assert_called_once()
 
-    @patch("chats.apps.ai_features.response_suggestions.services.FeaturePrompt.objects")
-    def test_generate_response_suggestion_invalid_prompt(
-        self, mock_feature_prompt_objects
-    ):
+    def test_generate_response_suggestion_invalid_prompt(self):
         # Setup mocks
         invalid_prompt = FeaturePrompt.objects.create(
             feature="response_suggestions",
-            version=1,
+            version=2,
             model="gpt-4",
             prompt="Invalid prompt without conversation placeholder",
             settings={"temperature": 0.7},
-        )
-        mock_feature_prompt_objects.filter.return_value.order_by.return_value.last.return_value = (
-            invalid_prompt
         )
 
         # Test
