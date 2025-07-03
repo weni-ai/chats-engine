@@ -290,6 +290,14 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         created_on = self.initial_data.get('created_on', timezone.now())
         if isinstance(created_on, str):
             created_on = pendulum.parse(created_on)
+        
+        project_tz = pendulum.timezone(str(sector.project.timezone))
+        if created_on.tzinfo is None:
+            created_on = project_tz.localize(created_on)
+        else:
+            created_on = created_on.in_timezone(project_tz)
+        
+        attrs['created_on'] = created_on
 
         self.check_work_time_weekend(sector, created_on)
 
@@ -301,8 +309,12 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         queue, sector = self.get_queue_and_sector(validated_data)
         project = sector.project
 
-        created_on = validated_data.get("created_on", timezone.now().time())
-        protocol = validated_data.get("custom_fields", {}).pop("protocol", None)
+        created_on = validated_data.get("created_on", timezone.now())
+        
+        protocol = validated_data.pop("protocol", None)
+        if protocol is None:
+            protocol = validated_data.get("custom_fields", {}).pop("protocol", None)
+        
         service_chat = validated_data.get("custom_fields", {}).pop(
             "service_chats", None
         )
