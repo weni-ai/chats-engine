@@ -78,20 +78,36 @@ class ResponseSuggestionsService:
             logger.info("No messages found in the room. Room %s", room.id)
             return None
 
-        messages = messages[messages_qty - CHATS_RESPONSE_SUGGESTIONS_MAX_MESSAGES :]
+        try:
+            messages = messages[
+                messages_qty - CHATS_RESPONSE_SUGGESTIONS_MAX_MESSAGES :
+            ]
 
-        conversation = []
+            conversation = []
 
-        for message in messages:
-            is_contact = message.contact is not None
-            sender = "user" if is_contact else "agent"
+            for message in messages:
+                is_contact = message.contact is not None
+                sender = "user" if is_contact else "agent"
 
-            conversation.append(
-                {
-                    "sender": sender,
-                    "text": message.text,
-                }
+                conversation.append(
+                    {
+                        "sender": sender,
+                        "text": message.text,
+                    }
+                )
+
+            conversation_text = json.dumps(conversation, ensure_ascii=False)
+            prompt_text = prompt_text.format(conversation=conversation_text)
+
+            response = self.integration_client_class(model_id).generate_text(
+                feature_prompt.settings, prompt_text
             )
 
-        conversation_text = json.dumps(conversation, ensure_ascii=False)
-        prompt_text = prompt_text.format(conversation=conversation_text)
+            return response
+
+        except Exception as e:
+            logger.error("Error generating response for room %s: %s", room.uuid, e)
+            capture_message(
+                f"Error generating response for room {room.uuid}: {e}",
+                level="error",
+            )
