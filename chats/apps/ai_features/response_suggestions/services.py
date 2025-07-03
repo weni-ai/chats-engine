@@ -8,12 +8,9 @@ from sentry_sdk import capture_message
 
 from chats.apps.ai_features.integrations.base_client import BaseAIPlatformClient
 from chats.apps.ai_features.models import FeaturePrompt
+from chats.apps.rooms.models import Room
 
 logger = logging.getLogger(__name__)
-
-
-if TYPE_CHECKING:
-    from chats.apps.rooms.models import Room
 
 
 # Number of messages to consider for the response suggestion
@@ -47,7 +44,7 @@ class ResponseSuggestionsService:
 
         return prompt
 
-    def get_response_suggestion(self, room: "Room") -> str | None:
+    def get_response_suggestion(self, room: "Room") -> str:
         """
         Get the response suggestion for the copilot feature.
         """
@@ -59,24 +56,24 @@ class ResponseSuggestionsService:
         if "{conversation}" not in prompt_text:
             logger.error(
                 "The prompt does not contain the {conversation} placeholder. Room %s",
-                room.id,
+                room.uuid,
             )
             capture_message(
                 "The prompt does not contain the {conversation} placeholder. Room %s",
-                room.id,
+                room.uuid,
             )
             return None
 
         messages = (
-            Room.objects.get(id=room.id)
+            Room.objects.get(uuid=room.uuid)
             .messages.filter(Q(user__isnull=False) | Q(contact__isnull=False))
             .select_related("contact", "user")
-            .order_by("created_at")
+            .order_by("created_on")
         )
         messages_qty = messages.count()
 
         if messages_qty == 0:
-            logger.info("No messages found in the room. Room %s", room.id)
+            logger.info("No messages found in the room. Room %s", room.uuid)
             return None
 
         try:
