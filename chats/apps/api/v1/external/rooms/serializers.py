@@ -290,6 +290,14 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         created_on = self.initial_data.get('created_on', timezone.now())
         if isinstance(created_on, str):
             created_on = pendulum.parse(created_on)
+        
+        project_tz = pendulum.timezone(str(sector.project.timezone))
+        if created_on.tzinfo is None:
+            created_on = project_tz.localize(created_on)
+        else:
+            created_on = created_on.in_timezone(project_tz)
+        
+        attrs['created_on'] = created_on
 
         self.check_work_time_weekend(sector, created_on)
 
