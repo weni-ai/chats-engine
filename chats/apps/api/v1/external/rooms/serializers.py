@@ -271,29 +271,33 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         sector_uuid = attrs.get("sector_uuid")
 
-        if not sector_uuid:
-            raise ValidationError("It is necessary to inform a queue or sector")
+        working_hours_config = {}
+        if sector_uuid:
+            try:
+                sector = Sector.objects.get(uuid=sector_uuid)
+                working_hours_config = (
+                    sector.config.get("working_hours", {}) if sector.config else {}
+                )
 
-        try:
-            sector = Sector.objects.get(uuid=sector_uuid)
-        except Sector.DoesNotExist:
-            raise ValidationError("Sector not found")
+                created_on = self.initial_data.get("created_on", timezone.now())
+                if isinstance(created_on, str):
+                    created_on = pendulum.parse(created_on)
+                else:
+                    created_on = pendulum.instance(created_on)
 
-        created_on = self.initial_data.get("created_on", timezone.now())
-        if isinstance(created_on, str):
-            created_on = pendulum.parse(created_on)
-        else:
-            created_on = pendulum.instance(created_on)
+                project_tz = pendulum.timezone(str(sector.project.timezone))
+                if created_on.tzinfo is None:
+                    created_on = project_tz.localize(created_on)
+                else:
+                    created_on = created_on.in_timezone(project_tz)
 
-        project_tz = pendulum.timezone(str(sector.project.timezone))
-        if created_on.tzinfo is None:
-            created_on = project_tz.localize(created_on)
-        else:
-            created_on = created_on.in_timezone(project_tz)
+                attrs["created_on"] = created_on
 
-        attrs["created_on"] = created_on
+                if working_hours_config:
+                    self.check_work_time_weekend(sector, created_on)
 
-        self.check_work_time_weekend(sector, created_on)
+            except Sector.DoesNotExist:
+                pass
 
         return attrs
 
@@ -407,7 +411,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         weekday = created_on.isoweekday()
 
-        if weekday in (6, 7):  # Só valida fim de semana
+        if weekday in (6, 7):
             if not working_hours_config.get("open_in_weekends", False):
                 raise ValidationError(
                     {"detail": _("Contact cannot be done outside working hours")}

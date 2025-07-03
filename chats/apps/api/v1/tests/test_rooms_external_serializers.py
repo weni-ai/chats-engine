@@ -1,6 +1,3 @@
-import uuid
-from unittest.mock import patch
-
 import pendulum
 from django.test import TestCase
 
