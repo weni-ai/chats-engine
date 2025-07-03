@@ -1,3 +1,11 @@
+# 3.22.4
+## Add
+  - Websocket notification to all users in the queue when there is a transfer
+  to another user
+## Fix
+  - Rooms list to do not include the pinned rooms logic when the status filter
+  is used and it is not "ongoing"
+
 # 3.22.3
 ## Fix
   - Online agents query to exclude correctly those who have an active custom status,
