@@ -309,7 +309,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         queue, sector = self.get_queue_and_sector(validated_data)
         project = sector.project
 
-        created_on = validated_data.get("created_on", timezone.now().time())
+        created_on = validated_data.get("created_on", timezone.now())
         
         protocol = validated_data.pop("protocol", None)
         if protocol is None:
