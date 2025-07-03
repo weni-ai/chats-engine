@@ -1,5 +1,4 @@
 import json
-from typing import TYPE_CHECKING
 import logging
 
 from django.conf import settings

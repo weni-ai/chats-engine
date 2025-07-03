@@ -96,7 +96,7 @@ class TestResponseSuggestionsService(TestCase):
 
     def test_generate_response_suggestion_invalid_prompt(self):
         # Setup mocks
-        invalid_prompt = FeaturePrompt.objects.create(
+        FeaturePrompt.objects.create(
             feature="response_suggestions",
             version=2,
             model="gpt-4",
