@@ -7,17 +7,17 @@ from django.db.models import (
     BooleanField,
     Case,
     Count,
+    DateTimeField,
     Max,
     OuterRef,
     Q,
     Subquery,
     When,
-    DateTimeField,
 )
-from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from django.utils.timezone import make_aware
 from django.utils.translation import gettext_lazy as _
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -59,10 +59,10 @@ from chats.apps.rooms.exceptions import (
 from chats.apps.rooms.models import Room, RoomPin
 from chats.apps.rooms.services import RoomsReportService
 from chats.apps.rooms.tasks import generate_rooms_report
+from chats.apps.rooms.utils import create_transfer_json
 from chats.apps.rooms.views import (
     close_room,
     create_room_feedback_message,
-    create_transfer_json,
     get_editable_custom_fields_room,
     update_custom_fields,
     update_flows_custom_fields,
@@ -343,8 +343,8 @@ class RoomViewset(
             room_metric.transfer_count += 1
             room_metric.save()
 
-        instance.transfer_history = feedback
         instance.save()
+        instance.add_transfer_to_history(feedback)
 
         # Create a message with the transfer data and Send to the room group
         # TODO separate create message in a function
@@ -492,8 +492,8 @@ class RoomViewset(
         room_metric.save()
 
         room.user = user
-        room.transfer_history = feedback
         room.save()
+        room.add_transfer_to_history(feedback)
 
         create_room_feedback_message(
             room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
