@@ -158,7 +158,13 @@ class RoomViewset(
         if isinstance(is_active, str):
             is_active = is_active.lower() == "true"
 
-        if not project or is_active is False:
+        room_status = request.query_params.get("room_status", None)
+
+        if (
+            not project
+            or is_active is False
+            or (room_status is not None and room_status != "ongoing")
+        ):
             filtered_qs = self.filter_queryset(qs)
             return self._get_paginated_response(filtered_qs)
 

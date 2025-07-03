@@ -53,6 +53,9 @@ from chats.apps.projects.models import (
 )
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.projects.usecases.status_service import InServiceStatusService
+from chats.apps.queues.utils import (
+    start_queue_priority_routing_for_all_queues_in_project,
+)
 from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import create_room_feedback_message
@@ -756,6 +759,10 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+
+            start_queue_priority_routing_for_all_queues_in_project(
+                instance.status_type.project
+            )
 
             with transaction.atomic():
                 end_time = timezone.now()
