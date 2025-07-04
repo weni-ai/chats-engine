@@ -279,6 +279,10 @@ class RoomFlowSerializer(serializers.ModelSerializer):
                     sector.config.get("working_hours", {}) if sector.config else {}
                 )
 
+                if not working_hours_config:
+                    return attrs
+
+                logger.info(f"flows json config to open a room: {attrs}")
                 created_on = self.initial_data.get("created_on", timezone.now())
                 if isinstance(created_on, str):
                     created_on = pendulum.parse(created_on)
@@ -296,8 +300,10 @@ class RoomFlowSerializer(serializers.ModelSerializer):
                 if working_hours_config:
                     self.check_work_time_weekend(sector, created_on)
 
-            except Sector.DoesNotExist:
-                pass
+            except serializers.ValidationError as error:
+                raise error
+            except Exception as error:
+                logger.error(f"Error getting sector: {error}")
 
         return attrs
 
@@ -426,6 +432,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             end_time_str = day_range.get("end")
 
             if start_time_str is None or end_time_str is None:
+                logger.info(f"there is a try to create a room out of working hours range")
                 raise ValidationError(
                     {"detail": _("Contact cannot be done outside working hours")}
                 )
@@ -434,9 +441,12 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             end_time = pendulum.parse(end_time_str).time()
 
             if not (start_time <= current_time <= end_time):
+                logger.info(f"there is a try to create a room out of working hours")
                 raise ValidationError(
                     {"detail": _("Contact cannot be done outside working hours")}
                 )
+            
+            logger.info(f"an room its created in the weekend")
 
     def handle_urn(self, validated_data):
         is_anon = validated_data.pop("is_anon", False)
