@@ -283,7 +283,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
                 if not working_hours_config:
                     return attrs
 
-                logger.info(f"flows json config to open a room: {attrs}")
+                logger.info("flows json config to open a room: %s", attrs)
                 created_on = self.initial_data.get("created_on", timezone.now())
                 if isinstance(created_on, str):
                     created_on = pendulum.parse(created_on)
@@ -305,7 +305,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
                 raise error
             except Exception as error:
                 capture_exception(error)
-                logger.error(f"Error getting sector: {error}")
+                logger.error("Error getting sector: %s", error)
 
         return attrs
 
@@ -435,7 +435,8 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
             if start_time_str is None or end_time_str is None:
                 logger.info(
-                    f"there is a try to create a room out of working hours range"
+                    "there is a try to create a room out of working hours range %s",
+                    created_on,
                 )
                 raise ValidationError(
                     {"detail": _("Contact cannot be done outside working hours")}
@@ -445,12 +446,15 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             end_time = pendulum.parse(end_time_str).time()
 
             if not (start_time <= current_time <= end_time):
-                logger.info(f"there is a try to create a room out of working hours")
+                logger.info(
+                    "there is a try to create a room out of working hours %s",
+                    created_on,
+                )
                 raise ValidationError(
                     {"detail": _("Contact cannot be done outside working hours")}
                 )
 
-            logger.info(f"an room its created in the weekend")
+            logger.info("an room its created in the weekend %s", created_on)
 
     def handle_urn(self, validated_data):
         is_anon = validated_data.pop("is_anon", False)
