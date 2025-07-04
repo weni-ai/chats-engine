@@ -21,6 +21,7 @@ from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import close_room
 from chats.apps.sectors.models import Sector
+from sentry_sdk import capture_exception
 
 logger = logging.getLogger(__name__)
 
@@ -303,6 +304,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             except serializers.ValidationError as error:
                 raise error
             except Exception as error:
+                capture_exception(error)
                 logger.error(f"Error getting sector: {error}")
 
         return attrs
@@ -432,7 +434,9 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             end_time_str = day_range.get("end")
 
             if start_time_str is None or end_time_str is None:
-                logger.info(f"there is a try to create a room out of working hours range")
+                logger.info(
+                    f"there is a try to create a room out of working hours range"
+                )
                 raise ValidationError(
                     {"detail": _("Contact cannot be done outside working hours")}
                 )
@@ -445,7 +449,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
                 raise ValidationError(
                     {"detail": _("Contact cannot be done outside working hours")}
                 )
-            
+
             logger.info(f"an room its created in the weekend")
 
     def handle_urn(self, validated_data):
