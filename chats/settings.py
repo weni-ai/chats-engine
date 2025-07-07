@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     "chats.apps.feature_version",
     "chats.core",
     "chats.apps.ai_features",
+    "chats.apps.ai_features.history_summary",
     # third party apps
     "channels",
     "drf_yasg",
@@ -438,15 +439,6 @@ USE_WS_CONNECTION_CHECK = env.bool("USE_WS_CONNECTION_CHECK", default=False)
 MAX_RETRIES = env.int("WS_MESSAGE_RETRIES", default=3)
 RETRY_DELAY_SECONDS = env.int("WS_MESSAGE_RETRIES", default=0.5)
 
-# AI Features
-
-AI_FEATURES_PROMPTS_API_SECRET = env.str("AI_FEATURES_PROMPTS_API_SECRET")
-
-# AI features related settings
-
-AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS = env.bool(
-    "AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS", default=False
-)
 # Email
 
 SEND_EMAILS = env.bool("SEND_EMAILS", default=False)
@@ -463,6 +455,13 @@ if SEND_EMAILS:
     EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL")
     EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS")
 
+# AI features related settings
+
+AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS = env.bool(
+    "AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS", default=False
+)
+
+AI_FEATURES_PROMPTS_API_SECRET = env.str("AI_FEATURES_PROMPTS_API_SECRET")
 
 # Pin rooms
 MAX_ROOM_PINS_LIMIT = env.int("MAX_ROOM_PINS_LIMIT", default=3)

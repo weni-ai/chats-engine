@@ -16,6 +16,7 @@ from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
     get_auth_class,
 )
+from chats.apps.ai_features.history_summary.tasks import generate_history_summary
 from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.external.rooms.serializers import (
     RoomFlowSerializer,
@@ -142,6 +143,9 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         serializer = RoomFlowSerializer()
         serializer.process_message_history(room, messages_data)
 
+        if room.queue.sector.project.has_chats_summary and room.messages.exists():
+            generate_history_summary.delay(room.uuid)
+
         return Response(status=status.HTTP_201_CREATED)
 
     @transaction.atomic
@@ -189,6 +193,9 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
             create_room_assigned_from_queue_feedback(instance, instance.user)
 
         room.notify_billing()
+
+        if room.queue.sector.project.has_chats_summary and room.messages.exists():
+            generate_history_summary.delay(room.uuid)
 
     def perform_update(self, serializer):
         serializer.save()
