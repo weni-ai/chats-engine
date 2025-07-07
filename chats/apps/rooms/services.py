@@ -81,7 +81,7 @@ class RoomsReportService:
                 Room.objects.filter(queue__sector__project=self.project, **filters)
                 .order_by("created_on")
                 .select_related("user", "contact", "queue", "queue__sector")
-            )
+            ).prefetch_related("tags")
 
             if not rooms.exists():
                 logger.info("No rooms found for project %s", self.project.uuid)
@@ -107,6 +107,7 @@ class RoomsReportService:
                     "Agente",
                     "Quantidade de mensagens",
                     "Tempo de espera",
+                    "Tags",
                 ]
             )
 
@@ -114,6 +115,8 @@ class RoomsReportService:
             for room in rooms:
                 urn = room.urn
                 phone_number = urn.split(":")[1]
+
+                tags = ", ".join([tag.name for tag in room.tags.all()])
 
                 writer.writerow(
                     [
@@ -126,6 +129,7 @@ class RoomsReportService:
                         room.user.name if room.user else None,
                         room.messages.count(),
                         room.metric.waiting_time,
+                        tags,
                     ]
                 )
 

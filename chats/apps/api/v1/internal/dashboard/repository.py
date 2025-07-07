@@ -5,6 +5,7 @@ from django.db.models.functions import JSONObject
 from django.utils import timezone
 
 from chats.apps.accounts.models import User
+from chats.apps.api.v1.dashboard.dto import get_admin_domains_exclude_filter
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.projects.models.models import CustomStatus
 
@@ -77,7 +78,7 @@ class AgentRepository:
 
         agents_query = self.model
         if not filters.is_weni_admin:
-            agents_query = agents_query.exclude(email__endswith="weni.ai")
+            agents_query = agents_query.exclude(get_admin_domains_exclude_filter())
 
         if filters.agent:
             agents_query = agents_query.filter(email=filters.agent)
@@ -105,8 +106,16 @@ class AgentRepository:
             agents_query.filter(agents_filters)
             .annotate(
                 status=Subquery(project_permission_subquery),
-                closed=Count("rooms", filter=Q(**closed_rooms, **rooms_filter)),
-                opened=Count("rooms", filter=Q(**opened_rooms, **rooms_filter)),
+                closed=Count(
+                    "rooms__uuid",
+                    distinct=True,
+                    filter=Q(**closed_rooms, **rooms_filter),
+                ),
+                opened=Count(
+                    "rooms__uuid",
+                    distinct=True,
+                    filter=Q(**opened_rooms, **rooms_filter),
+                ),
                 custom_status=custom_status_subquery,
             )
             .distinct()
@@ -192,6 +201,7 @@ class AgentRepository:
                         status_type=F("status_type__name"),
                         break_time=F("break_time"),
                         is_active=F("is_active"),
+                        created_on=F("created_on"),
                     )
                 )
             )
@@ -202,7 +212,7 @@ class AgentRepository:
         agents_query = self.model.all()
 
         if not filters.is_weni_admin:
-            agents_query = agents_query.exclude(email__endswith="weni.ai")
+            agents_query = agents_query.exclude(get_admin_domains_exclude_filter())
         if filters.agent:
             agents_query = agents_query.filter(email=filters.agent)
 
@@ -213,8 +223,16 @@ class AgentRepository:
             agents_query.filter(project_permissions__project=project, is_active=True)
             .annotate(
                 status=Subquery(project_permission_queryset),
-                closed=Count("rooms", filter=Q(**closed_rooms, **rooms_filter)),
-                opened=Count("rooms", filter=Q(**opened_rooms, **rooms_filter)),
+                closed=Count(
+                    "rooms__uuid",
+                    distinct=True,
+                    filter=Q(**closed_rooms, **rooms_filter),
+                ),
+                opened=Count(
+                    "rooms__uuid",
+                    distinct=True,
+                    filter=Q(**opened_rooms, **rooms_filter),
+                ),
                 custom_status=custom_status_subquery,
             )
             .values(
