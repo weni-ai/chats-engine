@@ -1,3 +1,124 @@
+# 3.22.4
+## Add
+  - Websocket notification to all users in the queue when there is a transfer
+  to another user
+## Fix
+  - Rooms list to do not include the pinned rooms logic when the status filter
+  is used and it is not "ongoing"
+
+# 3.22.3
+## Fix
+  - Online agents query to exclude correctly those who have an active custom status,
+  when not called "In-service"
+
+# 3.22.2
+## Add
+  - Automatic room distribution when closing a custom status
+
+# 3.22.1
+## Add
+  - Queue priority as default for all projects
+  - New filters to use in chats chips
+## Fix
+  - Save user and queue identifiers in the feedback tag in rooms' history
+
+# 3.22.0
+## Add
+  - In service feature
+
+# 3.21.4
+## Add
+  - Add missing PermissionDenied import from rooms viewset
+
+# 3.21.3
+## Remove
+  - User role permission checking to pick rooms with queue priority routing
+
+# 3.21.2
+## Fix
+  - Remove unnecessary message status checking when updating the status
+
+# 3.21.1
+## Fix
+  - Verify message_status before try to update message
+
+# 3.21.0
+## Add
+  - Adding pin chats feature
+  - Adding message status feature
+## Fix
+  - Allow admins to view full rooms history
+
+# 3.20.5
+## Add
+  - New method for calculating the response time of closed rooms
+  - Getting the room correctly in contact optimized serializer
+
+# 3.20.4
+## Add
+  - Adding imported history url field in contact model and rooms serializers.
+
+# 3.20.3
+## Fix
+  - Remove generic errors from discussions, project permissions and bulk transfer endpoints
+## Add
+  - Tests for project and project permissions internal viewsets and increase the test coverage
+    for bulk transfer
+
+# 3.20.2
+## Add
+  - Direct call to the Flows' API to create ticketers, instead of calling Connect's
+
+# 3.20.1
+## Add
+  - Index to external_id in contacts table
+
+# 3.20.0
+## Add
+  - Method to randomize available agents ordering for repeated active rooms count
+  - Tags field and filter to rooms report
+
+## Fix
+  - Exiting the retry loop when flows returns true
+  - Optimizations using selected/prefetch related
+
+# 3.19.5
+## Add:
+  - Chats history optimizations.
+     
+# 3.19.4
+## Add:
+  - Default blank value for AWS credentials
+
+# 3.19.3
+## Add:
+  - Indicator to show that a room was assigned to a user when the room is created
+
+# 3.19.2
+# Add
+  - new list rooms endpoint with limit and offset
+
+# 3.19.1
+# Add
+  - Agents data filters
+
+# 3.19.0
+# Fix
+  - Message index for external id
+  - Removing from online_agents, agents that have custom status
+
+# 3.18.14
+## Fix:
+  - Allow null and blank contact names in flow starts
+
+# 3.18.13
+## Fix
+  - set contact_name as optional for flow start
+
+# 3.18.12
+## Fix
+  - hide replied message until the query is optimized
+
 # 3.18.11
 ## Add
   - new feature to see what messages are responded in chats.
