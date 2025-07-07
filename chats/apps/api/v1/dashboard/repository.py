@@ -21,6 +21,7 @@ from .dto import (
     QueueRoomData,
     Sector,
     TransferRoomData,
+    get_admin_domains_exclude_filter,
 )
 from .interfaces import CacheRepository, RoomsDataRepository
 
@@ -67,10 +68,11 @@ class AgentRepository:
 
         agents_query = self.model
         if not filters.is_weni_admin:
-            agents_query = agents_query.exclude(email__endswith="weni.ai")
+            agents_query = agents_query.exclude(get_admin_domains_exclude_filter())
 
         agents_query = (
             agents_query.filter(project_permissions__project=project, is_active=True)
+            .select_related("project_permissions")
             .annotate(
                 agent_status=Subquery(project_permission_subquery),
                 closed_rooms=Count("rooms", filter=Q(**closed_rooms, **rooms_filter)),
