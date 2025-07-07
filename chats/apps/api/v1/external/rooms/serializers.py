@@ -6,6 +6,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+from sentry_sdk import capture_exception
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.accounts.serializers import UserSerializer
@@ -21,7 +22,6 @@ from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import close_room
 from chats.apps.sectors.models import Sector
-from sentry_sdk import capture_exception
 
 logger = logging.getLogger(__name__)
 
@@ -316,7 +316,11 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         project = sector.project
 
         created_on = validated_data.get("created_on", timezone.now())
-        protocol = validated_data.get("custom_fields", {}).pop("protocol", None)
+
+        protocol = validated_data.pop("protocol", None)
+        if protocol is None:
+            protocol = validated_data.get("custom_fields", {}).pop("protocol", None)
+
         service_chat = validated_data.get("custom_fields", {}).pop(
             "service_chats", None
         )
