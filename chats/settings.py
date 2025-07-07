@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     "chats.apps.discussions",
     "chats.apps.feature_version",
     "chats.core",
+    "chats.apps.ai_features",
     # third party apps
     "channels",
     "drf_yasg",
@@ -209,6 +210,8 @@ if USE_S3:
 
     AWS_QUERYSTRING_AUTH = env.bool("AWS_QUERYSTRING_AUTH", default=True)
     AWS_S3_FILE_OVERWRITE = env.bool("AWS_S3_FILE_OVERWRITE", default=False)
+
+    AWS_BEDROCK_REGION_NAME = env.str("AWS_BEDROCK_REGION_NAME", default="us-east-1")
 
 else:
     MEDIA_URL = "/media/"
