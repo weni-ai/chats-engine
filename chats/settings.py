@@ -203,8 +203,8 @@ if USE_S3:
 
     DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
 
-    AWS_ACCESS_KEY_ID = env.str("AWS_ACCESS_KEY_ID")
-    AWS_SECRET_ACCESS_KEY = env.str("AWS_SECRET_ACCESS_KEY")
+    AWS_ACCESS_KEY_ID = env.str("AWS_ACCESS_KEY_ID", default="")
+    AWS_SECRET_ACCESS_KEY = env.str("AWS_SECRET_ACCESS_KEY", default="")
 
     AWS_STORAGE_BUCKET_NAME = env.str("AWS_STORAGE_BUCKET_NAME")
 
@@ -438,7 +438,6 @@ USE_WS_CONNECTION_CHECK = env.bool("USE_WS_CONNECTION_CHECK", default=False)
 MAX_RETRIES = env.int("WS_MESSAGE_RETRIES", default=3)
 RETRY_DELAY_SECONDS = env.int("WS_MESSAGE_RETRIES", default=0.5)
 
-
 # Email
 
 SEND_EMAILS = env.bool("SEND_EMAILS", default=False)
@@ -462,3 +461,11 @@ AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS = env.bool(
 )
 
 AI_FEATURES_PROMPTS_API_SECRET = env.str("AI_FEATURES_PROMPTS_API_SECRET")
+
+# Pin rooms
+MAX_ROOM_PINS_LIMIT = env.int("MAX_ROOM_PINS_LIMIT", default=3)
+
+# Message Status Update Feature Flag
+MESSAGE_STATUS_UPDATE_ENABLED_PROJECTS = env.list(
+    "MESSAGE_STATUS_UPDATE_ENABLED_PROJECTS", default=[]
+)

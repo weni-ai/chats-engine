@@ -90,7 +90,7 @@ class Project(BaseConfigurableModel, BaseModel):
         null=True,
         blank=True,
         choices=RoomRoutingType.choices,
-        default=RoomRoutingType.GENERAL,
+        default=RoomRoutingType.QUEUE_PRIORITY,
         help_text=_(
             "Whether to route rooms using the queue priority or general routing"
         ),
@@ -561,7 +561,7 @@ class ContactGroupFlowReference(BaseModel):
         return self.flow_start.project
 
 
-class CustomStatusType(BaseModel):
+class CustomStatusType(BaseModel, BaseConfigurableModel):
     name = models.CharField(max_length=255)
     project = models.ForeignKey(
         Project, on_delete=models.CASCADE, related_name="custom_statuses"
@@ -577,7 +577,11 @@ class CustomStatusType(BaseModel):
             with transaction.atomic():
                 existing_count = (
                     CustomStatusType.objects.select_for_update()
-                    .filter(project=self.project, is_deleted=False)
+                    .filter(
+                        project=self.project,
+                        is_deleted=False,
+                        config__created_by_system__isnull=True,
+                    )
                     .count()
                 )
                 if existing_count > 10:
@@ -642,7 +646,7 @@ class CustomStatus(BaseModel):
         try:
             with transaction.atomic():
                 if self.is_active and self.user:
-                    CustomStatus.objects.filter(
+                    CustomStatus.objects.select_for_update().filter(
                         user=self.user, project=self.project, is_active=True
                     ).exclude(pk=self.pk).update(is_active=False)
 

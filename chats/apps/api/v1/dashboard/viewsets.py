@@ -22,7 +22,7 @@ from chats.apps.api.v1.permissions import HasDashboardAccess
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.core.excel_storage import ExcelStorage
 
-from .dto import Filters
+from .dto import Filters, should_exclude_admin_domains
 from .service import AgentsService, RawDataService, RoomsDataService, SectorService
 
 
@@ -43,9 +43,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         """General metrics for the project or the sector"""
         project = self.get_object()
 
-        user_permission = ProjectPermission.objects.get(
-            user=request.user, project=project
-        )
+        user_permission = ProjectPermission.objects.select_related(
+            "user", "project"
+        ).get(user=request.user, project=project)
         params = request.query_params.dict()
         filters = Filters(
             start_date=params.get("start_date"),
@@ -56,9 +56,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             queue=params.get("queue"),
             user_request=user_permission,
             project=project,
-            is_weni_admin=(
-                True if request.user and "weni.ai" in request.user.email else False
-            ),
+            is_weni_admin=should_exclude_admin_domains(request.user.email if request.user else ""),
         )
 
         rooms_service = RoomsDataService(
@@ -85,9 +83,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=params.get("tag"),
             queue=params.get("queue"),
             user_request=request.user,
-            is_weni_admin=(
-                True if request.user and "weni.ai" in request.user.email else False
-            ),
+            is_weni_admin=should_exclude_admin_domains(request.user.email if request.user else ""),
         )
 
         agents_service = AgentsService()
@@ -108,9 +104,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         project = self.get_object()
         params = request.query_params.dict()
 
-        user_permission = ProjectPermission.objects.get(
-            user=request.user, project=project
-        )
+        user_permission = ProjectPermission.objects.select_related(
+            "user", "project"
+        ).get(user=request.user, project=project)
         filters = Filters(
             start_date=params.get("start_date"),
             end_date=params.get("end_date"),
@@ -120,9 +116,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=params.get("tag"),
             user_request=user_permission,
             project=project,
-            is_weni_admin=(
-                True if request.user and "weni.ai" in request.user.email else False
-            ),
+            is_weni_admin=should_exclude_admin_domains(request.user.email if request.user else ""),
         )
 
         sectors_service = SectorService()
@@ -140,9 +134,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         """Raw data for the project, sector, queue and agent."""
         project = self.get_object()
         params = request.query_params.dict()
-        user_permission = ProjectPermission.objects.get(
-            user=request.user, project=project
-        )
+        user_permission = ProjectPermission.objects.select_related(
+            "user", "project"
+        ).get(user=request.user, project=project)
         filters = Filters(
             start_date=params.get("start_date"),
             end_date=params.get("end_date"),
@@ -152,9 +146,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=params.get("tag"),
             user_request=user_permission,
             project=project,
-            is_weni_admin=(
-                True if request.user and "weni.ai" in request.user.email else False
-            ),
+            is_weni_admin=should_exclude_admin_domains(request.user.email if request.user else ""),
         )
 
         raw_service = RawDataService()
@@ -236,9 +228,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         """
         project = self.get_object()
         filter = request.query_params
-        user_permission = ProjectPermission.objects.get(
-            user=request.user, project=project
-        )
+        user_permission = ProjectPermission.objects.select_related(
+            "user", "project"
+        ).get(user=request.user, project=project)
         filters = Filters(
             start_date=filter.get("start_date"),
             end_date=filter.get("end_date"),
@@ -248,9 +240,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=filter.get("tag"),
             user_request=user_permission,
             project=project,
-            is_weni_admin=(
-                True if request.user and "weni.ai" in request.user.email else False
-            ),
+            is_weni_admin=should_exclude_admin_domains(request.user.email if request.user else ""),
         )
 
         # Rooms Data
