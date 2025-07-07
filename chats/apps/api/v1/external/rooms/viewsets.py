@@ -16,7 +16,14 @@ from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
     get_auth_class,
 )
-from chats.apps.ai_features.history_summary.tasks import generate_history_summary
+from chats.apps.ai_features.history_summary.models import (
+    HistorySummary,
+    HistorySummaryStatus,
+)
+from chats.apps.ai_features.history_summary.tasks import (
+    cancel_history_summary_generation,
+    generate_history_summary,
+)
 from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.external.rooms.serializers import (
     RoomFlowSerializer,
@@ -143,8 +150,20 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         serializer = RoomFlowSerializer()
         serializer.process_message_history(room, messages_data)
 
-        if room.queue.sector.project.has_chats_summary and room.messages.exists():
-            generate_history_summary.delay(room.uuid)
+        if (
+            room.queue.sector.project.has_chats_summary
+            and room.messages.filter(
+                Q(user__isnull=False) | Q(contact__isnull=False)
+            ).exists()
+        ):
+            if not (
+                history_summary := HistorySummary.objects.filter(
+                    room=room, status=HistorySummaryStatus.PENDING
+                ).first()
+            ):
+                history_summary = HistorySummary.objects.create(room=room)
+
+            generate_history_summary.delay(history_summary.uuid)
 
         return Response(status=status.HTTP_201_CREATED)
 
@@ -194,8 +213,18 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
 
         room.notify_billing()
 
-        if room.queue.sector.project.has_chats_summary and room.messages.exists():
-            generate_history_summary.delay(room.uuid)
+        if room.queue.sector.project.has_chats_summary:
+            history_summary = HistorySummary.objects.create(room=room)
+
+            if room.messages.filter(
+                Q(user__isnull=False) | Q(contact__isnull=False)
+            ).exists():
+                generate_history_summary.delay(history_summary.uuid)
+
+            else:
+                cancel_history_summary_generation.apply_async(
+                    args=[history_summary.uuid], countdown=30
+                )  # 30 seconds delay
 
     def perform_update(self, serializer):
         serializer.save()

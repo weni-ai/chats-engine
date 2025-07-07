@@ -31,6 +31,10 @@ from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
 )
 from chats.apps.accounts.models import User
+from chats.apps.ai_features.history_summary.models import (
+    HistorySummary,
+    HistorySummaryStatus,
+)
 from chats.apps.api.utils import verify_user_room
 from chats.apps.api.v1 import permissions as api_permissions
 from chats.apps.api.v1.internal.rest_clients.openai_rest_client import OpenAIClient
@@ -39,6 +43,7 @@ from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1.rooms.pagination import RoomListPagination
 from chats.apps.api.v1.rooms.serializers import (
     ListRoomSerializer,
+    RoomHistorySummarySerializer,
     PinRoomSerializer,
     RoomInfoSerializer,
     RoomMessageStatusSerializer,
@@ -675,6 +680,27 @@ class RoomViewset(
         return Response(
             RoomInfoSerializer(rooms, many=True).data, status=status.HTTP_200_OK
         )
+
+    @action(detail=True, methods=["get"], url_path="chats-summary")
+    def chats_summary(self, request: Request, pk=None) -> Response:
+        """
+        Get the history summary for a room.
+        """
+        room = self.get_object()
+
+        history_summary = (
+            HistorySummary.objects.filter(room=room).order_by("created_on").last()
+        )
+
+        if not history_summary:
+            return Response(
+                {"status": HistorySummaryStatus.UNAVAILABLE, "summary": None},
+                status=status.HTTP_200_OK,
+            )
+
+        serializer = RoomHistorySummarySerializer(history_summary)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(
         detail=True,

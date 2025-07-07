@@ -10,7 +10,7 @@ class BaseAIPlatformClient(ABC):
         self.model_id = model_id
 
     @abstractmethod
-    def generate_text(self, request_body: dict) -> str:
+    def generate_text(self, prompt_settings: dict, prompt: str) -> str:
         """
         Generate text using the AI model platform client.
         """
