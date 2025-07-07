@@ -9,7 +9,7 @@ from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.pagination import CursorPagination
+from rest_framework.pagination import CursorPagination, LimitOffsetPagination
 from rest_framework.response import Response
 
 from chats.apps.accounts.authentication.drf.authorization import (
@@ -25,13 +25,16 @@ from chats.apps.api.v1.external.rooms.serializers import (
 )
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.dashboard.models import RoomMetrics
-from chats.apps.queues.utils import start_queue_priority_routing
+from chats.apps.queues.utils import (
+    create_room_assigned_from_queue_feedback,
+    start_queue_priority_routing,
+)
 from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
+from chats.apps.rooms.utils import create_transfer_json
 from chats.apps.rooms.views import (
     close_room,
     create_room_feedback_message,
-    create_transfer_json,
     get_editable_custom_fields_room,
     update_custom_fields,
     update_flows_custom_fields,
@@ -39,11 +42,10 @@ from chats.apps.rooms.views import (
 
 from .filters import RoomFilter, RoomMetricsFilter
 
-
 logger = logging.getLogger(__name__)
 
 
-def add_user_or_queue_to_room(instance, request):
+def add_user_or_queue_to_room(instance: Room, request):
     # TODO Separate this into smaller methods
     user = request.data.get("user_email")
     queue = request.data.get("queue_uuid")
@@ -64,8 +66,9 @@ def add_user_or_queue_to_room(instance, request):
             from_="",
             to=instance.queue,
         )
-    instance.transfer_history = feedback
-    instance.save()
+
+    instance.add_transfer_to_history(feedback)
+
     # Create a message with the transfer data and Send to the room group
     create_room_feedback_message(
         instance, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
@@ -186,6 +189,9 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         notification_method = getattr(instance, f"notify_{notify_level}")
         notification_method(notification_type)
 
+        if instance.user:
+            create_room_assigned_from_queue_feedback(instance, instance.user)
+
         room.notify_billing()
 
         if room.queue.sector.project.has_chats_summary and room.messages.exists():
@@ -270,8 +276,8 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
             from_="",
             to=room.user,
         )
-        room.transfer_history = feedback
         room.save()
+        room.add_transfer_to_history(feedback)
 
         room.notify_user("update", user=None)
         room.notify_queue("update")
@@ -372,6 +378,49 @@ class ExternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
 
     pagination_class = CursorPagination
     pagination_class.page_size = 5
+
+    def get_queryset(self):
+        return (
+            super()
+            .get_queryset()
+            .filter(queue__sector__project=self.request.auth.project)
+        )
+
+    @action(detail=False, methods=["GET"], url_name="count")
+    def count(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset()).filter(is_active=True)
+        waiting = queryset.filter(user__isnull=True).count()
+        in_service = queryset.filter(user__isnull=False).count()
+
+        return Response(
+            {"waiting": waiting, "in_service": in_service}, status=status.HTTP_200_OK
+        )
+
+
+class ExternalListWithPaginationRoomsViewSet(viewsets.ReadOnlyModelViewSet):
+    model = Room
+    queryset = Room.objects
+    serializer_class = RoomListSerializer
+    lookup_field = "uuid"
+    authentication_classes = [ProjectAdminAuthentication]
+
+    filter_backends = [
+        filters.OrderingFilter,
+        filters.SearchFilter,
+        DjangoFilterBackend,
+    ]
+    ordering = ["-created_on"]
+    search_fields = [
+        "contact__external_id",
+        "contact__name",
+        "user__email",
+        "urn",
+    ]
+    filterset_class = RoomMetricsFilter
+
+    pagination_class = LimitOffsetPagination
+    pagination_class.default_limit = 10
+    pagination_class.max_limit = 100
 
     def get_queryset(self):
         return (

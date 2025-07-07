@@ -1,9 +1,12 @@
+import random
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django.db.models import Subquery, OuterRef, Q
 
+from chats.apps.projects.models.models import CustomStatus
 from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
 
 from .queue_managers import QueueManager
@@ -62,11 +65,25 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
 
     @property
     def online_agents(self):
-        return self.agents.filter(
+        # Filtra agentes online
+        agents = self.agents.filter(
             project_permissions__status="ONLINE",
             project_permissions__project=self.sector.project,
             project_permissions__queue_authorizations__queue=self,
             project_permissions__queue_authorizations__role=1,
+        )
+
+        custom_status_query = Subquery(
+            CustomStatus.objects.filter(
+                Q(user__id=OuterRef("id"))
+                & Q(is_active=True)
+                & Q(status_type__project=self.sector.project)
+                & ~Q(status_type__name__iexact="in-service")
+            ).values("user__id")
+        )
+
+        return agents.exclude(
+            id__in=custom_status_query
         )  # TODO: Set this variable to ProjectPermission.STATUS_ONLINE
 
     @property
@@ -103,6 +120,33 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
             return online_agents.order_by("active_and_day_closed_rooms")
 
         return online_agents.order_by("active_rooms_count")
+
+    def get_available_agent(self):
+        """
+        Get an available agent for a queue, based on the number of active rooms.
+
+        If the active rooms count is the same for different agents,
+        a random agent, among the ones with the rooms count, is returned.
+        """
+        agents = list(self.available_agents)
+
+        if not agents:
+            return None
+
+        routing_option = self.sector.project.routing_option
+        field_name = (
+            "active_and_day_closed_rooms"
+            if routing_option == "general"
+            else "active_rooms_count"
+        )
+
+        min_rooms_count = min(getattr(agent, field_name) for agent in agents)
+
+        eligible_agents = [
+            agent for agent in agents if getattr(agent, field_name) == min_rooms_count
+        ]
+
+        return random.choice(eligible_agents)
 
     def is_agent(self, user):
         return self.authorizations.filter(permission__user=user).exists()

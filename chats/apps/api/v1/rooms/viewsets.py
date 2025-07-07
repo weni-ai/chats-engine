@@ -1,20 +1,31 @@
-from datetime import timedelta
 import logging
+from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import BooleanField, Case, Count, Max, OuterRef, Q, Subquery, When
-from django_filters.rest_framework import DjangoFilterBackend
+from django.db.models import (
+    BooleanField,
+    Case,
+    Count,
+    DateTimeField,
+    Max,
+    OuterRef,
+    Q,
+    Subquery,
+    When,
+)
 from django.utils import timezone
+from django.utils.timezone import make_aware
 from django.utils.translation import gettext_lazy as _
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.filters import OrderingFilter
 from rest_framework.request import Request
 from rest_framework.response import Response
-from rest_framework.viewsets import GenericViewSet
 from rest_framework.views import APIView
+from rest_framework.viewsets import GenericViewSet
 
 from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
@@ -25,8 +36,10 @@ from chats.apps.api.v1 import permissions as api_permissions
 from chats.apps.api.v1.internal.rest_clients.openai_rest_client import OpenAIClient
 from chats.apps.api.v1.msgs.serializers import ChatCompletionSerializer
 from chats.apps.api.v1.rooms import filters as room_filters
+from chats.apps.api.v1.rooms.pagination import RoomListPagination
 from chats.apps.api.v1.rooms.serializers import (
     ListRoomSerializer,
+    PinRoomSerializer,
     RoomInfoSerializer,
     RoomMessageStatusSerializer,
     RoomSerializer,
@@ -39,20 +52,21 @@ from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.choices import RoomFeedbackMethods
-from chats.apps.rooms.models import Room
+from chats.apps.rooms.exceptions import (
+    MaxPinRoomLimitReachedError,
+    RoomIsNotActiveError,
+)
+from chats.apps.rooms.models import Room, RoomPin
 from chats.apps.rooms.services import RoomsReportService
 from chats.apps.rooms.tasks import generate_rooms_report
+from chats.apps.rooms.utils import create_transfer_json
 from chats.apps.rooms.views import (
     close_room,
     create_room_feedback_message,
-    create_transfer_json,
     get_editable_custom_fields_room,
     update_custom_fields,
     update_flows_custom_fields,
 )
-from django.utils.timezone import make_aware
-from datetime import datetime
-
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +88,7 @@ class RoomViewset(
     search_fields = ["contact__name", "urn", "protocol", "service_chat"]
     ordering_fields = "__all__"
     ordering = ["user", "-last_interaction", "created_on"]
+    pagination_class = RoomListPagination
 
     def get_permissions(self):
         permission_classes = [permissions.IsAuthenticated]
@@ -127,6 +142,81 @@ class RoomViewset(
         elif "list" in self.action:
             return ListRoomSerializer
         return super().get_serializer_class()
+
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        project = request.query_params.get("project")
+        is_active = request.query_params.get("is_active", None)
+
+        if isinstance(is_active, str):
+            is_active = is_active.lower() == "true"
+
+        room_status = request.query_params.get("room_status", None)
+
+        if (
+            not project
+            or is_active is False
+            or (room_status is not None and room_status != "ongoing")
+        ):
+            filtered_qs = self.filter_queryset(qs)
+            return self._get_paginated_response(filtered_qs)
+
+        # Get pins for the user within the project
+        pins = RoomPin.objects.filter(
+            user=request.user, room__queue__sector__project=project
+        )
+
+        pinned_rooms = Room.objects.filter(
+            pk__in=pins.values_list("room__pk", flat=True)
+        )
+
+        filtered_qs = self.filter_queryset(qs)
+        room_ids = set(filtered_qs.values_list("pk", flat=True)) | set(
+            pinned_rooms.values_list("pk", flat=True)
+        )
+
+        secondary_sort = list(filtered_qs.query.order_by or self.ordering or [])
+
+        # Subquery to get the created_on of the pin for each room (or None)
+        pin_created_on_subquery = (
+            RoomPin.objects.filter(
+                user=request.user,
+                room=OuterRef("pk"),
+                room__queue__sector__project=project,
+            )
+            .order_by("-created_on")
+            .values("created_on")[:1]
+        )
+
+        annotated_qs = qs.filter(pk__in=room_ids).annotate(
+            is_pinned=Case(
+                When(pk__in=pinned_rooms, then=True),
+                default=False,
+                output_field=BooleanField(),
+            ),
+            pin_created_on=Subquery(
+                pin_created_on_subquery, output_field=DateTimeField()
+            ),
+        )
+
+        if secondary_sort:
+            # Order pinned rooms first, then by pin_created_on (descending),
+            # then the rest ordered by secondary_sort
+            annotated_qs = annotated_qs.order_by(
+                "-is_pinned", "-pin_created_on", *secondary_sort
+            )
+        else:
+            annotated_qs = annotated_qs.order_by("-is_pinned", "-pin_created_on")
+
+        return self._get_paginated_response(annotated_qs)
+
+    def _get_paginated_response(self, queryset):
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     @action(
         detail=True,
@@ -220,13 +310,17 @@ class RoomViewset(
         if user:
             if old_instance.user is None:
                 time = timezone.now() - old_instance.modified_on
-                room_metric = RoomMetrics.objects.get_or_create(room=instance)[0]
+                room_metric = RoomMetrics.objects.select_related("room").get_or_create(
+                    room=instance
+                )[0]
                 room_metric.waiting_time += time.total_seconds()
                 room_metric.queued_count += 1
                 room_metric.save()
             else:
                 # Get the room metric from instance and update the transfer_count value.
-                room_metric = RoomMetrics.objects.get_or_create(room=instance)[0]
+                room_metric = RoomMetrics.objects.select_related("room").get_or_create(
+                    room=instance
+                )[0]
                 room_metric.transfer_count += 1
                 room_metric.save()
 
@@ -249,12 +343,14 @@ class RoomViewset(
             ):  # if it is only a queue transfer from a user, need to reset the user field
                 instance.user = None
 
-            room_metric = RoomMetrics.objects.get_or_create(room=instance)[0]
+            room_metric = RoomMetrics.objects.select_related("room").get_or_create(
+                room=instance
+            )[0]
             room_metric.transfer_count += 1
             room_metric.save()
 
-        instance.transfer_history = feedback
         instance.save()
+        instance.add_transfer_to_history(feedback)
 
         # Create a message with the transfer data and Send to the room group
         # TODO separate create message in a function
@@ -381,12 +477,6 @@ class RoomViewset(
         room: Room = self.get_object()
         user: User = request.user
 
-        if not room.can_pick_queue(user):
-            raise PermissionDenied(
-                detail=_("User does not have permission to pick this room"),
-                code="user_is_not_project_admin_or_sector_manager",
-            )
-
         if room.user:
             raise ValidationError(
                 {"detail": _("Room is not queued")}, code="room_is_not_queued"
@@ -400,14 +490,16 @@ class RoomViewset(
         )
 
         time = timezone.now() - room.modified_on
-        room_metric = RoomMetrics.objects.get_or_create(room=room)[0]
+        room_metric = RoomMetrics.objects.select_related("room").get_or_create(
+            room=room
+        )[0]
         room_metric.waiting_time += time.total_seconds()
         room_metric.queued_count += 1
         room_metric.save()
 
         room.user = user
-        room.transfer_history = feedback
         room.save()
+        room.add_transfer_to_history(feedback)
 
         create_room_feedback_message(
             room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
@@ -425,8 +517,9 @@ class RoomViewset(
         url_name="bulk_transfer",
     )
     def bulk_transfer(self, request, pk=None):
-        rooms_list = Room.objects.filter(uuid__in=request.data.get("rooms_list"))
-
+        rooms_list = Room.objects.filter(
+            uuid__in=request.data.get("rooms_list")
+        ).select_related("user", "queue__sector__project")
         user_email = request.query_params.get("user_email")
         queue_uuid = request.query_params.get("queue_uuid")
         user_request = request.user or request.query_params.get("user_request")
@@ -437,89 +530,82 @@ class RoomViewset(
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        try:
-            if user_email:
-                user = User.objects.get(email=user_email)
+        if user_email:
+            user = User.objects.get(email=user_email)
 
-                for room in rooms_list:
-                    old_user = room.user
-                    project = room.queue.project
-                    if not project.permissions.filter(user=user).exists():
-                        return Response(
-                            {
-                                "error": (
-                                    f"User {user.email} has no permission on the project "
-                                    f"{project.name} <{project.uuid}>"
-                                )
-                            },
-                            status=status.HTTP_400_BAD_REQUEST,
-                        )
-
-                    transfer_user = verify_user_room(room, user_request)
-
-                    feedback = create_transfer_json(
-                        action="transfer",
-                        from_=transfer_user,
-                        to=user,
+            for room in rooms_list:
+                old_user = room.user
+                project = room.queue.project
+                if not project.permissions.filter(user=user).exists():
+                    return Response(
+                        {
+                            "error": (
+                                f"User {user.email} has no permission on the project "
+                                f"{project.name} <{project.uuid}>"
+                            )
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
                     )
-                    room.user = user
-                    room.save()
 
-                    logger.info(
-                        "Starting queue priority routing for room %s from bulk transfer to user %s",
-                        room.uuid,
-                        user.email,
-                    )
-                    start_queue_priority_routing(room.queue)
+                transfer_user = verify_user_room(room, user_request)
 
-                    create_room_feedback_message(
-                        room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
-                    )
-                    if old_user:
-                        room.notify_user("update", user=old_user)
-                    else:
-                        room.notify_user("update", user=transfer_user)
-                    room.notify_user("update")
+                feedback = create_transfer_json(
+                    action="transfer",
+                    from_=transfer_user,
+                    to=user,
+                )
+                room.user = user
+                room.save()
 
-                    room.update_ticket()
+                logger.info(
+                    "Starting queue priority routing for room %s from bulk transfer to user %s",
+                    room.uuid,
+                    user.email,
+                )
+                start_queue_priority_routing(room.queue)
 
-            if queue_uuid:
-                queue = Queue.objects.get(uuid=queue_uuid)
-                for room in rooms_list:
-                    if queue.project != room.project:
-                        return Response(
-                            {
-                                "error": "Cannot transfer rooms from a project to another"
-                            },
-                            status=status.HTTP_400_BAD_REQUEST,
-                        )
-                    transfer_user = verify_user_room(room, user_request)
-                    feedback = create_transfer_json(
-                        action="transfer",
-                        from_=transfer_user,
-                        to=queue,
-                    )
-                    room.user = None
-                    room.queue = queue
-                    room.save()
-
-                    create_room_feedback_message(
-                        room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
-                    )
+                create_room_feedback_message(
+                    room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+                )
+                if old_user:
+                    room.notify_user("update", user=old_user)
+                else:
                     room.notify_user("update", user=transfer_user)
-                    room.notify_queue("update")
+                room.notify_user("update")
+                room.notify_queue("update")
 
-                    logger.info(
-                        "Starting queue priority routing for room %s from bulk transfer to queue %s",
-                        room.uuid,
-                        queue.uuid,
+                room.update_ticket()
+
+        if queue_uuid:
+            queue = Queue.objects.get(uuid=queue_uuid)
+            for room in rooms_list:
+                if queue.project != room.project:
+                    return Response(
+                        {"error": "Cannot transfer rooms from a project to another"},
+                        status=status.HTTP_400_BAD_REQUEST,
                     )
-                    start_queue_priority_routing(queue)
+                transfer_user = verify_user_room(room, user_request)
+                feedback = create_transfer_json(
+                    action="transfer",
+                    from_=transfer_user,
+                    to=queue,
+                )
+                room.user = None
+                room.queue = queue
+                room.save()
 
-        except Exception as error:
-            return Response(
-                {"error": {error}}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+                create_room_feedback_message(
+                    room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+                )
+                room.notify_user("update", user=transfer_user)
+                room.notify_queue("update")
+
+                logger.info(
+                    "Starting queue priority routing for room %s from bulk transfer to queue %s",
+                    room.uuid,
+                    queue.uuid,
+                )
+                start_queue_priority_routing(queue)
 
         return Response(
             {"success": "Mass transfer completed"},
@@ -589,6 +675,36 @@ class RoomViewset(
         return Response(
             RoomInfoSerializer(rooms, many=True).data, status=status.HTTP_200_OK
         )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_name="pin",
+        url_path="pin",
+        serializer_class=PinRoomSerializer,
+    )
+    def pin(self, request: Request, pk=None) -> Response:
+        serializer = PinRoomSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        room: Room = self.get_object()
+        user: User = request.user
+
+        method = (
+            room.pin if serializer.validated_data.get("status") is True else room.unpin
+        )
+
+        try:
+            method(user)
+        except (
+            MaxPinRoomLimitReachedError,
+            RoomIsNotActiveError,
+        ) as e:
+            raise ValidationError(e.to_dict(), code=e.code) from e
+        except PermissionDenied as e:
+            return Response({"detail": str(e)}, status=status.HTTP_403_FORBIDDEN)
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class RoomsReportViewSet(APIView):
