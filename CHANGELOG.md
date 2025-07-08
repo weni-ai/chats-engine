@@ -1,3 +1,12 @@
+# 3.23.1
+## Fix
+  - Rooms waiting time metric
+
+# 3.23.0
+## Add
+  - AI-generated chat rooms history summary
+  - Protocol field in new rooms creation
+
 # 3.22.4
 ## Add
   - Websocket notification to all users in the queue when there is a transfer
