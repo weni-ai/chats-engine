@@ -1,3 +1,31 @@
+# 3.22.4
+## Add
+  - Websocket notification to all users in the queue when there is a transfer
+  to another user
+## Fix
+  - Rooms list to do not include the pinned rooms logic when the status filter
+  is used and it is not "ongoing"
+
+# 3.22.3
+## Fix
+  - Online agents query to exclude correctly those who have an active custom status,
+  when not called "In-service"
+
+# 3.22.2
+## Add
+  - Automatic room distribution when closing a custom status
+
+# 3.22.1
+## Add
+  - Queue priority as default for all projects
+  - New filters to use in chats chips
+## Fix
+  - Save user and queue identifiers in the feedback tag in rooms' history
+
+# 3.22.0
+## Add
+  - In service feature
+
 # 3.21.4
 ## Add
   - Add missing PermissionDenied import from rooms viewset
