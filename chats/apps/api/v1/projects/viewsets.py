@@ -529,11 +529,7 @@ class ProjectViewset(
                     {"project": "Project not found"}, status.HTTP_404_NOT_FOUND
                 )
 
-            print("projeto principal", project)
-
             integrations = IntegratedTicketers()
-
-            print("classe de integracao", integrations)
 
             integrations.integrate_ticketer(project)
             integrations.integrate_topic(project)
