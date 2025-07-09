@@ -1,7 +1,7 @@
 import os
 
-from django.http import HttpResponse, HttpResponseForbidden
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from django.http import HttpResponseForbidden
+from django_prometheus.exports import ExportToDjangoView
 
 
 def metrics_view(request):
@@ -12,6 +12,4 @@ def metrics_view(request):
     if not auth_token or auth_token != expected_token:
         return HttpResponseForbidden("Access denied")
 
-    from prometheus_client import REGISTRY
-
-    return HttpResponse(generate_latest(REGISTRY), content_type=CONTENT_TYPE_LATEST)
+    return ExportToDjangoView(request)
