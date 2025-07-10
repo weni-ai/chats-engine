@@ -1,17 +1,17 @@
 import amqp
 from django.conf import settings
-from chats.apps.msgs.models import ChatMessageReplyIndex
-import time
 
+from chats.apps.event_driven.backends.pyamqp_backend import basic_publish
 from chats.apps.event_driven.consumers import EDAConsumer, pyamqp_call_dlx_when_error
 from chats.apps.event_driven.parsers.json_parser import JSONParser
+from chats.apps.msgs.models import ChatMessageReplyIndex
 from chats.apps.msgs.usecases.UpdateStatusMessageUseCase import (
     UpdateStatusMessageUseCase,
 )
-from chats.apps.event_driven.backends.pyamqp_backend import basic_publish
 
 MAX_RETRIES = 5
 RETRY_DELAY_SECONDS = 5
+
 
 class MessageStatusConsumer(EDAConsumer):
     @staticmethod
@@ -31,7 +31,9 @@ class MessageStatusConsumer(EDAConsumer):
             retry_count = int(headers.get("x-retry-count", 0))
 
             if ChatMessageReplyIndex.objects.filter(external_id=message_id).exists():
-                print(f"[MessageStatusConsumer] - Consuming a message. Body: {message.body}")
+                print(
+                    f"[MessageStatusConsumer] - Consuming a message. Body: {message.body}"
+                )
                 update_message_usecase = UpdateStatusMessageUseCase()
                 update_message_usecase.update_status_message(message_id, message_status)
             else:
