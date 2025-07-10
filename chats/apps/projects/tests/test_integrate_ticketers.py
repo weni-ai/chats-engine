@@ -1,5 +1,5 @@
 import uuid
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 from django.test import TestCase
 from django.utils import timezone
