@@ -53,6 +53,7 @@ from chats.apps.api.v1.rooms.serializers import (
     TransferRoomSerializer,
 )
 from chats.apps.dashboard.models import RoomMetrics
+from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
 from chats.apps.msgs.models import Message
 from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
@@ -495,17 +496,16 @@ class RoomViewset(
             to=user,
         )
 
-        time = timezone.now() - room.modified_on
-        room_metric = RoomMetrics.objects.select_related("room").get_or_create(
-            room=room
-        )[0]
-        room_metric.waiting_time += time.total_seconds()
-        room_metric.queued_count += 1
-        room_metric.save()
-
         room.user = user
         room.save()
         room.add_transfer_to_history(feedback)
+
+        room_metric = RoomMetrics.objects.select_related("room").get_or_create(
+            room=room
+        )[0]
+        room_metric.waiting_time += calculate_last_queue_waiting_time(room)
+        room_metric.queued_count += 1
+        room_metric.save()
 
         create_room_feedback_message(
             room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
