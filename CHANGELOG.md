@@ -1,3 +1,21 @@
+# 3.23.2
+## Fix
+  - Verify if queues or sectors are already integrated before send to flows.
+  - Changing message status to save in is_read/is_delivered fields
+  - Verify if message index exists in chats before try to get status.
+## Add
+  - New field in sector to save working days
+  - Metrics to create websocket dashboard
+
+# 3.23.1
+## Fix
+  - Rooms waiting time metric
+
+# 3.23.0
+## Add
+  - AI-generated chat rooms history summary
+  - Protocol field in new rooms creation
+
 # 3.22.4
 ## Add
   - Websocket notification to all users in the queue when there is a transfer
