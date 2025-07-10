@@ -47,6 +47,12 @@ class Message(BaseModelWithManualCreatedOn):
         blank=True,
         null=True,
     )
+    is_read = models.CharField(
+        _("message is read"), max_length=50, blank=True, null=True
+    )
+    is_delivered = models.CharField(
+        _("message is delivered"), max_length=50, blank=True, null=True
+    )
 
     class Meta:
         verbose_name = "Message"
