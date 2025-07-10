@@ -277,7 +277,9 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             try:
                 sector = Sector.objects.get(uuid=sector_uuid)
                 working_hours_config = (
-                    sector.config.get("working_hours", {}) if sector.config else {}
+                    sector.working_day.get("working_hours", {})
+                    if sector.working_day
+                    else {}
                 )
 
                 if not working_hours_config:
@@ -415,7 +417,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
     def check_work_time_weekend(self, sector, created_on):
         working_hours_config = (
-            sector.config.get("working_hours", {}) if sector.config else {}
+            sector.working_day.get("working_hours", {}) if sector.working_day else {}
         )
 
         if not working_hours_config:
