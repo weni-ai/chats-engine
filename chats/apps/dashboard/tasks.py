@@ -10,6 +10,7 @@ import pandas as pd
 from datetime import datetime
 import io
 import logging
+from chats.apps.dashboard.models import ReportStatus
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ def close_metrics(room_uuid: UUID):
 
 
 @app.task
-def generate_custom_fields_report(project_uuid: UUID, fields_config: dict, user_email: str):
+def generate_custom_fields_report(project_uuid: UUID, fields_config: dict, user_email: str, report_status_id: int):
     """
     Generate a custom report based on the fields configuration.
     """
@@ -47,8 +48,15 @@ def generate_custom_fields_report(project_uuid: UUID, fields_config: dict, user_
     project = Project.objects.get(uuid=project_uuid)
     report_generator = ReportFieldsValidatorViewSet()
     
+    # Busca o objeto de status
+    report_status = ReportStatus.objects.get(id=report_status_id)
+    
     try:
-        # Gera o relatório
+        # Atualiza para processando
+        report_status.status = 'processing'
+        report_status.save()
+        
+        # Gera o relatório (código existente)
         report_data = report_generator._generate_report_data(fields_config, project)
         
         # Converte para DataFrame e depois para Excel
@@ -91,10 +99,13 @@ def generate_custom_fields_report(project_uuid: UUID, fields_config: dict, user_
         email.attach(f'custom_report_{dt}.xlsx', output.getvalue(), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
         email.send(fail_silently=False)
         
+        # Atualiza para concluído
+        report_status.status = 'completed'
+        report_status.save()
+        
     except Exception as e:
-        logger.error(
-            "Error generating custom report for project %s: %s",
-            project_uuid,
-            str(e)
-        )
+        # Atualiza para falhou
+        report_status.status = 'failed'
+        report_status.error_message = str(e)
+        report_status.save()
         raise

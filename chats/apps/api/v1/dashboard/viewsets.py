@@ -38,6 +38,8 @@ from chats.celery import app
 from django.core.mail import EmailMessage
 from django.conf import settings
 import logging
+from uuid import UUID
+from chats.apps.dashboard.models import ReportStatus
 
 logger = logging.getLogger(__name__)
 
@@ -390,6 +392,18 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
 
             return response
 
+    @action(detail=True, methods=['get'])
+    def report_status(self, request, pk=None):
+        """Verifica o status de um relatório"""
+        try:
+            report_status = ReportStatus.objects.get(id=pk, user=request.user)
+            return Response({
+                'status': report_status.status,
+                'error_message': report_status.error_message
+            })
+        except ReportStatus.DoesNotExist:
+            return Response({'error': 'Report not found'}, status=404)
+
 
 class ModelFieldsViewSet(APIView):
     """
@@ -660,17 +674,26 @@ class ReportFieldsValidatorViewSet(APIView):
             # Estima o tempo de execução
             estimated_time = self._estimate_execution_time(fields_config, project)
             
+            # Cria o objeto de status
+            report_status = ReportStatus.objects.create(
+                project=project,
+                user=request.user,
+                fields_config=fields_config
+            )
+            
             # Envia para processamento assíncrono
             generate_custom_fields_report.delay(
                 project_uuid=project.uuid,
                 fields_config=fields_config,
-                user_email=request.user.email
+                user_email=request.user.email,
+                report_status_id=report_status.uuid
             )
             
             return Response({
-                'message': 'O relatório será enviado para seu email quando estiver pronto.',
-                'status': 'processing',
-                'estimated_time_seconds': estimated_time
+                'message': 'The report will be sent to your email when it is ready.',
+                'status': 'pending',
+                'estimated_time_seconds': estimated_time,
+                'report_status_id': report_status.uuid
             }, status=status.HTTP_202_ACCEPTED)
             
         except ValidationError as e:
