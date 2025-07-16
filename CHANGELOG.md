@@ -1,3 +1,7 @@
+# 3.23.3
+## Fix
+  - Adding livesum in gauge metric
+
 # 3.23.2
 ## Fix
   - Verify if queues or sectors are already integrated before send to flows.
