@@ -6,7 +6,10 @@ ws_connections_total = Counter(
 )
 
 ws_active_connections = Gauge(
-    "ws_active_connections", "Current active WebSocket connections", ["consumer"]
+    "ws_active_connections",
+    "Current active WebSocket connections",
+    ["consumer"],
+    multiprocess_mode="livesum",
 )
 
 ws_disconnects_total = Counter(
