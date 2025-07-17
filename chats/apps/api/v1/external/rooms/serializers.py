@@ -22,6 +22,7 @@ from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import close_room
 from chats.apps.sectors.models import Sector
+from chats.apps.sectors.utils import working_hours_validator
 
 logger = logging.getLogger(__name__)
 
@@ -272,18 +273,9 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         sector_uuid = attrs.get("sector_uuid")
 
-        working_hours_config = {}
         if sector_uuid:
             try:
                 sector = Sector.objects.get(uuid=sector_uuid)
-                working_hours_config = (
-                    sector.working_day.get("working_hours", {})
-                    if sector.working_day
-                    else {}
-                )
-
-                if not working_hours_config:
-                    return attrs
 
                 logger.info("flows json config to open a room: %s", attrs)
                 created_on = self.initial_data.get("created_on", timezone.now())
@@ -300,8 +292,8 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
                 attrs["created_on"] = created_on
 
-                if working_hours_config:
-                    self.check_work_time_weekend(sector, created_on)
+                # Validação de horários de trabalho
+                self.check_work_time_weekend(sector, created_on)
 
             except serializers.ValidationError as error:
                 raise error
@@ -416,51 +408,11 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             )
 
     def check_work_time_weekend(self, sector, created_on):
-        working_hours_config = (
-            sector.working_day.get("working_hours", {}) if sector.working_day else {}
-        )
-
-        if not working_hours_config:
-            return
-
-        weekday = created_on.isoweekday()
-
-        if weekday in (6, 7):
-            if not working_hours_config.get("open_in_weekends", False):
-                raise ValidationError(
-                    {"detail": _("Contact cannot be done outside working hours")}
-                )
-
-            schedules = working_hours_config.get("schedules", {})
-            day_key = "saturday" if weekday == 6 else "sunday"
-            day_range = schedules.get(day_key, {})
-            current_time = created_on.time()
-
-            start_time_str = day_range.get("start")
-            end_time_str = day_range.get("end")
-
-            if start_time_str is None or end_time_str is None:
-                logger.info(
-                    "there is a try to create a room out of working hours range %s",
-                    created_on,
-                )
-                raise ValidationError(
-                    {"detail": _("Contact cannot be done outside working hours")}
-                )
-
-            start_time = pendulum.parse(start_time_str).time()
-            end_time = pendulum.parse(end_time_str).time()
-
-            if not (start_time <= current_time <= end_time):
-                logger.info(
-                    "there is a try to create a room out of working hours %s",
-                    created_on,
-                )
-                raise ValidationError(
-                    {"detail": _("Contact cannot be done outside working hours")}
-                )
-
-            logger.info("an room its created in the weekend %s", created_on)
+        """
+        Verify if the sector allows room opening at the specified time.
+        Uses the WorkingHoursValidator utility for optimized validation.
+        """
+        working_hours_validator.validate_working_hours(sector, created_on)
 
     def handle_urn(self, validated_data):
         is_anon = validated_data.pop("is_anon", False)

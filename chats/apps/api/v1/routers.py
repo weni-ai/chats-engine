@@ -41,10 +41,12 @@ from chats.apps.api.v1.sectors.viewsets import (
     SectorAuthorizationViewset,
     SectorTagsViewset,
     SectorViewset,
+    SectorHolidayViewSet,
 )
 from chats.apps.api.v1.users.viewsets import ProfileViewset
 from chats.apps.discussions.views import DiscussionViewSet
 from chats.apps.history.views import HistoryRoomViewset
+from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag, SectorHoliday
 
 
 class Router(routers.SimpleRouter):
@@ -196,3 +198,6 @@ router.register(
 router.register("external/sectors", SectorFlowViewset, basename="external_sector")
 router.register("external/queues", QueueFlowViewset, basename="external_queue")
 router.register("external/agents", AgentFlowViewset, basename="external_agent")
+
+router.register("sector_holiday", SectorHolidayViewSet, basename="sector_holiday")
+
