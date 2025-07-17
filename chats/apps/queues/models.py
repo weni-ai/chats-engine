@@ -1,10 +1,11 @@
 import random
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
+from django.db.models import OuterRef, Q, Subquery
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from django.db.models import Subquery, OuterRef, Q
 
 from chats.apps.projects.models.models import CustomStatus
 from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
@@ -44,6 +45,9 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
 
     @property
     def limit(self):
+        group_sector = self.sector.group_sectors.filter(is_deleted=False).first()
+        if group_sector:
+            return group_sector.rooms_limit
         return self.sector.rooms_limit
 
     def get_permission(self, user):
