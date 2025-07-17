@@ -1,3 +1,7 @@
+# 3.23.4
+## Add
+  - Adding support for rooms_limit in group sector.
+        
 # 3.23.3
 ## Fix
   - Adding livesum in gauge metric
