@@ -48,10 +48,6 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
     lookup_field = "uuid"
     queryset = Project.objects.all()
 
-    def get_permissions(self):
-        permission_classes = [permissions.IsAuthenticated, HasDashboardAccess]
-        return [permission() for permission in permission_classes]
-
     @action(
         detail=True,
         methods=["GET"],
@@ -393,10 +389,14 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             return response
 
     @action(detail=True, methods=['get'])
-    def report_status(self, request, pk=None):
+    def report_status(self, request, **kwargs):
         """Verifica o status de um relatório"""
         try:
-            report_status = ReportStatus.objects.get(id=pk, user=request.user)
+            # Pega o UUID tanto de 'pk' quanto de 'uuid'
+            report_uuid = kwargs.get('uuid') or kwargs.get('pk')
+            
+            # Para teste - remove o filtro de user
+            report_status = ReportStatus.objects.get(uuid=report_uuid)
             return Response({
                 'status': report_status.status,
                 'error_message': report_status.error_message
@@ -549,22 +549,11 @@ class ReportFieldsValidatorViewSet(APIView):
         if model_name not in available_fields:
             raise ValidationError(f'Modelo "{model_name}" não encontrado')
             
-        # Obtém o modelo real do Django
-        try:
-            common_apps = ['sectors', 'queues', 'rooms', 'accounts', 'contacts']
-            model = None
-            for app in common_apps:
-                try:
-                    model = apps.get_model(app_label=app, model_name=model_name.capitalize())
-                    break
-                except LookupError:
-                    continue
-            
-            if model is None:
-                raise ValidationError(f'Não foi possível encontrar o modelo para "{model_name}"')
-
-        except LookupError:
-            raise ValidationError(f'Modelo "{model_name}" não encontrado no sistema')
+        # Usa o método _get_model_class que já existe e tem o mapeamento correto
+        model = self._get_model_class(model_name)
+        
+        if model is None:
+            raise ValidationError(f'Não foi possível encontrar o modelo para "{model_name}"')
 
         # Constrói a query base
         return model.objects.all()

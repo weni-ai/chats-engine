@@ -39,7 +39,7 @@ def close_metrics(room_uuid: UUID):
 
 
 @app.task
-def generate_custom_fields_report(project_uuid: UUID, fields_config: dict, user_email: str, report_status_id: int):
+def generate_custom_fields_report(project_uuid: UUID, fields_config: dict, user_email: str, report_status_id: UUID):
     """
     Generate a custom report based on the fields configuration.
     """
@@ -49,8 +49,8 @@ def generate_custom_fields_report(project_uuid: UUID, fields_config: dict, user_
     report_generator = ReportFieldsValidatorViewSet()
     
     # Busca o objeto de status
-    report_status = ReportStatus.objects.get(id=report_status_id)
-    
+    report_status = ReportStatus.objects.get(uuid=report_status_id)
+
     try:
         # Atualiza para processando
         report_status.status = 'processing'
@@ -87,17 +87,18 @@ def generate_custom_fields_report(project_uuid: UUID, fields_config: dict, user_
             "está pronto e foi anexado a este email."
         )
 
-        email = EmailMessage(
-            subject=subject,
-            body=message,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[user_email],
-        )
-        
-        # Anexa o Excel
-        output.seek(0)
-        email.attach(f'custom_report_{dt}.xlsx', output.getvalue(), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        email.send(fail_silently=False)
+        if settings.SEND_EMAILS:
+            email = EmailMessage(
+                subject=subject,
+                body=message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[user_email],
+            )
+            
+            # Anexa o Excel
+            output.seek(0)
+            email.attach(f'custom_report_{dt}.xlsx', output.getvalue(), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            email.send(fail_silently=False)
         
         # Atualiza para concluído
         report_status.status = 'completed'
