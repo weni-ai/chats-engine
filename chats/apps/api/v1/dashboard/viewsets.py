@@ -405,17 +405,17 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             return Response({'error': 'Report not found'}, status=404)
 
 
-class ModelFieldsViewSet(APIView):
+class ModelFieldsViewSet(viewsets.GenericViewSet):
     """
     Endpoint para retornar os campos disponíveis dos principais models do sistema.
     """
     permission_classes = [permissions.IsAuthenticated, IsProjectAdmin]
 
-    def get(self, request):
+    def list(self, request):
         return Response(ModelFieldsPresenter.get_models_info())
 
 
-class ReportFieldsValidatorViewSet(APIView):
+class ReportFieldsValidatorViewSet(viewsets.GenericViewSet):
     """
     Endpoint para validar campos e gerar consulta para relatório baseado nos campos disponíveis.
     """
@@ -648,7 +648,7 @@ class ReportFieldsValidatorViewSet(APIView):
             
         return report_data
 
-    def post(self, request):
+    def create(self, request):
         project_uuid = request.data.get('project_uuid')
         if not project_uuid:
             raise ValidationError({'project_uuid': 'Este campo é obrigatório.'})
