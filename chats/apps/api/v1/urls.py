@@ -7,6 +7,11 @@ from chats.apps.api.v1.internal.ai_features.views import FeaturePromptsView
 
 urlpatterns = [
     path("rooms/report/", RoomsReportViewSet.as_view(), name="rooms_report"),
+    path(
+        "internal/ai_features/prompts/",
+        FeaturePromptsView.as_view(),
+        name="ai_features_prompts",
+    ),
     path("model-fields/", ModelFieldsViewSet.as_view({'get': 'list'}), name="model-fields"),
     path("custom-report/", ReportFieldsValidatorViewSet.as_view({'post': 'create'}), name="custom-report"),
     path("", include(router.urls)),
