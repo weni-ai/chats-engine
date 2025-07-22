@@ -3,6 +3,8 @@ import json
 import pendulum
 from django.db.models import Avg, Count, F, Q, Sum
 from django.utils import timezone
+from django.apps import apps
+from django.core.cache import cache
 
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.queues.models import Queue
@@ -294,3 +296,55 @@ def get_sector_data(project, filter):
 
     data = json.dumps(list(results))
     return data
+
+
+class ModelFieldsPresenter:
+    """
+    Presenter para retornar os campos disponíveis dos principais models do sistema.
+    """
+    
+    @staticmethod
+    def get_models_info():
+        """
+        Return information about the fields of each model, with a 1 day cache.
+        """
+        cache_key = 'model_fields_presenter_models_info'
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return cached_data
+
+        models_info = {
+            'sectors': ModelFieldsPresenter._get_model_fields('sectors', 'Sector'),
+            'queues': ModelFieldsPresenter._get_model_fields('queues', 'Queue'),
+            'rooms': ModelFieldsPresenter._get_model_fields('rooms', 'Room'),
+            'users': ModelFieldsPresenter._get_model_fields('accounts', 'User'),
+            'sector_tags': ModelFieldsPresenter._get_model_fields('sectors', 'SectorTag'),
+            'contacts': ModelFieldsPresenter._get_model_fields('contacts', 'Contact')
+        }
+        cache.set(cache_key, models_info, timeout=86400)
+        return models_info
+
+    @staticmethod
+    def _get_model_fields(app_label, model_name):
+        """
+        Return information about the fields of a specific model
+        """
+        try:
+            model = apps.get_model(app_label, model_name)
+            fields = {}
+            
+            for field in model._meta.get_fields():
+                if hasattr(field, 'get_internal_type'):
+                    field_info = {
+                        'type': field.get_internal_type(),
+                        'required': not field.null if hasattr(field, 'null') else True
+                    }
+                    
+                    if field.get_internal_type() in ['ForeignKey', 'ManyToManyField']:
+                        field_info['related_model'] = f"{field.related_model._meta.app_label}.{field.related_model._meta.model_name}"
+                    
+                    fields[field.name] = field_info
+
+            return fields
+        except LookupError:
+            return {'error': f'Model {model_name} not found in app {app_label}'}

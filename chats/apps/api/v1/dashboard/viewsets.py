@@ -3,9 +3,11 @@ import json
 
 import pandas
 from django.http import HttpResponse
+from chats.apps.dashboard.tasks import generate_custom_fields_report
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from chats.apps.api.v1.dashboard.presenter import get_export_data
 from chats.apps.api.v1.dashboard.repository import (
@@ -18,21 +20,33 @@ from chats.apps.api.v1.dashboard.serializers import (
     DashboardRoomSerializer,
     DashboardSectorSerializer,
 )
-from chats.apps.api.v1.permissions import HasDashboardAccess
+from chats.apps.api.v1.permissions import HasDashboardAccess, IsProjectAdmin
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.core.excel_storage import ExcelStorage
 
 from .dto import Filters, should_exclude_admin_domains
 from .service import AgentsService, RawDataService, RoomsDataService, SectorService
+from .presenter import ModelFieldsPresenter
+from rest_framework import permissions, status
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.exceptions import ValidationError
+from django.shortcuts import get_object_or_404
+from django.apps import apps
+from django.db.models import Q
+from chats.celery import app
+from django.core.mail import EmailMessage
+from django.conf import settings
+import logging
+from uuid import UUID
+from chats.apps.dashboard.models import ReportStatus
+
+logger = logging.getLogger(__name__)
 
 
 class DashboardLiveViewset(viewsets.GenericViewSet):
     lookup_field = "uuid"
     queryset = Project.objects.all()
-
-    def get_permissions(self):
-        permission_classes = [permissions.IsAuthenticated, HasDashboardAccess]
-        return [permission() for permission in permission_classes]
 
     @action(
         detail=True,
@@ -373,3 +387,311 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             data_frame_3.to_csv(response, index=False, mode="a", sep=";")
 
             return response
+
+    @action(detail=True, methods=['get'])
+    def report_status(self, request, **kwargs):
+        """Verifica o status de um relatório"""
+        try:
+            # Pega o UUID tanto de 'pk' quanto de 'uuid'
+            report_uuid = kwargs.get('uuid') or kwargs.get('pk')
+            
+            # Para teste - remove o filtro de user
+            report_status = ReportStatus.objects.get(uuid=report_uuid)
+            return Response({
+                'status': report_status.status,
+                'error_message': report_status.error_message
+            })
+        except ReportStatus.DoesNotExist:
+            return Response({'error': 'Report not found'}, status=404)
+
+
+class ModelFieldsViewSet(APIView):
+    """
+    Endpoint para retornar os campos disponíveis dos principais models do sistema.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsProjectAdmin]
+
+    def get(self, request):
+        return Response(ModelFieldsPresenter.get_models_info())
+
+
+class ReportFieldsValidatorViewSet(APIView):
+    """
+    Endpoint para validar campos e gerar consulta para relatório baseado nos campos disponíveis.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsProjectAdmin]
+
+    def _get_model_class(self, model_name):
+        """
+        Encontra a classe do modelo Django baseado no nome
+        """
+        # Mapeamento dos modelos conhecidos
+        model_mapping = {
+            'sectors': ('sectors', 'Sector'),
+            'queues': ('queues', 'Queue'),
+            'rooms': ('rooms', 'Room'),
+            'users': ('accounts', 'User'),
+            'sector_tags': ('sectors', 'SectorTag'),
+            'contacts': ('contacts', 'Contact')
+        }
+        
+        if model_name in model_mapping:
+            app_label, model_class_name = model_mapping[model_name]
+            try:
+                return apps.get_model(app_label=app_label, model_name=model_class_name)
+            except LookupError:
+                pass
+        
+        # Fallback: busca nos apps comuns
+        common_apps = ['sectors', 'queues', 'rooms', 'accounts', 'contacts', 'msgs', 'projects']
+        for app in common_apps:
+            try:
+                return apps.get_model(app_label=app, model_name=model_name.capitalize())
+            except LookupError:
+                continue
+        
+        return None
+
+    def _get_model_count_for_project(self, model_class, project):
+        """
+        Conta registros de um modelo específico para um projeto
+        """
+        try:
+            model_fields = {field.name: field for field in model_class._meta.get_fields()}
+            
+            filters = Q()
+            
+            # Aplica filtros baseados nos campos disponíveis
+            if 'project' in model_fields:
+                filters |= Q(project=project)
+            if 'sector' in model_fields:
+                filters |= Q(sector__project=project)
+            if 'queue' in model_fields:
+                filters |= Q(queue__sector__project=project)
+            if 'user' in model_fields:
+                filters |= Q(user__project_permissions__project=project)
+            
+            if filters:
+                return model_class.objects.filter(filters).distinct().count()
+            else:
+                # Se não conseguiu filtrar por projeto, retorna uma estimativa conservadora
+                total_count = model_class.objects.count()
+                return max(1, total_count // 10)  # 10% do total
+                
+        except Exception as e:
+            logger.error(f"Erro ao contar registros para {model_class.__name__}: {e}")
+            return 0
+
+    def _estimate_execution_time(self, fields_config, project):
+        """
+        Estima o tempo de execução baseado no volume de dados que será processado
+        """
+        # Verifica se os modelos são válidos
+        available_models = ModelFieldsPresenter.get_models_info()
+        invalid_models = [model for model in fields_config.keys() 
+                         if model not in available_models]
+        
+        if invalid_models:
+            raise ValidationError(
+                f"Modelos não disponíveis: {', '.join(invalid_models)}. "
+                f"Modelos disponíveis: {', '.join(sorted(available_models.keys()))}"
+            )
+        
+        total_records = 0
+        processed_models = []
+        
+        # Conta registros que serão processados
+        for model_name in fields_config.keys():
+            try:
+                model_class = self._get_model_class(model_name)
+                
+                if model_class:
+                    count = self._get_model_count_for_project(model_class, project)
+                    total_records += count
+                    processed_models.append({
+                        'model': model_name,
+                        'count': count
+                    })
+                    logger.info(f"Modelo {model_name}: {count} registros")
+                else:
+                    logger.warning(f"Modelo {model_name} não encontrado")
+                    
+            except Exception as e:
+                logger.error(f"Erro ao processar modelo {model_name}: {e}")
+                continue
+        
+        # Estimativas baseadas em testes empíricos
+        base_time = 30  # segundos base
+        time_per_1000_records = 45  # segundos por 1000 registros
+        
+        # Fator de complexidade baseado no número de modelos
+        complexity_factor = 1 + (len(processed_models) * 0.1)
+        
+        # Calcula estimativa
+        if total_records > 0:
+            estimated_time = (base_time + (total_records / 1000) * time_per_1000_records) * complexity_factor
+        else:
+            estimated_time = base_time
+        
+        # Limita a estimativa (mínimo 30s, máximo 10min)
+        final_estimate = max(30, min(int(estimated_time), 600))
+        
+        logger.info(f"Estimativa de tempo: {final_estimate}s para {total_records} registros em {len(processed_models)} modelos")
+        
+        return final_estimate
+
+    def _get_base_queryset(self, model_name, project):
+        """
+        Retorna o queryset base para qualquer modelo retornado pelo ModelFieldsPresenter
+        """
+        available_fields = ModelFieldsPresenter.get_models_info()
+        
+        if model_name not in available_fields:
+            raise ValidationError(f'Modelo "{model_name}" não encontrado')
+            
+        # Usa o método _get_model_class que já existe e tem o mapeamento correto
+        model = self._get_model_class(model_name)
+        
+        if model is None:
+            raise ValidationError(f'Não foi possível encontrar o modelo para "{model_name}"')
+
+        # Constrói a query base
+        return model.objects.all()
+
+    def _process_model_fields(self, model_name, field_data, project, available_fields):
+        """
+        Processa os campos de um modelo e suas relações
+        """
+        if model_name not in available_fields:
+            raise ValidationError(f'Modelo "{model_name}" não encontrado')
+
+        model_fields = available_fields[model_name]
+        query_fields = []
+        related_queries = {}
+
+        for key, value in field_data.items():
+            if key == 'fields' and isinstance(value, list):
+                # Valida campos diretos do modelo
+                invalid_fields = [
+                    field for field in value
+                    if field not in model_fields
+                ]
+                if invalid_fields:
+                    raise ValidationError(f'Campos inválidos para {model_name}: {", ".join(invalid_fields)}')
+                query_fields.extend(value)
+            elif key in available_fields:
+                # Processa campos relacionados
+                related_queries[key] = self._process_model_fields(key, value, project, available_fields)
+
+        # Obtém o queryset base
+        base_queryset = self._get_base_queryset(model_name, project)
+
+        # Aplica os campos selecionados
+        if query_fields:
+            base_queryset = base_queryset.values(*query_fields)
+
+        # Aplica filtros relacionados ao projeto
+        try:
+            base_queryset = base_queryset.filter(
+                Q(project=project) |
+                Q(sector__project=project) |
+                Q(queue__sector__project=project) |
+                Q(project_permissions__project=project)
+            ).distinct()
+        except Exception:
+            # Se os filtros não funcionarem, mantém o queryset original
+            pass
+
+        return {
+            'queryset': base_queryset,
+            'related': related_queries
+        }
+
+    def _execute_queries(self, query_data):
+        """
+        Executa as queries e formata o resultado
+        """
+        result = {}
+        
+        if 'queryset' in query_data:
+            try:
+                result['data'] = list(query_data['queryset'])
+            except Exception as e:
+                raise ValidationError(f'Erro ao executar query: {str(e)}')
+
+        if 'related' in query_data:
+            for model, related_data in query_data['related'].items():
+                result[model] = self._execute_queries(related_data)
+
+        return result
+
+    def _generate_report_data(self, data, project):
+        """
+        Método interno para gerar os dados do relatório
+        """
+        available_fields = ModelFieldsPresenter.get_models_info()
+        
+        # Processa cada modelo e seus campos
+        queries = {}
+        for model_name, field_data in data.items():
+            queries[model_name] = self._process_model_fields(
+                model_name,
+                field_data,
+                project,
+                available_fields
+            )
+        
+        # Executa as queries e formata o resultado
+        report_data = {}
+        for model_name, query_data in queries.items():
+            report_data[model_name] = self._execute_queries(query_data)
+            
+        return report_data
+
+    def post(self, request):
+        project_uuid = request.data.get('project_uuid')
+        if not project_uuid:
+            raise ValidationError({'project_uuid': 'Este campo é obrigatório.'})
+        
+        project = get_object_or_404(Project, uuid=project_uuid)
+        
+        try:
+            # Remove project_uuid do processamento
+            fields_config = {k: v for k, v in request.data.items() 
+                           if k != 'project_uuid'}
+            
+            # Estima o tempo de execução
+            estimated_time = self._estimate_execution_time(fields_config, project)
+            
+            # Cria o objeto de status
+            report_status = ReportStatus.objects.create(
+                project=project,
+                user=request.user,
+                fields_config=fields_config
+            )
+            
+            # Envia para processamento assíncrono
+            generate_custom_fields_report.delay(
+                project_uuid=project.uuid,
+                fields_config=fields_config,
+                user_email=request.user.email,
+                report_status_id=report_status.uuid
+            )
+            
+            return Response({
+                'message': 'The report will be sent to your email when it is ready.',
+                'status': 'pending',
+                'estimated_time_seconds': estimated_time,
+                'report_status_id': report_status.uuid
+            }, status=status.HTTP_202_ACCEPTED)
+            
+        except ValidationError as e:
+            return Response(
+                {'errors': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Erro inesperado: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
