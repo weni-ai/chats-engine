@@ -20,7 +20,7 @@ from chats.apps.api.v1.dashboard.serializers import (
     DashboardRoomSerializer,
     DashboardSectorSerializer,
 )
-from chats.apps.api.v1.permissions import HasDashboardAccess, IsProjectAdmin
+from chats.apps.api.v1.permissions import IsProjectAdminSpecific, IsProjectAdmin
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.core.excel_storage import ExcelStorage
 
@@ -409,7 +409,7 @@ class ModelFieldsViewSet(viewsets.GenericViewSet):
     """
     Endpoint para retornar os campos disponíveis dos principais models do sistema.
     """
-    permission_classes = [permissions.IsAuthenticated, IsProjectAdmin]
+    permission_classes = [permissions.IsAuthenticated, IsProjectAdminSpecific]
 
     def list(self, request):
         return Response(ModelFieldsPresenter.get_models_info())
@@ -419,7 +419,7 @@ class ReportFieldsValidatorViewSet(viewsets.GenericViewSet):
     """
     Endpoint para validar campos e gerar consulta para relatório baseado nos campos disponíveis.
     """
-    permission_classes = [permissions.IsAuthenticated, IsProjectAdmin]
+    permission_classes = [permissions.IsAuthenticated, IsProjectAdminSpecific]
 
     def _get_model_class(self, model_name):
         """
@@ -695,3 +695,4 @@ class ReportFieldsValidatorViewSet(viewsets.GenericViewSet):
                 {'error': f'Erro inesperado: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+

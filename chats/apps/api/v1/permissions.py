@@ -7,10 +7,36 @@ from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import SectorAuthorization
 from chats.core.permissions import GetPermission
+from chats.apps.projects.models import Project
 
 WRITE_METHODS = ["POST"]
 OBJECT_METHODS = ["DELETE", "PATCH", "PUT", "GET"]
 
+class IsProjectAdminSpecific(permissions.BasePermission):
+    def has_permission(self, request, view):
+        if request.user.is_anonymous:
+            return False
+        
+        if request.method == 'GET':
+            project_uuid = request.query_params.get('project_uuid')
+        elif request.method == 'POST':
+            project_uuid = request.data.get('project_uuid')
+        else:
+            return False
+            
+        if not project_uuid:
+            return False
+            
+        try:
+            project = Project.objects.get(uuid=project_uuid)
+            ProjectPermission.objects.get(
+                user=request.user, 
+                project=project,
+                role=1
+            )
+            return True
+        except (Project.DoesNotExist, ProjectPermission.DoesNotExist):
+            return False
 
 class IsProjectAdmin(permissions.BasePermission):
     def has_permission(self, request, view):
