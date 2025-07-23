@@ -312,7 +312,18 @@ class TestQueueOnlineAgents(TestCase):
         )
 
     def test_online_agents_returns_only_online_agents(self):
+        self.assertEqual(self.queue.online_agents.count(), 3)
         self.agent_1.project_permissions.update(status="OFFLINE")
+        self.assertEqual(self.queue.online_agents.count(), 2)
+        self.assertNotIn(self.agent_1, self.queue.online_agents)
+
+    def test_online_agents_deleting_queue_authorization_removes_agent_from_online_agents(
+        self,
+    ):
+        self.assertEqual(self.queue.online_agents.count(), 3)
+        self.queue.authorizations.filter(
+            permission=self.agent_1.project_permissions.first()
+        ).delete()
         self.assertEqual(self.queue.online_agents.count(), 2)
         self.assertNotIn(self.agent_1, self.queue.online_agents)
 
