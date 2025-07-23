@@ -66,7 +66,7 @@ class UpdateStatusMessageUseCase:
                 )
                 message = reply_index.message
 
-                if not message.room or not message.room.project:
+                if not message.room:
                     continue
 
                 updated = False
