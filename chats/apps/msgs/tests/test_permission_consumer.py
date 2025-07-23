@@ -14,6 +14,7 @@ class TestProjectPermissionConsumer(TestCase):
         self.mock_message.body = (
             b'{"project": "test_project", "user": "test_user", "role": "admin"}'
         )
+        self.mock_message.headers = {"x-error-count": 0}
 
     @mock.patch(
         "chats.apps.projects.consumers.permission_consumer.ProjectPermissionCreationUseCase"

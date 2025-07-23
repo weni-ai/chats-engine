@@ -17,22 +17,47 @@ def pyamqp_call_dlx_when_error(
             channel = message.channel
             try:
                 return consumer(*args, **kw)
-            except Exception as err:
-                capture_exception(err)
-                channel.basic_reject(message.delivery_tag, requeue=False)
-                print(f"[{consumer_name}] - Message rejected by: {err}")
-                callback_body = {
-                    "original_message": message.body.decode("utf-8"),
-                    "error_type": str(type(err)),
-                    "error_message": str(err),
-                }
-                exchange = message.headers.get("callback_exchange") or default_exchange
-                basic_publish(
-                    channel=channel,
-                    content=callback_body,
-                    properties={"delivery_mode": 2},
-                    exchange=exchange,
-                )
+            except Exception as error:
+                capture_exception(error)
+                try:
+                    channel.basic_reject(message.delivery_tag, requeue=False)
+                except Exception as reject_err:
+                    print(f"[{consumer_name}] - Failed to reject message: {reject_err}")
+                    return
+
+                print(f"[{consumer_name}] - Message rejected by: {error}")
+
+                headers = getattr(message, "headers", {}) or {}
+                error_count = headers.get("x-error-count", 0)
+
+                if error_count >= 3:
+                    print(
+                        f"[{consumer_name}] - Max error retries reached, dropping message"
+                    )
+                    return
+
+                try:
+                    callback_body = {
+                        "original_message": message.body.decode("utf-8"),
+                        "error_type": str(type(error)),
+                        "error_message": str(error),
+                    }
+                    exchange = headers.get("callback_exchange") or default_exchange
+
+                    new_headers = dict(headers)
+                    new_headers["x-error-count"] = error_count + 1
+
+                    basic_publish(
+                        channel=channel,
+                        content=callback_body,
+                        properties={"delivery_mode": 2},
+                        exchange=exchange,
+                        headers=new_headers,
+                    )
+                except Exception as publish_err:
+                    print(
+                        f"[{consumer_name}] - Failed to publish to DLX: {publish_err}"
+                    )
 
         return consumer_wrapper
 
