@@ -49,10 +49,12 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         config = validated_data.pop("config", None)
         sector = super().update(instance, validated_data)
-        if config:
+
+        if config is not None:
             sector.config = sector.config or {}
             sector.config.update(config)
-            sector.save()
+            sector.save(update_fields=["config"])
+
         return sector
 
 

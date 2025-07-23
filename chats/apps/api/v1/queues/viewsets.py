@@ -1,4 +1,5 @@
 import logging
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django_filters.rest_framework import DjangoFilterBackend
@@ -17,15 +18,14 @@ from chats.apps.api.v1.permissions import (
 from chats.apps.api.v1.queues import serializers as queue_serializers
 from chats.apps.api.v1.queues.filters import QueueAuthorizationFilter, QueueFilter
 from chats.apps.projects.models.models import Project
-from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
+from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.sectors.models import Sector, SectorGroupSector
 from chats.apps.sectors.usecases.group_sector_authorization import (
     QueueGroupSectorAuthorizationCreationUseCase,
 )
 
 from .serializers import QueueAgentsSerializer
-
 
 LOGGER = logging.getLogger(__name__)
 
@@ -100,7 +100,7 @@ class QueueViewset(ModelViewSet):
 
         if project.config and project.config.get("its_principal", False):
             integrate_use_case = IntegratedTicketers()
-            integrate_use_case.integrate__individual_topic(
+            integrate_use_case.integrate_individual_topic(
                 project, instance.sector.config.get("secondary_project")
             )
 

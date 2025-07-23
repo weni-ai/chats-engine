@@ -15,7 +15,6 @@ from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
-from django.utils import timezone
 
 from chats.apps.api.v1.internal.projects.serializers import (
     CheckAccessReadSerializer,
@@ -60,8 +59,6 @@ from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import create_room_feedback_message
 from chats.apps.sectors.models import Sector
-from chats.apps.projects.usecases.status_service import InServiceStatusService
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -534,11 +531,7 @@ class ProjectViewset(
                     {"project": "Project not found"}, status.HTTP_404_NOT_FOUND
                 )
 
-            print("projeto principal", project)
-
             integrations = IntegratedTicketers()
-
-            print("classe de integracao", integrations)
 
             integrations.integrate_ticketer(project)
             integrations.integrate_topic(project)

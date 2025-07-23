@@ -4,8 +4,8 @@ from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.utils.crypto import get_random_string
 from django.urls import reverse
+from django.utils.crypto import get_random_string
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.test import APITestCase
@@ -14,7 +14,6 @@ from chats.apps.ai_features.history_summary.models import (
     HistorySummary,
     HistorySummaryStatus,
 )
-
 from chats.apps.api.utils import create_contact, create_user_and_token
 from chats.apps.contacts.models import Contact
 from chats.apps.projects.models import Project, ProjectPermission

@@ -7,7 +7,7 @@ from chats.apps.contacts.models import Contact
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.rooms.models import Room
-from chats.apps.sectors.models import Sector
+from chats.apps.sectors.models import GroupSector, Sector
 
 User = get_user_model()
 
@@ -397,3 +397,60 @@ class TestQueueGetAvailableAgent(TestCase):
             picked_agents_set,
             "Agent 3 was never picked, suggesting non-random selection.",
         )
+
+
+class QueueLimitPropertyTestCase(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=5,
+            work_start="08:00:00",
+            work_end="17:00:00",
+        )
+        self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
+
+    def test_limit_returns_sector_rooms_limit_when_no_group(self):
+        """
+        Verify if limit returns sector rooms_limit when sector is not in any group
+        """
+        self.assertEqual(self.queue.limit, 5)
+
+    def test_limit_returns_group_rooms_limit_when_sector_in_active_group(self):
+        """
+        Verify if limit returns group rooms_limit when sector is in an active group
+        """
+        group_sector = GroupSector.objects.create(
+            name="Test Group", project=self.project, rooms_limit=10, is_deleted=False
+        )
+        group_sector.sectors.add(self.sector)
+
+        self.assertEqual(self.queue.limit, 10)
+
+    def test_limit_returns_sector_rooms_limit_when_group_is_deleted(self):
+        """
+        Verify if limit returns sector rooms_limit when group is deleted
+        """
+        group_sector = GroupSector.objects.create(
+            name="Test Group", project=self.project, rooms_limit=15, is_deleted=True
+        )
+        group_sector.sectors.add(self.sector)
+
+        self.assertEqual(self.queue.limit, 5)
+
+    def test_limit_with_multiple_groups_only_active_considered(self):
+        """
+        Verify if limit considers only active groups when sector has multiple group relations
+        """
+        deleted_group = GroupSector.objects.create(
+            name="Deleted Group", project=self.project, rooms_limit=20, is_deleted=True
+        )
+        active_group = GroupSector.objects.create(
+            name="Active Group", project=self.project, rooms_limit=12, is_deleted=False
+        )
+
+        deleted_group.sectors.add(self.sector)
+        active_group.sectors.add(self.sector)
+
+        self.assertEqual(self.queue.limit, 12)

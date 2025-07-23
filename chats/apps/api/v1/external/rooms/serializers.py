@@ -6,6 +6,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+from sentry_sdk import capture_exception
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.accounts.serializers import UserSerializer
@@ -322,11 +323,11 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         project = sector.project
 
         created_on = validated_data.get("created_on", timezone.now())
-        
+
         protocol = validated_data.pop("protocol", None)
         if protocol is None:
             protocol = validated_data.get("custom_fields", {}).pop("protocol", None)
-        
+
         service_chat = validated_data.get("custom_fields", {}).pop(
             "service_chats", None
         )
@@ -456,7 +457,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
                 raise ValidationError(
                     {"detail": _("Contact cannot be done outside working hours")}
                 )
-            
+
             print(f"an room its created in the weekend")
 
     def handle_urn(self, validated_data):

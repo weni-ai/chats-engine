@@ -1,4 +1,5 @@
 import logging
+
 import pendulum
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
@@ -45,6 +46,8 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
     can_edit_custom_fields = models.BooleanField(
         _("Can edit custom fields?"), default=False
     )
+
+    working_day = models.JSONField(_("working_day"), blank=True, null=True)
 
     tracker = FieldTracker(fields=["rooms_limit"])
 

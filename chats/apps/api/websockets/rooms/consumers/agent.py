@@ -20,8 +20,8 @@ from chats.apps.api.v1.prometheus.metrics import (
 from chats.apps.projects.models.models import ProjectPermission
 from chats.apps.projects.usecases.status_service import InServiceStatusService
 from chats.core.cache import CacheClient
-from chats.apps.projects.usecases.status_service import InServiceStatusService
-from chats.apps.projects.models.models import ProjectPermission
+
+logger = logging.getLogger(__name__)
 
 logger = logging.getLogger(__name__)
 
