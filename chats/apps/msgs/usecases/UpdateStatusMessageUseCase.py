@@ -120,9 +120,9 @@ class UpdateStatusMessageUseCase:
     def update_status_message(self, message_id, message_status):
         try:
             reply_index = ChatMessageReplyIndex.objects.select_related(
-                "message__room__project"
+                "message__room__queue__sector__project"
             ).get(external_id=message_id)
-            project_uuid = str(reply_index.message.room.project.uuid)
+            project_uuid = str(reply_index.message.room.queue.sector.project.uuid)
 
             if project_uuid not in settings.MESSAGE_STATUS_UPDATE_ENABLED_PROJECTS:
                 return
