@@ -53,7 +53,7 @@ class UpdateStatusMessageUseCase:
         )
 
         messages_to_update = []
-        update_fields_set = set()
+        message_update_fields = {}
 
         for msg_data in msgs_to_process:
             if not msg_data or not isinstance(msg_data, dict):
@@ -70,24 +70,24 @@ class UpdateStatusMessageUseCase:
                     continue
 
                 updated = False
-                if (
-                    msg_data["message_status"] == "read"
-                    and str(message.is_read or "") != "read"
-                ):
-                    message.is_read = "read"
-                    update_fields_set.add("is_read")
-                    updated = True
-                elif (
-                    msg_data["message_status"] == "delivered"
-                    and str(message.is_delivered or "") != "delivered"
-                ):
-                    message.is_delivered = "delivered"
-                    update_fields_set.add("is_delivered")
-                    updated = True
+                update_fields_for_this_message = set()
+                
+                if msg_data["message_status"] == "read":
+                    if not message.is_read:
+                        message.is_read = "read"
+                        update_fields_for_this_message.add("is_read")
+                        updated = True
+                        
+                if msg_data["message_status"] == "delivered":
+                    if not message.is_delivered:
+                        message.is_delivered = "delivered" 
+                        update_fields_for_this_message.add("is_delivered")
+                        updated = True
 
                 if updated:
                     messages_to_update.append(message)
                     message._pending_status = msg_data["message_status"]
+                    message_update_fields[message.uuid] = update_fields_for_this_message  # Usar UUID!
 
             except ChatMessageReplyIndex.DoesNotExist:
                 continue
@@ -98,9 +98,17 @@ class UpdateStatusMessageUseCase:
                 continue
 
         if messages_to_update:
-            update_fields = list(update_fields_set)
-            Message.objects.bulk_update(messages_to_update, update_fields)
+            fields_to_messages = {}
+            for message in messages_to_update:
+                fields_key = tuple(sorted(message_update_fields[message.uuid]))  # Usar UUID!
+                if fields_key not in fields_to_messages:
+                    fields_to_messages[fields_key] = []
+                fields_to_messages[fields_key].append(message)
+            
+            for fields, messages in fields_to_messages.items():
+                Message.objects.bulk_update(messages, list(fields))
 
+            # Notificar
             for message in messages_to_update:
                 if hasattr(message, "_pending_status"):
                     try:
