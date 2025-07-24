@@ -27,7 +27,11 @@ class MessageStatusConsumer(EDAConsumer):
         if (message_id := body.get("message_id")) and (
             message_status := body.get("status")
         ):
-            channel.basic_ack(message.delivery_tag)
-            process_message_status.delay(message_id, message_status)
+            try:
+                process_message_status.delay(message_id, message_status)
+                channel.basic_ack(message.delivery_tag)
+            except Exception as error:
+                print(f"[MessageStatusConsumer] Failed to send to Celery: {error}")
+                raise
         else:
             channel.basic_ack(message.delivery_tag)
