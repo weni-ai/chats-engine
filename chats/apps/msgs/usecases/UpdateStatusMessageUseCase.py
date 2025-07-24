@@ -71,23 +71,23 @@ class UpdateStatusMessageUseCase:
 
                 updated = False
                 update_fields_for_this_message = set()
-                
+
                 if msg_data["message_status"] == "read":
                     if not message.is_read:
                         message.is_read = "read"
                         update_fields_for_this_message.add("is_read")
                         updated = True
-                        
+
                 if msg_data["message_status"] == "delivered":
                     if not message.is_delivered:
-                        message.is_delivered = "delivered" 
+                        message.is_delivered = "delivered"
                         update_fields_for_this_message.add("is_delivered")
                         updated = True
 
                 if updated:
                     messages_to_update.append(message)
                     message._pending_status = msg_data["message_status"]
-                    message_update_fields[message.uuid] = update_fields_for_this_message  # Usar UUID!
+                    message_update_fields[message.uuid] = update_fields_for_this_message
 
             except ChatMessageReplyIndex.DoesNotExist:
                 continue
@@ -100,15 +100,14 @@ class UpdateStatusMessageUseCase:
         if messages_to_update:
             fields_to_messages = {}
             for message in messages_to_update:
-                fields_key = tuple(sorted(message_update_fields[message.uuid]))  # Usar UUID!
+                fields_key = tuple(sorted(message_update_fields[message.uuid]))
                 if fields_key not in fields_to_messages:
                     fields_to_messages[fields_key] = []
                 fields_to_messages[fields_key].append(message)
-            
+
             for fields, messages in fields_to_messages.items():
                 Message.objects.bulk_update(messages, list(fields))
 
-            # Notificar
             for message in messages_to_update:
                 if hasattr(message, "_pending_status"):
                     try:
@@ -128,9 +127,11 @@ class UpdateStatusMessageUseCase:
     def update_status_message(self, message_id, message_status):
         try:
             reply_index = ChatMessageReplyIndex.objects.select_related(
-                "message__room__project"
+                "message__room__queue__sector__project"  # CORREÇÃO: caminho correto
             ).get(external_id=message_id)
-            project_uuid = str(reply_index.message.room.project.uuid)
+            project_uuid = str(
+                reply_index.message.room.queue.sector.project.uuid
+            )  # CORREÇÃO: caminho correto
 
             if project_uuid not in settings.MESSAGE_STATUS_UPDATE_ENABLED_PROJECTS:
                 return
