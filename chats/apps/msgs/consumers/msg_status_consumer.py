@@ -18,9 +18,11 @@ class MessageStatusConsumer(EDAConsumer):
         try:
             body = JSONParser.parse(message.body)
             if not body or not isinstance(body, dict):
+                print("[MessageStatusConsumer] Empty or invalid message body")
                 channel.basic_ack(message.delivery_tag)
                 return
-        except Exception:
+        except Exception as error:
+            print(f"[MessageStatusConsumer] Failed to parse message: {error}")
             channel.basic_ack(message.delivery_tag)
             return
 
@@ -28,10 +30,19 @@ class MessageStatusConsumer(EDAConsumer):
             message_status := body.get("status")
         ):
             try:
+                print(
+                    f"[MessageStatusConsumer] Processing status update - ID: {message_id}, Status: {message_status}"
+                )
                 process_message_status.delay(message_id, message_status)
                 channel.basic_ack(message.delivery_tag)
+                print(
+                    f"[MessageStatusConsumer] Successfully queued status update for {message_id}"
+                )
             except Exception as error:
                 print(f"[MessageStatusConsumer] Failed to send to Celery: {error}")
                 raise
         else:
+            print(
+                f"[MessageStatusConsumer] Missing required fields - message_id: {body.get('message_id')}, status: {body.get('status')}"
+            )
             channel.basic_ack(message.delivery_tag)
