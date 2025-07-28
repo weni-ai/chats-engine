@@ -248,15 +248,20 @@ class MsgsExternalTests(APITestCase):
     def test_cannot_update_external_msgs_with_internal_token_without_can_communicate_internally_perm(
         self,
     ):
+        from django_redis import get_redis_connection
+
         message = self.room.messages.create(
             text="test.",
         )
 
-        # Criar usuário único para este teste específico
         import uuid
 
         unique_username = f"test_user_no_perm_{uuid.uuid4().hex[:8]}"
         user, token = create_user_and_token(unique_username)
+
+        redis_connection = get_redis_connection()
+        cache_key = f"internal_client_perm:{user.id}"
+        redis_connection.delete(cache_key)
 
         self.client.force_authenticate(user)
 
