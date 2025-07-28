@@ -1,3 +1,7 @@
+# 3.23.11
+## Add
+ - Adapting the message consumer to receive new statuses
+    
 # 3.23.10
 ## Fix
  - Correcting the select related for feature flag
