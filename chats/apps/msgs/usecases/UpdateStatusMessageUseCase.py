@@ -72,13 +72,19 @@ class UpdateStatusMessageUseCase:
                 updated = False
                 update_fields_for_this_message = set()
 
-                if msg_data["message_status"] == "read":
+                status = (
+                    msg_data["message_status"].upper()
+                    if msg_data["message_status"]
+                    else ""
+                )
+
+                if status in ["READ", "V"]:
                     if not message.is_read:
                         message.is_read = "read"
                         update_fields_for_this_message.add("is_read")
                         updated = True
 
-                if msg_data["message_status"] == "delivered":
+                if status in ["DELIVERED", "D"]:
                     if not message.is_delivered:
                         message.is_delivered = "delivered"
                         update_fields_for_this_message.add("is_delivered")
