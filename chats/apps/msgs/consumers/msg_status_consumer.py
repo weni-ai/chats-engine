@@ -43,6 +43,7 @@ class MessageStatusConsumer(EDAConsumer):
                 raise
         else:
             print(
-                f"[MessageStatusConsumer] Missing required fields - message_id: {body.get('message_id')}, status: {body.get('status')}"
+                f"[MessageStatusConsumer] Missing required fields - "
+                f"message_id: {body.get('message_id')}, status: {body.get('status')}"
             )
             channel.basic_ack(message.delivery_tag)
