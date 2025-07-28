@@ -83,11 +83,12 @@ class AgentRepository:
         if filters.agent:
             agents_query = agents_query.filter(email=filters.agent)
 
+        custom_status_filter = Q(user=OuterRef("email"), status_type__project=project)
+        if filters.start_date and filters.end_date:
+            custom_status_filter &= Q(created_on__range=[filters.start_date, filters.end_date])
+        
         custom_status_subquery = Subquery(
-            CustomStatus.objects.filter(
-                user=OuterRef("email"),
-                status_type__project=project,
-            )
+            CustomStatus.objects.filter(custom_status_filter)
             .values("user")
             .annotate(
                 aggregated=JSONBAgg(
@@ -189,11 +190,13 @@ class AgentRepository:
             user_id=OuterRef("email"),
         ).values("status")[:1]
 
+        # Apply date filter to custom_status_subquery if provided
+        custom_status_filter = Q(user=OuterRef("email"), status_type__project=project)
+        if filters.start_date and filters.end_date:
+            custom_status_filter &= Q(created_on__range=[filters.start_date, filters.end_date])
+        
         custom_status_subquery = Subquery(
-            CustomStatus.objects.filter(
-                user=OuterRef("email"),
-                status_type__project=project,
-            )
+            CustomStatus.objects.filter(custom_status_filter)
             .values("user")
             .annotate(
                 aggregated=JSONBAgg(
