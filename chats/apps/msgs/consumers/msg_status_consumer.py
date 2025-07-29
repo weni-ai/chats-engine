@@ -3,16 +3,9 @@ import time
 import amqp
 from django.conf import settings
 
-from chats.apps.event_driven.backends.pyamqp_backend import basic_publish
 from chats.apps.event_driven.consumers import EDAConsumer, pyamqp_call_dlx_when_error
 from chats.apps.event_driven.parsers.json_parser import JSONParser
-from chats.apps.msgs.models import ChatMessageReplyIndex
-from chats.apps.msgs.usecases.UpdateStatusMessageUseCase import (
-    UpdateStatusMessageUseCase,
-)
-
-MAX_RETRIES = 5
-RETRY_DELAY_SECONDS = 5
+from chats.apps.msgs.tasks import process_message_status
 
 update_message_usecase = UpdateStatusMessageUseCase()
 
@@ -34,43 +27,31 @@ class MessageStatusConsumer(EDAConsumer):
         try:
             body = JSONParser.parse(message.body)
             if not body or not isinstance(body, dict):
-                print("[MessageStatusConsumer] - Invalid body format")
+                print("[MessageStatusConsumer] Empty or invalid message body")
                 channel.basic_ack(message.delivery_tag)
                 return
         except Exception as error:
-            print(f"[MessageStatusConsumer] - JSON parse error: {error}")
+            print(f"[MessageStatusConsumer] Failed to parse message: {error}")
             channel.basic_ack(message.delivery_tag)
             return
 
         if (message_id := body.get("message_id")) and (
             message_status := body.get("status")
         ):
-            headers = getattr(message, "headers", None)
-            if not headers or not isinstance(headers, dict):
-                headers = {}
-            retry_count = int(headers.get("x-retry-count", 0))
-
-            if ChatMessageReplyIndex.objects.filter(external_id=message_id).exists():
+            try:
+                print(
+                    f"[MessageStatusConsumer] Processing status update - ID: {message_id}, Status: {message_status}"
+                )
+                process_message_status.delay(message_id, message_status)
                 channel.basic_ack(message.delivery_tag)
                 print(
-                    f"[MessageStatusConsumer] - Consuming a message. Body: {message.body}"
+                    f"[MessageStatusConsumer] Successfully queued status update for {message_id}"
                 )
-                try:
-                    update_message_usecase.update_status_message(
-                        message_id, message_status
-                    )
-                except Exception as error:
-                    print(f"[MessageStatusConsumer] - Error processing: {error}")
-            else:
-                if retry_count < MAX_RETRIES:
-                    new_headers = dict(headers)
-                    new_headers["x-retry-count"] = retry_count + 1
-                    basic_publish(
-                        channel=channel,
-                        content=body,
-                        exchange="chats.msgs-status-delay",
-                        headers=new_headers,
-                    )
-                channel.basic_ack(message.delivery_tag)
+            except Exception as error:
+                print(f"[MessageStatusConsumer] Failed to send to Celery: {error}")
+                raise
         else:
+            print(
+                f"[MessageStatusConsumer] Missing required fields - message_id: {body.get('message_id')}, status: {body.get('status')}"
+            )
             channel.basic_ack(message.delivery_tag)

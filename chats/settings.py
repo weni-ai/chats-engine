@@ -482,3 +482,7 @@ CHATS_RESPONSE_SUGGESTIONS_MAX_MESSAGES = env.int(
 )
 # MESSAGE_BULK_SIZE deve estar no settings.py
 MESSAGE_BULK_SIZE = env.int("MESSAGE_BULK_SIZE", default=100)
+
+# Message Status Consumer Settings
+MESSAGE_STATUS_MAX_RETRIES = env.int("MESSAGE_STATUS_MAX_RETRIES", default=3)
+MESSAGE_STATUS_RETRY_DELAY = env.int("MESSAGE_STATUS_RETRY_DELAY", default=2)
