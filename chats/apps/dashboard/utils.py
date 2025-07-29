@@ -1,15 +1,17 @@
 import logging
-from typing import TYPE_CHECKING
 from datetime import timedelta
+from typing import TYPE_CHECKING
 
 from django.db.models import Q
 from django.utils import timezone
+from pendulum.parser import parse as pendulum_parse
 
 logger = logging.getLogger(__name__)
 
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
+
     from chats.apps.msgs.models import Message
     from chats.apps.rooms.models import Room
 
@@ -68,3 +70,17 @@ def calculate_last_queue_waiting_time(room: "Room"):
         return (timezone.now() - room.created_on).total_seconds()
 
     return int((timezone.now() - room.added_to_queue_at).total_seconds())
+
+
+def parse_date_filter(date_value, is_end_date=False, tz=None):
+    """Convert string or datetime to datetime with timezone"""
+    if isinstance(date_value, str):
+        if is_end_date:
+            return pendulum_parse(date_value + " 23:59:59").replace(tzinfo=tz)
+        return pendulum_parse(date_value).replace(tzinfo=tz)
+    else:
+        if is_end_date:
+            return date_value.replace(
+                hour=23, minute=59, second=59, microsecond=999999, tzinfo=tz
+            )
+        return date_value.replace(tzinfo=tz)
