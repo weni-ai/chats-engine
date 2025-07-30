@@ -555,8 +555,24 @@ class ReportFieldsValidatorViewSet(APIView):
         if model is None:
             raise ValidationError(f'Não foi possível encontrar o modelo para "{model_name}"')
 
-        # Constrói a query base
-        return model.objects.all()
+        # Constrói a query base COM FILTRO DE PROJETO
+        queryset = model.objects.all()
+        
+        # Aplica filtro específico para cada modelo
+        if model_name == 'sectors':
+            queryset = queryset.filter(project=project)
+        elif model_name == 'queues':
+            queryset = queryset.filter(sector__project=project)
+        elif model_name == 'rooms':
+            queryset = queryset.filter(queue__sector__project=project)
+        elif model_name == 'contacts':
+            queryset = queryset.filter(rooms__queue__sector__project=project).distinct()
+        elif model_name == 'users':
+            queryset = queryset.filter(project_permissions__project=project).distinct()
+        elif model_name == 'sector_tags':
+            queryset = queryset.filter(sector__project=project)
+        
+        return queryset
 
     def _process_model_fields(self, model_name, field_data, project, available_fields):
         """
@@ -571,11 +587,22 @@ class ReportFieldsValidatorViewSet(APIView):
 
         for key, value in field_data.items():
             if key == 'fields' and isinstance(value, list):
-                # Valida campos diretos do modelo
-                invalid_fields = [
-                    field for field in value
-                    if field not in model_fields
-                ]
+                # Permite campos diretos E lookups (campo__subcampo)
+                invalid_fields = []
+                for field in value:
+                    # Aceita campos diretos
+                    if field in model_fields:
+                        continue
+                        
+                    # Aceita lookups simples
+                    if '__' in field:
+                        base_field = field.split('__')[0]
+                        if base_field in model_fields:
+                            continue
+                    
+                    # Campo inválido
+                    invalid_fields.append(field)
+                    
                 if invalid_fields:
                     raise ValidationError(f'Campos inválidos para {model_name}: {", ".join(invalid_fields)}')
                 query_fields.extend(value)
@@ -583,29 +610,68 @@ class ReportFieldsValidatorViewSet(APIView):
                 # Processa campos relacionados
                 related_queries[key] = self._process_model_fields(key, value, project, available_fields)
 
-        # Obtém o queryset base
+        # Obtém o queryset base (JÁ FILTRADO POR PROJETO)
         base_queryset = self._get_base_queryset(model_name, project)
 
         # Aplica os campos selecionados
         if query_fields:
             base_queryset = base_queryset.values(*query_fields)
 
-        # Aplica filtros relacionados ao projeto
-        try:
-            base_queryset = base_queryset.filter(
-                Q(project=project) |
-                Q(sector__project=project) |
-                Q(queue__sector__project=project) |
-                Q(project_permissions__project=project)
-            ).distinct()
-        except Exception:
-            # Se os filtros não funcionarem, mantém o queryset original
-            pass
-
+        # NÃO aplica filtros genéricos com OR - o filtro já foi aplicado em _get_base_queryset
+        
         return {
             'queryset': base_queryset,
             'related': related_queries
         }
+
+    def _group_duplicate_records(self, raw_data):
+        """
+        Agrupa registros duplicados causados por lookups de relações Many-to-Many ou ForeignKey reverso
+        """
+        if not raw_data:
+            return []
+        
+        # Identifica campos de agrupamento (campos sem __)
+        sample_row = raw_data[0]
+        group_fields = [key for key in sample_row.keys() if '__' not in key]
+        lookup_fields = [key for key in sample_row.keys() if '__' in key]
+        
+        # Se não há campos de agrupamento ou lookups, retorna os dados originais
+        if not group_fields or not lookup_fields:
+            return raw_data
+        
+        # Agrupa os registros
+        grouped_data = {}
+        
+        for row in raw_data:
+            # Cria chave de agrupamento baseada nos campos diretos
+            group_key = tuple(row.get(field) for field in group_fields)
+            
+            if group_key not in grouped_data:
+                # Primeiro registro do grupo - inicializa com campos diretos
+                grouped_data[group_key] = {field: row.get(field) for field in group_fields}
+                # Inicializa listas para campos com lookup
+                for field in lookup_fields:
+                    grouped_data[group_key][field] = []
+            
+            # Adiciona valores dos campos com lookup às listas
+            for field in lookup_fields:
+                value = row.get(field)
+                if value is not None and value not in grouped_data[group_key][field]:
+                    grouped_data[group_key][field].append(value)
+        
+        # Converte de volta para lista de dicionários
+        result = list(grouped_data.values())
+        
+        # Para campos com apenas um valor na lista, desempacota
+        for row in result:
+            for field in lookup_fields:
+                if len(row[field]) == 1:
+                    row[field] = row[field][0]
+                elif len(row[field]) == 0:
+                    row[field] = None
+        
+        return result
 
     def _execute_queries(self, query_data):
         """
@@ -615,7 +681,18 @@ class ReportFieldsValidatorViewSet(APIView):
         
         if 'queryset' in query_data:
             try:
-                result['data'] = list(query_data['queryset'])
+                # Executa a query
+                raw_data = list(query_data['queryset'])
+                
+                # Detecta se há campos com lookups que podem causar duplicação
+                has_lookups = any('__' in str(key) for row in raw_data[:1] for key in row.keys()) if raw_data else False
+                
+                if has_lookups and raw_data:
+                    # Agrupa registros duplicados causados por lookups
+                    result['data'] = self._group_duplicate_records(raw_data)
+                else:
+                    result['data'] = raw_data
+                    
             except Exception as e:
                 raise ValidationError(f'Erro ao executar query: {str(e)}')
 
