@@ -44,6 +44,13 @@ class BaseGrowthbookClient(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def flush_short_cache(self) -> None:
+        """
+        Flush short cache
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def set_feature_flags_to_long_cache(self, feature_flags: dict) -> None:
         """
         Set feature flags to long cache
@@ -155,6 +162,12 @@ class GrowthbookClient(BaseGrowthbookClient):
         self.cache_client.set(
             self.remote_cache_key, feature_flags, self.short_cache_ttl
         )
+
+    def flush_short_cache(self) -> None:
+        """
+        Flush short cache
+        """
+        self.cache_client.delete(self.remote_cache_key)
 
     def set_feature_flags_to_long_cache(self, feature_flags: dict) -> None:
         """
