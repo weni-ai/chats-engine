@@ -15,7 +15,7 @@ from chats.apps.api.v1.msgs.serializers import MessageSerializer
 from chats.apps.api.v1.queues.serializers import QueueSerializer
 from chats.apps.api.v1.sectors.serializers import DetailSectorTagSerializer
 from chats.apps.queues.models import Queue
-from chats.apps.rooms.models import Room, RoomPin
+from chats.apps.rooms.models import Room, RoomNote, RoomPin
 
 
 class RoomMessageStatusSerializer(serializers.Serializer):
@@ -401,3 +401,27 @@ class PinRoomSerializer(serializers.Serializer):
 
     # True to pin, False to unpin
     status = serializers.BooleanField(required=True)
+
+class RoomNoteSerializer(serializers.ModelSerializer):
+    """
+    Serializer for room notes
+    """
+    user = serializers.SerializerMethodField()
+    is_deletable = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = RoomNote
+        fields = [
+            "uuid",
+            "created_on",
+            "user",
+            "text",
+            "is_deletable"
+        ]
+        read_only_fields = ["uuid", "created_on", "user", "is_deletable"]
+    
+    def get_user(self, obj):
+        return {
+            "uuid": str(obj.user.uuid),
+            "name": obj.user.name
+        }

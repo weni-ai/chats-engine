@@ -48,6 +48,7 @@ from chats.apps.api.v1.rooms.serializers import (
     PinRoomSerializer,
     RoomInfoSerializer,
     RoomMessageStatusSerializer,
+    RoomNoteSerializer,
     RoomSerializer,
     RoomsReportSerializer,
     TransferRoomSerializer,
@@ -63,7 +64,7 @@ from chats.apps.rooms.exceptions import (
     MaxPinRoomLimitReachedError,
     RoomIsNotActiveError,
 )
-from chats.apps.rooms.models import Room, RoomPin
+from chats.apps.rooms.models import Room, RoomNote, RoomPin
 from chats.apps.rooms.services import RoomsReportService
 from chats.apps.rooms.tasks import generate_rooms_report
 from chats.apps.rooms.utils import create_transfer_json
@@ -301,7 +302,7 @@ class RoomViewset(
 
     def perform_update(self, serializer):
         # TODO Separate this into smaller methods
-        old_instance = self.get_object()
+        old_instance = serializer.instance
         old_user = old_instance.user
 
         user = self.request.data.get("user_email")
@@ -312,6 +313,9 @@ class RoomViewset(
             return None
 
         instance = serializer.instance
+
+        # Mark all notes as non-deletable when room is transferred
+        instance.mark_notes_as_non_deletable()
 
         # Create transfer object based on whether it's a user or a queue transfer and add it to the history
         if user:
@@ -582,6 +586,9 @@ class RoomViewset(
 
                 room.update_ticket()
 
+                # Mark all notes as non-deletable when room is transferred
+                room.mark_notes_as_non_deletable()
+
         if queue_uuid:
             queue = Queue.objects.get(uuid=queue_uuid)
             for room in rooms_list:
@@ -612,6 +619,9 @@ class RoomViewset(
                     queue.uuid,
                 )
                 start_queue_priority_routing(queue)
+
+                # Mark all notes as non-deletable when room is transferred
+                room.mark_notes_as_non_deletable()
 
         return Response(
             {"success": "Mass transfer completed"},
@@ -791,6 +801,44 @@ class RoomViewset(
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="room_note",
+        serializer_class=RoomNoteSerializer,
+    )
+    def create_note(self, request, pk=None):
+        """
+        Create a note for the room
+        """
+        room = self.get_object()
+        
+        # Verify user has access to the room
+        if not verify_user_room(request.user, room):
+            raise PermissionDenied("You don't have permission to add notes to this room")
+        
+        # Room must be active
+        if not room.is_active:
+            raise ValidationError({"detail": "Cannot add notes to closed rooms"})
+        
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        # Create the note
+        note = RoomNote.objects.create(
+            room=room,
+            user=request.user,
+            text=serializer.validated_data['text']
+        )
+        
+        # Send WebSocket notification
+        note.notify_websocket("create")
+        
+        # Return serialized note
+        return Response(
+            RoomNoteSerializer(note).data,
+            status=status.HTTP_201_CREATED
+        )
 
 class RoomsReportViewSet(APIView):
     """
@@ -837,3 +885,50 @@ class RoomsReportViewSet(APIView):
             },
             status=status.HTTP_202_ACCEPTED,
         )
+
+class RoomNoteViewSet(
+    mixins.ListModelMixin,
+    mixins.DestroyModelMixin,
+    GenericViewSet,
+):
+    """
+    ViewSet for Room Notes
+    """
+    queryset = RoomNote.objects.all()
+    serializer_class = RoomNoteSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ["room"]
+    lookup_field = "uuid"
+    
+    def get_queryset(self):
+        """
+        Filter notes based on user permissions
+        """
+        user = self.request.user
+        queryset = super().get_queryset()
+        
+        room_uuid = self.request.query_params.get('room')
+        if room_uuid:
+            queryset = queryset.filter(room__uuid=room_uuid)
+            
+        return queryset.filter(
+            Q(room__user=user) | 
+            Q(room__queue__sector__permissions__user=user)
+        ).distinct()
+    
+    def destroy(self, request, *args, **kwargs):
+        """
+        Delete a room note with validations
+        """
+        note = self.get_object()
+        
+        if not note.is_deletable:
+            raise ValidationError({"detail": "Note cannot be deleted because it was marked as non-deletable"})
+            
+        if note.user != request.user:
+            raise PermissionDenied("You can only delete your own notes")
+        
+        note.notify_websocket("delete")
+        
+        return super().destroy(request, *args, **kwargs)
