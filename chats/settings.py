@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     "chats.core",
     "chats.apps.ai_features",
     "chats.apps.ai_features.history_summary",
+    "chats.apps.feature_flags",
     # third party apps
     "channels",
     "drf_yasg",
