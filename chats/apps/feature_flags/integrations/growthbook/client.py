@@ -79,7 +79,7 @@ class GrowthbookClient(BaseGrowthbookClient):
     def __new__(
         cls,
         host_base_url: str,
-        api_key: str,
+        client_key: str,
         cache_client: CacheClient,
         short_cache_ttl: int,
         long_cache_ttl: int,
@@ -88,7 +88,7 @@ class GrowthbookClient(BaseGrowthbookClient):
             if cls._instance is None:
                 cls._instance = super().__new__(cls)
                 cls._instance.host_base_url = host_base_url
-                cls._instance.api_key = api_key
+                cls._instance.client_key = client_key
                 cls._instance.cache_client = cache_client
                 cls._instance.short_cache_ttl = short_cache_ttl
                 cls._instance.long_cache_ttl = long_cache_ttl
@@ -98,7 +98,7 @@ class GrowthbookClient(BaseGrowthbookClient):
     def __init__(
         self,
         host_base_url: str,
-        api_key: str,
+        client_key: str,
         cache_client: CacheClient,
         short_cache_ttl: int,
         long_cache_ttl: int,
@@ -106,7 +106,7 @@ class GrowthbookClient(BaseGrowthbookClient):
         if not hasattr(self, "_initialized"):
             self._initialized = True
             self.host_base_url = host_base_url
-            self.api_key = api_key
+            self.client_key = client_key
             self.cache_client: CacheClient = cache_client
             self.short_cache_ttl = short_cache_ttl
             self.long_cache_ttl = long_cache_ttl
@@ -171,8 +171,7 @@ class GrowthbookClient(BaseGrowthbookClient):
         """
         try:
             response = requests.get(
-                f"{self.host_base_url}/api/features",
-                headers={"Authorization": f"Bearer {self.api_key}"},
+                f"{self.host_base_url}/api/features/{self.client_key}",
                 timeout=60,
             )
             response.raise_for_status()
