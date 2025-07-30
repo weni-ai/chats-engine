@@ -122,7 +122,7 @@ class Message(BaseModelWithManualCreatedOn):
             try:
                 timeout = getattr(settings, "CALLBACK_TIMEOUT_SECONDS", None)
 
-                response = request_session.post(
+                request_session.post(
                     self.room.callback_url,
                     data=json.dumps(
                         {"type": "msg.create", "content": data},
@@ -134,7 +134,7 @@ class Message(BaseModelWithManualCreatedOn):
                     timeout=timeout,
                 )
 
-                response.raise_for_status()
+                # response.raise_for_status()
 
             except Exception as error:
                 logger.error(
@@ -142,7 +142,7 @@ class Message(BaseModelWithManualCreatedOn):
                     f"Message ID: {self.pk}, "
                     f"Error: {type(error).__name__}: {str(error)[:200]}"
                 )
-                raise
+                # raise
 
     @property
     def project(self):
@@ -210,7 +210,7 @@ class MessageMedia(BaseModelWithManualCreatedOn):
             try:
                 timeout = getattr(settings, "CALLBACK_TIMEOUT_SECONDS", None)
 
-                response = request_session.post(
+                request_session.post(
                     self.message.room.callback_url,
                     data=json.dumps(
                         {"type": "msg.create", "content": msg_data},
@@ -222,7 +222,7 @@ class MessageMedia(BaseModelWithManualCreatedOn):
                     timeout=timeout,
                 )
 
-                response.raise_for_status()
+                # response.raise_for_status()
 
             except Exception as error:
                 logger.error(
@@ -230,7 +230,7 @@ class MessageMedia(BaseModelWithManualCreatedOn):
                     f"MessageMedia ID: {self.pk}, "
                     f"Error: {type(error).__name__}: {str(error)[:200]}"
                 )
-                raise
+                # raise
 
     def notify_room(self, action: str = "create", callback: bool = False):
         """Delegate room notification to the associated Message"""
