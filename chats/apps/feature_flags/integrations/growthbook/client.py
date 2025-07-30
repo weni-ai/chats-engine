@@ -4,9 +4,6 @@ import requests
 import logging
 from sentry_sdk import capture_exception
 
-from django.utils import timezone
-from django.utils.timezone import timedelta
-
 from chats.core.cache import CacheClient
 
 
@@ -19,30 +16,44 @@ class BaseGrowthbookClient(ABC):
     """
 
     @abstractmethod
-    def get_feature_flags_from_local_cache(self) -> None:
+    def get_feature_flags_from_short_cache(self) -> dict:
         """
-        Get feature flags from local cache
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def set_feature_flags_to_local_cache(self, feature_flags: dict) -> None:
-        """
-        Set feature flags to local cache
+        Get feature flags from short cache
         """
         raise NotImplementedError
 
     @abstractmethod
-    def get_feature_flags_from_remote_cache(self) -> None:
+    def get_feature_flags_from_long_cache(self) -> dict:
+        """
+        Get feature flags from long cache
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_feature_flags_from_cache(self) -> None:
         """
         Get feature flags from cache
         """
         raise NotImplementedError
 
     @abstractmethod
-    def set_feature_flags_to_remote_cache(self, feature_flags: dict) -> None:
+    def set_feature_flags_to_short_cache(self, feature_flags: dict) -> None:
         """
-        Set feature flags to remote cache
+        Set feature flags to short cache
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def set_feature_flags_to_long_cache(self, feature_flags: dict) -> None:
+        """
+        Set feature flags to long cache
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def set_feature_flags_to_cache(self, feature_flags: dict) -> None:
+        """
+        Set feature flags to cache
         """
         raise NotImplementedError
 
@@ -69,20 +80,18 @@ class GrowthbookClient(BaseGrowthbookClient):
         cls,
         host_base_url: str,
         api_key: str,
-        local_cache_ttl: int,
-        remote_cache_client: CacheClient,
-        remote_short_cache_ttl: int,
-        remote_long_cache_ttl: int,
+        cache_client: CacheClient,
+        short_cache_ttl: int,
+        long_cache_ttl: int,
     ):
         with cls._lock:
             if cls._instance is None:
                 cls._instance = super().__new__(cls)
                 cls._instance.host_base_url = host_base_url
                 cls._instance.api_key = api_key
-                cls._instance.local_cache_ttl = local_cache_ttl
-                cls._instance.remote_cache_client = remote_cache_client
-                cls._instance.remote_short_cache_ttl = remote_short_cache_ttl
-                cls._instance.remote_long_cache_ttl = remote_long_cache_ttl
+                cls._instance.cache_client = cache_client
+                cls._instance.short_cache_ttl = short_cache_ttl
+                cls._instance.long_cache_ttl = long_cache_ttl
                 cls._instance._last_local_update = None
         return cls._instance
 
@@ -90,63 +99,38 @@ class GrowthbookClient(BaseGrowthbookClient):
         self,
         host_base_url: str,
         api_key: str,
-        local_cache_ttl: int,
-        remote_cache_client: CacheClient,
-        remote_short_cache_ttl: int,
-        remote_long_cache_ttl: int,
+        cache_client: CacheClient,
+        short_cache_ttl: int,
+        long_cache_ttl: int,
     ):
         if not hasattr(self, "_initialized"):
             self._initialized = True
             self.host_base_url = host_base_url
             self.api_key = api_key
-            self.local_cache_ttl = local_cache_ttl
-            self.remote_cache_client: CacheClient = remote_cache_client
-            self.remote_short_cache_ttl = remote_short_cache_ttl
-            self.remote_long_cache_ttl = remote_long_cache_ttl
+            self.cache_client: CacheClient = cache_client
+            self.short_cache_ttl = short_cache_ttl
+            self.long_cache_ttl = long_cache_ttl
             self.remote_cache_key = "growthbook:feature_flags"
-            self._last_local_update = None
             self._cached_feature_flags = None
 
-    def get_feature_flags_from_local_cache(self) -> dict:
+    def get_feature_flags_from_short_cache(self) -> dict:
         """
-        Get feature flags from local cache
+        Get feature flags from short cache
         """
-        if (
-            self._last_local_update is None
-            or self._last_local_update + timedelta(seconds=self.local_cache_ttl)
-            < timezone.now()
-        ):
-            return None
+        return self.cache_client.get(self.remote_cache_key)
 
-        return self._cached_feature_flags
+    def get_feature_flags_from_long_cache(self) -> dict:
+        """
+        Get feature flags from long cache
+        """
+        return self.cache_client.get(self.remote_cache_key)
 
-    def set_feature_flags_to_local_cache(self, feature_flags: dict) -> None:
+    def get_feature_flags_from_cache(self) -> dict:
         """
-        Set feature flags to local cache
-        """
-        self._cached_feature_flags = feature_flags
-        self._last_local_update = timezone.now()
-
-    def get_feature_flags_from_short_remote_cache(self) -> dict:
-        """
-        Get feature flags from short remote cache
-        """
-        return self.remote_cache_client.get(self.remote_cache_key)
-
-    def get_feature_flags_from_long_remote_cache(self) -> dict:
-        """
-        Get feature flags from long remote cache
-        """
-        return self.remote_cache_client.get(self.remote_cache_key)
-
-    def get_feature_flags_from_remote_cache(self) -> dict:
-        """
-        Get feature flags from remote cache
+        Get feature flags from cache
         """
         # First, we check the short cache
-        if (
-            short_cached_feature_flags := self.get_feature_flags_from_short_remote_cache()
-        ):
+        if short_cached_feature_flags := self.get_feature_flags_from_short_cache():
             return short_cached_feature_flags
 
         # TODO: Update the feature flags definitions (asynchronously)
@@ -154,36 +138,34 @@ class GrowthbookClient(BaseGrowthbookClient):
         # If the short cache is not valid, we check the long cache
         # This exists as a safety net to avoid not having the feature flags
         # definitions if Growthbook's API is down for some reason.
-        if long_cached_feature_flags := self.get_feature_flags_from_long_remote_cache():
-            self.set_feature_flags_to_short_remote_cache(long_cached_feature_flags)
+        if long_cached_feature_flags := self.get_feature_flags_from_long_cache():
+            self.set_feature_flags_to_short_cache(long_cached_feature_flags)
             return long_cached_feature_flags
 
         return None
 
-    def set_feature_flags_to_short_remote_cache(self, feature_flags: dict) -> None:
+    def set_feature_flags_to_short_cache(self, feature_flags: dict) -> None:
         """
-        Set feature flags to short remote cache
+        Set feature flags to short cache
         """
-        self.remote_cache_client.set(
-            self.remote_cache_key, feature_flags, self.remote_short_cache_ttl
+        self.cache_client.set(
+            self.remote_cache_key, feature_flags, self.short_cache_ttl
         )
 
-    def set_feature_flags_to_long_remote_cache(self, feature_flags: dict) -> None:
+    def set_feature_flags_to_long_cache(self, feature_flags: dict) -> None:
         """
-        Set feature flags to remote cache
+        Set feature flags to long cache
         """
-        self.remote_cache_client.set(
-            self.remote_cache_key, feature_flags, self.remote_long_cache_ttl
-        )
+        self.cache_client.set(self.remote_cache_key, feature_flags, self.long_cache_ttl)
 
-    def set_feature_flags_to_remote_cache(self, feature_flags: dict) -> None:
+    def set_feature_flags_to_cache(self, feature_flags: dict) -> None:
         """
-        Set feature flags to remote cache
+        Set feature flags to cache
         """
-        self.set_feature_flags_to_short_remote_cache(feature_flags)
-        self.set_feature_flags_to_long_remote_cache(feature_flags)
+        self.set_feature_flags_to_short_cache(feature_flags)
+        self.set_feature_flags_to_long_cache(feature_flags)
 
-    def update_feature_flags_definitions(self) -> None:
+    def update_feature_flags_definitions(self) -> dict:
         """
         Update feature flags definitions from Growthbook's API.
         """
@@ -194,7 +176,7 @@ class GrowthbookClient(BaseGrowthbookClient):
                 timeout=60,
             )
             response.raise_for_status()
-            self.set_feature_flags_to_remote_cache(response.json())
+            self.set_feature_flags_to_cache(response.json())
         except requests.exceptions.RequestException as e:
             logger.error(
                 "Failed to update feature flags definitions: %s",
@@ -202,21 +184,21 @@ class GrowthbookClient(BaseGrowthbookClient):
             )
             capture_exception(e)
 
+            raise e
+
+        return response.json()
+
     def get_feature_flags(self) -> dict:
         """
         Get feature flags.
         """
-        # If the local cache is still valid, we return it here
-        if local_cached_feature_flags := self.get_feature_flags_from_local_cache():
-            return local_cached_feature_flags
+        # If the cache is valid, we return it
+        if cached_feature_flags := self.get_feature_flags_from_cache():
+            return cached_feature_flags
 
-        # But if the local cache is not valid, we check the remote cache
-        if remote_cached_feature_flags := self.get_feature_flags_from_remote_cache():
-            self.set_feature_flags_to_local_cache(remote_cached_feature_flags)
+        # If the cache is not valid, we update the feature flags definitions
+        # This should not happen as we rely on the long cache to be valid,
+        # but we'll handle it just in case.
+        updated_feature_flags = self.update_feature_flags_definitions()
 
-            return self.get_feature_flags_from_local_cache()
-
-        # If the remote cache is not valid, we update the feature flags definitions
-        self.update_feature_flags_definitions()
-
-        return self.get_feature_flags_from_local_cache()
+        return updated_feature_flags
