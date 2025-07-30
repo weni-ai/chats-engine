@@ -1,6 +1,7 @@
 import json
 import logging
 
+import sentry_sdk
 from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
@@ -122,7 +123,7 @@ class Message(BaseModelWithManualCreatedOn):
             try:
                 timeout = getattr(settings, "CALLBACK_TIMEOUT_SECONDS", None)
 
-                request_session.post(
+                response = request_session.post(
                     self.room.callback_url,
                     data=json.dumps(
                         {"type": "msg.create", "content": data},
@@ -134,15 +135,42 @@ class Message(BaseModelWithManualCreatedOn):
                     timeout=timeout,
                 )
 
-                # response.raise_for_status()
+                if response.status_code >= 400:
+                    error_msg = (
+                        f"[Message.notify_room] Callback failed - "
+                        f"Message ID: {self.pk}, "
+                        f"HTTP {response.status_code}: {response.text[:200]}"
+                    )
+                    logger.error(error_msg)
+
+                    sentry_sdk.capture_message(
+                        error_msg,
+                        level="error",
+                        extras={
+                            "message_uuid": self.pk,
+                            "room_uuid": self.room.uuid,
+                            "callback_url": self.room.callback_url,
+                            "status_code": response.status_code,
+                            "response_text": response.text[:500],
+                        },
+                    )
 
             except Exception as error:
-                logger.error(
+                error_msg = (
                     f"[Message.notify_room] Callback failed - "
                     f"Message ID: {self.pk}, "
                     f"Error: {type(error).__name__}: {str(error)[:200]}"
                 )
-                # raise
+                logger.error(error_msg)
+
+                sentry_sdk.capture_exception(
+                    error,
+                    extras={
+                        "message_uuid": self.pk,
+                        "room_uuid": self.room.uuid,
+                        "callback_url": self.room.callback_url,
+                    },
+                )
 
     @property
     def project(self):
@@ -210,7 +238,7 @@ class MessageMedia(BaseModelWithManualCreatedOn):
             try:
                 timeout = getattr(settings, "CALLBACK_TIMEOUT_SECONDS", None)
 
-                request_session.post(
+                response = request_session.post(
                     self.message.room.callback_url,
                     data=json.dumps(
                         {"type": "msg.create", "content": msg_data},
@@ -222,15 +250,44 @@ class MessageMedia(BaseModelWithManualCreatedOn):
                     timeout=timeout,
                 )
 
-                # response.raise_for_status()
+                if response.status_code >= 400:
+                    error_msg = (
+                        f"[MessageMedia.callback] Callback failed - "
+                        f"MessageMedia ID: {self.pk}, "
+                        f"HTTP {response.status_code}: {response.text[:200]}"
+                    )
+                    logger.error(error_msg)
+
+                    sentry_sdk.capture_message(
+                        error_msg,
+                        level="error",
+                        extras={
+                            "media_uuid": self.pk,
+                            "message_uuid": self.message.pk,
+                            "room_uuid": self.message.room.uuid,
+                            "callback_url": self.message.room.callback_url,
+                            "status_code": response.status_code,
+                            "response_text": response.text[:500],
+                        },
+                    )
 
             except Exception as error:
-                logger.error(
+                error_msg = (
                     f"[MessageMedia.callback] Callback failed - "
                     f"MessageMedia ID: {self.pk}, "
                     f"Error: {type(error).__name__}: {str(error)[:200]}"
                 )
-                # raise
+                logger.error(error_msg)
+
+                sentry_sdk.capture_exception(
+                    error,
+                    extras={
+                        "media_uuid": self.pk,
+                        "message_uuid": self.message.pk,
+                        "room_uuid": self.message.room.uuid,
+                        "callback_url": self.message.room.callback_url,
+                    },
+                )
 
     def notify_room(self, action: str = "create", callback: bool = False):
         """Delegate room notification to the associated Message"""
