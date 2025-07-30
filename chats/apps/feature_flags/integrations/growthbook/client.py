@@ -104,6 +104,10 @@ class GrowthbookClient(BaseGrowthbookClient):
         long_cache_ttl: int,
     ):
         if not hasattr(self, "_initialized"):
+            assert (
+                short_cache_ttl < long_cache_ttl
+            ), "Short cache TTL must be less than long cache TTL"
+
             self._initialized = True
             self.host_base_url = host_base_url
             self.client_key = client_key
