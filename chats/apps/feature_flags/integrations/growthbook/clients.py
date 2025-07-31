@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import json
 import threading
 import requests
 import logging
@@ -136,13 +137,38 @@ class GrowthbookClient(BaseGrowthbookClient):
         """
         Get feature flags from short cache
         """
-        return self.cache_client.get(self.short_cache_key)
+        cached_feature_flags = self.cache_client.get(self.short_cache_key)
+
+        if not isinstance(cached_feature_flags, dict):
+            try:
+                cached_feature_flags = json.loads(cached_feature_flags)
+            except json.JSONDecodeError as e:
+                logger.error(
+                    "Failed to parse feature flags from short cache: %s",
+                    cached_feature_flags,
+                )
+                capture_exception(e)
+                return None
+
+        return cached_feature_flags
 
     def get_feature_flags_from_long_cache(self) -> dict:
         """
         Get feature flags from long cache
         """
-        return self.cache_client.get(self.long_cache_key)
+        cached_feature_flags = self.cache_client.get(self.long_cache_key)
+        if not isinstance(cached_feature_flags, dict):
+            try:
+                cached_feature_flags = json.loads(cached_feature_flags)
+            except json.JSONDecodeError as e:
+                logger.error(
+                    "Failed to parse feature flags from long cache: %s",
+                    cached_feature_flags,
+                )
+                capture_exception(e)
+                return None
+
+        return cached_feature_flags
 
     def get_feature_flags_from_cache(self) -> dict:
         """
@@ -169,7 +195,12 @@ class GrowthbookClient(BaseGrowthbookClient):
         """
         Set feature flags to short cache
         """
-        self.cache_client.set(self.short_cache_key, feature_flags, self.short_cache_ttl)
+
+        self.cache_client.set(
+            self.short_cache_key,
+            json.dumps(feature_flags, ensure_ascii=False),
+            self.short_cache_ttl,
+        )
 
     def flush_short_cache(self) -> None:
         """
@@ -181,7 +212,11 @@ class GrowthbookClient(BaseGrowthbookClient):
         """
         Set feature flags to long cache
         """
-        self.cache_client.set(self.long_cache_key, feature_flags, self.long_cache_ttl)
+        self.cache_client.set(
+            self.long_cache_key,
+            json.dumps(feature_flags, ensure_ascii=False),
+            self.long_cache_ttl,
+        )
 
     def set_feature_flags_to_cache(self, feature_flags: dict) -> None:
         """
