@@ -6,6 +6,9 @@ from django.conf import settings
 from chats.apps.event_driven.consumers import EDAConsumer, pyamqp_call_dlx_when_error
 from chats.apps.event_driven.parsers.json_parser import JSONParser
 from chats.apps.msgs.tasks import process_message_status
+from chats.apps.msgs.usecases.UpdateStatusMessageUseCase import (
+    UpdateStatusMessageUseCase,
+)
 
 update_message_usecase = UpdateStatusMessageUseCase()
 
