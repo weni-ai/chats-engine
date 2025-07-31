@@ -1,11 +1,13 @@
 from abc import ABC, abstractmethod
 import threading
-from typing import Callable
 import requests
 import logging
 from sentry_sdk import capture_exception
 
 from chats.core.cache import CacheClient
+from chats.apps.feature_flags.integrations.growthbook.tasks import (
+    update_growthbook_feature_flags,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -104,7 +106,6 @@ class GrowthbookClient(BaseGrowthbookClient):
                 cls._instance.short_cache_ttl = short_cache_ttl
                 cls._instance.long_cache_key = long_cache_key
                 cls._instance.long_cache_ttl = long_cache_ttl
-                cls._instance._last_local_update = None
         return cls._instance
 
     def __init__(
@@ -116,7 +117,6 @@ class GrowthbookClient(BaseGrowthbookClient):
         short_cache_ttl: int,
         long_cache_key: str,
         long_cache_ttl: int,
-        update_features_async_task: Callable,
     ):
         if not hasattr(self, "_initialized"):
             assert (
@@ -131,7 +131,6 @@ class GrowthbookClient(BaseGrowthbookClient):
             self.short_cache_ttl = short_cache_ttl
             self.long_cache_key = long_cache_key
             self.long_cache_ttl = long_cache_ttl
-            self.update_features_async_task = update_features_async_task
 
     def get_feature_flags_from_short_cache(self) -> dict:
         """
@@ -156,7 +155,7 @@ class GrowthbookClient(BaseGrowthbookClient):
         # If the short cache is not valid, this means that is time
         # to update the feature flags definitions.
         # This is done asynchronously and we return the long cache as a fallback.
-        self.update_features_async_task.delay()
+        update_growthbook_feature_flags.delay()
 
         # This exists as a safety net to avoid not having the feature flags
         # definitions if Growthbook's API is down for some reason.
