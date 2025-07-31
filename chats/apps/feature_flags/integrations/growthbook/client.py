@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import threading
+from typing import Callable
 import requests
 import logging
 from sentry_sdk import capture_exception
@@ -88,7 +89,9 @@ class GrowthbookClient(BaseGrowthbookClient):
         host_base_url: str,
         client_key: str,
         cache_client: CacheClient,
+        short_cache_key: str,
         short_cache_ttl: int,
+        long_cache_key: str,
         long_cache_ttl: int,
     ):
         with cls._lock:
@@ -97,7 +100,9 @@ class GrowthbookClient(BaseGrowthbookClient):
                 cls._instance.host_base_url = host_base_url
                 cls._instance.client_key = client_key
                 cls._instance.cache_client = cache_client
+                cls._instance.short_cache_key = short_cache_key
                 cls._instance.short_cache_ttl = short_cache_ttl
+                cls._instance.long_cache_key = long_cache_key
                 cls._instance.long_cache_ttl = long_cache_ttl
                 cls._instance._last_local_update = None
         return cls._instance
@@ -107,8 +112,11 @@ class GrowthbookClient(BaseGrowthbookClient):
         host_base_url: str,
         client_key: str,
         cache_client: CacheClient,
+        short_cache_key: str,
         short_cache_ttl: int,
+        long_cache_key: str,
         long_cache_ttl: int,
+        update_features_async_task: Callable,
     ):
         if not hasattr(self, "_initialized"):
             assert (
@@ -119,22 +127,23 @@ class GrowthbookClient(BaseGrowthbookClient):
             self.host_base_url = host_base_url
             self.client_key = client_key
             self.cache_client: CacheClient = cache_client
+            self.short_cache_key = short_cache_key
             self.short_cache_ttl = short_cache_ttl
+            self.long_cache_key = long_cache_key
             self.long_cache_ttl = long_cache_ttl
-            self.remote_cache_key = "growthbook:feature_flags"
-            self._cached_feature_flags = None
+            self.update_features_async_task = update_features_async_task
 
     def get_feature_flags_from_short_cache(self) -> dict:
         """
         Get feature flags from short cache
         """
-        return self.cache_client.get(self.remote_cache_key)
+        return self.cache_client.get(self.short_cache_key)
 
     def get_feature_flags_from_long_cache(self) -> dict:
         """
         Get feature flags from long cache
         """
-        return self.cache_client.get(self.remote_cache_key)
+        return self.cache_client.get(self.long_cache_key)
 
     def get_feature_flags_from_cache(self) -> dict:
         """
@@ -144,9 +153,11 @@ class GrowthbookClient(BaseGrowthbookClient):
         if short_cached_feature_flags := self.get_feature_flags_from_short_cache():
             return short_cached_feature_flags
 
-        # TODO: Update the feature flags definitions (asynchronously)
+        # If the short cache is not valid, this means that is time
+        # to update the feature flags definitions.
+        # This is done asynchronously and we return the long cache as a fallback.
+        self.update_features_async_task.delay()
 
-        # If the short cache is not valid, we check the long cache
         # This exists as a safety net to avoid not having the feature flags
         # definitions if Growthbook's API is down for some reason.
         if long_cached_feature_flags := self.get_feature_flags_from_long_cache():
@@ -159,21 +170,19 @@ class GrowthbookClient(BaseGrowthbookClient):
         """
         Set feature flags to short cache
         """
-        self.cache_client.set(
-            self.remote_cache_key, feature_flags, self.short_cache_ttl
-        )
+        self.cache_client.set(self.short_cache_key, feature_flags, self.short_cache_ttl)
 
     def flush_short_cache(self) -> None:
         """
         Flush short cache
         """
-        self.cache_client.delete(self.remote_cache_key)
+        self.cache_client.delete(self.short_cache_key)
 
     def set_feature_flags_to_long_cache(self, feature_flags: dict) -> None:
         """
         Set feature flags to long cache
         """
-        self.cache_client.set(self.remote_cache_key, feature_flags, self.long_cache_ttl)
+        self.cache_client.set(self.long_cache_key, feature_flags, self.long_cache_ttl)
 
     def set_feature_flags_to_cache(self, feature_flags: dict) -> None:
         """

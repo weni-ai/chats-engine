@@ -483,9 +483,15 @@ MESSAGE_STATUS_RETRY_DELAY = env.int("MESSAGE_STATUS_RETRY_DELAY", default=2)
 # Growthbook
 GROWTHBOOK_HOST_BASE_URL = env.str("GROWTHBOOK_HOST_BASE_URL", default="")
 GROWTHBOOK_CLIENT_KEY = env.str("GROWTHBOOK_CLIENT_KEY", default="")
+GROWTHBOOK_SHORT_CACHE_KEY = env.str(
+    "GROWTHBOOK_SHORT_CACHE_KEY", default="growthbook:feature_flags:short"
+)
 GROWTHBOOK_SHORT_CACHE_TTL = env.int(
     "GROWTHBOOK_SHORT_CACHE_TTL", default=(60 * 60)
 )  # 1 hour
+GROWTHBOOK_LONG_CACHE_KEY = env.str(
+    "GROWTHBOOK_LONG_CACHE_KEY", default="growthbook:feature_flags:long"
+)
 GROWTHBOOK_LONG_CACHE_TTL = env.int(
     "GROWTHBOOK_LONG_CACHE_TTL", default=(60 * 60 * 24 * 30)
 )  # 30 days
