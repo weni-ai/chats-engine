@@ -185,3 +185,55 @@ class TestGrowthbookClient(TestCase):
                     ),
                 ]
             )
+
+    @patch("chats.core.tests.mock.MockCacheClient.get")
+    def test_get_feature_flags_when_cache_is_valid(self, mock_get):
+        mock_get.side_effect = [{"test": True}, {"test": True}]
+
+        flags = self.client.get_feature_flags()
+
+        self.assertEqual(flags, {"test": True})
+        mock_get.assert_called_once_with(self.client.short_cache_key)
+
+    @patch("chats.core.tests.mock.MockCacheClient.get")
+    @patch("chats.core.tests.mock.MockCacheClient.set")
+    @patch(
+        "chats.apps.feature_flags.integrations.growthbook.tasks.update_growthbook_feature_flags.delay"
+    )
+    @patch("requests.get")
+    def test_get_feature_flags_when_cache_is_invalid(
+        self,
+        mock_request_get,
+        mock_update_growthbook_feature_flags,
+        mock_cache_set,
+        mock_cache_get,
+    ):
+        mock_request_get.return_value.json.return_value = {"test": True}
+
+        mock_cache_get.side_effect = [None, None]
+
+        flags = self.client.get_feature_flags()
+
+        self.assertEqual(flags, {"test": True})
+        mock_cache_get.assert_has_calls(
+            [call(self.client.short_cache_key), call(self.client.long_cache_key)]
+        )
+        mock_cache_set.assert_has_calls(
+            [
+                call(
+                    self.client.short_cache_key,
+                    {"test": True},
+                    self.client.short_cache_ttl,
+                ),
+                call(
+                    self.client.long_cache_key,
+                    {"test": True},
+                    self.client.long_cache_ttl,
+                ),
+            ]
+        )
+        mock_update_growthbook_feature_flags.assert_called_once()
+        mock_request_get.assert_called_once_with(
+            f"{self.client.host_base_url}/api/features/{self.client.client_key}",
+            timeout=60,
+        )
