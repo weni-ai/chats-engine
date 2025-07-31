@@ -115,3 +115,47 @@ class TestGrowthbookClient(TestCase):
 
         mock_get.assert_called_once_with(self.client.short_cache_key)
         mock_update_growthbook_feature_flags.assert_not_called()
+
+    @patch("chats.core.tests.mock.MockCacheClient.set")
+    def test_set_feature_flags_to_short_cache(self, mock_set):
+        feature_flags = {"test": True}
+
+        self.client.set_feature_flags_to_short_cache(feature_flags)
+        mock_set.assert_called_once_with(
+            self.client.short_cache_key, feature_flags, self.client.short_cache_ttl
+        )
+
+    @patch("chats.core.tests.mock.MockCacheClient.set")
+    def test_set_feature_flags_to_long_cache(self, mock_set):
+        feature_flags = {"test": True}
+
+        self.client.set_feature_flags_to_long_cache(feature_flags)
+        mock_set.assert_called_once_with(
+            self.client.long_cache_key, feature_flags, self.client.long_cache_ttl
+        )
+
+    @patch("chats.core.tests.mock.MockCacheClient.delete")
+    def test_flush_short_cache(self, mock_delete):
+        self.client.flush_short_cache()
+
+        mock_delete.assert_called_once_with(self.client.short_cache_key)
+
+    @patch("chats.core.tests.mock.MockCacheClient.set")
+    def test_set_feature_flags_to_cache(self, mock_set):
+        feature_flags = {"test": True}
+
+        self.client.set_feature_flags_to_cache(feature_flags)
+        mock_set.assert_has_calls(
+            [
+                call(
+                    self.client.short_cache_key,
+                    feature_flags,
+                    self.client.short_cache_ttl,
+                ),
+                call(
+                    self.client.long_cache_key,
+                    feature_flags,
+                    self.client.long_cache_ttl,
+                ),
+            ]
+        )
