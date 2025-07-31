@@ -1,7 +1,6 @@
 from django.test import TestCase
 from django.db import models
 
-from chats.core.managers import SoftDeletableManager
 from chats.core.models import BaseSoftDeleteModel
 
 
