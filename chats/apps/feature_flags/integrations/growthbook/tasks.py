@@ -1,5 +1,5 @@
 from chats.celery import app
-from chats.apps.feature_flags.integrations.growthbook.singleton import GROWTHBOOK_CLIENT
+from chats.apps.feature_flags.integrations.growthbook.instance import GROWTHBOOK_CLIENT
 
 
 @app.task

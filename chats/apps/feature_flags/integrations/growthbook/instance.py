@@ -1,6 +1,6 @@
 from django.conf import settings
 
-from chats.apps.feature_flags.integrations.growthbook.client import GrowthbookClient
+from chats.apps.feature_flags.integrations.growthbook.clients import GrowthbookClient
 from chats.core.cache import CacheClient
 
 
