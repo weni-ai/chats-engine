@@ -13,9 +13,6 @@ class TestOnlyModel(BaseSoftDeleteModel):
 
     name = models.CharField(max_length=100)
 
-    objects = SoftDeletableManager()
-    all_objects = SoftDeletableManager(include_deleted=True)
-
     class Meta:
         app_label = "core"
         db_table = "test_only_soft_deletable_model"

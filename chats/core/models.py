@@ -4,20 +4,18 @@ from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from chats.core.managers import SoftDeletableManager
 from chats.utils.websockets import send_channels_group
 
 
 class WebSocketsNotifiableMixin:
     @property
-    def serialized_ws_data(self) -> dict:
-        ...
+    def serialized_ws_data(self) -> dict: ...
 
     @property
-    def notification_groups(self) -> list:
-        ...
+    def notification_groups(self) -> list: ...
 
-    def get_action(self, action: str) -> str:
-        ...
+    def get_action(self, action: str) -> str: ...
 
     def notify(self, action: str, groups: list = [], content: dict = {}) -> None:
         if "." not in action:
@@ -59,6 +57,9 @@ class BaseModelWithManualCreatedOn(BaseModel):
 
 class BaseSoftDeleteModel(models.Model):
     is_deleted = models.BooleanField(_("is deleted?"), default=False)
+
+    objects = SoftDeletableManager()
+    all_objects = SoftDeletableManager(include_deleted=True)
 
     class Meta:
         abstract = True
