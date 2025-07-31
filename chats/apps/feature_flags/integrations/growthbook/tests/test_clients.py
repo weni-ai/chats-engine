@@ -1,3 +1,4 @@
+import json
 from unittest.mock import call, patch
 from django.test import TestCase
 
@@ -29,12 +30,12 @@ class TestGrowthbookClient(TestCase):
         mock_get.assert_called_once_with(self.client.short_cache_key)
         mock_get.reset_mock()
 
-        example_feature_flags = {"test": True}
+        example_feature_flags = json.dumps({"test": True}, ensure_ascii=False)
         mock_get.return_value = example_feature_flags
 
         flags = self.client.get_feature_flags_from_short_cache()
 
-        self.assertEqual(flags, example_feature_flags)
+        self.assertEqual(flags, json.loads(example_feature_flags))
 
         mock_get.assert_called_once_with(self.client.short_cache_key)
 
@@ -49,12 +50,12 @@ class TestGrowthbookClient(TestCase):
         mock_get.assert_called_once_with(self.client.long_cache_key)
         mock_get.reset_mock()
 
-        example_feature_flags = {"test": True}
+        example_feature_flags = json.dumps({"test": True}, ensure_ascii=False)
         mock_get.return_value = example_feature_flags
 
         flags = self.client.get_feature_flags_from_long_cache()
 
-        self.assertEqual(flags, example_feature_flags)
+        self.assertEqual(flags, json.loads(example_feature_flags))
 
         mock_get.assert_called_once_with(self.client.long_cache_key)
 
@@ -86,7 +87,7 @@ class TestGrowthbookClient(TestCase):
     def test_get_feature_flags_from_cache_when_short_cache_is_empty(
         self, mock_update_growthbook_feature_flags, mock_get
     ):
-        mock_get.side_effect = [None, {"test": True}]
+        mock_get.side_effect = [None, json.dumps({"test": True}, ensure_ascii=False)]
 
         flags = self.client.get_feature_flags_from_cache()
 
@@ -122,7 +123,9 @@ class TestGrowthbookClient(TestCase):
 
         self.client.set_feature_flags_to_short_cache(feature_flags)
         mock_set.assert_called_once_with(
-            self.client.short_cache_key, feature_flags, self.client.short_cache_ttl
+            self.client.short_cache_key,
+            json.dumps(feature_flags, ensure_ascii=False),
+            self.client.short_cache_ttl,
         )
 
     @patch("chats.core.tests.mock.MockCacheClient.set")
@@ -131,7 +134,9 @@ class TestGrowthbookClient(TestCase):
 
         self.client.set_feature_flags_to_long_cache(feature_flags)
         mock_set.assert_called_once_with(
-            self.client.long_cache_key, feature_flags, self.client.long_cache_ttl
+            self.client.long_cache_key,
+            json.dumps(feature_flags, ensure_ascii=False),
+            self.client.long_cache_ttl,
         )
 
     @patch("chats.core.tests.mock.MockCacheClient.delete")
@@ -149,12 +154,12 @@ class TestGrowthbookClient(TestCase):
             [
                 call(
                     self.client.short_cache_key,
-                    feature_flags,
+                    json.dumps(feature_flags, ensure_ascii=False),
                     self.client.short_cache_ttl,
                 ),
                 call(
                     self.client.long_cache_key,
-                    feature_flags,
+                    json.dumps(feature_flags, ensure_ascii=False),
                     self.client.long_cache_ttl,
                 ),
             ]
@@ -175,12 +180,12 @@ class TestGrowthbookClient(TestCase):
                 [
                     call(
                         self.client.short_cache_key,
-                        {"test": True},
+                        json.dumps({"test": True}, ensure_ascii=False),
                         self.client.short_cache_ttl,
                     ),
                     call(
                         self.client.long_cache_key,
-                        {"test": True},
+                        json.dumps({"test": True}, ensure_ascii=False),
                         self.client.long_cache_ttl,
                     ),
                 ]
@@ -222,12 +227,12 @@ class TestGrowthbookClient(TestCase):
             [
                 call(
                     self.client.short_cache_key,
-                    {"test": True},
+                    json.dumps({"test": True}, ensure_ascii=False),
                     self.client.short_cache_ttl,
                 ),
                 call(
                     self.client.long_cache_key,
-                    {"test": True},
+                    json.dumps({"test": True}, ensure_ascii=False),
                     self.client.long_cache_ttl,
                 ),
             ]
