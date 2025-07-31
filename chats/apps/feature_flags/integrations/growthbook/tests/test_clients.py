@@ -159,3 +159,29 @@ class TestGrowthbookClient(TestCase):
                 ),
             ]
         )
+
+    @patch("chats.core.tests.mock.MockCacheClient.set")
+    def test_update_feature_flags_definitions(self, mock_set):
+        with patch("requests.get") as mock_get:
+            mock_get.return_value.json.return_value = {"test": True}
+
+            self.client.update_feature_flags_definitions()
+
+            mock_get.assert_called_once_with(
+                f"{self.client.host_base_url}/api/features/{self.client.client_key}",
+                timeout=60,
+            )
+            mock_set.assert_has_calls(
+                [
+                    call(
+                        self.client.short_cache_key,
+                        {"test": True},
+                        self.client.short_cache_ttl,
+                    ),
+                    call(
+                        self.client.long_cache_key,
+                        {"test": True},
+                        self.client.long_cache_ttl,
+                    ),
+                ]
+            )
