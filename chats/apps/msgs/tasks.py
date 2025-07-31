@@ -16,6 +16,8 @@ update_message_usecase = UpdateStatusMessageUseCase()
 )
 def process_message_status(self, message_id: str, message_status: str):
     """Task Celery for processing message status with automatic retry"""
+    print(f"[TASK] Iniciando: {message_id} - {message_status}")
+
     if not ChatMessageReplyIndex.objects.filter(external_id=message_id).exists():
         if self.request.retries >= settings.MESSAGE_STATUS_MAX_RETRIES - 1:
             print(f"[WARNING] Message without external_id: {message_id}")
