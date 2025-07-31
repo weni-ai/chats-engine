@@ -139,6 +139,9 @@ class GrowthbookClient(BaseGrowthbookClient):
         """
         cached_feature_flags = self.cache_client.get(self.short_cache_key)
 
+        if not cached_feature_flags:
+            return None
+
         if not isinstance(cached_feature_flags, dict):
             try:
                 cached_feature_flags = json.loads(cached_feature_flags)
@@ -157,6 +160,10 @@ class GrowthbookClient(BaseGrowthbookClient):
         Get feature flags from long cache
         """
         cached_feature_flags = self.cache_client.get(self.long_cache_key)
+
+        if not cached_feature_flags:
+            return None
+
         if not isinstance(cached_feature_flags, dict):
             try:
                 cached_feature_flags = json.loads(cached_feature_flags)
