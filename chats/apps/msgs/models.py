@@ -1,5 +1,7 @@
 import json
+import logging
 
+import sentry_sdk
 from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
@@ -8,6 +10,8 @@ from rest_framework.exceptions import ValidationError
 
 from chats.core.models import BaseModelWithManualCreatedOn
 from chats.core.requests import get_request_session_with_retries
+
+logger = logging.getLogger(__name__)
 
 
 class Message(BaseModelWithManualCreatedOn):
@@ -104,24 +108,75 @@ class Message(BaseModelWithManualCreatedOn):
         return msg_data
 
     def notify_room(self, action: str, callback: bool = False):
-        """ """
+        """Notify room about message changes with optional webhook callback"""
         data = self.serialized_ws_data
         self.room.base_notification(content=data, action=f"msg.{action}")
+
         if self.room.callback_url and callback:
             data = self.update_msg_text_with_signature(data)
+
             request_session = get_request_session_with_retries(
-                status_forcelist=[429, 500, 502, 503, 504], method_whitelist=["POST"]
-            )
-            request_session.post(
-                self.room.callback_url,
-                data=json.dumps(
-                    {"type": "msg.create", "content": data},
-                    sort_keys=True,
-                    indent=1,
-                    cls=DjangoJSONEncoder,
+                retries=getattr(settings, "CALLBACK_RETRY_COUNT", 5),
+                backoff_factor=getattr(settings, "CALLBACK_RETRY_BACKOFF_FACTOR", 0.1),
+                status_forcelist=getattr(
+                    settings,
+                    "CALLBACK_RETRYABLE_STATUS_CODES",
+                    [429, 500, 502, 503, 504],
                 ),
-                headers={"content-type": "application/json"},
+                method_whitelist=["POST"],
             )
+
+            try:
+                timeout = getattr(settings, "CALLBACK_TIMEOUT_SECONDS", None)
+
+                response = request_session.post(
+                    self.room.callback_url,
+                    data=json.dumps(
+                        {"type": "msg.create", "content": data},
+                        sort_keys=True,
+                        indent=1,
+                        cls=DjangoJSONEncoder,
+                    ),
+                    headers={"content-type": "application/json"},
+                    timeout=timeout,
+                )
+
+                if response.status_code >= 400:
+                    error_msg = (
+                        f"[Message.notify_room] Callback failed - "
+                        f"Message ID: {self.pk}, "
+                        f"HTTP {response.status_code}: {response.text[:200]}"
+                    )
+                    logger.error(error_msg)
+
+                    sentry_sdk.capture_message(
+                        error_msg,
+                        level="error",
+                        extras={
+                            "message_uuid": self.pk,
+                            "room_uuid": self.room.uuid,
+                            "callback_url": self.room.callback_url,
+                            "status_code": response.status_code,
+                            "response_text": response.text[:500],
+                        },
+                    )
+
+            except Exception as error:
+                error_msg = (
+                    f"[Message.notify_room] Callback failed - "
+                    f"Message ID: {self.pk}, "
+                    f"Error: {type(error).__name__}: {str(error)[:200]}"
+                )
+                logger.error(error_msg)
+
+                sentry_sdk.capture_exception(
+                    error,
+                    extras={
+                        "message_uuid": self.pk,
+                        "room_uuid": self.room.uuid,
+                        "callback_url": self.room.callback_url,
+                    },
+                )
 
     @property
     def project(self):
@@ -170,28 +225,79 @@ class MessageMedia(BaseModelWithManualCreatedOn):
         return self.room.get_authorization(user)
 
     def callback(self):
-        """ """
+        """Send webhook callback for MessageMedia"""
         msg_data = self.message.serialized_ws_data
         msg_data["text"] = ""
 
         if self.message.room.callback_url:
             request_session = get_request_session_with_retries(
-                status_forcelist=[429, 500, 502, 503, 504], method_whitelist=["POST"]
-            )
-            request_session.post(
-                self.message.room.callback_url,
-                data=json.dumps(
-                    {"type": "msg.create", "content": msg_data},
-                    sort_keys=True,
-                    indent=1,
-                    cls=DjangoJSONEncoder,
+                retries=getattr(settings, "CALLBACK_RETRY_COUNT", 5),
+                backoff_factor=getattr(settings, "CALLBACK_RETRY_BACKOFF_FACTOR", 0.1),
+                status_forcelist=getattr(
+                    settings,
+                    "CALLBACK_RETRYABLE_STATUS_CODES",
+                    [429, 500, 502, 503, 504],
                 ),
-                headers={"content-type": "application/json"},
+                method_whitelist=["POST"],
             )
 
-    def notify_room(self, *args, **kwargs):
-        """ """
-        self.message.notify_room(*args, **kwargs)
+            try:
+                timeout = getattr(settings, "CALLBACK_TIMEOUT_SECONDS", None)
+
+                response = request_session.post(
+                    self.message.room.callback_url,
+                    data=json.dumps(
+                        {"type": "msg.create", "content": msg_data},
+                        sort_keys=True,
+                        indent=1,
+                        cls=DjangoJSONEncoder,
+                    ),
+                    headers={"content-type": "application/json"},
+                    timeout=timeout,
+                )
+
+                if response.status_code >= 400:
+                    error_msg = (
+                        f"[MessageMedia.callback] Callback failed - "
+                        f"MessageMedia ID: {self.pk}, "
+                        f"HTTP {response.status_code}: {response.text[:200]}"
+                    )
+                    logger.error(error_msg)
+
+                    sentry_sdk.capture_message(
+                        error_msg,
+                        level="error",
+                        extras={
+                            "media_uuid": self.pk,
+                            "message_uuid": self.message.pk,
+                            "room_uuid": self.message.room.uuid,
+                            "callback_url": self.message.room.callback_url,
+                            "status_code": response.status_code,
+                            "response_text": response.text[:500],
+                        },
+                    )
+
+            except Exception as error:
+                error_msg = (
+                    f"[MessageMedia.callback] Callback failed - "
+                    f"MessageMedia ID: {self.pk}, "
+                    f"Error: {type(error).__name__}: {str(error)[:200]}"
+                )
+                logger.error(error_msg)
+
+                sentry_sdk.capture_exception(
+                    error,
+                    extras={
+                        "media_uuid": self.pk,
+                        "message_uuid": self.message.pk,
+                        "room_uuid": self.message.room.uuid,
+                        "callback_url": self.message.room.callback_url,
+                    },
+                )
+
+    def notify_room(self, action: str = "create", callback: bool = False):
+        """Delegate room notification to the associated Message"""
+        self.message.notify_room(action, callback)
 
     @property
     def project(self):
