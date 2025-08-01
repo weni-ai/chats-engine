@@ -1,3 +1,31 @@
+# 3.23.11
+## Add
+ - Adapting the message consumer to receive new statuses
+    
+# 3.23.10
+## Fix
+ - Correcting the select related for feature flag
+
+# 3.23.9
+## Fix
+ - Resolving bulk update bug
+
+# 3.23.8
+## Add
+ -  Logs in msgs consumer and logging better in celery 
+
+# 3.23.7
+## Add
+ - Removing msgs consumers from project handle
+   
+# 3.23.6
+## Add
+  - Processing status via celery
+    
+# 3.23.5
+## Add
+  - Adding protections to avoid loops and better performance for message consumer.
+    
 # 3.23.4
 ## Add
   - Adding support for rooms_limit in group sector.

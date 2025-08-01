@@ -24,6 +24,5 @@ class SetMsgExternalIdUseCase:
                     create_reply_index(message)
                 except MessageMedia.DoesNotExist:
                     return
-            except Exception as e:
-                print(f"Error setting external id: {e}")
-                raise e
+            except Exception:
+                return
