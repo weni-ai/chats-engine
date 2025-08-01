@@ -1,6 +1,9 @@
 import logging
 from typing import TYPE_CHECKING
 
+from chats.apps.dashboard.models import RoomMetrics
+from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
+
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +75,11 @@ class QueueRouterService:
             create_room_assigned_from_queue_feedback(room, agent)
 
             rooms_routed += 1
+
+            metrics = RoomMetrics.objects.get_or_create(room=room)[0]
+            metrics.waiting_time += calculate_last_queue_waiting_time(room)
+            metrics.queued_count += 1
+            metrics.save()
 
         logger.info(
             "%s rooms routed for queue %s, ending routing",
