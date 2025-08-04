@@ -1,5 +1,6 @@
 import logging
 from typing import TYPE_CHECKING
+from django.db.models.functions import Coalesce
 
 
 logger = logging.getLogger(__name__)
@@ -30,9 +31,11 @@ class QueueRouterService:
 
         logger.info("Start routing rooms for queue %s", self.queue.uuid)
 
-        rooms = Room.objects.filter(
-            queue=self.queue, is_active=True, user__isnull=True
-        ).order_by("created_on")
+        rooms = (
+            Room.objects.filter(queue=self.queue, is_active=True, user__isnull=True)
+            .annotate(date_field=Coalesce("added_to_queue_at", "created_on"))
+            .order_by("date_field")
+        )
 
         if not rooms.exists():
             logger.info(
