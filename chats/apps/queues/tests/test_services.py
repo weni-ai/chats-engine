@@ -192,6 +192,7 @@ class QueueRouterServiceTestCase(TestCase):
         now = timezone.now()
         time_1_day_ago = now - timedelta(days=1)
         time_2_days_ago = now - timedelta(days=2)
+        time_3_days_ago = now - timedelta(days=3)
 
         with patch("django.utils.timezone.now", return_value=time_1_day_ago):
             room_1 = Room.objects.create(queue=self.queue, user=None)
@@ -199,4 +200,14 @@ class QueueRouterServiceTestCase(TestCase):
         with patch("django.utils.timezone.now", return_value=time_2_days_ago):
             room_2 = Room.objects.create(queue=self.queue, user=None)
 
-        self.assertEqual(list(self.service.get_rooms_to_route()), [room_2, room_1])
+        with patch("django.utils.timezone.now", return_value=time_3_days_ago):
+            room_3 = Room.objects.create(queue=self.queue, user=self.agent_1)
+
+        self.assertEqual(room_1.added_to_queue_at, time_1_day_ago)
+        self.assertEqual(room_2.added_to_queue_at, time_2_days_ago)
+
+        rooms = list(self.service.get_rooms_to_route())
+
+        # room 3 is ignored because it has a user assigned
+        self.assertNotIn(room_3, rooms)
+        self.assertEqual(rooms, [room_2, room_1])
