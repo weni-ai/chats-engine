@@ -150,9 +150,9 @@ class InServiceStatusService:
                 status.break_time = int(service_duration.total_seconds())
                 status.save(update_fields=["is_active", "break_time"])
             else:
-                logger.error("room_closed: Não encontrou In-Service ativo")
+                logger.info("room_closed: Não encontrou In-Service ativo")
         else:
-            logger.error(f"room_closed: Ainda tem {room_count} salas ativas")
+            logger.info(f"room_closed: Ainda tem {room_count} salas ativas")
 
     @classmethod
     @transaction.atomic
@@ -170,14 +170,14 @@ class InServiceStatusService:
             try:
                 user = User.objects.get(pk=user)
             except User.DoesNotExist:
-                logger.error(f"Usuário {user} não encontrado")
+                logger.info(f"Usuário {user} não encontrado")
                 return
 
         if isinstance(project, (int, str)):
             try:
                 project = Project.objects.get(pk=project)
             except Project.DoesNotExist:
-                logger.error(f"Projeto {project} não encontrado")
+                logger.info(f"Projeto {project} não encontrado")
                 return
 
         status_type = cls.get_or_create_status_type(project)
@@ -240,4 +240,4 @@ class InServiceStatusService:
                 with transaction.atomic():
                     cls.sync_agent_status(user_id, project_id)
             except Exception as e:
-                logger.error(f"Erro ao sincronizar status: {e}")
+                logger.info(f"Erro ao sincronizar status: {e}")
