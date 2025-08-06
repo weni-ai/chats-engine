@@ -4,7 +4,6 @@ from django.contrib.auth import get_user_model
 
 from chats.apps.projects.models import Project, ProjectPermission, TemplateType
 from chats.apps.projects.usecases.exceptions import InvalidProjectData
-from chats.apps.projects.tasks import send_secondary_project_to_insights
 
 User = get_user_model()
 
@@ -95,13 +94,3 @@ class ProjectCreationUseCase:
             )
             project.template_type = template_type
             project.save()
-
-        main_project = self._get_main_project_for_org(project_dto)
-
-        if main_project is not None:
-            # Scheduling the creation to 5 seconds from now
-            # to wait a reasonable time for the project to be created
-            # in Insights' side as well.
-            send_secondary_project_to_insights.apply_async(
-                args=[str(main_project.uuid), str(project.uuid)], countdown=5
-            )
