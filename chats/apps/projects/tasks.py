@@ -26,7 +26,7 @@ def send_secondary_project_to_insights(
     """
     try:
         url = (
-            f"{INSIGHTS_API_URL}/v1/project/{secondary_project_uuid}/set-as-secondary/"
+            f"{INSIGHTS_API_URL}/v1/projects/{secondary_project_uuid}/set-as-secondary/"
         )
         body = {
             "main_project": str(main_project_uuid),
