@@ -1,3 +1,15 @@
+# 3.23.14
+## Fix
+  - Waiting time metric to consider the automatic rooms routing
+
+# 3.23.13
+## Fix
+  - Use queue assignment date to prioritize rooms routing
+
+# 3.23.12
+## Add
+  - More logs and retries in Message and MessageMedia models when sending messages to flows
+
 # 3.23.11
 ## Add
  - Adapting the message consumer to receive new statuses
