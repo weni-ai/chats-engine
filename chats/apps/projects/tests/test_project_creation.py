@@ -1,5 +1,6 @@
 import uuid
 from unittest.mock import MagicMock
+from unittest.mock import patch
 
 from django.test import TestCase
 from django.utils import timezone
@@ -67,8 +68,12 @@ class TestProjectCreationUsecase(TestCase):
             users.append(user)
         return users
 
-    def test_create_project(self):
+    @patch("chats.apps.projects.tasks.send_secondary_project_to_insights.delay")
+    def test_create_project(self, mock_send_secondary_project_to_insights):
         """Test creating a regular project without any special configuration."""
+        mock_send_secondary_project_to_insights.return_value = MagicMock()
+        mock_send_secondary_project_to_insights.delay.assert_not_called()
+
         self.use_case.create_project(self.project_dto)
 
         project = Project.objects.get(uuid=self.project_dto.uuid)
@@ -85,13 +90,20 @@ class TestProjectCreationUsecase(TestCase):
         self.assertEqual(permission.role, 1)
 
         self.sector_setup_handler.setup_sectors_in_project.assert_not_called()
+        mock_send_secondary_project_to_insights.assert_not_called()
 
-    def test_create_project_with_its_principal(self):
+    @patch("chats.apps.projects.tasks.send_secondary_project_to_insights.delay")
+    def test_create_project_with_its_principal(
+        self, mock_send_secondary_project_to_insights
+    ):
         """
         Test creating a project with its_principal=True in config.
         This test verifies that when we manually set its_principal=True after creation,
         subsequent projects in the same org will have its_principal=False.
         """
+        mock_send_secondary_project_to_insights.return_value = MagicMock()
+        mock_send_secondary_project_to_insights.delay.assert_not_called()
+
         project_dto = self._create_base_project_dto()
         self.use_case.create_project(project_dto)
 
@@ -112,13 +124,21 @@ class TestProjectCreationUsecase(TestCase):
 
         self.assertEqual(second_project.config, {"its_principal": False})
 
-    def test_create_secondary_project(self):
+        mock_send_secondary_project_to_insights.assert_called_once_with(
+            str(project.uuid), str(second_project.uuid)
+        )
+
+    @patch("chats.apps.projects.tasks.send_secondary_project_to_insights.delay")
+    def test_create_secondary_project(self, mock_send_secondary_project_to_insights):
         """
         Test creating a secondary project when a principal project already exists.
 
         This test verifies that when a project with its_principal=True exists in an org,
         any new projects created in that org will have its_principal=False in their config.
         """
+        mock_send_secondary_project_to_insights.return_value = MagicMock()
+        mock_send_secondary_project_to_insights.delay.assert_not_called()
+
         principal_project = self._create_principal_project()
 
         self.assertEqual(principal_project.config, {"its_principal": True})
@@ -131,6 +151,12 @@ class TestProjectCreationUsecase(TestCase):
 
         self.assertEqual(secondary_project.config, {"its_principal": False})
 
+        mock_send_secondary_project_to_insights.assert_called_once_with(
+            str(principal_project.uuid), str(secondary_project.uuid)
+        )
+
+        mock_send_secondary_project_to_insights.reset_mock()
+
         different_org_uuid = str(uuid.uuid4())
         different_org_dto = self._create_base_project_dto(org=different_org_uuid)
 
@@ -139,6 +165,8 @@ class TestProjectCreationUsecase(TestCase):
         different_org_project = Project.objects.get(uuid=different_org_dto.uuid)
 
         self.assertEqual(different_org_project.config, {})
+
+        mock_send_secondary_project_to_insights.assert_not_called()
 
     def test_create_template_project(self):
         """

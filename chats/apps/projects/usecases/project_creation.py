@@ -2,8 +2,9 @@ from dataclasses import dataclass
 
 from django.contrib.auth import get_user_model
 
-from ..models import Project, ProjectPermission, TemplateType
-from .exceptions import InvalidProjectData
+from chats.apps.projects.models import Project, ProjectPermission, TemplateType
+from chats.apps.projects.usecases.exceptions import InvalidProjectData
+from chats.apps.projects.tasks import send_secondary_project_to_insights
 
 User = get_user_model()
 
@@ -28,11 +29,17 @@ class ProjectCreationUseCase:
     def get_or_create_user_by_email(self, email: str) -> tuple:
         return User.objects.get_or_create(email=email)
 
-    def _config_its_principal(self, project_dto: ProjectCreationDTO) -> dict:
-        exists = Project.objects.filter(
+    def _get_main_project_for_org(self, project_dto: ProjectCreationDTO) -> Project:
+        return Project.objects.filter(
             org=project_dto.org, config__its_principal=True
-        ).exists()
-        return {"its_principal": False} if exists else {}
+        ).first()
+
+    def _config_its_principal(self, project_dto: ProjectCreationDTO) -> dict:
+        return (
+            {"its_principal": False}
+            if self._get_main_project_for_org(project_dto) is not None
+            else {}
+        )
 
     def create_project(self, project_dto: ProjectCreationDTO):
         project: Project = None
@@ -88,3 +95,10 @@ class ProjectCreationUseCase:
             )
             project.template_type = template_type
             project.save()
+
+        main_project = self._get_main_project_for_org(project_dto)
+
+        if main_project is not None:
+            send_secondary_project_to_insights.delay(
+                str(main_project.uuid), str(project.uuid)
+            )

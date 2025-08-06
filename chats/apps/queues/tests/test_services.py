@@ -211,3 +211,36 @@ class QueueRouterServiceTestCase(TestCase):
         # room 3 is ignored because it has a user assigned
         self.assertNotIn(room_3, rooms)
         self.assertEqual(rooms, [room_2, room_1])
+
+        added_to_queue_at = room_2.added_to_queue_at
+
+        room_2.user = self.agent_1
+        room_2.save()
+
+        room_2.refresh_from_db()
+
+        # This should not change because the room was already assigned to an agent
+        self.assertEqual(room_2.added_to_queue_at, added_to_queue_at)
+
+        rooms = list(self.service.get_rooms_to_route())
+
+        self.assertEqual(rooms, [room_1])
+
+        room_2.user = None
+        room_2.save()
+
+        room_2.refresh_from_db()
+
+        # This should change because the room was not assigned to an user
+        self.assertNotEqual(room_2.added_to_queue_at, added_to_queue_at)
+        self.assertGreater(room_2.added_to_queue_at, room_1.added_to_queue_at)
+
+        rooms = list(self.service.get_rooms_to_route())
+
+        # The order now is reversed because the room_2 has been added to the queue
+        # after the room_1 (after removing the assigned user)
+        # which is the equivalent of sending the room back to the queue
+        self.assertEqual(rooms, [room_1, room_2])
+
+        room_1.user = self.agent_2
+        room_1.save()
