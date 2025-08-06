@@ -5,6 +5,10 @@ from celery import shared_task
 from django.conf import settings
 from sentry_sdk import capture_exception
 
+from chats.apps.api.v1.internal.rest_clients.internal_authorization import (
+    InternalAuthentication,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -31,7 +35,8 @@ def send_secondary_project_to_insights(
         body = {
             "main_project": str(main_project_uuid),
         }
-        response = requests.post(url, json=body, timeout=10)
+        headers = InternalAuthentication().headers
+        response = requests.post(url, json=body, timeout=10, headers=headers)
         response.raise_for_status()
     except requests.exceptions.RequestException as exc:
         logger.error(
