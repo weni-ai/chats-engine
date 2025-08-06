@@ -99,6 +99,9 @@ class ProjectCreationUseCase:
         main_project = self._get_main_project_for_org(project_dto)
 
         if main_project is not None:
-            send_secondary_project_to_insights.delay(
-                str(main_project.uuid), str(project.uuid)
+            # Scheduling the creation to 5 seconds from now
+            # to wait a reasonable time for the project to be created
+            # in Insights' side as well.
+            send_secondary_project_to_insights.apply_async(
+                args=[str(main_project.uuid), str(project.uuid)], countdown=5
             )
