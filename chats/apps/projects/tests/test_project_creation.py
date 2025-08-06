@@ -68,7 +68,7 @@ class TestProjectCreationUsecase(TestCase):
             users.append(user)
         return users
 
-    @patch("chats.apps.projects.tasks.send_secondary_project_to_insights.delay")
+    @patch("chats.apps.projects.tasks.send_secondary_project_to_insights.apply_async")
     def test_create_project(self, mock_send_secondary_project_to_insights):
         """Test creating a regular project without any special configuration."""
         mock_send_secondary_project_to_insights.return_value = MagicMock()
@@ -92,7 +92,7 @@ class TestProjectCreationUsecase(TestCase):
         self.sector_setup_handler.setup_sectors_in_project.assert_not_called()
         mock_send_secondary_project_to_insights.assert_not_called()
 
-    @patch("chats.apps.projects.tasks.send_secondary_project_to_insights.delay")
+    @patch("chats.apps.projects.tasks.send_secondary_project_to_insights.apply_async")
     def test_create_project_with_its_principal(
         self, mock_send_secondary_project_to_insights
     ):
@@ -125,10 +125,10 @@ class TestProjectCreationUsecase(TestCase):
         self.assertEqual(second_project.config, {"its_principal": False})
 
         mock_send_secondary_project_to_insights.assert_called_once_with(
-            str(project.uuid), str(second_project.uuid)
+            args=[str(project.uuid), str(second_project.uuid)], countdown=5
         )
 
-    @patch("chats.apps.projects.tasks.send_secondary_project_to_insights.delay")
+    @patch("chats.apps.projects.tasks.send_secondary_project_to_insights.apply_async")
     def test_create_secondary_project(self, mock_send_secondary_project_to_insights):
         """
         Test creating a secondary project when a principal project already exists.
@@ -152,7 +152,7 @@ class TestProjectCreationUsecase(TestCase):
         self.assertEqual(secondary_project.config, {"its_principal": False})
 
         mock_send_secondary_project_to_insights.assert_called_once_with(
-            str(principal_project.uuid), str(secondary_project.uuid)
+            args=[str(principal_project.uuid), str(secondary_project.uuid)], countdown=5
         )
 
         mock_send_secondary_project_to_insights.reset_mock()

@@ -37,10 +37,16 @@ def send_secondary_project_to_insights(
         }
         headers = InternalAuthentication().headers
         response = requests.post(url, json=body, timeout=10, headers=headers)
+
         response.raise_for_status()
     except requests.exceptions.RequestException as exc:
         logger.error(
             "Error sending secondary project to Insights API: %s", exc, exc_info=True
         )
         capture_exception(exc)
+        logger.warning(
+            "Retrying send_secondary_project_to_insights for %s after failure: %s",
+            secondary_project_uuid,
+            exc,
+        )
         raise self.retry(exc=exc)
