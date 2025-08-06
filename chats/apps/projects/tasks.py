@@ -25,7 +25,9 @@ def send_secondary_project_to_insights(
     Send secondary project to Insights API to set it as secondary
     """
     try:
-        url = f"{INSIGHTS_API_URL}/project/{secondary_project_uuid}/set-as-secondary/"
+        url = (
+            f"{INSIGHTS_API_URL}/v1/project/{secondary_project_uuid}/set-as-secondary/"
+        )
         body = {
             "main_project": str(main_project_uuid),
         }
