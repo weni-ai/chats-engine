@@ -454,8 +454,33 @@ class Room(BaseModel, BaseConfigurableModel):
         return not self.is_active or perm.is_manager(any_sector=True)
 
     def update_ticket(self):
+        """
+        Synchronously update ticket assignee.
+        """
         if self.ticket_uuid and self.user:
             FlowRESTClient().update_ticket_assignee(self.ticket_uuid, self.user.email)
+    
+    def update_ticket_async(self):
+        """
+        Asynchronously update ticket assignee using Celery task.
+        This method is non-blocking and provides retry functionality.
+        """
+        if self.ticket_uuid and self.user:
+            from chats.apps.rooms.tasks import update_ticket_assignee_async
+            
+            task = update_ticket_assignee_async.delay(
+                room_uuid=str(self.uuid),
+                ticket_uuid=self.ticket_uuid,
+                user_email=self.user.email
+            )
+            
+            logger.info(
+                f"[ROOM] Launched async ticket update task - Room: {self.uuid}, "
+                f"Ticket: {self.ticket_uuid}, User: {self.user.email}, "
+                f"Task ID: {task.id}"
+            )
+            
+            return task
 
     def can_pick_queue(self, user: User) -> bool:
         """
