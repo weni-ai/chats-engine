@@ -459,7 +459,7 @@ class Room(BaseModel, BaseConfigurableModel):
         """
         if self.ticket_uuid and self.user:
             FlowRESTClient().update_ticket_assignee(self.ticket_uuid, self.user.email)
-    
+
     def update_ticket_async(self):
         """
         Asynchronously update ticket assignee using Celery task.
@@ -467,19 +467,21 @@ class Room(BaseModel, BaseConfigurableModel):
         """
         if self.ticket_uuid and self.user:
             from chats.apps.rooms.tasks import update_ticket_assignee_async
-            
+
             task = update_ticket_assignee_async.delay(
                 room_uuid=str(self.uuid),
                 ticket_uuid=self.ticket_uuid,
                 user_email=self.user.email
             )
-            
+
+            import logging
+            logger = logging.getLogger(__name__)
             logger.info(
                 f"[ROOM] Launched async ticket update task - Room: {self.uuid}, "
                 f"Ticket: {self.ticket_uuid}, User: {self.user.email}, "
                 f"Task ID: {task.id}"
             )
-            
+
             return task
 
     def can_pick_queue(self, user: User) -> bool:

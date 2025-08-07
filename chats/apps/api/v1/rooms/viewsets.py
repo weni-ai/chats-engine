@@ -527,20 +527,24 @@ class RoomViewset(
                 room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
             )
             room.notify_queue("update")
-            
+
             # Use async ticket update to avoid blocking the response
             ticket_task = room.update_ticket_async()
-            
+
             logger.info(
                 f"[PICK_QUEUE_ROOM] Room pick completed successfully - Room: {room.uuid}, "
                 f"User: {user.email}, Ticket Task: {ticket_task.id if ticket_task else 'None'}"
             )
 
             return Response(
-                {"detail": _("Room picked successfully")}, status=status.HTTP_200_OK
+                {
+                    "detail": _("Room picked successfully"),
+                    "room_uuid": str(room.uuid),
+                    "ticket_task_id": ticket_task.id if ticket_task else None
+                },
+                status=status.HTTP_200_OK
             )
 
-            
         except Exception as exc:
             logger.error(
                 f"[PICK_QUEUE_ROOM] Error during room pick - Room: {room.uuid}, "

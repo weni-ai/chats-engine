@@ -23,42 +23,42 @@ def generate_rooms_report(project_uuid: UUID, filters: dict, recipient_email: st
 def update_ticket_assignee_async(room_uuid: str, ticket_uuid: str, user_email: str):
     """
     Asynchronously update ticket assignee in the external Flows API.
-    
+
     Args:
         room_uuid (str): UUID of the room being processed
         ticket_uuid (str): UUID of the ticket to update
         user_email (str): Email of the user to assign to the ticket
-        
+
     Returns:
         dict: Result of the operation with status and details
     """
     logger.info(
         f"[TASK] Starting ticket assignee update - Room: {room_uuid}, "
-        f"Ticket: {ticket_uuid}, User: {user_email}, "
+        f"Ticket: {ticket_uuid}, User: {user_email}"
     )
-    
+
     try:
         flows_client = FlowRESTClient()
-        
+
         flows_client.update_ticket_assignee(ticket_uuid, user_email)
-        
+
         logger.info(
             f"[TASK] Successfully updated ticket assignee - Room: {room_uuid}, "
             f"Ticket: {ticket_uuid}, User: {user_email}"
         )
-        
+
         return {
             "status": "success",
             "room_uuid": room_uuid,
             "ticket_uuid": ticket_uuid,
             "user_email": user_email,
         }
-        
+
     except Exception as exc:
         logger.error(
             f"[TASK] Error updating ticket assignee - Room: {room_uuid}, "
             f"Ticket: {ticket_uuid}, User: {user_email}, "
             f"Error: {str(exc)}"
         )
-        
+
         raise exc
