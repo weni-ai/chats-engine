@@ -506,22 +506,16 @@ class RoomViewset(
         )
 
         try:
-            with transaction.atomic():
-                room.user = user
-                room.save()
-                room.add_transfer_to_history(feedback)
+            room.user = user
+            room.save()
+            room.add_transfer_to_history(feedback)
 
-                room_metric = RoomMetrics.objects.select_related("room").get_or_create(
-                    room=room
-                )[0]
-                room_metric.waiting_time += calculate_last_queue_waiting_time(room)
-                room_metric.queued_count += 1
-                room_metric.save()
-
-                logger.info(
-                    f"[PICK_QUEUE_ROOM] Room successfully assigned - Room: {room.uuid}, "
-                    f"User: {user.email}, Waiting Time: {room_metric.waiting_time}s"
-                )
+            room_metric = RoomMetrics.objects.select_related("room").get_or_create(
+                room=room
+            )[0]
+            room_metric.waiting_time += calculate_last_queue_waiting_time(room)
+            room_metric.queued_count += 1
+            room_metric.save()
 
             create_room_feedback_message(
                 room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
@@ -529,18 +523,12 @@ class RoomViewset(
             room.notify_queue("update")
 
             # Use async ticket update to avoid blocking the response
-            ticket_task = room.update_ticket_async()
-
-            logger.info(
-                f"[PICK_QUEUE_ROOM] Room pick completed successfully - Room: {room.uuid}, "
-                f"User: {user.email}, Ticket Task: {ticket_task.id if ticket_task else 'None'}"
-            )
+            room.update_ticket_async()
 
             return Response(
                 {
                     "detail": _("Room picked successfully"),
                     "room_uuid": str(room.uuid),
-                    "ticket_task_id": ticket_task.id if ticket_task else None
                 },
                 status=status.HTTP_200_OK
             )
