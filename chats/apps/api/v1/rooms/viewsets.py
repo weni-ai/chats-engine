@@ -484,7 +484,16 @@ class RoomViewset(
         room: Room = self.get_object()
         user: User = request.user
 
+        logger.info(
+            f"[PICK_QUEUE_ROOM] Starting room pick - Room: {room.uuid}, "
+            f"User: {user.email}, Queue: {room.queue.name if room.queue else 'None'}"
+        )
+
         if room.user:
+            logger.warning(
+                f"[PICK_QUEUE_ROOM] Room already assigned - Room: {room.uuid}, "
+                f"Current User: {room.user.email}, Requested User: {user.email}"
+            )
             raise ValidationError(
                 {"detail": _("Room is not queued")}, code="room_is_not_queued"
             )
@@ -496,26 +505,40 @@ class RoomViewset(
             to=user,
         )
 
-        room.user = user
-        room.save()
-        room.add_transfer_to_history(feedback)
+        try:
+            room.user = user
+            room.save()
+            room.add_transfer_to_history(feedback)
 
-        room_metric = RoomMetrics.objects.select_related("room").get_or_create(
-            room=room
-        )[0]
-        room_metric.waiting_time += calculate_last_queue_waiting_time(room)
-        room_metric.queued_count += 1
-        room_metric.save()
+            room_metric = RoomMetrics.objects.select_related("room").get_or_create(
+                room=room
+            )[0]
+            room_metric.waiting_time += calculate_last_queue_waiting_time(room)
+            room_metric.queued_count += 1
+            room_metric.save()
 
-        create_room_feedback_message(
-            room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
-        )
-        room.notify_queue("update")
-        room.update_ticket()
+            create_room_feedback_message(
+                room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+            )
+            room.notify_queue("update")
 
-        return Response(
-            {"detail": _("Room picked successfully")}, status=status.HTTP_200_OK
-        )
+            # Use async ticket update to avoid blocking the response
+            room.update_ticket_async()
+
+            return Response(
+                {
+                    "detail": _("Room picked successfully"),
+                    "room_uuid": str(room.uuid),
+                },
+                status=status.HTTP_200_OK
+            )
+
+        except Exception as exc:
+            logger.error(
+                f"[PICK_QUEUE_ROOM] Error during room pick - Room: {room.uuid}, "
+                f"User: {user.email}, Error: {str(exc)}"
+            )
+            raise
 
     @action(
         detail=False,
