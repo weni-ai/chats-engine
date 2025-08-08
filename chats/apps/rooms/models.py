@@ -558,8 +558,6 @@ class Room(BaseModel, BaseConfigurableModel):
                 user_email=self.user.email
             )
 
-            import logging
-            logger = logging.getLogger(__name__)
             logger.info(
                 f"[ROOM] Launched async ticket update task - Room: {self.uuid}, "
                 f"Ticket: {self.ticket_uuid}, User: {self.user.email}, "
