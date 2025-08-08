@@ -39,6 +39,7 @@ from chats.apps.api.v1.quickmessages.viewsets import (
 from chats.apps.api.v1.rooms.viewsets import RoomViewset
 from chats.apps.api.v1.sectors.viewsets import (
     SectorAuthorizationViewset,
+    SectorHolidayViewSet,
     SectorTagsViewset,
     SectorViewset,
 )
@@ -196,3 +197,5 @@ router.register(
 router.register("external/sectors", SectorFlowViewset, basename="external_sector")
 router.register("external/queues", QueueFlowViewset, basename="external_queue")
 router.register("external/agents", AgentFlowViewset, basename="external_agent")
+
+router.register("sector_holiday", SectorHolidayViewSet, basename="sector_holiday")

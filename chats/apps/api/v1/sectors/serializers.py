@@ -3,7 +3,12 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from chats.apps.api.v1.accounts.serializers import UserSerializer
-from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
+from chats.apps.sectors.models import (
+    Sector,
+    SectorAuthorization,
+    SectorHoliday,
+    SectorTag,
+)
 
 User = get_user_model()
 
@@ -197,3 +202,68 @@ class SectorAgentsSerializer(serializers.ModelSerializer):
             "photo_url",
             "language",
         ]
+
+
+class SectorHolidaySerializer(serializers.ModelSerializer):
+    """
+    Serializer to manage configurable holidays and special days by sector
+    """
+
+    class Meta:
+        model = SectorHoliday
+        fields = [
+            "uuid",
+            "sector",
+            "date",
+            "day_type",
+            "start_time",
+            "end_time",
+            "description",
+            "created_on",
+            "modified_on",
+        ]
+        read_only_fields = ["uuid", "created_on", "modified_on"]
+
+    def validate(self, data):
+        """
+        Custom validations to ensure data consistency
+        """
+        day_type = data.get("day_type")
+        start_time = data.get("start_time")
+        end_time = data.get("end_time")
+
+        # Se é dia fechado, não deve ter horários
+        if day_type == SectorHoliday.CLOSED:
+            if start_time is not None or end_time is not None:
+                raise serializers.ValidationError(
+                    {"detail": _("Closed days should not have start_time or end_time")}
+                )
+
+        # Se tem horário customizado, deve ter ambos horários
+        elif day_type == SectorHoliday.CUSTOM_HOURS:
+            if start_time is None or end_time is None:
+                raise serializers.ValidationError(
+                    {
+                        "detail": _(
+                            "Custom hours days must have both start_time and end_time"
+                        )
+                    }
+                )
+
+            # Validar que fim é maior que início
+            if start_time >= end_time:
+                raise serializers.ValidationError(
+                    {"detail": _("End time must be greater than start time")}
+                )
+
+        return data
+
+
+class SectorHolidayListSerializer(serializers.ModelSerializer):
+    """
+    Serializer simplificado para listagem de holidays
+    """
+
+    class Meta:
+        model = SectorHoliday
+        fields = ["uuid", "date", "day_type", "start_time", "end_time", "description"]
