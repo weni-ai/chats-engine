@@ -493,3 +493,96 @@ class GroupSectorAuthorization(BaseModel):
             return self.group_sector.project.get_permission(user)
         except ObjectDoesNotExist:
             return None
+
+
+class SectorHoliday(BaseSoftDeleteModel, BaseModel):
+    """
+    Modelo para armazenar feriados e dias especiais configuráveis por setor
+    (feriados locais, folgas específicas, etc.)
+    """
+
+    CLOSED = "closed"
+    CUSTOM_HOURS = "custom_hours"
+
+    DAY_TYPE_CHOICES = [
+        (CLOSED, _("Closed")),
+        (CUSTOM_HOURS, _("Custom Hours")),
+    ]
+
+    sector = models.ForeignKey(
+        Sector,
+        verbose_name=_("Sector"),
+        related_name="holidays",
+        on_delete=models.CASCADE,
+    )
+    date = models.DateField(_("Date"))
+    day_type = models.CharField(
+        _("Day Type"), max_length=20, choices=DAY_TYPE_CHOICES, default=CLOSED
+    )
+    start_time = models.TimeField(
+        _("Start Time"),
+        null=True,
+        blank=True,
+        help_text=_("Leave empty if day is closed"),
+    )
+    end_time = models.TimeField(
+        _("End Time"),
+        null=True,
+        blank=True,
+        help_text=_("Leave empty if day is closed"),
+    )
+    description = models.CharField(
+        _("Description"),
+        max_length=255,
+        blank=True,
+        help_text=_("Holiday name or reason for special hours"),
+    )
+
+    class Meta:
+        verbose_name = _("Sector Holiday")
+        verbose_name_plural = _("Sector Holidays")
+        indexes = [
+            models.Index(fields=["sector", "date"], name="idx_sector_holiday"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["sector", "date"], name="unique_sector_holiday"
+            ),
+            models.CheckConstraint(
+                check=Q(
+                    Q(day_type="closed", start_time__isnull=True, end_time__isnull=True)
+                    | Q(
+                        day_type="custom_hours",
+                        start_time__isnull=False,
+                        end_time__isnull=False,
+                    )
+                ),
+                name="valid_holiday_times",
+            ),
+            models.CheckConstraint(
+                check=Q(end_time__gt=F("start_time")) | Q(start_time__isnull=True),
+                name="holiday_end_greater_than_start",
+            ),
+        ]
+        ordering = ["date"]
+
+    def __str__(self):
+        if self.day_type == self.CLOSED:
+            return f"{self.sector.name} - {self.date} (Closed)"
+        return f"{self.sector.name} - {self.date} ({self.start_time}-{self.end_time})"
+
+    def get_permission(self, user):
+        return self.sector.get_permission(user)
+
+    @property
+    def project(self):
+        return self.sector.project
+
+    def is_closed(self):
+        return self.day_type == self.CLOSED
+
+    def is_within_hours(self, time):
+        """Verifica se um horário está dentro do período configurado"""
+        if self.is_closed():
+            return False
+        return self.start_time <= time <= self.end_time

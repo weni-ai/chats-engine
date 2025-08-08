@@ -1,5 +1,8 @@
+from datetime import datetime
+
 from django.conf import settings
 from django.db import IntegrityError
+from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import exceptions, filters, status, viewsets
 from rest_framework.decorators import action
@@ -20,8 +23,14 @@ from chats.apps.api.v1.sectors.filters import (
 )
 from chats.apps.projects.models import Project
 from chats.apps.projects.models.models import ProjectPermission
-from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
+from chats.apps.sectors.models import (
+    Sector,
+    SectorAuthorization,
+    SectorHoliday,
+    SectorTag,
+)
+from chats.apps.sectors.utils import get_country_from_timezone, get_country_holidays
 
 
 class SectorViewset(viewsets.ModelViewSet):
@@ -273,3 +282,199 @@ class SectorAuthorizationViewset(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         instance.notify_user("destroy")
         super().perform_destroy(instance)
+
+
+class SectorHolidayViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet to manage holidays and special days by sectors.
+    """
+
+    serializer_class = sector_serializers.SectorHolidaySerializer
+    filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
+    lookup_field = "uuid"
+    ordering = ["date"]
+
+    def get_queryset(self):
+        """
+        Filter holidays based on user project permissions and sector parameter
+        """
+        queryset = SectorHoliday.objects.exclude(is_deleted=True).filter(
+            sector__project__in=ProjectPermission.objects.filter(
+                user=self.request.user
+            ).values_list("project", flat=True)
+        )
+
+        sector_uuid = self.request.query_params.get("sector")
+        if sector_uuid:
+            queryset = queryset.filter(sector__uuid=sector_uuid)
+
+        return queryset.order_by("date")
+
+    def get_serializer_class(self):
+        """
+        Uses simplified serializer for listing
+        """
+        if self.action == "list":
+            return sector_serializers.SectorHolidayListSerializer
+        return super().get_serializer_class()
+
+    def get_permissions(self):
+        """
+        Permissions based on action
+        """
+        if self.action in ["list", "retrieve"]:
+            permission_classes = [IsAuthenticated]
+        else:
+            permission_classes = [IsAuthenticated, IsSectorManager]
+        return [permission() for permission in permission_classes]
+
+    def perform_create(self, serializer):
+        """
+        Sector must be passed in the request body
+        """
+        serializer.save()
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.is_deleted = True
+        instance.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, methods=["get"])
+    def official_holidays(self, request):
+        """
+        GET /api/v1/sector_holiday/official_holidays/?sector=uuid&year=2024
+        Retorna feriados oficiais do país baseado no timezone do projeto
+        """
+        sector_uuid = request.query_params.get("sector")
+        year = request.query_params.get("year", timezone.now().year)
+
+        if not sector_uuid:
+            return Response(
+                {"detail": "Parameter 'sector' is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            sector = Sector.objects.get(uuid=sector_uuid)
+            country_code = get_country_from_timezone(str(sector.project.timezone))
+            official_holidays = get_country_holidays(country_code, int(year))
+
+            # Formatar para frontend
+            holidays_list = [
+                {
+                    "date": holiday_date.strftime("%Y-%m-%d"),
+                    "name": holiday_name,
+                    "country_code": country_code,
+                }
+                for holiday_date, holiday_name in official_holidays.items()
+            ]
+
+            return Response(
+                {
+                    "country_code": country_code,
+                    "year": int(year),
+                    "holidays": sorted(holidays_list, key=lambda x: x["date"]),
+                }
+            )
+
+        except Sector.DoesNotExist:
+            return Response(
+                {"detail": "Sector not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+    @action(detail=False, methods=["post"])
+    def import_official_holidays(self, request):
+        """
+        POST /api/v1/sector_holiday/import_official_holidays/
+        Cria holidays em lote a partir dos feriados oficiais selecionados
+
+        Body:
+        {
+            "sector": "uuid",
+            "year": 2024,
+            "holidays": ["2024-12-25", "2024-01-01"]  # Datas selecionadas
+        }
+        """
+        sector_uuid = request.data.get("sector")
+        year = request.data.get("year", timezone.now().year)
+        selected_holidays = request.data.get("holidays", [])
+
+        if not sector_uuid:
+            return Response(
+                {"detail": "Field 'sector' is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not selected_holidays:
+            return Response(
+                {"detail": "Field 'holidays' is required and must not be empty"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            sector = Sector.objects.get(uuid=sector_uuid)
+            country_code = get_country_from_timezone(str(sector.project.timezone))
+            official_holidays = get_country_holidays(country_code, int(year))
+
+            created_holidays = []
+            errors = []
+
+            for holiday_date_str in selected_holidays:
+                try:
+                    holiday_date = datetime.strptime(
+                        holiday_date_str, "%Y-%m-%d"
+                    ).date()
+
+                    # Verificar se existe nos feriados oficiais
+                    if holiday_date not in official_holidays:
+                        errors.append(
+                            f"Date {holiday_date_str} is not an official holiday"
+                        )
+                        continue
+
+                    # Verificar se já existe
+                    if SectorHoliday.objects.filter(
+                        sector=sector, date=holiday_date
+                    ).exists():
+                        errors.append(f"Holiday for {holiday_date_str} already exists")
+                        continue
+
+                    # Criar holiday
+                    holiday = SectorHoliday.objects.create(
+                        sector=sector,
+                        date=holiday_date,
+                        day_type=SectorHoliday.CLOSED,
+                        description=official_holidays[holiday_date],
+                    )
+
+                    created_holidays.append(
+                        {
+                            "uuid": str(holiday.uuid),
+                            "date": holiday_date_str,
+                            "description": holiday.description,
+                        }
+                    )
+
+                except ValueError:
+                    errors.append(f"Invalid date format: {holiday_date_str}")
+                except Exception as e:
+                    errors.append(
+                        f"Error creating holiday for {holiday_date_str}: {str(e)}"
+                    )
+
+            return Response(
+                {
+                    "created": len(created_holidays),
+                    "holidays": created_holidays,
+                    "errors": errors,
+                },
+                status=status.HTTP_201_CREATED
+                if created_holidays
+                else status.HTTP_400_BAD_REQUEST,
+            )
+
+        except Sector.DoesNotExist:
+            return Response(
+                {"detail": "Sector not found"}, status=status.HTTP_404_NOT_FOUND
+            )
