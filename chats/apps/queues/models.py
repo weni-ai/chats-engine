@@ -27,6 +27,7 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         _("Default queue message"), null=True, blank=True
     )
     objects = QueueManager()
+    all_objects = QueueManager(include_deleted=True)
 
     class Meta:
         verbose_name = _("Sector Queue")
