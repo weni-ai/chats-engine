@@ -94,7 +94,7 @@ class RoomViewset(
     filterset_class = room_filters.RoomFilter
     search_fields = ["contact__name", "urn", "protocol", "service_chat"]
     ordering_fields = "__all__"
-    ordering = ["user", "-last_interaction", "created_on"]
+    ordering = ["user", "-last_interaction", "created_on", "added_to_queue_at"]
     pagination_class = RoomListPagination
 
     def get_permissions(self):
