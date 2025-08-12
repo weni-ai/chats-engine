@@ -1,10 +1,11 @@
+from typing import List, Optional
 from uuid import UUID
 
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 
 from chats.apps.projects.models import ProjectPermission
-from chats.apps.queues.models import Queue
+from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.sectors.models import GroupSector, GroupSectorAuthorization, Sector
 
 
@@ -201,3 +202,74 @@ class RemoveSectorFromGroupSectorUseCase:
         self._delete_sector_permissions()
         self._delete_queue_permissions()
         self._remove_sector_from_group_sector()
+
+
+class UpdateAgentQueueAuthorizationsUseCase:
+    """
+    Habilita/Desabilita filas por agente dentro de um GroupSector.
+    - Valida se as filas pertencem aos setores do GroupSector e ao mesmo projeto.
+    - Cria autorizações para 'enabled_queue_uuids'.
+    - Remove autorizações para 'disabled_queue_uuids'.
+    """
+
+    def __init__(
+        self,
+        group_sector_uuid: UUID,
+        permission_uuid: UUID,
+        enabled_queue_uuids: Optional[List[UUID]] = None,
+        disabled_queue_uuids: Optional[List[UUID]] = None,
+    ):
+        try:
+            self.group_sector = GroupSector.objects.get(uuid=group_sector_uuid)
+            self.permission = ProjectPermission.objects.get(uuid=permission_uuid)
+        except ObjectDoesNotExist:
+            raise ValueError("Group sector or permission not found")
+        if self.permission.project.uuid != self.group_sector.project.uuid:
+            raise ValueError("Permission does not belong to the GroupSector project")
+        self.enabled_queue_uuids = set(str(u) for u in (enabled_queue_uuids or []))
+        self.disabled_queue_uuids = set(str(u) for u in (disabled_queue_uuids or []))
+
+    def _allowed_queue_ids(self):
+        # Normalize para strings para comparar com entradas vindas do payload (strings)
+        return set(
+            str(queue_uuid)
+            for queue_uuid in Queue.objects.filter(
+                sector__in=self.group_sector.sectors.filter(is_deleted=False),
+                is_deleted=False,
+            ).values_list("uuid", flat=True)
+        )
+
+    @transaction.atomic
+    def execute(self):
+        allowed_ids = self._allowed_queue_ids()
+        enable_ids = list(self.enabled_queue_uuids & allowed_ids)
+        disable_ids = list(self.disabled_queue_uuids & allowed_ids)
+
+        if enable_ids:
+            # Normalize para strings
+            existing = set(
+                str(queue_uuid)
+                for queue_uuid in QueueAuthorization.objects.filter(
+                    permission=self.permission, queue__uuid__in=enable_ids
+                ).values_list("queue__uuid", flat=True)
+            )
+            to_create_ids = [
+                queue_uuid for queue_uuid in enable_ids if queue_uuid not in existing
+            ]
+            if to_create_ids:
+                queues = list(Queue.objects.filter(uuid__in=to_create_ids))
+                QueueAuthorization.objects.bulk_create(
+                    [
+                        QueueAuthorization(
+                            queue=queue_obj, permission=self.permission, role=1
+                        )
+                        for queue_obj in queues
+                    ],
+                    ignore_conflicts=True,
+                )
+
+        # Delete authorizations for disable_ids
+        if disable_ids:
+            QueueAuthorization.objects.filter(
+                permission=self.permission, queue__uuid__in=disable_ids
+            ).delete()

@@ -5,6 +5,7 @@ from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
 from chats.apps.projects.models import Project, ProjectPermission
+from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.sectors.models import GroupSector, GroupSectorAuthorization, Sector
 
 
@@ -266,3 +267,200 @@ class GroupSectorAuthorizationTests(APITestCase):
         client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
         response = client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class GroupSectorQueueAndPermissionsTests(APITestCase):
+    fixtures = ["chats/fixtures/fixture_sector.json"]
+
+    def setUp(self):
+        self.manager_user = User.objects.get(pk=8)
+        self.login_token = Token.objects.get(user=self.manager_user)
+        self.project = Project.objects.get(pk="34a93b52-231e-11ed-861d-0242ac120002")
+        self.sector_fluxos = Sector.objects.get(
+            pk="21aecf8c-0c73-4059-ba82-4343e0cc627c"
+        )  # ENGINE
+        self.sector_intel = Sector.objects.get(
+            pk="4f88b656-194d-4a83-a166-5d84ba825b8d"
+        )  # FRONTEND
+
+        self.group_sector = GroupSector.objects.create(
+            name="GS Test", project=self.project, rooms_limit=10
+        )
+        self.group_sector.sectors.add(self.sector_fluxos, self.sector_intel)
+
+        self.project_permission = ProjectPermission.objects.get(
+            project=self.project, user=self.manager_user, role=1
+        )
+
+        self.engine_queue = Queue.objects.get(sector=self.sector_fluxos)
+        self.frontend_queue = Queue.objects.get(sector=self.sector_intel)
+
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+
+    def test_list_queues_by_selected_sectors(self):
+        url = reverse("group_sector-list-queues")
+        params = {"sectors": f"{self.sector_fluxos.uuid},{self.sector_intel.uuid}"}
+        resp = self.client.get(url, params)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        # ambos setores presentes
+        self.assertIn(str(self.sector_fluxos.uuid), resp.data)
+        self.assertIn(str(self.sector_intel.uuid), resp.data)
+        # formato de filas
+        fluxos_block = resp.data[str(self.sector_fluxos.uuid)]
+        self.assertIn("sector_name", fluxos_block)
+        self.assertIsInstance(fluxos_block["queues"], list)
+        if fluxos_block["queues"]:
+            first_queue = fluxos_block["queues"][0]
+            self.assertIn("queue_name", first_queue)
+            self.assertIn("uuid", first_queue)
+
+    def test_list_permissions_single_sector(self):
+        # conceder uma fila ao agente no setor Fluxos
+        QueueAuthorization.objects.get_or_create(
+            queue=self.engine_queue, permission=self.project_permission, role=1
+        )
+
+        url = reverse("group_sector-list-permissions")
+        params = {"sectors": f"{self.sector_fluxos.uuid}"}
+        resp = self.client.get(url, params)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertIn(self.manager_user.email, resp.data)
+        agent_entry = resp.data[self.manager_user.email]
+        self.assertIn("sectors", agent_entry)
+        self.assertIn(str(self.sector_fluxos.uuid), agent_entry["sectors"])
+        self.assertIn(
+            str(self.engine_queue.uuid),
+            agent_entry["sectors"][str(self.sector_fluxos.uuid)]["permissions"],
+        )
+
+    def test_list_permissions_multiple_sectors(self):
+        # conceder filas em dois setores
+        QueueAuthorization.objects.get_or_create(
+            queue=self.engine_queue, permission=self.project_permission, role=1
+        )
+        QueueAuthorization.objects.get_or_create(
+            queue=self.frontend_queue, permission=self.project_permission, role=1
+        )
+
+        url = reverse("group_sector-list-permissions")
+        params = {"sectors": f"{self.sector_fluxos.uuid},{self.sector_intel.uuid}"}
+        resp = self.client.get(url, params)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertIn(self.manager_user.email, resp.data)
+        agent_entry = resp.data[self.manager_user.email]
+        sectors_map = agent_entry.get("sectors", {})
+        self.assertIn(str(self.sector_fluxos.uuid), sectors_map)
+        self.assertIn(str(self.sector_intel.uuid), sectors_map)
+        self.assertIn(
+            str(self.engine_queue.uuid),
+            sectors_map[str(self.sector_fluxos.uuid)]["permissions"],
+        )
+        self.assertIn(
+            str(self.frontend_queue.uuid),
+            sectors_map[str(self.sector_intel.uuid)]["permissions"],
+        )
+
+
+class GroupSectorAuthorizationAgentQueuesTests(APITestCase):
+    fixtures = ["chats/fixtures/fixture_sector.json"]
+
+    def setUp(self):
+        self.manager_user = User.objects.get(pk=8)
+        self.login_token = Token.objects.get(user=self.manager_user)
+        self.project = Project.objects.get(pk="34a93b52-231e-11ed-861d-0242ac120002")
+        self.sector_fluxos = Sector.objects.get(
+            pk="21aecf8c-0c73-4059-ba82-4343e0cc627c"
+        )  # ENGINE
+        self.sector_intel = Sector.objects.get(
+            pk="4f88b656-194d-4a83-a166-5d84ba825b8d"
+        )  # FRONTEND
+
+        self.group_sector = GroupSector.objects.create(
+            name="GS Test", project=self.project, rooms_limit=10
+        )
+        self.group_sector.sectors.add(self.sector_fluxos, self.sector_intel)
+
+        self.project_permission = ProjectPermission.objects.get(
+            project=self.project, user=self.manager_user, role=1
+        )
+
+        self.engine_queue = Queue.objects.get(sector=self.sector_fluxos)
+        self.frontend_queue = Queue.objects.get(sector=self.sector_intel)
+
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+
+    def test_create_agent_auth_with_enabled_queues_only(self):
+        url = reverse("group_sector_auth-list")
+        data = {
+            "group_sector": str(self.group_sector.uuid),
+            "permission": str(self.project_permission.uuid),
+            "role": GroupSectorAuthorization.ROLE_AGENT,
+            "enabled_queues": [str(self.engine_queue.uuid)],
+        }
+        resp = self.client.post(url, data=data, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(
+            QueueAuthorization.objects.filter(
+                permission=self.project_permission, queue=self.engine_queue
+            ).exists()
+        )
+        self.assertFalse(
+            QueueAuthorization.objects.filter(
+                permission=self.project_permission, queue=self.frontend_queue
+            ).exists()
+        )
+
+    def test_edit_agent_auth_disable_queue(self):
+        # habilitar duas filas primeiro
+        url = reverse("group_sector_auth-list")
+        data = {
+            "group_sector": str(self.group_sector.uuid),
+            "permission": str(self.project_permission.uuid),
+            "role": GroupSectorAuthorization.ROLE_AGENT,
+            "enabled_queues": [
+                str(self.engine_queue.uuid),
+                str(self.frontend_queue.uuid),
+            ],
+        }
+        resp = self.client.post(url, data=data, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        # desabilitar uma
+        data2 = {
+            "group_sector": str(self.group_sector.uuid),
+            "permission": str(self.project_permission.uuid),
+            "role": GroupSectorAuthorization.ROLE_AGENT,
+            "disabled_queues": [str(self.frontend_queue.uuid)],
+        }
+        resp2 = self.client.post(url, data=data2, format="json")
+        self.assertEqual(resp2.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(
+            QueueAuthorization.objects.filter(
+                permission=self.project_permission, queue=self.engine_queue
+            ).exists()
+        )
+        self.assertFalse(
+            QueueAuthorization.objects.filter(
+                permission=self.project_permission, queue=self.frontend_queue
+            ).exists()
+        )
+
+    def test_retrocompatibility_when_no_enabled_disabled(self):
+        # Sem enabled/disabled → lógica antiga: concede todas as filas dos setores do grupo
+        url = reverse("group_sector_auth-list")
+        data = {
+            "group_sector": str(self.group_sector.uuid),
+            "permission": str(self.project_permission.uuid),
+            "role": GroupSectorAuthorization.ROLE_AGENT,
+        }
+        resp = self.client.post(url, data=data, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(
+            QueueAuthorization.objects.filter(
+                permission=self.project_permission, queue=self.engine_queue
+            ).exists()
+        )
+        self.assertTrue(
+            QueueAuthorization.objects.filter(
+                permission=self.project_permission, queue=self.frontend_queue
+            ).exists()
+        )
