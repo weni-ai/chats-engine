@@ -326,11 +326,10 @@ class GroupSectorQueueAndPermissionsTests(APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertIn(self.manager_user.email, resp.data)
         agent_entry = resp.data[self.manager_user.email]
-        self.assertIn("sectors", agent_entry)
-        self.assertIn(str(self.sector_fluxos.uuid), agent_entry["sectors"])
+        self.assertIn(str(self.sector_fluxos.uuid), agent_entry)
         self.assertIn(
             str(self.engine_queue.uuid),
-            agent_entry["sectors"][str(self.sector_fluxos.uuid)]["permissions"],
+            agent_entry[str(self.sector_fluxos.uuid)]["permissions"],
         )
 
     def test_list_permissions_multiple_sectors(self):
@@ -348,16 +347,15 @@ class GroupSectorQueueAndPermissionsTests(APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertIn(self.manager_user.email, resp.data)
         agent_entry = resp.data[self.manager_user.email]
-        sectors_map = agent_entry.get("sectors", {})
-        self.assertIn(str(self.sector_fluxos.uuid), sectors_map)
-        self.assertIn(str(self.sector_intel.uuid), sectors_map)
+        self.assertIn(str(self.sector_fluxos.uuid), agent_entry)
+        self.assertIn(str(self.sector_intel.uuid), agent_entry)
         self.assertIn(
             str(self.engine_queue.uuid),
-            sectors_map[str(self.sector_fluxos.uuid)]["permissions"],
+            agent_entry[str(self.sector_fluxos.uuid)]["permissions"],
         )
         self.assertIn(
             str(self.frontend_queue.uuid),
-            sectors_map[str(self.sector_intel.uuid)]["permissions"],
+            agent_entry[str(self.sector_intel.uuid)]["permissions"],
         )
 
 

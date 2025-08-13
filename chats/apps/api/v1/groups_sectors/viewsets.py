@@ -96,12 +96,10 @@ class GroupSectorViewset(viewsets.ModelViewSet):
     def list_permissions(self, request, *args, **kwargs):
         """
         GET /v1/group_sector/permissions/?sectors=uuid1,uuid2
-        Response (sempre):
+        Response:
         {
           "[agent_email]": {
-            "sectors": {
-              "[sectorUuid]": { "sector_name": "string", "permissions": ["queueUuid", ...] }
-            }
+            "[sectorUuid]": { "sector_name": "string", "permissions": ["queueUuid", ...] }
           }
         }
         """
@@ -133,8 +131,8 @@ class GroupSectorViewset(viewsets.ModelViewSet):
             agent_email = authorization.permission.user.email
             sector_uuid = str(authorization.queue.sector.uuid)
             sector_name = authorization.queue.sector.name
-            agent_entry = response_payload.setdefault(agent_email, {"sectors": {}})
-            sector_permissions_entry = agent_entry["sectors"].setdefault(
+            agent_entry = response_payload.setdefault(agent_email, {})
+            sector_permissions_entry = agent_entry.setdefault(
                 sector_uuid, {"sector_name": sector_name, "permissions": []}
             )
             sector_permissions_entry["permissions"].append(
