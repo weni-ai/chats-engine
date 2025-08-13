@@ -204,13 +204,6 @@ class RemoveSectorFromGroupSectorUseCase:
 
 
 class UpdateAgentQueueAuthorizationsUseCase:
-    """
-    Habilita/Desabilita filas por agente dentro de um GroupSector.
-    - Valida se as filas pertencem aos setores do GroupSector e ao mesmo projeto.
-    - Cria autorizações para 'enabled_queue_uuids'.
-    - Remove autorizações para 'disabled_queue_uuids'.
-    """
-
     def __init__(
         self,
         group_sector_uuid: UUID,
@@ -229,7 +222,6 @@ class UpdateAgentQueueAuthorizationsUseCase:
         self.disabled_queue_uuids = set(str(u) for u in (disabled_queue_uuids or []))
 
     def _allowed_queue_ids(self):
-        # Normalize para strings para comparar com entradas vindas do payload (strings)
         return set(
             str(queue_uuid)
             for queue_uuid in Queue.objects.filter(
@@ -245,7 +237,6 @@ class UpdateAgentQueueAuthorizationsUseCase:
         disable_ids = list(self.disabled_queue_uuids & allowed_ids)
 
         if enable_ids:
-            # Normalize para strings
             existing = set(
                 str(queue_uuid)
                 for queue_uuid in QueueAuthorization.objects.filter(
@@ -267,7 +258,6 @@ class UpdateAgentQueueAuthorizationsUseCase:
                     ignore_conflicts=True,
                 )
 
-        # Delete authorizations for disable_ids
         if disable_ids:
             QueueAuthorization.objects.filter(
                 permission=self.permission, queue__uuid__in=disable_ids

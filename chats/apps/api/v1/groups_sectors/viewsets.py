@@ -60,9 +60,6 @@ class GroupSectorViewset(viewsets.ModelViewSet):
         url_path="queue",
     )
     def list_queues(self, request, *args, **kwargs):
-        """
-        GET /v1/group_sector/queue/?sectors=uuid1,uuid2
-        """
         sectors_param = request.query_params.get("sectors", "")
         sector_uuids = [s.strip() for s in sectors_param.split(",") if s.strip()]
         if not sector_uuids:
@@ -94,15 +91,6 @@ class GroupSectorViewset(viewsets.ModelViewSet):
         url_path="permissions",
     )
     def list_permissions(self, request, *args, **kwargs):
-        """
-        GET /v1/group_sector/permissions/?sectors=uuid1,uuid2
-        Response:
-        {
-          "[agent_email]": {
-            "[sectorUuid]": { "sector_name": "string", "permissions": ["queueUuid", ...] }
-          }
-        }
-        """
         sectors_param = request.query_params.get("sectors", "")
         sector_uuids = [s.strip() for s in sectors_param.split(",") if s.strip()]
         if not sector_uuids:
@@ -219,7 +207,6 @@ class GroupSectorAuthorizationViewset(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Retrocompatibilidade: sem listas → lógica antiga
         if not enabled_queues and not disabled_queues:
             try:
                 GroupSectorAuthorizationCreationUseCase(
@@ -239,7 +226,6 @@ class GroupSectorAuthorizationViewset(viewsets.ModelViewSet):
             except Exception as e:
                 return Response({"message": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Nova lógica: listas só fazem sentido para ROLE_AGENT
         try:
             role = int(role)
         except Exception:

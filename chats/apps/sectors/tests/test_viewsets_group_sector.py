@@ -278,10 +278,10 @@ class GroupSectorQueueAndPermissionsTests(APITestCase):
         self.project = Project.objects.get(pk="34a93b52-231e-11ed-861d-0242ac120002")
         self.sector_fluxos = Sector.objects.get(
             pk="21aecf8c-0c73-4059-ba82-4343e0cc627c"
-        )  # ENGINE
+        )
         self.sector_intel = Sector.objects.get(
             pk="4f88b656-194d-4a83-a166-5d84ba825b8d"
-        )  # FRONTEND
+        )
 
         self.group_sector = GroupSector.objects.create(
             name="GS Test", project=self.project, rooms_limit=10
@@ -302,10 +302,8 @@ class GroupSectorQueueAndPermissionsTests(APITestCase):
         params = {"sectors": f"{self.sector_fluxos.uuid},{self.sector_intel.uuid}"}
         resp = self.client.get(url, params)
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        # ambos setores presentes
         self.assertIn(str(self.sector_fluxos.uuid), resp.data)
         self.assertIn(str(self.sector_intel.uuid), resp.data)
-        # formato de filas
         fluxos_block = resp.data[str(self.sector_fluxos.uuid)]
         self.assertIn("sector_name", fluxos_block)
         self.assertIsInstance(fluxos_block["queues"], list)
@@ -315,7 +313,6 @@ class GroupSectorQueueAndPermissionsTests(APITestCase):
             self.assertIn("uuid", first_queue)
 
     def test_list_permissions_single_sector(self):
-        # conceder uma fila ao agente no setor Fluxos
         QueueAuthorization.objects.get_or_create(
             queue=self.engine_queue, permission=self.project_permission, role=1
         )
@@ -333,7 +330,6 @@ class GroupSectorQueueAndPermissionsTests(APITestCase):
         )
 
     def test_list_permissions_multiple_sectors(self):
-        # conceder filas em dois setores
         QueueAuthorization.objects.get_or_create(
             queue=self.engine_queue, permission=self.project_permission, role=1
         )
@@ -368,10 +364,10 @@ class GroupSectorAuthorizationAgentQueuesTests(APITestCase):
         self.project = Project.objects.get(pk="34a93b52-231e-11ed-861d-0242ac120002")
         self.sector_fluxos = Sector.objects.get(
             pk="21aecf8c-0c73-4059-ba82-4343e0cc627c"
-        )  # ENGINE
+        )
         self.sector_intel = Sector.objects.get(
             pk="4f88b656-194d-4a83-a166-5d84ba825b8d"
-        )  # FRONTEND
+        )
 
         self.group_sector = GroupSector.objects.create(
             name="GS Test", project=self.project, rooms_limit=10
@@ -409,7 +405,6 @@ class GroupSectorAuthorizationAgentQueuesTests(APITestCase):
         )
 
     def test_edit_agent_auth_disable_queue(self):
-        # habilitar duas filas primeiro
         url = reverse("group_sector_auth-list")
         data = {
             "group_sector": str(self.group_sector.uuid),
@@ -422,7 +417,6 @@ class GroupSectorAuthorizationAgentQueuesTests(APITestCase):
         }
         resp = self.client.post(url, data=data, format="json")
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
-        # desabilitar uma
         data2 = {
             "group_sector": str(self.group_sector.uuid),
             "permission": str(self.project_permission.uuid),
@@ -443,7 +437,6 @@ class GroupSectorAuthorizationAgentQueuesTests(APITestCase):
         )
 
     def test_retrocompatibility_when_no_enabled_disabled(self):
-        # Sem enabled/disabled → lógica antiga: concede todas as filas dos setores do grupo
         url = reverse("group_sector_auth-list")
         data = {
             "group_sector": str(self.group_sector.uuid),
