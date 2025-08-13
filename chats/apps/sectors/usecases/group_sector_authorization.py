@@ -158,7 +158,6 @@ class AddSectorToGroupSectorUseCase:
         self._validate_exists_another_group_sector()
         self._add_sector_to_group_sector()
         self._create_sector_permissions()
-        self._create_queue_permissions()
 
 
 class RemoveSectorFromGroupSectorUseCase:
