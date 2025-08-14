@@ -36,7 +36,7 @@ do_gosu(){
 }
 
 
-if [[ "start-http-only" == "$1" ]]; then
+if [[ "start" == "$1" ]]; then
     do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" python manage.py collectstatic --noinput
     do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec gunicorn "${GUNICORN_APP}" \
       --name="${APPLICATION_NAME}" \

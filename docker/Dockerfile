@@ -104,4 +104,4 @@ USER "${PROJECT_USER}:${PROJECT_GROUP}"
 EXPOSE 8000
 
 ENTRYPOINT ["bash", "docker-entrypoint.sh"]
-CMD ["start-http-only"]
+CMD ["start"]
