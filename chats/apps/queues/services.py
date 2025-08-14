@@ -42,6 +42,7 @@ class QueueRouterService:
         Route rooms to available agents.
         """
         from chats.apps.queues.utils import create_room_assigned_from_queue_feedback
+        from chats.apps.rooms.tasks import update_ticket_assignee_async
 
         logger.info("Start routing rooms for queue %s", self.queue.uuid)
 
@@ -53,7 +54,7 @@ class QueueRouterService:
             )
             return
 
-        if self.queue.available_agents.exists():
+        if not self.queue.available_agents.exists():
             logger.info(
                 "No available agents for queue %s, ending routing", self.queue.uuid
             )
@@ -65,9 +66,15 @@ class QueueRouterService:
             # Checking if the room was already routed
             # This is to avoid routing the same room multiple times
             # (race condition)
-            room.refresh_from_db(fields=["user"])
+            room.refresh_from_db()
 
             if room.user:
+
+                logger.info(
+                    "Room %s already routed to agent %s, skipping",
+                    room.uuid,
+                    room.user.email,
+                )
                 continue
 
             agent = self.queue.get_available_agent()
@@ -80,6 +87,21 @@ class QueueRouterService:
 
             room.notify_user("update")
             room.notify_queue("update")
+
+            task = update_ticket_assignee_async.delay(
+                room_uuid=str(room.uuid),
+                ticket_uuid=room.ticket_uuid,
+                user_email=agent.email,
+            )
+
+            logger.info(
+                "[ROOM] Launched async ticket update task - Room: %s, "
+                "Ticket: %s, User: %s, Task ID: %s",
+                room.uuid,
+                room.ticket_uuid,
+                agent.email,
+                task.id,
+            )
 
             create_room_assigned_from_queue_feedback(room, agent)
 
