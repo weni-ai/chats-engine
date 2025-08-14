@@ -71,6 +71,9 @@ class QueueRouterService:
         rooms_routed = 0
 
         for room in rooms:
+            # Checking if the room was already routed
+            # This is to avoid routing the same room multiple times
+            # (race condition)
             room.refresh_from_db(fields=["user"])
 
             if room.user:
