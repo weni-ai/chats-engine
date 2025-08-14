@@ -71,7 +71,12 @@ class QueueRouterService:
         rooms_routed = 0
 
         for room in rooms:
-            agent = self.queue.available_agents.first()
+            room.refresh_from_db(fields=["user"])
+
+            if room.user:
+                continue
+
+            agent = self.queue.get_available_agent()
 
             if not agent:
                 break
