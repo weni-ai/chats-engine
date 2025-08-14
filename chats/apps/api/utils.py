@@ -52,11 +52,18 @@ def create_room_dto(rooms_data) -> List[DashboardRoomSerializer]:
 
 
 def verify_user_room(room, user_request):
-    user_request = User.objects.get(email=user_request)
+	from chats.core.cache_utils import get_user_id_by_email_cached
+	from chats.apps.accounts.models import User
 
-    if room.user:
-        return room.user
-    return user_request
+	if room.user:
+		return room.user
+
+	if isinstance(user_request, str):
+		uid = get_user_id_by_email_cached(user_request)
+		if uid is None:
+			raise User.DoesNotExist()
+		return User.objects.get(pk=uid)
+	return user_request
 
 
 def ensure_timezone(dt, tz):

@@ -5,6 +5,8 @@ from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
 from chats.apps.rooms.models import Room
+from chats.core.cache_utils import get_user_id_by_email_cached
+from chats.apps.projects.models.models import ProjectPermission
 
 User = get_user_model()
 
@@ -51,18 +53,25 @@ class RoomFilter(filters.FilterSet):
             )
         except ObjectDoesNotExist:
             return queryset.none()
-        user = self.request.query_params.get("email") or self.request.user
 
-        if type(user) is str:
-            user = User.objects.get(email=user)
-            project_permission = user.project_permissions.get(project__uuid=value)
+        user_param = self.request.query_params.get("email") or self.request.user
+        if isinstance(user_param, User):
+            user_email = (user_param.email or "").lower()
+        else:
+            user_email = (user_param or "").lower()
+            uid = get_user_id_by_email_cached(user_email)
+            if uid is None:
+                return queryset.none()
+            project_permission = ProjectPermission.objects.get(
+                user_id=user_email, project__uuid=value
+            )
 
         if project_permission.is_admin:
-            user_filter = Q(user=user) | Q(user__isnull=True)
+            user_filter = Q(user_id=user_email) | Q(user__isnull=True)
             return queryset.filter(
                 user_filter, is_active=True, queue__in=project_permission.queue_ids
             )
-        user_project = Q(user=user) & Q(project_uuid=value)
+        user_project = Q(user_id=user_email) & Q(project_uuid=value)
         queue_filter = Q(user__isnull=True) & Q(queue__in=project_permission.queue_ids)
         ff = user_project | queue_filter
         queryset = queryset.filter(

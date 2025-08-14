@@ -287,9 +287,9 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
                 status.HTTP_400_BAD_REQUEST,
             )
         try:
-            agent = filters.get("agent")
+            agent = (filters.get("agent") or "").lower()
             project = room.project
-            agent_permission = project.permissions.get(user__email=agent)
+            agent_permission = project.permissions.get(user_id=agent)
         except ObjectDoesNotExist:
             return Response(
                 {

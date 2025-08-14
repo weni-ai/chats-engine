@@ -107,14 +107,7 @@ class MessageMediaSerializer(serializers.ModelSerializer):
 class BaseMessageSerializer(serializers.ModelSerializer):
     contact = ContactSerializer(many=False, required=False, read_only=True)
     user = UserSerializer(many=False, required=False, read_only=True)
-    user_email = serializers.SlugRelatedField(
-        queryset=User.objects.all(),
-        required=False,
-        source="user",
-        slug_field="email",
-        write_only=True,
-        allow_null=True,
-    )
+    user_email = serializers.EmailField(write_only=True, required=False, allow_null=True)
     text = serializers.CharField(
         required=False, allow_null=True, allow_blank=True, default=""
     )
@@ -139,6 +132,16 @@ class BaseMessageSerializer(serializers.ModelSerializer):
             "created_on",
             "contact",
         ]
+    def validate(self, attrs):
+        email = attrs.pop("user_email", None)
+        if email:
+            from chats.core.cache_utils import get_user_id_by_email_cached
+
+            uid = get_user_id_by_email_cached(email)
+            if uid is None:
+                raise serializers.ValidationError({"user_email": "not found"})
+            attrs["user_id"] = email.lower()  # to_field=email
+        return super().validate(attrs)
 
     def create(self, validated_data):
         room = validated_data.get("room")

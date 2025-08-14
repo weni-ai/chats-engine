@@ -8,6 +8,8 @@ from chats.apps.api.v1.internal.users.serializers import UserSerializer
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.queues.models import QueueAuthorization
 from chats.apps.sectors.models import SectorAuthorization, SectorTag
+from chats.core.cache_utils import get_user_id_by_email_cached
+
 
 User = get_user_model()
 
@@ -53,14 +55,12 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
 
         instance = super().create(validated_data)
         if is_template is True:
-            user = User.objects.get(email=user_email)
-            permission, created = instance.permissions.get_or_create(user=user, role=1)
-
+            email_l = (user_email or "").lower()
+            if get_user_id_by_email_cached(email_l) is None:
+                raise exceptions.APIException(detail="User not found")
+            permission, created = instance.permissions.get_or_create(user_id=email_l, role=1)
             sector = instance.sectors.create(
-                name="Default Sector",
-                rooms_limit=5,
-                work_start="08:00",
-                work_end="18:00",
+                name="Default Sector", rooms_limit=5, work_start="08:00", work_end="18:00"
             )
             queue = sector.queues.create(name="Queue 1")
             SectorAuthorization.objects.create(
