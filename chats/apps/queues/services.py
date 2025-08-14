@@ -53,16 +53,7 @@ class QueueRouterService:
             )
             return
 
-        available_agents = self.queue.available_agents.all()
-        available_agents_count = available_agents.count()
-
-        logger.info(
-            "Available agents count: %s for queue %s",
-            available_agents_count,
-            self.queue.uuid,
-        )
-
-        if available_agents_count == 0:
+        if self.queue.available_agents.exists():
             logger.info(
                 "No available agents for queue %s, ending routing", self.queue.uuid
             )
