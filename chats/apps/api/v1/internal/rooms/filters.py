@@ -1,6 +1,7 @@
 from django.db.models import Q
 from django_filters import rest_framework as filters
 
+from chats.apps.api.utils.filters import UUIDInFilter
 from chats.apps.rooms.models import Room
 
 
@@ -23,9 +24,9 @@ class RoomFilter(filters.FilterSet):
         required=True,
         method="filter_project",
     )
-    sector = filters.CharFilter(
+    sector = UUIDInFilter(
         required=False,
-        method="filter_sector",
+        field_name="queue__sector",
     )
     agent = filters.CharFilter(
         field_name="user",
@@ -67,18 +68,3 @@ class RoomFilter(filters.FilterSet):
 
     def filter_attending(self, queryset, name, value):
         return queryset.filter(user__isnull=not value)
-
-    def filter_sector(self, queryset, name, value):
-        print("filter_sector", value)
-        if isinstance(value, str):
-            values = value.split(",")
-        elif isinstance(value, list):
-            values = value
-        else:
-            values = [value]
-
-        values = [v.strip() for v in values if v.strip()]
-
-        if values:
-            return queryset.filter(queue__sector__in=values)
-        return queryset
