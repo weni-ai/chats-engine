@@ -1,17 +1,9 @@
 import json
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-try:
-	from django_redis import get_redis_connection as _get_redis_connection  # type: ignore
-except Exception:
-	_get_redis_connection = None  # type: ignore
-
-def get_redis_connection():
-	if _get_redis_connection is None:
-		raise RuntimeError("django_redis is not installed or not configured")
-	return _get_redis_connection()
+from django_redis import get_redis_connection
 
 User = get_user_model()
 
@@ -33,32 +25,32 @@ def get_user_id_by_email_cached(email: str) -> Optional[int]:
     if not email:
         return None
     try:
-        r = get_redis_connection()
+        redis_conn = get_redis_connection()
     except Exception:
-        r = None
+        redis_conn = None
 
-    k = f"user:email:{email}"
-    if r:
-        v = r.get(k)
-        if v:
-            if v == b"-1":
+    cache_key = f"user:email:{email}"
+    if redis_conn:
+        cached_value = redis_conn.get(cache_key)
+        if cached_value:
+            if cached_value == b"-1":
                 return None
-            uid = int(v)
+            user_id = int(cached_value)
             try:
-                if User.objects.filter(pk=uid).exists():
-                    return uid
+                if User.objects.filter(pk=user_id).exists():
+                    return user_id
                 else:
-                    r.delete(k)
+                    redis_conn.delete(cache_key)
             except Exception:
                 pass
     try:
-        uid = User.objects.only("id").get(email=email).pk
-        if r:
-            r.setex(k, EMAIL_LOOKUP_TTL, uid)
-        return uid
+        user_id = User.objects.only("id").get(email=email).pk
+        if redis_conn:
+            redis_conn.setex(cache_key, EMAIL_LOOKUP_TTL, user_id)
+        return user_id
     except User.DoesNotExist:
-        if r:
-            r.setex(k, EMAIL_LOOKUP_NEG_TTL, -1)  # negative cache
+        if redis_conn:
+            redis_conn.setex(cache_key, EMAIL_LOOKUP_NEG_TTL, -1)  # negative cache
         return None
 
 
@@ -74,9 +66,9 @@ def invalidate_user_email_cache(email: str) -> None:
         return
 
     try:
-        r = get_redis_connection()
-        k = f"user:email:{email}"
-        r.delete(k)
+        redis_conn = get_redis_connection()
+        cache_key = f"user:email:{email}"
+        redis_conn.delete(cache_key)
     except Exception:
         # If Redis is down, we can't invalidate, but that's ok
         # because the fallback will query the database anyway
@@ -97,6 +89,7 @@ def invalidate_user_cache_by_id(user_id: int) -> None:
     except User.DoesNotExist:
         pass
 
+
 def get_project_by_uuid_cached(uuid: str) -> Optional[Dict[str, Any]]:
     """
     Get project data by UUID from cache or database.
@@ -105,6 +98,7 @@ def get_project_by_uuid_cached(uuid: str) -> Optional[Dict[str, Any]]:
     if not PROJECT_CACHE_ENABLED:
         try:
             from chats.apps.projects.models import Project
+
             project = Project.objects.get(uuid=uuid)
             return {
                 "uuid": str(project.uuid),
@@ -117,26 +111,27 @@ def get_project_by_uuid_cached(uuid: str) -> Optional[Dict[str, Any]]:
             }
         except Project.DoesNotExist:
             return None
-    
+
     if not uuid:
         return None
-    
+
     try:
-        r = get_redis_connection()
+        redis_conn = get_redis_connection()
     except Exception:
-        r = None
-    
-    k = f"project:uuid:{uuid}"
-    if r:
-        v = r.get(k)
-        if v:
-            if v == b"-1":
+        redis_conn = None
+
+    cache_key = f"project:uuid:{uuid}"
+    if redis_conn:
+        cached_value = redis_conn.get(cache_key)
+        if cached_value:
+            if cached_value == b"-1":
                 return None
-            return json.loads(v)
-    
+            return json.loads(cached_value)
+
     # Get from database
     try:
         from chats.apps.projects.models import Project
+
         project = Project.objects.get(uuid=uuid)
         project_data = {
             "uuid": str(project.uuid),
@@ -147,12 +142,12 @@ def get_project_by_uuid_cached(uuid: str) -> Optional[Dict[str, Any]]:
             "is_template": project.is_template,
             "room_routing_type": project.room_routing_type,
         }
-        if r:
-            r.setex(k, PROJECT_LOOKUP_TTL, json.dumps(project_data))
+        if redis_conn:
+            redis_conn.setex(cache_key, PROJECT_LOOKUP_TTL, json.dumps(project_data))
         return project_data
     except Project.DoesNotExist:
-        if r:
-            r.setex(k, PROJECT_LOOKUP_TTL, -1)  # negative cache
+        if redis_conn:
+            redis_conn.setex(cache_key, PROJECT_LOOKUP_TTL, -1)  # negative cache
         return None
 
 
@@ -163,32 +158,34 @@ def get_project_config_cached(project_uuid: str) -> Optional[Dict[str, Any]]:
     if not PROJECT_CACHE_ENABLED:
         try:
             from chats.apps.projects.models import Project
+
             config = Project.objects.get(uuid=project_uuid).config or {}
-            return dict(config)
+            return {**config}
         except Project.DoesNotExist:
             return None
-    
+
     try:
-        r = get_redis_connection()
+        redis_conn = get_redis_connection()
     except Exception:
-        r = None
-    
-    k = f"project:config:{project_uuid}"
-    if r:
-        v = r.get(k)
-        if v:
-            return json.loads(v) if v != b"-1" else None
-    
+        redis_conn = None
+
+    cache_key = f"project:config:{project_uuid}"
+    if redis_conn:
+        cached_value = redis_conn.get(cache_key)
+        if cached_value:
+            return json.loads(cached_value) if cached_value != b"-1" else None
+
     # Get from database
     try:
         from chats.apps.projects.models import Project
+
         config = Project.objects.get(uuid=project_uuid).config or {}
-        if r:
-            r.setex(k, PROJECT_CONFIG_TTL, json.dumps(config))
-        return dict(config)
+        if redis_conn:
+            redis_conn.setex(cache_key, PROJECT_CONFIG_TTL, json.dumps(config))
+        return {**config}
     except Project.DoesNotExist:
-        if r:
-            r.setex(k, PROJECT_CONFIG_TTL, -1)
+        if redis_conn:
+            redis_conn.setex(cache_key, PROJECT_CONFIG_TTL, -1)
         return None
 
 
@@ -198,15 +195,15 @@ def invalidate_project_cache(project_uuid: str) -> None:
     """
     if not PROJECT_CACHE_ENABLED:
         return
-    
+
     if not project_uuid:
         return
-    
+
     try:
-        r = get_redis_connection()
+        redis_conn = get_redis_connection()
         # Delete all project-related keys
-        r.delete(f"project:uuid:{project_uuid}")
-        r.delete(f"project:config:{project_uuid}")
+        redis_conn.delete(f"project:uuid:{project_uuid}")
+        redis_conn.delete(f"project:config:{project_uuid}")
     except Exception:
         pass
 
@@ -217,9 +214,10 @@ def invalidate_project_cache_by_id(project_id: int) -> None:
     """
     if not PROJECT_CACHE_ENABLED:
         return
-    
+
     try:
         from chats.apps.projects.models import Project
+
         project = Project.objects.only("uuid").get(pk=project_id)
         invalidate_project_cache(str(project.uuid))
     except Project.DoesNotExist:
