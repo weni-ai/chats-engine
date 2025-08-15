@@ -69,6 +69,7 @@ class RoomFilter(filters.FilterSet):
         return queryset.filter(user__isnull=not value)
 
     def filter_sector(self, queryset, name, value):
+        print("filter_sector", value)
         if isinstance(value, str):
             values = value.split(",")
         elif isinstance(value, list):
