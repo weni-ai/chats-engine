@@ -46,3 +46,38 @@ def get_user_id_by_email_cached(email: str) -> Optional[int]:
 		if r:
 			r.setex(k, EMAIL_LOOKUP_NEG_TTL, -1)  # negative cache
 		return None
+
+def invalidate_user_email_cache(email: str) -> None:
+    """
+    Invalidate the cache for a specific email
+    """
+    if not EMAIL_LOOKUP_CACHE_ENABLED:
+        return
+    
+    email = (email or "").lower()
+    if not email:
+        return
+    
+    try:
+        r = get_redis_connection()
+        k = f"user:email:{email}"
+        r.delete(k)
+    except Exception:
+        # If Redis is down, we can't invalidate, but that's ok
+        # because the fallback will query the database anyway
+        pass
+
+
+def invalidate_user_cache_by_id(user_id: int) -> None:
+    """
+    Invalidate cache for a user by their ID. 
+    Useful when we don't know the old email.
+    """
+    if not EMAIL_LOOKUP_CACHE_ENABLED:
+        return
+    
+    try:
+        user = User.objects.only("email").get(pk=user_id)
+        invalidate_user_email_cache(user.email)
+    except User.DoesNotExist:
+        pass

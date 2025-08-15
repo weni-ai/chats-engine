@@ -44,6 +44,26 @@ class UserManager(BaseUserManager):
         user, _ = self.get_or_create(email=settings.ADMIN_USER_EMAIL)
         return user
 
+    def update_email(self, user_id, new_email):
+        """
+        Update user email with cache invalidation
+        """
+        from chats.core.cache_utils import invalidate_user_email_cache
+        
+        try:
+            user = self.get(pk=user_id)
+            old_email = user.email
+            user.email = self.normalize_email(new_email)
+            user.save()
+            
+            # Invalidate both old and new email caches
+            invalidate_user_email_cache(old_email)
+            invalidate_user_email_cache(new_email)
+            
+            return user
+        except self.model.DoesNotExist:
+            raise
+
 
 class User(AbstractBaseUser, PermissionsMixin):
     first_name = models.CharField(_("first name"), max_length=30, blank=True)

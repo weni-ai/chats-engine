@@ -11,6 +11,10 @@ class FakeRedis:
         return self.store.get(k)
     def setex(self, k, ttl, v):
         self.store[k] = str(v).encode() if isinstance(v, int) else v
+    def delete(self, k):
+        if k in self.store:
+            del self.store[k]
+        return 1
 
 class GetUserIdByEmailCachedTests(TestCase):
     def setUp(self):
@@ -49,3 +53,57 @@ class GetUserIdByEmailCachedTests(TestCase):
     def test_blank_email_returns_none(self):
         self.assertIsNone(cache_utils.get_user_id_by_email_cached(""))
         self.assertIsNone(cache_utils.get_user_id_by_email_cached(None))
+
+class CacheInvalidationTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create(email="test@example.com", first_name="Test")
+        
+    @patch("chats.core.cache_utils.get_redis_connection")
+    def test_invalidate_user_email_cache(self, mock_conn):
+        r = FakeRedis()
+        mock_conn.return_value = r
+        
+        # First, cache the user
+        cache_utils.get_user_id_by_email_cached("test@example.com")
+        self.assertIsNotNone(r.get("user:email:test@example.com"))
+        
+        # Invalidate the cache
+        cache_utils.invalidate_user_email_cache("test@example.com")
+        self.assertIsNone(r.get("user:email:test@example.com"))
+    
+    @patch("chats.core.cache_utils.get_redis_connection")
+    def test_email_change_invalidates_cache(self, mock_conn):
+        r = FakeRedis()
+        mock_conn.return_value = r
+        
+        # Cache the original email
+        cache_utils.get_user_id_by_email_cached("test@example.com")
+        self.assertIsNotNone(r.get("user:email:test@example.com"))
+        
+        # Change the email
+        self.user.email = "newemail@example.com"
+        self.user.save()
+        
+        # Old email should be invalidated
+        self.assertIsNone(r.get("user:email:test@example.com"))
+        
+    @patch("chats.core.cache_utils.get_redis_connection")
+    def test_user_deletion_invalidates_cache(self, mock_conn):
+        r = FakeRedis()
+        mock_conn.return_value = r
+        
+        # Cache the user
+        cache_utils.get_user_id_by_email_cached("test@example.com")
+        self.assertIsNotNone(r.get("user:email:test@example.com"))
+        
+        # Delete the user
+        self.user.delete()
+        
+        # Cache should be invalidated
+        self.assertIsNone(r.get("user:email:test@example.com"))
+    
+    @patch("chats.core.cache_utils.EMAIL_LOOKUP_CACHE_ENABLED", False)
+    def test_invalidation_with_cache_disabled(self):
+        # Should not raise any errors
+        cache_utils.invalidate_user_email_cache("test@example.com")
+        cache_utils.invalidate_user_cache_by_id(self.user.pk)
