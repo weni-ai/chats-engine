@@ -1,7 +1,7 @@
 from django.db.models import Q
 from django_filters import rest_framework as filters
 
-from chats.apps.api.utils.filters import UUIDInFilter
+from chats.apps.api.filters import UUIDInFilter
 from chats.apps.rooms.models import Room
 
 
