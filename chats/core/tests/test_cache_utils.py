@@ -4,6 +4,7 @@ from django.test import TestCase
 
 from chats.apps.accounts.models import User
 from chats.core import cache_utils
+from chats.apps.projects.models import Project
 
 
 class FakeRedis:
@@ -110,3 +111,36 @@ class CacheInvalidationTests(TestCase):
     def test_invalidation_with_cache_disabled(self):
         cache_utils.invalidate_user_email_cache("test@example.com")
         cache_utils.invalidate_user_cache_by_id(self.user.pk)
+
+class ProjectCacheTests(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(
+            name="Test Project",
+            uuid="550e8400-e29b-41d4-a716-446655440000",
+            timezone="America/Sao_Paulo",
+            org="test-org"
+        )
+    
+    @patch("chats.core.cache_utils.get_redis_connection")
+    def test_project_uuid_cache(self, mock_conn):
+        r = FakeRedis()
+        mock_conn.return_value = r
+        
+        # First call - cache miss
+        project_data = cache_utils.get_project_by_uuid_cached(str(self.project.uuid))
+        self.assertEqual(project_data['name'], "Test Project")
+        
+        # Second call - cache hit
+        project_data = cache_utils.get_project_by_uuid_cached(str(self.project.uuid))
+        self.assertEqual(project_data['name'], "Test Project")
+    
+    @patch("chats.core.cache_utils.get_redis_connection")
+    def test_project_config_cache(self, mock_conn):
+        r = FakeRedis()
+        mock_conn.return_value = r
+        
+        self.project.config = {"test_key": "test_value"}
+        self.project.save()
+        
+        config = cache_utils.get_project_config_cached(str(self.project.uuid))
+        self.assertEqual(config['test_key'], "test_value")

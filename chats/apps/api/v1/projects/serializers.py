@@ -32,8 +32,10 @@ class ProjectSerializer(serializers.ModelSerializer):
         ]
 
     def get_config(self, project: Project):
-        config = project.config
+        from chats.core.cache_utils import get_project_config_cached
+        config = get_project_config_cached(str(project.uuid)) or project.config
         if config is not None and "chat_gpt_token" in config.keys():
+            config = config.copy()
             config.pop("chat_gpt_token", None)
         return config
 
