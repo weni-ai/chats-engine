@@ -2,8 +2,9 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
-from chats.core.cache_utils import get_user_id_by_email_cached
+
 from chats.apps.projects.models.models import ProjectPermission
+from chats.core.cache_utils import get_user_id_by_email_cached
 
 from ..models import Discussion
 

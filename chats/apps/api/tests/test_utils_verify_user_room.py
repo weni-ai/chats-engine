@@ -1,12 +1,15 @@
-# chats/apps/api/tests/test_utils_verify_user_room.py
-from django.test import TestCase
 from unittest.mock import patch
+
+from django.test import TestCase
+
 from chats.apps.accounts.models import User
 from chats.apps.api.utils import verify_user_room
+
 
 class DummyRoom:
     def __init__(self, user=None):
         self.user = user
+
 
 class VerifyUserRoomTests(TestCase):
     def setUp(self):

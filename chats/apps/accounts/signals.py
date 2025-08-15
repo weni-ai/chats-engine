@@ -1,5 +1,6 @@
-from django.db.models.signals import post_save, post_delete, pre_save
+from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
+
 from chats.apps.accounts.models import User
 from chats.core.cache_utils import invalidate_user_email_cache
 
@@ -24,16 +25,12 @@ def invalidate_user_cache_on_save(sender, instance, created, **kwargs):
     """
     Invalidate cache when user email is updated
     """
-    # If it's a new user, no cache to invalidate
     if created:
         return
-    
-    # Check if email was changed
-    old_email = getattr(instance, '_old_email', None)
+
+    old_email = getattr(instance, "_old_email", None)
     if old_email and old_email != instance.email:
-        # Invalidate the old email cache
         invalidate_user_email_cache(old_email)
-        # Also invalidate the new email cache (in case it was cached as non-existent)
         invalidate_user_email_cache(instance.email)
 
 

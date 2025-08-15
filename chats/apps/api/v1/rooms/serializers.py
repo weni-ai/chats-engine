@@ -197,7 +197,9 @@ class ListRoomSerializer(serializers.ModelSerializer):
 
 class TransferRoomSerializer(serializers.ModelSerializer):
     user = UserSerializer(many=False, required=False, read_only=True)
-    user_email = serializers.EmailField(write_only=True, required=False, allow_null=True)
+    user_email = serializers.EmailField(
+        write_only=True, required=False, allow_null=True
+    )
     queue_uuid = serializers.PrimaryKeyRelatedField(
         queryset=Queue.objects.all(), required=False, source="queue", write_only=True
     )
@@ -231,6 +233,7 @@ class TransferRoomSerializer(serializers.ModelSerializer):
             "contact": {"required": False, "read_only": True, "allow_null": False},
             "user": {"required": False, "read_only": True, "allow_null": False},
         }
+
     def validate(self, attrs):
         email = attrs.pop("user_email", None)
         if email:
