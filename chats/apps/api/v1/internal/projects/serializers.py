@@ -1,13 +1,14 @@
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework import exceptions, serializers, status
 from timezone_field.rest_framework import TimeZoneSerializerField
-from django.conf import settings
 
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.api.v1.internal.users.serializers import UserSerializer
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.queues.models import QueueAuthorization
 from chats.apps.sectors.models import SectorAuthorization, SectorTag
+from chats.core.cache_utils import get_user_id_by_email_cached
 
 User = get_user_model()
 
@@ -53,9 +54,12 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
 
         instance = super().create(validated_data)
         if is_template is True:
-            user = User.objects.get(email=user_email)
-            permission, created = instance.permissions.get_or_create(user=user, role=1)
-
+            email_l = (user_email or "").lower()
+            if get_user_id_by_email_cached(email_l) is None:
+                raise exceptions.APIException(detail="User not found")
+            permission, created = instance.permissions.get_or_create(
+                user_id=email_l, role=1
+            )
             sector = instance.sectors.create(
                 name="Default Sector",
                 rooms_limit=5,
@@ -104,7 +108,10 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
                 response_queue.status_code not in status_list
             ):
                 instance.delete()
-                error_message = f"[{response_sector.status_code}] Sector response: {response_sector.content}. [{response_queue.status_code}] Queue response: {response_queue.content}."  # NOQA
+                error_message = (
+                    f"[{response_sector.status_code}] Sector response: {response_sector.content}. "
+                    f"[{response_queue.status_code}] Queue response: {response_queue.content}."
+                )
                 raise exceptions.APIException(detail=error_message)
 
         return instance

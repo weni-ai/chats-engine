@@ -6,6 +6,8 @@ from rest_framework.response import Response
 from ..app_services.feedbacks import create_discussion_feedback_message
 from ..models import DiscussionUser
 from ..serializers import DiscussionUserListSerializer
+from chats.core.cache_utils import get_user_id_by_email_cached
+
 
 User = get_user_model()
 
@@ -16,8 +18,16 @@ class DiscussionUserActionsMixin:
     @action(detail=True, methods=["POST"], url_name="add_agents", filterset_class=None)
     def add_agents(self, request, *args, **kwargs):
         try:
-            user = request.data.get("user_email")
-            user = User.objects.get(email=user)
+            user_email = request.data.get("user_email")
+            email_l = (user_email or "").lower()
+            uid = get_user_id_by_email_cached(email_l)
+            if uid is None:
+                return Response(
+                    {"detail": "User not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            user = User.objects.get(pk=uid)
+
             discussion = self.get_object()
             added_agent = discussion.create_discussion_user(
                 from_user=request.user, to_user=user
