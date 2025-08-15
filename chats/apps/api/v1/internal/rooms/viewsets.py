@@ -32,8 +32,6 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = LimitOffsetPagination
     pagination_class.page_size = 5
 
-    def get_queryset(self):
-        # Exclude rooms with imported_room in config
-        return super().get_queryset().exclude(
-            config__imported_room=True
-        )
+    # def get_queryset(self):
+    #     # Exclude rooms with imported_room in config
+    #     return super().get_queryset().exclude(config__imported_room=True)
