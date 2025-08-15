@@ -239,7 +239,23 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": env.int("REST_PAGINATION_SIZE", default=20),
     "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
     "DEFAULT_METADATA_CLASS": "chats.apps.api.v1.metadata.Metadata",
+    "DEFAULT_THROTTLE_RATES": {
+        "external_second": env.str("EXTERNAL_SECOND_LIMIT", default="20/second"),
+        "external_minute": env.str("EXTERNAL_MINUTE_LIMIT", default="600/minute"),
+        "external_hour": env.str("EXTERNAL_HOUR_LIMIT", default="30000/hour"),
+        "external_anon": env.str("EXTERNAL_ANON_LIMIT", default="100/hour"),
+        "external_critical": env.str("EXTERNAL_CRITICAL_LIMIT", default="1000/minute"),
+        "user": env.str("DEFAULT_USER_LIMIT", default="20000/hour"),
+        "anon": env.str("DEFAULT_ANON_LIMIT", default="1000/hour"),
+    },
 }
+
+# Anti-DDoS Configuration
+EXTERNAL_SECOND_LIMIT = env.str("EXTERNAL_SECOND_LIMIT", default="20/second")
+EXTERNAL_MINUTE_LIMIT = env.str("EXTERNAL_MINUTE_LIMIT", default="600/minute")
+EXTERNAL_HOUR_LIMIT = env.str("EXTERNAL_HOUR_LIMIT", default="30000/hour")
+EXTERNAL_ANON_LIMIT = env.str("EXTERNAL_ANON_LIMIT", default="100/hour")
+EXTERNAL_CRITICAL_LIMIT = env.str("EXTERNAL_CRITICAL_LIMIT", default="1000/minute")
 
 # Logging
 

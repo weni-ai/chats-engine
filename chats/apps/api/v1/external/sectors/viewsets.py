@@ -5,6 +5,11 @@ from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
 )
 from chats.apps.api.v1.external.sectors.serializers import SectorFlowSerializer
+from chats.apps.api.v1.external.throttling import (
+    ExternalHourRateThrottle,
+    ExternalMinuteRateThrottle,
+    ExternalSecondRateThrottle,
+)
 from chats.apps.sectors.models import Sector
 
 
@@ -18,6 +23,11 @@ class SectorFlowViewset(viewsets.ReadOnlyModelViewSet):
     ]
     lookup_field = "uuid"
     authentication_classes = [ProjectAdminAuthentication]
+    throttle_classes = [
+        ExternalSecondRateThrottle,
+        ExternalMinuteRateThrottle,
+        ExternalHourRateThrottle,
+    ]
 
     def get_queryset(self):
         permission = self.request.auth
