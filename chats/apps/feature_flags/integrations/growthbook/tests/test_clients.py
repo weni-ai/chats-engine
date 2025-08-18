@@ -322,31 +322,31 @@ class TestGrowthbookClient(TestCase):
             },
             # Active if user email is the same as the one in the attributes
             # It is expected to be active because the user email is the same as the one in the attributes
-            "exampleByUserEmailTrue": {
+            "exampleByEmailInTrue": {
                 "defaultValue": False,
                 "rules": [
                     {
                         "id": "fr_40644z1tmdrec3rs",
-                        "condition": {"userEmail": attributes["userEmail"]},
+                        "condition": {"userEmail": {"$in": [attributes["userEmail"]]}},
                         "force": True,
                     }
                 ],
             },
             # Active if user email is not the same as the one in the attributes
             # It is expected to be inactive because the user email is not the same as the one in the attributes
-            "exampleByUserEmailFalse": {
+            "exampleByEmailInFalse": {
                 "defaultValue": False,
                 "rules": [
                     {
                         "id": "fr_40644z1tmdrec3rs",
-                        "condition": {"userEmail": "other@test.com"},
+                        "condition": {"userEmail": {"$in": ["other@test.com"]}},
                         "force": True,
                     }
                 ],
             },
             # Active if user email domain is vtex.com
             # It is expected to be active because the user email domain is vtex.com
-            "exampleByUserEmailDomainTrue": {
+            "exampleByEmailInDomainTrue": {
                 "defaultValue": False,
                 "rules": [
                     {
@@ -362,7 +362,7 @@ class TestGrowthbookClient(TestCase):
             },
             # Active if user email domain is weni.ai
             # It is expected to be inactive because the user email domain is not weni.ai
-            "exampleByUserEmailDomainFalse": {
+            "exampleByEmailInDomainFalse": {
                 "defaultValue": False,
                 "rules": [
                     {
@@ -386,7 +386,7 @@ class TestGrowthbookClient(TestCase):
                 "exampleWithoutRulesTrue",
                 "exampleByProjectInTrue",
                 "exampleByProjectNotInTrue",
-                "exampleByUserEmailTrue",
-                "exampleByUserEmailDomainTrue",
+                "exampleByEmailInTrue",
+                "exampleByEmailInDomainTrue",
             ],
         )
