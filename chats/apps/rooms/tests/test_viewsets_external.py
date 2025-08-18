@@ -735,6 +735,7 @@ class RoomsRoutingExternalTests(APITestCase):
         response = self._create_room("b5fab78a-4836-468c-96c4-f5b0bba3303a", data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+
 class RoomsExternalProtocolTests(APITestCase):
     fixtures = ["chats/fixtures/fixture_app.json"]
 
@@ -802,7 +803,9 @@ class RoomsExternalProtocolTests(APITestCase):
     @patch(
         "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
     )
-    def test_protocol_absent_in_body_uses_custom(self, mock_get_userinfo, mock_get_room):
+    def test_protocol_absent_in_body_uses_custom(
+        self, mock_get_userinfo, mock_get_room
+    ):
         mock_get_userinfo.return_value = {"sub": "test_user"}
         mock_get_room.return_value = None
 
