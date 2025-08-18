@@ -254,34 +254,74 @@ class TestGrowthbookClient(TestCase):
         }
 
         mock_get_feature_flags.return_value = {
+            # Always active while set to True in Growthbook
             "exampleWithoutRulesTrue": {
                 "defaultValue": True,
                 "rules": [],
             },
+            # Always inactive while set to False in Growthbook
             "exampleWithoutRulesFalse": {
                 "defaultValue": False,
                 "rules": [],
             },
-            "exampleByProjectTrue": {
+            # Active if project is in the list
+            # It is expected to be active because the project is in the list
+            # in the attributes above
+            "exampleByProjectInTrue": {
                 "defaultValue": False,
                 "rules": [
                     {
                         "id": "fr_40644z1tmdqamcpe",
-                        "condition": {"projectUUID": attributes["projectUUID"]},
+                        "condition": {
+                            "projectUUID": {"$in": [attributes["projectUUID"]]}
+                        },
                         "force": True,
                     }
                 ],
             },
-            "exampleByProjectFalse": {
+            # Active if project is not in the list
+            # It is expected to be inactive because the project is not in the list
+            # in the attributes above
+            "exampleByProjectInFalse": {
                 "defaultValue": False,
                 "rules": [
                     {
                         "id": "fr_40644z1tmdrec3rs",
-                        "condition": {"projectUUID": str(uuid.uuid4())},
+                        "condition": {"projectUUID": {"$in": [str(uuid.uuid4())]}},
                         "force": True,
                     }
                 ],
             },
+            # Active if project is not in the list
+            # It is expected to be active because the project is not in the list
+            # in the attributes above
+            "exampleByProjectNotInTrue": {
+                "defaultValue": False,
+                "rules": [
+                    {
+                        "id": "fr_40644z1tmdrec3rs",
+                        "condition": {"projectUUID": {"$nin": [str(uuid.uuid4())]}},
+                        "force": True,
+                    }
+                ],
+            },
+            # Active if project is not in the list
+            # It is expected to be inactive because the project is in the list
+            # in the attributes above
+            "exampleByProjectNotInFalse": {
+                "defaultValue": False,
+                "rules": [
+                    {
+                        "id": "fr_40644z1tmdrec3rs",
+                        "condition": {
+                            "projectUUID": {"$nin": [attributes["projectUUID"]]}
+                        },
+                        "force": True,
+                    }
+                ],
+            },
+            # Active if user email is the same as the one in the attributes
+            # It is expected to be active because the user email is the same as the one in the attributes
             "exampleByUserEmailTrue": {
                 "defaultValue": False,
                 "rules": [
@@ -292,6 +332,8 @@ class TestGrowthbookClient(TestCase):
                     }
                 ],
             },
+            # Active if user email is not the same as the one in the attributes
+            # It is expected to be inactive because the user email is not the same as the one in the attributes
             "exampleByUserEmailFalse": {
                 "defaultValue": False,
                 "rules": [
@@ -302,6 +344,8 @@ class TestGrowthbookClient(TestCase):
                     }
                 ],
             },
+            # Active if user email domain is vtex.com
+            # It is expected to be active because the user email domain is vtex.com
             "exampleByUserEmailDomainTrue": {
                 "defaultValue": False,
                 "rules": [
@@ -316,6 +360,8 @@ class TestGrowthbookClient(TestCase):
                     },
                 ],
             },
+            # Active if user email domain is weni.ai
+            # It is expected to be inactive because the user email domain is not weni.ai
             "exampleByUserEmailDomainFalse": {
                 "defaultValue": False,
                 "rules": [
@@ -337,8 +383,9 @@ class TestGrowthbookClient(TestCase):
         self.assertEqual(
             features,
             [
-                "exampleWithoutRules",
-                "exampleByProjectTrue",
+                "exampleWithoutRulesTrue",
+                "exampleByProjectInTrue",
+                "exampleByProjectNotInTrue",
                 "exampleByUserEmailTrue",
                 "exampleByUserEmailDomainTrue",
             ],
