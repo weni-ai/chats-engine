@@ -2,6 +2,8 @@ from datetime import time
 import json
 from unittest.mock import patch
 from django.test import TestCase
+from django.utils import timezone
+from django.utils.timezone import timedelta
 
 from chats.apps.projects.models.models import (
     Project,
@@ -183,3 +185,62 @@ class QueueRouterServiceTestCase(TestCase):
                 "id": str(self.agent_2.id),
             },
         )
+
+    def test_get_rooms_to_route_order(self):
+        self.assertEqual(self.service.get_rooms_to_route().count(), 0)
+
+        now = timezone.now()
+        time_1_day_ago = now - timedelta(days=1)
+        time_2_days_ago = now - timedelta(days=2)
+        time_3_days_ago = now - timedelta(days=3)
+
+        with patch("django.utils.timezone.now", return_value=time_1_day_ago):
+            room_1 = Room.objects.create(queue=self.queue, user=None)
+
+        with patch("django.utils.timezone.now", return_value=time_2_days_ago):
+            room_2 = Room.objects.create(queue=self.queue, user=None)
+
+        with patch("django.utils.timezone.now", return_value=time_3_days_ago):
+            room_3 = Room.objects.create(queue=self.queue, user=self.agent_1)
+
+        self.assertEqual(room_1.added_to_queue_at, time_1_day_ago)
+        self.assertEqual(room_2.added_to_queue_at, time_2_days_ago)
+
+        rooms = list(self.service.get_rooms_to_route())
+
+        # room 3 is ignored because it has a user assigned
+        self.assertNotIn(room_3, rooms)
+        self.assertEqual(rooms, [room_2, room_1])
+
+        added_to_queue_at = room_2.added_to_queue_at
+
+        room_2.user = self.agent_1
+        room_2.save()
+
+        room_2.refresh_from_db()
+
+        # This should not change because the room was already assigned to an agent
+        self.assertEqual(room_2.added_to_queue_at, added_to_queue_at)
+
+        rooms = list(self.service.get_rooms_to_route())
+
+        self.assertEqual(rooms, [room_1])
+
+        room_2.user = None
+        room_2.save()
+
+        room_2.refresh_from_db()
+
+        # This should change because the room was not assigned to an user
+        self.assertNotEqual(room_2.added_to_queue_at, added_to_queue_at)
+        self.assertGreater(room_2.added_to_queue_at, room_1.added_to_queue_at)
+
+        rooms = list(self.service.get_rooms_to_route())
+
+        # The order now is reversed because the room_2 has been added to the queue
+        # after the room_1 (after removing the assigned user)
+        # which is the equivalent of sending the room back to the queue
+        self.assertEqual(rooms, [room_1, room_2])
+
+        room_1.user = self.agent_2
+        room_1.save()

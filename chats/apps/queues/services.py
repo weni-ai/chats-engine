@@ -1,5 +1,9 @@
 import logging
 from typing import TYPE_CHECKING
+from django.db.models.functions import Coalesce
+
+from chats.apps.dashboard.models import RoomMetrics
+from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
 
 
 logger = logging.getLogger(__name__)
@@ -21,18 +25,27 @@ class QueueRouterService:
         if not self.queue.sector.project.use_queue_priority_routing:
             raise ValueError("Queue priority routing is not enabled for this project")
 
+    def get_rooms_to_route(self):
+        """
+        Get rooms to route.
+        """
+        from chats.apps.rooms.models import Room
+
+        return (
+            Room.objects.filter(queue=self.queue, is_active=True, user__isnull=True)
+            .annotate(date_field=Coalesce("added_to_queue_at", "created_on"))
+            .order_by("date_field")
+        )
+
     def route_rooms(self):
         """
         Route rooms to available agents.
         """
-        from chats.apps.rooms.models import Room
         from chats.apps.queues.utils import create_room_assigned_from_queue_feedback
 
         logger.info("Start routing rooms for queue %s", self.queue.uuid)
 
-        rooms = Room.objects.filter(
-            queue=self.queue, is_active=True, user__isnull=True
-        ).order_by("created_on")
+        rooms = self.get_rooms_to_route()
 
         if not rooms.exists():
             logger.info(
@@ -72,6 +85,11 @@ class QueueRouterService:
             create_room_assigned_from_queue_feedback(room, agent)
 
             rooms_routed += 1
+
+            metrics = RoomMetrics.objects.get_or_create(room=room)[0]
+            metrics.waiting_time += calculate_last_queue_waiting_time(room)
+            metrics.queued_count += 1
+            metrics.save()
 
         logger.info(
             "%s rooms routed for queue %s, ending routing",
