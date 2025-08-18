@@ -1,10 +1,13 @@
+# 3.23.19
+## Fix
+  - Race condition in route rooms for queue
+
 # 3.23.18
 ## Add
   - Internal ORM queries with soft-deleted instances
   - Unit tests for online agents in queue management
 ## Fix
   - Active rooms filtered by multiple sectors in internal endpoint used by Insights
-  - Race condition in route rooms for queue
   - Fix in how get the protocol field when opening rooms, to prevent the protocol field from arriving as an empty string and being saved incorrectly
 
 # 3.23.17
@@ -659,5 +662,6 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
