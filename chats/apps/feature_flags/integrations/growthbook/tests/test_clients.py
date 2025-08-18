@@ -1,5 +1,6 @@
 import json
 from unittest.mock import call, patch
+import uuid
 from django.test import TestCase
 
 from chats.apps.feature_flags.integrations.growthbook.clients import GrowthbookClient
@@ -242,3 +243,59 @@ class TestGrowthbookClient(TestCase):
             f"{self.client.host_base_url}/api/features/{self.client.client_key}",
             timeout=60,
         )
+
+    @patch(
+        "chats.apps.feature_flags.integrations.growthbook.clients.GrowthbookClient.get_feature_flags"
+    )
+    def test_evaluate_features_by_attributes(self, mock_get_feature_flags):
+        attributes = {
+            "userEmail": "test@test.com",
+            "projectUUID": str(uuid.uuid4()),
+        }
+
+        mock_get_feature_flags.return_value = {
+            "exampleByProject1": {
+                "defaultValue": False,
+                "rules": [
+                    {
+                        "id": "fr_40644z1tmdqamcpe",
+                        "condition": {"projectUUID": attributes["projectUUID"]},
+                        "force": True,
+                    }
+                ],
+            },
+            "exampleByProject2": {
+                "defaultValue": False,
+                "rules": [
+                    {
+                        "id": "fr_40644z1tmdrec3rs",
+                        "condition": {"projectUUID": str(uuid.uuid4())},
+                        "force": True,
+                    }
+                ],
+            },
+            "exampleByUser1": {
+                "defaultValue": False,
+                "rules": [
+                    {
+                        "id": "fr_40644z1tmdrec3rs",
+                        "condition": {"userEmail": attributes["userEmail"]},
+                        "force": True,
+                    }
+                ],
+            },
+            "exampleByUser2": {
+                "defaultValue": False,
+                "rules": [
+                    {
+                        "id": "fr_40644z1tmdrec3rs",
+                        "condition": {"userEmail": "other@test.com"},
+                        "force": True,
+                    }
+                ],
+            },
+        }
+
+        features = self.client.evaluate_features_by_attributes(attributes)
+
+        self.assertEqual(features, ["exampleByProject1", "exampleByUser1"])

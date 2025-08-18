@@ -291,8 +291,8 @@ class GrowthbookClient(BaseGrowthbookClient):
 
         active_features = []
 
-        for feature in all_features:
-            if gb.eval_feature(feature["key"]):
-                active_features.append(feature)
+        for key in all_features.keys():
+            if gb.eval_feature(key).on:
+                active_features.append(key)
 
         return active_features
