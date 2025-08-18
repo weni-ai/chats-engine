@@ -3,6 +3,9 @@ from abc import ABC, abstractmethod
 from chats.apps.accounts.models import User
 from chats.apps.projects.models.models import Project
 from chats.apps.feature_flags.integrations.growthbook.instance import GROWTHBOOK_CLIENT
+from chats.apps.feature_flags.integrations.growthbook.clients import (
+    BaseGrowthbookClient,
+)
 
 
 class BaseFeatureFlagService(ABC):
@@ -11,7 +14,7 @@ class BaseFeatureFlagService(ABC):
     """
 
     @abstractmethod
-    def get_feature_flags_list(self) -> list[str]:
+    def get_feature_flags_list_for_user_and_project(self) -> list[str]:
         """
         Get feature flags list.
         """
@@ -22,6 +25,9 @@ class FeatureFlagService(BaseFeatureFlagService):
     """
     Service for getting feature flags list.
     """
+
+    def __init__(self, growthbook_client: BaseGrowthbookClient = GROWTHBOOK_CLIENT):
+        self.growthbook_client = growthbook_client
 
     def get_feature_flags_list_for_user_and_project(
         self, user: User, project: Project
@@ -34,4 +40,4 @@ class FeatureFlagService(BaseFeatureFlagService):
             "projectUUID": project.uuid,
         }
 
-        return GROWTHBOOK_CLIENT.evaluate_features_by_attributes(attributes)
+        return self.growthbook_client.evaluate_features_by_attributes(attributes)
