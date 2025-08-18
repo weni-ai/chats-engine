@@ -734,3 +734,86 @@ class RoomsRoutingExternalTests(APITestCase):
         }
         response = self._create_room("b5fab78a-4836-468c-96c4-f5b0bba3303a", data)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+class RoomsExternalProtocolTests(APITestCase):
+    fixtures = ["chats/fixtures/fixture_app.json"]
+
+    def setUp(self) -> None:
+        self.queue_1 = Queue.objects.get(uuid="f341417b-5143-4469-a99d-f141a0676bd4")
+        self.user, self.token = create_user_and_token("test_user")
+
+        permission, _ = Permission.objects.get_or_create(
+            codename="can_communicate_internally",
+            content_type=ContentType.objects.get_for_model(User),
+        )
+        self.user.user_permissions.add(permission)
+        self.client.force_authenticate(self.user)
+
+        self.url = reverse("external_rooms-list")
+
+    def _create_room(self, data: dict):
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {self.token}")
+        return client.post(self.url, data=data, format="json")
+
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    @patch(
+        "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
+    )
+    def test_protocol_comes_in_body(self, mock_get_userinfo, mock_get_room):
+        mock_get_userinfo.return_value = {"sub": "test_user"}
+        mock_get_room.return_value = None
+
+        data = {
+            "queue_uuid": str(self.queue_1.uuid),
+            "contact": {"external_id": "contact-1", "name": "Foo"},
+            "protocol": "PROTO_BODY",
+            "custom_fields": {"protocol": "PROTO_CUSTOM"},
+        }
+
+        response = self._create_room(data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        room = Room.objects.get(uuid=response.data["uuid"])
+        self.assertEqual(room.protocol, "PROTO_BODY")
+
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    @patch(
+        "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
+    )
+    def test_protocol_empty_in_body_uses_custom(self, mock_get_userinfo, mock_get_room):
+        mock_get_userinfo.return_value = {"sub": "test_user"}
+        mock_get_room.return_value = None
+
+        data = {
+            "queue_uuid": str(self.queue_1.uuid),
+            "contact": {"external_id": "contact-2", "name": "Bar"},
+            "protocol": "",
+            "custom_fields": {"protocol": "PROTO_CUSTOM"},
+        }
+
+        response = self._create_room(data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        room = Room.objects.get(uuid=response.data["uuid"])
+        self.assertEqual(room.protocol, "PROTO_CUSTOM")
+
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    @patch(
+        "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
+    )
+    def test_protocol_absent_in_body_uses_custom(self, mock_get_userinfo, mock_get_room):
+        mock_get_userinfo.return_value = {"sub": "test_user"}
+        mock_get_room.return_value = None
+
+        data = {
+            "queue_uuid": str(self.queue_1.uuid),
+            "contact": {"external_id": "contact-3", "name": "Baz"},
+            "custom_fields": {"protocol": "PROTO_CUSTOM"},
+        }
+
+        response = self._create_room(data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        room = Room.objects.get(uuid=response.data["uuid"])
+        self.assertEqual(room.protocol, "PROTO_CUSTOM")
