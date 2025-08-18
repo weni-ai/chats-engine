@@ -249,7 +249,7 @@ class TestGrowthbookClient(TestCase):
     )
     def test_evaluate_features_by_attributes(self, mock_get_feature_flags):
         attributes = {
-            "userEmail": "test@test.com",
+            "userEmail": "test@vtex.com",
             "projectUUID": str(uuid.uuid4()),
         }
 
