@@ -5,7 +5,7 @@
 ## Fix
   - Active rooms filtered by multiple sectors in internal endpoint used by Insights
   - Race condition in route rooms for queue
-  - Fix in how get the protocol field when openinig rooms, to prevent the protocol field from arriving as an empty string and being saved incorrectly
+  - Fix in how get the protocol field when opening rooms, to prevent the protocol field from arriving as an empty string and being saved incorrectly
 
 # 3.23.17
 ## Add
@@ -659,4 +659,5 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
