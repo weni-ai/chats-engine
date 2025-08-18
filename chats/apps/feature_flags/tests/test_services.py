@@ -20,9 +20,22 @@ class TestFeatureFlagService(TestCase):
             project=self.project,
         )
 
-        self.service.growthbook_client.evaluate_features_by_attributes.assert_called_once_with(
+        self.service.growthbook_client.get_active_feature_flags_for_attributes.assert_called_once_with(
             {
                 "userEmail": "test@test.com",
                 "projectUUID": self.project.uuid,
             }
+        )
+
+    def test_evaluate_feature_flag_by_project(self):
+        self.service.evaluate_feature_flag_by_project(
+            key="example",
+            project=self.project,
+        )
+
+        self.service.growthbook_client.evaluate_feature_flag_by_attributes.assert_called_once_with(
+            "example",
+            {
+                "projectUUID": self.project.uuid,
+            },
         )

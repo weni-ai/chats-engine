@@ -37,8 +37,11 @@ class MockGrowthbookClient(BaseGrowthbookClient):
     def get_feature_flags(self) -> dict:
         return {}
 
-    def evaluate_features_by_attributes(self, attributes: dict) -> list[str]:
+    def get_active_feature_flags_for_attributes(self, attributes: dict) -> list[str]:
         return []
+
+    def evaluate_feature_flag_by_attributes(self, key: str, attributes: dict) -> bool:
+        return False
 
     def __init__(self):
         # Create mock methods that can be used for assertions
@@ -51,4 +54,5 @@ class MockGrowthbookClient(BaseGrowthbookClient):
         self.set_feature_flags_to_cache = MagicMock()
         self.update_feature_flags_definitions = MagicMock(return_value={})
         self.get_feature_flags = MagicMock(return_value={})
-        self.evaluate_features_by_attributes = MagicMock(return_value=[])
+        self.get_active_feature_flags_for_attributes = MagicMock(return_value=[])
+        self.evaluate_feature_flag_by_attributes = MagicMock(return_value=False)

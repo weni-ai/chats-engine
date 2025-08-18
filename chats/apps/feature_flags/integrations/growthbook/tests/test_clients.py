@@ -247,7 +247,7 @@ class TestGrowthbookClient(TestCase):
     @patch(
         "chats.apps.feature_flags.integrations.growthbook.clients.GrowthbookClient.get_feature_flags"
     )
-    def test_evaluate_features_by_attributes(self, mock_get_feature_flags):
+    def test_get_active_feature_flags_for_attributes(self, mock_get_feature_flags):
         attributes = {
             "userEmail": "test@vtex.com",
             "projectUUID": str(uuid.uuid4()),
@@ -378,7 +378,7 @@ class TestGrowthbookClient(TestCase):
             },
         }
 
-        features = self.client.evaluate_features_by_attributes(attributes)
+        features = self.client.get_active_feature_flags_for_attributes(attributes)
 
         self.assertEqual(
             features,
@@ -390,3 +390,30 @@ class TestGrowthbookClient(TestCase):
                 "exampleByEmailInDomainTrue",
             ],
         )
+
+    @patch(
+        "chats.apps.feature_flags.integrations.growthbook.clients.GrowthbookClient.get_feature_flags"
+    )
+    def test_evaluate_feature_flag_by_attributes(self, mock_get_feature_flags):
+        attributes = {
+            "projectUUID": str(uuid.uuid4()),
+        }
+
+        mock_get_feature_flags.return_value = {
+            "example": {
+                "defaultValue": False,
+                "rules": [
+                    {
+                        "id": "fr_40644z1tmdrec3rs",
+                        "condition": {
+                            "projectUUID": {"$in": [attributes["projectUUID"]]}
+                        },
+                        "force": True,
+                    }
+                ],
+            },
+        }
+
+        result = self.client.evaluate_feature_flag_by_attributes("example", attributes)
+
+        self.assertTrue(result)

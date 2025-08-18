@@ -85,9 +85,16 @@ class BaseGrowthbookClient(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def evaluate_features_by_attributes(self, attributes: dict) -> list[str]:
+    def get_active_feature_flags_for_attributes(self, attributes: dict) -> list[str]:
         """
         Evaluate features by attributes.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def evaluate_feature_flag_by_attributes(self, key: str, attributes: dict) -> bool:
+        """
+        Evaluate feature flag by attributes.
         """
         raise NotImplementedError
 
@@ -278,7 +285,7 @@ class GrowthbookClient(BaseGrowthbookClient):
 
         return updated_feature_flags
 
-    def evaluate_features_by_attributes(self, attributes: dict) -> list[str]:
+    def get_active_feature_flags_for_attributes(self, attributes: dict) -> list[str]:
         """
         Evaluate features by attributes.
         """
@@ -296,3 +303,16 @@ class GrowthbookClient(BaseGrowthbookClient):
                 active_features.append(key)
 
         return active_features
+
+    def evaluate_feature_flag_by_attributes(self, key: str, attributes: dict) -> bool:
+        """
+        Evaluate feature flag by attributes.
+        """
+        all_features = self.get_feature_flags()
+
+        gb = GrowthBook(
+            attributes=attributes,
+            features=all_features,
+        )
+
+        return gb.eval_feature(key).on

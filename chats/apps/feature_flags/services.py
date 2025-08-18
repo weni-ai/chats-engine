@@ -42,4 +42,18 @@ class FeatureFlagService(BaseFeatureFlagService):
             "projectUUID": project.uuid,
         }
 
-        return self.growthbook_client.evaluate_features_by_attributes(attributes)
+        return self.growthbook_client.get_active_feature_flags_for_attributes(
+            attributes
+        )
+
+    def evaluate_feature_flag_by_project(self, key: str, project: Project) -> bool:
+        """
+        Evaluate feature flag by project.
+        """
+        attributes = {
+            "projectUUID": project.uuid,
+        }
+
+        return self.growthbook_client.evaluate_feature_flag_by_attributes(
+            key, attributes
+        )
