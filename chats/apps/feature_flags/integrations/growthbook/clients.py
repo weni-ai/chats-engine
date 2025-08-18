@@ -3,7 +3,9 @@ import json
 import threading
 import requests
 import logging
+
 from sentry_sdk import capture_exception
+from growthbook import GrowthBook
 
 from chats.core.cache import CacheClient
 from chats.apps.feature_flags.integrations.growthbook.tasks import (
@@ -79,6 +81,13 @@ class BaseGrowthbookClient(ABC):
     def get_feature_flags(self) -> dict:
         """
         Get feature flags.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def evaluate_features_by_attributes(self, attributes: dict) -> list[str]:
+        """
+        Evaluate features by attributes.
         """
         raise NotImplementedError
 
@@ -268,3 +277,22 @@ class GrowthbookClient(BaseGrowthbookClient):
         updated_feature_flags = self.update_feature_flags_definitions()
 
         return updated_feature_flags
+
+    def evaluate_features_by_attributes(self, attributes: dict) -> list[str]:
+        """
+        Evaluate features by attributes.
+        """
+        all_features = self.get_feature_flags()
+
+        gb = GrowthBook(
+            attributes=attributes,
+            features=all_features,
+        )
+
+        active_features = []
+
+        for feature in all_features:
+            if gb.eval_feature(feature["key"]):
+                active_features.append(feature)
+
+        return active_features
