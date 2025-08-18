@@ -120,6 +120,9 @@ def get_room_user(
         # will be assigned to the them. This logic is not done here.
         return None
 
+    if queue.rooms.filter(is_active=True, user__isnull=True).exists():
+        return None
+
     # General room routing type
     return queue.get_available_agent()
 
@@ -184,6 +187,11 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
             )
             return msg_date.isoformat()
         return None
+
+
+class ProjectInfoSerializer(serializers.Serializer):
+    uuid = serializers.UUIDField(required=False, read_only=False)
+    name = serializers.CharField(required=False, read_only=False)
 
 
 class ProjectInfoSerializer(serializers.Serializer):
@@ -277,15 +285,13 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             try:
                 sector = Sector.objects.get(uuid=sector_uuid)
                 working_hours_config = (
-                    sector.working_day.get("working_hours", {})
-                    if sector.working_day
-                    else {}
+                    sector.config.get("working_hours", {}) if sector.config else {}
                 )
 
                 if not working_hours_config:
                     return attrs
 
-                logger.info("flows json config to open a room: %s", attrs)
+                print(f"flows json config to open a room: {attrs}")
                 created_on = self.initial_data.get("created_on", timezone.now())
                 if isinstance(created_on, str):
                     created_on = pendulum.parse(created_on)
@@ -306,8 +312,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             except serializers.ValidationError as error:
                 raise error
             except Exception as error:
-                capture_exception(error)
-                logger.error("Error getting sector: %s", error)
+                logger.error(f"Error getting sector: {error}")
 
         return attrs
 
@@ -320,7 +325,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         created_on = validated_data.get("created_on", timezone.now())
 
         protocol = validated_data.pop("protocol", None)
-        if protocol is None:
+        if protocol in (None, ""):
             protocol = validated_data.get("custom_fields", {}).pop("protocol", None)
 
         service_chat = validated_data.get("custom_fields", {}).pop(
@@ -364,7 +369,6 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         if history_data:
             self.process_message_history(room, history_data)
-
         return room
 
     def validate_unique_active_project(self, contact, project):
@@ -417,7 +421,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
     def check_work_time_weekend(self, sector, created_on):
         working_hours_config = (
-            sector.working_day.get("working_hours", {}) if sector.working_day else {}
+            sector.config.get("working_hours", {}) if sector.config else {}
         )
 
         if not working_hours_config:
@@ -440,10 +444,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             end_time_str = day_range.get("end")
 
             if start_time_str is None or end_time_str is None:
-                logger.info(
-                    "there is a try to create a room out of working hours range %s",
-                    created_on,
-                )
+                print(f"there is a try to create a room out of working hours range")
                 raise ValidationError(
                     {"detail": _("Contact cannot be done outside working hours")}
                 )
@@ -452,15 +453,12 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             end_time = pendulum.parse(end_time_str).time()
 
             if not (start_time <= current_time <= end_time):
-                logger.info(
-                    "there is a try to create a room out of working hours %s",
-                    created_on,
-                )
+                print(f"there is a try to create a room out of working hours")
                 raise ValidationError(
                     {"detail": _("Contact cannot be done outside working hours")}
                 )
 
-            logger.info("an room its created in the weekend %s", created_on)
+            print(f"an room its created in the weekend")
 
     def handle_urn(self, validated_data):
         is_anon = validated_data.pop("is_anon", False)
