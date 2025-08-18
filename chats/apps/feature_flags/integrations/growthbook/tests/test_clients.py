@@ -254,7 +254,15 @@ class TestGrowthbookClient(TestCase):
         }
 
         mock_get_feature_flags.return_value = {
-            "exampleByProject1": {
+            "exampleWithoutRulesTrue": {
+                "defaultValue": True,
+                "rules": [],
+            },
+            "exampleWithoutRulesFalse": {
+                "defaultValue": False,
+                "rules": [],
+            },
+            "exampleByProjectTrue": {
                 "defaultValue": False,
                 "rules": [
                     {
@@ -264,7 +272,7 @@ class TestGrowthbookClient(TestCase):
                     }
                 ],
             },
-            "exampleByProject2": {
+            "exampleByProjectFalse": {
                 "defaultValue": False,
                 "rules": [
                     {
@@ -274,7 +282,7 @@ class TestGrowthbookClient(TestCase):
                     }
                 ],
             },
-            "exampleByUser1": {
+            "exampleByUserEmailTrue": {
                 "defaultValue": False,
                 "rules": [
                     {
@@ -284,7 +292,7 @@ class TestGrowthbookClient(TestCase):
                     }
                 ],
             },
-            "exampleByUser2": {
+            "exampleByUserEmailFalse": {
                 "defaultValue": False,
                 "rules": [
                     {
@@ -294,8 +302,44 @@ class TestGrowthbookClient(TestCase):
                     }
                 ],
             },
+            "exampleByUserEmailDomainTrue": {
+                "defaultValue": False,
+                "rules": [
+                    {
+                        "id": "fr_40644z1tmdrec3rs",
+                        "condition": {
+                            "userEmail": {
+                                "$regex": "^[\\w.+-]+@([\\w-]+\\.)*vtex\\.com$"
+                            }
+                        },
+                        "force": True,
+                    },
+                ],
+            },
+            "exampleByUserEmailDomainFalse": {
+                "defaultValue": False,
+                "rules": [
+                    {
+                        "id": "fr_40644z1tmdrec3rs",
+                        "condition": {
+                            "userEmail": {
+                                "$regex": "^[\\w.+-]+@([\\w-]+\\.)*weni\\.ai$"
+                            }
+                        },
+                        "force": True,
+                    },
+                ],
+            },
         }
 
         features = self.client.evaluate_features_by_attributes(attributes)
 
-        self.assertEqual(features, ["exampleByProject1", "exampleByUser1"])
+        self.assertEqual(
+            features,
+            [
+                "exampleWithoutRules",
+                "exampleByProjectTrue",
+                "exampleByUserEmailTrue",
+                "exampleByUserEmailDomainTrue",
+            ],
+        )
