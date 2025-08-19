@@ -32,9 +32,7 @@ class FeatureFlagService(BaseFeatureFlagService):
     def __init__(self, growthbook_client: "BaseGrowthbookClient"):
         self.growthbook_client = growthbook_client
 
-    def get_feature_flags_list_for_user_and_project(
-        self, user: User, project: Project
-    ) -> list[str]:
+    def get_feature_flags_list_for_user_and_project(self, user: User, project: Project):
         """
         Get feature flags list for user and project.
         """
