@@ -37,7 +37,7 @@ class MockGrowthbookClient(BaseGrowthbookClient):
     def get_feature_flags(self) -> dict:
         return {}
 
-    def get_active_feature_flags_for_attributes(self, attributes: dict) -> list[str]:
+    def get_active_feature_flags_for_attributes(self, attributes: dict):
         return []
 
     def evaluate_feature_flag_by_attributes(self, key: str, attributes: dict) -> bool:

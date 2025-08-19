@@ -85,7 +85,7 @@ class BaseGrowthbookClient(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_active_feature_flags_for_attributes(self, attributes: dict) -> list[str]:
+    def get_active_feature_flags_for_attributes(self, attributes: dict):
         """
         Evaluate features by attributes.
         """
@@ -288,7 +288,7 @@ class GrowthbookClient(BaseGrowthbookClient):
 
         return updated_feature_flags
 
-    def get_active_feature_flags_for_attributes(self, attributes: dict) -> list[str]:
+    def get_active_feature_flags_for_attributes(self, attributes: dict):
         """
         Evaluate features by attributes.
         """

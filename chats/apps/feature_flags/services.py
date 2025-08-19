@@ -17,9 +17,7 @@ class BaseFeatureFlagService(ABC):
     """
 
     @abstractmethod
-    def get_feature_flags_list_for_user_and_project(
-        self, user: User, project: Project
-    ) -> list[str]:
+    def get_feature_flags_list_for_user_and_project(self, user: User, project: Project):
         """
         Get feature flags list.
         """
