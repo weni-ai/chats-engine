@@ -28,8 +28,8 @@ class FeatureFlagService(BaseFeatureFlagService):
     Service for getting feature flags list.
     """
 
-    def __init__(self, growthbook_client: BaseGrowthbookClient = GROWTHBOOK_CLIENT):
-        self.growthbook_client = growthbook_client
+    def __init__(self, growthbook_client: BaseGrowthbookClient = None):
+        self.growthbook_client = growthbook_client or GROWTHBOOK_CLIENT
 
     def get_feature_flags_list_for_user_and_project(
         self, user: User, project: Project
