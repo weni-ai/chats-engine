@@ -168,7 +168,9 @@ class TestGrowthbookClient(TestCase):
     @patch("chats.core.tests.mock.MockCacheClient.set")
     def test_update_feature_flags_definitions(self, mock_set):
         with patch("requests.get") as mock_get:
-            mock_get.return_value.json.return_value = {"test": True}
+            mock_get.return_value.json.return_value = {
+                "features": {"test": True},
+            }
 
             self.client.update_feature_flags_definitions()
 
@@ -213,7 +215,7 @@ class TestGrowthbookClient(TestCase):
         mock_cache_set,
         mock_cache_get,
     ):
-        mock_request_get.return_value.json.return_value = {"test": True}
+        mock_request_get.return_value.json.return_value = {"features": {"test": True}}
 
         mock_cache_get.side_effect = [None, None]
 
