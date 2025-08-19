@@ -15,9 +15,4 @@ class FeatureFlagsQueryParamsSerializer(serializers.Serializer):
 
         attrs["project"] = Project.objects.filter(uuid=project_uuid).first()
 
-        if not attrs["project"]:
-            raise serializers.ValidationError(
-                {"project_uuid": "Project not found"}, code="project_not_found"
-            )
-
         return attrs

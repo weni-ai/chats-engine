@@ -296,7 +296,9 @@ class ProjectQueryParamPermission(permissions.BasePermission):
         project_uuid = request.query_params.get("project_uuid")
 
         if not project_uuid:
-            raise ValidationError({"project_uuid": "This field is required"})
+            raise ValidationError(
+                {"project_uuid": ["This field is required"]}, code="required"
+            )
 
         return ProjectPermission.objects.filter(
             project__uuid=project_uuid, user=request.user
