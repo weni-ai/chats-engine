@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 
 from chats.apps.accounts.models import User
 from chats.apps.projects.models.models import Project
-from chats.apps.feature_flags.integrations.growthbook.instance import GROWTHBOOK_CLIENT
 from chats.apps.feature_flags.integrations.growthbook.clients import (
     BaseGrowthbookClient,
 )
