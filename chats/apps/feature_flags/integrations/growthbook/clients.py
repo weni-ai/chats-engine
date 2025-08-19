@@ -294,6 +294,8 @@ class GrowthbookClient(BaseGrowthbookClient):
         """
         all_features = self.get_feature_flags()
 
+        print("All features: ", all_features)
+
         gb = GrowthBook(
             attributes=attributes,
             features=all_features,
