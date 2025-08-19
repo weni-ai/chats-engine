@@ -409,7 +409,7 @@ class ModelFieldsViewSet(APIView):
     """
     Endpoint para retornar os campos disponíveis dos principais models do sistema.
     """
-    permission_classes = [permissions.IsAuthenticated, IsProjectAdmin]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         return Response(ModelFieldsPresenter.get_models_info())
@@ -740,35 +740,24 @@ class ReportFieldsValidatorViewSet(APIView):
             # Estima o tempo de execução
             estimated_time = self._estimate_execution_time(fields_config, project)
             
-            # Cria o objeto de status
+            # Cria o objeto de status (pendente)
             report_status = ReportStatus.objects.create(
                 project=project,
                 user=request.user,
                 fields_config=fields_config
             )
-            
-            # Envia para processamento assíncrono
-            generate_custom_fields_report.delay(
-                project_uuid=project.uuid,
-                fields_config=fields_config,
-                user_email=request.user.email,
-                report_status_id=report_status.uuid
+            # Não processa agora; retorna 202 e o UUID para o cliente acompanhar
+            return Response(
+                {
+                    'message': 'Report scheduled. It will be processed asynchronously.',
+                    'status': 'pending',
+                    'report_uuid': str(report_status.uuid),
+                    'estimated_time': estimated_time
+                },
+                status=status.HTTP_202_ACCEPTED
             )
-            
-            return Response({
-                'message': 'The report will be sent to your email when it is ready.',
-                'status': 'pending',
-                'estimated_time_seconds': estimated_time,
-                'report_status_id': report_status.uuid
-            }, status=status.HTTP_202_ACCEPTED)
-            
         except ValidationError as e:
-            return Response(
-                {'errors': str(e)},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            raise e
         except Exception as e:
-            return Response(
-                {'error': f'Erro inesperado: {str(e)}'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            logger.error(f"Erro ao gerar relatório: {e}")
+            raise ValidationError('Erro ao iniciar a geração do relatório.')
