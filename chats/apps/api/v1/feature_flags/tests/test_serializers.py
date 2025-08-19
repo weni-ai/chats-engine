@@ -1,5 +1,3 @@
-import uuid
-
 from django.test import TestCase
 
 from chats.apps.api.v1.feature_flags.serializers import (
