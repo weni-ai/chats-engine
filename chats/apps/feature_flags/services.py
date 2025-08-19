@@ -1,10 +1,14 @@
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
 
 from chats.apps.accounts.models import User
 from chats.apps.projects.models.models import Project
-from chats.apps.feature_flags.integrations.growthbook.clients import (
-    BaseGrowthbookClient,
-)
+
+
+if TYPE_CHECKING:
+    from chats.apps.feature_flags.integrations.growthbook.clients import (
+        BaseGrowthbookClient,
+    )
 
 
 class BaseFeatureFlagService(ABC):
@@ -27,7 +31,7 @@ class FeatureFlagService(BaseFeatureFlagService):
     Service for getting feature flags list.
     """
 
-    def __init__(self, growthbook_client: BaseGrowthbookClient):
+    def __init__(self, growthbook_client: "BaseGrowthbookClient"):
         self.growthbook_client = growthbook_client
 
     def get_feature_flags_list_for_user_and_project(
