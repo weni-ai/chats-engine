@@ -23,6 +23,15 @@ class BaseFeatureFlagService(ABC):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def evaluate_feature_flag(
+        self, key: str, user: User = None, project: Project = None
+    ) -> bool:
+        """
+        Evaluate feature flag by project.
+        """
+        raise NotImplementedError
+
 
 class FeatureFlagService(BaseFeatureFlagService):
     """
@@ -45,13 +54,21 @@ class FeatureFlagService(BaseFeatureFlagService):
             attributes
         )
 
-    def evaluate_feature_flag_by_project(self, key: str, project: Project) -> bool:
+    def evaluate_feature_flag(
+        self, key: str, user: User = None, project: Project = None
+    ) -> bool:
         """
         Evaluate feature flag by project.
         """
-        attributes = {
-            "projectUUID": project.uuid,
-        }
+        attributes = {}
+
+        if user:
+            attributes["userEmail"] = user.email
+        if project:
+            attributes["projectUUID"] = project.uuid
+
+        if not attributes:
+            raise ValueError("No attributes provided to evaluate feature flag")
 
         return self.growthbook_client.evaluate_feature_flag_by_attributes(
             key, attributes
