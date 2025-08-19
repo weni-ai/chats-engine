@@ -34,26 +34,23 @@ class TestFeatureFlagsViewSetAsAuthenticatedUser(BaseTestFeatureFlagsViewSet):
 
         self.client.force_authenticate(user=self.user)
 
-    def test_cannot_get_active_features_as_authenticated_user_without_project_uuid(
+    def test_cannot_get_active_features_without_project_uuid(
         self,
     ):
         response = self.get_active_features({})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["project_uuid"][0].code, "required")
 
-    @with_project_permission
-    def test_cannot_get_active_features_as_authenticated_user_with_invalid_project_uuid(
-        self,
-    ):
-        response = self.get_active_features({"project_uuid": uuid.uuid4()})
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data["project_uuid"][0].code, "project_not_found")
+    def test_cannot_get_active_features_without_permission(self):
+        response = self.get_active_features({"project_uuid": self.project.uuid})
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     @with_project_permission
     @patch(
         "chats.apps.feature_flags.services.FeatureFlagService.get_feature_flags_list_for_user_and_project"
     )
-    def test_get_active_features_as_authenticated_user_with_valid_project_uuid(
+    def test_get_active_features_with_valid_project_uuid(
         self,
         mock_get_feature_flags_list_for_user_and_project,
     ):
