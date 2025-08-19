@@ -112,9 +112,10 @@ class GrowthbookClient(BaseGrowthbookClient):
         short_cache_ttl: int,
         long_cache_key: str,
         long_cache_ttl: int,
+        is_singleton: bool = False,
     ):
         with cls._lock:
-            if cls._instance is None:
+            if cls._instance is None or is_singleton is False:
                 cls._instance = super().__new__(cls)
                 cls._instance.host_base_url = host_base_url
                 cls._instance.client_key = client_key
@@ -123,6 +124,7 @@ class GrowthbookClient(BaseGrowthbookClient):
                 cls._instance.short_cache_ttl = short_cache_ttl
                 cls._instance.long_cache_key = long_cache_key
                 cls._instance.long_cache_ttl = long_cache_ttl
+                cls._instance.is_singleton = is_singleton
         return cls._instance
 
     def __init__(
@@ -134,13 +136,14 @@ class GrowthbookClient(BaseGrowthbookClient):
         short_cache_ttl: int,
         long_cache_key: str,
         long_cache_ttl: int,
+        is_singleton: bool = False,
     ):
-        if not hasattr(self, "_initialized"):
+        if getattr(self, "_initialized", False) is False:
             assert (
                 short_cache_ttl < long_cache_ttl
             ), "Short cache TTL must be less than long cache TTL"
 
-            self._initialized = True
+            self._initialized = True if is_singleton is True else False
             self.host_base_url = host_base_url
             self.client_key = client_key
             self.cache_client: CacheClient = cache_client
