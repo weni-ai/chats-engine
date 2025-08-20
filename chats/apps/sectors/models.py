@@ -29,8 +29,8 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         on_delete=models.CASCADE,
     )
     rooms_limit = models.PositiveIntegerField(_("Rooms limit per employee"))
-    work_start = models.TimeField(_("work start"), auto_now=False, auto_now_add=False)
-    work_end = models.TimeField(_("work end"), auto_now=False, auto_now_add=False)
+    work_start = models.TimeField(_("work start"), auto_now=False, auto_now_add=False, null=True, blank=True)
+    work_end = models.TimeField(_("work end"), auto_now=False, auto_now_add=False, null=True, blank=True)
     can_trigger_flows = models.BooleanField(
         _("Can trigger flows?"),
         help_text=_(
@@ -56,16 +56,6 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
     class Meta:
         verbose_name = _("Sector")
         verbose_name_plural = _("Sectors")
-
-        constraints = [
-            models.CheckConstraint(
-                check=Q(work_end__gt=F("work_start")),
-                name="wordend_greater_than_workstart_check",
-            ),
-            models.UniqueConstraint(
-                fields=["project", "name"], name="unique_sector_name"
-            ),
-        ]
 
     @property
     def external_token(self):

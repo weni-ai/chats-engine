@@ -17,21 +17,20 @@ class SectorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Sector
         fields = "__all__"
+        extra_kwargs = {
+            "work_start": {"required": False, "allow_null": True},
+            "work_end": {"required": False, "allow_null": True},
+        }
 
     def validate(self, data):
         """
         Check if the work_end date its greater than work_start date.
         """
-        if self.instance:
-            if self.instance.work_end < self.instance.work_start:
-                raise serializers.ValidationError(
-                    {"detail": _("work_end date must be greater than work_start date.")}
-                )
-        else:
-            if data["work_end"] < data["work_start"]:
-                raise serializers.ValidationError(
-                    {"detail": _("work_end date must be greater than work_start date.")}
-                )
+        start = data.get("work_start", getattr(self.instance, "work_start", None) if self.instance else None)
+        end = data.get("work_end", getattr(self.instance, "work_end", None) if self.instance else None)
+        if start is not None and end is not None:
+            if end <= start:
+                raise serializers.ValidationError({"detail": _("work_end date must be greater than work_start date.")})
         return data
 
 
