@@ -22,6 +22,7 @@ from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import close_room
 from chats.apps.sectors.models import Sector
+from chats.apps.sectors.utils import working_hours_validator
 
 logger = logging.getLogger(__name__)
 
@@ -280,7 +281,6 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         sector_uuid = attrs.get("sector_uuid")
 
-        working_hours_config = {}
         if sector_uuid:
             try:
                 sector = Sector.objects.get(uuid=sector_uuid)
@@ -306,8 +306,8 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
                 attrs["created_on"] = created_on
 
-                if working_hours_config:
-                    self.check_work_time_weekend(sector, created_on)
+                # Validação de horários de trabalho
+                self.check_work_time_weekend(sector, created_on)
 
             except serializers.ValidationError as error:
                 raise error
