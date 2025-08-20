@@ -324,7 +324,7 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
         """
         Permissions based on action
         """
-        if self.action in ["list", "retrieve"]:
+        if self.action in ["list", "retrieve", "official_holidays"]:
             permission_classes = [IsAuthenticated]
         else:
             permission_classes = [IsAuthenticated, IsSectorManager]
@@ -345,45 +345,61 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"])
     def official_holidays(self, request):
         """
-        GET /api/v1/sector_holiday/official_holidays/?sector=uuid&year=2024
-        Retorna feriados oficiais do país baseado no timezone do projeto
+        GET /api/v1/sector_holiday/official_holidays/?project=<uuid>&year=2025
+        Retorna os feriados nacionais inferidos pelo timezone do projeto.
+        Parâmetros:
+        - project (obrigatório): UUID do projeto
+        - year (opcional): ex. 2025. Default: ano atual (timezone do projeto)
         """
-        sector_uuid = request.query_params.get("sector")
-        year = request.query_params.get("year", timezone.now().year)
+        project_uuid = request.query_params.get("project")
+        year_param = request.query_params.get("year")
 
-        if not sector_uuid:
+        if not project_uuid:
             return Response(
-                {"detail": "Parameter 'sector' is required"},
+                {"detail": "Parameter 'project' is required"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
-            sector = Sector.objects.get(uuid=sector_uuid)
-            country_code = get_country_from_timezone(str(sector.project.timezone))
-            official_holidays = get_country_holidays(country_code, int(year))
+            project = Project.objects.get(uuid=project_uuid)
+        except Project.DoesNotExist:
+            return Response({"detail": "Project not found"}, status=status.HTTP_404_NOT_FOUND)
 
-            # Formatar para frontend
-            holidays_list = [
-                {
-                    "date": holiday_date.strftime("%Y-%m-%d"),
-                    "name": holiday_name,
-                    "country_code": country_code,
-                }
-                for holiday_date, holiday_name in official_holidays.items()
-            ]
+        has_access = ProjectPermission.objects.filter(
+            user=request.user, project=project
+        ).exists()
+        if not has_access:
+            return Response({"detail": "You dont have permission in this project."}, status=status.HTTP_403_FORBIDDEN)
 
-            return Response(
-                {
-                    "country_code": country_code,
-                    "year": int(year),
-                    "holidays": sorted(holidays_list, key=lambda x: x["date"]),
-                }
-            )
+        # Default do ano baseado no timezone do projeto; trata vazio/ inválido
+        if not year_param:
+            year = timezone.now().astimezone(project.timezone).year
+        else:
+            try:
+                year = int(year_param)
+            except (TypeError, ValueError):
+                return Response(
+                    {"detail": "Invalid 'year'. Use an integer like 2025."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-        except Sector.DoesNotExist:
-            return Response(
-                {"detail": "Sector not found"}, status=status.HTTP_404_NOT_FOUND
-            )
+        country_code = get_country_from_timezone(str(project.timezone))
+        official_holidays = get_country_holidays(country_code, year)
+
+        holidays_list = [
+            {
+                "date": holiday_date.strftime("%Y-%m-%d"),
+                "name": holiday_name,
+                "country_code": country_code,
+            }
+            for holiday_date, holiday_name in official_holidays.items()
+        ]
+
+        return Response({
+            "country_code": country_code,
+            "year": year,
+            "holidays": sorted(holidays_list, key=lambda x: x["date"]),
+        })
 
     @action(detail=False, methods=["post"])
     def import_official_holidays(self, request):
