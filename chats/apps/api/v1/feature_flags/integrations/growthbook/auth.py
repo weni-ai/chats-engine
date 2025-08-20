@@ -29,3 +29,11 @@ class GrowthbookSignatureAuthentication(BaseAuthentication):
             raise AuthenticationFailed("Signature verification failed") from e
 
         return (None, None)
+
+    def authenticate_header(self, request):
+        """
+        Return a string to be used as the WWW-Authenticate header in a
+        401 Unauthorized response, or None if the authentication scheme
+        should return 403 Forbidden responses.
+        """
+        return "Growthbook-Signature"

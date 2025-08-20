@@ -1,14 +1,20 @@
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import AllowAny
 
-from .auth import GrowthbookSignatureAuthentication
+
+from chats.apps.api.v1.feature_flags.integrations.growthbook.auth import (
+    GrowthbookSignatureAuthentication,
+)
+from chats.apps.feature_flags.integrations.growthbook.tasks import (
+    update_growthbook_feature_flags,
+)
 
 
 class GrowthbookWebhook(GenericViewSet):
     authentication_classes = [GrowthbookSignatureAuthentication]
-    permission_classes = [AllowAny]
 
     def create(self, request, *args, **kwargs):
-        return Response(status=status.HTTP_200_OK)
+        update_growthbook_feature_flags.delay()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
