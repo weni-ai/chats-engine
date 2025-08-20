@@ -16,11 +16,16 @@ class GrowthbookSignatureAuthentication(BaseAuthentication):
     """
 
     def authenticate(self, request):
+        """
+        Authenticate the Growthbook webhook using
+        the signature provided in the request headers.
+        """
         secret = settings.GROWTHBOOK_WEBHOOK_SECRET
 
         raw = request.body
         headers = {k.lower(): v for k, v in request.headers.items()}
 
+        # https://docs.growthbook.io/app/webhooks/sdk-webhooks#standard-webhooks
         try:
             wh = Webhook(base64.b64encode(secret.encode()).decode())
             wh.verify(raw, headers)
