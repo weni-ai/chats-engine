@@ -444,7 +444,7 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
         """
         sector_uuid = request.data.get("sector")
         year = request.data.get("year", timezone.now().year)
-        selected_holidays = request.data.get("holidays", [])
+        selected_holidays = request.data.get("enabled_holidays", [])
 
         if not sector_uuid:
             return Response(
