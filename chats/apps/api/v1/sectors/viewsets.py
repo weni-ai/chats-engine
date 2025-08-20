@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.db import IntegrityError
@@ -351,11 +351,69 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
             permission_classes = [IsAuthenticated, IsSectorManager]
         return [permission() for permission in permission_classes]
 
-    def perform_create(self, serializer):
+    def create(self, request, *args, **kwargs):
         """
-        Sector must be passed in the request body
+        Suporta:
+        - date: "YYYY-MM-DD" (um dia)
+        - date: {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"} (intervalo)
         """
-        serializer.save()
+        data = request.data
+        date_field = data.get("date")
+
+        if isinstance(date_field, dict):
+            start_str = date_field.get("start")
+            end_str = date_field.get("end")
+            if not start_str or not end_str:
+                return Response(
+                    {"detail": "date.start is required"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            try:
+                start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
+                end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
+            except ValueError:
+                return Response(
+                    {
+                        "detail": "Date has wrong format. Use YYYY-MM-DD or {'start','end'} with this format."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if end_date < start_date:
+                return Response(
+                    {"detail": "date.end must be greater than or equal to date.start"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            created = []
+            day_type = data.get("day_type", SectorHoliday.CLOSED)
+            start_time = data.get("start_time")
+            end_time = data.get("end_time")
+            description = data.get("description", "")
+            sector = data.get("sector")
+
+            for i in range((end_date - start_date).days + 1):
+                current_date = start_date + timedelta(days=i)
+                payload = {
+                    "sector": sector,
+                    "date": current_date.isoformat(),
+                    "day_type": day_type,
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "description": description,
+                }
+                serializer = self.get_serializer(data=payload)
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
+                created.append(serializer.data)
+
+            return Response(
+                {"created": len(created), "holidays": created},
+                status=status.HTTP_201_CREATED,
+            )
+
+        return super().create(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
