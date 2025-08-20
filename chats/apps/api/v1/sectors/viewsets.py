@@ -496,3 +496,21 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
             return Response(
                 {"detail": "Sector not found"}, status=status.HTTP_404_NOT_FOUND
             )
+
+@action(detail=True, methods=["GET", "POST"], url_path="worktime")
+def worktime(self, request, *args, **kwargs):
+	sector = self.get_object()
+
+	if request.method == "GET":
+		working_hours = (sector.working_day or {}).get("working_hours", {})
+		return Response({"working_hours": working_hours}, status=status.HTTP_200_OK)
+
+	working_hours = request.data.get("working_hours", {})
+	if not isinstance(working_hours, dict):
+		return Response({"detail": "Field 'working_hours' must be an object"}, status=status.HTTP_400_BAD_REQUEST)
+
+	working_day = sector.working_day or {}
+	working_day["working_hours"] = working_hours
+	sector.working_day = working_day
+	sector.save(update_fields=["working_day"])
+	return Response({"working_hours": working_hours}, status=status.HTTP_200_OK)
