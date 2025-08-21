@@ -40,8 +40,8 @@ class UserFeedback(BaseModel):
         on_delete=models.CASCADE,
         related_name="user_feedbacks",
     )
-    rate = models.IntegerField(choices=FeedbackRate.choices)
-    text = models.TextField(null=True, blank=True)
+    rating = models.IntegerField(choices=FeedbackRate.choices)
+    comment = models.TextField(null=True, blank=True)
     project = models.ForeignKey(
         "projects.Project",
         related_name="user_feedbacks",

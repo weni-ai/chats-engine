@@ -2,12 +2,14 @@ import pickle
 from abc import ABC, abstractmethod
 from datetime import datetime
 import logging
+from typing import Optional
 
 from django.conf import settings
 from django.utils import timezone
 
 from chats.apps.accounts.models import User
 from chats.apps.feature_flags.services import FeatureFlagService
+from chats.apps.projects.models.models import Project
 from chats.core.cache import CacheClient
 from chats.apps.feedbacks.models import LastFeedbackShownToUser, UserFeedback
 from chats.apps.rooms.models import Room
@@ -42,6 +44,12 @@ class BaseUserFeedbackService(ABC):
 
     @abstractmethod
     def should_show_feedback_form(self, user: User) -> bool:
+        pass
+
+    @abstractmethod
+    def create_feedback(
+        self, user: User, project: Project, rating: int, comment: Optional[str] = None
+    ) -> UserFeedback:
         pass
 
 
@@ -203,3 +211,17 @@ class UserFeedbackService(BaseUserFeedbackService):
         self.increment_feedback_form_shown_count(user)
 
         return True
+
+    def create_feedback(
+        self, user: User, project: Project, rating: int, comment: Optional[str] = None
+    ) -> UserFeedback:
+        """
+        Create feedback
+        """
+        return UserFeedback.objects.create(
+            user=user,
+            project=project,
+            rating=rating,
+            comment=comment,
+            answered_at=timezone.now(),
+        )

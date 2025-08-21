@@ -4,11 +4,12 @@ from django.test import TestCase
 from django.utils import timezone
 from django.utils.timezone import timedelta
 
-from chats.apps.feedbacks.models import LastFeedbackShownToUser
+from chats.apps.feedbacks.models import LastFeedbackShownToUser, UserFeedback
 from chats.apps.feedbacks.services import UserFeedbackService
 from chats.apps.feature_flags.tests.mock import MockFeatureFlagService
 from chats.core.tests.mock import MockCacheClient
 from chats.apps.accounts.models import User
+from chats.apps.projects.models.models import Project
 
 
 class TestUserFeedbackService(TestCase):
@@ -418,3 +419,17 @@ class TestUserFeedbackService(TestCase):
             last_shown_at=now,
         )
         mock_increment_feedback_form_shown_count.assert_called_once_with(user)
+
+    def test_create_feedback(self):
+        user = User.objects.create(email="test@test.com")
+        project = Project.objects.create(name="Test Project")
+        rating = 5
+        comment = "Test Comment"
+
+        feedback = self.service.create_feedback(user, project, rating, comment)
+
+        self.assertIsInstance(feedback, UserFeedback)
+        self.assertEqual(feedback.user, user)
+        self.assertEqual(feedback.project, project)
+        self.assertEqual(feedback.rating, rating)
+        self.assertEqual(feedback.comment, comment)
