@@ -49,6 +49,7 @@ class UserFeedback(BaseModel):
         null=True,
         blank=True,
     )
+    answered_at = models.DateTimeField()
 
     class Meta:
         verbose_name = "User Feedback"

@@ -9,7 +9,7 @@ from django.utils import timezone
 from chats.apps.accounts.models import User
 from chats.apps.feature_flags.services import FeatureFlagService
 from chats.core.cache import CacheClient
-from chats.apps.feedbacks.models import LastFeedbackShownToUser
+from chats.apps.feedbacks.models import LastFeedbackShownToUser, UserFeedback
 from chats.apps.rooms.models import Room
 
 logger = logging.getLogger(__name__)
@@ -147,6 +147,9 @@ class UserFeedbackService(BaseUserFeedbackService):
         now = timezone.now()
 
         if now > end_date or now < start_date:
+            return False
+
+        if UserFeedback.objects.filter(user=user, answered_at__gte=start_date).exists():
             return False
 
         query = {
