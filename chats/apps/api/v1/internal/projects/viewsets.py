@@ -17,6 +17,8 @@ from chats.apps.projects.usecases.status_service import InServiceStatusService
 from chats.apps.queues.utils import (
     start_queue_priority_routing_for_all_queues_in_project,
 )
+from chats.core.cache_utils import get_user_id_by_email_cached
+
 from chats.apps.rooms.models import Room
 from chats.core.views import persist_keycloak_user_by_email
 from chats.apps.projects.usecases.status_service import InServiceStatusService
@@ -83,10 +85,16 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
             role = request.data["role"]
             project_uuid = request.data["project"]
             persist_keycloak_user_by_email(user_email)
-            user = User.objects.get(email=user_email)
+            email_l = (user_email or "").lower()
+            uid = get_user_id_by_email_cached(email_l)
+            if uid is None:
+                return Response(
+                    {"Detail": f"User {user_email} not found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
             project = Project.objects.get(pk=project_uuid)
 
-            permission = qs.get_or_create(user=user, project=project)[0]
+            permission = qs.get_or_create(user_id=email_l, project=project)[0]
             permission.role = role
             permission.save()
         except (KeyError, ProjectPermission.DoesNotExist):

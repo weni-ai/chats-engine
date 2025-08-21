@@ -112,6 +112,14 @@ class Project(BaseConfigurableModel, BaseModel):
     def __str__(self):
         return self.name
 
+    def get_cached_config(self):
+        """Try to get config from cache first"""
+        from chats.core.cache_utils import get_project_config_cached
+        cached = get_project_config_cached(str(self.uuid))
+        if cached is not None:
+            return cached
+        return self.config or {}
+
     @property
     def agents_can_see_queue_history(self):
         """
@@ -119,7 +127,8 @@ class Project(BaseConfigurableModel, BaseModel):
         False > agents will only see rooms that have been closed by them
         """
         try:
-            return self.config.get("agents_can_see_queue_history", True)
+            config = self.get_cached_config()
+            return config.get("agents_can_see_queue_history", True)
         except AttributeError:
             return True
 
@@ -132,21 +141,24 @@ class Project(BaseConfigurableModel, BaseModel):
             None: Will only consider open rooms, does not matter when the room was created.
         """
         try:
-            return self.config.get("routing_option", None)
+            config = self.get_cached_config()
+            return config.get("routing_option", None)
         except AttributeError:
             return None
 
     @property
     def history_contacts_blocklist(self):
         try:
-            return self.config.get("history_contacts_blocklist", [])
+            config = self.get_cached_config()
+            return config.get("history_contacts_blocklist", [])
         except AttributeError:
             return []
 
     @property
     def openai_token(self):
         try:
-            return self.config.get("openai_token")
+            config = self.get_cached_config()
+            return config.get("openai_token")
         except AttributeError:
             return None
 

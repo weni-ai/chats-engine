@@ -70,7 +70,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             queue=params.get("queue"),
             user_request=user_permission,
             project=project,
-            is_weni_admin=should_exclude_admin_domains(request.user.email if request.user else ""),
+            is_weni_admin=should_exclude_admin_domains(
+                request.user.email if request.user else ""
+            ),
         )
 
         rooms_service = RoomsDataService(
@@ -97,7 +99,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=params.get("tag"),
             queue=params.get("queue"),
             user_request=request.user,
-            is_weni_admin=should_exclude_admin_domains(request.user.email if request.user else ""),
+            is_weni_admin=should_exclude_admin_domains(
+                request.user.email if request.user else ""
+            ),
         )
 
         agents_service = AgentsService()
@@ -130,7 +134,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=params.get("tag"),
             user_request=user_permission,
             project=project,
-            is_weni_admin=should_exclude_admin_domains(request.user.email if request.user else ""),
+            is_weni_admin=should_exclude_admin_domains(
+                request.user.email if request.user else ""
+            ),
         )
 
         sectors_service = SectorService()
@@ -160,7 +166,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=params.get("tag"),
             user_request=user_permission,
             project=project,
-            is_weni_admin=should_exclude_admin_domains(request.user.email if request.user else ""),
+            is_weni_admin=should_exclude_admin_domains(
+                request.user.email if request.user else ""
+            ),
         )
 
         raw_service = RawDataService()
@@ -194,7 +202,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
                     startcol=0,
                     index=False,
                 )
-            excel_rooms_buffer.seek(0)  # Move o cursor para o início do buffer
+            excel_rooms_buffer.seek(0)
             storage = ExcelStorage()
 
             bytes_archive = excel_rooms_buffer.getvalue()
@@ -254,7 +262,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=filter.get("tag"),
             user_request=user_permission,
             project=project,
-            is_weni_admin=should_exclude_admin_domains(request.user.email if request.user else ""),
+            is_weni_admin=should_exclude_admin_domains(
+                request.user.email if request.user else ""
+            ),
         )
 
         # Rooms Data
@@ -356,7 +366,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
                     index=False,
                 )
 
-            excel_buffer.seek(0)  # Move o cursor para o início do buffer
+            excel_buffer.seek(0)
             storage = ExcelStorage()
 
             bytes_archive = excel_buffer.getvalue()

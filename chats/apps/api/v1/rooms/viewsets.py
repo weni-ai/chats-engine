@@ -17,6 +17,7 @@ from django.db.models import (
 from django.utils import timezone
 from django.utils.timezone import make_aware
 from django.utils.translation import gettext_lazy as _
+from chats.core.cache_utils import get_user_id_by_email_cached
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
@@ -560,7 +561,16 @@ class RoomViewset(
             )
 
         if user_email:
-            user = User.objects.get(email=user_email)
+            email_l = (user_email or "").lower()
+            uid = get_user_id_by_email_cached(email_l)
+
+            if uid is None:
+                return Response(
+                    {"error": f"User {user_email} not found"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            user = User.objects.get(pk=uid)
 
             for room in rooms_list:
                 old_user = room.user
