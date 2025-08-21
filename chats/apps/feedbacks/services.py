@@ -49,30 +49,24 @@ class UserFeedbackService(BaseUserFeedbackService):
 
         return f"feedback_form_shown_count_{user.id}_{current_date}"
 
-    def get_feedback_form_shown_count_data(self, user: User) -> dict:
+    def get_feedback_form_shown_count(self, user: User) -> dict:
         """
         Get feedback form shown count data
         """
         return self.cache_client.get(
             self.get_feedback_form_shown_count_cache_key(user),
-            {
-                "count": 0,
-                "last_shown_at": None,
-            },
+            0,
         )
 
     def increment_feedback_form_shown_count(self, user: User) -> int:
         """
         Increment feedback form shown count
         """
-        current_count_data = self.get_feedback_form_shown_count_data(user)
+        current_count = self.get_feedback_form_shown_count(user)
 
         self.cache_client.set(
             self.get_feedback_form_shown_count_cache_key(user),
-            {
-                "count": current_count_data.get("count", 0) + 1,
-                "last_shown_at": timezone.now(),
-            },
+            current_count + 1,
         )
 
     def get_survey_date_range(self) -> tuple[datetime.date, datetime.date]:
@@ -84,9 +78,9 @@ class UserFeedbackService(BaseUserFeedbackService):
         """
         Should show feedback form
         """
-        shown_count_data = self.get_feedback_form_shown_count_data(user)
+        shown_count = self.get_feedback_form_shown_count(user)
 
-        if shown_count_data.get("count", 0) >= 2:
+        if shown_count >= 2:
             return False
 
         # TODO: Continue
