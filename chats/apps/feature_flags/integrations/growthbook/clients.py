@@ -3,7 +3,9 @@ import json
 import threading
 import requests
 import logging
+
 from sentry_sdk import capture_exception
+from growthbook import GrowthBook
 
 from chats.core.cache import CacheClient
 from chats.apps.feature_flags.integrations.growthbook.tasks import (
@@ -82,6 +84,20 @@ class BaseGrowthbookClient(ABC):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def get_active_feature_flags_for_attributes(self, attributes: dict):
+        """
+        Evaluate features by attributes.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def evaluate_feature_flag_by_attributes(self, key: str, attributes: dict) -> bool:
+        """
+        Evaluate feature flag by attributes.
+        """
+        raise NotImplementedError
+
 
 class GrowthbookClient(BaseGrowthbookClient):
     _instance = None
@@ -96,9 +112,10 @@ class GrowthbookClient(BaseGrowthbookClient):
         short_cache_ttl: int,
         long_cache_key: str,
         long_cache_ttl: int,
+        is_singleton: bool = False,
     ):
         with cls._lock:
-            if cls._instance is None:
+            if cls._instance is None or is_singleton is False:
                 cls._instance = super().__new__(cls)
                 cls._instance.host_base_url = host_base_url
                 cls._instance.client_key = client_key
@@ -107,6 +124,7 @@ class GrowthbookClient(BaseGrowthbookClient):
                 cls._instance.short_cache_ttl = short_cache_ttl
                 cls._instance.long_cache_key = long_cache_key
                 cls._instance.long_cache_ttl = long_cache_ttl
+                cls._instance.is_singleton = is_singleton
         return cls._instance
 
     def __init__(
@@ -118,13 +136,14 @@ class GrowthbookClient(BaseGrowthbookClient):
         short_cache_ttl: int,
         long_cache_key: str,
         long_cache_ttl: int,
+        is_singleton: bool = False,
     ):
-        if not hasattr(self, "_initialized"):
+        if getattr(self, "_initialized", False) is False:
             assert (
                 short_cache_ttl < long_cache_ttl
             ), "Short cache TTL must be less than long cache TTL"
 
-            self._initialized = True
+            self._initialized = True if is_singleton is True else False
             self.host_base_url = host_base_url
             self.client_key = client_key
             self.cache_client: CacheClient = cache_client
@@ -272,3 +291,35 @@ class GrowthbookClient(BaseGrowthbookClient):
         updated_feature_flags = self.update_feature_flags_definitions()
 
         return updated_feature_flags
+
+    def get_active_feature_flags_for_attributes(self, attributes: dict):
+        """
+        Evaluate features by attributes.
+        """
+        all_features = self.get_feature_flags()
+
+        gb = GrowthBook(
+            attributes=attributes,
+            features=all_features,
+        )
+
+        active_features = []
+
+        for key in all_features.keys():
+            if gb.eval_feature(key).on:
+                active_features.append(key)
+
+        return active_features
+
+    def evaluate_feature_flag_by_attributes(self, key: str, attributes: dict) -> bool:
+        """
+        Evaluate feature flag by attributes.
+        """
+        all_features = self.get_feature_flags()
+
+        gb = GrowthBook(
+            attributes=attributes,
+            features=all_features,
+        )
+
+        return gb.eval_feature(key).on

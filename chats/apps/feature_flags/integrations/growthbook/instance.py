@@ -12,4 +12,5 @@ GROWTHBOOK_CLIENT = GrowthbookClient(
     short_cache_ttl=settings.GROWTHBOOK_SHORT_CACHE_TTL,
     long_cache_key=settings.GROWTHBOOK_LONG_CACHE_KEY,
     long_cache_ttl=settings.GROWTHBOOK_LONG_CACHE_TTL,
+    is_singleton=True,
 )

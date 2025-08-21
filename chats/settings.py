@@ -502,8 +502,8 @@ GROWTHBOOK_SHORT_CACHE_KEY = env.str(
     "GROWTHBOOK_SHORT_CACHE_KEY", default="growthbook:feature_flags:short"
 )
 GROWTHBOOK_SHORT_CACHE_TTL = env.int(
-    "GROWTHBOOK_SHORT_CACHE_TTL", default=(60 * 60)
-)  # 1 hour
+    "GROWTHBOOK_SHORT_CACHE_TTL", default=300
+)  # 5 minutes
 GROWTHBOOK_LONG_CACHE_KEY = env.str(
     "GROWTHBOOK_LONG_CACHE_KEY", default="growthbook:feature_flags:long"
 )
