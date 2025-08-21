@@ -175,9 +175,9 @@ class UserFeedbackService(BaseUserFeedbackService):
         else:
             query["ended_at__gte"] = start_date
 
-        rooms_count = Room.objects.filter(**query)
+        rooms_count = Room.objects.filter(**query).count()
 
-        if rooms_count > 15:
+        if rooms_count >= 15:
             return True
 
         return False
