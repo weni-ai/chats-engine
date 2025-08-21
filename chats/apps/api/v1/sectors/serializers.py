@@ -207,8 +207,6 @@ class SectorHolidaySerializer(serializers.ModelSerializer):
     """
     Serializer to manage configurable holidays and special days by sector
     """
-    its_custom = serializers.BooleanField(source="is_custom", read_only=True)
-
     class Meta:
         model = SectorHoliday
         fields = [
@@ -224,8 +222,9 @@ class SectorHolidaySerializer(serializers.ModelSerializer):
             "repeat",
             "created_on",
             "modified_on",
+            "its_custom",
         ]
-        read_only_fields = ["uuid", "created_on", "modified_on", "its_custom"]
+        read_only_fields = ["uuid", "created_on", "modified_on"]
 
     def validate(self, data):
         """
@@ -277,8 +276,6 @@ class SectorHolidayListSerializer(serializers.ModelSerializer):
     """
     Serializer simplificado para listagem de holidays
     """
-    its_custom = serializers.BooleanField(source="is_custom", read_only=True)
-
     class Meta:
         model = SectorHoliday
         fields = ["uuid", "date", "date_end", "day_type", "start_time", "end_time", "description", "its_custom", "repeat"]

@@ -533,7 +533,7 @@ class SectorHoliday(BaseSoftDeleteModel, BaseModel):
         blank=True,
         help_text=_("Holiday name or reason for special hours"),
     )
-    is_custom = models.BooleanField(_("Is Custom"), default=False)
+    its_custom = models.BooleanField(_("Is Custom"), default=False)
     repeat = models.BooleanField(_("Repeat Annually"), default=False)
     
     class Meta:

@@ -400,7 +400,7 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
                 "start_time": body.get("start_time"),
                 "end_time": body.get("end_time"),
                 "description": body.get("description", ""),
-                "is_custom": True,
+                "its_custom": bool(body.get("its_custom", False)),
                 "repeat": bool(body.get("repeat", False)),
             }
 
