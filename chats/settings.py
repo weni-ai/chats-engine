@@ -512,3 +512,9 @@ GROWTHBOOK_LONG_CACHE_TTL = env.int(
     "GROWTHBOOK_LONG_CACHE_TTL", default=(60 * 60 * 24 * 30)
 )  # 30 days
 GROWTHBOOK_WEBHOOK_SECRET = env.str("GROWTHBOOK_WEBHOOK_SECRET", default="")
+
+
+# Feedback
+FEEDBACK_FEATURE_FLAG_KEY = env.str(
+    "FEEDBACK_FEATURE_FLAG_KEY", default="weniChatsFeedback"
+)

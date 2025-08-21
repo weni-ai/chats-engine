@@ -19,6 +19,12 @@ class LastFeedbackShownToUser(BaseModel):
     class Meta:
         verbose_name = "Last feedback shown to user"
         verbose_name_plural = "Last feedback shown to users"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user"],
+                name="unique_user_last_feedback_shown_to_user",
+            )
+        ]
 
     def __str__(self):
         return f"Last feedback shown to {self.user.email} at {self.last_shown_at}"
