@@ -64,6 +64,7 @@ urllib3 = "1.26.20"
 growthbook = "^1.3.1"
 workalendar = "^17.0.0"
 xlsxwriter = "^3.2.5"
+standardwebhooks = "^1.0.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"

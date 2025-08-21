@@ -261,7 +261,6 @@ class GrowthbookClient(BaseGrowthbookClient):
                 timeout=60,
             )
             response.raise_for_status()
-            self.set_feature_flags_to_cache(response.json())
         except requests.exceptions.RequestException as e:
             logger.error(
                 "Failed to update feature flags definitions: %s",
@@ -271,7 +270,12 @@ class GrowthbookClient(BaseGrowthbookClient):
 
             raise e
 
-        return response.json()
+        response = response.json()
+        features = response.get("features", {})
+
+        self.set_feature_flags_to_cache(features)
+
+        return features
 
     def get_feature_flags(self) -> dict:
         """
