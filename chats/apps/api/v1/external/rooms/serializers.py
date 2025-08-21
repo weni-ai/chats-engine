@@ -420,46 +420,12 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             )
 
     def check_work_time_weekend(self, sector, created_on):
-        working_hours_config = (
-            sector.config.get("working_hours", {}) if sector.config else {}
-        )
-
-        if not working_hours_config:
-            return
-
-        weekday = created_on.isoweekday()
-
-        if weekday in (6, 7):
-            if not working_hours_config.get("open_in_weekends", False):
-                raise ValidationError(
-                    {"detail": _("Contact cannot be done outside working hours")}
-                )
-
-            schedules = working_hours_config.get("schedules", {})
-            day_key = "saturday" if weekday == 6 else "sunday"
-            day_range = schedules.get(day_key, {})
-            current_time = created_on.time()
-
-            start_time_str = day_range.get("start")
-            end_time_str = day_range.get("end")
-
-            if start_time_str is None or end_time_str is None:
-                print(f"there is a try to create a room out of working hours range")
-                raise ValidationError(
-                    {"detail": _("Contact cannot be done outside working hours")}
-                )
-
-            start_time = pendulum.parse(start_time_str).time()
-            end_time = pendulum.parse(end_time_str).time()
-
-            if not (start_time <= current_time <= end_time):
-                print(f"there is a try to create a room out of working hours")
-                raise ValidationError(
-                    {"detail": _("Contact cannot be done outside working hours")}
-                )
-
-            print(f"an room its created in the weekend")
-
+        """
+        Verify if the sector allows room opening at the specified time.
+        Uses the WorkingHoursValidator utility for optimized validation.
+        """
+        working_hours_validator.validate_working_hours(sector, created_on)
+    
     def handle_urn(self, validated_data):
         is_anon = validated_data.pop("is_anon", False)
         urn = validated_data.get("contact", {}).pop("urn", "").split("?")[0]
