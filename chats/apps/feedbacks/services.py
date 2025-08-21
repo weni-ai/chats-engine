@@ -29,7 +29,15 @@ class BaseUserFeedbackService(ABC):
         pass
 
     @abstractmethod
+    def increment_feedback_form_shown_count(self, user: User) -> int:
+        pass
+
+    @abstractmethod
     def get_survey_date_range(self) -> tuple[datetime.date, datetime.date]:
+        pass
+
+    @abstractmethod
+    def can_create_feedback(self, user: User) -> bool:
         pass
 
     @abstractmethod
@@ -55,15 +63,17 @@ class UserFeedbackService(BaseUserFeedbackService):
         """
         current_date = timezone.now().date().isoformat()  # YYYY-MM-DD
 
-        return f"feedback_form_shown_count_{user.id}_{current_date}"
+        return f"feedback_form_shown_count:{user.id}:{current_date}"
 
     def get_feedback_form_shown_count(self, user: User) -> dict:
         """
         Get feedback form shown count data
         """
-        return self.cache_client.get(
-            self.get_feedback_form_shown_count_cache_key(user),
-            0,
+        return (
+            self.cache_client.get(
+                self.get_feedback_form_shown_count_cache_key(user),
+            )
+            or 0
         )
 
     def increment_feedback_form_shown_count(self, user: User) -> int:
@@ -102,17 +112,17 @@ class UserFeedbackService(BaseUserFeedbackService):
         if not rules:
             return None, None
 
-        survey_rule = None
+        dates = []
 
         for rule in rules:
-            if rule.get("condition", {}).get("dateRange", None) is not None:
-                survey_rule = rule
+            date_range = rule.get("condition", {}).get("dateRange", {}).get("$in", [])
+            if date_range != []:
+                dates = date_range
+
                 break
 
-        if not survey_rule:
+        if not dates:
             return None, None
-
-        dates = survey_rule.get("condition", {}).get("dateRange", [])
 
         if len(dates) != 2:
             return None, None
