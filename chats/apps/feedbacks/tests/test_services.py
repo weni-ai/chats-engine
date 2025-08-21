@@ -372,3 +372,49 @@ class TestUserFeedbackService(TestCase):
             is_active=False,
             ended_at__gte=last_shown.last_shown_at,
         )
+
+    @patch("chats.apps.feedbacks.services.UserFeedbackService.can_create_feedback")
+    def test_should_show_feedback_form_when_cannot_create_feedback(
+        self, mock_can_create_feedback
+    ):
+        mock_can_create_feedback.return_value = False
+
+        user = User.objects.create(email="test@test.com")
+
+        self.assertFalse(self.service.should_show_feedback_form(user))
+
+        mock_can_create_feedback.assert_called_once_with(user)
+
+    @patch("chats.apps.feedbacks.services.UserFeedbackService.can_create_feedback")
+    @patch("chats.apps.feedbacks.services.LastFeedbackShownToUser.objects.filter")
+    @patch("chats.apps.feedbacks.services.LastFeedbackShownToUser.objects.create")
+    @patch(
+        "chats.apps.feedbacks.services.UserFeedbackService.increment_feedback_form_shown_count"
+    )
+    def test_should_show_feedback_form_when_can_create_feedback_and_no_last_shown_feedback(
+        self,
+        mock_increment_feedback_form_shown_count,
+        mock_last_feedback_shown_to_user_create,
+        mock_last_feedback_shown_to_user_filter,
+        mock_can_create_feedback,
+    ):
+        mock_can_create_feedback.return_value = True
+        mock_last_feedback_shown_to_user_filter.return_value.first.return_value = None
+        mock_last_feedback_shown_to_user_create.return_value = True
+        mock_increment_feedback_form_shown_count.return_value = 1
+
+        user = User.objects.create(email="test@test.com")
+
+        now = timezone.now()
+
+        with patch("chats.apps.feedbacks.services.timezone.now") as mock_timezone_now:
+            mock_timezone_now.return_value = now
+            self.assertTrue(self.service.should_show_feedback_form(user))
+
+        mock_can_create_feedback.assert_called_once_with(user)
+        mock_last_feedback_shown_to_user_filter.assert_called_once_with(user=user)
+        mock_last_feedback_shown_to_user_create.assert_called_once_with(
+            user=user,
+            last_shown_at=now,
+        )
+        mock_increment_feedback_form_shown_count.assert_called_once_with(user)
