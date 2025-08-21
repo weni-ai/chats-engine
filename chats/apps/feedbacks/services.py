@@ -35,7 +35,7 @@ class BaseUserFeedbackService(ABC):
         pass
 
     @abstractmethod
-    def get_survey_date_range(self) -> tuple[datetime.date, datetime.date]:
+    def get_survey_date_range(self) -> tuple:
         pass
 
     @abstractmethod
@@ -96,7 +96,7 @@ class UserFeedbackService(BaseUserFeedbackService):
             ex=(60 * 60 * 24),  # 24 hours
         )
 
-    def get_survey_date_range(self) -> tuple[datetime.date, datetime.date]:
+    def get_survey_date_range(self) -> tuple:
         """
         Get survey date range
         """
