@@ -410,11 +410,26 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         return queue, sector
 
     def check_work_time(self, sector, created_on):
-        if not sector.is_attending(created_on):
-            raise ValidationError(
-                {"detail": _("Contact cannot be done outside working hours")}
-            )
-        elif sector.validate_agent_status() is False:
+        """
+        Validate using sector.working_day['working_hours'] exclusively.
+        """
+        if isinstance(created_on, str):
+            created_on_dt = pendulum.parse(created_on)
+        else:
+            created_on_dt = pendulum.instance(created_on)
+
+        project_tz = pendulum.timezone(str(sector.project.timezone))
+        created_on_dt = (
+            project_tz.localize(created_on_dt)
+            if created_on_dt.tzinfo is None
+            else created_on_dt.in_timezone(project_tz)
+        )
+
+        # Working hours validation (raises ValidationError when blocked)
+        working_hours_validator.validate_working_hours(sector, created_on_dt)
+
+        # Agent status validation unchanged
+        if sector.validate_agent_status() is False:
             raise ValidationError(
                 {"detail": _("Contact cannot be done when agents are offline")}
             )

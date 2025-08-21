@@ -208,12 +208,25 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         return is_online
 
     def is_attending(self, created_on):
+        """
+        Backwards-compat boolean: now delegates to working_hours config.
+        Returns True if creation time is allowed by working_hours, False otherwise.
+        """
         tz = pendulum.timezone(str(self.project.timezone))
-        created_on = pendulum.parse(str(created_on)).in_timezone(tz)
-        start = pendulum.parse(str(self.work_start))
-        end = pendulum.parse(str(self.work_end))
-
-        return start.time() < created_on.time() < end.time()
+        created_on = (
+            pendulum.instance(created_on)
+            if not isinstance(created_on, pendulum.DateTime)
+            else created_on
+        )
+        created_on = (
+            tz.localize(created_on) if created_on.tzinfo is None else created_on.in_timezone(tz)
+        )
+        try:
+            from chats.apps.sectors.utils import working_hours_validator
+            working_hours_validator.validate_working_hours(self, created_on)
+            return True
+        except Exception:
+            return False
 
     def get_or_create_user_authorization(self, user):
         sector_auth, created = self.authorizations.get_or_create(user=user)
