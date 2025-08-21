@@ -77,10 +77,11 @@ class WorkingHoursValidator:
             }
             day_key = weekday_map.get(weekday)
             day_cfg = schedules.get(day_key)
-            if day_cfg is not None:
-                # se houver configuração, precisa respeitar ao menos um intervalo
-                self._validate_day_schedules_generic(day_cfg, current_time)
-            # se não houver schedule para o dia, considera permitido
+            # Sem schedule configurado no dia útil => fechado
+            if day_cfg is None:
+                raise ValidationError({"detail": _("Contact cannot be done outside working hours")})
+            # Com schedule, validar intervalos
+            self._validate_day_schedules_generic(day_cfg, current_time)
             return
 
         # 2) fins de semana e outros casos complexos
@@ -171,7 +172,7 @@ class WorkingHoursValidator:
             start_time = self._parse_time_cached(start_str)
             end_time = self._parse_time_cached(end_str)
 
-            if not (start_time <= current_time <= end_time):
+            if not (start_time <= current_time < end_time):
                 raise ValidationError(
                     {"detail": _("Contact cannot be done outside working hours")}
                 )
@@ -192,7 +193,7 @@ class WorkingHoursValidator:
             start_time = self._parse_time_cached(start_str)
             end_time = self._parse_time_cached(end_str)
 
-            if not (start_time <= current_time <= end_time):
+            if not (start_time <= current_time < end_time):
                 raise ValidationError(
                     {"detail": _("Contact cannot be done outside working hours")}
                 )
@@ -214,7 +215,7 @@ class WorkingHoursValidator:
                 )
             start_time = self._parse_time_cached(start_str)
             end_time = self._parse_time_cached(end_str)
-            if start_time <= current_time <= end_time:
+            if start_time <= current_time < end_time:
                 return
             raise ValidationError(
                 {"detail": _("Contact cannot be done outside working hours")}
@@ -231,7 +232,7 @@ class WorkingHoursValidator:
                         continue
                     start_time = self._parse_time_cached(start_str)
                     end_time = self._parse_time_cached(end_str)
-                    if start_time <= current_time <= end_time:
+                    if start_time <= current_time < end_time:
                         any_ok = True
                         break
                 except Exception:
@@ -319,7 +320,7 @@ class WorkingHoursValidator:
         start_time = self._parse_time_cached(start_str)
         end_time = self._parse_time_cached(end_str)
 
-        if not (start_time <= current_time <= end_time):
+        if not (start_time <= current_time < end_time):
             raise ValidationError(
                 {"detail": _("Contact cannot be done outside working hours")}
             )

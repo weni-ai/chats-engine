@@ -274,46 +274,10 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         extra_kwargs = {"queue": {"required": False, "read_only": True}}
 
     def validate(self, attrs):
+        # Mantém somente limpeza de project_info; validação de horário ocorre em create()
         attrs["config"] = self.initial_data.get("project_info", {})
-
         if "project_info" in attrs:
             attrs.pop("project_info")
-
-        sector_uuid = attrs.get("sector_uuid")
-
-        if sector_uuid:
-            try:
-                sector = Sector.objects.get(uuid=sector_uuid)
-                working_hours_config = (
-                    sector.config.get("working_hours", {}) if sector.config else {}
-                )
-
-                if not working_hours_config:
-                    return attrs
-
-                print(f"flows json config to open a room: {attrs}")
-                created_on = self.initial_data.get("created_on", timezone.now())
-                if isinstance(created_on, str):
-                    created_on = pendulum.parse(created_on)
-                else:
-                    created_on = pendulum.instance(created_on)
-
-                project_tz = pendulum.timezone(str(sector.project.timezone))
-                if created_on.tzinfo is None:
-                    created_on = project_tz.localize(created_on)
-                else:
-                    created_on = created_on.in_timezone(project_tz)
-
-                attrs["created_on"] = created_on
-
-                # Validação de horários de trabalho
-                self.check_work_time_weekend(sector, created_on)
-
-            except serializers.ValidationError as error:
-                raise error
-            except Exception as error:
-                logger.error(f"Error getting sector: {error}")
-
         return attrs
 
     def create(self, validated_data):
@@ -322,7 +286,9 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         queue, sector = self.get_queue_and_sector(validated_data)
         project = sector.project
 
-        created_on = validated_data.get("created_on", timezone.now())
+        created_on = self.initial_data.get(
+            "created_on", validated_data.get("created_on", timezone.now())
+        )
 
         protocol = validated_data.pop("protocol", None)
         if protocol is None:
@@ -394,18 +360,23 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             )
 
     def get_queue_and_sector(self, validated_data):
-        try:
-            queue = validated_data.pop("queue", None)
-            sector = validated_data.pop("sector_uuid", None) or queue.sector
-        except AttributeError:
-            raise ValidationError(
-                {"detail": _("Cannot create a room without queue_uuid or sector_uuid")}
-            )
+        """
+        Resolve sempre a queue e usa seu setor; se sector_uuid também vier, garante consistência.
+        """
+        queue = validated_data.pop("queue", None)  # já vem instanciada pelo PrimaryKeyRelatedField
+        provided_sector_uuid = validated_data.pop("sector_uuid", None)
+
+        if queue is None and provided_sector_uuid is None:
+            raise ValidationError({"detail": _("Cannot create a room without queue_uuid or sector_uuid")})
 
         if queue is None:
-            queue = Queue.objects.filter(sector__uuid=sector, is_deleted=False).first()
+            queue = Queue.objects.filter(sector__uuid=provided_sector_uuid, is_deleted=False).first()
+            if queue is None:
+                raise ValidationError({"detail": _("No active queue found for provided sector_uuid")})
 
         sector = queue.sector
+        if provided_sector_uuid and str(provided_sector_uuid) != str(sector.uuid):
+            raise ValidationError({"detail": _("queue_uuid does not belong to provided sector_uuid")})
 
         return queue, sector
 
@@ -426,7 +397,12 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         )
 
         # Working hours validation (raises ValidationError when blocked)
-        working_hours_validator.validate_working_hours(sector, created_on_dt)
+        try:
+            working_hours_validator.validate_working_hours(sector, created_on_dt)
+        except ValidationError as e:
+            raise serializers.ValidationError(
+                {"detail": e.detail}
+            )
 
         # Agent status validation unchanged
         if sector.validate_agent_status() is False:
