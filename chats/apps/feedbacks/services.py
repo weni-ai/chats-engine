@@ -130,9 +130,9 @@ class UserFeedbackService(BaseUserFeedbackService):
 
         return start_date, end_date
 
-    def should_show_feedback_form(self, user: User) -> bool:
+    def can_create_feedback(self, user: User) -> bool:
         """
-        Should show feedback form
+        Can create feedback
         """
         shown_count = self.get_feedback_form_shown_count(user)
 
@@ -168,17 +168,28 @@ class UserFeedbackService(BaseUserFeedbackService):
         rooms_count = Room.objects.filter(**query)
 
         if rooms_count > 15:
-            if not last_shown:
-                LastFeedbackShownToUser.objects.create(
-                    user=user,
-                    last_shown_at=timezone.now(),
-                )
-            else:
-                last_shown.last_shown_at = timezone.now()
-                last_shown.save(update_fields=["last_shown_at"])
-
-            self.increment_feedback_form_shown_count(user)
-
             return True
 
         return False
+
+    def should_show_feedback_form(self, user: User) -> bool:
+        """
+        Should show feedback form
+        """
+        if not self.can_create_feedback(user):
+            return False
+
+        last_shown = LastFeedbackShownToUser.objects.filter(user=user).first()
+
+        if not last_shown:
+            LastFeedbackShownToUser.objects.create(
+                user=user,
+                last_shown_at=timezone.now(),
+            )
+        else:
+            last_shown.last_shown_at = timezone.now()
+            last_shown.save(update_fields=["last_shown_at"])
+
+        self.increment_feedback_form_shown_count(user)
+
+        return True
