@@ -351,68 +351,65 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
             permission_classes = [IsAuthenticated, IsSectorManager]
         return [permission() for permission in permission_classes]
 
+    def perform_create(self, serializer):
+        """
+        Sector must be passed in the request body
+        """
+        serializer.save()
+
     def create(self, request, *args, **kwargs):
         """
         Suporta:
         - date: "YYYY-MM-DD" (um dia)
-        - date: {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"} (intervalo)
+        - date: {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"} (intervalo em um único registro)
         """
-        data = request.data
-        date_field = data.get("date")
+        body = request.data
+        date_field = body.get("date")
 
+        # Range: {"start": "...", "end": "..."}
         if isinstance(date_field, dict):
             start_str = date_field.get("start")
             end_str = date_field.get("end")
-            if not start_str or not end_str:
-                return Response(
-                    {"detail": "date.start is required"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+
+            # Guardas para o linter e runtime
+            if not isinstance(start_str, str) or not start_str:
+                return Response({"detail": "date.start is required (YYYY-MM-DD)"}, status=status.HTTP_400_BAD_REQUEST)
+            if not isinstance(end_str, str) or not end_str:
+                end_str = start_str
+
+            start_str = start_str.strip()
+            end_str = end_str.strip()
 
             try:
                 start_date = datetime.strptime(start_str, "%Y-%m-%d").date()
                 end_date = datetime.strptime(end_str, "%Y-%m-%d").date()
             except ValueError:
                 return Response(
-                    {
-                        "detail": "Date has wrong format. Use YYYY-MM-DD or {'start','end'} with this format."
-                    },
+                    {"detail": "Date has wrong format. Use YYYY-MM-DD or {'start','end'} with this format."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
             if end_date < start_date:
-                return Response(
-                    {"detail": "date.end must be greater than or equal to date.start"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+                return Response({"detail": "date.end must be greater than or equal to date.start"}, status=status.HTTP_400_BAD_REQUEST)
 
-            created = []
-            day_type = data.get("day_type", SectorHoliday.CLOSED)
-            start_time = data.get("start_time")
-            end_time = data.get("end_time")
-            description = data.get("description", "")
-            sector = data.get("sector")
+            payload = {
+                "sector": body.get("sector"),
+                "date": start_date,
+                "date_end": end_date,
+                "day_type": body.get("day_type", SectorHoliday.CLOSED),
+                "start_time": body.get("start_time"),
+                "end_time": body.get("end_time"),
+                "description": body.get("description", ""),
+                "is_custom": True,
+                "repeat": bool(body.get("repeat", False)),
+            }
 
-            for i in range((end_date - start_date).days + 1):
-                current_date = start_date + timedelta(days=i)
-                payload = {
-                    "sector": sector,
-                    "date": current_date.isoformat(),
-                    "day_type": day_type,
-                    "start_time": start_time,
-                    "end_time": end_time,
-                    "description": description,
-                }
-                serializer = self.get_serializer(data=payload)
-                serializer.is_valid(raise_exception=True)
-                serializer.save()
-                created.append(serializer.data)
+            serializer = self.get_serializer(data=payload)
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-            return Response(
-                {"created": len(created), "holidays": created},
-                status=status.HTTP_201_CREATED,
-            )
-
+        # Caso não seja range, segue o fluxo padrão (um dia)
         return super().create(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):

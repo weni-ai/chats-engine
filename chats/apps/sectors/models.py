@@ -506,6 +506,12 @@ class SectorHoliday(BaseSoftDeleteModel, BaseModel):
         on_delete=models.CASCADE,
     )
     date = models.DateField(_("Date"))
+    date_end = models.DateField(
+        _("End Date"),
+        null=True,
+        blank=True,
+        help_text=_("End date for holiday range"),
+    )
     day_type = models.CharField(
         _("Day Type"), max_length=20, choices=DAY_TYPE_CHOICES, default=CLOSED
     )
@@ -527,7 +533,9 @@ class SectorHoliday(BaseSoftDeleteModel, BaseModel):
         blank=True,
         help_text=_("Holiday name or reason for special hours"),
     )
-
+    is_custom = models.BooleanField(_("Is Custom"), default=True)
+    repeat = models.BooleanField(_("Repeat Annually"), default=False)
+    
     class Meta:
         verbose_name = _("Sector Holiday")
         verbose_name_plural = _("Sector Holidays")
