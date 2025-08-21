@@ -47,7 +47,7 @@ class FeatureFlagService(BaseFeatureFlagService):
         """
         attributes = {
             "userEmail": user.email,
-            "projectUUID": project.uuid,
+            "projectUUID": str(project.uuid),
         }
 
         return self.growthbook_client.get_active_feature_flags_for_attributes(
@@ -65,7 +65,7 @@ class FeatureFlagService(BaseFeatureFlagService):
         if user:
             attributes["userEmail"] = user.email
         if project:
-            attributes["projectUUID"] = project.uuid
+            attributes["projectUUID"] = str(project.uuid)
 
         if not attributes:
             raise ValueError("No attributes provided to evaluate feature flag")
