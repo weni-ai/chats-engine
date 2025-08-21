@@ -9,6 +9,8 @@ from django.utils import timezone
 from chats.apps.accounts.models import User
 from chats.apps.feature_flags.services import FeatureFlagService
 from chats.core.cache import CacheClient
+from chats.apps.feedbacks.models import LastFeedbackShownToUser
+from chats.apps.rooms.models import Room
 
 logger = logging.getLogger(__name__)
 
@@ -147,4 +149,33 @@ class UserFeedbackService(BaseUserFeedbackService):
         if now > end_date or now < start_date:
             return False
 
-        # TODO: Continue
+        query = {
+            "user": user,
+            "is_active": False,
+        }
+
+        last_shown = LastFeedbackShownToUser.objects.filter(user=user).first()
+
+        if last_shown and last_shown.last_shown_at > start_date:
+            query["ended_at__gte"] = last_shown.last_shown_at
+
+        else:
+            query["ended_at__gte"] = start_date
+
+        rooms_count = Room.objects.filter(**query)
+
+        if rooms_count > 15:
+            if not last_shown:
+                LastFeedbackShownToUser.objects.create(
+                    user=user,
+                    last_shown_at=timezone.now(),
+                )
+            else:
+                last_shown.last_shown_at = timezone.now()
+                last_shown.save(update_fields=["last_shown_at"])
+
+            self.increment_feedback_form_shown_count(user)
+
+            return True
+
+        return False

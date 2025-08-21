@@ -14,7 +14,7 @@ class LastFeedbackShownToUser(BaseModel):
         on_delete=models.CASCADE,
         related_name="last_feedback_shown_to_user",
     )
-    last_shown_at = models.DateTimeField(auto_now_add=True)
+    last_shown_at = models.DateTimeField()
 
     class Meta:
         verbose_name = "Last feedback shown to user"
