@@ -23,7 +23,7 @@ class TestFeatureFlagService(TestCase):
         self.service.growthbook_client.get_active_feature_flags_for_attributes.assert_called_once_with(
             {
                 "userEmail": "test@test.com",
-                "projectUUID": self.project.uuid,
+                "projectUUID": str(self.project.uuid),
             }
         )
 
@@ -42,7 +42,7 @@ class TestFeatureFlagService(TestCase):
         self.service.growthbook_client.evaluate_feature_flag_by_attributes.assert_called_once_with(
             "example",
             {
-                "projectUUID": self.project.uuid,
+                "projectUUID": str(self.project.uuid),
             },
         )
 
@@ -70,6 +70,6 @@ class TestFeatureFlagService(TestCase):
             "example",
             {
                 "userEmail": "test@test.com",
-                "projectUUID": self.project.uuid,
+                "projectUUID": str(self.project.uuid),
             },
         )
