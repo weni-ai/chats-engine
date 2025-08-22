@@ -59,9 +59,6 @@ class AgentRepository:
         if filters.start_date and filters.end_date:
             start_time = filters.start_date
             end_time = filters.end_date
-
-            rooms_filter["rooms__created_on__range"] = [start_time, end_time]
-
             # We want to count rooms that were created before the end date
             # and are still active (still in progress)
             opened_rooms["rooms__is_active"] = True
