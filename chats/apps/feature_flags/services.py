@@ -32,6 +32,13 @@ class BaseFeatureFlagService(ABC):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def get_feature_flag_rules(self, key: str) -> dict:
+        """
+        Get feature flag rules
+        """
+        raise NotImplementedError
+
 
 class FeatureFlagService(BaseFeatureFlagService):
     """
@@ -73,3 +80,11 @@ class FeatureFlagService(BaseFeatureFlagService):
         return self.growthbook_client.evaluate_feature_flag_by_attributes(
             key, attributes
         )
+
+    def get_feature_flag_rules(self, key: str) -> dict:
+        """
+        Get feature flag rules
+        """
+        feature_flags = self.growthbook_client.get_feature_flags()
+
+        return feature_flags.get(key, {}).get("rules", [])
