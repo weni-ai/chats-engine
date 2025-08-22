@@ -11,7 +11,6 @@ class Metadata(BaseMetadata):
         {
             serializers.Field: "field",
             serializers.BooleanField: "boolean",
-            serializers.NullBooleanField: "boolean",
             serializers.CharField: "string",
             serializers.URLField: "url",
             serializers.EmailField: "email",
