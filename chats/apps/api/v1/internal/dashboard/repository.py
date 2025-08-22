@@ -59,10 +59,15 @@ class AgentRepository:
         if filters.start_date and filters.end_date:
             start_time = filters.start_date
             end_time = filters.end_date
+            # We want to count rooms that were created before the end date
+            # and are still active (still in progress)
+            opened_rooms["rooms__is_active"] = True
+            opened_rooms["rooms__created_on__lte"] = end_time
 
-            rooms_filter["rooms__created_on__range"] = [start_time, end_time]
-            rooms_filter["rooms__is_active"] = False
+            # We want to count rooms that were ended between the start and end date
+            # and are not active (they are closed)
             closed_rooms["rooms__ended_at__range"] = [start_time, end_time]
+            closed_rooms["rooms__is_active"] = False
         else:
             closed_rooms["rooms__ended_at__gte"] = initial_datetime
             opened_rooms["rooms__is_active"] = True
@@ -148,17 +153,17 @@ class AgentRepository:
         if filters.queue and filters.sector:
             rooms_filter["rooms__queue"] = filters.queue
             rooms_filter["rooms__queue__sector__in"] = filters.sector
-            agents_filter[
-                "project_permissions__queue_authorizations__queue"
-            ] = filters.queue
+            agents_filter["project_permissions__queue_authorizations__queue"] = (
+                filters.queue
+            )
             agents_filter[
                 "project_permissions__queue_authorizations__queue__sector__in"
             ] = filters.sector
         elif filters.queue:
             rooms_filter["rooms__queue"] = filters.queue
-            agents_filter[
-                "project_permissions__queue_authorizations__queue"
-            ] = filters.queue
+            agents_filter["project_permissions__queue_authorizations__queue"] = (
+                filters.queue
+            )
         elif filters.sector:
             rooms_filter["rooms__queue__sector__in"] = filters.sector
             agents_filter[
