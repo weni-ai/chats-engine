@@ -5,6 +5,7 @@ from rest_framework.test import APITestCase
 
 from chats.apps.contacts.models import Contact
 from chats.apps.projects.models import Project, ProjectPermission
+from chats.apps.projects.models.models import CustomStatus, CustomStatusType
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import GroupSector, Sector
@@ -273,6 +274,94 @@ class PropertyTests(QueueSetUpMixin, APITestCase):
         Verify if the property for get if user can list its returning the correct value.
         """
         self.assertEqual(self.agent_auth.can_list, True)
+
+
+class TestQueueOnlineAgents(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="Test chat Project 1")
+        self.sector = Sector.objects.create(
+            name="Test chat Sector 1",
+            project=self.project,
+            rooms_limit=5,
+            work_start="08:00:00",
+            work_end="17:00:00",
+        )
+        self.queue = Queue.objects.create(name="Q1", sector=self.sector)
+
+        self.agent_1 = create_user("agent1")
+        self.agent_2 = create_user("agent2")
+        self.agent_3 = create_user("agent3")
+
+        for agent in [self.agent_1, self.agent_2, self.agent_3]:
+            agent.project_permissions.create(
+                project=self.project,
+                role=ProjectPermission.ROLE_ATTENDANT,
+                status="ONLINE",
+            )
+            self.queue.authorizations.create(
+                permission=agent.project_permissions.first()
+            )
+
+        self.custom_status_type = CustomStatusType.objects.create(
+            name="Test custom status type",
+            project=self.project,
+        )
+        self.in_service_custom_status_type = CustomStatusType.objects.create(
+            name="In-Service",
+            project=self.project,
+        )
+
+    def test_online_agents_returns_only_online_agents(self):
+        self.assertEqual(self.queue.online_agents.count(), 3)
+        self.agent_1.project_permissions.update(status="OFFLINE")
+        self.assertEqual(self.queue.online_agents.count(), 2)
+        self.assertNotIn(self.agent_1, self.queue.online_agents)
+
+    def test_online_agents_deleting_queue_authorization_removes_agent_from_online_agents(
+        self,
+    ):
+        self.assertEqual(self.queue.online_agents.count(), 3)
+        self.queue.authorizations.filter(
+            permission=self.agent_1.project_permissions.first()
+        ).delete()
+        self.assertEqual(self.queue.online_agents.count(), 2)
+        self.assertNotIn(self.agent_1, self.queue.online_agents)
+
+    def test_online_agents_returns_agents_with_active_custom_status(self):
+        custom_status = CustomStatus.objects.create(
+            user=self.agent_1,
+            status_type=self.custom_status_type,
+            is_active=True,
+        )
+        self.assertEqual(self.queue.online_agents.count(), 2)
+        self.assertNotIn(self.agent_1, self.queue.online_agents)
+
+        custom_status.is_active = False
+        custom_status.save(update_fields=["is_active"])
+        self.assertEqual(self.queue.online_agents.count(), 3)
+        self.assertIn(self.agent_1, self.queue.online_agents)
+
+    def test_online_agents_returns_agents_with_in_service_custom_status(self):
+        CustomStatus.objects.create(
+            user=self.agent_1,
+            status_type=self.in_service_custom_status_type,
+            is_active=True,
+        )
+        self.assertEqual(self.queue.online_agents.count(), 3)
+        self.assertIn(self.agent_1, self.queue.online_agents)
+
+        custom_status = CustomStatus.objects.create(
+            user=self.agent_1,
+            status_type=self.custom_status_type,
+            is_active=True,
+        )
+        self.assertEqual(self.queue.online_agents.count(), 2)
+        self.assertNotIn(self.agent_1, self.queue.online_agents)
+
+        custom_status.is_active = False
+        custom_status.save(update_fields=["is_active"])
+        self.assertEqual(self.queue.online_agents.count(), 3)
+        self.assertIn(self.agent_1, self.queue.online_agents)
 
 
 class TestQueueGetAvailableAgent(TestCase):

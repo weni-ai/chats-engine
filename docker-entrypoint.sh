@@ -5,7 +5,7 @@ export CELERY_APP=${CELERY_APP:-"chats"}
 export GUNICORN_CONF=${GUNICORN_CONF:-"${PROJECT_PATH}/gunicorn.conf.py"}
 export LOG_LEVEL=${LOG_LEVEL:-"INFO"}
 export CELERY_MAX_WORKERS=${CELERY_MAX_WORKERS:-'6'}
-# export CELERY_BEAT_DATABASE_FILE=${CELERY_BEAT_DATABASE_FILE:-'/tmp/celery_beat_database'}
+export CELERY_BEAT_DATABASE_FILE=${CELERY_BEAT_DATABASE_FILE:-'/tmp/celery_beat_database'}
 export HEALTHCHECK_TIMEOUT=${HEALTHCHECK_TIMEOUT:-"10"}
 
 do_gosu(){
@@ -74,6 +74,11 @@ elif [[ "healthcheck-celery-worker" == "$1" ]]; then
     echo "${HEALTHCHECK_OUT}"
     grep -F -qs "${celery_queue}@${HOSTNAME}: OK" <<< "${HEALTHCHECK_OUT}" || exit 1
     exit 0
+elif [[ "celery-beat" == "$1" ]]; then
+    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec celery \
+        -A "${CELERY_APP}" --workdir="${PROJECT_PATH}" beat \
+        --loglevel="${LOG_LEVEL}" \
+        -s "${CELERY_BEAT_DATABASE_FILE}"
 fi
 
 exec "$@"
