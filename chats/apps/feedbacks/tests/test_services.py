@@ -315,7 +315,6 @@ class TestUserFeedbackService(TestCase):
     )
     @patch("chats.apps.feedbacks.services.UserFeedbackService.get_survey_date_range")
     @patch("chats.apps.feedbacks.services.UserFeedback.objects.filter")
-    @patch("chats.apps.feedbacks.services.LastFeedbackShownToUser.objects.filter")
     @patch("chats.apps.rooms.models.Room.objects.filter")
     @patch(
         "chats.apps.feedbacks.services.UserFeedbackService.increment_feedback_form_shown_count"
@@ -324,7 +323,6 @@ class TestUserFeedbackService(TestCase):
         self,
         mock_increment_feedback_form_shown_count,
         mock_rooms_filter,
-        mock_last_feedback_shown_to_user_filter,
         mock_user_feedback_filter,
         mock_get_survey_date_range,
         mock_get_feedback_form_shown_count,
@@ -339,9 +337,6 @@ class TestUserFeedbackService(TestCase):
         last_shown = LastFeedbackShownToUser.objects.create(
             user=user,
             last_shown_at=timezone.now() - timedelta(days=1),
-        )
-        mock_last_feedback_shown_to_user_filter.return_value.first.return_value = (
-            last_shown
         )
         mock_increment_feedback_form_shown_count.return_value = 1
         mock_rooms_filter.return_value.count.return_value = 15
@@ -363,7 +358,6 @@ class TestUserFeedbackService(TestCase):
             user=user,
             answered_at__gte=start_date,
         )
-        mock_last_feedback_shown_to_user_filter.assert_called_once_with(user=user)
         mock_rooms_filter.assert_called_once_with(
             user=user,
             is_active=False,
