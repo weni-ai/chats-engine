@@ -22,6 +22,8 @@ from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import close_room
 from chats.apps.sectors.models import Sector
+from rest_framework.validators import UniqueTogetherValidator
+
 
 logger = logging.getLogger(__name__)
 
@@ -263,6 +265,12 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             "transfer_history",
         ]
         extra_kwargs = {"queue": {"required": False, "read_only": True}}
+    
+    def get_validators(self):
+        return [
+            v for v in super().get_validators()
+            if not isinstance(v, UniqueTogetherValidator)
+        ]
 
     def validate(self, attrs):
         attrs["config"] = self.initial_data.get("project_info", {})
