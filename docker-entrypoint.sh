@@ -72,7 +72,7 @@ elif [[ "healthcheck-celery-worker" == "$1" ]]; then
     exit 0
 elif [[ "celery-beat" == "$1" ]]; then
     do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec celery \
-        -A chats --workdir="${PROJECT_PATH}" beat \
+        -A "${CELERY_APP}" --workdir="${PROJECT_PATH}" beat \
         --loglevel="${LOG_LEVEL}" \
         -s "${CELERY_BEAT_DATABASE_FILE}"
 fi
