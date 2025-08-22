@@ -39,11 +39,11 @@ class BaseUserFeedbackService(ABC):
         pass
 
     @abstractmethod
-    def can_create_feedback(self, user: User) -> bool:
+    def should_show_feedback_form(self, user: User) -> bool:
         pass
 
     @abstractmethod
-    def should_show_feedback_form(self, user: User) -> bool:
+    def can_create_feedback(self, user: User) -> bool:
         pass
 
     @abstractmethod
@@ -148,9 +148,9 @@ class UserFeedbackService(BaseUserFeedbackService):
 
         return start_date, end_date
 
-    def can_create_feedback(self, user: User) -> bool:
+    def should_show_feedback_form(self, user: User) -> bool:
         """
-        Can create feedback
+        Should show feedback form
         """
         shown_count = self.get_feedback_form_shown_count(user)
 
@@ -186,29 +186,37 @@ class UserFeedbackService(BaseUserFeedbackService):
         rooms_count = Room.objects.filter(**query).count()
 
         if rooms_count >= 15:
+            if not last_shown:
+                LastFeedbackShownToUser.objects.create(
+                    user=user,
+                    last_shown_at=timezone.now(),
+                )
+            else:
+                last_shown.last_shown_at = timezone.now()
+                last_shown.save(update_fields=["last_shown_at"])
+
+            self.increment_feedback_form_shown_count(user)
+
             return True
 
         return False
 
-    def should_show_feedback_form(self, user: User) -> bool:
+    def can_create_feedback(self, user: User) -> bool:
         """
-        Should show feedback form
+        Can create feedback
         """
-        if not self.can_create_feedback(user):
+        start_date, end_date = self.get_survey_date_range()
+
+        if not start_date or not end_date:
             return False
 
-        last_shown = LastFeedbackShownToUser.objects.filter(user=user).first()
+        now = timezone.now()
 
-        if not last_shown:
-            LastFeedbackShownToUser.objects.create(
-                user=user,
-                last_shown_at=timezone.now(),
-            )
-        else:
-            last_shown.last_shown_at = timezone.now()
-            last_shown.save(update_fields=["last_shown_at"])
+        if now > end_date or now < start_date:
+            return False
 
-        self.increment_feedback_form_shown_count(user)
+        if UserFeedback.objects.filter(user=user, answered_at__gte=start_date).exists():
+            return False
 
         return True
 

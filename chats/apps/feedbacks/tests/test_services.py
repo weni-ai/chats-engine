@@ -108,13 +108,13 @@ class TestUserFeedbackService(TestCase):
     @patch(
         "chats.apps.feedbacks.services.UserFeedbackService.get_feedback_form_shown_count"
     )
-    def test_can_create_feedback_when_shown_count_is_2(
+    def test_should_show_feedback_form_when_shown_count_is_2(
         self, mock_get_feedback_form_shown_count
     ):
         mock_get_feedback_form_shown_count.return_value = 2
         user = User.objects.create(email="test@test.com")
 
-        self.assertFalse(self.service.can_create_feedback(user))
+        self.assertFalse(self.service.should_show_feedback_form(user))
 
         mock_get_feedback_form_shown_count.assert_called_once_with(user)
 
@@ -122,32 +122,31 @@ class TestUserFeedbackService(TestCase):
         "chats.apps.feedbacks.services.UserFeedbackService.get_feedback_form_shown_count"
     )
     @patch("chats.apps.feedbacks.services.UserFeedbackService.get_survey_date_range")
-    def test_can_create_feedback_when_shown_count_is_less_than_2_and_survey_date_range_is_not_set(
+    def test_should_show_feedback_form_when_shown_count_is_less_than_2_and_survey_date_range_is_not_set(
         self, mock_get_survey_date_range, mock_get_feedback_form_shown_count
     ):
-        mock_get_feedback_form_shown_count.return_value = 0
+        mock_get_feedback_form_shown_count.return_value = 1
         mock_get_survey_date_range.return_value = (None, None)
         user = User.objects.create(email="test@test.com")
 
-        self.assertFalse(self.service.can_create_feedback(user))
+        self.assertFalse(self.service.should_show_feedback_form(user))
 
         mock_get_feedback_form_shown_count.assert_called_once_with(user)
-        mock_get_survey_date_range.assert_called_once()
 
     @patch(
         "chats.apps.feedbacks.services.UserFeedbackService.get_feedback_form_shown_count"
     )
     @patch("chats.apps.feedbacks.services.UserFeedbackService.get_survey_date_range")
-    def test_can_create_feedback_when_survey_date_range_is_set_but_in_the_past(
+    def test_should_show_feedback_form_when_survey_date_range_is_set_and_in_the_past(
         self, mock_get_survey_date_range, mock_get_feedback_form_shown_count
     ):
-        mock_get_feedback_form_shown_count.return_value = 0
-        start_date = timezone.now() - timedelta(days=2)
+        mock_get_feedback_form_shown_count.return_value = 1
+        start_date = timezone.now() - timedelta(days=5)
         end_date = timezone.now() - timedelta(days=1)
         mock_get_survey_date_range.return_value = (start_date, end_date)
         user = User.objects.create(email="test@test.com")
 
-        self.assertFalse(self.service.can_create_feedback(user))
+        self.assertFalse(self.service.should_show_feedback_form(user))
 
         mock_get_feedback_form_shown_count.assert_called_once_with(user)
         mock_get_survey_date_range.assert_called_once()
@@ -156,16 +155,16 @@ class TestUserFeedbackService(TestCase):
         "chats.apps.feedbacks.services.UserFeedbackService.get_feedback_form_shown_count"
     )
     @patch("chats.apps.feedbacks.services.UserFeedbackService.get_survey_date_range")
-    def test_can_create_feedback_when_survey_date_range_is_set_and_in_the_future(
+    def test_should_show_feedback_form_when_survey_date_range_is_set_and_in_the_future(
         self, mock_get_survey_date_range, mock_get_feedback_form_shown_count
     ):
-        mock_get_feedback_form_shown_count.return_value = 0
+        mock_get_feedback_form_shown_count.return_value = 1
         start_date = timezone.now() + timedelta(days=1)
         end_date = timezone.now() + timedelta(days=2)
         mock_get_survey_date_range.return_value = (start_date, end_date)
         user = User.objects.create(email="test@test.com")
 
-        self.assertFalse(self.service.can_create_feedback(user))
+        self.assertFalse(self.service.should_show_feedback_form(user))
 
         mock_get_feedback_form_shown_count.assert_called_once_with(user)
         mock_get_survey_date_range.assert_called_once()
@@ -175,13 +174,248 @@ class TestUserFeedbackService(TestCase):
     )
     @patch("chats.apps.feedbacks.services.UserFeedbackService.get_survey_date_range")
     @patch("chats.apps.feedbacks.services.UserFeedback.objects.filter")
-    def test_can_create_feedback_when_user_already_answered_feedback_in_the_past(
+    def test_should_show_feedback_form_when_feedback_already_exists_for_period(
         self,
         mock_user_feedback_filter,
         mock_get_survey_date_range,
         mock_get_feedback_form_shown_count,
     ):
-        mock_get_feedback_form_shown_count.return_value = 0
+        mock_get_feedback_form_shown_count.return_value = 1
+        start_date = timezone.now() - timedelta(days=1)
+        end_date = timezone.now() + timedelta(days=1)
+        mock_get_survey_date_range.return_value = (start_date, end_date)
+
+        user = User.objects.create(email="test@test.com")
+        mock_user_feedback_filter.return_value.exists.return_value = True
+
+        self.assertFalse(self.service.should_show_feedback_form(user))
+
+        mock_get_feedback_form_shown_count.assert_called_once_with(user)
+        mock_get_survey_date_range.assert_called_once()
+        mock_user_feedback_filter.assert_called_once_with(
+            user=user,
+            answered_at__gte=start_date,
+        )
+
+    @patch(
+        "chats.apps.feedbacks.services.UserFeedbackService.get_feedback_form_shown_count"
+    )
+    @patch("chats.apps.feedbacks.services.UserFeedbackService.get_survey_date_range")
+    @patch("chats.apps.feedbacks.services.UserFeedback.objects.filter")
+    @patch("chats.apps.feedbacks.services.LastFeedbackShownToUser.objects.filter")
+    @patch("chats.apps.rooms.models.Room.objects.filter")
+    @patch("chats.apps.feedbacks.services.LastFeedbackShownToUser.objects.create")
+    @patch(
+        "chats.apps.feedbacks.services.UserFeedbackService.increment_feedback_form_shown_count"
+    )
+    def test_should_show_feedback_form_when_feedback_does_not_exist_and_user_does_not_have_enough_rooms(
+        self,
+        mock_increment_feedback_form_shown_count,
+        mock_last_feedback_shown_to_user_create,
+        mock_rooms_filter,
+        mock_last_feedback_shown_to_user_filter,
+        mock_user_feedback_filter,
+        mock_get_survey_date_range,
+        mock_get_feedback_form_shown_count,
+    ):
+        mock_get_feedback_form_shown_count.return_value = 1
+        start_date = timezone.now() - timedelta(days=1)
+        end_date = timezone.now() + timedelta(days=1)
+        mock_get_survey_date_range.return_value = (start_date, end_date)
+
+        user = User.objects.create(email="test@test.com")
+        mock_user_feedback_filter.return_value.exists.return_value = False
+        mock_last_feedback_shown_to_user_filter.return_value.first.return_value = None
+        mock_last_feedback_shown_to_user_create.return_value = True
+        mock_increment_feedback_form_shown_count.return_value = 1
+        mock_rooms_filter.return_value.count.return_value = 14
+
+        now = timezone.now()
+
+        with patch("django.utils.timezone.now") as mock_now:
+            mock_now.return_value = now
+
+            self.assertFalse(self.service.should_show_feedback_form(user))
+
+        mock_get_feedback_form_shown_count.assert_called_once_with(user)
+        mock_get_survey_date_range.assert_called_once()
+        mock_user_feedback_filter.assert_called_once_with(
+            user=user,
+            answered_at__gte=start_date,
+        )
+        mock_last_feedback_shown_to_user_filter.assert_called_once_with(user=user)
+        mock_rooms_filter.assert_called_once_with(
+            user=user,
+            is_active=False,
+            ended_at__gte=start_date,
+        )
+        mock_last_feedback_shown_to_user_create.assert_not_called()
+        mock_increment_feedback_form_shown_count.assert_not_called()
+
+    @patch(
+        "chats.apps.feedbacks.services.UserFeedbackService.get_feedback_form_shown_count"
+    )
+    @patch("chats.apps.feedbacks.services.UserFeedbackService.get_survey_date_range")
+    @patch("chats.apps.feedbacks.services.UserFeedback.objects.filter")
+    @patch("chats.apps.feedbacks.services.LastFeedbackShownToUser.objects.filter")
+    @patch("chats.apps.rooms.models.Room.objects.filter")
+    @patch("chats.apps.feedbacks.services.LastFeedbackShownToUser.objects.create")
+    @patch(
+        "chats.apps.feedbacks.services.UserFeedbackService.increment_feedback_form_shown_count"
+    )
+    def test_should_show_feedback_form_when_user_does_have_enough_rooms(
+        self,
+        mock_increment_feedback_form_shown_count,
+        mock_last_feedback_shown_to_user_create,
+        mock_rooms_filter,
+        mock_last_feedback_shown_to_user_filter,
+        mock_user_feedback_filter,
+        mock_get_survey_date_range,
+        mock_get_feedback_form_shown_count,
+    ):
+        mock_get_feedback_form_shown_count.return_value = 1
+        start_date = timezone.now() - timedelta(days=1)
+        end_date = timezone.now() + timedelta(days=1)
+        mock_get_survey_date_range.return_value = (start_date, end_date)
+
+        user = User.objects.create(email="test@test.com")
+        mock_user_feedback_filter.return_value.exists.return_value = False
+        mock_last_feedback_shown_to_user_filter.return_value.first.return_value = None
+        mock_last_feedback_shown_to_user_create.return_value = True
+        mock_increment_feedback_form_shown_count.return_value = 1
+        mock_rooms_filter.return_value.count.return_value = 15
+
+        now = timezone.now()
+
+        with patch("django.utils.timezone.now") as mock_now:
+            mock_now.return_value = now
+
+            self.assertTrue(self.service.should_show_feedback_form(user))
+
+        mock_get_feedback_form_shown_count.assert_called_once_with(user)
+        mock_get_survey_date_range.assert_called_once()
+        mock_user_feedback_filter.assert_called_once_with(
+            user=user,
+            answered_at__gte=start_date,
+        )
+        mock_last_feedback_shown_to_user_filter.assert_called_once_with(user=user)
+        mock_rooms_filter.assert_called_once_with(
+            user=user,
+            is_active=False,
+            ended_at__gte=start_date,
+        )
+        mock_last_feedback_shown_to_user_create.assert_called_once_with(
+            user=user,
+            last_shown_at=now,
+        )
+        mock_increment_feedback_form_shown_count.assert_called_once_with(user)
+
+    @patch(
+        "chats.apps.feedbacks.services.UserFeedbackService.get_feedback_form_shown_count"
+    )
+    @patch("chats.apps.feedbacks.services.UserFeedbackService.get_survey_date_range")
+    @patch("chats.apps.feedbacks.services.UserFeedback.objects.filter")
+    @patch("chats.apps.feedbacks.services.LastFeedbackShownToUser.objects.filter")
+    @patch("chats.apps.rooms.models.Room.objects.filter")
+    @patch(
+        "chats.apps.feedbacks.services.UserFeedbackService.increment_feedback_form_shown_count"
+    )
+    def test_should_show_feedback_form_when_user_does_have_enough_rooms_and_last_shown_exists(
+        self,
+        mock_increment_feedback_form_shown_count,
+        mock_rooms_filter,
+        mock_last_feedback_shown_to_user_filter,
+        mock_user_feedback_filter,
+        mock_get_survey_date_range,
+        mock_get_feedback_form_shown_count,
+    ):
+        mock_get_feedback_form_shown_count.return_value = 1
+        start_date = timezone.now() - timedelta(days=1)
+        end_date = timezone.now() + timedelta(days=1)
+        mock_get_survey_date_range.return_value = (start_date, end_date)
+
+        user = User.objects.create(email="test@test.com")
+        mock_user_feedback_filter.return_value.exists.return_value = False
+        last_shown = LastFeedbackShownToUser.objects.create(
+            user=user,
+            last_shown_at=timezone.now() - timedelta(days=1),
+        )
+        mock_last_feedback_shown_to_user_filter.return_value.first.return_value = (
+            last_shown
+        )
+        mock_increment_feedback_form_shown_count.return_value = 1
+        mock_rooms_filter.return_value.count.return_value = 15
+
+        now = timezone.now()
+
+        with patch("django.utils.timezone.now") as mock_now, patch(
+            "chats.apps.feedbacks.services.LastFeedbackShownToUser.objects.create"
+        ) as mock_last_feedback_shown_to_user_create:
+            mock_last_feedback_shown_to_user_create.return_value = True
+            mock_now.return_value = now
+
+            self.assertTrue(self.service.should_show_feedback_form(user))
+            mock_last_feedback_shown_to_user_create.assert_not_called()
+
+        mock_get_feedback_form_shown_count.assert_called_once_with(user)
+        mock_get_survey_date_range.assert_called_once()
+        mock_user_feedback_filter.assert_called_once_with(
+            user=user,
+            answered_at__gte=start_date,
+        )
+        mock_last_feedback_shown_to_user_filter.assert_called_once_with(user=user)
+        mock_rooms_filter.assert_called_once_with(
+            user=user,
+            is_active=False,
+            ended_at__gte=last_shown.last_shown_at,
+        )
+
+        mock_increment_feedback_form_shown_count.assert_called_once_with(user)
+
+    @patch("chats.apps.feedbacks.services.UserFeedbackService.get_survey_date_range")
+    def test_can_create_feedback_when_survey_date_range_is_not_set(
+        self, mock_get_survey_date_range
+    ):
+        mock_get_survey_date_range.return_value = (None, None)
+        user = User.objects.create(email="test@test.com")
+
+        self.assertFalse(self.service.can_create_feedback(user))
+
+        mock_get_survey_date_range.assert_called_once()
+
+    @patch("chats.apps.feedbacks.services.UserFeedbackService.get_survey_date_range")
+    def test_can_create_feedback_when_survey_date_range_is_set_but_in_the_past(
+        self, mock_get_survey_date_range
+    ):
+        start_date = timezone.now() - timedelta(days=2)
+        end_date = timezone.now() - timedelta(days=1)
+        mock_get_survey_date_range.return_value = (start_date, end_date)
+        user = User.objects.create(email="test@test.com")
+
+        self.assertFalse(self.service.can_create_feedback(user))
+
+        mock_get_survey_date_range.assert_called_once()
+
+    @patch("chats.apps.feedbacks.services.UserFeedbackService.get_survey_date_range")
+    def test_can_create_feedback_when_survey_date_range_is_set_and_in_the_future(
+        self, mock_get_survey_date_range
+    ):
+        start_date = timezone.now() + timedelta(days=1)
+        end_date = timezone.now() + timedelta(days=2)
+        mock_get_survey_date_range.return_value = (start_date, end_date)
+        user = User.objects.create(email="test@test.com")
+
+        self.assertFalse(self.service.can_create_feedback(user))
+
+        mock_get_survey_date_range.assert_called_once()
+
+    @patch("chats.apps.feedbacks.services.UserFeedbackService.get_survey_date_range")
+    @patch("chats.apps.feedbacks.services.UserFeedback.objects.filter")
+    def test_can_create_feedback_when_user_already_answered_feedback_in_the_past(
+        self,
+        mock_user_feedback_filter,
+        mock_get_survey_date_range,
+    ):
         start_date = timezone.now() - timedelta(days=1)
         end_date = timezone.now() + timedelta(days=2)
         mock_get_survey_date_range.return_value = (start_date, end_date)
@@ -191,234 +425,11 @@ class TestUserFeedbackService(TestCase):
 
         self.assertFalse(self.service.can_create_feedback(user))
 
-        mock_get_feedback_form_shown_count.assert_called_once_with(user)
         mock_get_survey_date_range.assert_called_once()
         mock_user_feedback_filter.assert_called_once_with(
             user=user,
             answered_at__gte=start_date,
         )
-
-    @patch(
-        "chats.apps.feedbacks.services.UserFeedbackService.get_feedback_form_shown_count"
-    )
-    @patch("chats.apps.feedbacks.services.UserFeedbackService.get_survey_date_range")
-    @patch("chats.apps.feedbacks.services.UserFeedback.objects.filter")
-    @patch("chats.apps.feedbacks.services.LastFeedbackShownToUser.objects.filter")
-    @patch("chats.apps.feedbacks.services.Room.objects.filter")
-    def test_can_create_feedback_when_user_has_no_shown_feedback_yet_and_does_not_have_enough_rooms(
-        self,
-        mock_room_filter,
-        mock_last_feedback_shown_to_user_filter,
-        mock_user_feedback_filter,
-        mock_get_survey_date_range,
-        mock_get_feedback_form_shown_count,
-    ):
-        mock_get_feedback_form_shown_count.return_value = 0
-        start_date = timezone.now() - timedelta(days=1)
-        end_date = timezone.now() + timedelta(days=2)
-        mock_get_survey_date_range.return_value = (start_date, end_date)
-        user = User.objects.create(email="test@test.com")
-
-        mock_user_feedback_filter.return_value.exists.return_value = False
-        mock_last_feedback_shown_to_user_filter.return_value.first.return_value = None
-        mock_room_filter.return_value.count.return_value = 14
-
-        self.assertFalse(self.service.can_create_feedback(user))
-
-        mock_get_feedback_form_shown_count.assert_called_once_with(user)
-        mock_get_survey_date_range.assert_called_once()
-        mock_user_feedback_filter.assert_called_once_with(
-            user=user,
-            answered_at__gte=start_date,
-        )
-        mock_last_feedback_shown_to_user_filter.assert_called_once_with(user=user)
-        mock_room_filter.assert_called_once_with(
-            user=user,
-            is_active=False,
-            ended_at__gte=start_date,
-        )
-
-    @patch(
-        "chats.apps.feedbacks.services.UserFeedbackService.get_feedback_form_shown_count"
-    )
-    @patch("chats.apps.feedbacks.services.UserFeedbackService.get_survey_date_range")
-    @patch("chats.apps.feedbacks.services.UserFeedback.objects.filter")
-    @patch("chats.apps.feedbacks.services.LastFeedbackShownToUser.objects.filter")
-    @patch("chats.apps.feedbacks.services.Room.objects.filter")
-    def test_can_create_feedback_when_user_has_no_shown_feedback_yet_and_does_have_enough_rooms(
-        self,
-        mock_room_filter,
-        mock_last_feedback_shown_to_user_filter,
-        mock_user_feedback_filter,
-        mock_get_survey_date_range,
-        mock_get_feedback_form_shown_count,
-    ):
-        mock_get_feedback_form_shown_count.return_value = 0
-        start_date = timezone.now() - timedelta(days=1)
-        end_date = timezone.now() + timedelta(days=2)
-        mock_get_survey_date_range.return_value = (start_date, end_date)
-        user = User.objects.create(email="test@test.com")
-
-        mock_user_feedback_filter.return_value.exists.return_value = False
-        mock_last_feedback_shown_to_user_filter.return_value.first.return_value = None
-        mock_room_filter.return_value.count.return_value = 15
-
-        self.assertTrue(self.service.can_create_feedback(user))
-
-        mock_get_feedback_form_shown_count.assert_called_once_with(user)
-        mock_get_survey_date_range.assert_called_once()
-        mock_user_feedback_filter.assert_called_once_with(
-            user=user,
-            answered_at__gte=start_date,
-        )
-        mock_last_feedback_shown_to_user_filter.assert_called_once_with(user=user)
-        mock_room_filter.assert_called_once_with(
-            user=user,
-            is_active=False,
-            ended_at__gte=start_date,
-        )
-
-    @patch(
-        "chats.apps.feedbacks.services.UserFeedbackService.get_feedback_form_shown_count"
-    )
-    @patch("chats.apps.feedbacks.services.UserFeedbackService.get_survey_date_range")
-    @patch("chats.apps.feedbacks.services.UserFeedback.objects.filter")
-    @patch("chats.apps.feedbacks.services.LastFeedbackShownToUser.objects.filter")
-    @patch("chats.apps.feedbacks.services.Room.objects.filter")
-    def test_can_create_feedback_when_user_has_shown_feedback_yet_and_does_not_have_enough_rooms(
-        self,
-        mock_room_filter,
-        mock_last_feedback_shown_to_user_filter,
-        mock_user_feedback_filter,
-        mock_get_survey_date_range,
-        mock_get_feedback_form_shown_count,
-    ):
-        mock_get_feedback_form_shown_count.return_value = 1
-        start_date = timezone.now() - timedelta(days=1)
-        end_date = timezone.now() + timedelta(days=2)
-        mock_get_survey_date_range.return_value = (start_date, end_date)
-        user = User.objects.create(email="test@test.com")
-
-        mock_user_feedback_filter.return_value.exists.return_value = False
-
-        last_shown = LastFeedbackShownToUser.objects.create(
-            user=user,
-            last_shown_at=timezone.now(),
-        )
-
-        mock_last_feedback_shown_to_user_filter.return_value.first.return_value = (
-            last_shown
-        )
-        mock_room_filter.return_value.count.return_value = 14
-
-        self.assertFalse(self.service.can_create_feedback(user))
-
-        mock_get_feedback_form_shown_count.assert_called_once_with(user)
-        mock_get_survey_date_range.assert_called_once()
-        mock_user_feedback_filter.assert_called_once_with(
-            user=user,
-            answered_at__gte=start_date,
-        )
-        mock_last_feedback_shown_to_user_filter.assert_called_once_with(user=user)
-        mock_room_filter.assert_called_once_with(
-            user=user,
-            is_active=False,
-            ended_at__gte=last_shown.last_shown_at,
-        )
-
-    @patch(
-        "chats.apps.feedbacks.services.UserFeedbackService.get_feedback_form_shown_count"
-    )
-    @patch("chats.apps.feedbacks.services.UserFeedbackService.get_survey_date_range")
-    @patch("chats.apps.feedbacks.services.UserFeedback.objects.filter")
-    @patch("chats.apps.feedbacks.services.LastFeedbackShownToUser.objects.filter")
-    @patch("chats.apps.feedbacks.services.Room.objects.filter")
-    def test_can_create_feedback_when_user_has_shown_feedback_yet_and_does_not_enough_rooms(
-        self,
-        mock_room_filter,
-        mock_last_feedback_shown_to_user_filter,
-        mock_user_feedback_filter,
-        mock_get_survey_date_range,
-        mock_get_feedback_form_shown_count,
-    ):
-        mock_get_feedback_form_shown_count.return_value = 1
-        start_date = timezone.now() - timedelta(days=1)
-        end_date = timezone.now() + timedelta(days=2)
-        mock_get_survey_date_range.return_value = (start_date, end_date)
-        user = User.objects.create(email="test@test.com")
-
-        mock_user_feedback_filter.return_value.exists.return_value = False
-
-        last_shown = LastFeedbackShownToUser.objects.create(
-            user=user,
-            last_shown_at=timezone.now(),
-        )
-
-        mock_last_feedback_shown_to_user_filter.return_value.first.return_value = (
-            last_shown
-        )
-        mock_room_filter.return_value.count.return_value = 15
-
-        self.assertTrue(self.service.can_create_feedback(user))
-
-        mock_get_feedback_form_shown_count.assert_called_once_with(user)
-        mock_get_survey_date_range.assert_called_once()
-        mock_user_feedback_filter.assert_called_once_with(
-            user=user,
-            answered_at__gte=start_date,
-        )
-        mock_last_feedback_shown_to_user_filter.assert_called_once_with(user=user)
-        mock_room_filter.assert_called_once_with(
-            user=user,
-            is_active=False,
-            ended_at__gte=last_shown.last_shown_at,
-        )
-
-    @patch("chats.apps.feedbacks.services.UserFeedbackService.can_create_feedback")
-    def test_should_show_feedback_form_when_cannot_create_feedback(
-        self, mock_can_create_feedback
-    ):
-        mock_can_create_feedback.return_value = False
-
-        user = User.objects.create(email="test@test.com")
-
-        self.assertFalse(self.service.should_show_feedback_form(user))
-
-        mock_can_create_feedback.assert_called_once_with(user)
-
-    @patch("chats.apps.feedbacks.services.UserFeedbackService.can_create_feedback")
-    @patch("chats.apps.feedbacks.services.LastFeedbackShownToUser.objects.filter")
-    @patch("chats.apps.feedbacks.services.LastFeedbackShownToUser.objects.create")
-    @patch(
-        "chats.apps.feedbacks.services.UserFeedbackService.increment_feedback_form_shown_count"
-    )
-    def test_should_show_feedback_form_when_can_create_feedback_and_no_last_shown_feedback(
-        self,
-        mock_increment_feedback_form_shown_count,
-        mock_last_feedback_shown_to_user_create,
-        mock_last_feedback_shown_to_user_filter,
-        mock_can_create_feedback,
-    ):
-        mock_can_create_feedback.return_value = True
-        mock_last_feedback_shown_to_user_filter.return_value.first.return_value = None
-        mock_last_feedback_shown_to_user_create.return_value = True
-        mock_increment_feedback_form_shown_count.return_value = 1
-
-        user = User.objects.create(email="test@test.com")
-
-        now = timezone.now()
-
-        with patch("chats.apps.feedbacks.services.timezone.now") as mock_timezone_now:
-            mock_timezone_now.return_value = now
-            self.assertTrue(self.service.should_show_feedback_form(user))
-
-        mock_can_create_feedback.assert_called_once_with(user)
-        mock_last_feedback_shown_to_user_filter.assert_called_once_with(user=user)
-        mock_last_feedback_shown_to_user_create.assert_called_once_with(
-            user=user,
-            last_shown_at=now,
-        )
-        mock_increment_feedback_form_shown_count.assert_called_once_with(user)
 
     def test_create_feedback(self):
         user = User.objects.create(email="test@test.com")
