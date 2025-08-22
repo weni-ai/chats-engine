@@ -6,7 +6,6 @@ from django.utils import timezone
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.dashboard.dto import get_admin_domains_exclude_filter
-from chats.apps.dashboard.utils import parse_date_filter
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.projects.models.models import CustomStatus
 
@@ -48,6 +47,7 @@ class AgentRepository:
             #   (even if they were never assigned to a room from the sector)
             # - Agents that are linked to rooms related to the sector
             #   (even if they don't have authorization to the sector anymore)
+
             rooms_filter["rooms__queue__sector__in"] = filters.sector
             agents_filters &= Q(
                 project_permissions__sector_authorizations__sector__in=filters.sector
@@ -57,8 +57,8 @@ class AgentRepository:
         if filters.tag:
             rooms_filter["rooms__tags__in"] = filters.tag.split(",")
         if filters.start_date and filters.end_date:
-            start_time = parse_date_filter(filters.start_date, is_end_date=False, tz=tz)
-            end_time = parse_date_filter(filters.end_date, is_end_date=True, tz=tz)
+            start_time = filters.start_date
+            end_time = filters.end_date
 
             rooms_filter["rooms__created_on__range"] = [start_time, end_time]
 
@@ -91,15 +91,11 @@ class AgentRepository:
         if filters.agent:
             agents_query = agents_query.filter(email=filters.agent)
 
-        custom_status_filter = Q(user=OuterRef("email"), status_type__project=project)
-        if filters.start_date and filters.end_date:
-            start_time = parse_date_filter(filters.start_date, is_end_date=False, tz=tz)
-            end_time = parse_date_filter(filters.end_date, is_end_date=True, tz=tz)
-
-            custom_status_filter &= Q(created_on__range=[start_time, end_time])
-
         custom_status_subquery = Subquery(
-            CustomStatus.objects.filter(custom_status_filter)
+            CustomStatus.objects.filter(
+                user=OuterRef("email"),
+                status_type__project=project,
+            )
             .values("user")
             .annotate(
                 aggregated=JSONBAgg(
@@ -121,14 +117,12 @@ class AgentRepository:
                 closed=Count(
                     "rooms__uuid",
                     distinct=True,
-                    filter=Q(**closed_rooms, **rooms_filter)
-                    & ~Q(rooms__config__imported_room=True),
+                    filter=Q(**closed_rooms, **rooms_filter),
                 ),
                 opened=Count(
                     "rooms__uuid",
                     distinct=True,
-                    filter=Q(**opened_rooms, **rooms_filter)
-                    & ~Q(rooms__config__imported_room=True),
+                    filter=Q(**opened_rooms, **rooms_filter),
                 ),
                 custom_status=custom_status_subquery,
             )
@@ -185,8 +179,8 @@ class AgentRepository:
             rooms_filter["rooms__tags__in"] = filters.tag.split(",")
 
         if filters.start_date and filters.end_date:
-            start_time = parse_date_filter(filters.start_date, is_end_date=False, tz=tz)
-            end_time = parse_date_filter(filters.end_date, is_end_date=True, tz=tz)
+            start_time = filters.start_date
+            end_time = filters.end_date
             rooms_filter["rooms__created_on__range"] = [start_time, end_time]
             rooms_filter["rooms__is_active"] = False
             closed_rooms["rooms__ended_at__range"] = [start_time, end_time]
@@ -203,15 +197,11 @@ class AgentRepository:
             user_id=OuterRef("email"),
         ).values("status")[:1]
 
-        custom_status_filter = Q(user=OuterRef("email"), status_type__project=project)
-        if filters.start_date and filters.end_date:
-            start_time = parse_date_filter(filters.start_date, is_end_date=False, tz=tz)
-            end_time = parse_date_filter(filters.end_date, is_end_date=True, tz=tz)
-
-            custom_status_filter &= Q(created_on__range=[start_time, end_time])
-
         custom_status_subquery = Subquery(
-            CustomStatus.objects.filter(custom_status_filter)
+            CustomStatus.objects.filter(
+                user=OuterRef("email"),
+                status_type__project=project,
+            )
             .values("user")
             .annotate(
                 aggregated=JSONBAgg(
@@ -239,20 +229,17 @@ class AgentRepository:
 
         agents_query = (
             agents_query.filter(project_permissions__project=project, is_active=True)
-            .exclude(rooms__config__imported_room=True)
             .annotate(
                 status=Subquery(project_permission_queryset),
                 closed=Count(
                     "rooms__uuid",
                     distinct=True,
-                    filter=Q(**closed_rooms, **rooms_filter)
-                    & ~Q(rooms__config__imported_room=True),
+                    filter=Q(**closed_rooms, **rooms_filter),
                 ),
                 opened=Count(
                     "rooms__uuid",
                     distinct=True,
-                    filter=Q(**opened_rooms, **rooms_filter)
-                    & ~Q(rooms__config__imported_room=True),
+                    filter=Q(**opened_rooms, **rooms_filter),
                 ),
                 custom_status=custom_status_subquery,
             )
