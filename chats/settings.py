@@ -311,7 +311,7 @@ if OIDC_ENABLED:
     OIDC_RP_CLIENT_ID = env.str("OIDC_RP_CLIENT_ID")
     OIDC_RP_CLIENT_SECRET = env.str("OIDC_RP_CLIENT_SECRET")
     OIDC_OP_AUTHORIZATION_ENDPOINT = env.str("OIDC_OP_AUTHORIZATION_ENDPOINT")
-    OIDC_OP_TOKEN_ENDPOINT = env.str("OIDC_OP_TOKEN_ENDPOINT")
+    OIDC_OP_TOKEN_ENDPOINT = env.str("OIDC_OP_TOKEN_ENDPOINT", default="https://accounts.weni.ai/auth/realms/weni-staging/protocol/openid-connect/token")
     OIDC_OP_USER_ENDPOINT = env.str("OIDC_OP_USER_ENDPOINT")
     OIDC_OP_USERS_DATA_ENDPOINT = env.str("OIDC_OP_USERS_DATA_ENDPOINT")
     OIDC_OP_JWKS_ENDPOINT = env.str("OIDC_OP_JWKS_ENDPOINT")
@@ -418,6 +418,19 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 
+# celery beat
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60
+CELERY_BEAT_SCHEDULER = "celery.beat:PersistentScheduler"
+CELERY_BEAT_MAX_LOOP_INTERVAL = 10
+
+CELERY_BEAT_SCHEDULE = {
+    "beat-heartbeat-test": {
+        "task": "chats.core.tasks.beat_heartbeat",
+        "schedule": 30.0,
+        "args": (),
+    },
+}
 # Event Driven Architecture configurations
 
 USE_EDA = env.bool("USE_EDA", default=False)
