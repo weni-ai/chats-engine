@@ -1,3 +1,9 @@
+# 3.23.20
+## Add
+  - Protocol field in rooms metrics endpoint
+## Fix
+  - Agents list open rooms count for Insights dashboard
+
 # 3.23.19
 ## Fix
   - Race condition in route rooms for queue
@@ -662,6 +668,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 
