@@ -123,6 +123,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
     is_active = serializers.BooleanField(default=True)
     imported_history_url = serializers.CharField(read_only=True, default="")
     is_pinned = serializers.SerializerMethodField()
+    added_to_queue_at = serializers.DateTimeField(read_only=True)
 
     class Meta:
         model = Room
@@ -146,6 +147,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
             "config",
             "imported_history_url",
             "is_pinned",
+            "added_to_queue_at",
         ]
 
     def get_user(self, room: Room):
