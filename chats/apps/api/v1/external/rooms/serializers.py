@@ -158,7 +158,7 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
     tags = TagSimpleSerializer(many=True, required=False)
     interaction_time = serializers.IntegerField(source="metric.interaction_time")
     contact_external_id = serializers.CharField(source="contact.external_id")
-    protocol = serializers.CharField(source="protocol", read_only=True)
+    protocol = serializers.CharField(read_only=True)
 
     class Meta:
         model = Room
