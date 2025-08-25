@@ -72,6 +72,7 @@ INSTALLED_APPS = [
     "chats.apps.ai_features.history_summary",
     "chats.apps.ai_features.response_suggestions",
     "chats.apps.feature_flags",
+    "chats.apps.feedbacks",
     # third party apps
     "channels",
     "drf_yasg",
@@ -538,3 +539,8 @@ GROWTHBOOK_WEBHOOK_SECRET = env.str("GROWTHBOOK_WEBHOOK_SECRET", default="")
 INSIGHTS_API_URL = env.str("INSIGHTS_API_URL", default="")
 INSIGHTS_API_MAX_RETRIES = env.int("INSIGHTS_API_MAX_RETRIES", default=3)
 INSIGHTS_API_RETRY_DELAY = env.int("INSIGHTS_API_RETRY_DELAY", default=5)
+
+# Feedback
+FEEDBACK_FEATURE_FLAG_KEY = env.str(
+    "FEEDBACK_FEATURE_FLAG_KEY", default="weniChatsFeedback"
+)

@@ -73,3 +73,34 @@ class TestFeatureFlagService(TestCase):
                 "projectUUID": str(self.project.uuid),
             },
         )
+
+    def test_get_feature_flag_rules(self):
+        self.service.growthbook_client.get_feature_flags.return_value = {
+            "exampleEmail": {
+                "defaultValue": False,
+                "rules": [
+                    {
+                        "id": "fr_40644z1tmdrec3rs",
+                        "condition": {"userEmail": {"$nin": ["test@test.com"]}},
+                        "force": True,
+                    }
+                ],
+            },
+        }
+
+        rules = self.service.get_feature_flag_rules(
+            key="exampleEmail",
+        )
+
+        self.service.growthbook_client.get_feature_flags.assert_called_once_with()
+
+        self.assertEqual(
+            rules,
+            [
+                {
+                    "id": "fr_40644z1tmdrec3rs",
+                    "condition": {"userEmail": {"$nin": ["test@test.com"]}},
+                    "force": True,
+                }
+            ],
+        )
