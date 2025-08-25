@@ -154,6 +154,7 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
     tags = TagSimpleSerializer(many=True, required=False)
     interaction_time = serializers.IntegerField(source="metric.interaction_time")
     contact_external_id = serializers.CharField(source="contact.external_id")
+    protocol = serializers.CharField(read_only=True)
 
     class Meta:
         model = Room
@@ -167,6 +168,7 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
             "user_assigned_at",
             "first_user_message",
             "tags",
+            "protocol",
         ]
 
     def get_user_name(self, obj):
