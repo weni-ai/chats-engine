@@ -1,6 +1,9 @@
 # 3.23.20
 ## Add
   - Protocol field in rooms metrics endpoint
+  - Configuration to separate websocket pods from engine pods
+  - Configuration to use celery beat
+
 ## Fix
   - Agents list open rooms count for Insights dashboard
 
@@ -668,6 +671,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 
