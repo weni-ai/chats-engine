@@ -7,6 +7,6 @@ from chats.apps.api.v1.routers import router
 urlpatterns = [
     path("rooms/report/", RoomsReportViewSet.as_view(), name="rooms_report"),
     path("model-fields/", ModelFieldsViewSet.as_view(), name="model-fields"),
-    path("custom-report/", ReportFieldsValidatorViewSet.as_view(), name="custom-report"),
+    path("chats/report/", ReportFieldsValidatorViewSet.as_view(), name="chats-report"),
     path("", include(router.urls)),
 ]
