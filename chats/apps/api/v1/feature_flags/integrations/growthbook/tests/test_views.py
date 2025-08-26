@@ -16,7 +16,8 @@ class TestGrowthbookWebhook(APITestCase):
         return self.client.post(url, body, format="json")
 
     @patch(
-        "chats.apps.api.v1.feature_flags.integrations.growthbook.auth.GrowthbookWebhookSecretAuthentication.authenticate"
+        "chats.apps.api.v1.feature_flags.integrations.growthbook.auth."
+        "GrowthbookWebhookSecretAuthentication.authenticate"
     )
     @patch(
         "chats.apps.feature_flags.integrations.growthbook.tasks.update_growthbook_feature_flags.delay"
@@ -34,7 +35,8 @@ class TestGrowthbookWebhook(APITestCase):
         mock_update_growthbook_feature_flags.assert_not_called()
 
     @patch(
-        "chats.apps.api.v1.feature_flags.integrations.growthbook.auth.GrowthbookWebhookSecretAuthentication.authenticate"
+        "chats.apps.api.v1.feature_flags.integrations.growthbook.auth."
+        "GrowthbookWebhookSecretAuthentication.authenticate"
     )
     @patch(
         "chats.apps.feature_flags.integrations.growthbook.tasks.update_growthbook_feature_flags.delay"
