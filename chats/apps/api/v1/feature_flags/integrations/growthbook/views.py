@@ -4,7 +4,7 @@ from rest_framework import status
 
 
 from chats.apps.api.v1.feature_flags.integrations.growthbook.auth import (
-    GrowthbookSignatureAuthentication,
+    GrowthbookWebhookSecretAuthentication,
 )
 from chats.apps.feature_flags.integrations.growthbook.tasks import (
     update_growthbook_feature_flags,
@@ -12,7 +12,7 @@ from chats.apps.feature_flags.integrations.growthbook.tasks import (
 
 
 class GrowthbookWebhook(GenericViewSet):
-    authentication_classes = [GrowthbookSignatureAuthentication]
+    authentication_classes = [GrowthbookWebhookSecretAuthentication]
 
     def create(self, request, *args, **kwargs):
         update_growthbook_feature_flags.delay()
