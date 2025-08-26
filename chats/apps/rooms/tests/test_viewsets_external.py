@@ -76,9 +76,13 @@ class RoomsExternalTests(APITestCase):
         response = self._create_room(token, data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
+    @mock.patch(
+        "chats.apps.api.v1.internal.permissions.ModuleHasPermission.has_permission",
+    )
     def test_cannot_create_room_with_token_without_can_communicate_internally_perm(
-        self,
+        self, mock_has_permission
     ):
+        mock_has_permission.return_value = False
         user, token = create_user_and_token("test_user")
         self.client.force_authenticate(user)
 
@@ -87,6 +91,7 @@ class RoomsExternalTests(APITestCase):
         }
         response = self._create_room(token, data)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        mock_has_permission.assert_called_once()
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
