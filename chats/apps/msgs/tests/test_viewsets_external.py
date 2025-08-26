@@ -192,14 +192,19 @@ class MsgsExternalTests(APITestCase):
         response = self._request_create_message(token=token)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
+    @mock.patch(
+        "chats.apps.api.v1.internal.permissions.ModuleHasPermission.has_permission",
+    )
     def test_cannot_create_external_msgs_with_internal_token_without_can_communicate_internally_perm(
-        self,
+        self, mock_has_permission
     ):
+        mock_has_permission.return_value = False
         user, token = create_user_and_token("test_user")
         self.client.force_authenticate(user)
 
         response = self._request_create_message(token=token)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        mock_has_permission.assert_called_once()
 
     def test_update_external_msgs(self):
         message = self.room.messages.create(
@@ -285,11 +290,17 @@ class MsgsExternalTests(APITestCase):
         response = self._request_list_messages(token=token)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    @mock.patch(
+        "chats.apps.api.v1.internal.permissions.ModuleHasPermission.has_permission",
+        return_value=False,
+    )
     def test_cannot_list_external_msgs_with_internal_token_without_can_communicate_internally_perm(
-        self,
+        self, mock_has_permission
     ):
+        mock_has_permission.return_value = False
         user, token = create_user_and_token("test_user")
         self.client.force_authenticate(user)
 
         response = self._request_list_messages(token=token)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        mock_has_permission.assert_called_once()
