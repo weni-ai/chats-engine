@@ -1,3 +1,9 @@
+# 3.23.21
+## Add
+  - callid custom field in rooms metrics endpoint
+## Fix
+  - Module has permission broken tests
+
 # 3.23.20
 ## Add
   - Protocol field in rooms metrics endpoint
@@ -671,6 +677,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 
