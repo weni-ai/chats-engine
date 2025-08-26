@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import pendulum
 from django.utils import timezone
@@ -155,6 +155,7 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
     interaction_time = serializers.IntegerField(source="metric.interaction_time")
     contact_external_id = serializers.CharField(source="contact.external_id")
     protocol = serializers.CharField(read_only=True)
+    callid = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -169,6 +170,7 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
             "first_user_message",
             "tags",
             "protocol",
+            "callid",
         ]
 
     def get_user_name(self, obj):
@@ -186,6 +188,11 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
             )
             return msg_date.isoformat()
         return None
+
+    def get_callid(self, obj: Room) -> Optional[str]:
+        custom_fields = obj.custom_fields or {}
+
+        return custom_fields.get("callid", None)
 
 
 class ProjectInfoSerializer(serializers.Serializer):
