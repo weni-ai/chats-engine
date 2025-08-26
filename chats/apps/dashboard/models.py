@@ -36,8 +36,8 @@ class ReportStatus(BaseModel):
         max_length=20,
         choices=[
             ('pending', 'Pending'),
-            ('processing', 'Processing'),
-            ('completed', 'Completed'),
+            ('ready', 'Ready'),
+            ('in_progress', 'In Progress'),
             ('failed', 'Failed'),
         ],
         default='pending'

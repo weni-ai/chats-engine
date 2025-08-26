@@ -304,6 +304,50 @@ class ModelFieldsPresenter:
     """
     
     @staticmethod
+    def _allowed_fields_map():
+        """
+        Campos permitidos por modelo, conforme especificação do cliente.
+        Observações:
+        - 'is_delete' => campo real 'is_deleted'
+        - 'full_transfer_history' => campo real 'transfer_history'
+        - 'service chat' => campo real 'service_chat'
+        - 'is_wating' => campo real 'is_waiting'
+        """
+        return {
+            'sectors': {
+                'name', 'rooms_limit', 'config'
+            },
+            'queues': {
+                'name', 'is_deleted', 'config'
+            },
+            'sector_tags': {
+                'name'
+            },
+            'rooms': {
+                'ended_at', 'ended_by', 'is_active', 'is_waiting',
+                'urn', 'protocol', 'config', 'transfer_history',
+                'service_chat', 'custom_fields', 'tags', 'contact', 'user'
+            },
+            'contacts': {
+                'name', 'email', 'status', 'phone', 'custom_fields', 'external_id'
+            },
+            'users': {
+                'email', 'first_name', 'last_name'
+            },
+        }
+
+    @staticmethod
+    def _filter_allowed(model_key, fields_dict):
+        """
+        Filtra o dicionário de campos baseado no mapa permitido.
+        Mantém a estrutura {'field_name': {'type': ..., 'required': ...}}
+        """
+        allowed = ModelFieldsPresenter._allowed_fields_map().get(model_key, set())
+        if not allowed:
+            return {}
+        return {k: v for k, v in fields_dict.items() if k in allowed}
+
+    @staticmethod
     def get_models_info():
         """
         Return information about the fields of each model, with a 1 day cache.
@@ -312,14 +356,18 @@ class ModelFieldsPresenter:
         cached_data = cache.get(cache_key)
         if cached_data is not None:
             return cached_data
-
-        models_info = {
+ 
+        raw_models_info = {
             'sectors': ModelFieldsPresenter._get_model_fields('sectors', 'Sector'),
             'queues': ModelFieldsPresenter._get_model_fields('queues', 'Queue'),
             'rooms': ModelFieldsPresenter._get_model_fields('rooms', 'Room'),
             'users': ModelFieldsPresenter._get_model_fields('accounts', 'User'),
             'sector_tags': ModelFieldsPresenter._get_model_fields('sectors', 'SectorTag'),
             'contacts': ModelFieldsPresenter._get_model_fields('contacts', 'Contact')
+        }
+        models_info = {
+            key: ModelFieldsPresenter._filter_allowed(key, value)
+            for key, value in raw_models_info.items()
         }
         cache.set(cache_key, models_info, timeout=86400)
         return models_info

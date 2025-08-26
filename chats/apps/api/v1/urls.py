@@ -15,15 +15,7 @@ urlpatterns = [
         FeaturePromptsView.as_view(),
         name="ai_features_prompts",
     ),
-    path(
-        "model-fields/",
-        ModelFieldsViewSet.as_view({"get": "list"}),
-        name="model-fields",
-    ),
-    path(
-        "custom-report/",
-        ReportFieldsValidatorViewSet.as_view({"post": "create"}),
-        name="custom-report",
-    ),
+    path("model-fields/", ModelFieldsViewSet.as_view(), name="model-fields"),
+    path("chats/report/", ReportFieldsValidatorViewSet.as_view(), name="chats-report"),
     path("", include(router.urls)),
 ]

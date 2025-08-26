@@ -17,6 +17,8 @@ import environ
 import sentry_sdk
 from django.utils.log import DEFAULT_LOGGING
 from sentry_sdk.integrations.django import DjangoIntegration
+from celery.schedules import crontab
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -423,6 +425,19 @@ CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60
 CELERY_BEAT_SCHEDULER = "celery.beat:PersistentScheduler"
 CELERY_BEAT_MAX_LOOP_INTERVAL = 10
+
+CELERY_BEAT_SCHEDULE = {
+    "process-pending-reports": {
+        "task": "process_pending_reports",
+        "schedule": 20.0,
+    }
+}
+
+# Disable report emails unless explicitly enabled
+REPORTS_SEND_EMAILS = env.bool("REPORTS_SEND_EMAILS", default=True)
+REPORTS_SAVE_DIR = env.str("REPORTS_SAVE_DIR", default=str(BASE_DIR / "media" / "reports"))
+REPORTS_CHUNK_SIZE = env.int("REPORTS_CHUNK_SIZE", default=5000)
+REPORTS_SAVE_LOCALLY = env.bool("REPORTS_SAVE_LOCALLY", default=False)
 
 # Event Driven Architecture configurations
 
