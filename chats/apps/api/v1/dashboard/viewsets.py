@@ -422,7 +422,7 @@ class ReportFieldsValidatorViewSet(APIView):
     """
     Endpoint para validar campos e gerar consulta para relatório baseado nos campos disponíveis.
     """
-    permission_classes = [permissions.IsAuthenticated, IsProjectAdmin]
+    permission_classes = [permissions.IsAuthenticated]
 
     def _get_model_class(self, model_name):
         """
@@ -807,7 +807,14 @@ class ReportFieldsValidatorViewSet(APIView):
             )
 
             minutes = max(1, (estimated_time + 59) // 60)
-            return Response({'time_request': f'{minutes}min'}, status=status.HTTP_200_OK)
+            logger.info("ReportStatus created (pending): %s project=%s", report_status.uuid, project.uuid)
+            return Response(
+                {
+                    'time_request': f'{minutes}min',
+                    'uuid_relatorio': str(report_status.uuid),
+                },
+                status=status.HTTP_200_OK,
+            )
         except ValidationError as e:
             raise e
     

@@ -395,6 +395,21 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    "process-pending-reports": {
+        "task": "process_pending_reports",
+        "schedule": 20.0,
+    }
+}
+
+# Disable report emails unless explicitly enabled
+REPORTS_SEND_EMAILS = env.bool("REPORTS_SEND_EMAILS", default=True)
+REPORTS_SAVE_DIR = env.str("REPORTS_SAVE_DIR", default=str(BASE_DIR / "media" / "reports"))
+REPORTS_CHUNK_SIZE = env.int("REPORTS_CHUNK_SIZE", default=5000)
+REPORTS_SAVE_LOCALLY = env.bool("REPORTS_SAVE_LOCALLY", default=False)
+
 # Event Driven Architecture configurations
 
 USE_EDA = env.bool("USE_EDA", default=False)
