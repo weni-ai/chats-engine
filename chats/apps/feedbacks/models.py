@@ -56,4 +56,4 @@ class UserFeedback(BaseModel):
         verbose_name_plural = "User Feedbacks"
 
     def __str__(self):
-        return f"Feedback from {self.user.email} {self.rate}"
+        return f"Feedback from {self.user.email} {self.rating}"
