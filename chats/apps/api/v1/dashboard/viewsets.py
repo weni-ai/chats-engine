@@ -641,6 +641,21 @@ class ReportFieldsValidatorViewSet(APIView):
                 start_dt = pendulum.parse(start_date).replace(tzinfo=tz)
                 end_dt = pendulum.parse(end_date + " 23:59:59").replace(tzinfo=tz)
                 base_queryset = base_queryset.filter(created_on__range=[start_dt, end_dt])
+        else:
+            # [NOVO] Aplica data range genérico (por created_on) para demais models que possuam esse campo
+            start_date = field_data.get('start_date')
+            end_date = field_data.get('end_date')
+            if start_date and end_date:
+                try:
+                    tz = project.timezone
+                    start_dt = pendulum.parse(start_date).replace(tzinfo=tz)
+                    end_dt = pendulum.parse(end_date + " 23:59:59").replace(tzinfo=tz)
+                    model_obj = base_queryset.model
+                    model_field_names = {f.name for f in model_obj._meta.get_fields()}
+                    if 'created_on' in model_field_names:
+                        base_queryset = base_queryset.filter(created_on__range=[start_dt, end_dt])
+                except Exception as _:
+                    pass
 
         # Aplica os campos selecionados
         if query_fields:
@@ -770,6 +785,9 @@ class ReportFieldsValidatorViewSet(APIView):
             open_chats = fields_config.pop('open_chats', None)
             closed_chats = fields_config.pop('closed_chats', None)
             _ = fields_config.pop('type', None)  # ignorado aqui; controle de formato pode ser adicionado depois
+            # [NOVO] Data range no root (aplicado a todos os models compatíveis)
+            root_start_date = fields_config.pop('start_date', None)
+            root_end_date = fields_config.pop('end_date', None)
 
             # [NOVO] Propaga flags para o modelo rooms, se existir
             if 'rooms' in fields_config and isinstance(fields_config['rooms'], dict):
@@ -777,6 +795,21 @@ class ReportFieldsValidatorViewSet(APIView):
                     fields_config['rooms']['open_chats'] = open_chats
                 if isinstance(closed_chats, bool):
                     fields_config['rooms']['closed_chats'] = closed_chats
+                # Propaga datas para rooms se não vierem dentro de rooms
+                if root_start_date and 'start_date' not in fields_config['rooms']:
+                    fields_config['rooms']['start_date'] = root_start_date
+                if root_end_date and 'end_date' not in fields_config['rooms']:
+                    fields_config['rooms']['end_date'] = root_end_date
+
+            # [NOVO] Propaga datas para todos os outros models (usam created_on se existir)
+            for model_name, cfg in list(fields_config.items()):
+                if model_name == 'rooms':
+                    continue
+                if isinstance(cfg, dict):
+                    if root_start_date and 'start_date' not in cfg:
+                        cfg['start_date'] = root_start_date
+                    if root_end_date and 'end_date' not in cfg:
+                        cfg['end_date'] = root_end_date
 
             # Estima o tempo de execução
             estimated_time = self._estimate_execution_time(fields_config, project)
