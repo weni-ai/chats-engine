@@ -1,9 +1,6 @@
 from uuid import UUID
 from chats.apps.dashboard.models import RoomMetrics
-from chats.apps.dashboard.utils import (
-    calculate_last_queue_waiting_time,
-    calculate_response_time,
-)
+from chats.apps.dashboard.utils import calculate_response_time
 from chats.apps.rooms.models import Room
 from chats.celery import app
 from chats.apps.projects.models import Project
@@ -66,10 +63,6 @@ def generate_metrics(room_uuid: UUID):
     metric_room = RoomMetrics.objects.get_or_create(room=room)[0]
     metric_room.message_response_time = calculate_response_time(room)
     metric_room.interaction_time = interaction_time.total_seconds()
-
-    if not room.user:
-        metric_room.waiting_time += calculate_last_queue_waiting_time(room)
-
     metric_room.save()
 
 

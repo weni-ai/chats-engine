@@ -22,7 +22,7 @@ from chats.apps.api.v1.dashboard.serializers import (
     DashboardRoomSerializer,
     DashboardSectorSerializer,
 )
-from chats.apps.api.v1.permissions import IsProjectAdminSpecific, IsProjectAdmin
+from chats.apps.api.v1.permissions import HasDashboardAccess, IsProjectAdmin
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.core.excel_storage import ExcelStorage
 
@@ -73,9 +73,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             queue=params.get("queue"),
             user_request=user_permission,
             project=project,
-            is_weni_admin=should_exclude_admin_domains(
-                request.user.email if request.user else ""
-            ),
+            is_weni_admin=should_exclude_admin_domains(request.user.email if request.user else ""),
         )
 
         rooms_service = RoomsDataService(
@@ -102,9 +100,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=params.get("tag"),
             queue=params.get("queue"),
             user_request=request.user,
-            is_weni_admin=should_exclude_admin_domains(
-                request.user.email if request.user else ""
-            ),
+            is_weni_admin=should_exclude_admin_domains(request.user.email if request.user else ""),
         )
 
         agents_service = AgentsService()
@@ -137,9 +133,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=params.get("tag"),
             user_request=user_permission,
             project=project,
-            is_weni_admin=should_exclude_admin_domains(
-                request.user.email if request.user else ""
-            ),
+            is_weni_admin=should_exclude_admin_domains(request.user.email if request.user else ""),
         )
 
         sectors_service = SectorService()
@@ -169,9 +163,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=params.get("tag"),
             user_request=user_permission,
             project=project,
-            is_weni_admin=should_exclude_admin_domains(
-                request.user.email if request.user else ""
-            ),
+            is_weni_admin=should_exclude_admin_domains(request.user.email if request.user else ""),
         )
 
         raw_service = RawDataService()
@@ -205,7 +197,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
                     startcol=0,
                     index=False,
                 )
-            excel_rooms_buffer.seek(0)
+            excel_rooms_buffer.seek(0)  # Move o cursor para o início do buffer
             storage = ExcelStorage()
 
             bytes_archive = excel_rooms_buffer.getvalue()
@@ -265,9 +257,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=filter.get("tag"),
             user_request=user_permission,
             project=project,
-            is_weni_admin=should_exclude_admin_domains(
-                request.user.email if request.user else ""
-            ),
+            is_weni_admin=should_exclude_admin_domains(request.user.email if request.user else ""),
         )
 
         # Rooms Data
@@ -369,7 +359,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
                     index=False,
                 )
 
-            excel_buffer.seek(0)
+            excel_buffer.seek(0)  # Move o cursor para o início do buffer
             storage = ExcelStorage()
 
             bytes_archive = excel_buffer.getvalue()
@@ -418,17 +408,17 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             return Response({'error': 'Report not found'}, status=404)
 
 
-class ModelFieldsViewSet(viewsets.GenericViewSet):
+class ModelFieldsViewSet(APIView):
     """
     Endpoint para retornar os campos disponíveis dos principais models do sistema.
     """
     permission_classes = [permissions.IsAuthenticated]
 
-    def list(self, request):
+    def get(self, request):
         return Response(ModelFieldsPresenter.get_models_info())
 
 
-class ReportFieldsValidatorViewSet(viewsets.GenericViewSet):
+class ReportFieldsValidatorViewSet(APIView):
     """
     Endpoint para validar campos e gerar consulta para relatório baseado nos campos disponíveis.
     """
@@ -764,7 +754,7 @@ class ReportFieldsValidatorViewSet(viewsets.GenericViewSet):
             
         return report_data
 
-    def create(self, request):
+    def post(self, request):
         project_uuid = request.data.get('project_uuid')
         if not project_uuid:
             raise ValidationError({'project_uuid': 'This field is required.'})
