@@ -836,8 +836,7 @@ class ReportFieldsValidatorViewSet(APIView):
             report_status = ReportStatus.objects.create(
                 project=project,
                 user=request.user,
-                fields_config=fields_config,
-                file_type=file_type
+                fields_config=fields_config
             )
 
             minutes = max(1, (estimated_time + 59) // 60)
