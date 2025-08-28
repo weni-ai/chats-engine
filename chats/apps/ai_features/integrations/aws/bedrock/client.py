@@ -1,5 +1,7 @@
 import json
 import logging
+from typing import List
+
 import boto3
 from botocore.exceptions import ClientError
 from django.conf import settings
@@ -53,7 +55,7 @@ class BedrockClient(BaseAIPlatformClient):
         raise ValueError(f"Unsupported response format: {response_body}")
 
     def format_request_body(
-        self, prompt_settings: dict, prompt_msgs: list[PromptMessage]
+        self, prompt_settings: dict, prompt_msgs: List[PromptMessage]
     ) -> dict:
         """
         Format the request body for the Bedrock client.
