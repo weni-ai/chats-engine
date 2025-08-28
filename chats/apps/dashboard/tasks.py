@@ -98,8 +98,11 @@ def generate_custom_fields_report(project_uuid: UUID, fields_config: dict, user_
         report_status.status = 'processing'
         report_status.save()
         
-        # Gera o relatório (código existente)
-        report_data = report_generator._generate_report_data(fields_config, project)
+        # Gera o relatório: filtra apenas modelos conhecidos e ignora chaves auxiliares (ex.: 'type')
+        from chats.apps.api.v1.dashboard.presenter import ModelFieldsPresenter
+        available_fields = ModelFieldsPresenter.get_models_info()
+        models_config = {k: v for k, v in (fields_config or {}).items() if k in available_fields}
+        report_data = report_generator._generate_report_data(models_config, project)
         
         # Gera em XLSX (default) ou CSV+ZIP
         file_type = _norm_file_type(fields_config.get('_file_type'))
@@ -235,14 +238,17 @@ def process_pending_reports():
         view = ReportFieldsValidatorViewSet()
         available_fields = ModelFieldsPresenter.get_models_info()
 
-        # Decide formato (xlsx ou csv zip)
-        file_type = _norm_file_type(fields_config.get('_file_type'))
+        # Decide formato
+        file_type = _norm_file_type(fields_config.get('type'))
         output = io.BytesIO()
 
         if file_type == "xlsx":
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                 wrote_any = False
-                for model_name, field_data in fields_config.items():
+                # Itera somente pelos modelos conhecidos
+                for model_name, field_data in (fields_config or {}).items():
+                    if model_name not in available_fields:
+                        continue
                     query_data = view._process_model_fields(
                         model_name, field_data, project, available_fields
                     )
@@ -303,7 +309,9 @@ def process_pending_reports():
                     df.to_csv(buf, index=False, header=(row_offset == 0))
                     row_offset += len(df)
 
-            for model_name, field_data in fields_config.items():
+            for model_name, field_data in (fields_config or {}).items():
+                if model_name not in available_fields:
+                    continue
                 query_data = view._process_model_fields(
                     model_name, field_data, project, available_fields
                 )

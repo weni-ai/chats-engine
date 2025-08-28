@@ -784,7 +784,7 @@ class ReportFieldsValidatorViewSet(APIView):
             # [NOVO] Extrai flags de nível raiz e evita quebrar o processamento
             open_chats = fields_config.pop('open_chats', None)
             closed_chats = fields_config.pop('closed_chats', None)
-            file_type = fields_config.pop('type', None)     
+            file_type = fields_config.pop('type', None)
             # [NOVO] Data range no root (aplicado a todos os models compatíveis)
             root_start_date = fields_config.pop('start_date', None)
             root_end_date = fields_config.pop('end_date', None)
@@ -832,6 +832,9 @@ class ReportFieldsValidatorViewSet(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
+            # Reinsere 'type' para ser persistido no ReportStatus
+            if file_type:
+                fields_config['type'] = file_type
             # Cria o objeto de status (pendente)
             report_status = ReportStatus.objects.create(
                 project=project,
