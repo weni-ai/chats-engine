@@ -784,7 +784,7 @@ class ReportFieldsValidatorViewSet(APIView):
             # [NOVO] Extrai flags de nível raiz e evita quebrar o processamento
             open_chats = fields_config.pop('open_chats', None)
             closed_chats = fields_config.pop('closed_chats', None)
-            _ = fields_config.pop('type', None)  # ignorado aqui; controle de formato pode ser adicionado depois
+            file_type = fields_config.pop('type', None)     
             # [NOVO] Data range no root (aplicado a todos os models compatíveis)
             root_start_date = fields_config.pop('start_date', None)
             root_end_date = fields_config.pop('end_date', None)
@@ -836,7 +836,8 @@ class ReportFieldsValidatorViewSet(APIView):
             report_status = ReportStatus.objects.create(
                 project=project,
                 user=request.user,
-                fields_config=fields_config
+                fields_config=fields_config,
+                file_type=file_type
             )
 
             minutes = max(1, (estimated_time + 59) // 60)
