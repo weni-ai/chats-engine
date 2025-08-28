@@ -50,6 +50,12 @@ def _excel_safe_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         df = df.applymap(_strip_tz_value)
     return df
 
+def _norm_file_type(v: Optional[str]) -> str:
+    v = (v or "").lower()
+    if "csv" in v:
+        return "csv"
+    return "xlsx"
+
 
 def generate_metrics(room_uuid: UUID):
     """
@@ -95,36 +101,55 @@ def generate_custom_fields_report(project_uuid: UUID, fields_config: dict, user_
         # Gera o relatório (código existente)
         report_data = report_generator._generate_report_data(fields_config, project)
         
-        # Converte para DataFrame e depois para Excel
+        # Gera em XLSX (default) ou CSV+ZIP
+        file_type = _norm_file_type(fields_config.get('_file_type'))
         output = io.BytesIO()
-        
-        # Cria um Excel writer
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            # Para cada modelo no relatório
-            for model_name, model_data in report_data.items():
-                # Converte os dados para DataFrame (removendo tz)
-                df_data = _strip_tz(model_data.get('data', []))
-                df = pd.DataFrame(df_data)
-                df = _excel_safe_dataframe(df)
-                if not df.empty:
-                    df.to_excel(writer, sheet_name=model_name, index=False)
-                
-                # Processa dados relacionados
-                related_data = model_data.get('related', {})
-                for related_name, related_content in related_data.items():
-                    sheet_name = f"{model_name}_{related_name}"
-                    df_related_data = _strip_tz(related_content.get('data', []))
-                    df_related = pd.DataFrame(df_related_data)
-                    df_related = _excel_safe_dataframe(df_related)
-                    if not df_related.empty:
-                        df_related.to_excel(writer, sheet_name=sheet_name[:31], index=False)
+        if file_type == "xlsx":
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                for model_name, model_data in report_data.items():
+                    df_data = _strip_tz(model_data.get('data', []))
+                    df = pd.DataFrame(df_data)
+                    df = _excel_safe_dataframe(df)
+                    if not df.empty:
+                        df.to_excel(writer, sheet_name=model_name, index=False)
+                    related_data = model_data.get('related', {})
+                    for related_name, related_content in related_data.items():
+                        sheet_name = f"{model_name}_{related_name}"
+                        df_related_data = _strip_tz(related_content.get('data', []))
+                        df_related = pd.DataFrame(df_related_data)
+                        df_related = _excel_safe_dataframe(df_related)
+                        if not df_related.empty:
+                            df_related.to_excel(writer, sheet_name=sheet_name[:31], index=False)
+        else:
+            zip_buf = io.BytesIO()
+            with ZipFile(zip_buf, "w", ZIP_DEFLATED) as zf:
+                for model_name, model_data in report_data.items():
+                    df_data = _strip_tz(model_data.get('data', []))
+                    df = pd.DataFrame(df_data)
+                    df = _excel_safe_dataframe(df)
+                    if not df.empty:
+                        csv_io = io.StringIO()
+                        df.to_csv(csv_io, index=False)
+                        zf.writestr(f"{model_name[:31]}.csv", csv_io.getvalue().encode("utf-8"))
+                    related_data = model_data.get('related', {})
+                    for related_name, related_content in related_data.items():
+                        sheet_name = f"{model_name}_{related_name}"
+                        df_related_data = _strip_tz(related_content.get('data', []))
+                        df_related = pd.DataFrame(df_related_data)
+                        df_related = _excel_safe_dataframe(df_related)
+                        if not df_related.empty:
+                            csv_io = io.StringIO()
+                            df_related.to_csv(csv_io, index=False)
+                            zf.writestr(f"{sheet_name[:31]}.csv", csv_io.getvalue().encode("utf-8"))
+            output = zip_buf
         
         # Salva arquivo localmente (timestamp sem barras)
         dt = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         if getattr(settings, "REPORTS_SAVE_LOCALLY", True):
             base_dir = getattr(settings, "REPORTS_SAVE_DIR", os.path.join(settings.MEDIA_ROOT, "reports"))
             os.makedirs(base_dir, exist_ok=True)
-            filename = f'custom_report_{project.uuid}_{dt}.xlsx'
+            ext = "xlsx" if file_type == "xlsx" else "zip"
+            filename = f'custom_report_{project.uuid}_{dt}.{ext}'
             filename = filename.replace("/", "-").replace("\\", "-")
             output.seek(0)
             file_path = os.path.join(base_dir, filename)
@@ -151,7 +176,18 @@ def generate_custom_fields_report(project_uuid: UUID, fields_config: dict, user_
                     to=[user_email],
                 )
                 output.seek(0)
-                email.attach(f'custom_report_{dt}.xlsx', output.getvalue(), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                if file_type == "xlsx":
+                    email.attach(
+                        f'custom_report_{dt}.xlsx',
+                        output.getvalue(),
+                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    )
+                else:
+                    email.attach(
+                        f'custom_report_{dt}.zip',
+                        output.getvalue(),
+                        'application/zip'
+                    )
                 email.send(fail_silently=False)
             except Exception as e:
                 logger.exception("Erro ao enviar e-mail do relatório: %s", e)
@@ -199,57 +235,97 @@ def process_pending_reports():
         view = ReportFieldsValidatorViewSet()
         available_fields = ModelFieldsPresenter.get_models_info()
 
+        # Decide formato (xlsx ou csv zip)
+        file_type = _norm_file_type(fields_config.get('_file_type'))
         output = io.BytesIO()
 
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            wrote_any = False
+        if file_type == "xlsx":
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                wrote_any = False
+                for model_name, field_data in fields_config.items():
+                    query_data = view._process_model_fields(
+                        model_name, field_data, project, available_fields
+                    )
+
+                    def _write_queryset(sheet_name: str, qs):
+                        total = qs.count()
+                        row_offset = 0
+                        for start in range(0, total, chunk_size):
+                            end = min(start + chunk_size, total)
+                            logging.info("Writing chunk: sheet=%s start=%s end=%s total=%s chunk_size=%s",
+                                         sheet_name, start, end, total, chunk_size)
+                            chunk = list(qs[start:end])
+                            chunk = _strip_tz(chunk)
+                            if not chunk:
+                                continue
+                            df = pd.DataFrame(chunk)
+                            df = _excel_safe_dataframe(df)
+                            df.to_excel(
+                                writer,
+                                sheet_name=sheet_name[:31],
+                                index=False,
+                                header=(row_offset == 0),
+                                startrow=row_offset if row_offset > 0 else 0,
+                            )
+                            row_offset += len(df)
+                            wrote_any = True
+
+                    if 'queryset' in query_data:
+                        _write_queryset(model_name, query_data['queryset'])
+
+                    for related_name, related_qd in (query_data.get('related') or {}).items():
+                        if 'queryset' in related_qd:
+                            _write_queryset(f"{model_name}_{related_name}", related_qd['queryset'])
+
+                if not wrote_any:
+                    meta = pd.DataFrame([{"message": "No data for the selected configuration"}])
+                    meta.to_excel(writer, sheet_name='metadata', index=False)
+        else:
+            # CSV: gera um zip com um CSV por aba
+            csv_buffers = {}
+            def _write_csv_queryset(sheet_name: str, qs):
+                total = qs.count()
+                row_offset = 0
+                buf = csv_buffers.get(sheet_name)
+                if buf is None:
+                    buf = io.StringIO()
+                    csv_buffers[sheet_name] = buf
+                for start in range(0, total, chunk_size):
+                    end = min(start + chunk_size, total)
+                    logging.info("Writing chunk (csv): sheet=%s start=%s end=%s total=%s chunk_size=%s",
+                                 sheet_name, start, end, total, chunk_size)
+                    chunk = list(qs[start:end])
+                    chunk = _strip_tz(chunk)
+                    if not chunk:
+                        continue
+                    df = pd.DataFrame(chunk)
+                    df = _excel_safe_dataframe(df)
+                    df.to_csv(buf, index=False, header=(row_offset == 0))
+                    row_offset += len(df)
+
             for model_name, field_data in fields_config.items():
                 query_data = view._process_model_fields(
                     model_name, field_data, project, available_fields
                 )
-
-                def _write_queryset(sheet_name: str, qs):
-                    total = qs.count()
-                    row_offset = 0
-                    for start in range(0, total, chunk_size):
-                        end = min(start + chunk_size, total)
-                        logging.info("Writing chunk: sheet=%s start=%s end=%s total=%s chunk_size=%s",
-                                     sheet_name, start, end, total, chunk_size)
-                        chunk = list(qs[start:end])
-                        # Remove timezone de todos os valores antes de montar o DataFrame
-                        chunk = _strip_tz(chunk)
-                        if not chunk:
-                            continue
-                        df = pd.DataFrame(chunk)
-                        df = _excel_safe_dataframe(df)
-                        df.to_excel(
-                            writer,
-                            sheet_name=sheet_name[:31],
-                            index=False,
-                            header=(row_offset == 0),
-                            startrow=row_offset if row_offset > 0 else 0,
-                        )
-                        row_offset += len(df)
-                        wrote_any = True
-
                 if 'queryset' in query_data:
-                    _write_queryset(model_name, query_data['queryset'])
-
+                    _write_csv_queryset(model_name, query_data['queryset'])
                 for related_name, related_qd in (query_data.get('related') or {}).items():
                     if 'queryset' in related_qd:
-                        _write_queryset(f"{model_name}_{related_name}", related_qd['queryset'])
+                        _write_csv_queryset(f"{model_name}_{related_name}", related_qd['queryset'])
 
-            if not wrote_any:
-                # Cria ao menos uma aba para workbook válido
-                meta = pd.DataFrame([{"message": "No data for the selected configuration"}])
-                meta.to_excel(writer, sheet_name='metadata', index=False)
+            zip_buf = io.BytesIO()
+            with ZipFile(zip_buf, "w", ZIP_DEFLATED) as zf:
+                for sheet_name, buf in csv_buffers.items():
+                    zf.writestr(f"{sheet_name[:31]}.csv", buf.getvalue().encode("utf-8"))
+            output = zip_buf
 
         dt = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         # Salva arquivo localmente
         if getattr(settings, "REPORTS_SAVE_LOCALLY", True):
             base_dir = getattr(settings, "REPORTS_SAVE_DIR", os.path.join(settings.MEDIA_ROOT, "reports"))
             os.makedirs(base_dir, exist_ok=True)
-            filename = f'custom_report_{project.uuid}_{dt}.xlsx'
+            ext = "xlsx" if file_type == "xlsx" else "zip"
+            filename = f'custom_report_{project.uuid}_{dt}.{ext}'
             filename = filename.replace("/", "-").replace("\\", "-")
             output.seek(0)
             file_path = os.path.join(base_dir, filename)
@@ -275,11 +351,18 @@ def process_pending_reports():
                     to=[user_email],
                 )
                 output.seek(0)
-                email.attach(
-                    f'custom_report_{dt}.xlsx',
-                    output.getvalue(),
-                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                )
+                if file_type == "xlsx":
+                    email.attach(
+                        f'custom_report_{dt}.xlsx',
+                        output.getvalue(),
+                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    )
+                else:
+                    email.attach(
+                        f'custom_report_{dt}.zip',
+                        output.getvalue(),
+                        'application/zip',
+                    )
                 email.send(fail_silently=False)
             except Exception as e:
                 logging.exception("Erro ao enviar e-mail do relatório: %s", e)
