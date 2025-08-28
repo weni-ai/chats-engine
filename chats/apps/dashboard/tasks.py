@@ -1,4 +1,5 @@
 from uuid import UUID
+from zipfile import ZIP_DEFLATED
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.dashboard.utils import calculate_response_time
 from chats.apps.rooms.models import Room
