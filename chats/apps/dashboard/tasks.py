@@ -15,6 +15,7 @@ import logging
 from chats.apps.dashboard.models import ReportStatus
 from django.db import transaction
 from typing import Optional
+import zipfile
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +127,7 @@ def generate_custom_fields_report(project_uuid: UUID, fields_config: dict, user_
                             df_related.to_excel(writer, sheet_name=sheet_name[:31], index=False)
         else:
             zip_buf = io.BytesIO()
-            with ZipFile(zip_buf, "w", ZIP_DEFLATED) as zf:
+            with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
                 for model_name, model_data in report_data.items():
                     df_data = _strip_tz(model_data.get('data', []))
                     df = pd.DataFrame(df_data)
@@ -323,7 +324,7 @@ def process_pending_reports():
                         _write_csv_queryset(f"{model_name}_{related_name}", related_qd['queryset'])
 
             zip_buf = io.BytesIO()
-            with ZipFile(zip_buf, "w", ZIP_DEFLATED) as zf:
+            with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
                 for sheet_name, buf in csv_buffers.items():
                     zf.writestr(f"{sheet_name[:31]}.csv", buf.getvalue().encode("utf-8"))
             output = zip_buf

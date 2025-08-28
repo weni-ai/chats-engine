@@ -427,7 +427,7 @@ CELERY_BEAT_SCHEDULER = "celery.beat:PersistentScheduler"
 CELERY_BEAT_MAX_LOOP_INTERVAL = 10
 
 # Intervalo (em segundos) para a tarefa de relatórios (configurável por env)
-REPORTS_SCHEDULE_SECONDS = env.float("REPORTS_SCHEDULE_SECONDS", default=120.0)
+REPORTS_SCHEDULE_SECONDS = env.float("REPORTS_SCHEDULE_SECONDS", default=20.0)
 
 CELERY_BEAT_SCHEDULE = {
     "process-pending-reports": {
