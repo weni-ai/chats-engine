@@ -6,6 +6,7 @@ from django.db.models import Q
 from sentry_sdk import capture_message
 from chats.apps.ai_features.history_summary.models import HistorySummaryStatus
 from chats.apps.ai_features.integrations.base_client import BaseAIPlatformClient
+from chats.apps.ai_features.integrations.dataclass import PromptMessage
 from chats.apps.ai_features.models import FeaturePrompt
 
 
@@ -89,10 +90,15 @@ class HistorySummaryService:
                 )
 
             conversation_text = json.dumps(conversation, ensure_ascii=False)
-            prompt_text = prompt_text.format(conversation=conversation_text)
+            prompt_initial_context = prompt_text.split("{conversation}")[0]
+
+            prompt_msgs = [
+                PromptMessage(text=prompt_initial_context, should_cache=True),
+                PromptMessage(text=conversation_text),
+            ]
 
             summary_text = self.integration_client_class(model_id).generate_text(
-                feature_prompt.settings, prompt_text
+                feature_prompt.settings, prompt_msgs
             )
 
             logger.info(
