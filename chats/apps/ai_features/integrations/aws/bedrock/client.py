@@ -5,6 +5,7 @@ from botocore.exceptions import ClientError
 from django.conf import settings
 
 from chats.apps.ai_features.integrations.base_client import BaseAIPlatformClient
+from chats.apps.ai_features.integrations.dataclass import PromptMessage
 
 
 logger = logging.getLogger(__name__)
@@ -51,7 +52,9 @@ class BedrockClient(BaseAIPlatformClient):
         # If neither format matches, raise an error
         raise ValueError(f"Unsupported response format: {response_body}")
 
-    def format_request_body(self, prompt_settings: dict, prompt: str) -> dict:
+    def format_request_body(
+        self, prompt_settings: dict, prompt_msgs: list[PromptMessage]
+    ) -> dict:
         """
         Format the request body for the Bedrock client.
         """
@@ -65,8 +68,19 @@ class BedrockClient(BaseAIPlatformClient):
                 "messages": [
                     {
                         "role": "user",
-                        "content": [{"type": "text", "text": prompt}],
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": prompt_msg.text,
+                                **(
+                                    {"cache_control": {"type": "ephemeral"}}
+                                    if prompt_msg.should_cache
+                                    else {}
+                                ),
+                            }
+                        ],
                     }
+                    for prompt_msg in prompt_msgs
                 ],
                 **settings_body,
             }
@@ -76,8 +90,18 @@ class BedrockClient(BaseAIPlatformClient):
                 "messages": [
                     {
                         "role": "user",
-                        "content": [{"text": prompt}],
+                        "content": [
+                            {
+                                "text": prompt_msg.text,
+                                **(
+                                    {"cachePoint": {"type": "default"}}
+                                    if prompt_msg.should_cache
+                                    else {}
+                                ),
+                            }
+                        ],
                     }
+                    for prompt_msg in prompt_msgs
                 ],
                 **settings_body,
             }
