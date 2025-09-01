@@ -9,7 +9,7 @@ class FeedbackSerializer(serializers.Serializer):
     Serializer for feedback creation.
     """
 
-    rating = serializers.IntegerField(min_value=1, max_value=5)
+    rating = serializers.IntegerField(min_value=1, max_value=3)
     comment = serializers.CharField(allow_blank=True, allow_null=True)
     project_uuid = serializers.UUIDField()
 
