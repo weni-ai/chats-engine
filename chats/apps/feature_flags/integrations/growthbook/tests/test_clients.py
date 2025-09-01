@@ -1,5 +1,6 @@
 import json
 from unittest.mock import call, patch
+import uuid
 from django.test import TestCase
 
 from chats.apps.feature_flags.integrations.growthbook.clients import GrowthbookClient
@@ -244,3 +245,177 @@ class TestGrowthbookClient(TestCase):
             f"{self.client.host_base_url}/api/features/{self.client.client_key}",
             timeout=60,
         )
+
+    @patch(
+        "chats.apps.feature_flags.integrations.growthbook.clients.GrowthbookClient.get_feature_flags"
+    )
+    def test_get_active_feature_flags_for_attributes(self, mock_get_feature_flags):
+        attributes = {
+            "userEmail": "test@vtex.com",
+            "projectUUID": str(uuid.uuid4()),
+        }
+
+        mock_get_feature_flags.return_value = {
+            # Always active while set to True in Growthbook
+            "exampleWithoutRulesTrue": {
+                "defaultValue": True,
+                "rules": [],
+            },
+            # Always inactive while set to False in Growthbook
+            "exampleWithoutRulesFalse": {
+                "defaultValue": False,
+                "rules": [],
+            },
+            # Active if project is in the list
+            # It is expected to be active because the project is in the list
+            # in the attributes above
+            "exampleByProjectInTrue": {
+                "defaultValue": False,
+                "rules": [
+                    {
+                        "id": "fr_40644z1tmdqamcpe",
+                        "condition": {
+                            "projectUUID": {"$in": [attributes["projectUUID"]]}
+                        },
+                        "force": True,
+                    }
+                ],
+            },
+            # Active if project is not in the list
+            # It is expected to be inactive because the project is not in the list
+            # in the attributes above
+            "exampleByProjectInFalse": {
+                "defaultValue": False,
+                "rules": [
+                    {
+                        "id": "fr_40644z1tmdrec3rs",
+                        "condition": {"projectUUID": {"$in": [str(uuid.uuid4())]}},
+                        "force": True,
+                    }
+                ],
+            },
+            # Active if project is not in the list
+            # It is expected to be active because the project is not in the list
+            # in the attributes above
+            "exampleByProjectNotInTrue": {
+                "defaultValue": False,
+                "rules": [
+                    {
+                        "id": "fr_40644z1tmdrec3rs",
+                        "condition": {"projectUUID": {"$nin": [str(uuid.uuid4())]}},
+                        "force": True,
+                    }
+                ],
+            },
+            # Active if project is not in the list
+            # It is expected to be inactive because the project is in the list
+            # in the attributes above
+            "exampleByProjectNotInFalse": {
+                "defaultValue": False,
+                "rules": [
+                    {
+                        "id": "fr_40644z1tmdrec3rs",
+                        "condition": {
+                            "projectUUID": {"$nin": [attributes["projectUUID"]]}
+                        },
+                        "force": True,
+                    }
+                ],
+            },
+            # Active if user email is the same as the one in the attributes
+            # It is expected to be active because the user email is the same as the one in the attributes
+            "exampleByEmailInTrue": {
+                "defaultValue": False,
+                "rules": [
+                    {
+                        "id": "fr_40644z1tmdrec3rs",
+                        "condition": {"userEmail": {"$in": [attributes["userEmail"]]}},
+                        "force": True,
+                    }
+                ],
+            },
+            # Active if user email is not the same as the one in the attributes
+            # It is expected to be inactive because the user email is not the same as the one in the attributes
+            "exampleByEmailInFalse": {
+                "defaultValue": False,
+                "rules": [
+                    {
+                        "id": "fr_40644z1tmdrec3rs",
+                        "condition": {"userEmail": {"$in": ["other@test.com"]}},
+                        "force": True,
+                    }
+                ],
+            },
+            # Active if user email domain is vtex.com
+            # It is expected to be active because the user email domain is vtex.com
+            "exampleByEmailInDomainTrue": {
+                "defaultValue": False,
+                "rules": [
+                    {
+                        "id": "fr_40644z1tmdrec3rs",
+                        "condition": {
+                            "userEmail": {
+                                "$regex": "^[\\w.+-]+@([\\w-]+\\.)*vtex\\.com$"
+                            }
+                        },
+                        "force": True,
+                    },
+                ],
+            },
+            # Active if user email domain is weni.ai
+            # It is expected to be inactive because the user email domain is not weni.ai
+            "exampleByEmailInDomainFalse": {
+                "defaultValue": False,
+                "rules": [
+                    {
+                        "id": "fr_40644z1tmdrec3rs",
+                        "condition": {
+                            "userEmail": {
+                                "$regex": "^[\\w.+-]+@([\\w-]+\\.)*weni\\.ai$"
+                            }
+                        },
+                        "force": True,
+                    },
+                ],
+            },
+        }
+
+        features = self.client.get_active_feature_flags_for_attributes(attributes)
+
+        self.assertEqual(
+            features,
+            [
+                "exampleWithoutRulesTrue",
+                "exampleByProjectInTrue",
+                "exampleByProjectNotInTrue",
+                "exampleByEmailInTrue",
+                "exampleByEmailInDomainTrue",
+            ],
+        )
+
+    @patch(
+        "chats.apps.feature_flags.integrations.growthbook.clients.GrowthbookClient.get_feature_flags"
+    )
+    def test_evaluate_feature_flag_by_attributes(self, mock_get_feature_flags):
+        attributes = {
+            "projectUUID": str(uuid.uuid4()),
+        }
+
+        mock_get_feature_flags.return_value = {
+            "example": {
+                "defaultValue": False,
+                "rules": [
+                    {
+                        "id": "fr_40644z1tmdrec3rs",
+                        "condition": {
+                            "projectUUID": {"$in": [attributes["projectUUID"]]}
+                        },
+                        "force": True,
+                    }
+                ],
+            },
+        }
+
+        result = self.client.evaluate_feature_flag_by_attributes("example", attributes)
+
+        self.assertTrue(result)
