@@ -77,7 +77,7 @@ class UserFeedbackService(BaseUserFeedbackService):
         """
         Get feedback form shown count data
         """
-        return (
+        return int(
             self.cache_client.get(
                 self.get_feedback_form_shown_count_cache_key(user),
             )
