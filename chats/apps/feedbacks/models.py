@@ -1,0 +1,59 @@
+from django.db import models
+
+from chats.core.models import BaseModel
+from chats.apps.feedbacks.choices import FeedbackRate
+
+
+class LastFeedbackShownToUser(BaseModel):
+    """
+    Last feedback shown to user model
+    """
+
+    user = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="last_feedback_shown_to_user",
+    )
+    last_shown_at = models.DateTimeField()
+
+    class Meta:
+        verbose_name = "Last feedback shown to user"
+        verbose_name_plural = "Last feedback shown to users"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user"],
+                name="unique_user_last_feedback_shown_to_user",
+            )
+        ]
+
+    def __str__(self):
+        return f"Last feedback shown to {self.user.email} at {self.last_shown_at}"
+
+
+class UserFeedback(BaseModel):
+    """
+    User feedback model
+    """
+
+    user = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="user_feedbacks",
+    )
+    rating = models.IntegerField(choices=FeedbackRate.choices)
+    comment = models.TextField(null=True, blank=True)
+    project = models.ForeignKey(
+        "projects.Project",
+        related_name="user_feedbacks",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    answered_at = models.DateTimeField()
+
+    class Meta:
+        verbose_name = "User Feedback"
+        verbose_name_plural = "User Feedbacks"
+
+    def __str__(self):
+        return f"Feedback from {self.user.email} {self.rate}"
