@@ -1,3 +1,9 @@
+# 3.24.0
+## Add
+  - Growthbook client
+  - Feature flag service + endpoint
+  - Users feedback
+
 # 3.23.21
 ## Add
   - callid custom field in rooms metrics endpoint
@@ -677,6 +683,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 
