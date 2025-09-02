@@ -319,6 +319,24 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         room = get_active_room_flow_start(contact, flow_uuid, project)
 
         if room is not None:
+            update_fields = []
+            
+            if "callback_url" in self.initial_data:
+                new_callback_url = validated_data.get("callback_url")
+                if new_callback_url is not None:
+                    room.callback_url = new_callback_url
+                    update_fields.append("callback_url")
+                    
+            if "ticket_uuid" in self.initial_data:
+                new_ticket_uuid = validated_data.get("ticket_uuid")
+                if new_ticket_uuid is not None:
+                    room.ticket_uuid = new_ticket_uuid
+                    update_fields.append("ticket_uuid")
+
+            if update_fields:
+                room.request_callback(room.serialized_ws_data)
+                room.save(update_fields=update_fields)
+
             if history_data:
                 self.process_message_history(room, history_data)
             return room

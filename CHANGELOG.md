@@ -1,3 +1,18 @@
+# 3.23.21
+## Add
+  - callid custom field in rooms metrics endpoint
+## Fix
+  - Module has permission broken tests
+
+# 3.23.20
+## Add
+  - Protocol field in rooms metrics endpoint
+  - Configuration to separate websocket pods from engine pods
+  - Configuration to use celery beat
+
+## Fix
+  - Agents list open rooms count for Insights dashboard
+
 # 3.23.19
 ## Fix
   - Race condition in route rooms for queue
@@ -662,6 +677,9 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
+
+
 
 
 
