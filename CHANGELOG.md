@@ -1,3 +1,7 @@
+# 3.24.1
+## Add
+  - releasing status message feature for all projects
+ 
 # 3.24.0
 ## Add
   - Growthbook client
@@ -683,6 +687,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 
