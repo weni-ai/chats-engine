@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ("projects", "0029_change_projects_room_routing_type"),
+        ("projects", "0030_project_internal_flags"),
     ]
 
     operations = [
