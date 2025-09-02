@@ -694,3 +694,33 @@ class CustomStatus(BaseModel):
                     "you can't have more than one active status per project."
                 )
             raise
+
+
+class AgentDisconnectLog(BaseModel):
+    """
+    Audit log for supervisor-enforced agent disconnections.
+    """
+    project = models.ForeignKey(
+        "projects.Project",
+        related_name="agent_disconnect_logs",
+        verbose_name=_("project"),
+        on_delete=models.CASCADE,
+    )
+    agent = models.ForeignKey(
+        User,
+        related_name="agent_disconnected_logs",
+        verbose_name=_("agent"),
+        on_delete=models.CASCADE,
+        to_field="email",
+    )
+    disconnected_by = models.ForeignKey(
+        User,
+        related_name="agent_disconnect_actions",
+        verbose_name=_("disconnected by"),
+        on_delete=models.CASCADE,
+        to_field="email",
+    )
+
+    class Meta:
+        verbose_name = "Agent Disconnect Log"
+        verbose_name_plural = "Agent Disconnect Logs"
