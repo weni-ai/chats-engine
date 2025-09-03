@@ -349,13 +349,13 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         if room is not None:
             update_fields = []
-            
+
             if "callback_url" in self.initial_data:
                 new_callback_url = validated_data.get("callback_url")
                 if new_callback_url is not None:
                     room.callback_url = new_callback_url
                     update_fields.append("callback_url")
-                    
+
             if "ticket_uuid" in self.initial_data:
                 new_ticket_uuid = validated_data.get("ticket_uuid")
                 if new_ticket_uuid is not None:
