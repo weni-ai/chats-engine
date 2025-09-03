@@ -1,4 +1,8 @@
 # 3.24.1
+## Fix
+  - updating the ticket uuid field and callback url when a flow is triggered for an already open room
+    
+# 3.24.1
 ## Add
   - releasing status message feature for all projects
  
@@ -687,6 +691,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 
