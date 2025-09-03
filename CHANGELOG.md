@@ -1,4 +1,4 @@
-# 3.24.1
+# 3.24.2
 ## Fix
   - updating the ticket uuid field and callback url when a flow is triggered for an already open room
     
@@ -691,6 +691,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 
