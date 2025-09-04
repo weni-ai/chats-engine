@@ -29,8 +29,12 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         on_delete=models.CASCADE,
     )
     rooms_limit = models.PositiveIntegerField(_("Rooms limit per employee"))
-    work_start = models.TimeField(_("work start"), auto_now=False, auto_now_add=False)
-    work_end = models.TimeField(_("work end"), auto_now=False, auto_now_add=False)
+    work_start = models.TimeField(
+        _("work start"), auto_now=False, auto_now_add=False, null=True, blank=True
+    )
+    work_end = models.TimeField(
+        _("work end"), auto_now=False, auto_now_add=False, null=True, blank=True
+    )
     can_trigger_flows = models.BooleanField(
         _("Can trigger flows?"),
         help_text=_(
@@ -59,10 +63,6 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         verbose_name_plural = _("Sectors")
 
         constraints = [
-            models.CheckConstraint(
-                check=Q(work_end__gt=F("work_start")),
-                name="wordend_greater_than_workstart_check",
-            ),
             models.UniqueConstraint(
                 fields=["project", "name"], name="unique_sector_name"
             ),
@@ -219,12 +219,28 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         return is_online
 
     def is_attending(self, created_on):
+        """
+        Backwards-compat boolean: now delegates to working_hours config.
+        Returns True if creation time is allowed by working_hours, False otherwise.
+        """
         tz = pendulum.timezone(str(self.project.timezone))
-        created_on = pendulum.parse(str(created_on)).in_timezone(tz)
-        start = pendulum.parse(str(self.work_start))
-        end = pendulum.parse(str(self.work_end))
+        created_on = (
+            pendulum.instance(created_on)
+            if not isinstance(created_on, pendulum.DateTime)
+            else created_on
+        )
+        created_on = (
+            tz.localize(created_on)
+            if created_on.tzinfo is None
+            else created_on.in_timezone(tz)
+        )
+        try:
+            from chats.apps.sectors.utils import working_hours_validator
 
-        return start.time() < created_on.time() < end.time()
+            working_hours_validator.validate_working_hours(self, created_on)
+            return True
+        except Exception:
+            return False
 
     def get_or_create_user_authorization(self, user):
         sector_auth, created = self.authorizations.get_or_create(user=user)
@@ -494,3 +510,104 @@ class GroupSectorAuthorization(BaseModel):
             return self.group_sector.project.get_permission(user)
         except ObjectDoesNotExist:
             return None
+
+
+class SectorHoliday(BaseSoftDeleteModel, BaseModel):
+    """
+    Model to store holidays and configurable special days by sector
+    (feriados locais, folgas específicas, etc.)
+    """
+
+    CLOSED = "closed"
+    CUSTOM_HOURS = "custom_hours"
+
+    DAY_TYPE_CHOICES = [
+        (CLOSED, _("Closed")),
+        (CUSTOM_HOURS, _("Custom Hours")),
+    ]
+
+    sector = models.ForeignKey(
+        Sector,
+        verbose_name=_("Sector"),
+        related_name="holidays",
+        on_delete=models.CASCADE,
+    )
+    date = models.DateField(_("Date"))
+    date_end = models.DateField(
+        _("End Date"),
+        null=True,
+        blank=True,
+        help_text=_("End date for holiday range"),
+    )
+    day_type = models.CharField(
+        _("Day Type"), max_length=20, choices=DAY_TYPE_CHOICES, default=CLOSED
+    )
+    start_time = models.TimeField(
+        _("Start Time"),
+        null=True,
+        blank=True,
+        help_text=_("Leave empty if day is closed"),
+    )
+    end_time = models.TimeField(
+        _("End Time"),
+        null=True,
+        blank=True,
+        help_text=_("Leave empty if day is closed"),
+    )
+    description = models.CharField(
+        _("Description"),
+        max_length=255,
+        blank=True,
+        help_text=_("Holiday name or reason for special hours"),
+    )
+    its_custom = models.BooleanField(_("Is Custom"), default=False)
+    repeat = models.BooleanField(_("Repeat Annually"), default=False)
+
+    class Meta:
+        verbose_name = _("Sector Holiday")
+        verbose_name_plural = _("Sector Holidays")
+        indexes = [
+            models.Index(fields=["sector", "date"], name="idx_sector_holiday"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["sector", "date"], name="unique_sector_holiday"
+            ),
+            models.CheckConstraint(
+                check=Q(
+                    Q(day_type="closed", start_time__isnull=True, end_time__isnull=True)
+                    | Q(
+                        day_type="custom_hours",
+                        start_time__isnull=False,
+                        end_time__isnull=False,
+                    )
+                ),
+                name="valid_holiday_times",
+            ),
+            models.CheckConstraint(
+                check=Q(end_time__gt=F("start_time")) | Q(start_time__isnull=True),
+                name="holiday_end_greater_than_start",
+            ),
+        ]
+        ordering = ["date"]
+
+    def __str__(self):
+        if self.day_type == self.CLOSED:
+            return f"{self.sector.name} - {self.date} (Closed)"
+        return f"{self.sector.name} - {self.date} ({self.start_time}-{self.end_time})"
+
+    def get_permission(self, user):
+        return self.sector.get_permission(user)
+
+    @property
+    def project(self):
+        return self.sector.project
+
+    def is_closed(self):
+        return self.day_type == self.CLOSED
+
+    def is_within_hours(self, time):
+        """Verifica se um horário está dentro do período configurado"""
+        if self.is_closed():
+            return False
+        return self.start_time <= time <= self.end_time

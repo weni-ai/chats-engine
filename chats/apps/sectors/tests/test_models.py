@@ -1,5 +1,6 @@
 from datetime import time
 from unittest.mock import patch
+
 from django.db import IntegrityError
 from django.test import TestCase
 from rest_framework.test import APITestCase
@@ -22,20 +23,6 @@ class ConstraintTests(APITestCase):
         )
         self.sector_tag = SectorTag.objects.get(
             uuid="62d9e7c4-4f2d-40fc-acf7-9549bface0fb"
-        )
-
-    def test_work_end_greater_than_work_start_check_constraint(self):
-        with self.assertRaises(IntegrityError) as context:
-            Sector.objects.create(
-                name="sector test",
-                project=self.project,
-                work_start="12",
-                work_end="10",
-                rooms_limit=10,
-            )
-        self.assertTrue(
-            'new row for relation "sectors_sector" violates check constraint "wordend_greater_than_workstart_check"'
-            in str(context.exception)
         )
 
     def test_unique_sector_name_constraint(self):

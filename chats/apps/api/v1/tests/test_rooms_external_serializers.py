@@ -1,5 +1,6 @@
 import pendulum
 from django.test import TestCase
+from rest_framework.exceptions import ValidationError
 
 from chats.apps.api.v1.external.rooms.serializers import RoomFlowSerializer
 from chats.apps.projects.models.models import Project
@@ -23,9 +24,13 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
                 "working_hours": {
                     "open_in_weekends": True,
                     "schedules": {
-                        "weekdays": {"start": "09:00", "end": "17:00"},
-                        "saturday": {"start": "09:00", "end": "15:00"},
-                        "sunday": {"start": None, "end": None},
+                        "monday": [{"start": "09:00", "end": "17:00"}],
+                        "tuesday": [{"start": "09:00", "end": "17:00"}],
+                        "wednesday": [{"start": "09:00", "end": "17:00"}],
+                        "thursday": [{"start": "09:00", "end": "17:00"}],
+                        "friday": [{"start": "09:00", "end": "17:00"}],
+                        "saturday": [{"start": "09:00", "end": "15:00"}],
+                        "sunday": None,
                     },
                 }
             },
@@ -85,11 +90,10 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
         }
 
         serializer = RoomFlowSerializer(data=data)
-        self.assertFalse(serializer.is_valid())
-        self.assertIn("detail", serializer.errors)
-        self.assertIn(
-            "Contact cannot be done outside working hours", str(serializer.errors)
-        )
+        self.assertTrue(serializer.is_valid())
+        with self.assertRaises(ValidationError) as cm:
+            serializer.save()
+        self.assertIn("Contact cannot be done outside working hours", str(cm.exception))
 
     def test_weekend_validation_sunday_closed(self):
         """Test room creation on Sunday when sector is closed"""
@@ -116,11 +120,10 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
         }
 
         serializer = RoomFlowSerializer(data=data)
-        self.assertFalse(serializer.is_valid())
-        self.assertIn("detail", serializer.errors)
-        self.assertIn(
-            "Contact cannot be done outside working hours", str(serializer.errors)
-        )
+        self.assertTrue(serializer.is_valid())
+        with self.assertRaises(ValidationError) as cm:
+            serializer.save()
+        self.assertIn("Contact cannot be done outside working hours", str(cm.exception))
 
     def test_weekend_validation_sector_not_open_weekends(self):
         """Test room creation on weekend when sector doesn't operate"""
@@ -133,7 +136,15 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
             working_day={
                 "working_hours": {
                     "open_in_weekends": False,
-                    "schedules": {"weekdays": {"start": "09:00", "end": "17:00"}},
+                    "schedules": {
+                        "monday": [{"start": "09:00", "end": "17:00"}],
+                        "tuesday": [{"start": "09:00", "end": "17:00"}],
+                        "wednesday": [{"start": "09:00", "end": "17:00"}],
+                        "thursday": [{"start": "09:00", "end": "17:00"}],
+                        "friday": [{"start": "09:00", "end": "17:00"}],
+                        "saturday": None,
+                        "sunday": None,
+                    },
                 }
             },
         )
@@ -163,11 +174,10 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
         }
 
         serializer = RoomFlowSerializer(data=data)
-        self.assertFalse(serializer.is_valid())
-        self.assertIn("detail", serializer.errors)
-        self.assertIn(
-            "Contact cannot be done outside working hours", str(serializer.errors)
-        )
+        self.assertTrue(serializer.is_valid())
+        with self.assertRaises(ValidationError) as cm:
+            serializer.save()
+        self.assertIn("Contact cannot be done outside working hours", str(cm.exception))
 
     def test_weekend_validation_sector_open_all_weekend(self):
         """Test room creation on weekend when sector operates 24h"""
@@ -181,9 +191,13 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
                 "working_hours": {
                     "open_in_weekends": True,
                     "schedules": {
-                        "weekdays": {"start": "09:00", "end": "17:00"},
-                        "saturday": {"start": "00:00", "end": "23:59"},
-                        "sunday": {"start": "00:00", "end": "23:59"},
+                        "monday": [{"start": "09:00", "end": "17:00"}],
+                        "tuesday": [{"start": "09:00", "end": "17:00"}],
+                        "wednesday": [{"start": "09:00", "end": "17:00"}],
+                        "thursday": [{"start": "09:00", "end": "17:00"}],
+                        "friday": [{"start": "09:00", "end": "17:00"}],
+                        "saturday": [{"start": "00:00", "end": "23:59"}],
+                        "sunday": [{"start": "00:00", "end": "23:59"}],
                     },
                 }
             },
