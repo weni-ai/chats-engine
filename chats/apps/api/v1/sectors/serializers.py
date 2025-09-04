@@ -17,18 +17,25 @@ class SectorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Sector
         fields = "__all__"
+        extra_kwargs = {
+            "work_start": {"required": False, "allow_null": True},
+            "work_end": {"required": False, "allow_null": True},
+        }
 
     def validate(self, data):
         """
         Check if the work_end date its greater than work_start date.
         """
-        if self.instance:
-            if self.instance.work_end < self.instance.work_start:
-                raise serializers.ValidationError(
-                    {"detail": _("work_end date must be greater than work_start date.")}
-                )
-        else:
-            if data["work_end"] < data["work_start"]:
+        start = data.get(
+            "work_start",
+            getattr(self.instance, "work_start", None) if self.instance else None,
+        )
+        end = data.get(
+            "work_end",
+            getattr(self.instance, "work_end", None) if self.instance else None,
+        )
+        if start is not None and end is not None:
+            if end <= start:
                 raise serializers.ValidationError(
                     {"detail": _("work_end date must be greater than work_start date.")}
                 )
@@ -215,12 +222,16 @@ class SectorHolidaySerializer(serializers.ModelSerializer):
             "uuid",
             "sector",
             "date",
+            "date_end",
             "day_type",
             "start_time",
             "end_time",
             "description",
+            "its_custom",
+            "repeat",
             "created_on",
             "modified_on",
+            "its_custom",
         ]
         read_only_fields = ["uuid", "created_on", "modified_on"]
 
@@ -232,14 +243,12 @@ class SectorHolidaySerializer(serializers.ModelSerializer):
         start_time = data.get("start_time")
         end_time = data.get("end_time")
 
-        # Se é dia fechado, não deve ter horários
         if day_type == SectorHoliday.CLOSED:
             if start_time is not None or end_time is not None:
                 raise serializers.ValidationError(
                     {"detail": _("Closed days should not have start_time or end_time")}
                 )
 
-        # Se tem horário customizado, deve ter ambos horários
         elif day_type == SectorHoliday.CUSTOM_HOURS:
             if start_time is None or end_time is None:
                 raise serializers.ValidationError(
@@ -249,13 +258,26 @@ class SectorHolidaySerializer(serializers.ModelSerializer):
                         )
                     }
                 )
-
-            # Validar que fim é maior que início
             if start_time >= end_time:
                 raise serializers.ValidationError(
                     {"detail": _("End time must be greater than start time")}
                 )
 
+        return data
+
+    def to_representation(self, instance):
+        """
+        Renderiza `date` como objeto {start, end} quando `date_end` existir,
+        senão string 'YYYY-MM-DD'.
+        """
+        data = super().to_representation(instance)
+        start = instance.date.strftime("%Y-%m-%d")
+        if instance.date_end:
+            end = instance.date_end.strftime("%Y-%m-%d")
+            data["date"] = {"start": start, "end": end}
+        else:
+            data["date"] = start
+        data.pop("date_end", None)
         return data
 
 
@@ -266,4 +288,25 @@ class SectorHolidayListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = SectorHoliday
-        fields = ["uuid", "date", "day_type", "start_time", "end_time", "description"]
+        fields = [
+            "uuid",
+            "date",
+            "date_end",
+            "day_type",
+            "start_time",
+            "end_time",
+            "description",
+            "its_custom",
+            "repeat",
+        ]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        start = instance.date.strftime("%Y-%m-%d")
+        if instance.date_end:
+            end = instance.date_end.strftime("%Y-%m-%d")
+            data["date"] = {"start": start, "end": end}
+        else:
+            data["date"] = start
+        data.pop("date_end", None)
+        return data

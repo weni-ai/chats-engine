@@ -3,6 +3,7 @@ import logging
 
 import pendulum
 from django.core.cache import cache
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
@@ -46,22 +47,46 @@ class WorkingHoursValidator:
         current_date = created_on.date()
         current_time = created_on.time()
 
-        # Early return: dias de semana normais (segunda a sexta) sem configurações especiais
-        if 1 <= weekday <= 5:
-            closed_weekdays = working_hours_config.get("closed_weekdays", [])
-            if weekday not in closed_weekdays:
-                # Verificar apenas holidays para dias de semana normais
-                holiday = self._get_cached_holiday(sector.uuid, current_date)
-                if holiday:
-                    self._validate_holiday(holiday, current_time, created_on)
-                else:
-                    # Verificar feriados estáticos rapidamente
-                    self._check_static_holidays_fast(
-                        working_hours_config, current_date, current_time, created_on
-                    )
-                return
+        # 0) dias da semana fechados (configurados)
+        closed_weekdays = working_hours_config.get("closed_weekdays", [])
+        if weekday in closed_weekdays:
+            raise ValidationError(
+                {"detail": _("Contact cannot be done outside working hours")}
+            )
 
-        # Verificações completas para fins de semana e dias fechados
+        # 1) dias úteis (1..5)
+        if 1 <= weekday <= 5:
+            # feriados primeiro
+            holiday = self._get_cached_holiday(sector.uuid, current_date)
+            if holiday:
+                self._validate_holiday(holiday, current_time, created_on)
+                return
+            else:
+                # estáticos (config locales no JSON)
+                self._check_static_holidays_fast(
+                    working_hours_config, current_date, current_time, created_on
+                )
+            # validar schedules do dia útil, se houver
+            schedules = working_hours_config.get("schedules", {})
+            weekday_map = {
+                1: "monday",
+                2: "tuesday",
+                3: "wednesday",
+                4: "thursday",
+                5: "friday",
+            }
+            day_key = weekday_map.get(weekday)
+            day_cfg = schedules.get(day_key)
+            # Sem schedule para o dia útil => fechado (nega)
+            if day_cfg is None:
+                raise ValidationError(
+                    {"detail": _("Contact cannot be done outside working hours")}
+                )
+            # Respeitar os intervalos configurados (fim inclusivo)
+            self._validate_day_schedules_generic(day_cfg, current_time)
+            return
+
+        # 2) fins de semana e outros casos complexos
         self._full_validation(
             sector,
             working_hours_config,
@@ -86,9 +111,12 @@ class WorkingHoursValidator:
         # Cache miss - search in database
         from chats.apps.sectors.models import SectorHoliday
 
-        holiday = SectorHoliday.objects.filter(
-            sector__uuid=sector_uuid, date=date
-        ).first()
+        # considera ranges (date <= current <= date_end) e ignora soft-deleted
+        holiday = (
+            SectorHoliday.objects.filter(sector__uuid=sector_uuid, is_deleted=False)
+            .filter(Q(date=date) | Q(date__lte=date, date_end__gte=date))
+            .first()
+        )
 
         if holiday:
             holiday_data = {
@@ -146,6 +174,7 @@ class WorkingHoursValidator:
             start_time = self._parse_time_cached(start_str)
             end_time = self._parse_time_cached(end_str)
 
+            # fim inclusivo
             if not (start_time <= current_time <= end_time):
                 raise ValidationError(
                     {"detail": _("Contact cannot be done outside working hours")}
@@ -167,10 +196,63 @@ class WorkingHoursValidator:
             start_time = self._parse_time_cached(start_str)
             end_time = self._parse_time_cached(end_str)
 
+            # fim inclusivo
             if not (start_time <= current_time <= end_time):
                 raise ValidationError(
                     {"detail": _("Contact cannot be done outside working hours")}
                 )
+
+    def _validate_day_schedules_generic(self, day_cfg, current_time):
+        """
+        Valida um dia a partir de:
+          - dict {"start": "HH:MM", "end": "HH:MM"} (um intervalo)
+          - list[{"start": "HH:MM", "end": "HH:MM"}, ...] (múltiplos intervalos)
+        Passa se pelo menos um intervalo contiver o horário.
+        """
+        # um único intervalo
+        if isinstance(day_cfg, dict):
+            start_str = day_cfg.get("start")
+            end_str = day_cfg.get("end")
+            if not start_str or not end_str:
+                raise ValidationError(
+                    {"detail": _("Contact cannot be done outside working hours")}
+                )
+            start_time = self._parse_time_cached(start_str)
+            end_time = self._parse_time_cached(end_str)
+            # fim inclusivo
+            if start_time <= current_time <= end_time:
+                return
+            raise ValidationError(
+                {"detail": _("Contact cannot be done outside working hours")}
+            )
+
+        # múltiplos intervalos
+        if isinstance(day_cfg, list):
+            any_ok = False
+            for interval in day_cfg:
+                try:
+                    start_str = interval.get("start")
+                    end_str = interval.get("end")
+                    if not start_str or not end_str:
+                        continue
+                    start_time = self._parse_time_cached(start_str)
+                    end_time = self._parse_time_cached(end_str)
+                    # fim inclusivo
+                    if start_time <= current_time <= end_time:
+                        any_ok = True
+                        break
+                except Exception:
+                    continue
+            if not any_ok:
+                raise ValidationError(
+                    {"detail": _("Contact cannot be done outside working hours")}
+                )
+            return
+
+        # tipo inesperado
+        raise ValidationError(
+            {"detail": _("Contact cannot be done outside working hours")}
+        )
 
     @staticmethod
     def _parse_time_cached(time_str):
@@ -199,7 +281,7 @@ class WorkingHoursValidator:
         """
         Full validation for complex cases (weekends, closed days)
         """
-        # 1. Holidays primeiro
+        # 1. Holidays primeiro (inclui ranges)
         holiday = self._get_cached_holiday(sector.uuid, current_date)
         if holiday:
             self._validate_holiday(holiday, current_time, created_on)
@@ -210,29 +292,20 @@ class WorkingHoursValidator:
             working_hours_config, current_date, current_time, created_on
         )
 
-        # 3. Dias da semana fechados
-        closed_weekdays = working_hours_config.get("closed_weekdays", [])
-        if weekday in closed_weekdays:
-            raise ValidationError(
-                {"detail": _("Contact cannot be done outside working hours")}
-            )
-
-        # 4. Fins de semana
+        # 3. Fins de semana: apenas verifica se há schedule no dia; se houver, aplica (fim inclusivo)
         if weekday in (6, 7):
-            if not working_hours_config.get("open_in_weekends", False):
+            schedules = working_hours_config.get("schedules", {})
+            day_key = "saturday" if weekday == 6 else "sunday"
+            day_cfg = schedules.get(day_key)
+            if day_cfg is None:
                 raise ValidationError(
                     {"detail": _("Contact cannot be done outside working hours")}
                 )
-
-            schedules = working_hours_config.get("schedules", {})
-            day_key = "saturday" if weekday == 6 else "sunday"
-            day_range = schedules.get(day_key, {})
-
-            self._validate_day_schedule_fast(day_range, current_time, created_on)
+            self._validate_day_schedules_generic(day_cfg, current_time)
 
     def _validate_day_schedule_fast(self, day_config, current_time, created_on):
         """
-        Optimized validation of schedules
+        Backward-compat: single interval validation (deprecated internally).
         """
         start_str = day_config.get("start")
         end_str = day_config.get("end")
@@ -245,6 +318,7 @@ class WorkingHoursValidator:
         start_time = self._parse_time_cached(start_str)
         end_time = self._parse_time_cached(end_str)
 
+        # fim inclusivo
         if not (start_time <= current_time <= end_time):
             raise ValidationError(
                 {"detail": _("Contact cannot be done outside working hours")}
