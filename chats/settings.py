@@ -70,6 +70,8 @@ INSTALLED_APPS = [
     "chats.core",
     "chats.apps.ai_features",
     "chats.apps.ai_features.history_summary",
+    "chats.apps.feature_flags",
+    "chats.apps.feedbacks",
     # third party apps
     "channels",
     "drf_yasg",
@@ -399,6 +401,12 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 
+# celery beat
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60
+CELERY_BEAT_SCHEDULER = "celery.beat:PersistentScheduler"
+CELERY_BEAT_MAX_LOOP_INTERVAL = 10
+
 # Event Driven Architecture configurations
 
 USE_EDA = env.bool("USE_EDA", default=False)
@@ -492,3 +500,27 @@ MESSAGE_BULK_SIZE = env.int("MESSAGE_BULK_SIZE", default=100)
 # Message Status Consumer Settings
 MESSAGE_STATUS_MAX_RETRIES = env.int("MESSAGE_STATUS_MAX_RETRIES", default=3)
 MESSAGE_STATUS_RETRY_DELAY = env.int("MESSAGE_STATUS_RETRY_DELAY", default=2)
+
+
+# Growthbook
+GROWTHBOOK_HOST_BASE_URL = env.str("GROWTHBOOK_HOST_BASE_URL", default="")
+GROWTHBOOK_CLIENT_KEY = env.str("GROWTHBOOK_CLIENT_KEY", default="")
+GROWTHBOOK_SHORT_CACHE_KEY = env.str(
+    "GROWTHBOOK_SHORT_CACHE_KEY", default="growthbook:feature_flags:short"
+)
+GROWTHBOOK_SHORT_CACHE_TTL = env.int(
+    "GROWTHBOOK_SHORT_CACHE_TTL", default=300
+)  # 5 minutes
+GROWTHBOOK_LONG_CACHE_KEY = env.str(
+    "GROWTHBOOK_LONG_CACHE_KEY", default="growthbook:feature_flags:long"
+)
+GROWTHBOOK_LONG_CACHE_TTL = env.int(
+    "GROWTHBOOK_LONG_CACHE_TTL", default=(60 * 60 * 24 * 30)
+)  # 30 days
+GROWTHBOOK_WEBHOOK_SECRET = env.str("GROWTHBOOK_WEBHOOK_SECRET", default="")
+
+
+# Feedback
+FEEDBACK_FEATURE_FLAG_KEY = env.str(
+    "FEEDBACK_FEATURE_FLAG_KEY", default="weniChatsFeedback"
+)

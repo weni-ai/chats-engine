@@ -46,6 +46,11 @@ from chats.apps.api.v1.sectors.viewsets import (
 from chats.apps.api.v1.users.viewsets import ProfileViewset
 from chats.apps.discussions.views import DiscussionViewSet
 from chats.apps.history.views import HistoryRoomViewset
+from chats.apps.api.v1.feature_flags.views import FeatureFlagsViewSet
+from chats.apps.api.v1.feature_flags.integrations.growthbook.views import (
+    GrowthbookWebhook,
+)
+from chats.apps.api.v1.feedbacks.views import FeedbackViewSet
 
 
 class Router(routers.SimpleRouter):
@@ -139,6 +144,14 @@ router.register(
 )
 router.register("authorization/queue", QueueAuthorizationViewset, basename="queue_auth")
 router.register("dashboard", DashboardLiveViewset, basename="dashboard")
+router.register(
+    "feature_flags/growthbook_webhook",
+    GrowthbookWebhook,
+    basename="growthbook_webhook",
+)
+router.register("feature_flags", FeatureFlagsViewSet, basename="feature_flags")
+router.register("feedbacks", FeedbackViewSet, basename="feedbacks")
+
 # Internal
 
 router.register(

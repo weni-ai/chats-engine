@@ -56,6 +56,7 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
     tracker = FieldTracker(fields=["rooms_limit"])
 
     objects = SectorManager()
+    all_objects = SectorManager(include_deleted=True)
 
     class Meta:
         verbose_name = _("Sector")

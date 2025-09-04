@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import permissions
+from rest_framework.exceptions import ValidationError
 
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.queues.models import Queue, QueueAuthorization
@@ -285,3 +286,37 @@ class HasDashboardAccess(permissions.BasePermission):
             return False
 
         return False
+
+
+class ProjectQueryParamPermission(permissions.BasePermission):
+    def has_permission(self, request, view):
+        if request.user.is_anonymous:
+            return False
+
+        project_uuid = request.query_params.get("project_uuid")
+
+        if not project_uuid:
+            raise ValidationError(
+                {"project_uuid": ["This field is required"]}, code="required"
+            )
+
+        return ProjectPermission.objects.filter(
+            project__uuid=project_uuid, user=request.user
+        ).exists()
+
+
+class ProjectBodyPermission(permissions.BasePermission):
+    def has_permission(self, request, view):
+        if request.user.is_anonymous:
+            return False
+
+        project_uuid = request.data.get("project_uuid")
+
+        if not project_uuid:
+            raise ValidationError(
+                {"project_uuid": ["This field is required"]}, code="required"
+            )
+
+        return ProjectPermission.objects.filter(
+            project__uuid=project_uuid, user=request.user
+        ).exists()
