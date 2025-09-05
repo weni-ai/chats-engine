@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from django.conf import settings
 from django.db import IntegrityError
@@ -691,9 +691,11 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
                     "holidays": created_holidays,
                     "errors": errors,
                 },
-                status=status.HTTP_201_CREATED
-                if created_holidays
-                else status.HTTP_400_BAD_REQUEST,
+                status=(
+                    status.HTTP_201_CREATED
+                    if created_holidays
+                    else status.HTTP_400_BAD_REQUEST
+                ),
             )
 
         except Sector.DoesNotExist:

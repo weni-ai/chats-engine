@@ -6,7 +6,6 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from sentry_sdk import capture_exception
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.accounts.serializers import UserSerializer
@@ -21,7 +20,6 @@ from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import close_room
-from chats.apps.sectors.models import Sector
 from chats.apps.sectors.utils import working_hours_validator
 
 logger = logging.getLogger(__name__)
@@ -319,6 +317,24 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         room = get_active_room_flow_start(contact, flow_uuid, project)
 
         if room is not None:
+            update_fields = []
+
+            if "callback_url" in self.initial_data:
+                new_callback_url = validated_data.get("callback_url")
+                if new_callback_url is not None:
+                    room.callback_url = new_callback_url
+                    update_fields.append("callback_url")
+
+            if "ticket_uuid" in self.initial_data:
+                new_ticket_uuid = validated_data.get("ticket_uuid")
+                if new_ticket_uuid is not None:
+                    room.ticket_uuid = new_ticket_uuid
+                    update_fields.append("ticket_uuid")
+
+            if update_fields:
+                room.request_callback(room.serialized_ws_data)
+                room.save(update_fields=update_fields)
+
             if history_data:
                 self.process_message_history(room, history_data)
             return room
@@ -373,20 +389,30 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         """
         Resolve sempre a queue e usa seu setor; se sector_uuid também vier, garante consistência.
         """
-        queue = validated_data.pop("queue", None)  # já vem instanciada pelo PrimaryKeyRelatedField
+        queue = validated_data.pop(
+            "queue", None
+        )  # já vem instanciada pelo PrimaryKeyRelatedField
         provided_sector_uuid = validated_data.pop("sector_uuid", None)
 
         if queue is None and provided_sector_uuid is None:
-            raise ValidationError({"detail": _("Cannot create a room without queue_uuid or sector_uuid")})
+            raise ValidationError(
+                {"detail": _("Cannot create a room without queue_uuid or sector_uuid")}
+            )
 
         if queue is None:
-            queue = Queue.objects.filter(sector__uuid=provided_sector_uuid, is_deleted=False).first()
+            queue = Queue.objects.filter(
+                sector__uuid=provided_sector_uuid, is_deleted=False
+            ).first()
             if queue is None:
-                raise ValidationError({"detail": _("No active queue found for provided sector_uuid")})
+                raise ValidationError(
+                    {"detail": _("No active queue found for provided sector_uuid")}
+                )
 
         sector = queue.sector
         if provided_sector_uuid and str(provided_sector_uuid) != str(sector.uuid):
-            raise ValidationError({"detail": _("queue_uuid does not belong to provided sector_uuid")})
+            raise ValidationError(
+                {"detail": _("queue_uuid does not belong to provided sector_uuid")}
+            )
 
         return queue, sector
 
@@ -410,9 +436,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         try:
             working_hours_validator.validate_working_hours(sector, created_on_dt)
         except ValidationError as e:
-            raise serializers.ValidationError(
-                {"detail": e.detail}
-            )
+            raise serializers.ValidationError({"detail": e.detail})
 
         # Agent status validation unchanged
         if sector.validate_agent_status() is False:
@@ -426,7 +450,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         Uses the WorkingHoursValidator utility for optimized validation.
         """
         working_hours_validator.validate_working_hours(sector, created_on)
-    
+
     def handle_urn(self, validated_data):
         is_anon = validated_data.pop("is_anon", False)
         urn = validated_data.get("contact", {}).pop("urn", "").split("?")[0]

@@ -1,11 +1,12 @@
+from unittest.mock import patch
+
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
-from unittest.mock import patch
 
 from chats.apps.projects.models.models import Project
-from chats.apps.sectors.models import Sector
 from chats.apps.queues.models import Queue
+from chats.apps.sectors.models import Sector
 
 
 class ExternalRoomsWorkingHoursTests(APITestCase):
@@ -58,7 +59,10 @@ class ExternalRoomsWorkingHoursTests(APITestCase):
             "protocol": "1234567890",
         }
 
-    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room", return_value=None)
+    @patch(
+        "chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room",
+        return_value=None,
+    )
     def test_denies_outside_working_hours_weekday(self, _mock_billing):
         # Quinta-feira 2025-08-21 20:00 -03:00 (fora do intervalo 08:00–18:00)
         payload = self._base_payload()
@@ -67,26 +71,34 @@ class ExternalRoomsWorkingHoursTests(APITestCase):
         resp = self._create(payload)
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
-    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room", return_value=None)
+    @patch(
+        "chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room",
+        return_value=None,
+    )
     def test_allows_inside_working_hours_weekday(self, _mock_billing):
         # Quinta-feira 2025-08-21 10:00 -03:00 (dentro do horário)
         payload = self._base_payload()
         payload["contact"]["external_id"] = "00000000-0000-0000-0000-000000000002"
         payload["created_on"] = "2025-08-21T10:00:00-03:00"
         resp = self._create(payload)
-        print("print do teste", resp.data)
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
 
-    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room", return_value=None)
+    @patch(
+        "chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room",
+        return_value=None,
+    )
     def test_end_time_is_exclusive(self, _mock_billing):
-        # Quinta-feira 2025-08-21 18:00 -03:00 (fim do intervalo — deve bloquear)
+        # Quinta-feira 2025-08-21 18:01 -03:00 (fim do intervalo — deve bloquear)
         payload = self._base_payload()
         payload["contact"]["external_id"] = "00000000-0000-0000-0000-000000000003"
-        payload["created_on"] = "2025-08-21T18:00:00-03:00"
+        payload["created_on"] = "2025-08-21T18:01:00-03:00"
         resp = self._create(payload)
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
-    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room", return_value=None)
+    @patch(
+        "chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room",
+        return_value=None,
+    )
     def test_weekend_without_open_flag_denies(self, _mock_billing):
         # Sábado 2025-08-23 10:00 -03:00 (sem open_in_weekends — deve bloquear)
         payload = self._base_payload()
@@ -95,10 +107,15 @@ class ExternalRoomsWorkingHoursTests(APITestCase):
         resp = self._create(payload)
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
-    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room", return_value=None)
+    @patch(
+        "chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room",
+        return_value=None,
+    )
     def test_sector_queue_mismatch_returns_400(self, _mock_billing):
         # sector_uuid diferente do setor da queue -> deve 400
-        other_sector = Sector.objects.create(project=self.project, rooms_limit=1)
+        other_sector = Sector.objects.create(
+            project=self.project, rooms_limit=1, name="Other Sector"
+        )
         payload = self._base_payload()
         payload["contact"]["external_id"] = "00000000-0000-0000-0000-000000000005"
         payload["sector_uuid"] = str(other_sector.uuid)

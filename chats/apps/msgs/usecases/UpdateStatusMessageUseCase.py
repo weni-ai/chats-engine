@@ -131,21 +131,6 @@ class UpdateStatusMessageUseCase:
         )
 
     def update_status_message(self, message_id, message_status):
-        try:
-            reply_index = ChatMessageReplyIndex.objects.select_related(
-                "message__room__queue__sector__project"  # CORREÇÃO: caminho correto
-            ).get(external_id=message_id)
-            project_uuid = str(
-                reply_index.message.room.queue.sector.project.uuid
-            )  # CORREÇÃO: caminho correto
-
-            if project_uuid not in settings.MESSAGE_STATUS_UPDATE_ENABLED_PROJECTS:
-                return
-        except ChatMessageReplyIndex.DoesNotExist:
-            return
-        except Exception:
-            return
-
         self._msgs.append({"message_id": message_id, "message_status": message_status})
 
         if len(self._msgs) >= getattr(settings, "MESSAGE_BULK_SIZE", 100):

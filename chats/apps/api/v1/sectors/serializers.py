@@ -26,11 +26,19 @@ class SectorSerializer(serializers.ModelSerializer):
         """
         Check if the work_end date its greater than work_start date.
         """
-        start = data.get("work_start", getattr(self.instance, "work_start", None) if self.instance else None)
-        end = data.get("work_end", getattr(self.instance, "work_end", None) if self.instance else None)
+        start = data.get(
+            "work_start",
+            getattr(self.instance, "work_start", None) if self.instance else None,
+        )
+        end = data.get(
+            "work_end",
+            getattr(self.instance, "work_end", None) if self.instance else None,
+        )
         if start is not None and end is not None:
             if end <= start:
-                raise serializers.ValidationError({"detail": _("work_end date must be greater than work_start date.")})
+                raise serializers.ValidationError(
+                    {"detail": _("work_end date must be greater than work_start date.")}
+                )
         return data
 
 
@@ -207,6 +215,7 @@ class SectorHolidaySerializer(serializers.ModelSerializer):
     """
     Serializer to manage configurable holidays and special days by sector
     """
+
     class Meta:
         model = SectorHoliday
         fields = [
@@ -276,9 +285,20 @@ class SectorHolidayListSerializer(serializers.ModelSerializer):
     """
     Serializer simplificado para listagem de holidays
     """
+
     class Meta:
         model = SectorHoliday
-        fields = ["uuid", "date", "date_end", "day_type", "start_time", "end_time", "description", "its_custom", "repeat"]
+        fields = [
+            "uuid",
+            "date",
+            "date_end",
+            "day_type",
+            "start_time",
+            "end_time",
+            "description",
+            "its_custom",
+            "repeat",
+        ]
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

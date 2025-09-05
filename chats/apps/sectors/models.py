@@ -29,8 +29,12 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         on_delete=models.CASCADE,
     )
     rooms_limit = models.PositiveIntegerField(_("Rooms limit per employee"))
-    work_start = models.TimeField(_("work start"), auto_now=False, auto_now_add=False, null=True, blank=True)
-    work_end = models.TimeField(_("work end"), auto_now=False, auto_now_add=False, null=True, blank=True)
+    work_start = models.TimeField(
+        _("work start"), auto_now=False, auto_now_add=False, null=True, blank=True
+    )
+    work_end = models.TimeField(
+        _("work end"), auto_now=False, auto_now_add=False, null=True, blank=True
+    )
     can_trigger_flows = models.BooleanField(
         _("Can trigger flows?"),
         help_text=_(
@@ -57,6 +61,12 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
     class Meta:
         verbose_name = _("Sector")
         verbose_name_plural = _("Sectors")
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project", "name"], name="unique_sector_name"
+            ),
+        ]
 
     @property
     def external_token(self):
@@ -220,10 +230,13 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
             else created_on
         )
         created_on = (
-            tz.localize(created_on) if created_on.tzinfo is None else created_on.in_timezone(tz)
+            tz.localize(created_on)
+            if created_on.tzinfo is None
+            else created_on.in_timezone(tz)
         )
         try:
             from chats.apps.sectors.utils import working_hours_validator
+
             working_hours_validator.validate_working_hours(self, created_on)
             return True
         except Exception:
@@ -501,7 +514,7 @@ class GroupSectorAuthorization(BaseModel):
 
 class SectorHoliday(BaseSoftDeleteModel, BaseModel):
     """
-    Modelo para armazenar feriados e dias especiais configuráveis por setor
+    Model to store holidays and configurable special days by sector
     (feriados locais, folgas específicas, etc.)
     """
 
@@ -549,7 +562,7 @@ class SectorHoliday(BaseSoftDeleteModel, BaseModel):
     )
     its_custom = models.BooleanField(_("Is Custom"), default=False)
     repeat = models.BooleanField(_("Repeat Annually"), default=False)
-    
+
     class Meta:
         verbose_name = _("Sector Holiday")
         verbose_name_plural = _("Sector Holidays")
