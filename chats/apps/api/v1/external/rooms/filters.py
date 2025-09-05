@@ -11,11 +11,6 @@ class RoomFilter(filters.FilterSet):
         required=False,
         method="filter_sector",
     )
-    urns_list = filters.CharFilter(
-        field_name="urn",
-        required=False,
-        method="filter_urns_list",
-    )
 
     class Meta:
         model = Room
@@ -27,15 +22,15 @@ class RoomFilter(filters.FilterSet):
         )
         return queryset.filter(sector_filter)
 
-    def filter_urns_list(self, queryset, name, value):
-        urns = value.split(",")
-
-        return queryset.filter(urn__in=urns)
-
 
 class RoomMetricsFilter(RoomFilter):
     created_on__lte = filters.DateTimeFilter(field_name="created_on", lookup_expr="lte")
     created_on__gte = filters.DateTimeFilter(field_name="created_on", lookup_expr="gte")
+    urns_list = filters.CharFilter(
+        field_name="urn",
+        required=False,
+        method="filter_urns_list",
+    )
 
     class Meta(RoomFilter.Meta):
         fields = RoomFilter.Meta.fields + ["created_on__lte", "created_on__gte"]
@@ -52,3 +47,8 @@ class RoomMetricsFilter(RoomFilter):
             )
 
         return queryset
+
+    def filter_urns_list(self, queryset, name, value):
+        urns = value.split(",")
+
+        return queryset.filter(urn__in=urns)
