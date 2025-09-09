@@ -16,21 +16,15 @@ class AutomaticMessagesService:
     Service for automatic messages.
     """
 
-    def should_send_automatic_message(self, room: Room) -> bool:
-        """
-        Check if the automatic message should be sent to a room.
-        """
-        return (
-            room.queue.sector.is_automatic_message_active
-            and room.automatic_message is None
-            and not room.messages.filter(user__isnull=False).exists()
-        )
-
     def send_automatic_message(self, room: Room, message: str, user: User):
         """
         Send an automatic message to a room.
         """
-        if not self.should_send_automatic_message(room):
+        if (
+            room.queue.sector.is_automatic_message_active
+            and room.automatic_message is None
+            and not room.messages.filter(user__isnull=False).exists()
+        ):
             logger.info(
                 "[AUTOMATIC MESSAGES SERVICE] Automatic message not sent to room %s",
                 room.pk,
@@ -52,6 +46,10 @@ class AutomaticMessagesService:
 
                 message.notify_room("create", True)
         except Exception as e:
-            logger.error("Error sending automatic message to room %s: %s", room.pk, e)
+            logger.error(
+                "[AUTOMATIC MESSAGES SERVICE] Error sending automatic message to room %s: %s"
+                % (room.pk, e),
+                exc_info=True,
+            )
             capture_exception(e)
             return
