@@ -142,7 +142,7 @@ class SectorTests(APITestCase):
             url,
             data={
                 "automatic_message": {
-                    "is_automatic_message_active": True,
+                    "is_active": True,
                     "text": "Hello, how can I help you?",
                 },
             },
@@ -176,7 +176,7 @@ class SectorTests(APITestCase):
             url,
             data={
                 "automatic_message": {
-                    "is_automatic_message_active": True,
+                    "is_active": True,
                     "text": text,
                 },
             },

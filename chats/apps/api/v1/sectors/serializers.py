@@ -92,9 +92,7 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
             current_is_automatic_message_active = (
                 self.instance.is_automatic_message_active
             )
-            new_is_automatic_message_active = automatic_message.get(
-                "is_automatic_message_active"
-            )
+            new_is_automatic_message_active = automatic_message.get("is_active")
 
             if (
                 current_is_automatic_message_active != new_is_automatic_message_active
@@ -114,6 +112,7 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
                     code="automatic_message_feature_flag_is_not_active",
                 )
 
+            attrs.pop("automatic_message")
             attrs["is_automatic_message_active"] = new_is_automatic_message_active
             attrs["automatic_message_text"] = automatic_message.get("text")
 
