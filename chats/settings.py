@@ -564,7 +564,10 @@ INSIGHTS_API_URL = env.str("INSIGHTS_API_URL", default="")
 INSIGHTS_API_MAX_RETRIES = env.int("INSIGHTS_API_MAX_RETRIES", default=3)
 INSIGHTS_API_RETRY_DELAY = env.int("INSIGHTS_API_RETRY_DELAY", default=5)
 
-# Feedback
+# Feature flags
 FEEDBACK_FEATURE_FLAG_KEY = env.str(
     "FEEDBACK_FEATURE_FLAG_KEY", default="weniChatsFeedback"
+)
+AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY = env.str(
+    "AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY", default="weniChatsAutomaticMessage"
 )

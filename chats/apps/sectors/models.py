@@ -53,6 +53,13 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
 
     working_day = models.JSONField(_("working_day"), blank=True, null=True)
 
+    automatic_message_text = models.TextField(
+        _("automatic message text"), blank=True, null=True
+    )
+    is_automatic_message_active = models.BooleanField(
+        _("is automatic message active?"), default=False
+    )
+
     tracker = FieldTracker(fields=["rooms_limit"])
 
     objects = SectorManager()

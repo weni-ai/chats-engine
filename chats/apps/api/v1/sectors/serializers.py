@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
@@ -9,6 +10,7 @@ from chats.apps.sectors.models import (
     SectorHoliday,
     SectorTag,
 )
+from chats.apps.feature_flags.utils import is_feature_active
 
 User = get_user_model()
 
@@ -42,7 +44,18 @@ class SectorSerializer(serializers.ModelSerializer):
         return data
 
 
+class SectorAutomaticMessageSerializer(serializers.ModelSerializer):
+    is_active = serializers.BooleanField(source="is_automatic_message_active")
+    text = serializers.CharField(source="automatic_message_text")
+
+    class Meta:
+        model = Sector
+        fields = ["is_active", "text"]
+
+
 class SectorUpdateSerializer(serializers.ModelSerializer):
+    automatic_message = serializers.JSONField(required=False)
+
     class Meta:
         model = Sector
         fields = [
@@ -55,6 +68,7 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
             "sign_messages",
             "can_edit_custom_fields",
             "config",
+            "automatic_message",
         ]
         extra_kwargs = {field: {"required": False} for field in fields}
 
@@ -69,11 +83,55 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
 
         return sector
 
+    def validate(self, attrs: dict):
+        project = self.instance.project
+
+        automatic_message = attrs.get("automatic_message", None)
+
+        if automatic_message is not None:
+            current_is_automatic_message_active = (
+                self.instance.is_automatic_message_active
+            )
+            new_is_automatic_message_active = automatic_message.get(
+                "is_automatic_message_active"
+            )
+
+            if (
+                current_is_automatic_message_active != new_is_automatic_message_active
+                and not is_feature_active(
+                    settings.AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY,
+                    self.context["request"].user,
+                    project,
+                )
+            ):
+
+                raise serializers.ValidationError(
+                    {
+                        "is_automatic_message_active": [
+                            _("This feature is not available for this project.")
+                        ]
+                    },
+                    code="automatic_message_feature_flag_is_not_active",
+                )
+
+            attrs["is_automatic_message_active"] = new_is_automatic_message_active
+            attrs["automatic_message_text"] = automatic_message.get("text")
+
+        return attrs
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+
+        data["automatic_message"] = SectorAutomaticMessageSerializer(instance).data
+
+        return data
+
 
 class SectorReadOnlyListSerializer(serializers.ModelSerializer):
     agents = serializers.SerializerMethodField()
     contacts = serializers.SerializerMethodField()
     has_group_sector = serializers.SerializerMethodField()
+    automatic_message = serializers.SerializerMethodField()
 
     class Meta:
         model = Sector
@@ -85,6 +143,7 @@ class SectorReadOnlyListSerializer(serializers.ModelSerializer):
             "can_trigger_flows",
             "created_on",
             "has_group_sector",
+            "automatic_message",
         ]
 
     def get_agents(self, sector: Sector):
@@ -96,8 +155,13 @@ class SectorReadOnlyListSerializer(serializers.ModelSerializer):
     def get_has_group_sector(self, sector: Sector):
         return sector.sector_group_sectors.exists()
 
+    def get_automatic_message(self, sector: Sector):
+        return SectorAutomaticMessageSerializer(sector).data
+
 
 class SectorReadOnlyRetrieveSerializer(serializers.ModelSerializer):
+    automatic_message = serializers.SerializerMethodField()
+
     class Meta:
         model = Sector
         fields = [
@@ -110,7 +174,11 @@ class SectorReadOnlyRetrieveSerializer(serializers.ModelSerializer):
             "sign_messages",
             "can_edit_custom_fields",
             "config",
+            "automatic_message",
         ]
+
+    def get_automatic_message(self, sector: Sector):
+        return SectorAutomaticMessageSerializer(sector).data
 
 
 class SectorWSSerializer(serializers.ModelSerializer):
