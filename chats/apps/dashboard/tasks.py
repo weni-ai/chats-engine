@@ -286,8 +286,12 @@ def process_pending_reports():
                             _write_queryset(f"{model_name}_{related_name}", related_qd['queryset'])
 
                 if not wrote_any:
-                    meta = pd.DataFrame([{"message": "No data for the selected configuration"}])
-                    meta.to_excel(writer, sheet_name='metadata', index=False)
+                    for model_name, field_data in (fields_config or {}).items():
+                        if model_name not in available_fields:
+                            continue
+                        requested_fields = field_data.get('fields') or []
+                        empty_df = pd.DataFrame(columns=requested_fields)
+                        empty_df.to_excel(writer, sheet_name=model_name[:31], index=False)
         else:
             # CSV: gera um zip com um CSV por aba
             csv_buffers = {}
