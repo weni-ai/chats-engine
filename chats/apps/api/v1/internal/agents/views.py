@@ -1,18 +1,18 @@
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status, permissions
-from rest_framework.exceptions import NotFound, PermissionDenied
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from rest_framework import permissions, status
+from rest_framework.exceptions import NotFound, PermissionDenied
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from chats.apps.api.v1.internal.permissions import ModuleHasPermission
+from chats.apps.api.v1.permissions import ProjectBodyIsAdmin
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.projects.tasks import create_agent_disconnect_log
 from chats.utils.websockets import send_channels_group
-from django.conf import settings
 
 
 class AgentDisconnectView(APIView):
-    permission_classes = [permissions.IsAuthenticated, ModuleHasPermission]
+    permission_classes = [permissions.IsAuthenticated, ProjectBodyIsAdmin]
 
     def post(self, request):
         project_uuid = request.data.get("project_uuid")
