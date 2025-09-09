@@ -99,7 +99,7 @@ class QueueRouterService:
                 send_automatic_message.delay(
                     room_uuid=room.uuid,
                     message=room.queue.sector.automatic_message_text,
-                    user=agent,
+                    user=agent.id,
                 )
 
             task = update_ticket_assignee_async.delay(

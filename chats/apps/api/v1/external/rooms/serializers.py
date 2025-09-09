@@ -366,7 +366,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             send_automatic_message.delay(
                 room_uuid=room.uuid,
                 message=queue.sector.automatic_message_text,
-                user=room.user,
+                user=room.user.id,
             )
 
         if history_data:
