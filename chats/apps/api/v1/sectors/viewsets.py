@@ -72,7 +72,7 @@ class SectorViewset(viewsets.ModelViewSet):
             instance = serializer.save()
         except IntegrityError as e:
             raise exceptions.APIException(
-                detail=f"Error when saving the sector. Exception: {str(e)}"  # NOQA
+                detail=f"Error when saving the sector. Exception: {str(e)}"
             )
 
         project = Project.objects.get(uuid=instance.project.uuid)
@@ -98,7 +98,7 @@ class SectorViewset(viewsets.ModelViewSet):
                 instance.delete()
 
                 raise exceptions.APIException(
-                    detail=f"[{response.status_code}] Error posting the sector/ticketer on flows. Exception: {response.content}"  # NOQA
+                    detail=f"[{response.status_code}] Error posting the sector/ticketer on flows. Exception: {response.content}"
                 )
 
         if project.config and project.config.get("its_principal", False):
@@ -163,7 +163,6 @@ class SectorViewset(viewsets.ModelViewSet):
         project_uuid = request.query_params.get("project")
         project = Project.objects.get(uuid=project_uuid)
         sector_count = project.get_sectors(user=request.user).count()
-        # TODO: CREATE A METHOD DO COUNT SECTORS OF USER
         if sector_count == 0:
             sector_count = (
                 Sector.objects.filter(
@@ -360,18 +359,16 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         """
         Suporta:
-        - date: "YYYY-MM-DD" (um dia)
-        - date: {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"} (intervalo em um único registro)
+        - date: "YYYY-MM-DD" (one day)
+        - date: {"start": "YYYY-MM-DD", "end": "YYYY-MM-DD"} (range in a single record)
         """
         body = request.data
         date_field = body.get("date")
 
-        # Range: {"start": "...", "end": "..."}
         if isinstance(date_field, dict):
             start_str = date_field.get("start")
             end_str = date_field.get("end")
 
-            # Guardas para o linter e runtime
             if not isinstance(start_str, str) or not start_str:
                 return Response(
                     {"detail": "date.start is required (YYYY-MM-DD)"},
@@ -417,7 +414,6 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
             self.perform_create(serializer)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        # Caso não seja range, segue o fluxo padrão (um dia)
         return super().create(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
@@ -461,7 +457,6 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
                     {"detail": "Sector not found"}, status=status.HTTP_404_NOT_FOUND
                 )
 
-            # Map years -> official holidays once per year to avoid repeated calls
             def parse_date_str(ds):
                 if not isinstance(ds, str) or not ds:
                     return None
@@ -484,7 +479,6 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
             disabled_count = 0
             errors = []
 
-            # Enable (create or undelete) by date
             for ds in enabled_dates:
                 d = parse_date_str(ds)
                 if not d:
@@ -492,13 +486,9 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
                     continue
 
                 obj = SectorHoliday.objects.filter(sector=sector, date=d).first()
-                # Pick official name if exists, else empty string
-                name = official_by_year.get(d.year, {}).get(
-                    d, ""
-                )  # dict key is date object
+                name = official_by_year.get(d.year, {}).get(d, "")
 
                 if obj:
-                    # Reativar caso soft-deleted; e garantir que é oficial (is_custom=False)
                     updates = {}
                     if obj.is_deleted:
                         obj.is_deleted = False
@@ -525,7 +515,6 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
                     )
                     enabled_count += 1
 
-            # Disable (soft delete) by date
             for ds in disabled_dates:
                 d = parse_date_str(ds)
                 if not d:
@@ -536,7 +525,6 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
                     obj.is_deleted = True
                     obj.save(update_fields=["is_deleted"])
                     disabled_count += 1
-                # Se não existir ou já desativado, apenas ignore
 
             return Response(
                 {
@@ -547,7 +535,6 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_200_OK,
             )
 
-        # GET (mantido como estava)
         project_uuid = request.query_params.get("project")
         year_param = request.query_params.get("year")
 
@@ -573,7 +560,6 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # Default do ano baseado no timezone do projeto; trata vazio/ inválido
         if not year_param:
             year = timezone.now().astimezone(project.timezone).year
         else:
@@ -609,13 +595,13 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
     def import_official_holidays(self, request):
         """
         POST /api/v1/sector_holiday/import_official_holidays/
-        Cria holidays em lote a partir dos feriados oficiais selecionados
+        Create holidays in bulk from selected official holidays
 
         Body:
         {
             "sector": "uuid",
             "year": 2024,
-            "holidays": ["2024-12-25", "2024-01-01"]  # Datas selecionadas
+            "holidays": ["2024-12-25", "2024-01-01"]  # Selected dates
         }
         """
         sector_uuid = request.data.get("sector")
@@ -648,21 +634,18 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
                         holiday_date_str, "%Y-%m-%d"
                     ).date()
 
-                    # Verificar se existe nos feriados oficiais
                     if holiday_date not in official_holidays:
                         errors.append(
                             f"Date {holiday_date_str} is not an official holiday"
                         )
                         continue
 
-                    # Verificar se já existe
                     if SectorHoliday.objects.filter(
-                        sector=sector, date=holiday_date
+                        sector=sector, date=holiday_date, is_deleted=False
                     ).exists():
                         errors.append(f"Holiday for {holiday_date_str} already exists")
                         continue
 
-                    # Criar holiday
                     holiday = SectorHoliday.objects.create(
                         sector=sector,
                         date=holiday_date,

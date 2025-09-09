@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 
 import pendulum
 from django.contrib.auth import get_user_model
@@ -571,7 +572,9 @@ class SectorHoliday(BaseSoftDeleteModel, BaseModel):
         ]
         constraints = [
             models.UniqueConstraint(
-                fields=["sector", "date"], name="unique_sector_holiday"
+                condition=Q(is_deleted=False),
+                fields=["sector", "date"],
+                name="unique_sector_holiday",
             ),
             models.CheckConstraint(
                 check=Q(
@@ -611,3 +614,33 @@ class SectorHoliday(BaseSoftDeleteModel, BaseModel):
         if self.is_closed():
             return False
         return self.start_time <= time <= self.end_time
+
+    # Cache invalidation helpers
+    def _iter_dates(self):
+        start = self.date
+        end = self.date_end or self.date
+        cur = start
+        while cur <= end:
+            yield cur
+            cur += timedelta(days=1)
+
+    def _invalidate_cache(self):
+        try:
+            from chats.apps.sectors.utils import CacheClient
+
+            cache_client = CacheClient()
+            sector_uuid = str(self.sector.uuid)
+            for d in self._iter_dates():
+                cache_key = f"holiday:{sector_uuid}:{d}"
+                cache_client.delete(cache_key)
+        except Exception:
+            pass
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self._invalidate_cache()
+
+    def delete(self, *args, **kwargs):
+        self.is_deleted = True
+        super().save(update_fields=["is_deleted"])
+        self._invalidate_cache()
