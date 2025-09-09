@@ -4,6 +4,7 @@ from django.db import transaction
 
 from chats.apps.rooms.models import Room
 from chats.apps.msgs.models import Message, AutomaticMessage
+from chats.apps.accounts.models import User
 
 
 logger = logging.getLogger(__name__)
