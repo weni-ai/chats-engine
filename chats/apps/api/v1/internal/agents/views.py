@@ -34,7 +34,9 @@ class AgentDisconnectView(APIView):
 
         # Requester must be admin on the same project; attendants cannot disconnect others.
         try:
-            requester_perm = ProjectPermission.objects.get(user=request.user, project=project)
+            requester_perm = ProjectPermission.objects.get(
+                user=request.user, project=project
+            )
         except ProjectPermission.DoesNotExist:
             raise PermissionDenied(detail="Not allowed on this project")
         if not requester_perm.is_admin:
@@ -42,7 +44,9 @@ class AgentDisconnectView(APIView):
 
         # Target permission must exist
         try:
-            target_perm = ProjectPermission.objects.get(user=target_user, project=project)
+            target_perm = ProjectPermission.objects.get(
+                user=target_user, project=project
+            )
         except ProjectPermission.DoesNotExist:
             raise NotFound(detail="Agent permission not found")
 
@@ -65,9 +69,10 @@ class AgentDisconnectView(APIView):
 
         # Create audit log via Celery (or inline if Celery disabled)
         if getattr(settings, "USE_CELERY", False):
-            create_agent_disconnect_log.delay(str(project.uuid), target_user.email, request.user.email)
+            create_agent_disconnect_log.delay(
+                str(project.uuid), target_user.email, request.user.email
+            )
         else:
             create_agent_disconnect_log(str(project.uuid), target_user.email, request.user.email)  # type: ignore
 
         return Response(status=status.HTTP_200_OK)
-
