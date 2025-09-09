@@ -1,14 +1,22 @@
-from datetime import time
+from datetime import date, datetime, time
 from unittest.mock import patch
+
 from django.db import IntegrityError
 from django.test import TestCase
+from rest_framework.exceptions import ValidationError
 from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
 from chats.apps.projects.models.models import Project, RoomRoutingType
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
-from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
+from chats.apps.sectors.models import (
+    Sector,
+    SectorAuthorization,
+    SectorHoliday,
+    SectorTag,
+)
+from chats.apps.sectors.utils import WorkingHoursValidator
 
 
 class ConstraintTests(APITestCase):
@@ -22,20 +30,6 @@ class ConstraintTests(APITestCase):
         )
         self.sector_tag = SectorTag.objects.get(
             uuid="62d9e7c4-4f2d-40fc-acf7-9549bface0fb"
-        )
-
-    def test_work_end_greater_than_work_start_check_constraint(self):
-        with self.assertRaises(IntegrityError) as context:
-            Sector.objects.create(
-                name="sector test",
-                project=self.project,
-                work_start="12",
-                work_end="10",
-                rooms_limit=10,
-            )
-        self.assertTrue(
-            'new row for relation "sectors_sector" violates check constraint "wordend_greater_than_workstart_check"'
-            in str(context.exception)
         )
 
     def test_unique_sector_name_constraint(self):
@@ -239,3 +233,130 @@ class TestSectorSave(TestCase):
         self.sector.save()
 
         mock_start_queue_priority_routing.assert_not_called()
+
+
+class SectorHolidaySoftDeleteUniquenessTests(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(
+            name="Holidays Project",
+            room_routing_type=RoomRoutingType.QUEUE_PRIORITY,
+        )
+        self.sector = Sector.objects.create(
+            name="Support",
+            project=self.project,
+            rooms_limit=1,
+        )
+        self.holiday_date = date(2025, 1, 6)  # Monday
+
+    def test_recreate_after_soft_delete_should_not_violate_uniqueness(self):
+        first = SectorHoliday.objects.create(
+            sector=self.sector,
+            date=self.holiday_date,
+            day_type=SectorHoliday.CLOSED,
+            description="Test",
+        )
+        first.is_deleted = True
+        first.save(update_fields=["is_deleted"])
+
+        try:
+            SectorHoliday.objects.create(
+                sector=self.sector,
+                date=self.holiday_date,
+                day_type=SectorHoliday.CLOSED,
+                description="Recreated",
+            )
+        except IntegrityError:
+            self.fail(
+                "Should allow recreating holiday after soft delete (uniqueness must ignore is_deleted=True)."
+            )
+
+
+class _FakeCache:
+    def __init__(self):
+        self.store = {}
+
+    def get(self, key):
+        return self.store.get(key, None)
+
+    def set(self, key, value, ex=None):
+        self.store[key] = value
+        return True
+
+    def delete(self, key):
+        self.store.pop(key, None)
+        return True
+
+
+class SectorHolidayCacheInvalidationTests(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(
+            name="Cache Project",
+            room_routing_type=RoomRoutingType.QUEUE_PRIORITY,
+        )
+        self.sector = Sector.objects.create(
+            name="Sales",
+            project=self.project,
+            rooms_limit=1,
+            working_day={
+                "working_hours": {
+                    "closed_weekdays": [],
+                    "schedules": {
+                        "monday": {"start": "08:00", "end": "17:00"},
+                        "tuesday": {"start": "08:00", "end": "17:00"},
+                        "wednesday": {"start": "08:00", "end": "17:00"},
+                        "thursday": {"start": "08:00", "end": "17:00"},
+                        "friday": {"start": "08:00", "end": "17:00"},
+                    },
+                }
+            },
+        )
+        self.monday_dt = datetime(2025, 1, 6, 9, 0, 0)  # Monday 09:00
+        self.cache = _FakeCache()
+        self.validator = WorkingHoursValidator()
+
+    @patch("chats.apps.sectors.utils.CacheClient")
+    def test_cache_is_invalidated_on_create(self, MockCacheClient):
+        MockCacheClient.return_value = self.cache
+        cache_key = f"holiday:{self.sector.uuid}:{self.monday_dt.date()}"
+
+        # Prime cache com "null" (sem feriado)
+        self.cache.set(cache_key, "null", ex=300)
+
+        # Primeiro check: sem feriado -> deve passar
+        self.validator.validate_working_hours(self.sector, self.monday_dt)
+
+        # Cria feriado (fechado) para a mesma data
+        SectorHoliday.objects.create(
+            sector=self.sector,
+            date=self.monday_dt.date(),
+            day_type=SectorHoliday.CLOSED,
+            description="New Holiday",
+        )
+
+        # Esperado: invalidação de cache -> agora deve lançar
+        with self.assertRaises(ValidationError):
+            self.validator.validate_working_hours(self.sector, self.monday_dt)
+
+    @patch("chats.apps.sectors.utils.CacheClient")
+    def test_cache_is_invalidated_on_delete(self, MockCacheClient):
+        MockCacheClient.return_value = self.cache
+        cache_key = f"holiday:{self.sector.uuid}:{self.monday_dt.date()}"
+
+        # Cria feriado e popula cache executando a validação uma vez
+        holiday = SectorHoliday.objects.create(
+            sector=self.sector,
+            date=self.monday_dt.date(),
+            day_type=SectorHoliday.CLOSED,
+            description="Existing Holiday",
+        )
+        # Este check deve lançar e também setar o cache
+        with self.assertRaises(ValidationError):
+            self.validator.validate_working_hours(self.sector, self.monday_dt)
+        self.assertIn(cache_key, self.cache.store)
+
+        # Soft delete
+        holiday.is_deleted = True
+        holiday.save(update_fields=["is_deleted"])
+
+        # Esperado: invalidação -> agora deve passar (sem feriado)
+        self.validator.validate_working_hours(self.sector, self.monday_dt)
