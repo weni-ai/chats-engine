@@ -276,7 +276,8 @@ class Room(BaseModel, BaseConfigurableModel):
         super().save(*args, **kwargs)
 
         if (
-            old_user_assigned_at is None  # User being assigned for the first time
+            self.user
+            and old_user_assigned_at is None  # User being assigned for the first time
             and self.user_assigned_at is not None
             and self.queue.sector.is_automatic_message_active
             and self.queue.sector.automatic_message_text
