@@ -4,7 +4,6 @@ from django.db.models.functions import Coalesce
 
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
-from chats.apps.sectors.tasks import send_automatic_message
 
 
 logger = logging.getLogger(__name__)
@@ -83,24 +82,11 @@ class QueueRouterService:
             if not agent:
                 break
 
-            old_user_assigned_at = room.user_assigned_at
-
             room.user = agent
             room.save()
 
             room.notify_user("update")
             room.notify_queue("update")
-
-            if (
-                old_user_assigned_at is None  # User being assigned for the first time
-                and room.queue.sector.is_automatic_message_active
-                and room.queue.sector.automatic_message_text
-            ):
-                send_automatic_message.delay(
-                    room_uuid=room.uuid,
-                    message=room.queue.sector.automatic_message_text,
-                    user=agent.id,
-                )
 
             task = update_ticket_assignee_async.delay(
                 room_uuid=str(room.uuid),

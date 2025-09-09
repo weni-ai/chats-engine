@@ -191,6 +191,8 @@ class Room(BaseModel, BaseConfigurableModel):
         ]
 
     def save(self, *args, **kwargs) -> None:
+        from chats.apps.sectors.tasks import send_automatic_message
+
         if self.__original_is_active is False:
             raise ValidationError({"detail": _("Closed rooms cannot receive updates")})
 
@@ -198,6 +200,8 @@ class Room(BaseModel, BaseConfigurableModel):
             self.added_to_queue_at = timezone.now()
 
         user_has_changed = self.pk and self.tracker.has_changed("user")
+
+        old_user_assigned_at = self.user_assigned_at
 
         if self.user and not self.user_assigned_at or user_has_changed:
             self.user_assigned_at = timezone.now()
@@ -211,6 +215,17 @@ class Room(BaseModel, BaseConfigurableModel):
         is_new = self._state.adding
 
         super().save(*args, **kwargs)
+
+        if (
+            old_user_assigned_at is None  # User being assigned for the first time
+            and self.user_assigned_at is not None
+            and self.queue.sector.is_automatic_message_active
+            and self.queue.sector.automatic_message_text
+        ):
+            logger.info("[ROOM] Sending automatic message to room %s", self.uuid)
+            send_automatic_message.delay(
+                self.uuid, self.queue.sector.automatic_message_text, self.user.id
+            )
 
         self._update_agent_service_status(is_new)
 
@@ -471,7 +486,7 @@ class Room(BaseModel, BaseConfigurableModel):
             task = update_ticket_assignee_async.delay(
                 room_uuid=str(self.uuid),
                 ticket_uuid=self.ticket_uuid,
-                user_email=self.user.email
+                user_email=self.user.email,
             )
 
             logger.info(

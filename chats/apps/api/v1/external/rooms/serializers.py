@@ -357,18 +357,6 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         )
         RoomMetrics.objects.create(room=room)
 
-        if (
-            is_new_room
-            and room.user is not None
-            and queue.sector.is_automatic_message_active
-            and queue.sector.automatic_message_text
-        ):
-            send_automatic_message.delay(
-                room_uuid=room.uuid,
-                message=queue.sector.automatic_message_text,
-                user=room.user.id,
-            )
-
         if history_data:
             self.process_message_history(room, history_data)
         return room
