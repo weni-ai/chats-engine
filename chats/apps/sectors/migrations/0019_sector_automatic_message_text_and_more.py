@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sectors', '0017_remove_sector_wordend_greater_than_workstart_check'),
+        ('sectors', '0018_remove_sectorholiday_unique_sector_holiday_and_more'),
     ]
 
     operations = [
