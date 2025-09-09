@@ -7,6 +7,15 @@ class ExternalBaseThrottle(SimpleRateThrottle):
     Base throttle para endpoints externos - SEMPRE autenticados
     """
 
+    def allow_request(self, request, view):
+        user = getattr(request, "user", None)
+        if user is not None and not isinstance(user, str):
+            if getattr(user, "has_perm", None) and user.has_perm(
+                "accounts.can_communicate_internally"
+            ):
+                return True
+        return super().allow_request(request, view)
+
     def get_rate(self):
         rates = api_settings.DEFAULT_THROTTLE_RATES or {}
         return rates.get(self.scope)
