@@ -860,19 +860,22 @@ class ReportFieldsValidatorViewSet(APIView):
             raise ValidationError({'project_uuid': 'This field is required.'})
 
         project = get_object_or_404(Project, uuid=project_uuid)
-
-        report_status = ReportStatus.objects.filter(project=project).order_by('-created_on').first()
-        if not report_status:
+        # Se o projeto nunca concluiu uma exportação, retornar READY
+        has_completed_export = ReportStatus.objects.filter(project=project, status='completed').exists()
+        if not has_completed_export:
             return Response(
                 {
-                    'status': 'PENDING',
+                    'status': 'READY',
                     'email': None,
                     'uuid_relatorio': None,
                 },
                 status=status.HTTP_200_OK,
             )
 
+        report_status = ReportStatus.objects.filter(project=project).order_by('-created_on').first()
+
         status_map = {'pending': 'PENDING', 'processing': 'IN_PROGRESS', 'completed': 'READY', 'failed': 'FAILED'}
+        
         return Response({
             'status': status_map.get(report_status.status, 'PENDING'),
             'email': report_status.user.email if report_status.user.pk else None,
