@@ -8,7 +8,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 
-from chats.core.models import BaseModelWithManualCreatedOn
+from chats.core.models import BaseModelWithManualCreatedOn, BaseModel
 from chats.core.requests import get_request_session_with_retries
 
 logger = logging.getLogger(__name__)
@@ -315,3 +315,28 @@ class ChatMessageReplyIndex(BaseModelWithManualCreatedOn):
     class Meta:
         verbose_name = "Chat Message Reply Index"
         verbose_name_plural = "Chat Message Reply Indexes"
+
+
+class AutomaticMessage(BaseModel):
+    """
+    Automatic message for a room.
+
+    This is only used as a reference for a message that is sent automatically
+    when the room is first assigned to a user.
+
+    A room can only have one automatic message.
+    """
+
+    message = models.OneToOneField(
+        "msgs.Message", on_delete=models.CASCADE, related_name="automatic_message"
+    )
+    room = models.OneToOneField(
+        "rooms.Room", on_delete=models.CASCADE, related_name="automatic_message"
+    )
+
+    class Meta:
+        verbose_name = "Automatic Message"
+        verbose_name_plural = "Automatic Messages"
+
+    def __str__(self):
+        return f"{self.room.uuid} - {self.message.uuid}"
