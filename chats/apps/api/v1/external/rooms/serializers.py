@@ -21,7 +21,6 @@ from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import close_room
 from chats.apps.sectors.utils import working_hours_validator
-from chats.apps.sectors.tasks import send_automatic_message
 
 logger = logging.getLogger(__name__)
 
@@ -349,8 +348,6 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         validated_data["user"] = get_room_user(
             contact, queue, user, groups, created, flow_uuid, project
         )
-
-        is_new_room = room is None
 
         room = Room.objects.create(
             **validated_data,
