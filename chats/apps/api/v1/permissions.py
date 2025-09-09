@@ -321,6 +321,7 @@ class ProjectBodyPermission(permissions.BasePermission):
             project__uuid=project_uuid, user=request.user
         ).exists()
 
+
 class ProjectBodyIsAdmin(permissions.BasePermission):
     def has_permission(self, request, view):
         if request.user.is_anonymous:
@@ -338,4 +339,3 @@ class ProjectBodyIsAdmin(permissions.BasePermission):
             user=request.user,
             role=ProjectPermission.ROLE_ADMIN,
         ).exists()
-
