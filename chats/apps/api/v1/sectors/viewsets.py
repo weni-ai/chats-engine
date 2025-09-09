@@ -62,7 +62,7 @@ class SectorViewset(viewsets.ModelViewSet):
             return sector_serializers.SectorReadOnlyListSerializer
         elif self.action == "retrieve":
             return sector_serializers.SectorReadOnlyRetrieveSerializer
-        elif self.action == "update":
+        elif self.action in ["update", "partial_update"]:
             return sector_serializers.SectorUpdateSerializer
 
         return super().get_serializer_class()
@@ -122,9 +122,6 @@ class SectorViewset(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
         return super().update(request, *args, **kwargs)
-
-    def perform_update(self, serializer):
-        serializer.save()
 
     def perform_destroy(self, instance):
         content = {
@@ -691,9 +688,11 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
                     "holidays": created_holidays,
                     "errors": errors,
                 },
-                status=status.HTTP_201_CREATED
-                if created_holidays
-                else status.HTTP_400_BAD_REQUEST,
+                status=(
+                    status.HTTP_201_CREATED
+                    if created_holidays
+                    else status.HTTP_400_BAD_REQUEST
+                ),
             )
 
         except Sector.DoesNotExist:

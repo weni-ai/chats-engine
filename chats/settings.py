@@ -520,7 +520,10 @@ GROWTHBOOK_LONG_CACHE_TTL = env.int(
 GROWTHBOOK_WEBHOOK_SECRET = env.str("GROWTHBOOK_WEBHOOK_SECRET", default="")
 
 
-# Feedback
+# Feature flags
 FEEDBACK_FEATURE_FLAG_KEY = env.str(
     "FEEDBACK_FEATURE_FLAG_KEY", default="weniChatsFeedback"
+)
+AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY = env.str(
+    "AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY", default="weniChatsAutomaticMessage"
 )

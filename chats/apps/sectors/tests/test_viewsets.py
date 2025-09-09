@@ -34,11 +34,39 @@ class SectorTests(APITestCase):
         client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
         response = client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["automatic_message"]["is_active"], False)
+        self.assertIsNone(response.data["automatic_message"]["text"])
+
+    def test_retrieve_sector_with_right_project_token_and_automatic_message_active(
+        self,
+    ):
+        """
+        Verify if the list endpoint for sector its returning the correct object.
+        """
+        self.sector.is_automatic_message_active = True
+        self.sector.automatic_message_text = "Hello, how can I help you?"
+        self.sector.save(
+            update_fields=["is_automatic_message_active", "automatic_message_text"]
+        )
+        url = reverse("sector-detail", args=[self.sector.pk])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["automatic_message"]["is_active"], True)
+        self.assertEqual(
+            response.data["automatic_message"]["text"], "Hello, how can I help you?"
+        )
 
     def test_get_sector_list_with_right_project_token(self):
         """
         Ensure that the user need to pass a project_id in order to get the sectors related to them
         """
+        self.sector_2.is_automatic_message_active = True
+        self.sector_2.automatic_message_text = "Hello, how can I help you?"
+        self.sector_2.save(
+            update_fields=["is_automatic_message_active", "automatic_message_text"]
+        )
         url = reverse("sector-list")
         client = self.client
         client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
@@ -47,7 +75,13 @@ class SectorTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(results[0].get("uuid"), str(self.sector.pk))
+        self.assertEqual(results[0].get("automatic_message")["is_active"], False)
+        self.assertIsNone(results[0].get("automatic_message")["text"])
         self.assertEqual(results[1].get("uuid"), str(self.sector_2.pk))
+        self.assertEqual(results[1].get("automatic_message")["is_active"], True)
+        self.assertEqual(
+            results[1].get("automatic_message")["text"], "Hello, how can I help you?"
+        )
 
     def test_get_sector_list_with_wrong_project_token(self):
         """
@@ -90,6 +124,71 @@ class SectorTests(APITestCase):
 
         sector = Sector.objects.get(pk="21aecf8c-0c73-4059-ba82-4343e0cc627c")
         self.assertEqual("sector 2 updated", sector.name)
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active")
+    def test_update_sector_automatic_message_when_feature_flag_is_off(
+        self, mock_is_feature_active
+    ):
+        """
+        Verify if the endpoint for update in sector is working with correctly.
+        """
+        mock_is_feature_active.return_value = False
+        self.sector.is_automatic_message_active = False
+        self.sector.save(update_fields=["is_automatic_message_active"])
+        url = reverse("sector-detail", args=[self.sector.pk])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = client.patch(
+            url,
+            data={
+                "automatic_message": {
+                    "is_automatic_message_active": True,
+                    "text": "Hello, how can I help you?",
+                },
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["is_automatic_message_active"][0].code,
+            "automatic_message_feature_flag_is_not_active",
+        )
+
+        self.sector.refresh_from_db()
+        self.assertFalse(self.sector.is_automatic_message_active)
+        self.assertIsNone(self.sector.automatic_message_text)
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active")
+    def test_update_sector_automatic_message_when_feature_flag_is_on(
+        self, mock_is_feature_active
+    ):
+        """
+        Verify if the endpoint for update in sector is working with correctly.
+        """
+        mock_is_feature_active.return_value = True
+        self.sector.is_automatic_message_active = False
+        self.sector.save(update_fields=["is_automatic_message_active"])
+        url = reverse("sector-detail", args=[self.sector.pk])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        text = "Hello, how can I help you?"
+        response = client.patch(
+            url,
+            data={
+                "automatic_message": {
+                    "is_automatic_message_active": True,
+                    "text": text,
+                },
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["automatic_message"]["is_active"], True)
+        self.assertEqual(response.data["automatic_message"]["text"], text)
+
+        self.sector.refresh_from_db()
+        self.assertTrue(self.sector.is_automatic_message_active)
+        self.assertEqual(self.sector.automatic_message_text, text)
 
     def test_delete_sector_with_right_project_token(self):
         """
