@@ -15,10 +15,35 @@ from chats.apps.feature_flags.utils import is_feature_active
 User = get_user_model()
 
 
-class SectorSerializer(serializers.ModelSerializer):
+class SectorAutomaticMessageSerializer(serializers.ModelSerializer):
+    is_active = serializers.BooleanField(source="is_automatic_message_active")
+    text = serializers.CharField(source="automatic_message_text")
+
     class Meta:
         model = Sector
-        fields = "__all__"
+        fields = ["is_active", "text"]
+
+
+class SectorSerializer(serializers.ModelSerializer):
+    automatic_message = serializers.JSONField(required=False)
+
+    class Meta:
+        model = Sector
+        fields = [
+            "name",
+            "can_edit_custom_fields",
+            "can_trigger_flows",
+            "config",
+            "project",
+            "rooms_limit",
+            "sign_messages",
+            "work_start",
+            "work_end",
+            "open_offline",
+            "can_edit_custom_fields",
+            "working_day",
+            "automatic_message",
+        ]
         extra_kwargs = {
             "work_start": {"required": False, "allow_null": True},
             "work_end": {"required": False, "allow_null": True},
@@ -41,16 +66,36 @@ class SectorSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"detail": _("work_end date must be greater than work_start date.")}
                 )
+
+        automatic_message = data.get("automatic_message")
+
+        if automatic_message:
+            if not is_feature_active(
+                settings.AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY,
+                self.context["request"].user,
+                data.get("project"),
+            ):
+                raise serializers.ValidationError(
+                    {
+                        "is_automatic_message_active": [
+                            _("This feature is not available for this project.")
+                        ]
+                    },
+                    code="automatic_message_feature_flag_is_not_active",
+                )
+
+            data.pop("automatic_message")
+
+            data["is_automatic_message_active"] = automatic_message.get("is_active")
+            data["automatic_message_text"] = automatic_message.get("text")
+
         return data
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["automatic_message"] = SectorAutomaticMessageSerializer(instance).data
 
-class SectorAutomaticMessageSerializer(serializers.ModelSerializer):
-    is_active = serializers.BooleanField(source="is_automatic_message_active")
-    text = serializers.CharField(source="automatic_message_text")
-
-    class Meta:
-        model = Sector
-        fields = ["is_active", "text"]
+        return data
 
 
 class SectorUpdateSerializer(serializers.ModelSerializer):
