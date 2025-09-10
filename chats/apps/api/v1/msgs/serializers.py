@@ -214,6 +214,7 @@ class MessageSerializer(BaseMessageSerializer):
             "replied_message",
             "is_read",
             "is_delivered",
+            "is_automatic_message",
         ]
         read_only_fields = [
             "uuid",
