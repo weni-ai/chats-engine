@@ -590,6 +590,7 @@ class RoomNote(BaseModel):
     )
     text = models.TextField(_("text"))
     is_deletable = models.BooleanField(_("is deletable"), default=True)
+    message = models.OneToOneField("msgs.Message", related_name="internal_note", verbose_name=_("message"), on_delete=models.CASCADE, null=True, blank=True)
     
     class Meta:
         verbose_name = _("Room Note")
@@ -654,3 +655,12 @@ class RoomNote(BaseModel):
                 content=content,
                 action=event_name,
             )
+
+    def delete(self, *args, **kwargs):
+        """
+        Ensure the associated blank message is also removed when deleting the note
+        """
+        msg = self.message
+        super().delete(*args, **kwargs)
+        if msg:
+            msg.delete()

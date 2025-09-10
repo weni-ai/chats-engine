@@ -12,6 +12,7 @@ from chats.apps.api.v1.contacts.serializers import ContactSerializer
 from chats.apps.msgs.models import ChatMessageReplyIndex
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
+from chats.apps.rooms.models import RoomNote
 
 LOGGER = logging.getLogger(__name__)
 
@@ -192,6 +193,7 @@ class MessageSerializer(BaseMessageSerializer):
 
     media = MessageMediaSimpleSerializer(many=True, required=False)
     replied_message = serializers.SerializerMethodField(read_only=True)
+    internal_note = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = ChatMessage
@@ -209,6 +211,7 @@ class MessageSerializer(BaseMessageSerializer):
             "replied_message",
             "is_read",
             "is_delivered",
+            "internal_note",
         ]
         read_only_fields = [
             "uuid",
@@ -263,6 +266,34 @@ class MessageSerializer(BaseMessageSerializer):
         except Exception as error:
             LOGGER.error("Error getting replied message: %s", error)
             return None
+
+    def get_internal_note(self, obj):
+        # Returns the internal note attached to this message (if any)
+        try:
+            note = obj.internal_note
+        except RoomNote.DoesNotExist:
+            return None
+        except AttributeError:
+            return None
+
+        if not note:
+            return None
+
+        user = note.user
+        user_data = None
+        if user:
+            user_data = {
+                "uuid": str(user.uuid),
+                "name": user.name,
+            }
+
+        return {
+            "uuid": str(note.uuid),
+            "created_on": note.created_on,
+            "user": user_data,
+            "text": note.text,
+            "is_deletable": note.is_deletable,
+        }
 
 
 class MessageWSSerializer(MessageSerializer):

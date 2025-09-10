@@ -824,14 +824,26 @@ class RoomViewset(
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
-        # Create the note
+        # Create a blank message to attach the internal note
+        msg = Message.objects.create(
+            room=room,
+            user=None,
+            contact=None,
+            text="",
+        )
+        
+        # Create the note attached to the message
         note = RoomNote.objects.create(
             room=room,
             user=request.user,
-            text=serializer.validated_data['text']
+            text=serializer.validated_data['text'],
+            message=msg,
         )
         
-        # Send WebSocket notification
+        # Notify message creation for clients listening to messages
+        msg.notify_room("create", True)
+        
+        # Send WebSocket notification for the note itself
         note.notify_websocket("create")
         
         # Return serialized note

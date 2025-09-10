@@ -15,6 +15,7 @@ from chats.apps.api.v1.msgs.serializers import (
 )
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
+from chats.apps.rooms.models import RoomNote
 
 
 class MessageViewset(
@@ -24,7 +25,7 @@ class MessageViewset(
     viewsets.GenericViewSet,
 ):
     queryset = ChatMessage.objects.select_related(
-        "room", "user", "contact"
+        "room", "user", "contact", "internal_note", "internal_note__user"
     ).prefetch_related("medias")
     serializer_class = MessageSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
