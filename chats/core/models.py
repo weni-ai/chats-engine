@@ -64,13 +64,24 @@ class BaseSoftDeleteModel(models.Model):
     class Meta:
         abstract = True
 
-    def deleted_sufix(self):
-        name_sufix = "_is_deleted_" + str(timezone.now())
-        return name_sufix
+    def deleted_sufix(self, user=None):
+        """
+        Build the soft-delete suffix including timestamp and the user identifier.
+        """
+        timestamp = str(timezone.now())
+        if user is None:
+            user_ident = "system"
+        else:
+            user_ident = getattr(user, "email", None) or getattr(user, "uuid", None) or str(user)
+        user_ident = str(user_ident).replace(" ", "_")
+        return f"_is_deleted_{timestamp}_{user_ident}"
 
-    def delete(self):
+    def delete(self, user=None, *args, **kwargs):
+        """
+        Soft delete: mark as deleted and append suffix with timestamp and user.
+        """
         self.is_deleted = True
-        self.name += self.deleted_sufix()
+        self.name += self.deleted_sufix(user)
         self.save()
 
 
