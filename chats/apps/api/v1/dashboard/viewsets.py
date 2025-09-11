@@ -837,6 +837,9 @@ class ReportFieldsValidatorViewSet(APIView):
         project = get_object_or_404(Project, uuid=project_uuid)
         
         try:
+            # Reconstrói o fields_config a partir do payload (sem project_uuid)
+            fields_config = {k: v for k, v in request.data.items() if k != 'project_uuid'}
+
             # [NOVO] Extrai flags de nível raiz e normaliza para bool
             def _is_true(v):
                 if isinstance(v, bool):
