@@ -607,6 +607,9 @@ class ReportFieldsValidatorViewSet(APIView):
                 if invalid_fields:
                     raise NotFound(f'Campos inválidos para {model_name}: {", ".join(invalid_fields)}')
                 query_fields.extend(value)
+                # Ajuste: quando usuário pedir 'contact', retornamos o nome do contato
+                if model_name == 'rooms' and 'contact' in query_fields and 'contact__name' not in query_fields:
+                    query_fields = [f if f != 'contact' else 'contact__name' for f in query_fields]
             elif key in available_fields:
                 # Processa campos relacionados
                 related_queries[key] = self._process_model_fields(key, value, project, available_fields)
@@ -642,12 +645,12 @@ class ReportFieldsValidatorViewSet(APIView):
                 end_dt = pendulum.parse(end_date + " 23:59:59").replace(tzinfo=tz)
                 base_queryset = base_queryset.filter(created_on__range=[start_dt, end_dt])
 
-        # Filtros globais aplicados somente a rooms (sector/queue/agent/tags)
+        # [NOVO] Filtros globais aplicados somente a rooms (sector/queue/agent/tags)
         if model_name == 'rooms':
             def _norm_list(value):
                 """
                 Accepts: list/tuple/set, single str/uuid, dicts like {'uuids': [...]} or {'uuid': '...'}.
-                Returns: flat list[str]
+                Returns: flat list[str]. Se contiver "__all__", ignora o filtro (retorna []).
                 """
                 if value is None:
                     return []
@@ -661,16 +664,23 @@ class ReportFieldsValidatorViewSet(APIView):
                                 out.append(str(item['value']))
                         else:
                             out.append(str(item))
+                    # Se qualquer item é "__all__", não filtra
+                    if any(str(x).strip() == "__all__" for x in out):
+                        return []
                     return out
                 if isinstance(value, dict):
                     if 'uuids' in value and isinstance(value['uuids'], (list, tuple, set)):
-                        return [str(v) for v in value['uuids']]
+                        vals = [str(v) for v in value['uuids']]
+                        return [] if any(v.strip() == "__all__" for v in vals) else vals
                     if 'uuid' in value:
-                        return [str(value['uuid'])]
+                        v = str(value['uuid'])
+                        return [] if v.strip() == "__all__" else [v]
                     if 'value' in value:
-                        return [str(value['value'])]
+                        v = str(value['value'])
+                        return [] if v.strip() == "__all__" else [v]
                     return []
-                return [str(value)]
+                v = str(value)
+                return [] if v.strip() == "__all__" else [v]
 
             sectors = _norm_list(field_data.get('sectors') or field_data.get('sector'))
             queues = _norm_list(field_data.get('queues') or field_data.get('queue'))
