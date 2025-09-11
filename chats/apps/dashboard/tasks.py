@@ -111,41 +111,21 @@ def generate_custom_fields_report(project_uuid: UUID, fields_config: dict, user_
         output = io.BytesIO()
         if file_type == "xlsx":
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                for model_name, model_data in report_data.items():
-                    df_data = _strip_tz(model_data.get('data', []))
-                    df = pd.DataFrame(df_data)
-                    df = _excel_safe_dataframe(df)
-                    if not df.empty:
-                        df.to_excel(writer, sheet_name=model_name, index=False)
-                    related_data = model_data.get('related', {})
-                    for related_name, related_content in related_data.items():
-                        sheet_name = f"{model_name}_{related_name}"
-                        df_related_data = _strip_tz(related_content.get('data', []))
-                        df_related = pd.DataFrame(df_related_data)
-                        df_related = _excel_safe_dataframe(df_related)
-                        if not df_related.empty:
-                            df_related.to_excel(writer, sheet_name=sheet_name[:31], index=False)
+                # Escreve somente a aba de rooms
+                model_data = report_data.get('rooms', {})
+                df_data = _strip_tz(model_data.get('data', []))
+                df = pd.DataFrame(df_data)
+                df = _excel_safe_dataframe(df)
+                if not df.empty:
+                    df.to_excel(writer, sheet_name='rooms', index=False)
         else:
             zip_buf = io.BytesIO()
             with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
-                for model_name, model_data in report_data.items():
-                    df_data = _strip_tz(model_data.get('data', []))
-                    df = pd.DataFrame(df_data)
-                    df = _excel_safe_dataframe(df)
-                    if not df.empty:
-                        csv_io = io.StringIO()
-                        df.to_csv(csv_io, index=False)
-                        zf.writestr(f"{model_name[:31]}.csv", csv_io.getvalue().encode("utf-8"))
-                    related_data = model_data.get('related', {})
-                    for related_name, related_content in related_data.items():
-                        sheet_name = f"{model_name}_{related_name}"
-                        df_related_data = _strip_tz(related_content.get('data', []))
-                        df_related = pd.DataFrame(df_related_data)
-                        df_related = _excel_safe_dataframe(df_related)
-                        if not df_related.empty:
-                            csv_io = io.StringIO()
-                            df_related.to_csv(csv_io, index=False)
-                            zf.writestr(f"{sheet_name[:31]}.csv", csv_io.getvalue().encode("utf-8"))
+                df_data = _strip_tz(report_data.get('rooms', {}).get('data', []))
+                df = pd.DataFrame(df_data)
+                df = _excel_safe_dataframe(df)
+                if not df.empty:
+                    zf.writestr("rooms.csv", df.to_csv(index=False).encode("utf-8"))
             output = zip_buf
         
         # Salva arquivo localmente (timestamp sem barras)
@@ -246,52 +226,49 @@ def process_pending_reports():
 
         if file_type == "xlsx":
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                wrote_any = False
-                # Itera somente pelos modelos conhecidos
-                for model_name, field_data in (fields_config or {}).items():
-                    if model_name not in available_fields:
-                        continue
+                # Sempre gerar apenas a aba 'rooms'
+                rooms_cfg = (fields_config or {}).get('rooms') or {}
+                query_data = None
+                if rooms_cfg:
                     query_data = view._process_model_fields(
-                        model_name, field_data, project, available_fields
+                        'rooms', rooms_cfg, project, available_fields
                     )
 
-                    def _write_queryset(sheet_name: str, qs):
-                        total = qs.count()
-                        row_offset = 0
-                        for start in range(0, total, chunk_size):
-                            end = min(start + chunk_size, total)
-                            logging.info("Writing chunk: sheet=%s start=%s end=%s total=%s chunk_size=%s",
-                                         sheet_name, start, end, total, chunk_size)
-                            chunk = list(qs[start:end])
-                            chunk = _strip_tz(chunk)
-                            if not chunk:
-                                continue
-                            df = pd.DataFrame(chunk)
-                            df = _excel_safe_dataframe(df)
-                            df.to_excel(
-                                writer,
-                                sheet_name=sheet_name[:31],
-                                index=False,
-                                header=(row_offset == 0),
-                                startrow=row_offset if row_offset > 0 else 0,
-                            )
-                            row_offset += len(df)
-                            wrote_any = True
-
-                    if 'queryset' in query_data:
-                        _write_queryset(model_name, query_data['queryset'])
-
-                    for related_name, related_qd in (query_data.get('related') or {}).items():
-                        if 'queryset' in related_qd:
-                            _write_queryset(f"{model_name}_{related_name}", related_qd['queryset'])
-
-                if not wrote_any:
-                    for model_name, field_data in (fields_config or {}).items():
-                        if model_name not in available_fields:
+                def _write_queryset(sheet_name: str, qs):
+                    total = qs.count()
+                    row_offset = 0
+                    for start in range(0, total, chunk_size):
+                        end = min(start + chunk_size, total)
+                        logging.info("Writing chunk: sheet=%s start=%s end=%s total=%s chunk_size=%s",
+                                     sheet_name, start, end, total, chunk_size)
+                        chunk = list(qs[start:end])
+                        chunk = _strip_tz(chunk)
+                        if not chunk:
                             continue
-                        requested_fields = field_data.get('fields') or []
-                        empty_df = pd.DataFrame(columns=requested_fields)
-                        empty_df.to_excel(writer, sheet_name=model_name[:31], index=False)
+                        df = pd.DataFrame(chunk)
+                        df = _excel_safe_dataframe(df)
+                        df.to_excel(
+                            writer,
+                            sheet_name=sheet_name[:31],
+                            index=False,
+                            header=(row_offset == 0),
+                            startrow=row_offset if row_offset > 0 else 0,
+                        )
+                        row_offset += len(df)
+
+                qs = (query_data or {}).get('queryset')
+                if qs is not None:
+                    if qs.count() > 0:
+                        _write_queryset('rooms', qs)
+                    else:
+                        # Sem linhas: cria aba 'rooms' apenas com os headers escolhidos (se houver)
+                        requested_fields = rooms_cfg.get('fields') or []
+                        pd.DataFrame(columns=requested_fields).to_excel(
+                            writer, sheet_name='rooms', index=False
+                        )
+                else:
+                    # Nenhuma config de rooms: cria aba vazia para manter workbook válido
+                    pd.DataFrame().to_excel(writer, sheet_name='rooms', index=False)
         else:
             # CSV: gera um zip com um CSV por aba
             csv_buffers = {}
@@ -315,17 +292,12 @@ def process_pending_reports():
                     df.to_csv(buf, index=False, header=(row_offset == 0))
                     row_offset += len(df)
 
-            for model_name, field_data in (fields_config or {}).items():
-                if model_name not in available_fields:
-                    continue
+            if 'rooms' in (fields_config or {}):
                 query_data = view._process_model_fields(
-                    model_name, field_data, project, available_fields
+                    'rooms', fields_config['rooms'], project, available_fields
                 )
-                if 'queryset' in query_data:
-                    _write_csv_queryset(model_name, query_data['queryset'])
-                for related_name, related_qd in (query_data.get('related') or {}).items():
-                    if 'queryset' in related_qd:
-                        _write_csv_queryset(f"{model_name}_{related_name}", related_qd['queryset'])
+                if 'queryset' in (query_data or {}):
+                    _write_csv_queryset('rooms', query_data['queryset'])
 
             zip_buf = io.BytesIO()
             with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
