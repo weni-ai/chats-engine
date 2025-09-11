@@ -644,16 +644,38 @@ class ReportFieldsValidatorViewSet(APIView):
 
         # Filtros globais aplicados somente a rooms (sector/queue/agent/tags)
         if model_name == 'rooms':
-            def _as_list(v):
-                if v is None:
+            def _norm_list(value):
+                """
+                Accepts: list/tuple/set, single str/uuid, dicts like {'uuids': [...]} or {'uuid': '...'}.
+                Returns: flat list[str]
+                """
+                if value is None:
                     return []
-                if isinstance(v, list):
-                    return v
-                return [v]
-            sectors = _as_list(field_data.get('sectors') or field_data.get('sector'))
-            queues = _as_list(field_data.get('queues') or field_data.get('queue'))
-            agents = _as_list(field_data.get('agents') or field_data.get('agent'))
-            tags = _as_list(field_data.get('tags') or field_data.get('tag'))
+                if isinstance(value, (list, tuple, set)):
+                    out = []
+                    for item in value:
+                        if isinstance(item, dict):
+                            if 'uuid' in item:
+                                out.append(str(item['uuid']))
+                            elif 'value' in item:
+                                out.append(str(item['value']))
+                        else:
+                            out.append(str(item))
+                    return out
+                if isinstance(value, dict):
+                    if 'uuids' in value and isinstance(value['uuids'], (list, tuple, set)):
+                        return [str(v) for v in value['uuids']]
+                    if 'uuid' in value:
+                        return [str(value['uuid'])]
+                    if 'value' in value:
+                        return [str(value['value'])]
+                    return []
+                return [str(value)]
+
+            sectors = _norm_list(field_data.get('sectors') or field_data.get('sector'))
+            queues = _norm_list(field_data.get('queues') or field_data.get('queue'))
+            agents = _norm_list(field_data.get('agents') or field_data.get('agent'))
+            tags = _norm_list(field_data.get('tags') or field_data.get('tag'))
 
             if sectors:
                 base_queryset = base_queryset.filter(queue__sector__uuid__in=sectors)
