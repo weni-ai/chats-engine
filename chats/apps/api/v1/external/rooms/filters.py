@@ -26,6 +26,11 @@ class RoomFilter(filters.FilterSet):
 class RoomMetricsFilter(RoomFilter):
     created_on__lte = filters.DateTimeFilter(field_name="created_on", lookup_expr="lte")
     created_on__gte = filters.DateTimeFilter(field_name="created_on", lookup_expr="gte")
+    external_ids = filters.CharFilter(
+        field_name="external_ids",
+        required=False,
+        method="filter_external_ids",
+    )
 
     class Meta(RoomFilter.Meta):
         fields = RoomFilter.Meta.fields + ["created_on__lte", "created_on__gte"]
@@ -42,3 +47,8 @@ class RoomMetricsFilter(RoomFilter):
             )
 
         return queryset
+
+    def filter_external_ids(self, queryset, name, value):
+        external_ids = value.split(",")
+
+        return queryset.filter(contact__external_id__in=external_ids)
