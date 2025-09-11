@@ -226,42 +226,49 @@ def process_pending_reports():
 
         if file_type == "xlsx":
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                # Itera apenas por rooms
-                if 'rooms' in (fields_config or {}):
+                # Sempre gerar apenas a aba 'rooms'
+                rooms_cfg = (fields_config or {}).get('rooms') or {}
+                query_data = None
+                if rooms_cfg:
                     query_data = view._process_model_fields(
-                        'rooms', fields_config['rooms'], project, available_fields
+                        'rooms', rooms_cfg, project, available_fields
                     )
 
-                    def _write_queryset(sheet_name: str, qs):
-                        total = qs.count()
-                        row_offset = 0
-                        for start in range(0, total, chunk_size):
-                            end = min(start + chunk_size, total)
-                            logging.info("Writing chunk: sheet=%s start=%s end=%s total=%s chunk_size=%s",
-                                         sheet_name, start, end, total, chunk_size)
-                            chunk = list(qs[start:end])
-                            chunk = _strip_tz(chunk)
-                            if not chunk:
-                                continue
-                            df = pd.DataFrame(chunk)
-                            df = _excel_safe_dataframe(df)
-                            df.to_excel(
-                                writer,
-                                sheet_name=sheet_name[:31],
-                                index=False,
-                                header=(row_offset == 0),
-                                startrow=row_offset if row_offset > 0 else 0,
-                            )
-                            row_offset += len(df)
-                            wrote_any = True
+                def _write_queryset(sheet_name: str, qs):
+                    total = qs.count()
+                    row_offset = 0
+                    for start in range(0, total, chunk_size):
+                        end = min(start + chunk_size, total)
+                        logging.info("Writing chunk: sheet=%s start=%s end=%s total=%s chunk_size=%s",
+                                     sheet_name, start, end, total, chunk_size)
+                        chunk = list(qs[start:end])
+                        chunk = _strip_tz(chunk)
+                        if not chunk:
+                            continue
+                        df = pd.DataFrame(chunk)
+                        df = _excel_safe_dataframe(df)
+                        df.to_excel(
+                            writer,
+                            sheet_name=sheet_name[:31],
+                            index=False,
+                            header=(row_offset == 0),
+                            startrow=row_offset if row_offset > 0 else 0,
+                        )
+                        row_offset += len(df)
 
-                    if 'queryset' in (query_data or {}):
-                        _write_queryset('rooms', query_data['queryset'])
-
-                if not wrote_any:
-                    requested_fields = (fields_config.get('rooms') or {}).get('fields') or []
-                    empty_df = pd.DataFrame(columns=requested_fields)
-                    empty_df.to_excel(writer, sheet_name='rooms', index=False)
+                qs = (query_data or {}).get('queryset')
+                if qs is not None:
+                    if qs.count() > 0:
+                        _write_queryset('rooms', qs)
+                    else:
+                        # Sem linhas: cria aba 'rooms' apenas com os headers escolhidos (se houver)
+                        requested_fields = rooms_cfg.get('fields') or []
+                        pd.DataFrame(columns=requested_fields).to_excel(
+                            writer, sheet_name='rooms', index=False
+                        )
+                else:
+                    # Nenhuma config de rooms: cria aba vazia para manter workbook válido
+                    pd.DataFrame().to_excel(writer, sheet_name='rooms', index=False)
         else:
             # CSV: gera um zip com um CSV por aba
             csv_buffers = {}
