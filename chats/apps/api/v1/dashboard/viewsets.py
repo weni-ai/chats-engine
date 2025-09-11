@@ -630,12 +630,7 @@ class ReportFieldsValidatorViewSet(APIView):
             closed_chats = field_data.get('closed_chats')
             if open_chats is True and closed_chats is True:
                 raise ValidationError('open_chats and closed_chats cannot be used together.')
-            if open_chats is True:
-                base_queryset = base_queryset.filter(is_active=True)
-            if closed_chats is True:
-                base_queryset = base_queryset.filter(is_active=False)
 
-        # Aplica o filtro de datas SOMENTE em rooms
         if model_name == 'rooms':
             start_date = field_data.get('start_date')
             end_date = field_data.get('end_date')
@@ -643,7 +638,29 @@ class ReportFieldsValidatorViewSet(APIView):
                 tz = project.timezone
                 start_dt = pendulum.parse(start_date).replace(tzinfo=tz)
                 end_dt = pendulum.parse(end_date + " 23:59:59").replace(tzinfo=tz)
-                base_queryset = base_queryset.filter(created_on__range=[start_dt, end_dt])
+                if open_chats is True:
+                    base_queryset = base_queryset.filter(created_on__range=[start_dt, end_dt])
+                elif closed_chats is True:
+                    base_queryset = base_queryset.filter(ended_at__range=[start_dt, end_dt])
+                else:
+                    base_queryset = base_queryset.filter(
+                        Q(created_on__range=[start_dt, end_dt]) | Q(ended_at__range=[start_dt, end_dt])
+                    )
+        else:
+            # [NOVO] Aplica data range genérico (por created_on) para demais models que possuam esse campo
+            start_date = field_data.get('start_date')
+            end_date = field_data.get('end_date')
+            if start_date and end_date:
+                try:
+                    tz = project.timezone
+                    start_dt = pendulum.parse(start_date).replace(tzinfo=tz)
+                    end_dt = pendulum.parse(end_date + " 23:59:59").replace(tzinfo=tz)
+                    model_obj = base_queryset.model
+                    model_field_names = {f.name for f in model_obj._meta.get_fields()}
+                    if 'created_on' in model_field_names:
+                        base_queryset = base_queryset.filter(created_on__range=[start_dt, end_dt])
+                except Exception as _:
+                    pass
 
         # [NOVO] Filtros globais aplicados somente a rooms (sector/queue/agent/tags)
         if model_name == 'rooms':
