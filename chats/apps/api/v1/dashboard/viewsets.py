@@ -43,6 +43,7 @@ import logging
 from uuid import UUID
 from chats.apps.dashboard.models import ReportStatus
 import pendulum
+from django.contrib.postgres.aggregates import ArrayAgg
 
 logger = logging.getLogger(__name__)
 
@@ -719,6 +720,10 @@ class ReportFieldsValidatorViewSet(APIView):
 
         # Aplica os campos selecionados
         if query_fields:
+            if model_name == 'rooms' and 'tags' in query_fields:
+                base_queryset = base_queryset.annotate(
+                    tags=ArrayAgg('tags__name', distinct=True)
+                )
             base_queryset = base_queryset.values(*query_fields)
 
         # NÃO aplica filtros genéricos com OR - o filtro já foi aplicado em _get_base_queryset
