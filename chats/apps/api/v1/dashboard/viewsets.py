@@ -837,24 +837,26 @@ class ReportFieldsValidatorViewSet(APIView):
         project = get_object_or_404(Project, uuid=project_uuid)
         
         try:
-            # Remove project_uuid do processamento
-            fields_config = {k: v for k, v in request.data.items() 
-                        if k != 'project_uuid'}
- 
-            # [NOVO] Extrai flags de nível raiz e evita quebrar o processamento
-            open_chats = fields_config.pop('open_chats', None)
-            closed_chats = fields_config.pop('closed_chats', None)
+            # [NOVO] Extrai flags de nível raiz e normaliza para bool
+            def _is_true(v):
+                if isinstance(v, bool):
+                    return v
+                if isinstance(v, str):
+                    return v.strip().lower() in ("true", "1", "yes", "y", "on")
+                if isinstance(v, int):
+                    return v == 1
+                return False
+            open_chats = _is_true(fields_config.pop('open_chats', None))
+            closed_chats = _is_true(fields_config.pop('closed_chats', None))
             file_type = fields_config.pop('type', None)
             # Data range no root (aplicado apenas em rooms)
             root_start_date = fields_config.pop('start_date', None)
             root_end_date = fields_config.pop('end_date', None)
  
-            # [NOVO] Propaga flags para o modelo rooms, se existir
+            # Propaga flags (sempre normalizados) para rooms
             if 'rooms' in fields_config and isinstance(fields_config['rooms'], dict):
-                if isinstance(open_chats, bool):
-                    fields_config['rooms']['open_chats'] = open_chats
-                if isinstance(closed_chats, bool):
-                    fields_config['rooms']['closed_chats'] = closed_chats
+                fields_config['rooms']['open_chats'] = open_chats
+                fields_config['rooms']['closed_chats'] = closed_chats
                 # Propaga datas para rooms se não vierem dentro de rooms
                 if root_start_date and 'start_date' not in fields_config['rooms']:
                     fields_config['rooms']['start_date'] = root_start_date
