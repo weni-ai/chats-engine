@@ -722,8 +722,9 @@ class ReportFieldsValidatorViewSet(APIView):
         if query_fields:
             if model_name == 'rooms' and 'tags' in query_fields:
                 base_queryset = base_queryset.annotate(
-                    tags=ArrayAgg('tags__name', distinct=True)
+                    tags_list=ArrayAgg('tags__name', distinct=True)
                 )
+                query_fields = ['tags_list' if f == 'tags' else f for f in query_fields]
             base_queryset = base_queryset.values(*query_fields)
 
         # NÃO aplica filtros genéricos com OR - o filtro já foi aplicado em _get_base_queryset
