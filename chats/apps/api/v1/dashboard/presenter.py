@@ -324,9 +324,9 @@ class ModelFieldsPresenter:
                 'name'
             },
             'rooms': {
-                'ended_at', 'ended_by', 'is_active', 'is_waiting',
+                'created_on', 'ended_at', 'ended_by', 'is_active', 'is_waiting',
                 'urn', 'protocol', 'config', 'transfer_history',
-                'service_chat', 'custom_fields', 'tags', 'contact', 'user'
+                'service_chat', 'custom_fields', 'tags', 'contact', 'user', 'queue'
             },
             'contacts': {
                 'name', 'email', 'status', 'phone', 'custom_fields', 'external_id'
