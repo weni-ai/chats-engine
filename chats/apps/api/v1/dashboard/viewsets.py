@@ -641,13 +641,17 @@ class ReportFieldsValidatorViewSet(APIView):
                 if open_chats is True:
                     base_queryset = base_queryset.filter(created_on__range=[start_dt, end_dt])
                 elif closed_chats is True:
-                    base_queryset = base_queryset.filter(ended_at__range=[start_dt, end_dt])
+                    base_queryset = (
+                        base_queryset
+                        .exclude(queue__is_deleted=True)
+                        .exclude(config__imported_room=True)
+                        .filter(is_active=False, ended_at__range=[start_dt, end_dt])
+                    )
                 else:
                     base_queryset = base_queryset.filter(
                         Q(created_on__range=[start_dt, end_dt]) | Q(ended_at__range=[start_dt, end_dt])
                     )
         else:
-            # [NOVO] Aplica data range genérico (por created_on) para demais models que possuam esse campo
             start_date = field_data.get('start_date')
             end_date = field_data.get('end_date')
             if start_date and end_date:
