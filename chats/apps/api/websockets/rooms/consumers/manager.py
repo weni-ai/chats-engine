@@ -55,7 +55,7 @@ class ManagerAgentRoomConsumer(AgentRoomConsumer):
                 user_email = self.scope["query_params"].get("user_email")[0]
                 is_manager = await self.check_is_manager()
                 if user_email and UserModel and is_manager:
-                    self.user = await UserModel.objects.aget(email=user_email)
+                    self.user = await database_sync_to_async(UserModel.objects.get)(email=user_email)
                     self.permission = await self.get_permission()
                 else:
                     close = True
