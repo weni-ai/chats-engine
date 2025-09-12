@@ -641,12 +641,10 @@ class ReportFieldsValidatorViewSet(APIView):
                 end_dt = pendulum.parse(end_date + " 23:59:59").replace(tzinfo=tz)
                 if open_chats is True:
                     base_queryset = base_queryset.filter(created_on__range=[start_dt, end_dt])
-                elif closed_chats is True:
-                    base_queryset = (
-                        base_queryset
-                        .exclude(queue__is_deleted=True)
-                        .exclude(config__imported_room=True)
-                        .filter(is_active=False, ended_at__range=[start_dt, end_dt])
+                elif closed_chats and not open_chats:
+                    base_queryset = base_queryset.filter(
+                        is_active=False,
+                        ended_at__range=[start_dt, end_dt],
                     )
                 else:
                     base_queryset = base_queryset.filter(
