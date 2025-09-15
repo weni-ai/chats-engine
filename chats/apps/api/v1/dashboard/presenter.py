@@ -363,6 +363,27 @@ class ModelFieldsPresenter:
             key: ModelFieldsPresenter._filter_allowed(key, value)
             for key, value in raw_models_info.items()
         }
+        # rooms: retornar exatamente os 16 campos na ordem exigida pela UI
+        rooms = models_info.get('rooms', {})
+        ordered_rooms = {
+            'user__first_name': {'type': 'CharField', 'required': False, 'related_model': 'accounts.user'},
+            'user__last_name': {'type': 'CharField', 'required': False, 'related_model': 'accounts.user'},
+            'user__email': {'type': 'EmailField', 'required': False, 'related_model': 'accounts.user'},
+            'queue__sector__name': {'type': 'CharField', 'required': False, 'related_model': 'sectors.sector'},
+            'queue__name': {'type': 'CharField', 'required': False, 'related_model': 'queues.queue'},
+            'uuid': {'type': 'UUIDField', 'required': True},
+            'is_active': rooms.get('is_active', {'type': 'BooleanField', 'required': True}),
+            'protocol': rooms.get('protocol', {'type': 'TextField', 'required': False}),
+            'tags': rooms.get('tags', {'type': 'ManyToManyField', 'required': True, 'related_model': 'sectors.sectortag'}),
+            'created_on': rooms.get('created_on', {'type': 'DateTimeField', 'required': True}),
+            'ended_at': rooms.get('ended_at', {'type': 'DateTimeField', 'required': False}),
+            'transfer_history': rooms.get('transfer_history', {'type': 'JSONField', 'required': False}),
+            'contact__name': {'type': 'CharField', 'required': False, 'related_model': 'contacts.contact'},
+            'contact__uuid': {'type': 'UUIDField', 'required': False, 'related_model': 'contacts.contact'},
+            'urn': rooms.get('urn', {'type': 'TextField', 'required': False}),
+            'custom_fields': rooms.get('custom_fields', {'type': 'JSONField', 'required': False}),
+        }
+        models_info['rooms'] = ordered_rooms
         cache.set(cache_key, models_info, timeout=86400)
         return models_info
 
