@@ -289,8 +289,6 @@ class MessageSerializer(BaseMessageSerializer):
 
         return {
             "uuid": str(note.uuid),
-            "created_on": note.created_on,
-            "user": user_data,
             "text": note.text,
             "is_deletable": note.is_deletable,
         }

@@ -843,9 +843,6 @@ class RoomViewset(
         # Notify message creation for clients listening to messages
         msg.notify_room("create", True)
         
-        # Send WebSocket notification for the note itself
-        note.notify_websocket("create")
-        
         # Return serialized note
         return Response(
             RoomNoteSerializer(note).data,
@@ -936,10 +933,15 @@ class RoomNoteViewSet(
         note = self.get_object()
         
         if not note.is_deletable:
-            raise ValidationError({"detail": "Note cannot be deleted because it was marked as non-deletable"})
+            raise ValidationError({"Note cannot be deleted because it was marked as non-deletable"})
             
         if note.user != request.user:
             raise PermissionDenied("You can only delete your own notes")
+
+        # Sala aberta
+        if not note.room.is_active:
+            raise ValidationError({"detail": "Cannot delete notes from closed rooms"})
+
         
         note.notify_websocket("delete")
         
