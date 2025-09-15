@@ -31,6 +31,11 @@ class RoomMetricsFilter(RoomFilter):
         required=False,
         method="filter_external_ids",
     )
+    secondary_project = filters.CharFilter(
+        field_name="secondary_project",
+        required=False,
+        method="filter_secondary_project",
+    )
 
     class Meta(RoomFilter.Meta):
         fields = RoomFilter.Meta.fields + ["created_on__lte", "created_on__gte"]
@@ -52,3 +57,6 @@ class RoomMetricsFilter(RoomFilter):
         external_ids = value.split(",")
 
         return queryset.filter(contact__external_id__in=external_ids)
+
+    def filter_secondary_project(self, queryset, name, value):
+        return queryset.filter(queue__sector__config__secondary_project=value)
