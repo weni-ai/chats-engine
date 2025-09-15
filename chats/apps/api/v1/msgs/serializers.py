@@ -216,11 +216,8 @@ class MessageSerializer(BaseMessageSerializer):
             "replied_message",
             "is_read",
             "is_delivered",
-<<<<<<< HEAD
             "is_automatic_message",
-=======
             "internal_note",
->>>>>>> feature/internal-note
         ]
         read_only_fields = [
             "uuid",
