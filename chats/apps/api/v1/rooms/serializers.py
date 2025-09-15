@@ -46,6 +46,7 @@ class RoomSerializer(serializers.ModelSerializer):
     full_transfer_history = serializers.JSONField(
         required=False, read_only=True, default=list
     )
+    added_to_queue_at = serializers.DateTimeField(read_only=True)
 
     class Meta:
         model = Room
@@ -61,6 +62,7 @@ class RoomSerializer(serializers.ModelSerializer):
             "can_edit_custom_fields",
             "imported_history_url",
             "full_transfer_history",
+            "added_to_queue_at",
         ]
 
     def get_is_24h_valid(self, room: Room) -> bool:
@@ -121,6 +123,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
     is_active = serializers.BooleanField(default=True)
     imported_history_url = serializers.CharField(read_only=True, default="")
     is_pinned = serializers.SerializerMethodField()
+    added_to_queue_at = serializers.DateTimeField(read_only=True)
 
     class Meta:
         model = Room
@@ -144,6 +147,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
             "config",
             "imported_history_url",
             "is_pinned",
+            "added_to_queue_at",
         ]
 
     def get_user(self, room: Room):
