@@ -43,6 +43,7 @@ import logging
 from uuid import UUID
 from chats.apps.dashboard.models import ReportStatus
 import pendulum
+from django.contrib.postgres.aggregates import ArrayAgg
 
 logger = logging.getLogger(__name__)
 
@@ -607,6 +608,9 @@ class ReportFieldsValidatorViewSet(APIView):
                 if invalid_fields:
                     raise NotFound(f'Campos inválidos para {model_name}: {", ".join(invalid_fields)}')
                 query_fields.extend(value)
+                # Ajuste: quando usuário pedir 'contact', retornamos o nome do contato
+                if model_name == 'rooms' and 'contact' in query_fields and 'contact__name' not in query_fields:
+                    query_fields = [f if f != 'contact' else 'contact__name' for f in query_fields]
             elif key in available_fields:
                 # Processa campos relacionados
                 related_queries[key] = self._process_model_fields(key, value, project, available_fields)
@@ -627,12 +631,7 @@ class ReportFieldsValidatorViewSet(APIView):
             closed_chats = field_data.get('closed_chats')
             if open_chats is True and closed_chats is True:
                 raise ValidationError('open_chats and closed_chats cannot be used together.')
-            if open_chats is True:
-                base_queryset = base_queryset.filter(is_active=True)
-            if closed_chats is True:
-                base_queryset = base_queryset.filter(is_active=False)
 
-        # Aplica o filtro de datas nas queries de rooms
         if model_name == 'rooms':
             start_date = field_data.get('start_date')
             end_date = field_data.get('end_date')
@@ -640,9 +639,18 @@ class ReportFieldsValidatorViewSet(APIView):
                 tz = project.timezone
                 start_dt = pendulum.parse(start_date).replace(tzinfo=tz)
                 end_dt = pendulum.parse(end_date + " 23:59:59").replace(tzinfo=tz)
-                base_queryset = base_queryset.filter(created_on__range=[start_dt, end_dt])
+                if open_chats is True:
+                    base_queryset = base_queryset.filter(created_on__range=[start_dt, end_dt])
+                elif closed_chats and not open_chats:
+                    base_queryset = base_queryset.filter(
+                        is_active=False,
+                        ended_at__range=[start_dt, end_dt],
+                    )
+                else:
+                    base_queryset = base_queryset.filter(
+                        Q(created_on__range=[start_dt, end_dt]) | Q(ended_at__range=[start_dt, end_dt])
+                    )
         else:
-            # [NOVO] Aplica data range genérico (por created_on) para demais models que possuam esse campo
             start_date = field_data.get('start_date')
             end_date = field_data.get('end_date')
             if start_date and end_date:
@@ -657,8 +665,64 @@ class ReportFieldsValidatorViewSet(APIView):
                 except Exception as _:
                     pass
 
+        # [NOVO] Filtros globais aplicados somente a rooms (sector/queue/agent/tags)
+        if model_name == 'rooms':
+            def _norm_list(value):
+                """
+                Accepts: list/tuple/set, single str/uuid, dicts like {'uuids': [...]} or {'uuid': '...'}.
+                Returns: flat list[str]. Se contiver "__all__", ignora o filtro (retorna []).
+                """
+                if value is None:
+                    return []
+                if isinstance(value, (list, tuple, set)):
+                    out = []
+                    for item in value:
+                        if isinstance(item, dict):
+                            if 'uuid' in item:
+                                out.append(str(item['uuid']))
+                            elif 'value' in item:
+                                out.append(str(item['value']))
+                        else:
+                            out.append(str(item))
+                    # Se qualquer item é "__all__", não filtra
+                    if any(str(x).strip() == "__all__" for x in out):
+                        return []
+                    return out
+                if isinstance(value, dict):
+                    if 'uuids' in value and isinstance(value['uuids'], (list, tuple, set)):
+                        vals = [str(v) for v in value['uuids']]
+                        return [] if any(v.strip() == "__all__" for v in vals) else vals
+                    if 'uuid' in value:
+                        v = str(value['uuid'])
+                        return [] if v.strip() == "__all__" else [v]
+                    if 'value' in value:
+                        v = str(value['value'])
+                        return [] if v.strip() == "__all__" else [v]
+                    return []
+                v = str(value)
+                return [] if v.strip() == "__all__" else [v]
+
+            sectors = _norm_list(field_data.get('sectors') or field_data.get('sector'))
+            queues = _norm_list(field_data.get('queues') or field_data.get('queue'))
+            agents = _norm_list(field_data.get('agents') or field_data.get('agent'))
+            tags = _norm_list(field_data.get('tags') or field_data.get('tag'))
+
+            if sectors:
+                base_queryset = base_queryset.filter(queue__sector__uuid__in=sectors)
+            if queues:
+                base_queryset = base_queryset.filter(queue__uuid__in=queues)
+            if agents:
+                base_queryset = base_queryset.filter(user__uuid__in=agents)
+            if tags:
+                base_queryset = base_queryset.filter(tags__name__in=tags)
+
         # Aplica os campos selecionados
         if query_fields:
+            if model_name == 'rooms' and 'tags' in query_fields:
+                base_queryset = base_queryset.annotate(
+                    tags_list=ArrayAgg('tags__name', distinct=True)
+                )
+                query_fields = ['tags_list' if f == 'tags' else f for f in query_fields]
             base_queryset = base_queryset.values(*query_fields)
 
         # NÃO aplica filtros genéricos com OR - o filtro já foi aplicado em _get_base_queryset
@@ -777,40 +841,54 @@ class ReportFieldsValidatorViewSet(APIView):
         project = get_object_or_404(Project, uuid=project_uuid)
         
         try:
-            # Remove project_uuid do processamento
-            fields_config = {k: v for k, v in request.data.items() 
-                        if k != 'project_uuid'}
+            # Reconstrói o fields_config a partir do payload (sem project_uuid)
+            fields_config = {k: v for k, v in request.data.items() if k != 'project_uuid'}
 
-            # [NOVO] Extrai flags de nível raiz e evita quebrar o processamento
-            open_chats = fields_config.pop('open_chats', None)
-            closed_chats = fields_config.pop('closed_chats', None)
+            # [NOVO] Extrai flags de nível raiz e normaliza para bool
+            def _is_true(v):
+                if isinstance(v, bool):
+                    return v
+                if isinstance(v, str):
+                    return v.strip().lower() in ("true", "1", "yes", "y", "on")
+                if isinstance(v, int):
+                    return v == 1
+                return False
+            open_chats = _is_true(fields_config.pop('open_chats', None))
+            closed_chats = _is_true(fields_config.pop('closed_chats', None))
             file_type = fields_config.pop('type', None)
-            # [NOVO] Data range no root (aplicado a todos os models compatíveis)
+            # Data range no root (aplicado apenas em rooms)
             root_start_date = fields_config.pop('start_date', None)
             root_end_date = fields_config.pop('end_date', None)
-
-            # [NOVO] Propaga flags para o modelo rooms, se existir
+ 
+            # Propaga flags (sempre normalizados) para rooms
             if 'rooms' in fields_config and isinstance(fields_config['rooms'], dict):
-                if isinstance(open_chats, bool):
-                    fields_config['rooms']['open_chats'] = open_chats
-                if isinstance(closed_chats, bool):
-                    fields_config['rooms']['closed_chats'] = closed_chats
+                fields_config['rooms']['open_chats'] = open_chats
+                fields_config['rooms']['closed_chats'] = closed_chats
                 # Propaga datas para rooms se não vierem dentro de rooms
                 if root_start_date and 'start_date' not in fields_config['rooms']:
                     fields_config['rooms']['start_date'] = root_start_date
                 if root_end_date and 'end_date' not in fields_config['rooms']:
                     fields_config['rooms']['end_date'] = root_end_date
+ 
+            # Propaga filtros globais (sector/queue/agent/tags) somente para rooms
+            root_sectors = request.data.get('sectors') or request.data.get('sector')
+            root_queues = request.data.get('queues') or request.data.get('queue')
+            root_agents = request.data.get('agents') or request.data.get('agent')
+            root_tags = request.data.get('tags') or request.data.get('tag')
+            if 'rooms' not in fields_config or not isinstance(fields_config['rooms'], dict):
+                fields_config['rooms'] = {}
+            if root_sectors is not None:
+                fields_config['rooms']['sectors'] = root_sectors
+            if root_queues is not None:
+                fields_config['rooms']['queues'] = root_queues
+            if root_agents is not None:
+                fields_config['rooms']['agents'] = root_agents
+            if root_tags is not None:
+                fields_config['rooms']['tags'] = root_tags
 
-            # [NOVO] Propaga datas para todos os outros models (usam created_on se existir)
-            for model_name, cfg in list(fields_config.items()):
-                if model_name == 'rooms':
-                    continue
-                if isinstance(cfg, dict):
-                    if root_start_date and 'start_date' not in cfg:
-                        cfg['start_date'] = root_start_date
-                    if root_end_date and 'end_date' not in cfg:
-                        cfg['end_date'] = root_end_date
-
+            # Mantém apenas rooms no relatório (as outras “abas” viram somente filtros)
+            fields_config = {'rooms': fields_config.get('rooms', {})}
+ 
             # Estima o tempo de execução
             estimated_time = self._estimate_execution_time(fields_config, project)
             

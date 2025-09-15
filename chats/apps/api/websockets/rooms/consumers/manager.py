@@ -13,6 +13,7 @@ from chats.apps.api.v1.prometheus.metrics import (
     ws_disconnects_total,
 )
 from chats.apps.api.websockets.rooms.consumers.agent import AgentRoomConsumer
+from chats.core.cache_utils import get_user_id_by_email_cached
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,7 @@ class ManagerAgentRoomConsumer(AgentRoomConsumer):
                 user_email = self.scope["query_params"].get("user_email")[0]
                 is_manager = await self.check_is_manager()
                 if user_email and UserModel and is_manager:
-                    self.user = await database_sync_to_async(UserModel.objects.get)(email=user_email)
+                    self.user = await self._get_user_by_email(UserModel, user_email)
                     self.permission = await self.get_permission()
                 else:
                     close = True
@@ -103,3 +104,15 @@ class ManagerAgentRoomConsumer(AgentRoomConsumer):
     @database_sync_to_async
     def check_is_manager(self):
         return self.permission.is_manager(any_sector=True)
+
+    @database_sync_to_async
+    def _get_user_by_email(self, UserModel, user_email: str):
+        """
+        Resolve user via cache first; fall back to DB by pk.
+        Raises UserModel.DoesNotExist on miss (caught by ObjectDoesNotExist).
+        """
+        email_l = (user_email or "").lower()
+        uid = get_user_id_by_email_cached(email_l)
+        if uid is None:
+            raise UserModel.DoesNotExist
+        return UserModel.objects.get(pk=uid)
