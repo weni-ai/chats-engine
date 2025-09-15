@@ -305,14 +305,6 @@ class ModelFieldsPresenter:
     
     @staticmethod
     def _allowed_fields_map():
-        """
-        Campos permitidos por modelo, conforme especificação do cliente.
-        Observações:
-        - 'is_delete' => campo real 'is_deleted'
-        - 'full_transfer_history' => campo real 'transfer_history'
-        - 'service chat' => campo real 'service_chat'
-        - 'is_wating' => campo real 'is_waiting'
-        """
         return {
             'sectors': {
                 'name', 'rooms_limit', 'config'
@@ -326,7 +318,9 @@ class ModelFieldsPresenter:
             'rooms': {
                 'created_on', 'ended_at', 'ended_by', 'is_active', 'is_waiting',
                 'urn', 'protocol', 'config', 'transfer_history',
-                'service_chat', 'custom_fields', 'tags', 'contact', 'user', 'queue'
+                'service_chat', 'custom_fields', 'tags',
+                'contact', 'user', 'queue',
+                'uuid', 'sector', 'status', 'contact_uuid', 'contact_id'
             },
             'contacts': {
                 'name', 'email', 'status', 'phone', 'custom_fields', 'external_id'
