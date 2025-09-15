@@ -68,7 +68,6 @@ workalendar = "^17.0.0"
 xlsxwriter = "^3.2.5"
 daphne = "^3.0.0"
 
-daphne = "^3.0.0"
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
 flake8 = "^4.0.1"
