@@ -1,10 +1,10 @@
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import (
     MultipleObjectsReturned,
     ObjectDoesNotExist,
     ValidationError,
 )
-from django.conf import settings
 from django.db import IntegrityError, models, transaction
 from django.db.models import Q, UniqueConstraint
 from django.utils.translation import gettext_lazy as _
@@ -115,6 +115,7 @@ class Project(BaseConfigurableModel, BaseModel):
     def get_cached_config(self):
         """Try to get config from cache first"""
         from chats.core.cache_utils import get_project_config_cached
+
         cached = get_project_config_cached(str(self.uuid))
         if cached is not None:
             return cached
@@ -700,6 +701,7 @@ class AgentDisconnectLog(BaseModel):
     """
     Audit log for supervisor-enforced agent disconnections.
     """
+
     project = models.ForeignKey(
         "projects.Project",
         related_name="agent_disconnect_logs",
@@ -720,6 +722,9 @@ class AgentDisconnectLog(BaseModel):
         on_delete=models.CASCADE,
         to_field="email",
     )
+
+    def __str__(self) -> str:
+        return f"{self.project.name}: {self.agent.email} disconnected by {self.disconnected_by.email}"
 
     class Meta:
         verbose_name = "Agent Disconnect Log"

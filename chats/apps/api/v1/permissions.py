@@ -346,3 +346,22 @@ class ProjectBodyPermission(permissions.BasePermission):
         return ProjectPermission.objects.filter(
             project__uuid=project_uuid, user=request.user
         ).exists()
+
+
+class ProjectBodyIsAdmin(permissions.BasePermission):
+    def has_permission(self, request, view):
+        if request.user.is_anonymous:
+            return False
+
+        project_uuid = request.data.get("project_uuid")
+
+        if not project_uuid:
+            raise ValidationError(
+                {"project_uuid": ["This field is required"]}, code="required"
+            )
+
+        return ProjectPermission.objects.filter(
+            project__uuid=project_uuid,
+            user=request.user,
+            role=ProjectPermission.ROLE_ADMIN,
+        ).exists()

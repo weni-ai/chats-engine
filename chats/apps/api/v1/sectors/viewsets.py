@@ -98,7 +98,10 @@ class SectorViewset(viewsets.ModelViewSet):
                 instance.delete()
 
                 raise exceptions.APIException(
-                    detail=f"[{response.status_code}] Error posting the sector/ticketer on flows. Exception: {response.content}"
+                    detail=(
+                        f"[{response.status_code}] Error posting the sector/ticketer on flows. "
+                        f"Exception: {response.content}"
+                    )
                 )
 
         if project.config and project.config.get("its_principal", False):
