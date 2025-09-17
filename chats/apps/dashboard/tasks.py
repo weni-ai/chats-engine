@@ -136,7 +136,6 @@ def generate_custom_fields_report(
                     zf.writestr("rooms.csv", df.to_csv(index=False).encode("utf-8"))
             output = zip_buf
 
-        # Salva arquivo localmente (timestamp sem barras)
         dt = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
         if getattr(settings, "REPORTS_SAVE_LOCALLY", True):
             base_dir = getattr(
@@ -327,7 +326,6 @@ def process_pending_reports():
             output = zip_buf
 
         dt = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
-        # Salva arquivo localmente
         if getattr(settings, "REPORTS_SAVE_LOCALLY", True):
             base_dir = getattr(
                 settings,
