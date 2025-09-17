@@ -1,3 +1,16 @@
+# 3.25.2
+# Add
+  - Daphne serving ws
+  - User disconnect feature 
+
+# 3.25.1
+## Fix
+  - Fix in holiday cache and constraint
+
+# 3.25.0
+## Add
+  - New feature, working day.
+
 # 3.24.2
 ## Fix
   - updating the ticket uuid field and callback url when a flow is triggered for an already open room
@@ -691,6 +704,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 
