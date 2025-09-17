@@ -956,7 +956,7 @@ class RoomNoteViewSet(
             
         return queryset.filter(
             Q(room__user=user) | 
-            Q(room__queue__project__permissions__user=user)
+            Q(room__queue__sector__project__permissions__user=user)
         ).distinct()
     
     def destroy(self, request, *args, **kwargs):

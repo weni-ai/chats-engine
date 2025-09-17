@@ -293,7 +293,7 @@ class MessageSerializer(BaseMessageSerializer):
         user_data = None
         if user:
             user_data = {
-                "uuid": str(user.uuid),
+                "uuid": str(user.pk),
                 "name": user.name,
             }
 

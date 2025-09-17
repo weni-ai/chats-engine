@@ -731,7 +731,7 @@ class RoomNote(BaseModel):
             "uuid": str(self.uuid),
             "room": str(self.room.uuid),
             "user": {
-                "uuid": str(self.user.uuid),
+                "uuid": str(self.user.pk),
                 "name": self.user.name
             },
             "text": self.text,
