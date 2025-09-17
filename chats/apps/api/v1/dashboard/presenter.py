@@ -352,12 +352,7 @@ class ModelFieldsPresenter:
             return cached_data
  
         raw_models_info = {
-            'sectors': ModelFieldsPresenter._get_model_fields('sectors', 'Sector'),
-            'queues': ModelFieldsPresenter._get_model_fields('queues', 'Queue'),
             'rooms': ModelFieldsPresenter._get_model_fields('rooms', 'Room'),
-            'users': ModelFieldsPresenter._get_model_fields('accounts', 'User'),
-            'sector_tags': ModelFieldsPresenter._get_model_fields('sectors', 'SectorTag'),
-            'contacts': ModelFieldsPresenter._get_model_fields('contacts', 'Contact')
         }
         models_info = {
             key: ModelFieldsPresenter._filter_allowed(key, value)
