@@ -847,7 +847,7 @@ class RoomViewset(
         room = self.get_object()
         
         # Verify user has access to the room
-        if not verify_user_room(request.user, room):
+        if not verify_user_room(room, request.user):
             raise PermissionDenied("You don't have permission to add notes to this room")
         
         # Room must be active
@@ -956,7 +956,7 @@ class RoomNoteViewSet(
             
         return queryset.filter(
             Q(room__user=user) | 
-            Q(room__queue__sector__permissions__user=user)
+            Q(room__queue__project__permissions__user=user)
         ).distinct()
     
     def destroy(self, request, *args, **kwargs):
