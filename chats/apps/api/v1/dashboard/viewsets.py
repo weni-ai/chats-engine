@@ -1,15 +1,19 @@
 import io
 import json
+import logging
 
 import pandas
+import pendulum
+from django.apps import apps
+from django.contrib.postgres.aggregates import ArrayAgg
+from django.db.models import Q
 from django.http import HttpResponse
-from chats.apps.dashboard.tasks import generate_custom_fields_report
+from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.exceptions import ValidationError
-from rest_framework.exceptions import NotFound
 
 from chats.apps.api.v1.dashboard.presenter import get_export_data
 from chats.apps.api.v1.dashboard.repository import (
@@ -22,28 +26,13 @@ from chats.apps.api.v1.dashboard.serializers import (
     DashboardRoomSerializer,
     DashboardSectorSerializer,
 )
-from chats.apps.api.v1.permissions import HasDashboardAccess, IsProjectAdmin
+from chats.apps.dashboard.models import ReportStatus
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.core.excel_storage import ExcelStorage
 
 from .dto import Filters, should_exclude_admin_domains
-from .service import AgentsService, RawDataService, RoomsDataService, SectorService
 from .presenter import ModelFieldsPresenter
-from rest_framework import permissions, status
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from rest_framework.exceptions import ValidationError
-from django.shortcuts import get_object_or_404
-from django.apps import apps
-from django.db.models import Q
-from chats.celery import app
-from django.core.mail import EmailMessage
-from django.conf import settings
-import logging
-from uuid import UUID
-from chats.apps.dashboard.models import ReportStatus
-import pendulum
-from django.contrib.postgres.aggregates import ArrayAgg
+from .service import AgentsService, RawDataService, RoomsDataService, SectorService
 
 logger = logging.getLogger(__name__)
 
@@ -206,7 +195,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
                     startcol=0,
                     index=False,
                 )
-            excel_rooms_buffer.seek(0)  # Move o cursor para o início do buffer
+            excel_rooms_buffer.seek(0)
             storage = ExcelStorage()
 
             bytes_archive = excel_rooms_buffer.getvalue()
@@ -271,7 +260,6 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             ),
         )
 
-        # Rooms Data
         rooms_service = RoomsDataService(
             ORMRoomsDataRepository(), RoomsCacheRepository()
         )
@@ -285,7 +273,6 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
                 "Tempo de Interação",
             ]
 
-        # Raw Data
         raw_data_service = RawDataService()
         raw_data = raw_data_service.get_raw_data(filters)
         raw_data_serializer = DashboardRawDataSerializer(
@@ -299,7 +286,6 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
                 "Transferencias",
                 "Salas na Fila",
             ]
-        # Sector Data
         sector_data_service = SectorService()
         sector_data = sector_data_service.get_sector_data(filters)
         sector_dataset = DashboardSectorSerializer(sector_data, many=True)
@@ -316,7 +302,6 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
                 "Tempo de Interação",
             ]
 
-        # Agents Data
         agents_service = AgentsService()
         agents_data = agents_service.get_agents_data(filters, project)
         agents_dataset = DashboardAgentsSerializer(agents_data, many=True)
@@ -370,7 +355,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
                     index=False,
                 )
 
-            excel_buffer.seek(0)  # Move o cursor para o início do buffer
+            excel_buffer.seek(0)
             storage = ExcelStorage()
 
             bytes_archive = excel_buffer.getvalue()
@@ -406,10 +391,8 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
     def report_status(self, request, **kwargs):
         """Verifica o status de um relatório"""
         try:
-            # Pega o UUID tanto de 'pk' quanto de 'uuid'
             report_uuid = kwargs.get("uuid") or kwargs.get("pk")
 
-            # Para teste - remove o filtro de user
             report_status = ReportStatus.objects.get(uuid=report_uuid)
             return Response(
                 {
@@ -441,9 +424,8 @@ class ReportFieldsValidatorViewSet(APIView):
 
     def _get_model_class(self, model_name):
         """
-        Encontra a classe do modelo Django baseado no nome
+        Find the Django model class based on the name
         """
-        # Mapeamento dos modelos conhecidos
         model_mapping = {
             "sectors": ("sectors", "Sector"),
             "queues": ("queues", "Queue"),
@@ -460,7 +442,6 @@ class ReportFieldsValidatorViewSet(APIView):
             except LookupError:
                 pass
 
-        # Fallback: busca nos apps comuns
         common_apps = [
             "sectors",
             "queues",
@@ -480,7 +461,7 @@ class ReportFieldsValidatorViewSet(APIView):
 
     def _get_model_count_for_project(self, model_class, project):
         """
-        Conta registros de um modelo específico para um projeto
+        Count records of a specific model for a project
         """
         try:
             model_fields = {
@@ -489,7 +470,6 @@ class ReportFieldsValidatorViewSet(APIView):
 
             filters = Q()
 
-            # Aplica filtros baseados nos campos disponíveis
             if "project" in model_fields:
                 filters |= Q(project=project)
             if "sector" in model_fields:
@@ -502,9 +482,8 @@ class ReportFieldsValidatorViewSet(APIView):
             if filters:
                 return model_class.objects.filter(filters).distinct().count()
             else:
-                # Se não conseguiu filtrar por projeto, retorna uma estimativa conservadora
                 total_count = model_class.objects.count()
-                return max(1, total_count // 10)  # 10% do total
+                return max(1, total_count // 10)
 
         except Exception as e:
             logger.error(f"Erro ao contar registros para {model_class.__name__}: {e}")
@@ -512,9 +491,8 @@ class ReportFieldsValidatorViewSet(APIView):
 
     def _estimate_execution_time(self, fields_config, project):
         """
-        Estima o tempo de execução baseado no volume de dados que será processado
+        Estimate the execution time based on the volume of data that will be processed
         """
-        # Verifica se os modelos são válidos
         available_models = ModelFieldsPresenter.get_models_info()
         invalid_models = [
             model for model in fields_config.keys() if model not in available_models
@@ -529,7 +507,6 @@ class ReportFieldsValidatorViewSet(APIView):
         total_records = 0
         processed_models = []
 
-        # Conta registros que serão processados
         for model_name in fields_config.keys():
             try:
                 model_class = self._get_model_class(model_name)
@@ -538,22 +515,19 @@ class ReportFieldsValidatorViewSet(APIView):
                     count = self._get_model_count_for_project(model_class, project)
                     total_records += count
                     processed_models.append({"model": model_name, "count": count})
-                    logger.info(f"Modelo {model_name}: {count} registros")
+                    logger.info(f"Model {model_name}: {count} records")
                 else:
-                    logger.warning(f"Modelo {model_name} não encontrado")
+                    logger.warning(f"Model {model_name} not found")
 
             except Exception as e:
-                logger.error(f"Erro ao processar modelo {model_name}: {e}")
+                logger.error(f"Error processing model {model_name}: {e}")
                 continue
 
-        # Estimativas baseadas em testes empíricos
-        base_time = 30  # segundos base
-        time_per_1000_records = 45  # segundos por 1000 registros
+        base_time = 30
+        time_per_1000_records = 45
 
-        # Fator de complexidade baseado no número de modelos
         complexity_factor = 1 + (len(processed_models) * 0.1)
 
-        # Calcula estimativa
         if total_records > 0:
             estimated_time = (
                 base_time + (total_records / 1000) * time_per_1000_records
@@ -561,34 +535,30 @@ class ReportFieldsValidatorViewSet(APIView):
         else:
             estimated_time = base_time
 
-        # Limita a estimativa (mínimo 30s, máximo 10min)
         final_estimate = max(30, min(int(estimated_time), 600))
 
         logger.info(
-            f"Estimativa de tempo: {final_estimate}s para {total_records} registros em {len(processed_models)} modelos"
+            f"Estimated time: {final_estimate}s for {total_records} records in {len(processed_models)} models"
         )
 
         return final_estimate
 
     def _get_base_queryset(self, model_name, project):
         """
-        Retorna o queryset base para qualquer modelo retornado pelo ModelFieldsPresenter
+        Return the base queryset for any model returned by the ModelFieldsPresenter
         """
         available_fields = ModelFieldsPresenter.get_models_info()
 
         if model_name not in available_fields:
             raise NotFound(f'Model "{model_name}" not found')
 
-        # Usa o método _get_model_class que já existe e tem o mapeamento correto
         model = self._get_model_class(model_name)
 
         if model is None:
             raise NotFound(f'Model "{model_name}" not found')
 
-        # Constrói a query base COM FILTRO DE PROJETO
         queryset = model.objects.all()
 
-        # Aplica filtro específico para cada modelo
         if model_name == "sectors":
             queryset = queryset.filter(project=project)
         elif model_name == "queues":
@@ -606,7 +576,7 @@ class ReportFieldsValidatorViewSet(APIView):
 
     def _process_model_fields(self, model_name, field_data, project, available_fields):
         """
-        Processa os campos de um modelo e suas relações
+        Process the fields of a model and its relationships
         """
         if model_name not in available_fields:
             raise NotFound(f'Model "{model_name}" not found')
@@ -617,23 +587,19 @@ class ReportFieldsValidatorViewSet(APIView):
 
         for key, value in field_data.items():
             if key == "fields" and isinstance(value, list):
-                # Permite campos diretos E lookups (campo__subcampo)
                 invalid_fields = []
                 for field in value:
-                    # Aceita campos diretos
                     if field in model_fields:
                         continue
-                    # Aceita lookups simples
                     if "__" in field:
                         base_field = field.split("__")[0]
                         if base_field in model_fields:
                             continue
-                    # Campo inválido
                     invalid_fields.append(field)
 
                 if invalid_fields:
                     raise NotFound(
-                        f'Campos inválidos para {model_name}: {", ".join(invalid_fields)}'
+                        f'Invalid fields for {model_name}: {", ".join(invalid_fields)}'
                     )
                 query_fields.extend(value)
                 if (
@@ -676,17 +642,13 @@ class ReportFieldsValidatorViewSet(APIView):
                     key, value, project, available_fields
                 )
 
-        # Obtém o queryset base (JÁ FILTRADO POR PROJETO)
         base_queryset = self._get_base_queryset(model_name, project)
 
-        # [NOVO] Filtro por lista de uuids (genérico por modelo)
         uuids = field_data.get("uuids")
         if isinstance(uuids, list) and uuids:
-            # "__all__" => não aplica filtro
             if "__all__" not in uuids:
                 base_queryset = base_queryset.filter(uuid__in=uuids)
 
-        # [NOVO] Filtros específicos de rooms: open_chats/closed_chats
         if model_name == "rooms":
             open_chats = field_data.get("open_chats")
             closed_chats = field_data.get("closed_chats")
@@ -730,16 +692,15 @@ class ReportFieldsValidatorViewSet(APIView):
                         base_queryset = base_queryset.filter(
                             created_on__range=[start_dt, end_dt]
                         )
-                except Exception as _:
+                except Exception:
                     pass
 
-        # [NOVO] Filtros globais aplicados somente a rooms (sector/queue/agent/tags)
         if model_name == "rooms":
 
             def _norm_list(value):
                 """
                 Accepts: list/tuple/set, single str/uuid, dicts like {'uuids': [...]} or {'uuid': '...'}.
-                Returns: flat list[str]. Se contiver "__all__", ignora o filtro (retorna []).
+                Returns: flat list[str]. If contains "__all__", ignore the filter (return []).
                 """
                 if value is None:
                     return []
@@ -753,7 +714,6 @@ class ReportFieldsValidatorViewSet(APIView):
                                 out.append(str(item["value"]))
                         else:
                             out.append(str(item))
-                    # Se qualquer item é "__all__", não filtra
                     if any(str(x).strip() == "__all__" for x in out):
                         return []
                     return out
@@ -787,7 +747,6 @@ class ReportFieldsValidatorViewSet(APIView):
             if tags:
                 base_queryset = base_queryset.filter(tags__name__in=tags)
 
-        # Aplica os campos selecionados
         if query_fields:
             if model_name == "rooms" and "tags" in query_fields:
                 base_queryset = base_queryset.annotate(
@@ -796,52 +755,41 @@ class ReportFieldsValidatorViewSet(APIView):
                 query_fields = ["tags_list" if f == "tags" else f for f in query_fields]
             base_queryset = base_queryset.values(*query_fields)
 
-        # NÃO aplica filtros genéricos com OR - o filtro já foi aplicado em _get_base_queryset
-
         return {"queryset": base_queryset, "related": related_queries}
 
     def _group_duplicate_records(self, raw_data):
         """
-        Agrupa registros duplicados causados por lookups de relações Many-to-Many ou ForeignKey reverso
+        Group duplicate records caused by Many-to-Many or ForeignKey reverse lookups
         """
         if not raw_data:
             return []
 
-        # Identifica campos de agrupamento (campos sem __)
         sample_row = raw_data[0]
         group_fields = [key for key in sample_row.keys() if "__" not in key]
         lookup_fields = [key for key in sample_row.keys() if "__" in key]
 
-        # Se não há campos de agrupamento ou lookups, retorna os dados originais
         if not group_fields or not lookup_fields:
             return raw_data
 
-        # Agrupa os registros
         grouped_data = {}
 
         for row in raw_data:
-            # Cria chave de agrupamento baseada nos campos diretos
             group_key = tuple(row.get(field) for field in group_fields)
 
             if group_key not in grouped_data:
-                # Primeiro registro do grupo - inicializa com campos diretos
                 grouped_data[group_key] = {
                     field: row.get(field) for field in group_fields
                 }
-                # Inicializa listas para campos com lookup
                 for field in lookup_fields:
                     grouped_data[group_key][field] = []
 
-            # Adiciona valores dos campos com lookup às listas
             for field in lookup_fields:
                 value = row.get(field)
                 if value is not None and value not in grouped_data[group_key][field]:
                     grouped_data[group_key][field].append(value)
 
-        # Converte de volta para lista de dicionários
         result = list(grouped_data.values())
 
-        # Para campos com apenas um valor na lista, desempacota
         for row in result:
             for field in lookup_fields:
                 if len(row[field]) == 1:
@@ -859,10 +807,8 @@ class ReportFieldsValidatorViewSet(APIView):
 
         if "queryset" in query_data:
             try:
-                # Executa a query
                 raw_data = list(query_data["queryset"])
 
-                # Detecta se há campos com lookups que podem causar duplicação
                 has_lookups = (
                     any("__" in str(key) for row in raw_data[:1] for key in row.keys())
                     if raw_data
@@ -870,7 +816,6 @@ class ReportFieldsValidatorViewSet(APIView):
                 )
 
                 if has_lookups and raw_data:
-                    # Agrupa registros duplicados causados por lookups
                     result["data"] = self._group_duplicate_records(raw_data)
                 else:
                     result["data"] = raw_data
@@ -886,18 +831,16 @@ class ReportFieldsValidatorViewSet(APIView):
 
     def _generate_report_data(self, data, project):
         """
-        Método interno para gerar os dados do relatório
+        Internal method to generate the report data
         """
         available_fields = ModelFieldsPresenter.get_models_info()
 
-        # Processa cada modelo e seus campos
         queries = {}
         for model_name, field_data in data.items():
             queries[model_name] = self._process_model_fields(
                 model_name, field_data, project, available_fields
             )
 
-        # Executa as queries e formata o resultado
         report_data = {}
         for model_name, query_data in queries.items():
             report_data[model_name] = self._execute_queries(query_data)
@@ -905,19 +848,35 @@ class ReportFieldsValidatorViewSet(APIView):
         return report_data
 
     def post(self, request):
+
         project_uuid = request.data.get("project_uuid")
         if not project_uuid:
             raise ValidationError({"project_uuid": "This field is required."})
 
         project = get_object_or_404(Project, uuid=project_uuid)
 
+        active_exists = ReportStatus.objects.filter(
+            project=project,
+            status__in=["pending", "processing"],
+        ).exists()
+
+        if active_exists:
+            return Response(
+                {
+                    "error": {
+                        "code": "max_report_limit",
+                        "message": "Report in progress, please wait for it to finish or cancel it",
+                        "limit": 1,
+                    }
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         try:
-            # Reconstrói o fields_config a partir do payload (sem project_uuid)
             fields_config = {
                 k: v for k, v in request.data.items() if k != "project_uuid"
             }
 
-            # [NOVO] Extrai flags de nível raiz e normaliza para bool
             def _is_true(v):
                 if isinstance(v, bool):
                     return v
@@ -930,21 +889,17 @@ class ReportFieldsValidatorViewSet(APIView):
             open_chats = _is_true(fields_config.pop("open_chats", None))
             closed_chats = _is_true(fields_config.pop("closed_chats", None))
             file_type = fields_config.pop("type", None)
-            # Data range no root (aplicado apenas em rooms)
             root_start_date = fields_config.pop("start_date", None)
             root_end_date = fields_config.pop("end_date", None)
 
-            # Propaga flags (sempre normalizados) para rooms
             if "rooms" in fields_config and isinstance(fields_config["rooms"], dict):
                 fields_config["rooms"]["open_chats"] = open_chats
                 fields_config["rooms"]["closed_chats"] = closed_chats
-                # Propaga datas para rooms se não vierem dentro de rooms
                 if root_start_date and "start_date" not in fields_config["rooms"]:
                     fields_config["rooms"]["start_date"] = root_start_date
                 if root_end_date and "end_date" not in fields_config["rooms"]:
                     fields_config["rooms"]["end_date"] = root_end_date
 
-            # Propaga filtros globais (sector/queue/agent/tags) somente para rooms
             root_sectors = request.data.get("sectors") or request.data.get("sector")
             root_queues = request.data.get("queues") or request.data.get("queue")
             root_agents = request.data.get("agents") or request.data.get("agent")
@@ -962,34 +917,12 @@ class ReportFieldsValidatorViewSet(APIView):
             if root_tags is not None:
                 fields_config["rooms"]["tags"] = root_tags
 
-            # Mantém apenas rooms no relatório (as outras “abas” viram somente filtros)
             fields_config = {"rooms": fields_config.get("rooms", {})}
 
-            # Estima o tempo de execução
             estimated_time = self._estimate_execution_time(fields_config, project)
 
-            # Limite: só 1 relatório ativo (pending|processing) por projeto
-            active_exists = ReportStatus.objects.filter(
-                project=project,
-                status__in=["pending", "processing"],
-            ).exists()
-
-            if active_exists:
-                return Response(
-                    {
-                        "error": {
-                            "code": "max_report_limit",
-                            "message": "Report in progress, please wait for it to finish or cancel it",
-                            "limit": 1,
-                        }
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            # Reinsere 'type' para ser persistido no ReportStatus
             if file_type:
                 fields_config["type"] = file_type
-            # Cria o objeto de status (pendente)
             report_status = ReportStatus.objects.create(
                 project=project, user=request.user, fields_config=fields_config
             )
@@ -1003,7 +936,7 @@ class ReportFieldsValidatorViewSet(APIView):
             return Response(
                 {
                     "time_request": f"{minutes}min",
-                    "uuid_relatorio": str(report_status.uuid),
+                    "report_uuid": str(report_status.uuid),
                 },
                 status=status.HTTP_200_OK,
             )
@@ -1016,7 +949,6 @@ class ReportFieldsValidatorViewSet(APIView):
             raise ValidationError({"project_uuid": "This field is required."})
 
         project = get_object_or_404(Project, uuid=project_uuid)
-        # Se o projeto nunca concluiu uma exportação, retornar READY
         has_completed_export = ReportStatus.objects.filter(
             project=project, status="completed"
         ).exists()
@@ -1025,7 +957,7 @@ class ReportFieldsValidatorViewSet(APIView):
                 {
                     "status": "READY",
                     "email": None,
-                    "uuid_relatorio": None,
+                    "report_uuid": None,
                 },
                 status=status.HTTP_200_OK,
             )
@@ -1044,8 +976,8 @@ class ReportFieldsValidatorViewSet(APIView):
         return Response(
             {
                 "status": status_map.get(report_status.status, "PENDING"),
-                "email": report_status.user.email if report_status.user.pk else None,
-                "uuid_relatorio": str(report_status.uuid),
+                "email": report_status.user.email,
+                "report_uuid": str(report_status.uuid),
             },
             status=status.HTTP_200_OK,
         )
