@@ -449,5 +449,6 @@ class RoomNoteSerializer(serializers.ModelSerializer):
     def get_user(self, obj):
         return {
             "uuid": str(obj.user.pk),
-            "name": obj.user.full_name
+            "name": obj.user.full_name,
+            "email": obj.user.email,
         }
