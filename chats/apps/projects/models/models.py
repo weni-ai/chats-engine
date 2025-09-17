@@ -1,10 +1,10 @@
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import (
     MultipleObjectsReturned,
     ObjectDoesNotExist,
     ValidationError,
 )
-from django.conf import settings
 from django.db import IntegrityError, models, transaction
 from django.db.models import Q, UniqueConstraint
 from django.utils.translation import gettext_lazy as _
@@ -657,3 +657,37 @@ class CustomStatus(BaseModel):
                     "you can't have more than one active status per project."
                 )
             raise
+
+
+class AgentDisconnectLog(BaseModel):
+    """
+    Audit log for supervisor-enforced agent disconnections.
+    """
+
+    project = models.ForeignKey(
+        "projects.Project",
+        related_name="agent_disconnect_logs",
+        verbose_name=_("project"),
+        on_delete=models.CASCADE,
+    )
+    agent = models.ForeignKey(
+        User,
+        related_name="agent_disconnected_logs",
+        verbose_name=_("agent"),
+        on_delete=models.CASCADE,
+        to_field="email",
+    )
+    disconnected_by = models.ForeignKey(
+        User,
+        related_name="agent_disconnect_actions",
+        verbose_name=_("disconnected by"),
+        on_delete=models.CASCADE,
+        to_field="email",
+    )
+
+    def __str__(self) -> str:
+        return f"{self.project.name}: {self.agent.email} disconnected by {self.disconnected_by.email}"
+
+    class Meta:
+        verbose_name = "Agent Disconnect Log"
+        verbose_name_plural = "Agent Disconnect Logs"

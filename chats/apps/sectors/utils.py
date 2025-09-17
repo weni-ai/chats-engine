@@ -20,9 +20,6 @@ class WorkingHoursValidator:
     Checks configurable holidays, static holidays, weekends and closed days.
     """
 
-    def __init__(self):
-        self.cache_client = CacheClient()
-
     def validate_working_hours(self, sector, created_on):
         """
         Main method for working hours validation.
@@ -91,7 +88,8 @@ class WorkingHoursValidator:
         Search for holiday with 5 minute cache (simple and effective)
         """
         cache_key = f"holiday:{sector_uuid}:{date}"
-        cached_result = self.cache_client.get(cache_key)
+        cache_client = CacheClient()
+        cached_result = cache_client.get(cache_key)
 
         if cached_result is not None:
             if cached_result == "null":
@@ -117,10 +115,10 @@ class WorkingHoursValidator:
                 else None,
                 "description": holiday.description,
             }
-            self.cache_client.set(cache_key, json.dumps(holiday_data), ex=300)
+            cache_client.set(cache_key, json.dumps(holiday_data), ex=300)
             return holiday_data
         else:
-            self.cache_client.set(cache_key, "null", ex=300)
+            cache_client.set(cache_key, "null", ex=300)
             return None
 
     def _check_static_holidays_fast(
