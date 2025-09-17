@@ -12,13 +12,11 @@ from django.core.mail import EmailMessage
 from django.db import transaction
 
 from chats.apps.dashboard.models import ReportStatus, RoomMetrics
-from chats.apps.dashboard.utils import calculate_response_time
-from chats.apps.projects.models import Project
-from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.dashboard.utils import (
     calculate_last_queue_waiting_time,
     calculate_response_time,
 )
+from chats.apps.projects.models import Project
 from chats.apps.rooms.models import Room
 from chats.celery import app
 
