@@ -860,7 +860,7 @@ class RoomViewset(
         # Create a blank message to attach the internal note
         msg = Message.objects.create(
             room=room,
-            user=None,
+            user=request.user,
             contact=None,
             text="",
         )
