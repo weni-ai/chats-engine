@@ -70,7 +70,7 @@ class SectorSerializer(serializers.ModelSerializer):
         automatic_message = data.get("automatic_message")
 
         if automatic_message:
-            if not is_feature_active(
+            if automatic_message.get("is_active", False) and not is_feature_active(
                 settings.AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY,
                 self.context["request"].user,
                 data.get("project"),

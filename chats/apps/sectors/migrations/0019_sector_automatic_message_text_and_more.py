@@ -6,18 +6,22 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sectors', '0018_remove_sectorholiday_unique_sector_holiday_and_more'),
+        ("sectors", "0018_remove_sectorholiday_unique_sector_holiday_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='sector',
-            name='automatic_message_text',
-            field=models.TextField(blank=True, null=True, verbose_name='automatic message text'),
+            model_name="sector",
+            name="automatic_message_text",
+            field=models.TextField(
+                blank=True, null=True, verbose_name="automatic message text"
+            ),
         ),
         migrations.AddField(
-            model_name='sector',
-            name='is_automatic_message_active',
-            field=models.BooleanField(default=False, verbose_name='is automatic message active?'),
+            model_name="sector",
+            name="is_automatic_message_active",
+            field=models.BooleanField(
+                default=False, verbose_name="is automatic message active?"
+            ),
         ),
     ]
