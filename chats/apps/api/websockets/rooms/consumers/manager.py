@@ -1,13 +1,24 @@
+import logging
+import time
 import uuid
 
 from channels.db import database_sync_to_async
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 
+from chats.apps.api.v1.prometheus.metrics import (
+    ws_active_connections,
+    ws_connection_duration,
+    ws_connections_total,
+    ws_disconnects_total,
+)
 from chats.apps.api.websockets.rooms.consumers.agent import AgentRoomConsumer
+
+logger = logging.getLogger(__name__)
 
 
 class ManagerAgentRoomConsumer(AgentRoomConsumer):
+    CONSUMER_TYPE = "manager_agent"
     """
     Agent side of the chat
     """
@@ -23,6 +34,7 @@ class ManagerAgentRoomConsumer(AgentRoomConsumer):
         self.permission = None
         self.connection_id = uuid.uuid4()
         UserModel = None
+        self._start_time = time.time()
 
         try:
             self.user = self.scope["user"]
@@ -43,7 +55,7 @@ class ManagerAgentRoomConsumer(AgentRoomConsumer):
                 user_email = self.scope["query_params"].get("user_email")[0]
                 is_manager = await self.check_is_manager()
                 if user_email and UserModel and is_manager:
-                    self.user = await UserModel.objects.aget(email=user_email)
+                    self.user = await database_sync_to_async(UserModel.objects.get)(email=user_email)
                     self.permission = await self.get_permission()
                 else:
                     close = True
@@ -53,19 +65,26 @@ class ManagerAgentRoomConsumer(AgentRoomConsumer):
                 await self.close()  # TODO validate if the code continues from this or if it stops here
             else:
                 await self.accept()
+                try:
+                    ws_connections_total.labels(consumer=self.CONSUMER_TYPE).inc()
+                    ws_active_connections.labels(consumer=self.CONSUMER_TYPE).inc()
+                except Exception as e:
+                    logger.warning(f"Error updating Prometheus metrics: {e}")
                 await self.load_queues()
                 await self.load_user()
                 self.last_ping = timezone.now()
 
     async def disconnect(self, *args, **kwargs):
-        for group in set(self.added_groups):
-            try:
-                await self.channel_layer.group_discard(group, self.channel_name)
-            except AssertionError:
-                pass
-
-        # Finalizar In-Service se necessário
-        await self.finalize_in_service_if_needed()
+        try:
+            ws_active_connections.labels(consumer=self.CONSUMER_TYPE).dec()
+            ws_disconnects_total.labels(consumer=self.CONSUMER_TYPE).inc()
+            if hasattr(self, "_start_time"):
+                ws_connection_duration.labels(consumer=self.CONSUMER_TYPE).observe(
+                    time.time() - self._start_time
+                )
+        except Exception as e:
+            logger.warning(f"Error updating Prometheus metrics: {e}")
+        await super().disconnect(*args, **kwargs)
 
     @database_sync_to_async
     def finalize_in_service_if_needed(self):

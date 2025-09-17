@@ -1,7 +1,11 @@
+import logging
 from typing import TYPE_CHECKING
 from datetime import timedelta
 
 from django.db.models import Q
+from django.utils import timezone
+
+logger = logging.getLogger(__name__)
 
 
 if TYPE_CHECKING:
@@ -53,3 +57,14 @@ def calculate_response_time(room: "Room") -> int:
         total_response_time_sum.total_seconds() / agent_responses_count
     )
     return int(average_response_seconds)
+
+
+def calculate_last_queue_waiting_time(room: "Room"):
+    """
+    Calculate waiting time for a room.
+    """
+
+    if not room.added_to_queue_at:
+        return (timezone.now() - room.created_on).total_seconds()
+
+    return int((timezone.now() - room.added_to_queue_at).total_seconds())

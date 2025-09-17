@@ -2,6 +2,7 @@ from django.db.models import Q
 from django_filters import rest_framework as filters
 
 from chats.apps.rooms.models import Room
+from chats.apps.sectors.models import Sector
 
 
 class RoomFilter(filters.FilterSet):
@@ -23,9 +24,10 @@ class RoomFilter(filters.FilterSet):
         required=True,
         method="filter_project",
     )
-    sector = filters.BaseInFilter(
-        field_name="queue__sector",
+    sector = filters.ModelMultipleChoiceFilter(
         required=False,
+        field_name="queue__sector",
+        queryset=Sector.objects.all(),
     )
     agent = filters.CharFilter(
         field_name="user",

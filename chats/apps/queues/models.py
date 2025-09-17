@@ -1,10 +1,13 @@
 import random
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
+from django.db.models import OuterRef, Q, Subquery
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from chats.apps.projects.models.models import CustomStatus
 from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
 
 from .queue_managers import QueueManager
@@ -24,6 +27,7 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         _("Default queue message"), null=True, blank=True
     )
     objects = QueueManager()
+    all_objects = QueueManager(include_deleted=True)
 
     class Meta:
         verbose_name = _("Sector Queue")
@@ -42,6 +46,9 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
 
     @property
     def limit(self):
+        group_sector = self.sector.group_sectors.filter(is_deleted=False).first()
+        if group_sector:
+            return group_sector.rooms_limit
         return self.sector.rooms_limit
 
     def get_permission(self, user):
@@ -71,13 +78,17 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
             project_permissions__queue_authorizations__role=1,
         )
 
-        # remove agents that have active custom status other than in service
+        custom_status_query = Subquery(
+            CustomStatus.objects.filter(
+                Q(user__id=OuterRef("id"))
+                & Q(is_active=True)
+                & Q(status_type__project=self.sector.project)
+                & ~Q(status_type__name__iexact="in-service")
+            ).values("user__id")
+        )
+
         return agents.exclude(
-            models.Q(
-                user_custom_status__is_active=True,
-                user_custom_status__project=self.sector.project,
-            )
-            & ~models.Q(user_custom_status__status_type__name__iexact="In-service")
+            id__in=custom_status_query
         )  # TODO: Set this variable to ProjectPermission.STATUS_ONLINE
 
     @property

@@ -16,6 +16,14 @@ from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
     get_auth_class,
 )
+from chats.apps.ai_features.history_summary.models import (
+    HistorySummary,
+    HistorySummaryStatus,
+)
+from chats.apps.ai_features.history_summary.tasks import (
+    cancel_history_summary_generation,
+    generate_history_summary,
+)
 from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.external.rooms.serializers import (
     RoomFlowSerializer,
@@ -30,10 +38,10 @@ from chats.apps.queues.utils import (
 )
 from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
+from chats.apps.rooms.utils import create_transfer_json
 from chats.apps.rooms.views import (
     close_room,
     create_room_feedback_message,
-    create_transfer_json,
     get_editable_custom_fields_room,
     update_custom_fields,
     update_flows_custom_fields,
@@ -44,7 +52,7 @@ from .filters import RoomFilter, RoomMetricsFilter
 logger = logging.getLogger(__name__)
 
 
-def add_user_or_queue_to_room(instance, request):
+def add_user_or_queue_to_room(instance: Room, request):
     # TODO Separate this into smaller methods
     user = request.data.get("user_email")
     queue = request.data.get("queue_uuid")
@@ -65,8 +73,9 @@ def add_user_or_queue_to_room(instance, request):
             from_="",
             to=instance.queue,
         )
-    instance.transfer_history = feedback
-    instance.save()
+
+    instance.add_transfer_to_history(feedback)
+
     # Create a message with the transfer data and Send to the room group
     create_room_feedback_message(
         instance, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
@@ -141,6 +150,21 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         serializer = RoomFlowSerializer()
         serializer.process_message_history(room, messages_data)
 
+        if (
+            room.queue.sector.project.has_chats_summary
+            and room.messages.filter(
+                Q(user__isnull=False) | Q(contact__isnull=False)
+            ).exists()
+        ):
+            if not (
+                history_summary := HistorySummary.objects.filter(
+                    room=room, status=HistorySummaryStatus.PENDING
+                ).first()
+            ):
+                history_summary = HistorySummary.objects.create(room=room)
+
+            generate_history_summary.delay(history_summary.uuid)
+
         return Response(status=status.HTTP_201_CREATED)
 
     @transaction.atomic
@@ -188,6 +212,19 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
             create_room_assigned_from_queue_feedback(instance, instance.user)
 
         room.notify_billing()
+
+        if room.queue.sector.project.has_chats_summary:
+            history_summary = HistorySummary.objects.create(room=room)
+
+            if room.messages.filter(
+                Q(user__isnull=False) | Q(contact__isnull=False)
+            ).exists():
+                generate_history_summary.delay(history_summary.uuid)
+
+            else:
+                cancel_history_summary_generation.apply_async(
+                    args=[history_summary.uuid], countdown=30
+                )  # 30 seconds delay
 
     def perform_update(self, serializer):
         serializer.save()
@@ -268,8 +305,8 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
             from_="",
             to=room.user,
         )
-        room.transfer_history = feedback
         room.save()
+        room.add_transfer_to_history(feedback)
 
         room.notify_user("update", user=None)
         room.notify_queue("update")

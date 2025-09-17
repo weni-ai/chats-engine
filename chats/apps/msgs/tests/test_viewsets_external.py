@@ -1,11 +1,12 @@
 from unittest import mock
-from django.urls import reverse
-from rest_framework import status
-from rest_framework.test import APITestCase
-from django.utils import timezone
-from django.utils.timezone import timedelta
+
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
+from django.urls import reverse
+from django.utils import timezone
+from django.utils.timezone import timedelta
+from rest_framework import status
+from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
 from chats.apps.api.utils import create_user_and_token
@@ -191,14 +192,19 @@ class MsgsExternalTests(APITestCase):
         response = self._request_create_message(token=token)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
+    @mock.patch(
+        "chats.apps.api.v1.internal.permissions.ModuleHasPermission.has_permission",
+    )
     def test_cannot_create_external_msgs_with_internal_token_without_can_communicate_internally_perm(
-        self,
+        self, mock_has_permission
     ):
+        mock_has_permission.return_value = False
         user, token = create_user_and_token("test_user")
         self.client.force_authenticate(user)
 
         response = self._request_create_message(token=token)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        mock_has_permission.assert_called_once()
 
     def test_update_external_msgs(self):
         message = self.room.messages.create(
@@ -244,18 +250,33 @@ class MsgsExternalTests(APITestCase):
         response = self._request_update_message(message, data=data, token=token)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    @mock.patch(
+        "chats.apps.api.v1.internal.permissions.ModuleHasPermission.has_permission",
+    )
     def test_cannot_update_external_msgs_with_internal_token_without_can_communicate_internally_perm(
-        self,
+        self, mock_has_permission
     ):
+        mock_has_permission.return_value = False
+        from django_redis import get_redis_connection
+
         message = self.room.messages.create(
             text="test.",
         )
 
-        user, token = create_user_and_token("test_user")
+        import uuid
+
+        unique_username = f"test_user_no_perm_{uuid.uuid4().hex[:8]}"
+        user, token = create_user_and_token(unique_username)
+
+        redis_connection = get_redis_connection()
+        cache_key = f"internal_client_perm:{user.id}"
+        redis_connection.delete(cache_key)
+
         self.client.force_authenticate(user)
 
         response = self._request_update_message(message, data={}, token=token)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        mock_has_permission.assert_called_once()
 
     def test_list_external_msgs(self):
         response = self._request_list_messages()
@@ -274,11 +295,17 @@ class MsgsExternalTests(APITestCase):
         response = self._request_list_messages(token=token)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    @mock.patch(
+        "chats.apps.api.v1.internal.permissions.ModuleHasPermission.has_permission",
+        return_value=False,
+    )
     def test_cannot_list_external_msgs_with_internal_token_without_can_communicate_internally_perm(
-        self,
+        self, mock_has_permission
     ):
+        mock_has_permission.return_value = False
         user, token = create_user_and_token("test_user")
         self.client.force_authenticate(user)
 
         response = self._request_list_messages(token=token)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        mock_has_permission.assert_called_once()

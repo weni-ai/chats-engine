@@ -5,9 +5,10 @@ from rest_framework.test import APITestCase
 
 from chats.apps.contacts.models import Contact
 from chats.apps.projects.models import Project, ProjectPermission
+from chats.apps.projects.models.models import CustomStatus, CustomStatusType
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.rooms.models import Room
-from chats.apps.sectors.models import Sector
+from chats.apps.sectors.models import GroupSector, Sector
 
 User = get_user_model()
 
@@ -275,6 +276,94 @@ class PropertyTests(QueueSetUpMixin, APITestCase):
         self.assertEqual(self.agent_auth.can_list, True)
 
 
+class TestQueueOnlineAgents(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="Test chat Project 1")
+        self.sector = Sector.objects.create(
+            name="Test chat Sector 1",
+            project=self.project,
+            rooms_limit=5,
+            work_start="08:00:00",
+            work_end="17:00:00",
+        )
+        self.queue = Queue.objects.create(name="Q1", sector=self.sector)
+
+        self.agent_1 = create_user("agent1")
+        self.agent_2 = create_user("agent2")
+        self.agent_3 = create_user("agent3")
+
+        for agent in [self.agent_1, self.agent_2, self.agent_3]:
+            agent.project_permissions.create(
+                project=self.project,
+                role=ProjectPermission.ROLE_ATTENDANT,
+                status="ONLINE",
+            )
+            self.queue.authorizations.create(
+                permission=agent.project_permissions.first()
+            )
+
+        self.custom_status_type = CustomStatusType.objects.create(
+            name="Test custom status type",
+            project=self.project,
+        )
+        self.in_service_custom_status_type = CustomStatusType.objects.create(
+            name="In-Service",
+            project=self.project,
+        )
+
+    def test_online_agents_returns_only_online_agents(self):
+        self.assertEqual(self.queue.online_agents.count(), 3)
+        self.agent_1.project_permissions.update(status="OFFLINE")
+        self.assertEqual(self.queue.online_agents.count(), 2)
+        self.assertNotIn(self.agent_1, self.queue.online_agents)
+
+    def test_online_agents_deleting_queue_authorization_removes_agent_from_online_agents(
+        self,
+    ):
+        self.assertEqual(self.queue.online_agents.count(), 3)
+        self.queue.authorizations.filter(
+            permission=self.agent_1.project_permissions.first()
+        ).delete()
+        self.assertEqual(self.queue.online_agents.count(), 2)
+        self.assertNotIn(self.agent_1, self.queue.online_agents)
+
+    def test_online_agents_returns_agents_with_active_custom_status(self):
+        custom_status = CustomStatus.objects.create(
+            user=self.agent_1,
+            status_type=self.custom_status_type,
+            is_active=True,
+        )
+        self.assertEqual(self.queue.online_agents.count(), 2)
+        self.assertNotIn(self.agent_1, self.queue.online_agents)
+
+        custom_status.is_active = False
+        custom_status.save(update_fields=["is_active"])
+        self.assertEqual(self.queue.online_agents.count(), 3)
+        self.assertIn(self.agent_1, self.queue.online_agents)
+
+    def test_online_agents_returns_agents_with_in_service_custom_status(self):
+        CustomStatus.objects.create(
+            user=self.agent_1,
+            status_type=self.in_service_custom_status_type,
+            is_active=True,
+        )
+        self.assertEqual(self.queue.online_agents.count(), 3)
+        self.assertIn(self.agent_1, self.queue.online_agents)
+
+        custom_status = CustomStatus.objects.create(
+            user=self.agent_1,
+            status_type=self.custom_status_type,
+            is_active=True,
+        )
+        self.assertEqual(self.queue.online_agents.count(), 2)
+        self.assertNotIn(self.agent_1, self.queue.online_agents)
+
+        custom_status.is_active = False
+        custom_status.save(update_fields=["is_active"])
+        self.assertEqual(self.queue.online_agents.count(), 3)
+        self.assertIn(self.agent_1, self.queue.online_agents)
+
+
 class TestQueueGetAvailableAgent(TestCase):
     def setUp(self):
         self.project = Project.objects.create(name="Test chat Project 1")
@@ -397,3 +486,60 @@ class TestQueueGetAvailableAgent(TestCase):
             picked_agents_set,
             "Agent 3 was never picked, suggesting non-random selection.",
         )
+
+
+class QueueLimitPropertyTestCase(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=5,
+            work_start="08:00:00",
+            work_end="17:00:00",
+        )
+        self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
+
+    def test_limit_returns_sector_rooms_limit_when_no_group(self):
+        """
+        Verify if limit returns sector rooms_limit when sector is not in any group
+        """
+        self.assertEqual(self.queue.limit, 5)
+
+    def test_limit_returns_group_rooms_limit_when_sector_in_active_group(self):
+        """
+        Verify if limit returns group rooms_limit when sector is in an active group
+        """
+        group_sector = GroupSector.objects.create(
+            name="Test Group", project=self.project, rooms_limit=10, is_deleted=False
+        )
+        group_sector.sectors.add(self.sector)
+
+        self.assertEqual(self.queue.limit, 10)
+
+    def test_limit_returns_sector_rooms_limit_when_group_is_deleted(self):
+        """
+        Verify if limit returns sector rooms_limit when group is deleted
+        """
+        group_sector = GroupSector.objects.create(
+            name="Test Group", project=self.project, rooms_limit=15, is_deleted=True
+        )
+        group_sector.sectors.add(self.sector)
+
+        self.assertEqual(self.queue.limit, 5)
+
+    def test_limit_with_multiple_groups_only_active_considered(self):
+        """
+        Verify if limit considers only active groups when sector has multiple group relations
+        """
+        deleted_group = GroupSector.objects.create(
+            name="Deleted Group", project=self.project, rooms_limit=20, is_deleted=True
+        )
+        active_group = GroupSector.objects.create(
+            name="Active Group", project=self.project, rooms_limit=12, is_deleted=False
+        )
+
+        deleted_group.sectors.add(self.sector)
+        active_group.sectors.add(self.sector)
+
+        self.assertEqual(self.queue.limit, 12)

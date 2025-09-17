@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import pendulum
 from django.utils import timezone
@@ -20,7 +20,7 @@ from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import close_room
-
+from chats.apps.sectors.utils import working_hours_validator
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +119,9 @@ def get_room_user(
         # will be assigned to the them. This logic is not done here.
         return None
 
+    if queue.rooms.filter(is_active=True, user__isnull=True).exists():
+        return None
+
     # General room routing type
     return queue.get_available_agent()
 
@@ -153,6 +156,8 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
     tags = TagSimpleSerializer(many=True, required=False)
     interaction_time = serializers.IntegerField(source="metric.interaction_time")
     contact_external_id = serializers.CharField(source="contact.external_id")
+    protocol = serializers.CharField(read_only=True)
+    callid = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -166,6 +171,8 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
             "user_assigned_at",
             "first_user_message",
             "tags",
+            "protocol",
+            "callid",
         ]
 
     def get_user_name(self, obj):
@@ -183,6 +190,11 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
             )
             return msg_date.isoformat()
         return None
+
+    def get_callid(self, obj: Room) -> Optional[str]:
+        custom_fields = obj.custom_fields or {}
+
+        return custom_fields.get("callid", None)
 
 
 class ProjectInfoSerializer(serializers.Serializer):
@@ -264,12 +276,11 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         extra_kwargs = {"queue": {"required": False, "read_only": True}}
 
     def validate(self, attrs):
+        # Mantém somente limpeza de project_info; validação de horário ocorre em create()
         attrs["config"] = self.initial_data.get("project_info", {})
-
         if "project_info" in attrs:
             attrs.pop("project_info")
-
-        return super().validate(attrs)
+        return attrs
 
     def create(self, validated_data):
         history_data = validated_data.pop("history", [])
@@ -277,8 +288,15 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         queue, sector = self.get_queue_and_sector(validated_data)
         project = sector.project
 
-        created_on = validated_data.get("created_on", timezone.now().time())
-        protocol = validated_data.get("custom_fields", {}).pop("protocol", None)
+        created_on = self.initial_data.get(
+            "created_on", validated_data.get("created_on", timezone.now())
+        )
+
+        protocol = validated_data.pop("protocol", None)
+
+        if protocol in (None, ""):
+            protocol = validated_data.get("custom_fields", {}).pop("protocol", None)
+
         service_chat = validated_data.get("custom_fields", {}).pop(
             "service_chats", None
         )
@@ -294,6 +312,24 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         room = get_active_room_flow_start(contact, flow_uuid, project)
 
         if room is not None:
+            update_fields = []
+
+            if "callback_url" in self.initial_data:
+                new_callback_url = validated_data.get("callback_url")
+                if new_callback_url is not None:
+                    room.callback_url = new_callback_url
+                    update_fields.append("callback_url")
+
+            if "ticket_uuid" in self.initial_data:
+                new_ticket_uuid = validated_data.get("ticket_uuid")
+                if new_ticket_uuid is not None:
+                    room.ticket_uuid = new_ticket_uuid
+                    update_fields.append("ticket_uuid")
+
+            if update_fields:
+                room.request_callback(room.serialized_ws_data)
+                room.save(update_fields=update_fields)
+
             if history_data:
                 self.process_message_history(room, history_data)
             return room
@@ -320,7 +356,6 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         if history_data:
             self.process_message_history(room, history_data)
-
         return room
 
     def validate_unique_active_project(self, contact, project):
@@ -346,30 +381,70 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             )
 
     def get_queue_and_sector(self, validated_data):
-        try:
-            queue = validated_data.pop("queue", None)
-            sector = validated_data.pop("sector_uuid", None) or queue.sector
-        except AttributeError:
+        """
+        Resolve sempre a queue e usa seu setor; se sector_uuid também vier, garante consistência.
+        """
+        queue = validated_data.pop(
+            "queue", None
+        )  # já vem instanciada pelo PrimaryKeyRelatedField
+        provided_sector_uuid = validated_data.pop("sector_uuid", None)
+
+        if queue is None and provided_sector_uuid is None:
             raise ValidationError(
                 {"detail": _("Cannot create a room without queue_uuid or sector_uuid")}
             )
 
         if queue is None:
-            queue = Queue.objects.filter(sector__uuid=sector, is_deleted=False).first()
+            queue = Queue.objects.filter(
+                sector__uuid=provided_sector_uuid, is_deleted=False
+            ).first()
+            if queue is None:
+                raise ValidationError(
+                    {"detail": _("No active queue found for provided sector_uuid")}
+                )
 
         sector = queue.sector
+        if provided_sector_uuid and str(provided_sector_uuid) != str(sector.uuid):
+            raise ValidationError(
+                {"detail": _("queue_uuid does not belong to provided sector_uuid")}
+            )
 
         return queue, sector
 
     def check_work_time(self, sector, created_on):
-        if not sector.is_attending(created_on):
-            raise ValidationError(
-                {"detail": _("Contact cannot be done outside working hours")}
-            )
-        elif sector.validate_agent_status() is False:
+        """
+        Validate using sector.working_day['working_hours'] exclusively.
+        """
+        if isinstance(created_on, str):
+            created_on_dt = pendulum.parse(created_on)
+        else:
+            created_on_dt = pendulum.instance(created_on)
+
+        project_tz = pendulum.timezone(str(sector.project.timezone))
+        created_on_dt = (
+            project_tz.localize(created_on_dt)
+            if created_on_dt.tzinfo is None
+            else created_on_dt.in_timezone(project_tz)
+        )
+
+        # Working hours validation (raises ValidationError when blocked)
+        try:
+            working_hours_validator.validate_working_hours(sector, created_on_dt)
+        except ValidationError as e:
+            raise serializers.ValidationError({"detail": e.detail})
+
+        # Agent status validation unchanged
+        if sector.validate_agent_status() is False:
             raise ValidationError(
                 {"detail": _("Contact cannot be done when agents are offline")}
             )
+
+    def check_work_time_weekend(self, sector, created_on):
+        """
+        Verify if the sector allows room opening at the specified time.
+        Uses the WorkingHoursValidator utility for optimized validation.
+        """
+        working_hours_validator.validate_working_hours(sector, created_on)
 
     def handle_urn(self, validated_data):
         is_anon = validated_data.pop("is_anon", False)

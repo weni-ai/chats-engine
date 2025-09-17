@@ -3,7 +3,12 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from chats.apps.api.v1.accounts.serializers import UserSerializer
-from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
+from chats.apps.sectors.models import (
+    Sector,
+    SectorAuthorization,
+    SectorHoliday,
+    SectorTag,
+)
 
 User = get_user_model()
 
@@ -12,18 +17,25 @@ class SectorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Sector
         fields = "__all__"
+        extra_kwargs = {
+            "work_start": {"required": False, "allow_null": True},
+            "work_end": {"required": False, "allow_null": True},
+        }
 
     def validate(self, data):
         """
         Check if the work_end date its greater than work_start date.
         """
-        if self.instance:
-            if self.instance.work_end < self.instance.work_start:
-                raise serializers.ValidationError(
-                    {"detail": _("work_end date must be greater than work_start date.")}
-                )
-        else:
-            if data["work_end"] < data["work_start"]:
+        start = data.get(
+            "work_start",
+            getattr(self.instance, "work_start", None) if self.instance else None,
+        )
+        end = data.get(
+            "work_end",
+            getattr(self.instance, "work_end", None) if self.instance else None,
+        )
+        if start is not None and end is not None:
+            if end <= start:
                 raise serializers.ValidationError(
                     {"detail": _("work_end date must be greater than work_start date.")}
                 )
@@ -49,10 +61,12 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         config = validated_data.pop("config", None)
         sector = super().update(instance, validated_data)
-        if config:
+
+        if config is not None:
             sector.config = sector.config or {}
             sector.config.update(config)
-            sector.save()
+            sector.save(update_fields=["config"])
+
         return sector
 
 
@@ -195,3 +209,104 @@ class SectorAgentsSerializer(serializers.ModelSerializer):
             "photo_url",
             "language",
         ]
+
+
+class SectorHolidaySerializer(serializers.ModelSerializer):
+    """
+    Serializer to manage configurable holidays and special days by sector
+    """
+
+    class Meta:
+        model = SectorHoliday
+        fields = [
+            "uuid",
+            "sector",
+            "date",
+            "date_end",
+            "day_type",
+            "start_time",
+            "end_time",
+            "description",
+            "its_custom",
+            "repeat",
+            "created_on",
+            "modified_on",
+            "its_custom",
+        ]
+        read_only_fields = ["uuid", "created_on", "modified_on"]
+
+    def validate(self, data):
+        """
+        Custom validations to ensure data consistency
+        """
+        day_type = data.get("day_type")
+        start_time = data.get("start_time")
+        end_time = data.get("end_time")
+
+        if day_type == SectorHoliday.CLOSED:
+            if start_time is not None or end_time is not None:
+                raise serializers.ValidationError(
+                    {"detail": _("Closed days should not have start_time or end_time")}
+                )
+
+        elif day_type == SectorHoliday.CUSTOM_HOURS:
+            if start_time is None or end_time is None:
+                raise serializers.ValidationError(
+                    {
+                        "detail": _(
+                            "Custom hours days must have both start_time and end_time"
+                        )
+                    }
+                )
+            if start_time >= end_time:
+                raise serializers.ValidationError(
+                    {"detail": _("End time must be greater than start time")}
+                )
+
+        return data
+
+    def to_representation(self, instance):
+        """
+        Renderiza `date` como objeto {start, end} quando `date_end` existir,
+        senão string 'YYYY-MM-DD'.
+        """
+        data = super().to_representation(instance)
+        start = instance.date.strftime("%Y-%m-%d")
+        if instance.date_end:
+            end = instance.date_end.strftime("%Y-%m-%d")
+            data["date"] = {"start": start, "end": end}
+        else:
+            data["date"] = start
+        data.pop("date_end", None)
+        return data
+
+
+class SectorHolidayListSerializer(serializers.ModelSerializer):
+    """
+    Serializer simplificado para listagem de holidays
+    """
+
+    class Meta:
+        model = SectorHoliday
+        fields = [
+            "uuid",
+            "date",
+            "date_end",
+            "day_type",
+            "start_time",
+            "end_time",
+            "description",
+            "its_custom",
+            "repeat",
+        ]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        start = instance.date.strftime("%Y-%m-%d")
+        if instance.date_end:
+            end = instance.date_end.strftime("%Y-%m-%d")
+            data["date"] = {"start": start, "end": end}
+        else:
+            data["date"] = start
+        data.pop("date_end", None)
+        return data

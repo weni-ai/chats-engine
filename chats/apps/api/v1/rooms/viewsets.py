@@ -7,20 +7,20 @@ from django.db.models import (
     BooleanField,
     Case,
     Count,
+    DateTimeField,
     Max,
     OuterRef,
     Q,
     Subquery,
     When,
-    DateTimeField,
 )
-from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from django.utils.timezone import make_aware
 from django.utils.translation import gettext_lazy as _
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError, NotFound
 from rest_framework.filters import OrderingFilter
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -31,6 +31,10 @@ from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
 )
 from chats.apps.accounts.models import User
+from chats.apps.ai_features.history_summary.models import (
+    HistorySummary,
+    HistorySummaryStatus,
+)
 from chats.apps.api.utils import verify_user_room
 from chats.apps.api.v1 import permissions as api_permissions
 from chats.apps.api.v1.internal.rest_clients.openai_rest_client import OpenAIClient
@@ -39,6 +43,8 @@ from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1.rooms.pagination import RoomListPagination
 from chats.apps.api.v1.rooms.serializers import (
     ListRoomSerializer,
+    RoomHistorySummaryFeedbackSerializer,
+    RoomHistorySummarySerializer,
     PinRoomSerializer,
     RoomInfoSerializer,
     RoomMessageStatusSerializer,
@@ -47,6 +53,7 @@ from chats.apps.api.v1.rooms.serializers import (
     TransferRoomSerializer,
 )
 from chats.apps.dashboard.models import RoomMetrics
+from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
 from chats.apps.msgs.models import Message
 from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
@@ -59,10 +66,10 @@ from chats.apps.rooms.exceptions import (
 from chats.apps.rooms.models import Room, RoomPin
 from chats.apps.rooms.services import RoomsReportService
 from chats.apps.rooms.tasks import generate_rooms_report
+from chats.apps.rooms.utils import create_transfer_json
 from chats.apps.rooms.views import (
     close_room,
     create_room_feedback_message,
-    create_transfer_json,
     get_editable_custom_fields_room,
     update_custom_fields,
     update_flows_custom_fields,
@@ -87,7 +94,7 @@ class RoomViewset(
     filterset_class = room_filters.RoomFilter
     search_fields = ["contact__name", "urn", "protocol", "service_chat"]
     ordering_fields = "__all__"
-    ordering = ["user", "-last_interaction", "created_on"]
+    ordering = ["user", "-last_interaction", "created_on", "added_to_queue_at"]
     pagination_class = RoomListPagination
 
     def get_permissions(self):
@@ -151,7 +158,13 @@ class RoomViewset(
         if isinstance(is_active, str):
             is_active = is_active.lower() == "true"
 
-        if not project or is_active is False:
+        room_status = request.query_params.get("room_status", None)
+
+        if (
+            not project
+            or is_active is False
+            or (room_status is not None and room_status != "ongoing")
+        ):
             filtered_qs = self.filter_queryset(qs)
             return self._get_paginated_response(filtered_qs)
 
@@ -343,8 +356,8 @@ class RoomViewset(
             room_metric.transfer_count += 1
             room_metric.save()
 
-        instance.transfer_history = feedback
         instance.save()
+        instance.add_transfer_to_history(feedback)
 
         # Create a message with the transfer data and Send to the room group
         # TODO separate create message in a function
@@ -471,7 +484,16 @@ class RoomViewset(
         room: Room = self.get_object()
         user: User = request.user
 
+        logger.info(
+            f"[PICK_QUEUE_ROOM] Starting room pick - Room: {room.uuid}, "
+            f"User: {user.email}, Queue: {room.queue.name if room.queue else 'None'}"
+        )
+
         if room.user:
+            logger.warning(
+                f"[PICK_QUEUE_ROOM] Room already assigned - Room: {room.uuid}, "
+                f"Current User: {room.user.email}, Requested User: {user.email}"
+            )
             raise ValidationError(
                 {"detail": _("Room is not queued")}, code="room_is_not_queued"
             )
@@ -483,27 +505,40 @@ class RoomViewset(
             to=user,
         )
 
-        time = timezone.now() - room.modified_on
-        room_metric = RoomMetrics.objects.select_related("room").get_or_create(
-            room=room
-        )[0]
-        room_metric.waiting_time += time.total_seconds()
-        room_metric.queued_count += 1
-        room_metric.save()
+        try:
+            room.user = user
+            room.save()
+            room.add_transfer_to_history(feedback)
 
-        room.user = user
-        room.transfer_history = feedback
-        room.save()
+            room_metric = RoomMetrics.objects.select_related("room").get_or_create(
+                room=room
+            )[0]
+            room_metric.waiting_time += calculate_last_queue_waiting_time(room)
+            room_metric.queued_count += 1
+            room_metric.save()
 
-        create_room_feedback_message(
-            room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
-        )
-        room.notify_queue("update")
-        room.update_ticket()
+            create_room_feedback_message(
+                room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+            )
+            room.notify_queue("update")
 
-        return Response(
-            {"detail": _("Room picked successfully")}, status=status.HTTP_200_OK
-        )
+            # Use async ticket update to avoid blocking the response
+            room.update_ticket_async()
+
+            return Response(
+                {
+                    "detail": _("Room picked successfully"),
+                    "room_uuid": str(room.uuid),
+                },
+                status=status.HTTP_200_OK
+            )
+
+        except Exception as exc:
+            logger.error(
+                f"[PICK_QUEUE_ROOM] Error during room pick - Room: {room.uuid}, "
+                f"User: {user.email}, Error: {str(exc)}"
+            )
+            raise
 
     @action(
         detail=False,
@@ -566,6 +601,7 @@ class RoomViewset(
                 else:
                     room.notify_user("update", user=transfer_user)
                 room.notify_user("update")
+                room.notify_queue("update")
 
                 room.update_ticket()
 
@@ -668,6 +704,85 @@ class RoomViewset(
         return Response(
             RoomInfoSerializer(rooms, many=True).data, status=status.HTTP_200_OK
         )
+
+    @action(detail=True, methods=["get"], url_path="chats-summary")
+    def chats_summary(self, request: Request, pk=None) -> Response:
+        """
+        Get the history summary for a room.
+        """
+        room = self.get_object()
+
+        history_summary = (
+            HistorySummary.objects.filter(room=room).order_by("created_on").last()
+        )
+
+        if not history_summary:
+            return Response(
+                {
+                    "status": HistorySummaryStatus.UNAVAILABLE,
+                    "summary": None,
+                    "feedback": {"liked": None},
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        serializer = RoomHistorySummarySerializer(
+            history_summary, context={"request": request}
+        )
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_name="chats-summary-feedback",
+        url_path="chats-summary/feedback",
+        serializer_class=RoomHistorySummaryFeedbackSerializer,
+    )
+    def chats_summary_feedback(self, request: Request, pk=None) -> Response:
+        """
+        Get the history summary for a room.
+        """
+        room = self.get_object()
+
+        history_summary = (
+            HistorySummary.objects.filter(room=room).order_by("created_on").last()
+        )
+
+        if not history_summary:
+            raise NotFound({"detail": "No history summary found for this room."})
+
+        if history_summary.room.user != request.user:
+            raise PermissionDenied(
+                {"detail": "You are not allowed to give feedback for this room."},
+                code="user_is_not_the_room_user",
+            )
+
+        if history_summary.status != HistorySummaryStatus.DONE:
+            raise ValidationError(
+                {
+                    "detail": "You can only give feedback when the history summary is done."
+                },
+                code="room_history_summary_not_done",
+            )
+
+        serializers_params = {
+            "data": request.data,
+            "context": {"request": request, "history_summary": history_summary},
+        }
+
+        if existing_feedback := history_summary.feedbacks.filter(
+            user=request.user
+        ).first():
+            serializers_params["instance"] = existing_feedback
+
+        serializer = RoomHistorySummaryFeedbackSerializer(
+            **serializers_params,
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(
         detail=True,

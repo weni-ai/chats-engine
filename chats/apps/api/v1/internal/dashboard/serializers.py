@@ -9,6 +9,9 @@ class DashboardAgentsSerializer(serializers.Serializer):
     agent = serializers.SerializerMethodField()
     closed = serializers.IntegerField(allow_null=True, required=False)
     status = serializers.SerializerMethodField()
+    agent_email = serializers.EmailField(
+        source="email", allow_null=True, required=False
+    )
 
     def get_link(self, obj):
         return {
@@ -46,6 +49,9 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
     status = serializers.SerializerMethodField()
     custom_status = serializers.SerializerMethodField()
     in_service_time = serializers.SerializerMethodField()
+    agent_email = serializers.EmailField(
+        source="email", allow_null=True, required=False
+    )
 
     def get_link(self, obj):
         return {

@@ -1,8 +1,24 @@
+from abc import ABC, abstractmethod
+
 from django_redis import get_redis_connection
 from typing import Optional, Any
 
 
-class CacheClient:
+class BaseCacheClient(ABC):
+    @abstractmethod
+    def get(self, key: str) -> Optional[Any]:
+        pass
+
+    @abstractmethod
+    def set(self, key: str, value: Any, ex: Optional[int] = None) -> bool:
+        pass
+
+    @abstractmethod
+    def delete(self, key: str) -> bool:
+        pass
+
+
+class CacheClient(BaseCacheClient):
     def __init__(self) -> None:
         pass
 

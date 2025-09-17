@@ -5,6 +5,10 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from chats.apps.accounts.models import User
+from chats.apps.ai_features.history_summary.models import (
+    HistorySummary,
+    HistorySummaryFeedback,
+)
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactRelationsSerializer
 from chats.apps.api.v1.msgs.serializers import MessageSerializer
@@ -39,6 +43,10 @@ class RoomSerializer(serializers.ModelSerializer):
     can_edit_custom_fields = serializers.SerializerMethodField()
     config = serializers.JSONField(required=False, read_only=True)
     imported_history_url = serializers.CharField(read_only=True, default="")
+    full_transfer_history = serializers.JSONField(
+        required=False, read_only=True, default=list
+    )
+    added_to_queue_at = serializers.DateTimeField(read_only=True)
 
     class Meta:
         model = Room
@@ -53,6 +61,8 @@ class RoomSerializer(serializers.ModelSerializer):
             "last_interaction",
             "can_edit_custom_fields",
             "imported_history_url",
+            "full_transfer_history",
+            "added_to_queue_at",
         ]
 
     def get_is_24h_valid(self, room: Room) -> bool:
@@ -113,6 +123,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
     is_active = serializers.BooleanField(default=True)
     imported_history_url = serializers.CharField(read_only=True, default="")
     is_pinned = serializers.SerializerMethodField()
+    added_to_queue_at = serializers.DateTimeField(read_only=True)
 
     class Meta:
         model = Room
@@ -136,6 +147,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
             "config",
             "imported_history_url",
             "is_pinned",
+            "added_to_queue_at",
         ]
 
     def get_user(self, room: Room):
@@ -301,6 +313,47 @@ class RoomInfoSerializer(serializers.ModelSerializer):
             return first_user_message.created_on
 
         return None
+
+
+class RoomHistorySummarySerializer(serializers.ModelSerializer):
+    feedback = serializers.SerializerMethodField()
+
+    class Meta:
+        model = HistorySummary
+        fields = ["status", "summary", "feedback"]
+
+    def get_feedback(self, history_summary: HistorySummary) -> dict:
+        feedback = history_summary.feedbacks.filter(
+            user=self.context["request"].user
+        ).first()
+
+        if feedback:
+            return {
+                "liked": feedback.liked,
+            }
+
+        return {
+            "liked": None,
+        }
+
+
+class RoomHistorySummaryFeedbackSerializer(serializers.ModelSerializer):
+    text = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True, max_length=150
+    )
+
+    class Meta:
+        model = HistorySummaryFeedback
+        fields = ["liked", "text"]
+
+    def validate(self, attrs):
+        attrs["user"] = self.context["request"].user
+        attrs["history_summary"] = self.context["history_summary"]
+
+        if not attrs.get("text"):
+            attrs["text"] = None
+
+        return super().validate(attrs)
 
 
 class RoomsReportFiltersSerializer(serializers.Serializer):

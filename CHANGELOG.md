@@ -1,3 +1,163 @@
+# 3.25.2
+# Add
+  - Daphne serving ws
+  - User disconnect feature 
+
+# 3.25.1
+## Fix
+  - Fix in holiday cache and constraint
+
+# 3.25.0
+## Add
+  - New feature, working day.
+
+# 3.24.2
+## Fix
+  - updating the ticket uuid field and callback url when a flow is triggered for an already open room
+    
+# 3.24.1
+## Add
+  - releasing status message feature for all projects
+ 
+# 3.24.0
+## Add
+  - Growthbook client
+  - Feature flag service + endpoint
+  - Users feedback
+
+# 3.23.21
+## Add
+  - callid custom field in rooms metrics endpoint
+## Fix
+  - Module has permission broken tests
+
+# 3.23.20
+## Add
+  - Protocol field in rooms metrics endpoint
+  - Configuration to separate websocket pods from engine pods
+  - Configuration to use celery beat
+
+## Fix
+  - Agents list open rooms count for Insights dashboard
+
+# 3.23.19
+## Fix
+  - Race condition in route rooms for queue
+
+# 3.23.18
+## Add
+  - Internal ORM queries with soft-deleted instances
+  - Unit tests for online agents in queue management
+## Fix
+  - Active rooms filtered by multiple sectors in internal endpoint used by Insights
+  - Fix in how get the protocol field when opening rooms, to prevent the protocol field from arriving as an empty string and being saved incorrectly
+
+# 3.23.17
+## Add
+  - Agents management control endpoint
+
+# 3.23.16
+## Fix
+  - Adjust pick queue room logic
+
+# 3.23.15
+## Add
+  - added_to_queue_at ordering filter to the Rooms endpoint
+
+# 3.23.14
+## Fix
+  - Waiting time metric to consider the automatic rooms routing
+
+# 3.23.13
+## Fix
+  - Use queue assignment date to prioritize rooms routing
+
+# 3.23.12
+## Add
+  - More logs and retries in Message and MessageMedia models when sending messages to flows
+
+# 3.23.11
+## Add
+ - Adapting the message consumer to receive new statuses
+    
+# 3.23.10
+## Fix
+ - Correcting the select related for feature flag
+
+# 3.23.9
+## Fix
+ - Resolving bulk update bug
+
+# 3.23.8
+## Add
+ -  Logs in msgs consumer and logging better in celery 
+
+# 3.23.7
+## Add
+ - Removing msgs consumers from project handle
+   
+# 3.23.6
+## Add
+  - Processing status via celery
+    
+# 3.23.5
+## Add
+  - Adding protections to avoid loops and better performance for message consumer.
+    
+# 3.23.4
+## Add
+  - Adding support for rooms_limit in group sector.
+        
+# 3.23.3
+## Fix
+  - Adding livesum in gauge metric
+
+# 3.23.2
+## Fix
+  - Verify if queues or sectors are already integrated before send to flows.
+  - Changing message status to save in is_read/is_delivered fields
+  - Verify if message index exists in chats before try to get status.
+## Add
+  - New field in sector to save working days
+  - Metrics to create websocket dashboard
+
+# 3.23.1
+## Fix
+  - Rooms waiting time metric
+
+# 3.23.0
+## Add
+  - AI-generated chat rooms history summary
+  - Protocol field in new rooms creation
+
+# 3.22.4
+## Add
+  - Websocket notification to all users in the queue when there is a transfer
+  to another user
+## Fix
+  - Rooms list to do not include the pinned rooms logic when the status filter
+  is used and it is not "ongoing"
+
+# 3.22.3
+## Fix
+  - Online agents query to exclude correctly those who have an active custom status,
+  when not called "In-service"
+
+# 3.22.2
+## Add
+  - Automatic room distribution when closing a custom status
+
+# 3.22.1
+## Add
+  - Queue priority as default for all projects
+  - New filters to use in chats chips
+## Fix
+  - Save user and queue identifiers in the feedback tag in rooms' history
+
+# 3.22.0
+## Add
+  - In service feature
+
 # 3.21.4
 ## Add
   - Add missing PermissionDenied import from rooms viewset
@@ -544,3 +704,14 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
+
+
+
+
+
+
+
+
+
+

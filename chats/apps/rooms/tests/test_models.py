@@ -1,8 +1,9 @@
+import time
 import uuid
 
 from django.conf import settings
-from django.db import IntegrityError
 from django.core.exceptions import PermissionDenied
+from django.db import IntegrityError
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APITestCase
@@ -15,6 +16,7 @@ from chats.apps.rooms.exceptions import (
     RoomIsNotActiveError,
 )
 from chats.apps.rooms.models import Room
+from chats.apps.rooms.utils import create_transfer_json
 from chats.apps.sectors.models import Sector
 
 
@@ -208,3 +210,57 @@ class TestRoomModel(TestCase):
 
         room.close()
         self.assertEqual(room.pins.count(), 0)
+
+    def test_add_to_queue_at_field(self):
+        user = User.objects.create(email="a@user.com")
+        room = Room.objects.create(queue=self.queue)
+
+        added_to_queue_at = room.added_to_queue_at
+
+        self.assertEqual(
+            added_to_queue_at.strftime("%Y-%m-%d %H:%M:%S"),
+            room.created_on.strftime("%Y-%m-%d %H:%M:%S"),
+        )
+
+        time.sleep(1)
+
+        room.user = user
+        room.save()
+
+        room.refresh_from_db()
+
+        # added_to_queue_at should not change
+        self.assertEqual(room.added_to_queue_at, added_to_queue_at)
+
+        time.sleep(1)
+
+        room.user = None
+        room.save()
+
+        room.refresh_from_db()
+
+        # added_to_queue_at should change when user is removed
+        # as, in practice, the room is added to the queue
+        self.assertNotEqual(room.added_to_queue_at, added_to_queue_at)
+
+    def test_add_transfer_to_history(self):
+        user = User.objects.create(email="a@user.com")
+        room = Room.objects.create(queue=self.queue)
+        self.assertEqual(room.full_transfer_history, [])
+        feedback = create_transfer_json(
+            action="transfer",
+            from_=room.queue,
+            to=user,
+        )
+        room.add_transfer_to_history(feedback)
+        self.assertEqual(room.full_transfer_history, [feedback])
+        self.assertEqual(room.transfer_history, feedback)
+
+        other_feedback = create_transfer_json(
+            action="transfer",
+            from_=room.queue,
+            to=user,
+        )
+        room.add_transfer_to_history(other_feedback)
+        self.assertEqual(room.full_transfer_history, [feedback, other_feedback])
+        self.assertEqual(room.transfer_history, other_feedback)

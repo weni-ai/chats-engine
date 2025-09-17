@@ -92,7 +92,12 @@ class Room(BaseModel, BaseConfigurableModel):
     is_active = models.BooleanField(_("is active?"), default=True)
     is_waiting = models.BooleanField(_("is waiting for answer?"), default=False)
 
+    # Legacy, only stores the last transfer
     transfer_history = models.JSONField(_("Transfer History"), null=True, blank=True)
+    # New, stores the full transfer history
+    full_transfer_history = models.JSONField(
+        _("Full Transfer History"), null=True, blank=True, default=list
+    )
 
     tags = models.ManyToManyField(
         "sectors.SectorTag",
@@ -108,6 +113,9 @@ class Room(BaseModel, BaseConfigurableModel):
 
     user_assigned_at = models.DateTimeField(
         _("User assigned at"), null=True, blank=True
+    )
+    added_to_queue_at = models.DateTimeField(
+        _("Added to queue at"), null=True, blank=True
     )
 
     tracker = FieldTracker(fields=["user"])
@@ -186,10 +194,16 @@ class Room(BaseModel, BaseConfigurableModel):
         if self.__original_is_active is False:
             raise ValidationError({"detail": _("Closed rooms cannot receive updates")})
 
+        if self._state.adding:
+            self.added_to_queue_at = timezone.now()
+
         user_has_changed = self.pk and self.tracker.has_changed("user")
 
         if self.user and not self.user_assigned_at or user_has_changed:
             self.user_assigned_at = timezone.now()
+
+        if user_has_changed and not self.user:
+            self.added_to_queue_at = timezone.now()
 
         if user_has_changed:
             self.clear_pins()
@@ -440,8 +454,33 @@ class Room(BaseModel, BaseConfigurableModel):
         return not self.is_active or perm.is_manager(any_sector=True)
 
     def update_ticket(self):
+        """
+        Synchronously update ticket assignee.
+        """
         if self.ticket_uuid and self.user:
             FlowRESTClient().update_ticket_assignee(self.ticket_uuid, self.user.email)
+
+    def update_ticket_async(self):
+        """
+        Asynchronously update ticket assignee using Celery task.
+        This method is non-blocking and provides retry functionality.
+        """
+        if self.ticket_uuid and self.user:
+            from chats.apps.rooms.tasks import update_ticket_assignee_async
+
+            task = update_ticket_assignee_async.delay(
+                room_uuid=str(self.uuid),
+                ticket_uuid=self.ticket_uuid,
+                user_email=self.user.email
+            )
+
+            logger.info(
+                f"[ROOM] Launched async ticket update task - Room: {self.uuid}, "
+                f"Ticket: {self.ticket_uuid}, User: {self.user.email}, "
+                f"Task ID: {task.id}"
+            )
+
+            return task
 
     def can_pick_queue(self, user: User) -> bool:
         """
@@ -513,6 +552,14 @@ class Room(BaseModel, BaseConfigurableModel):
         Clears all pins for a room.
         """
         return self.pins.all().delete()
+
+    def add_transfer_to_history(self, transfer: dict):
+        """
+        Adds a transfer to the full transfer history.
+        """
+        self.full_transfer_history.append(transfer)
+        self.transfer_history = transfer  # legacy
+        self.save(update_fields=["full_transfer_history", "transfer_history"])
 
 
 class RoomPin(BaseModel):

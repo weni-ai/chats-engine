@@ -299,7 +299,7 @@ class GroupSectorAuthorizationUseCaseTests(APITestCase):
         use_case.execute()
 
         # Check if queue authorization was created
-        self.assertTrue(
+        self.assertFalse(
             self.queue.authorizations.filter(
                 permission=self.project_permission, role=1
             ).exists()

@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import (
     MultipleObjectsReturned,
@@ -89,7 +90,7 @@ class Project(BaseConfigurableModel, BaseModel):
         null=True,
         blank=True,
         choices=RoomRoutingType.choices,
-        default=RoomRoutingType.GENERAL,
+        default=RoomRoutingType.QUEUE_PRIORITY,
         help_text=_(
             "Whether to route rooms using the queue priority or general routing"
         ),
@@ -234,6 +235,22 @@ class Project(BaseConfigurableModel, BaseModel):
         return sectors.filter(
             Q(sector_auth_filter | queue_auth_filter), **custom_filters
         ).distinct()
+
+    @property
+    def has_chats_summary(self):
+        """
+        Checks if the chat summary feature is enabled for this project.
+
+        The feature is enabled if:
+        1. `settings.AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS` is True, or
+        2. The project-specific configuration "has_chats_summary" is True.
+
+        Returns:
+            bool: True if chat summary is enabled, False otherwise.
+        """
+        return settings.AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS or self.get_config(
+            "has_chats_summary", False
+        )
 
     def is_admin(self, user):
         return self.permissions.filter(
@@ -640,3 +657,37 @@ class CustomStatus(BaseModel):
                     "you can't have more than one active status per project."
                 )
             raise
+
+
+class AgentDisconnectLog(BaseModel):
+    """
+    Audit log for supervisor-enforced agent disconnections.
+    """
+
+    project = models.ForeignKey(
+        "projects.Project",
+        related_name="agent_disconnect_logs",
+        verbose_name=_("project"),
+        on_delete=models.CASCADE,
+    )
+    agent = models.ForeignKey(
+        User,
+        related_name="agent_disconnected_logs",
+        verbose_name=_("agent"),
+        on_delete=models.CASCADE,
+        to_field="email",
+    )
+    disconnected_by = models.ForeignKey(
+        User,
+        related_name="agent_disconnect_actions",
+        verbose_name=_("disconnected by"),
+        on_delete=models.CASCADE,
+        to_field="email",
+    )
+
+    def __str__(self) -> str:
+        return f"{self.project.name}: {self.agent.email} disconnected by {self.disconnected_by.email}"
+
+    class Meta:
+        verbose_name = "Agent Disconnect Log"
+        verbose_name_plural = "Agent Disconnect Logs"

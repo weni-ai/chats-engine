@@ -68,6 +68,10 @@ INSTALLED_APPS = [
     "chats.apps.discussions",
     "chats.apps.feature_version",
     "chats.core",
+    "chats.apps.ai_features",
+    "chats.apps.ai_features.history_summary",
+    "chats.apps.feature_flags",
+    "chats.apps.feedbacks",
     # third party apps
     "channels",
     "drf_yasg",
@@ -209,6 +213,8 @@ if USE_S3:
 
     AWS_QUERYSTRING_AUTH = env.bool("AWS_QUERYSTRING_AUTH", default=True)
     AWS_S3_FILE_OVERWRITE = env.bool("AWS_S3_FILE_OVERWRITE", default=False)
+
+    AWS_BEDROCK_REGION_NAME = env.str("AWS_BEDROCK_REGION_NAME", default="us-east-1")
 
 else:
     MEDIA_URL = "/media/"
@@ -395,8 +401,6 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 
-from celery.schedules import crontab
-
 CELERY_BEAT_SCHEDULE = {
     "process-pending-reports": {
         "task": "process_pending_reports",
@@ -409,6 +413,12 @@ REPORTS_SEND_EMAILS = env.bool("REPORTS_SEND_EMAILS", default=True)
 REPORTS_SAVE_DIR = env.str("REPORTS_SAVE_DIR", default=str(BASE_DIR / "media" / "reports"))
 REPORTS_CHUNK_SIZE = env.int("REPORTS_CHUNK_SIZE", default=5000)
 REPORTS_SAVE_LOCALLY = env.bool("REPORTS_SAVE_LOCALLY", default=False)
+
+# celery beat
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60
+CELERY_BEAT_SCHEDULER = "celery.beat:PersistentScheduler"
+CELERY_BEAT_MAX_LOOP_INTERVAL = 10
 
 # Event Driven Architecture configurations
 
@@ -450,6 +460,20 @@ USE_WS_CONNECTION_CHECK = env.bool("USE_WS_CONNECTION_CHECK", default=False)
 MAX_RETRIES = env.int("WS_MESSAGE_RETRIES", default=3)
 RETRY_DELAY_SECONDS = env.int("WS_MESSAGE_RETRIES", default=0.5)
 
+# HTTP Callback Retry Configuration
+CALLBACK_RETRYABLE_STATUS_CODES = env.list(
+    "CALLBACK_RETRYABLE_STATUS_CODES",
+    default=[408, 429, 500, 502, 503, 504, 507, 509, 510, 511],
+    cast=int,
+)
+CALLBACK_NON_RETRYABLE_STATUS_CODES = env.list(
+    "CALLBACK_NON_RETRYABLE_STATUS_CODES",
+    default=[400, 401, 403, 404, 405, 422],
+    cast=int,
+)
+CALLBACK_RETRY_COUNT = env.int("CALLBACK_RETRY_COUNT", default=5)
+CALLBACK_RETRY_BACKOFF_FACTOR = env.float("CALLBACK_RETRY_BACKOFF_FACTOR", default=0.5)
+CALLBACK_TIMEOUT_SECONDS = env.int("CALLBACK_TIMEOUT_SECONDS", default=30)
 
 # Email
 
@@ -467,6 +491,13 @@ if SEND_EMAILS:
     EMAIL_USE_SSL = env.bool("EMAIL_USE_SSL")
     EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS")
 
+# AI features related settings
+
+AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS = env.bool(
+    "AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS", default=False
+)
+
+AI_FEATURES_PROMPTS_API_SECRET = env.str("AI_FEATURES_PROMPTS_API_SECRET")
 
 # Pin rooms
 MAX_ROOM_PINS_LIMIT = env.int("MAX_ROOM_PINS_LIMIT", default=3)
@@ -474,4 +505,35 @@ MAX_ROOM_PINS_LIMIT = env.int("MAX_ROOM_PINS_LIMIT", default=3)
 # Message Status Update Feature Flag
 MESSAGE_STATUS_UPDATE_ENABLED_PROJECTS = env.list(
     "MESSAGE_STATUS_UPDATE_ENABLED_PROJECTS", default=[]
+)
+
+# MESSAGE_BULK_SIZE deve estar no settings.py
+MESSAGE_BULK_SIZE = env.int("MESSAGE_BULK_SIZE", default=100)
+
+# Message Status Consumer Settings
+MESSAGE_STATUS_MAX_RETRIES = env.int("MESSAGE_STATUS_MAX_RETRIES", default=3)
+MESSAGE_STATUS_RETRY_DELAY = env.int("MESSAGE_STATUS_RETRY_DELAY", default=2)
+
+
+# Growthbook
+GROWTHBOOK_HOST_BASE_URL = env.str("GROWTHBOOK_HOST_BASE_URL", default="")
+GROWTHBOOK_CLIENT_KEY = env.str("GROWTHBOOK_CLIENT_KEY", default="")
+GROWTHBOOK_SHORT_CACHE_KEY = env.str(
+    "GROWTHBOOK_SHORT_CACHE_KEY", default="growthbook:feature_flags:short"
+)
+GROWTHBOOK_SHORT_CACHE_TTL = env.int(
+    "GROWTHBOOK_SHORT_CACHE_TTL", default=300
+)  # 5 minutes
+GROWTHBOOK_LONG_CACHE_KEY = env.str(
+    "GROWTHBOOK_LONG_CACHE_KEY", default="growthbook:feature_flags:long"
+)
+GROWTHBOOK_LONG_CACHE_TTL = env.int(
+    "GROWTHBOOK_LONG_CACHE_TTL", default=(60 * 60 * 24 * 30)
+)  # 30 days
+GROWTHBOOK_WEBHOOK_SECRET = env.str("GROWTHBOOK_WEBHOOK_SECRET", default="")
+
+
+# Feedback
+FEEDBACK_FEATURE_FLAG_KEY = env.str(
+    "FEEDBACK_FEATURE_FLAG_KEY", default="weniChatsFeedback"
 )
