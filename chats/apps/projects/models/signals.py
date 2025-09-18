@@ -1,5 +1,6 @@
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
+
 from chats.apps.projects.models import Project
 from chats.core.cache_utils import invalidate_project_cache
 
