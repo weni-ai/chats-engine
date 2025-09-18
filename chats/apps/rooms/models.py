@@ -9,7 +9,7 @@ import sentry_sdk
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db import models, transaction
+from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_redis import get_redis_connection
@@ -256,8 +256,6 @@ class Room(BaseModel, BaseConfigurableModel):
             return
 
     def save(self, *args, **kwargs) -> None:
-        from chats.apps.sectors.tasks import send_automatic_message
-
         if self.__original_is_active is False:
             raise ValidationError({"detail": _("Closed rooms cannot receive updates")})
 
@@ -265,8 +263,6 @@ class Room(BaseModel, BaseConfigurableModel):
             self.added_to_queue_at = timezone.now()
 
         user_has_changed = self.pk and self.tracker.has_changed("user")
-
-        old_user_assigned_at = self.user_assigned_at
 
         if self.user and not self.user_assigned_at or user_has_changed:
             self.user_assigned_at = timezone.now()
@@ -281,21 +277,20 @@ class Room(BaseModel, BaseConfigurableModel):
 
         super().save(*args, **kwargs)
 
+        self._update_agent_service_status(is_new)
+
+    def send_automatic_message(self):
+        from chats.apps.sectors.tasks import send_automatic_message
+
         if (
             self.user
-            and old_user_assigned_at is None  # User being assigned for the first time
             and self.user_assigned_at is not None
             and self.queue.sector.is_automatic_message_active
             and self.queue.sector.automatic_message_text
         ):
-            logger.info("[ROOM] Sending automatic message to room %s", self.uuid)
-            transaction.on_commit(
-                lambda: send_automatic_message.delay(
-                    self.uuid, self.queue.sector.automatic_message_text, self.user.id
-                )
+            send_automatic_message.delay(
+                self.uuid, self.queue.sector.automatic_message_text, self.user.id
             )
-
-        self._update_agent_service_status(is_new)
 
     def get_permission(self, user):
         try:

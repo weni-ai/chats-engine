@@ -303,6 +303,8 @@ class TestRoomModel(TransactionTestCase):
 
         room = Room.objects.create(user=user, queue=self.queue)
 
+        room.send_automatic_message()
+
         mock_send_automatic_message.assert_called_once_with(
             room.uuid, self.sector.automatic_message_text, user.id
         )
@@ -326,6 +328,8 @@ class TestRoomModel(TransactionTestCase):
         room.user = user
         room.save()
 
+        room.send_automatic_message()
+
         mock_send_automatic_message.assert_called_once_with(
             room.uuid, self.sector.automatic_message_text, user.id
         )
@@ -340,6 +344,8 @@ class TestRoomModel(TransactionTestCase):
         self.sector.is_automatic_message_active = False
         self.sector.save()
 
-        Room.objects.create(user=user, queue=self.queue)
+        room = Room.objects.create(user=user, queue=self.queue)
+
+        room.send_automatic_message()
 
         mock_send_automatic_message.assert_not_called()
