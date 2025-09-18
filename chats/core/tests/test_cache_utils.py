@@ -90,8 +90,9 @@ class CacheInvalidationTests(TestCase):
         cache_utils.get_user_id_by_email_cached("test@example.com")
         self.assertIsNotNone(r.get("user:email:test@example.com"))
 
-        self.user.email = "newemail@example.com"
-        self.user.save()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.user.email = "newemail@example.com"
+            self.user.save()
 
         self.assertIsNone(r.get("user:email:test@example.com"))
 
@@ -103,7 +104,8 @@ class CacheInvalidationTests(TestCase):
         cache_utils.get_user_id_by_email_cached("test@example.com")
         self.assertIsNotNone(r.get("user:email:test@example.com"))
 
-        self.user.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.user.delete()
 
         self.assertIsNone(r.get("user:email:test@example.com"))
 

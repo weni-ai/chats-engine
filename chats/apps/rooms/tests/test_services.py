@@ -1,17 +1,18 @@
-from django.test import TestCase, override_settings
-from django.core import mail
-from unittest.mock import patch
 import uuid
+from unittest.mock import patch
+
+from django.core import mail
+from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from chats.apps.contacts.models import Contact
+from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.services import RoomsReportService
 from chats.apps.sectors.models import Sector
 from chats.core.cache import CacheClient
-from chats.apps.dashboard.models import RoomMetrics
 
 
 @override_settings(SEND_EMAILS=True)
@@ -47,7 +48,7 @@ class RoomsReportServiceTest(TestCase):
 
     def test_get_cache_key(self):
         """Test if cache key is generated correctly"""
-        expected_key = f"rooms_report_{self.project}"
+        expected_key = f"rooms_report_{self.project.uuid}"
         self.assertEqual(self.service.get_cache_key(), expected_key)
 
     def test_is_generating_report(self):

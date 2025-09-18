@@ -15,21 +15,30 @@ PROJECT_CONFIG_TTL = getattr(settings, "PROJECT_CONFIG_TTL", 900)
 PROJECT_CACHE_ENABLED = getattr(settings, "PROJECT_CACHE_ENABLED", True)
 
 
-def get_user_id_by_email_cached(email: str) -> Optional[int]:
-    if not EMAIL_LOOKUP_CACHE_ENABLED:
-        try:
-            return User.objects.only("id").get(email=(email or "").lower()).pk
-        except User.DoesNotExist:
-            return None
-    email = (email or "").lower()
+def _normalize_email(email: Optional[str]) -> Optional[str]:
+    """
+    Normalize email string for consistent cache and DB lookups.
+    """
     if not email:
         return None
+    return email.strip().lower()
+
+
+def get_user_id_by_email_cached(email: str) -> Optional[int]:
+    normalized_email = _normalize_email(email)
+    if not normalized_email:
+        return None
+    if not EMAIL_LOOKUP_CACHE_ENABLED:
+        try:
+            return User.objects.only("id").get(email=normalized_email).pk
+        except User.DoesNotExist:
+            return None
     try:
         redis_conn = get_redis_connection()
     except Exception:
         redis_conn = None
 
-    cache_key = f"user:email:{email}"
+    cache_key = f"user:email:{normalized_email}"
     if redis_conn:
         cached_value = redis_conn.get(cache_key)
         if cached_value:
@@ -44,7 +53,7 @@ def get_user_id_by_email_cached(email: str) -> Optional[int]:
             except Exception:
                 pass
     try:
-        user_id = User.objects.only("id").get(email=email).pk
+        user_id = User.objects.only("id").get(email=normalized_email).pk
         if redis_conn:
             redis_conn.setex(cache_key, EMAIL_LOOKUP_TTL, user_id)
         return user_id
@@ -61,13 +70,13 @@ def invalidate_user_email_cache(email: str) -> None:
     if not EMAIL_LOOKUP_CACHE_ENABLED:
         return
 
-    email = (email or "").lower()
-    if not email:
+    normalized_email = _normalize_email(email)
+    if not normalized_email:
         return
 
     try:
         redis_conn = get_redis_connection()
-        cache_key = f"user:email:{email}"
+        cache_key = f"user:email:{normalized_email}"
         redis_conn.delete(cache_key)
     except Exception:
         # If Redis is down, we can't invalidate, but that's ok

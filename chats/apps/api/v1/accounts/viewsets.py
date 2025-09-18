@@ -59,6 +59,6 @@ class UserDataViewset(viewsets.GenericViewSet):
         try:
             instance = self.get_object()
         except User.DoesNotExist:
-            return Response({"Detail": "Email not found"}, status.HTTP_404_NOT_FOUND)
+            return Response({"detail": "Email not found"}, status.HTTP_404_NOT_FOUND)
         serializer = self.get_serializer(instance)
         return Response(serializer.data)

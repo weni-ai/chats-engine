@@ -1,12 +1,12 @@
-import logging
-import time
 import csv
 import io
-from datetime import datetime
+import logging
+import time
 
 from django.conf import settings
 from django.core.mail import EmailMessage
 from django.db import models
+from django.utils import timezone
 from sentry_sdk import capture_message
 
 from chats.apps.projects.models.models import Project
@@ -51,7 +51,7 @@ class RoomsReportService:
         Get the cache key for the rooms report.
         """
 
-        return f"rooms_report_{self.project}"
+        return f"rooms_report_{self.project.uuid}"
 
     def is_generating_report(self) -> bool:
         """
@@ -152,7 +152,7 @@ class RoomsReportService:
                     recipient_email,
                 )
 
-                dt = datetime.now().strftime("%d/%m/%Y_%H-%M-%S")
+                dt = timezone.now().strftime("%d/%m/%Y_%H-%M-%S")
                 subject = f"Relatório de salas do projeto {self.project.name} - {dt}"
                 message = (
                     f"O relatório de salas do projeto {self.project.name} "
