@@ -5,7 +5,8 @@ from unittest.mock import patch
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase, override_settings
+from django.db import transaction
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
@@ -36,7 +37,8 @@ class ConstraintTests(APITestCase):
         )
 
 
-class TestRoomModel(TestCase):
+@override_settings(ATOMIC_REQUESTS=True)
+class TestRoomModel(TransactionTestCase):
     def setUp(self):
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
@@ -317,6 +319,6 @@ class TestRoomModel(TestCase):
         self.sector.is_automatic_message_active = False
         self.sector.save()
 
-        room = Room.objects.create(user=user, queue=self.queue)
+        Room.objects.create(user=user, queue=self.queue)
 
         mock_send_automatic_message.assert_not_called()

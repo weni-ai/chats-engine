@@ -9,7 +9,7 @@ import sentry_sdk
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_redis import get_redis_connection
@@ -224,8 +224,10 @@ class Room(BaseModel, BaseConfigurableModel):
             and self.queue.sector.automatic_message_text
         ):
             logger.info("[ROOM] Sending automatic message to room %s", self.uuid)
-            send_automatic_message.delay(
-                self.uuid, self.queue.sector.automatic_message_text, self.user.id
+            transaction.on_commit(
+                lambda: send_automatic_message.delay(
+                    self.uuid, self.queue.sector.automatic_message_text, self.user.id
+                )
             )
 
         self._update_agent_service_status(is_new)
