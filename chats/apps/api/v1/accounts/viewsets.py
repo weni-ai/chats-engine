@@ -8,6 +8,7 @@ from rest_framework.response import Response
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.accounts.serializers import LoginSerializer, UserNameSerializer
+from chats.core.cache_utils import get_user_id_by_email_cached
 
 
 @method_decorator(
@@ -49,16 +50,15 @@ class UserDataViewset(viewsets.GenericViewSet):
 
     def get_object(self):
         user_email = self.request.query_params.get("user_email")
-        return User.objects.get(email=user_email)
+        uid = get_user_id_by_email_cached(user_email)
+        if uid is None:
+            raise User.DoesNotExist()
+        return User.objects.only("email", "first_name", "last_name").get(pk=uid)
 
     def retrieve(self, request, *args, **kwargs):
         try:
             instance = self.get_object()
         except User.DoesNotExist:
-            return Response(
-                {"Detail": "Email not found"},
-                status.HTTP_404_NOT_FOUND,
-            )
-
+            return Response({"detail": "Email not found"}, status.HTTP_404_NOT_FOUND)
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
