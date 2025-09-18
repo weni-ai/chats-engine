@@ -1,10 +1,12 @@
 import time
 import uuid
+from unittest.mock import patch
 
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase, override_settings
+from django.db import transaction
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
@@ -35,7 +37,8 @@ class ConstraintTests(APITestCase):
         )
 
 
-class TestRoomModel(TestCase):
+@override_settings(ATOMIC_REQUESTS=True)
+class TestRoomModel(TransactionTestCase):
     def setUp(self):
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
@@ -286,3 +289,58 @@ class TestRoomModel(TestCase):
         room.add_transfer_to_history(other_feedback)
         self.assertEqual(room.full_transfer_history, [feedback, other_feedback])
         self.assertEqual(room.transfer_history, other_feedback)
+
+    @patch("chats.apps.sectors.tasks.send_automatic_message.delay")
+    def test_send_automatic_message_when_room_is_created_with_user(
+        self, mock_send_automatic_message
+    ):
+        mock_send_automatic_message.return_value = None
+
+        user = User.objects.create(email="a@user.com")
+
+        self.sector.is_automatic_message_active = True
+        self.sector.automatic_message_text = "Test Message"
+        self.sector.save()
+
+        room = Room.objects.create(user=user, queue=self.queue)
+
+        mock_send_automatic_message.assert_called_once_with(
+            room.uuid, self.sector.automatic_message_text, user.id
+        )
+
+    @patch("chats.apps.sectors.tasks.send_automatic_message.delay")
+    def test_send_automatic_message_when_room_is_updated_with_user(
+        self, mock_send_automatic_message
+    ):
+        mock_send_automatic_message.return_value = None
+
+        user = User.objects.create(email="a@user.com")
+
+        self.sector.is_automatic_message_active = True
+        self.sector.automatic_message_text = "Test Message"
+        self.sector.save()
+
+        room = Room.objects.create(queue=self.queue)
+
+        mock_send_automatic_message.assert_not_called()
+
+        room.user = user
+        room.save()
+
+        mock_send_automatic_message.assert_called_once_with(
+            room.uuid, self.sector.automatic_message_text, user.id
+        )
+
+    @patch("chats.apps.sectors.tasks.send_automatic_message.delay")
+    def test_do_not_send_automatic_message_when_sector_automatic_message_is_not_active(
+        self, mock_send_automatic_message
+    ):
+        mock_send_automatic_message.return_value = None
+        user = User.objects.create(email="a@user.com")
+
+        self.sector.is_automatic_message_active = False
+        self.sector.save()
+
+        Room.objects.create(user=user, queue=self.queue)
+
+        mock_send_automatic_message.assert_not_called()
