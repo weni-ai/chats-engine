@@ -5,8 +5,7 @@ from unittest.mock import patch
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError
-from django.test import TestCase, TransactionTestCase, override_settings
-from django.db import transaction
+from django.test import TransactionTestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
