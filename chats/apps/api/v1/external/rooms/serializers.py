@@ -14,7 +14,7 @@ from chats.apps.api.v1.queues.serializers import QueueSerializer
 from chats.apps.api.v1.sectors.serializers import TagSimpleSerializer
 from chats.apps.contacts.models import Contact
 from chats.apps.dashboard.models import RoomMetrics
-from chats.apps.msgs.models import Message, MessageMedia
+from chats.apps.msgs.models import AutomaticMessage, Message, MessageMedia
 from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
@@ -158,6 +158,7 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
     contact_external_id = serializers.CharField(source="contact.external_id")
     protocol = serializers.CharField(read_only=True)
     callid = serializers.SerializerMethodField()
+    automatic_message_sent_at = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -173,6 +174,7 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
             "tags",
             "protocol",
             "callid",
+            "automatic_message_sent_at",
         ]
 
     def get_user_name(self, obj):
@@ -195,6 +197,16 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
         custom_fields = obj.custom_fields or {}
 
         return custom_fields.get("callid", None)
+
+    def get_automatic_message_sent_at(self, obj: Room) -> Optional[str]:
+        automatic_message: AutomaticMessage = AutomaticMessage.objects.filter(
+            room=obj
+        ).first()
+
+        if automatic_message:
+            return automatic_message.message.created_on.isoformat()
+
+        return None
 
 
 class ProjectInfoSerializer(serializers.Serializer):

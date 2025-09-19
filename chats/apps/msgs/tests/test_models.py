@@ -6,7 +6,7 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 from django.utils.timezone import timedelta
 
-from chats.apps.msgs.models import Message, MessageMedia
+from chats.apps.msgs.models import Message, MessageMedia, AutomaticMessage
 from chats.apps.projects.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
@@ -122,6 +122,15 @@ class TestMessageModel(TestCase):
 
         self.assertIsNone(msg.metadata["context"]["from"])
         self.assertIsNone(msg.metadata["context"]["id"])
+
+    def test_message_without_automatic_message(self):
+        msg = Message.objects.create(room=self.room)
+        self.assertFalse(msg.is_automatic_message)
+
+    def test_message_with_automatic_message(self):
+        msg = Message.objects.create(room=self.room)
+        AutomaticMessage.objects.create(message=msg, room=self.room)
+        self.assertTrue(msg.is_automatic_message)
 
 
 class TestMessageMediaModel(TestCase):
