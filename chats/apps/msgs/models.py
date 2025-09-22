@@ -176,6 +176,10 @@ class Message(BaseModelWithManualCreatedOn):
     def project(self):
         return self.room.project
 
+    @property
+    def is_automatic_message(self):
+        return hasattr(self, "automatic_message") and self.automatic_message is not None
+
 
 class MessageMedia(BaseModelWithManualCreatedOn):
     message = models.ForeignKey(
