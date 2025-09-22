@@ -36,6 +36,12 @@ class MessageViewset(
     pagination_class = CustomCursorPagination
     ordering = ["-created_on"]
 
+    def get_paginated_response(self, data):
+        if self.request.query_params.get("reverse_results", False):
+            data.reverse()
+        qs = super().get_paginated_response(data)
+        return qs
+
     def create(self, request, *args, **kwargs):
         # TODO USE THE REQUEST.USER TO SET THE USER IN THE MESSAGE
         return super().create(request, *args, **kwargs)
