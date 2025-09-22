@@ -511,17 +511,19 @@ class RoomViewset(
             room.save()
             room.add_transfer_to_history(feedback)
 
+            create_room_feedback_message(
+                room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+            )
+            room.notify_queue("update")
+
+            room.send_automatic_message()
+
             room_metric = RoomMetrics.objects.select_related("room").get_or_create(
                 room=room
             )[0]
             room_metric.waiting_time += calculate_last_queue_waiting_time(room)
             room_metric.queued_count += 1
             room_metric.save()
-
-            create_room_feedback_message(
-                room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
-            )
-            room.notify_queue("update")
 
             # Use async ticket update to avoid blocking the response
             room.update_ticket_async()
@@ -531,7 +533,7 @@ class RoomViewset(
                     "detail": _("Room picked successfully"),
                     "room_uuid": str(room.uuid),
                 },
-                status=status.HTTP_200_OK
+                status=status.HTTP_200_OK,
             )
 
         except Exception as exc:
@@ -593,6 +595,9 @@ class RoomViewset(
                     from_=transfer_user,
                     to=user,
                 )
+
+                old_user_assigned_at = room.user_assigned_at
+
                 room.user = user
                 room.save()
 
@@ -614,6 +619,13 @@ class RoomViewset(
                 room.notify_queue("update")
 
                 room.update_ticket()
+
+                if (
+                    not old_user_assigned_at
+                    and room.queue.sector.is_automatic_message_active
+                    and room.queue.sector.automatic_message_text
+                ):
+                    room.send_automatic_message()
 
         if queue_uuid:
             queue = Queue.objects.get(uuid=queue_uuid)
