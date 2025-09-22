@@ -82,6 +82,8 @@ class QueueRouterService:
             if not agent:
                 break
 
+            old_user_assigned_at = room.user_assigned_at
+
             room.user = agent
             room.save()
 
@@ -104,6 +106,13 @@ class QueueRouterService:
             )
 
             create_room_assigned_from_queue_feedback(room, agent)
+
+            if (
+                not old_user_assigned_at
+                and room.queue.sector.is_automatic_message_active
+                and room.queue.sector.automatic_message_text
+            ):
+                room.send_automatic_message()
 
             rooms_routed += 1
 

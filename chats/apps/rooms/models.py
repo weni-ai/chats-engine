@@ -214,6 +214,19 @@ class Room(BaseModel, BaseConfigurableModel):
 
         self._update_agent_service_status(is_new)
 
+    def send_automatic_message(self):
+        from chats.apps.sectors.tasks import send_automatic_message
+
+        if (
+            self.user
+            and self.user_assigned_at is not None
+            and self.queue.sector.is_automatic_message_active
+            and self.queue.sector.automatic_message_text
+        ):
+            send_automatic_message.delay(
+                self.uuid, self.queue.sector.automatic_message_text, self.user.id
+            )
+
     def get_permission(self, user):
         try:
             return self.queue.get_permission(user)
@@ -471,7 +484,7 @@ class Room(BaseModel, BaseConfigurableModel):
             task = update_ticket_assignee_async.delay(
                 room_uuid=str(self.uuid),
                 ticket_uuid=self.ticket_uuid,
-                user_email=self.user.email
+                user_email=self.user.email,
             )
 
             logger.info(
