@@ -5,6 +5,7 @@ from rest_framework import filters, mixins, pagination, parsers, status, viewset
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.pagination import CursorPagination
 
 from chats.apps.api.v1.msgs.filters import MessageFilter, MessageMediaFilter
 from chats.apps.api.v1.msgs.permissions import MessageMediaPermission, MessagePermission
@@ -31,6 +32,9 @@ class MessageViewset(
     filterset_class = MessageFilter
     permission_classes = [IsAuthenticated, MessagePermission]
     lookup_field = "uuid"
+
+    pagination_class = CursorPagination
+    ordering = ["-created_on"]
 
     def get_paginated_response(self, data):
         if self.request.query_params.get("reverse_results", False):
