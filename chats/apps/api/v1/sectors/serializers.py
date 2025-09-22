@@ -30,6 +30,7 @@ class SectorSerializer(serializers.ModelSerializer):
     class Meta:
         model = Sector
         fields = [
+            "uuid",
             "name",
             "can_edit_custom_fields",
             "can_trigger_flows",
