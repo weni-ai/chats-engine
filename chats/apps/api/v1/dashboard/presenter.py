@@ -1,6 +1,8 @@
 import json
 
 import pendulum
+from django.apps import apps
+from django.core.cache import cache
 from django.db.models import Avg, Count, F, Q, Sum
 from django.utils import timezone
 from django.apps import apps
@@ -10,6 +12,7 @@ from chats.apps.projects.models import ProjectPermission
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
+
 from .dto import EXCLUDED_DOMAINS
 
 
@@ -27,7 +30,7 @@ def get_export_data(project, filter):
         )
         rooms_filter["created_on__range"] = [
             start_time,
-            end_time,  # TODO: USE DATETIME IN END DATE
+            end_time,
         ]
     else:
         rooms_filter["created_on__gte"] = initial_datetime
@@ -77,19 +80,19 @@ def get_general_data(project, filter):
         )
         rooms_filter["created_on__range"] = [
             start_time,
-            end_time,  # TODO: USE DATETIME IN END DATE
+            end_time,
         ]
         rooms_filter_in_progress_chats["created_on__range"] = [
             start_time,
-            end_time,  # TODO: USE DATETIME IN END DATE
+            end_time,
         ]
         rooms_filter_waiting_service["created_on__range"] = [
             start_time,
-            end_time,  # TODO: USE DATETIME IN END DATE
+            end_time,
         ]
         rooms_filter_closed["ended_at__range"] = [
             start_time,
-            end_time,  # TODO: USE DATETIME IN END DATE
+            end_time,
         ]
         rooms_filter_in_progress_chats["is_active"] = False
     else:
@@ -120,16 +123,12 @@ def get_general_data(project, filter):
     data = {}
     metrics_rooms_count = Room.objects.filter(**rooms_filter).count()
 
-    # in_progress
     active_chats = Room.objects.filter(**rooms_filter_in_progress_chats).count()
 
-    # waiting_service
     queue_rooms = Room.objects.filter(**rooms_filter_waiting_service).count()
 
-    # closed_rooms
     closed_rooms = Room.objects.filter(**rooms_filter_closed).count()
 
-    # interaction_time
     interaction_value = Room.objects.filter(**rooms_filter).aggregate(
         interaction_time=Sum("metric__interaction_time")
     )
@@ -138,7 +137,6 @@ def get_general_data(project, filter):
     else:
         interaction_time = 0
 
-    # response_time
     response_time_value = Room.objects.filter(**rooms_filter).aggregate(
         message_response_time=Sum("metric__message_response_time")
     )
@@ -149,7 +147,6 @@ def get_general_data(project, filter):
     else:
         response_time = 0
 
-    # waiting_time
     waiting_time_value = Room.objects.filter(**rooms_filter).aggregate(
         waiting_time=Sum("metric__waiting_time")
     )
@@ -189,11 +186,11 @@ def get_agents_data(project, filter):
         )
         rooms_filter["user__rooms__created_on__range"] = [
             start_time,
-            end_time,  # TODO: USE DATETIME IN END DATE
+            end_time,
         ]
         closed_rooms["user__rooms__ended_at__range"] = [
             start_time,
-            end_time,  # TODO: USE DATETIME IN END DATE
+            end_time,
         ]
     else:
         closed_rooms["user__rooms__ended_at__gte"] = initial_datetime
@@ -212,7 +209,6 @@ def get_agents_data(project, filter):
         rooms_filter["user__rooms__queue__sector__project"] = project
         closed_rooms["user__rooms__queue__sector__project"] = project
 
-    # Criar filtro para excluir múltiplos domínios
     exclude_filter = Q()
     for domain in EXCLUDED_DOMAINS:
         exclude_filter |= Q(user__email__icontains=domain)
@@ -271,7 +267,7 @@ def get_sector_data(project, filter):
         )
         rooms_filter[f"{rooms_filter_prefix}rooms__created_on__range"] = [
             start_time,
-            end_time,  # TODO: USE DATETIME IN END DATE
+            end_time,
         ]
     else:
         rooms_filter[f"{rooms_filter_prefix}rooms__created_on__gte"] = initial_datetime
@@ -302,32 +298,44 @@ class ModelFieldsPresenter:
     """
     Presenter para retornar os campos disponíveis dos principais models do sistema.
     """
-    
+
     @staticmethod
     def _allowed_fields_map():
         return {
-            'sectors': {
-                'name', 'rooms_limit', 'config'
+            "sectors": {"name", "rooms_limit", "config"},
+            "queues": {"name", "is_deleted", "config"},
+            "sector_tags": {"name"},
+            "rooms": {
+                "created_on",
+                "ended_at",
+                "ended_by",
+                "is_active",
+                "is_waiting",
+                "urn",
+                "protocol",
+                "config",
+                "transfer_history",
+                "service_chat",
+                "custom_fields",
+                "tags",
+                "contact",
+                "user",
+                "queue",
+                "uuid",
+                "sector",
+                "status",
+                "contact_uuid",
+                "contact_id",
             },
-            'queues': {
-                'name', 'is_deleted', 'config'
+            "contacts": {
+                "name",
+                "email",
+                "status",
+                "phone",
+                "custom_fields",
+                "external_id",
             },
-            'sector_tags': {
-                'name'
-            },
-            'rooms': {
-                'created_on', 'ended_at', 'ended_by', 'is_active', 'is_waiting',
-                'urn', 'protocol', 'config', 'transfer_history',
-                'service_chat', 'custom_fields', 'tags',
-                'contact', 'user', 'queue',
-                'uuid', 'sector', 'status', 'contact_uuid', 'contact_id'
-            },
-            'contacts': {
-                'name', 'email', 'status', 'phone', 'custom_fields', 'external_id'
-            },
-            'users': {
-                'email', 'first_name', 'last_name'
-            },
+            "users": {"email", "first_name", "last_name"},
         }
 
     @staticmethod
@@ -346,39 +354,83 @@ class ModelFieldsPresenter:
         """
         Return information about the fields of each model, with a 1 day cache.
         """
-        cache_key = 'model_fields_presenter_models_info'
+        cache_key = "model_fields_presenter_models_info"
         cached_data = cache.get(cache_key)
         if cached_data is not None:
             return cached_data
- 
+
         raw_models_info = {
-            'rooms': ModelFieldsPresenter._get_model_fields('rooms', 'Room'),
+            "rooms": ModelFieldsPresenter._get_model_fields("rooms", "Room"),
         }
         models_info = {
             key: ModelFieldsPresenter._filter_allowed(key, value)
             for key, value in raw_models_info.items()
         }
-        # rooms: retornar exatamente os 16 campos na ordem exigida pela UI
-        rooms = models_info.get('rooms', {})
+        rooms = models_info.get("rooms", {})
         ordered_rooms = {
-            'user__first_name': {'type': 'CharField', 'required': False, 'related_model': 'accounts.user'},
-            'user__last_name': {'type': 'CharField', 'required': False, 'related_model': 'accounts.user'},
-            'user__email': {'type': 'EmailField', 'required': False, 'related_model': 'accounts.user'},
-            'queue__sector__name': {'type': 'CharField', 'required': False, 'related_model': 'sectors.sector'},
-            'queue__name': {'type': 'CharField', 'required': False, 'related_model': 'queues.queue'},
-            'uuid': {'type': 'UUIDField', 'required': True},
-            'is_active': rooms.get('is_active', {'type': 'BooleanField', 'required': True}),
-            'protocol': rooms.get('protocol', {'type': 'TextField', 'required': False}),
-            'tags': rooms.get('tags', {'type': 'ManyToManyField', 'required': True, 'related_model': 'sectors.sectortag'}),
-            'created_on': rooms.get('created_on', {'type': 'DateTimeField', 'required': True}),
-            'ended_at': rooms.get('ended_at', {'type': 'DateTimeField', 'required': False}),
-            'transfer_history': rooms.get('transfer_history', {'type': 'JSONField', 'required': False}),
-            'contact__name': {'type': 'CharField', 'required': False, 'related_model': 'contacts.contact'},
-            'contact__uuid': {'type': 'UUIDField', 'required': False, 'related_model': 'contacts.contact'},
-            'urn': rooms.get('urn', {'type': 'TextField', 'required': False}),
-            'custom_fields': rooms.get('custom_fields', {'type': 'JSONField', 'required': False}),
+            "user__first_name": {
+                "type": "CharField",
+                "required": False,
+                "related_model": "accounts.user",
+            },
+            "user__last_name": {
+                "type": "CharField",
+                "required": False,
+                "related_model": "accounts.user",
+            },
+            "user__email": {
+                "type": "EmailField",
+                "required": False,
+                "related_model": "accounts.user",
+            },
+            "queue__sector__name": {
+                "type": "CharField",
+                "required": False,
+                "related_model": "sectors.sector",
+            },
+            "queue__name": {
+                "type": "CharField",
+                "required": False,
+                "related_model": "queues.queue",
+            },
+            "uuid": {"type": "UUIDField", "required": True},
+            "is_active": rooms.get(
+                "is_active", {"type": "BooleanField", "required": True}
+            ),
+            "protocol": rooms.get("protocol", {"type": "TextField", "required": False}),
+            "tags": rooms.get(
+                "tags",
+                {
+                    "type": "ManyToManyField",
+                    "required": True,
+                    "related_model": "sectors.sectortag",
+                },
+            ),
+            "created_on": rooms.get(
+                "created_on", {"type": "DateTimeField", "required": True}
+            ),
+            "ended_at": rooms.get(
+                "ended_at", {"type": "DateTimeField", "required": False}
+            ),
+            "transfer_history": rooms.get(
+                "transfer_history", {"type": "JSONField", "required": False}
+            ),
+            "contact__name": {
+                "type": "CharField",
+                "required": False,
+                "related_model": "contacts.contact",
+            },
+            "contact__uuid": {
+                "type": "UUIDField",
+                "required": False,
+                "related_model": "contacts.contact",
+            },
+            "urn": rooms.get("urn", {"type": "TextField", "required": False}),
+            "custom_fields": rooms.get(
+                "custom_fields", {"type": "JSONField", "required": False}
+            ),
         }
-        models_info['rooms'] = ordered_rooms
+        models_info["rooms"] = ordered_rooms
         cache.set(cache_key, models_info, timeout=86400)
         return models_info
 
@@ -390,19 +442,21 @@ class ModelFieldsPresenter:
         try:
             model = apps.get_model(app_label, model_name)
             fields = {}
-            
+
             for field in model._meta.get_fields():
-                if hasattr(field, 'get_internal_type'):
+                if hasattr(field, "get_internal_type"):
                     field_info = {
-                        'type': field.get_internal_type(),
-                        'required': not field.null if hasattr(field, 'null') else True
+                        "type": field.get_internal_type(),
+                        "required": not field.null if hasattr(field, "null") else True,
                     }
-                    
-                    if field.get_internal_type() in ['ForeignKey', 'ManyToManyField']:
-                        field_info['related_model'] = f"{field.related_model._meta.app_label}.{field.related_model._meta.model_name}"
-                    
+
+                    if field.get_internal_type() in ["ForeignKey", "ManyToManyField"]:
+                        field_info["related_model"] = (
+                            f"{field.related_model._meta.app_label}.{field.related_model._meta.model_name}"
+                        )
+
                     fields[field.name] = field_info
 
             return fields
         except LookupError:
-            return {'error': f'Model {model_name} not found in app {app_label}'}
+            return {"error": f"Model {model_name} not found in app {app_label}"}

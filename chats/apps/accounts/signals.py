@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 
@@ -30,8 +31,12 @@ def invalidate_user_cache_on_save(sender, instance, created, **kwargs):
 
     old_email = getattr(instance, "_old_email", None)
     if old_email and old_email != instance.email:
-        invalidate_user_email_cache(old_email)
-        invalidate_user_email_cache(instance.email)
+        transaction.on_commit(
+            lambda oe=old_email, ne=instance.email: (
+                invalidate_user_email_cache(oe),
+                invalidate_user_email_cache(ne),
+            )
+        )
 
 
 @receiver(post_delete, sender=User)
@@ -39,4 +44,4 @@ def invalidate_user_cache_on_delete(sender, instance, **kwargs):
     """
     Invalidate cache when user is deleted
     """
-    invalidate_user_email_cache(instance.email)
+    transaction.on_commit(lambda e=instance.email: invalidate_user_email_cache(e))

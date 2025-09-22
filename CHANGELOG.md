@@ -1,3 +1,31 @@
+# 3.26.0
+# Add
+  - Export feature
+    
+# 3.25.8
+# Add
+  - Add 'added_to_queue_at' field as read-only in RoomSerializer
+    
+# 3.25.7
+# Add
+  - Add secondary project filter to RoomMetricsFilter
+    
+# 3.25.6
+# Fix
+  - Assync get in manager ws class
+    
+# 3.25.5
+# Add
+  - Add rooms contacts external id filter for metrics
+
+# 3.25.4
+# Fix
+  - Passing user email in agents serializers
+
+# 3.25.3 
+# Fix
+  - Passing url for user disconnect
+
 # 3.25.2
 # Add
   - Daphne serving ws
@@ -704,6 +732,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 

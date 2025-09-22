@@ -35,12 +35,12 @@ class ReportStatus(BaseModel):
     status = models.CharField(
         max_length=20,
         choices=[
-            ('pending', 'Pending'),
-            ('ready', 'Ready'),
-            ('in_progress', 'In Progress'),
-            ('failed', 'Failed'),
+            ("pending", "Pending"),
+            ("ready", "Ready"),
+            ("in_progress", "In Progress"),
+            ("failed", "Failed"),
         ],
-        default='pending'
+        default="pending",
     )
     fields_config = models.JSONField()
     error_message = models.TextField(blank=True, null=True)
