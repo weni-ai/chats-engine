@@ -7,6 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.pagination import CursorPagination
 
+from chats.apps.api.pagination import CustomCursorPagination
 from chats.apps.api.v1.msgs.filters import MessageFilter, MessageMediaFilter
 from chats.apps.api.v1.msgs.permissions import MessageMediaPermission, MessagePermission
 from chats.apps.api.v1.msgs.serializers import (
@@ -33,14 +34,8 @@ class MessageViewset(
     permission_classes = [IsAuthenticated, MessagePermission]
     lookup_field = "uuid"
 
-    pagination_class = CursorPagination
+    pagination_class = CustomCursorPagination
     ordering = ["-created_on"]
-
-    def get_paginated_response(self, data):
-        if self.request.query_params.get("reverse_results", False):
-            data.reverse()
-        qs = super().get_paginated_response(data)
-        return qs
 
     def create(self, request, *args, **kwargs):
         # TODO USE THE REQUEST.USER TO SET THE USER IN THE MESSAGE
