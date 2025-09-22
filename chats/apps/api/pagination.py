@@ -1,4 +1,3 @@
-from django.conf import settings
 from rest_framework.settings import api_settings
 from rest_framework.pagination import CursorPagination
 

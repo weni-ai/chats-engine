@@ -5,7 +5,6 @@ from rest_framework import filters, mixins, pagination, parsers, status, viewset
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.pagination import CursorPagination
 
 from chats.apps.api.pagination import CustomCursorPagination
 from chats.apps.api.v1.msgs.filters import MessageFilter, MessageMediaFilter
