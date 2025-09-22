@@ -1,3 +1,11 @@
+# 3.26.2
+# Add
+  - sectors automatic messages
+
+# 3.26.1
+# Add
+  - throttling in external endpoints
+
 # 3.26.0
 # Add
   - Export feature
@@ -732,6 +740,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 
