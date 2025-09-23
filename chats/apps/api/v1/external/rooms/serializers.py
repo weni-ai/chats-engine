@@ -178,6 +178,7 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
             "callid",
             "automatic_message_sent_at",
             "first_user_assigned_at",
+            "time_to_send_automatic_message",
         ]
 
     def get_user_name(self, obj):
