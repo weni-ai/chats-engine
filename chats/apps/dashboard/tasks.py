@@ -208,10 +208,20 @@ def process_pending_reports():
 
     # Select a pending report safely (avoid concurrency)
     with transaction.atomic():
-        # Também reprocessa relatórios 'failed' (para retomar do que já foi gerado)
+        # Também reprocessa relatórios 'failed' e 'processing' estagnados
+        stale_seconds = getattr(settings, "REPORTS_STALE_SECONDS", None)
+        if stale_seconds is not None:
+            stale_after = datetime.now(timezone.utc) - timedelta(seconds=stale_seconds)
+        else:
+            stale_after = datetime.now(timezone.utc) - timedelta(
+                minutes=getattr(settings, "REPORTS_STALE_MINUTES", 10)
+            )
         report = (
             ReportStatus.objects.select_for_update(skip_locked=True)
-            .filter(status__in=["pending", "failed"])
+            .filter(
+                Q(status__in=["pending", "failed"])
+                | Q(status="processing", modified_on__lt=stale_after)
+            )
             .order_by("created_on")
             .first()
         )
@@ -260,7 +270,40 @@ def process_pending_reports():
 
         existing_parts = _list_existing_parts()
         existing_count = len(existing_parts)
-        next_start = existing_count * chunk_size
+
+        # Conta exatamente quantas linhas já persistimos nas partes
+        def _count_processed_rows() -> int:
+            total_rows = 0
+            first = True
+            for p in existing_parts:
+                try:
+                    with storage.open(p, "rb") as f:
+                        content = f.read().decode("utf-8")
+                except Exception:
+                    first = False
+                    continue
+                if not content:
+                    first = False
+                    continue
+                lines = [ln for ln in content.splitlines() if ln.strip()]
+                if not lines:
+                    first = False
+                    continue
+                if first:
+                    # primeira parte inclui header
+                    total_rows += max(0, len(lines) - 1)
+                else:
+                    total_rows += len(lines)
+                first = False
+            return total_rows
+
+        next_start = _count_processed_rows()
+        logging.info(
+            "Resuming report: parts=%s, processed_rows=%s, chunk_size=%s",
+            existing_count,
+            next_start,
+            chunk_size,
+        )
 
         # Função para escrever partes de CSV (header só na primeira parte)
         def _write_parts_from_queryset(qs):
@@ -271,6 +314,11 @@ def process_pending_reports():
             header_written = existing_count > 0
             for start in range(next_start, total, chunk_size):
                 end = min(start + chunk_size, total)
+                # Heartbeat: atualiza modified_on para não ser considerado 'stale'
+                try:
+                    report.save(update_fields=["modified_on"])
+                except Exception:
+                    pass
                 logging.info(
                     "Writing chunk (part): sheet=%s start=%s end=%s total=%s chunk_size=%s",
                     "rooms",

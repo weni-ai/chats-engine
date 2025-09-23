@@ -17,7 +17,7 @@ class AgentDisconnectView(APIView):
 
     def post(self, request):
         project_uuid = request.data.get("project_uuid")
-        agent_email = request.data.get("agent")
+        agent_email = request.data.get("agent") or request.data.get("agent_email")
 
         project, target_user, target_perm = validate_agent_disconnect(
             request.user, project_uuid, agent_email
@@ -28,55 +28,59 @@ class AgentDisconnectView(APIView):
                 CustomStatus.objects.select_for_update()
                 .filter(user=target_user, project=project, is_active=True)
             )
-            if active_qs.exists():
-                updated = active_qs.update(is_active=False)
-                if updated:
-                    permission_pk = target_perm.pk
-                    user_email = target_user.email
-                    disconnected_by_email = request.user.email
-                    transaction.on_commit(
-                        lambda: send_channels_group(
-                            group_name=f"permission_{permission_pk}",
-                            call_type="notify",
-                            content={
-                                "user": user_email,
-                                "custom_status_active": False,
-                                "user_disconnected_agent": disconnected_by_email,
-                            },
-                            action="custom_status.close",
-                        )
+            closed_count = active_qs.update(is_active=False)
+
+            if closed_count > 0:
+                permission_pk = target_perm.pk
+                user_email = target_user.email
+                disconnected_by_email = request.user.email
+
+                transaction.on_commit(
+                    lambda: send_channels_group(
+                        group_name=f"permission_{permission_pk}",
+                        call_type="notify",
+                        content={
+                            "user": user_email,
+                            "custom_status_active": False,
+                            "user_disconnected_agent": disconnected_by_email,
+                        },
+                        action="custom_status.close",
                     )
-                    transaction.on_commit(
-                        lambda: create_agent_disconnect_log.delay(
-                            str(project.uuid), target_user.email, request.user.email
-                        )
-                        if getattr(settings, "USE_CELERY", False)
-                        else create_agent_disconnect_log(
-                            str(project.uuid), target_user.email, request.user.email
-                        )
+                )
+                transaction.on_commit(
+                    lambda: create_agent_disconnect_log.delay(
+                        str(project.uuid), target_user.email, request.user.email
                     )
+                    if getattr(settings, "USE_CELERY", False)
+                    else create_agent_disconnect_log(
+                        str(project.uuid), target_user.email, request.user.email
+                    )
+                )
                 return Response(status=status.HTTP_200_OK)
 
-        if target_perm.status != ProjectPermission.STATUS_OFFLINE:
-            target_perm.status = ProjectPermission.STATUS_OFFLINE
-            target_perm.save(update_fields=["status"])
+            if target_perm.status != ProjectPermission.STATUS_OFFLINE:
+                target_perm.status = ProjectPermission.STATUS_OFFLINE
+                target_perm.save(update_fields=["status"])
 
-        send_channels_group(
-            group_name=f"permission_{target_perm.pk}",
-            call_type="notify",
-            content={
-                "user": target_user.email,
-                "status": ProjectPermission.STATUS_OFFLINE,
-                "user_disconnected_agent": request.user.email,
-            },
-            action="status.close",
-        )
-
-        if getattr(settings, "USE_CELERY", False):
-            create_agent_disconnect_log.delay(
-                str(project.uuid), target_user.email, request.user.email
+            transaction.on_commit(
+                lambda: send_channels_group(
+                    group_name=f"permission_{target_perm.pk}",
+                    call_type="notify",
+                    content={
+                        "user": target_user.email,
+                        "status": ProjectPermission.STATUS_OFFLINE,
+                        "user_disconnected_agent": request.user.email,
+                    },
+                    action="status.close",
+                )
             )
-        else:
-            create_agent_disconnect_log(str(project.uuid), target_user.email, request.user.email)
-
-        return Response(status=status.HTTP_200_OK)
+            transaction.on_commit(
+                lambda: create_agent_disconnect_log.delay(
+                    str(project.uuid), target_user.email, request.user.email
+                )
+                if getattr(settings, "USE_CELERY", False)
+                else create_agent_disconnect_log(
+                    str(project.uuid), target_user.email, request.user.email
+                )
+            )
+            return Response(status=status.HTTP_200_OK)
