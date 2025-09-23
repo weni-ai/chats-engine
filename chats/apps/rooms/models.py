@@ -111,6 +111,9 @@ class Room(BaseModel, BaseConfigurableModel):
         _("service chat"), null=True, blank=True, default=""
     )
 
+    first_user_assigned_at = models.DateTimeField(
+        _("First user assigned at"), null=True, blank=True
+    )
     user_assigned_at = models.DateTimeField(
         _("User assigned at"), null=True, blank=True
     )
@@ -201,6 +204,12 @@ class Room(BaseModel, BaseConfigurableModel):
 
         if self.user and not self.user_assigned_at or user_has_changed:
             self.user_assigned_at = timezone.now()
+
+        if self.is_active and self.user and not self.first_user_assigned_at:
+            if self.user_assigned_at:
+                self.first_user_assigned_at = self.user_assigned_at
+            else:
+                self.first_user_assigned_at = timezone.now()
 
         if user_has_changed and not self.user:
             self.added_to_queue_at = timezone.now()
