@@ -107,8 +107,8 @@ def generate_custom_fields_report(
     report_status = ReportStatus.objects.get(uuid=report_status_id)
 
     try:
-        # Update to processing
-        report_status.status = "processing"
+        # Update to in_progress
+        report_status.status = "in_progress"
         report_status.save()
 
         # Generate the report: filter only known models and ignore auxiliary keys (ex.: 'type')
@@ -186,8 +186,8 @@ def generate_custom_fields_report(
             except Exception as e:
                 logger.exception("Error sending email report: %s", e)
 
-        # Update to completed
-        report_status.status = "completed"
+        # Update to ready
+        report_status.status = "ready"
         report_status.save()
 
     except Exception as e:
@@ -228,7 +228,7 @@ def process_pending_reports():
         if not report:
             logging.info("No pending reports to process.")
             return
-        report.status = "processing"
+        report.status = "in_progress"
         report.save()
 
     project = report.project
@@ -460,7 +460,7 @@ def process_pending_reports():
             except Exception as e:
                 logging.exception("Error sending email report: %s", e)
 
-        report.status = "completed"
+        report.status = "ready"
         report.save()
 
     except Exception as e:
