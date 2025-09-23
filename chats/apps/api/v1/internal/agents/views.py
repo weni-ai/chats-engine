@@ -24,9 +24,11 @@ class AgentDisconnectView(APIView):
         )
 
         with transaction.atomic():
-            active_qs = (
-                CustomStatus.objects.select_for_update()
-                .filter(user=target_user, project=project, is_active=True)
+            active_qs = CustomStatus.objects.select_for_update().filter(
+                user=target_user,
+                project=project,
+                is_active=True,
+                status_type__config__created_by_system__isnull=True,
             )
             closed_count = active_qs.update(is_active=False)
 
