@@ -159,6 +159,7 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
     protocol = serializers.CharField(read_only=True)
     callid = serializers.SerializerMethodField()
     automatic_message_sent_at = serializers.SerializerMethodField()
+    first_user_assigned_at = serializers.DateTimeField()
 
     class Meta:
         model = Room
@@ -175,6 +176,7 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
             "protocol",
             "callid",
             "automatic_message_sent_at",
+            "first_user_assigned_at",
         ]
 
     def get_user_name(self, obj):
