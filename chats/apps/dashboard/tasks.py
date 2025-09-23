@@ -214,7 +214,7 @@ def process_pending_reports():
             stale_after = datetime.now(timezone.utc) - timedelta(seconds=stale_seconds)
         else:
             stale_after = datetime.now(timezone.utc) - timedelta(
-                minutes=getattr(settings, "REPORTS_STALE_MINUTES", 10)
+                minutes=getattr(settings, "REPORTS_STALE_MINUTES", 1)
             )
         report = (
             ReportStatus.objects.select_for_update(skip_locked=True)
