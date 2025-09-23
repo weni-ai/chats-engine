@@ -220,7 +220,7 @@ def process_pending_reports():
             ReportStatus.objects.select_for_update(skip_locked=True)
             .filter(
                 Q(status__in=["pending", "failed"])
-                | Q(status="processing", modified_on__lt=stale_after)
+                | Q(status="in_progress", modified_on__lt=stale_after)  # Corrigir aqui
             )
             .order_by("created_on")
             .first()
