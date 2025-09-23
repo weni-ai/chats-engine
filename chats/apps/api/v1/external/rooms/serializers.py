@@ -224,8 +224,8 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
             return max(
                 int(
                     (
-                        obj.first_user_assigned_at
-                        - automatic_message.message.created_on
+                        automatic_message.message.created_on
+                        - obj.first_user_assigned_at
                     ).total_seconds()
                 ),
                 0,
