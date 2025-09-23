@@ -270,7 +270,7 @@ class Room(BaseModel, BaseConfigurableModel):
         if self.user and not self.user_assigned_at or user_has_changed:
             self.user_assigned_at = timezone.now()
 
-        if self.user and not self.first_user_assigned_at:
+        if self.is_active and self.user and not self.first_user_assigned_at:
             if self.user_assigned_at:
                 self.first_user_assigned_at = self.user_assigned_at
             else:
