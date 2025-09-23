@@ -208,7 +208,10 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
         ).first()
 
         if automatic_message:
-            return automatic_message.message.created_on.isoformat()
+            msg_date = pendulum.instance(automatic_message.message.created_on).in_tz(
+                "America/Sao_Paulo"
+            )
+            return msg_date.isoformat()
 
         return None
 
