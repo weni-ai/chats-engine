@@ -160,6 +160,7 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
     callid = serializers.SerializerMethodField()
     automatic_message_sent_at = serializers.SerializerMethodField()
     first_user_assigned_at = serializers.DateTimeField()
+    time_to_send_automatic_message = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -207,6 +208,20 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
 
         if automatic_message:
             return automatic_message.message.created_on.isoformat()
+
+        return None
+
+    def get_time_to_send_automatic_message(self, obj: Room) -> Optional[str]:
+        automatic_message: AutomaticMessage = AutomaticMessage.objects.filter(
+            room=obj
+        ).first()
+
+        if automatic_message and obj.first_user_assigned_at:
+            return int(
+                (
+                    obj.first_user_assigned_at - automatic_message.message.created_on
+                ).total_seconds()
+            )
 
         return None
 
