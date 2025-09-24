@@ -280,8 +280,10 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             )
         elif "rooms." in event.get("action"):
             content = event.get("content", {})
+
             if isinstance(content, str):
                 content = json.loads(content)
+
             room_uuid = content.get("uuid")
 
             if not room_uuid:
