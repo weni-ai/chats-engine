@@ -50,6 +50,7 @@ from chats.apps.api.v1.rooms.serializers import (
     RoomInfoSerializer,
     RoomMessageStatusSerializer,
     RoomSerializer,
+    RoomTagSerializer,
     RoomsReportSerializer,
     TransferRoomSerializer,
 )
@@ -100,7 +101,11 @@ class RoomViewset(
 
     def get_permissions(self):
         permission_classes = [permissions.IsAuthenticated]
-        if self.action != "list":
+
+        if self.action == "tags":
+            permission_classes.append(api_permissions.HasObjectProjectPermission)
+
+        elif self.action != "list":
             permission_classes = (
                 permissions.IsAuthenticated,
                 api_permissions.IsQueueAgent,
@@ -835,6 +840,27 @@ class RoomViewset(
             return Response({"detail": str(e)}, status=status.HTTP_403_FORBIDDEN)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="tags",
+        serializer_class=RoomTagSerializer,
+    )
+    def tags(self, request: Request, pk=None) -> Response:
+        room: Room = self.get_object()
+
+        tags = room.tags.all()
+
+        page = self.paginate_queryset(tags)
+
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(tags, many=True)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class RoomsReportViewSet(APIView):

@@ -16,6 +16,7 @@ from chats.apps.api.v1.queues.serializers import QueueSerializer
 from chats.apps.api.v1.sectors.serializers import DetailSectorTagSerializer
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room, RoomPin
+from chats.apps.sectors.models import SectorTag
 
 
 class RoomMessageStatusSerializer(serializers.Serializer):
@@ -411,3 +412,9 @@ class PinRoomSerializer(serializers.Serializer):
 
     # True to pin, False to unpin
     status = serializers.BooleanField(required=True)
+
+
+class RoomTagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SectorTag
+        fields = ["uuid", "name"]
