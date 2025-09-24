@@ -6,6 +6,11 @@ from chats.apps.accounts.authentication.drf.authorization import (
 )
 from chats.apps.api.v1.external.queues.filters import QueueFlowFilter
 from chats.apps.api.v1.external.queues.serializers import QueueFlowSerializer
+from chats.apps.api.v1.external.throttling import (
+    ExternalHourRateThrottle,
+    ExternalMinuteRateThrottle,
+    ExternalSecondRateThrottle,
+)
 from chats.apps.queues.models import Queue
 
 
@@ -18,6 +23,11 @@ class QueueFlowViewset(viewsets.ReadOnlyModelViewSet):
 
     lookup_field = "uuid"
     authentication_classes = [ProjectAdminAuthentication]
+    throttle_classes = [
+        ExternalSecondRateThrottle,
+        ExternalMinuteRateThrottle,
+        ExternalHourRateThrottle,
+    ]
 
     def get_queryset(self):
         permission = self.request.auth

@@ -27,3 +27,23 @@ class RoomMetrics(BaseModel):
     @property
     def project(self):
         return self.room.project
+
+
+class ReportStatus(BaseModel):
+    project = models.ForeignKey("projects.Project", on_delete=models.CASCADE)
+    user = models.ForeignKey("accounts.User", on_delete=models.CASCADE)
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ("pending", "Pending"),
+            ("ready", "Ready"),
+            ("in_progress", "In Progress"),
+            ("failed", "Failed"),
+        ],
+        default="pending",
+    )
+    fields_config = models.JSONField()
+    error_message = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"Report Status: {self.project.name} - {self.status}"

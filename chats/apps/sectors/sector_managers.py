@@ -1,6 +1,5 @@
-from django.db import models
+from chats.core.managers import SoftDeletableManager
 
 
-class SectorManager(models.Manager):
-    def get_queryset(self):
-        return super().get_queryset().filter(is_deleted=False)
+class SectorManager(SoftDeletableManager):
+    pass

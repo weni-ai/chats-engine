@@ -17,6 +17,7 @@ from django.db.models import (
 from django.utils import timezone
 from django.utils.timezone import make_aware
 from django.utils.translation import gettext_lazy as _
+from chats.core.cache_utils import get_user_id_by_email_cached
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
@@ -95,7 +96,7 @@ class RoomViewset(
     filterset_class = room_filters.RoomFilter
     search_fields = ["contact__name", "urn", "protocol", "service_chat"]
     ordering_fields = "__all__"
-    ordering = ["user", "-last_interaction", "created_on"]
+    ordering = ["user", "-last_interaction", "created_on", "added_to_queue_at"]
     pagination_class = RoomListPagination
 
     def get_permissions(self):
@@ -488,7 +489,16 @@ class RoomViewset(
         room: Room = self.get_object()
         user: User = request.user
 
+        logger.info(
+            f"[PICK_QUEUE_ROOM] Starting room pick - Room: {room.uuid}, "
+            f"User: {user.email}, Queue: {room.queue.name if room.queue else 'None'}"
+        )
+
         if room.user:
+            logger.warning(
+                f"[PICK_QUEUE_ROOM] Room already assigned - Room: {room.uuid}, "
+                f"Current User: {room.user.email}, Requested User: {user.email}"
+            )
             raise ValidationError(
                 {"detail": _("Room is not queued")}, code="room_is_not_queued"
             )
@@ -500,26 +510,42 @@ class RoomViewset(
             to=user,
         )
 
-        room.user = user
-        room.save()
-        room.add_transfer_to_history(feedback)
+        try:
+            room.user = user
+            room.save()
+            room.add_transfer_to_history(feedback)
 
-        room_metric = RoomMetrics.objects.select_related("room").get_or_create(
-            room=room
-        )[0]
-        room_metric.waiting_time += calculate_last_queue_waiting_time(room)
-        room_metric.queued_count += 1
-        room_metric.save()
+            create_room_feedback_message(
+                room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+            )
+            room.notify_queue("update")
 
-        create_room_feedback_message(
-            room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
-        )
-        room.notify_queue("update")
-        room.update_ticket()
+            room.send_automatic_message()
 
-        return Response(
-            {"detail": _("Room picked successfully")}, status=status.HTTP_200_OK
-        )
+            room_metric = RoomMetrics.objects.select_related("room").get_or_create(
+                room=room
+            )[0]
+            room_metric.waiting_time += calculate_last_queue_waiting_time(room)
+            room_metric.queued_count += 1
+            room_metric.save()
+
+            # Use async ticket update to avoid blocking the response
+            room.update_ticket_async()
+
+            return Response(
+                {
+                    "detail": _("Room picked successfully"),
+                    "room_uuid": str(room.uuid),
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as exc:
+            logger.error(
+                f"[PICK_QUEUE_ROOM] Error during room pick - Room: {room.uuid}, "
+                f"User: {user.email}, Error: {str(exc)}"
+            )
+            raise
 
     @action(
         detail=False,
@@ -541,7 +567,16 @@ class RoomViewset(
             )
 
         if user_email:
-            user = User.objects.get(email=user_email)
+            email_l = (user_email or "").lower()
+            uid = get_user_id_by_email_cached(email_l)
+
+            if uid is None:
+                return Response(
+                    {"error": f"User {user_email} not found"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            user = User.objects.get(pk=uid)
 
             for room in rooms_list:
                 old_user = room.user
@@ -564,6 +599,9 @@ class RoomViewset(
                     from_=transfer_user,
                     to=user,
                 )
+
+                old_user_assigned_at = room.user_assigned_at
+
                 room.user = user
                 room.save()
 
@@ -585,9 +623,13 @@ class RoomViewset(
                 room.notify_queue("update")
 
                 room.update_ticket()
-
-                # Mark all notes as non-deletable when room is transferred
                 room.mark_notes_as_non_deletable()
+                if (
+                    not old_user_assigned_at
+                    and room.queue.sector.is_automatic_message_active
+                    and room.queue.sector.automatic_message_text
+                ):
+                    room.send_automatic_message()
 
         if queue_uuid:
             queue = Queue.objects.get(uuid=queue_uuid)

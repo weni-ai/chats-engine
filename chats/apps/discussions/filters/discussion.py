@@ -3,6 +3,9 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 
+from chats.apps.projects.models.models import ProjectPermission
+from chats.core.cache_utils import get_user_id_by_email_cached
+
 from ..models import Discussion
 
 User = get_user_model()
@@ -36,11 +39,16 @@ class DiscussionFilter(filters.FilterSet):
         ):
             return queryset.filter(queue__sector__project=value)
 
-        user = self.request.query_params.get("email") or self.request.user
-        if not isinstance(user, User):
-            user = User.objects.get(email=user)
+        user_param = self.request.query_params.get("email") or self.request.user
+        if isinstance(user_param, User):
+            user_email = (user_param.email or "").lower()
+        else:
+            user_email = (user_param or "").lower()
+            uid = get_user_id_by_email_cached(user_email)
+            if uid is None:
+                return queryset.none()
 
-        permission = user.project_permissions.get(project=value)
+        permission = ProjectPermission.objects.get(project=value, user_id=user_email)
 
         queues_filter = (
             Q(queue__sector__project=value)
@@ -49,6 +57,5 @@ class DiscussionFilter(filters.FilterSet):
         )
 
         return queryset.filter(
-            Q(queues_filter & Q(is_queued=True))
-            | Q(Q(added_users__permission=permission))
+            (queues_filter & Q(is_queued=True)) | Q(added_users__permission=permission)
         ).distinct()

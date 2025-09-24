@@ -39,7 +39,8 @@ class MessageViewset(
         return qs
 
     def create(self, request, *args, **kwargs):
-        # TODO USE THE REQUEST.USER TO SET THE USER IN THE MESSAGE
+        request.data["user"] = request.user
+
         return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):

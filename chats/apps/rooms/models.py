@@ -111,6 +111,9 @@ class Room(BaseModel, BaseConfigurableModel):
         _("service chat"), null=True, blank=True, default=""
     )
 
+    first_user_assigned_at = models.DateTimeField(
+        _("First user assigned at"), null=True, blank=True
+    )
     user_assigned_at = models.DateTimeField(
         _("User assigned at"), null=True, blank=True
     )
@@ -208,6 +211,12 @@ class Room(BaseModel, BaseConfigurableModel):
         if self.user and not self.user_assigned_at or user_has_changed:
             self.user_assigned_at = timezone.now()
 
+        if self.is_active and self.user and not self.first_user_assigned_at:
+            if self.user_assigned_at:
+                self.first_user_assigned_at = self.user_assigned_at
+            else:
+                self.first_user_assigned_at = timezone.now()
+
         if user_has_changed and not self.user:
             self.added_to_queue_at = timezone.now()
 
@@ -219,6 +228,19 @@ class Room(BaseModel, BaseConfigurableModel):
         super().save(*args, **kwargs)
 
         self._update_agent_service_status(is_new)
+
+    def send_automatic_message(self):
+        from chats.apps.sectors.tasks import send_automatic_message
+
+        if (
+            self.user
+            and self.user_assigned_at is not None
+            and self.queue.sector.is_automatic_message_active
+            and self.queue.sector.automatic_message_text
+        ):
+            send_automatic_message.delay(
+                self.uuid, self.queue.sector.automatic_message_text, self.user.id
+            )
 
     def get_permission(self, user):
         try:
@@ -460,8 +482,33 @@ class Room(BaseModel, BaseConfigurableModel):
         return not self.is_active or perm.is_manager(any_sector=True)
 
     def update_ticket(self):
+        """
+        Synchronously update ticket assignee.
+        """
         if self.ticket_uuid and self.user:
             FlowRESTClient().update_ticket_assignee(self.ticket_uuid, self.user.email)
+
+    def update_ticket_async(self):
+        """
+        Asynchronously update ticket assignee using Celery task.
+        This method is non-blocking and provides retry functionality.
+        """
+        if self.ticket_uuid and self.user:
+            from chats.apps.rooms.tasks import update_ticket_assignee_async
+
+            task = update_ticket_assignee_async.delay(
+                room_uuid=str(self.uuid),
+                ticket_uuid=self.ticket_uuid,
+                user_email=self.user.email,
+            )
+
+            logger.info(
+                f"[ROOM] Launched async ticket update task - Room: {self.uuid}, "
+                f"Ticket: {self.ticket_uuid}, User: {self.user.email}, "
+                f"Task ID: {task.id}"
+            )
+
+            return task
 
     def can_pick_queue(self, user: User) -> bool:
         """

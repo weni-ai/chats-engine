@@ -30,6 +30,11 @@ from chats.apps.api.v1.external.rooms.serializers import (
     RoomListSerializer,
     RoomMetricsSerializer,
 )
+from chats.apps.api.v1.external.throttling import (
+    ExternalHourRateThrottle,
+    ExternalMinuteRateThrottle,
+    ExternalSecondRateThrottle,
+)
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.queues.utils import (
@@ -211,6 +216,12 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         if instance.user:
             create_room_assigned_from_queue_feedback(instance, instance.user)
 
+            if (
+                instance.queue.sector.is_automatic_message_active
+                and instance.queue.sector.automatic_message_text
+            ):
+                instance.send_automatic_message()
+
         room.notify_billing()
 
         if room.queue.sector.project.has_chats_summary:
@@ -287,9 +298,9 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
                 status.HTTP_400_BAD_REQUEST,
             )
         try:
-            agent = filters.get("agent")
+            agent = (filters.get("agent") or "").lower()
             project = room.project
-            agent_permission = project.permissions.get(user__email=agent)
+            agent_permission = project.permissions.get(user_id=agent)
         except ObjectDoesNotExist:
             return Response(
                 {
@@ -331,6 +342,11 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
 class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
     serializer_class = RoomFlowSerializer
     authentication_classes = [ProjectAdminAuthentication]
+    throttle_classes = [
+        ExternalSecondRateThrottle,
+        ExternalMinuteRateThrottle,
+        ExternalHourRateThrottle,
+    ]
 
     def partial_update(self, request, pk=None):
         custom_fields_update = request.data
@@ -390,6 +406,11 @@ class ExternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = RoomListSerializer
     lookup_field = "uuid"
     authentication_classes = [ProjectAdminAuthentication]
+    throttle_classes = [
+        ExternalSecondRateThrottle,
+        ExternalMinuteRateThrottle,
+        ExternalHourRateThrottle,
+    ]
 
     filter_backends = [
         filters.OrderingFilter,
@@ -432,6 +453,11 @@ class ExternalListWithPaginationRoomsViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = RoomListSerializer
     lookup_field = "uuid"
     authentication_classes = [ProjectAdminAuthentication]
+    throttle_classes = [
+        ExternalSecondRateThrottle,
+        ExternalMinuteRateThrottle,
+        ExternalHourRateThrottle,
+    ]
 
     filter_backends = [
         filters.OrderingFilter,
@@ -475,6 +501,11 @@ class RoomMetricsViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = RoomMetricsSerializer
     lookup_field = "uuid"
     authentication_classes = [ProjectAdminAuthentication]
+    throttle_classes = [
+        ExternalSecondRateThrottle,
+        ExternalMinuteRateThrottle,
+        ExternalHourRateThrottle,
+    ]
 
     filter_backends = [
         filters.OrderingFilter,

@@ -46,6 +46,7 @@ class RoomSerializer(serializers.ModelSerializer):
     full_transfer_history = serializers.JSONField(
         required=False, read_only=True, default=list
     )
+    added_to_queue_at = serializers.DateTimeField(read_only=True)
 
     class Meta:
         model = Room
@@ -61,6 +62,7 @@ class RoomSerializer(serializers.ModelSerializer):
             "can_edit_custom_fields",
             "imported_history_url",
             "full_transfer_history",
+            "added_to_queue_at",
         ]
 
     def get_is_24h_valid(self, room: Room) -> bool:
@@ -121,6 +123,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
     is_active = serializers.BooleanField(default=True)
     imported_history_url = serializers.CharField(read_only=True, default="")
     is_pinned = serializers.SerializerMethodField()
+    added_to_queue_at = serializers.DateTimeField(read_only=True)
 
     class Meta:
         model = Room
@@ -144,6 +147,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
             "config",
             "imported_history_url",
             "is_pinned",
+            "added_to_queue_at",
         ]
 
     def get_user(self, room: Room):
@@ -197,13 +201,8 @@ class ListRoomSerializer(serializers.ModelSerializer):
 
 class TransferRoomSerializer(serializers.ModelSerializer):
     user = UserSerializer(many=False, required=False, read_only=True)
-    user_email = serializers.SlugRelatedField(
-        queryset=User.objects.all(),
-        required=False,
-        source="user",
-        slug_field="email",
-        write_only=True,
-        allow_null=True,
+    user_email = serializers.EmailField(
+        write_only=True, required=False, allow_null=True
     )
     queue_uuid = serializers.PrimaryKeyRelatedField(
         queryset=Queue.objects.all(), required=False, source="queue", write_only=True
@@ -238,6 +237,17 @@ class TransferRoomSerializer(serializers.ModelSerializer):
             "contact": {"required": False, "read_only": True, "allow_null": False},
             "user": {"required": False, "read_only": True, "allow_null": False},
         }
+
+    def validate(self, attrs):
+        email = attrs.pop("user_email", None)
+        if email:
+            from chats.core.cache_utils import get_user_id_by_email_cached
+
+            uid = get_user_id_by_email_cached(email)
+            if uid is None:
+                raise serializers.ValidationError({"user_email": "not found"})
+            attrs["user_id"] = email.lower()
+        return super().validate(attrs)
 
     def get_linked_user(self, room: Room):
         try:

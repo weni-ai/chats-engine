@@ -1,3 +1,117 @@
+# 3.26.2
+# Add
+  - sectors automatic messages
+
+# 3.26.1
+# Add
+  - throttling in external endpoints
+
+# 3.26.0
+# Add
+  - Export feature
+    
+# 3.25.8
+# Add
+  - Add 'added_to_queue_at' field as read-only in RoomSerializer
+    
+# 3.25.7
+# Add
+  - Add secondary project filter to RoomMetricsFilter
+    
+# 3.25.6
+# Fix
+  - Assync get in manager ws class
+    
+# 3.25.5
+# Add
+  - Add rooms contacts external id filter for metrics
+
+# 3.25.4
+# Fix
+  - Passing user email in agents serializers
+
+# 3.25.3 
+# Fix
+  - Passing url for user disconnect
+
+# 3.25.2
+# Add
+  - Daphne serving ws
+  - User disconnect feature 
+
+# 3.25.1
+## Fix
+  - Fix in holiday cache and constraint
+
+# 3.25.0
+## Add
+  - New feature, working day.
+
+# 3.24.2
+## Fix
+  - updating the ticket uuid field and callback url when a flow is triggered for an already open room
+    
+# 3.24.1
+## Add
+  - releasing status message feature for all projects
+ 
+# 3.24.0
+## Add
+  - Growthbook client
+  - Feature flag service + endpoint
+  - Users feedback
+
+# 3.23.21
+## Add
+  - callid custom field in rooms metrics endpoint
+## Fix
+  - Module has permission broken tests
+
+# 3.23.20
+## Add
+  - Protocol field in rooms metrics endpoint
+  - Configuration to separate websocket pods from engine pods
+  - Configuration to use celery beat
+
+## Fix
+  - Agents list open rooms count for Insights dashboard
+
+# 3.23.19
+## Fix
+  - Race condition in route rooms for queue
+
+# 3.23.18
+## Add
+  - Internal ORM queries with soft-deleted instances
+  - Unit tests for online agents in queue management
+## Fix
+  - Active rooms filtered by multiple sectors in internal endpoint used by Insights
+  - Fix in how get the protocol field when opening rooms, to prevent the protocol field from arriving as an empty string and being saved incorrectly
+
+# 3.23.17
+## Add
+  - Agents management control endpoint
+
+# 3.23.16
+## Fix
+  - Adjust pick queue room logic
+
+# 3.23.15
+## Add
+  - added_to_queue_at ordering filter to the Rooms endpoint
+
+# 3.23.14
+## Fix
+  - Waiting time metric to consider the automatic rooms routing
+
+# 3.23.13
+## Fix
+  - Use queue assignment date to prioritize rooms routing
+
+# 3.23.12
+## Add
+  - More logs and retries in Message and MessageMedia models when sending messages to flows
+
 # 3.23.11
 ## Add
  - Adapting the message consumer to receive new statuses
@@ -626,3 +740,16 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
+
+
+
+
+
+
+
+
+
+
+
+
