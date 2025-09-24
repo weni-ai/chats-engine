@@ -1387,6 +1387,16 @@ class TestListRoomTagsAuthenticatedUser(BaseTestListRoomTags):
     @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
     @with_queue_authorization(role=QueueAuthorization.ROLE_AGENT)
     def test_list_room_tags_with_permission(self):
+        another_room = Room.objects.create(
+            queue=self.queue,
+            user=self.user,
+        )
+        tag = SectorTag.objects.create(
+            name="Test Tag 3",
+            sector=self.sector,
+        )
+        another_room.tags.add(tag)
+
         response = self.list_room_tags(self.room.uuid)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
