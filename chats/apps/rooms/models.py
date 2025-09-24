@@ -126,7 +126,7 @@ class Room(BaseModel, BaseConfigurableModel):
         Returns True if the room has been billed
         """
         return self.get_config("is_billing_notified", False)
-    
+
     def mark_notes_as_non_deletable(self):
         """
         Mark all notes in this room as non-deletable when room is transferred
@@ -572,10 +572,12 @@ class RoomPin(BaseModel):
             )
         ]
 
+
 class RoomNote(BaseModel):
     """
     Internal notes for rooms that can be created by agents
     """
+
     room = models.ForeignKey(
         "rooms.Room",
         related_name="notes",
@@ -590,13 +592,20 @@ class RoomNote(BaseModel):
     )
     text = models.TextField(_("text"))
     is_deletable = models.BooleanField(_("is deletable"), default=True)
-    message = models.OneToOneField("msgs.Message", related_name="internal_note", verbose_name=_("message"), on_delete=models.CASCADE, null=True, blank=True)
-    
+    message = models.OneToOneField(
+        "msgs.Message",
+        related_name="internal_note",
+        verbose_name=_("message"),
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+
     class Meta:
         verbose_name = _("Room Note")
         verbose_name_plural = _("Room Notes")
         ordering = ["-created_on"]
-    
+
     @property
     def serialized_ws_data(self):
         """
@@ -605,15 +614,12 @@ class RoomNote(BaseModel):
         return {
             "uuid": str(self.uuid),
             "room": str(self.room.uuid),
-            "user": {
-                "uuid": str(self.user.uuid),
-                "name": self.user.name
-            },
+            "user": {"uuid": str(self.user.pk), "name": self.user.name},
             "text": self.text,
             "created_on": self.created_on.isoformat(),
-            "is_deletable": self.is_deletable
+            "is_deletable": self.is_deletable,
         }
-    
+
     def notify_websocket(self, action):
         """
         Send WebSocket notification for note actions
@@ -623,13 +629,10 @@ class RoomNote(BaseModel):
             content = self.serialized_ws_data
         elif action == "delete":
             event_name = "room_note.delete"
-            content = {
-                "uuid": str(self.uuid),
-                "room": str(self.room.uuid)
-            }
+            content = {"uuid": str(self.uuid), "room": str(self.room.uuid)}
         else:
             return
-            
+
         # Send to room group
         send_channels_group(
             group_name=f"room_{self.room.uuid}",
@@ -637,7 +640,7 @@ class RoomNote(BaseModel):
             content=content,
             action=event_name,
         )
-        
+
         # Send to queue or user permission group
         if self.room.user:
             permission = self.room.get_permission(self.room.user)

@@ -402,26 +402,23 @@ class PinRoomSerializer(serializers.Serializer):
     # True to pin, False to unpin
     status = serializers.BooleanField(required=True)
 
+
 class RoomNoteSerializer(serializers.ModelSerializer):
     """
     Serializer for room notes
     """
+
     user = serializers.SerializerMethodField()
     is_deletable = serializers.ReadOnlyField()
-    
+
     class Meta:
         model = RoomNote
-        fields = [
-            "uuid",
-            "created_on",
-            "user",
-            "text",
-            "is_deletable"
-        ]
+        fields = ["uuid", "created_on", "user", "text", "is_deletable"]
         read_only_fields = ["uuid", "created_on", "user", "is_deletable"]
-    
+
     def get_user(self, obj):
         return {
-            "uuid": str(obj.user.uuid),
-            "name": obj.user.name
+            "uuid": str(obj.user.pk),
+            "name": obj.user.full_name,
+            "email": obj.user.email,
         }

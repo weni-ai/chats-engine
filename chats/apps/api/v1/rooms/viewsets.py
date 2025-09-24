@@ -20,7 +20,7 @@ from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied, ValidationError, NotFound
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.filters import OrderingFilter
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -43,9 +43,9 @@ from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1.rooms.pagination import RoomListPagination
 from chats.apps.api.v1.rooms.serializers import (
     ListRoomSerializer,
+    PinRoomSerializer,
     RoomHistorySummaryFeedbackSerializer,
     RoomHistorySummarySerializer,
-    PinRoomSerializer,
     RoomInfoSerializer,
     RoomMessageStatusSerializer,
     RoomNoteSerializer,
@@ -637,8 +637,8 @@ class RoomViewset(
         if not project_uuid:
             return Response({"error": "'project_uuid' is required."}, status=400)
 
-        default_start_date = make_aware(datetime.now() - timedelta(days=30))
-        default_end_date = make_aware(datetime.now())
+        default_start_date = timezone.now() - timedelta(days=30)
+        default_end_date = timezone.now()
 
         try:
             if start_date:
@@ -812,42 +812,42 @@ class RoomViewset(
         Create a note for the room
         """
         room = self.get_object()
-        
+
         # Verify user has access to the room
-        if not verify_user_room(request.user, room):
-            raise PermissionDenied("You don't have permission to add notes to this room")
-        
+        if not verify_user_room(room, request.user):
+            raise PermissionDenied(
+                "You don't have permission to add notes to this room"
+            )
+
         # Room must be active
         if not room.is_active:
             raise ValidationError({"detail": "Cannot add notes to closed rooms"})
-        
+
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
+
         # Create a blank message to attach the internal note
         msg = Message.objects.create(
             room=room,
-            user=None,
+            user=request.user,
             contact=None,
             text="",
         )
-        
+
         # Create the note attached to the message
         note = RoomNote.objects.create(
             room=room,
             user=request.user,
-            text=serializer.validated_data['text'],
+            text=serializer.validated_data["text"],
             message=msg,
         )
-        
+
         # Notify message creation for clients listening to messages
         msg.notify_room("create", True)
-        
+
         # Return serialized note
-        return Response(
-            RoomNoteSerializer(note).data,
-            status=status.HTTP_201_CREATED
-        )
+        return Response(RoomNoteSerializer(note).data, status=status.HTTP_201_CREATED)
+
 
 class RoomsReportViewSet(APIView):
     """
@@ -895,6 +895,7 @@ class RoomsReportViewSet(APIView):
             status=status.HTTP_202_ACCEPTED,
         )
 
+
 class RoomNoteViewSet(
     mixins.ListModelMixin,
     mixins.DestroyModelMixin,
@@ -903,38 +904,45 @@ class RoomNoteViewSet(
     """
     ViewSet for Room Notes
     """
+
     queryset = RoomNote.objects.all()
     serializer_class = RoomNoteSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["room"]
     lookup_field = "uuid"
-    
+
     def get_queryset(self):
         """
         Filter notes based on user permissions
         """
         user = self.request.user
         queryset = super().get_queryset()
-        
-        room_uuid = self.request.query_params.get('room')
+
+        room_uuid = self.request.query_params.get("room")
         if room_uuid:
             queryset = queryset.filter(room__uuid=room_uuid)
-            
-        return queryset.filter(
-            Q(room__user=user) | 
-            Q(room__queue__sector__permissions__user=user)
-        ).distinct()
-    
+
+        return (
+            queryset.filter(
+                Q(room__user=user)
+                | Q(room__queue__sector__project__permissions__user=user)
+            )
+            .distinct()
+            .order_by("created_on")
+        )
+
     def destroy(self, request, *args, **kwargs):
         """
         Delete a room note with validations
         """
         note = self.get_object()
-        
+
         if not note.is_deletable:
-            raise ValidationError({"Note cannot be deleted because it was marked as non-deletable"})
-            
+            raise ValidationError(
+                {"Note cannot be deleted because it was marked as non-deletable"}
+            )
+
         if note.user != request.user:
             raise PermissionDenied("You can only delete your own notes")
 
@@ -942,7 +950,6 @@ class RoomNoteViewSet(
         if not note.room.is_active:
             raise ValidationError({"detail": "Cannot delete notes from closed rooms"})
 
-        
         note.notify_websocket("delete")
-        
+
         return super().destroy(request, *args, **kwargs)

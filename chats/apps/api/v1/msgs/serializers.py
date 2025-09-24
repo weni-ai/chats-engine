@@ -268,7 +268,6 @@ class MessageSerializer(BaseMessageSerializer):
             return None
 
     def get_internal_note(self, obj):
-        # Returns the internal note attached to this message (if any)
         try:
             note = obj.internal_note
         except RoomNote.DoesNotExist:
@@ -278,14 +277,6 @@ class MessageSerializer(BaseMessageSerializer):
 
         if not note:
             return None
-
-        user = note.user
-        user_data = None
-        if user:
-            user_data = {
-                "uuid": str(user.uuid),
-                "name": user.name,
-            }
 
         return {
             "uuid": str(note.uuid),
