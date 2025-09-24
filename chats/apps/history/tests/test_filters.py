@@ -13,7 +13,7 @@ from chats.apps.sectors.models import Sector
 from chats.apps.queues.models import Queue, QueueAuthorization
 
 
-class HistoryRoomFilterTests(TestCase):
+class TestHistoryRoomFilter(TestCase):
     def setUp(self):
         self.user = User.objects.create(email="test@test.com")
         self.project = Project.objects.create(name="Test Project")
@@ -200,3 +200,6 @@ class HistoryRoomFilterTests(TestCase):
         )
 
         self.assertIn(room, queryset)
+
+
+class TestGetHistoryRoomsQuerysetByContact(TestCase):
