@@ -18,7 +18,7 @@ from chats.apps.rooms.exceptions import (
 )
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.utils import create_transfer_json
-from chats.apps.sectors.models import Sector
+from chats.apps.sectors.models import Sector, SectorTag
 
 
 class ConstraintTests(APITestCase):
@@ -327,3 +327,32 @@ class TestRoomModel(TransactionTestCase):
         room.send_automatic_message()
 
         mock_send_automatic_message.assert_not_called()
+
+    def test_change_queue_without_changing_sector(self):
+        other_queue = Queue.objects.create(sector=self.sector, name="Other Queue")
+        tags = SectorTag.objects.create(sector=self.sector, name="Test Tag")
+
+        room = Room.objects.create(queue=self.queue)
+        room.tags.add(tags)
+        self.assertEqual(room.tags.count(), 1)
+
+        room.queue = other_queue
+        room.save()
+
+        self.assertEqual(room.tags.count(), 1)
+
+    def test_change_queue_changing_sector(self):
+        other_queue = Queue.objects.create(
+            sector=Sector.objects.create(project=self.project, name="Other Sector"),
+            name="Other Queue",
+        )
+        tags = SectorTag.objects.create(sector=self.sector, name="Test Tag")
+
+        room = Room.objects.create(queue=self.queue)
+        room.tags.add(tags)
+        self.assertEqual(room.tags.count(), 1)
+
+        room.queue = other_queue
+        room.save()
+
+        self.assertEqual(room.tags.count(), 0)
