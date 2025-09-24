@@ -221,10 +221,14 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
         ).first()
 
         if automatic_message and obj.first_user_assigned_at:
-            return int(
-                (
-                    obj.first_user_assigned_at - automatic_message.message.created_on
-                ).total_seconds()
+            return max(
+                int(
+                    (
+                        automatic_message.message.created_on
+                        - obj.first_user_assigned_at
+                    ).total_seconds()
+                ),
+                0,
             )
 
         return None
