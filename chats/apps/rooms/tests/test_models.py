@@ -343,7 +343,13 @@ class TestRoomModel(TransactionTestCase):
 
     def test_change_queue_changing_sector(self):
         other_queue = Queue.objects.create(
-            sector=Sector.objects.create(project=self.project, name="Other Sector"),
+            sector=Sector.objects.create(
+                project=self.project,
+                name="Other Sector",
+                rooms_limit=10,
+                work_start="09:00",
+                work_end="18:00",
+            ),
             name="Other Queue",
         )
         tags = SectorTag.objects.create(sector=self.sector, name="Test Tag")
