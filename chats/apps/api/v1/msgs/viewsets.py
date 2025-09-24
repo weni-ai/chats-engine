@@ -15,7 +15,6 @@ from chats.apps.api.v1.msgs.serializers import (
 )
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
-from chats.apps.rooms.models import RoomNote
 
 
 class MessageViewset(
