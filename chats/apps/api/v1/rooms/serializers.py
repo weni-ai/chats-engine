@@ -14,6 +14,9 @@ from chats.apps.api.v1.contacts.serializers import ContactRelationsSerializer
 from chats.apps.api.v1.msgs.serializers import MessageSerializer
 from chats.apps.api.v1.queues.serializers import QueueSerializer
 from chats.apps.api.v1.sectors.serializers import DetailSectorTagSerializer
+from chats.apps.history.filters.rooms_filter import (
+    get_history_rooms_queryset_by_contact,
+)
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room, RoomPin
 
@@ -124,6 +127,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
     imported_history_url = serializers.CharField(read_only=True, default="")
     is_pinned = serializers.SerializerMethodField()
     added_to_queue_at = serializers.DateTimeField(read_only=True)
+    has_history = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -148,6 +152,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
             "imported_history_url",
             "is_pinned",
             "added_to_queue_at",
+            "has_history",
         ]
 
     def get_user(self, room: Room):
@@ -197,6 +202,13 @@ class ListRoomSerializer(serializers.ModelSerializer):
             return False
 
         return RoomPin.objects.filter(room=room, user=request.user).exists()
+
+    def get_has_history(self, room: Room) -> bool:
+        user = self.context.get("request").user
+
+        return get_history_rooms_queryset_by_contact(
+            room.contact, user, room.queue.sector.project
+        ).exists()
 
 
 class TransferRoomSerializer(serializers.ModelSerializer):
