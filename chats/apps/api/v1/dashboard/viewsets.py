@@ -959,12 +959,12 @@ class ReportFieldsValidatorViewSet(APIView):
 
         project = get_object_or_404(Project, uuid=project_uuid)
         has_completed_export = ReportStatus.objects.filter(
-            project=project, status="completed"
+            project=project, status="ready"
         ).exists()
         if not has_completed_export:
             return Response(
                 {
-                    "status": "READY",
+                    "status": "ready",
                     "email": None,
                     "report_uuid": None,
                 },
@@ -975,16 +975,9 @@ class ReportFieldsValidatorViewSet(APIView):
             ReportStatus.objects.filter(project=project).order_by("-created_on").first()
         )
 
-        status_map = {
-            "pending": "PENDING",
-            "processing": "IN_PROGRESS",
-            "completed": "READY",
-            "failed": "FAILED",
-        }
-
         return Response(
             {
-                "status": status_map.get(report_status.status, "PENDING"),
+                "status": report_status.status,
                 "email": report_status.user.email,
                 "report_uuid": str(report_status.uuid),
             },
