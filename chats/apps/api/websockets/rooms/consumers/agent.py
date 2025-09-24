@@ -9,6 +9,7 @@ from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
+from django.core.serializers.json import DjangoJSONEncoder
 
 from chats.apps.api.v1.prometheus.metrics import (
     ws_active_connections,
@@ -293,11 +294,17 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
 
             try:
                 has_history = await self.get_has_history_by_room_uuid(room_uuid)
+                content["has_history"] = has_history
+
+                event["content"] = json.dumps(
+                    content,
+                    sort_keys=True,
+                    indent=1,
+                    cls=DjangoJSONEncoder,
+                )
             except Exception as e:
                 logger.error(f"Error getting history rooms queryset by contact: {e}")
                 return self.send_json(event)
-
-            event["content"]["has_history"] = has_history
 
             await self.send_json(event)
         else:
