@@ -5,7 +5,6 @@ from chats.apps.accounts.models import User
 from chats.apps.contacts.models import Contact
 from chats.apps.history.filters.rooms_filter import (
     filter_history_rooms_queryset_by_project_permission,
-    get_history_rooms_queryset_by_contact,
 )
 from chats.apps.projects.models.models import Project, ProjectPermission
 from chats.apps.rooms.models import Room
@@ -200,6 +199,3 @@ class TestHistoryRoomFilter(TestCase):
         )
 
         self.assertIn(room, queryset)
-
-
-class TestGetHistoryRoomsQuerysetByContact(TestCase):

@@ -1,6 +1,3 @@
-from typing import TYPE_CHECKING
-
-
 from django.db.models import QuerySet
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
