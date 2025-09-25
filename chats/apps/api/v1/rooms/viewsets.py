@@ -17,7 +17,6 @@ from django.db.models import (
 from django.utils import timezone
 from django.utils.timezone import make_aware
 from django.utils.translation import gettext_lazy as _
-from chats.core.cache_utils import get_user_id_by_email_cached
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
@@ -42,6 +41,7 @@ from chats.apps.api.v1.internal.rest_clients.openai_rest_client import OpenAICli
 from chats.apps.api.v1.msgs.serializers import ChatCompletionSerializer
 from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1.rooms.pagination import RoomListPagination
+from chats.apps.api.v1.rooms.permissions import RoomNotePermission
 from chats.apps.api.v1.rooms.serializers import (
     ListRoomSerializer,
     PinRoomSerializer,
@@ -76,6 +76,7 @@ from chats.apps.rooms.views import (
     update_custom_fields,
     update_flows_custom_fields,
 )
+from chats.core.cache_utils import get_user_id_by_email_cached
 
 logger = logging.getLogger(__name__)
 
@@ -949,7 +950,7 @@ class RoomNoteViewSet(
 
     queryset = RoomNote.objects.all()
     serializer_class = RoomNoteSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RoomNotePermission]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["room"]
     lookup_field = "uuid"
@@ -973,6 +974,20 @@ class RoomNoteViewSet(
             .distinct()
             .order_by("created_on")
         )
+
+    def list(self, request, *args, **kwargs):
+        """
+        List room notes with additional validations
+        """
+
+        room_uuid = request.query_params.get("room")
+        if not room_uuid:
+            raise ValidationError({"detail": "Room UUID is required"})
+
+        if not Room.objects.filter(uuid=room_uuid).exists():
+            raise ValidationError({"detail": "Room not found"})
+
+        return super().list(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
         """
