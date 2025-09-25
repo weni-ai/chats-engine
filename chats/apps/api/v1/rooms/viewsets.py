@@ -43,6 +43,7 @@ from chats.apps.api.v1.msgs.serializers import ChatCompletionSerializer
 from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1.rooms.pagination import RoomListPagination
 from chats.apps.api.v1.rooms.serializers import (
+    AddOrRemoveTagFromRoomSerializer,
     ListRoomSerializer,
     RoomHistorySummaryFeedbackSerializer,
     RoomHistorySummarySerializer,
@@ -861,6 +862,30 @@ class RoomViewset(
         serializer = self.get_serializer(tags, many=True)
 
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="tags/add",
+        url_name="add-tag",
+        serializer_class=AddOrRemoveTagFromRoomSerializer,
+    )
+    def add_tag(self, request: Request, pk=None) -> Response:
+        room: Room = self.get_object()
+
+        if not room.is_active == True:
+            raise ValidationError(
+                {"detail": "Room is not active."},
+                code="room_is_not_active",
+            )
+
+        serializer = self.get_serializer(data=request.data, context={"room": room})
+        serializer.is_valid(raise_exception=True)
+
+        sector_tag = serializer.validated_data.get("sector_tag")
+        room.tags.add(sector_tag)
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class RoomsReportViewSet(APIView):
