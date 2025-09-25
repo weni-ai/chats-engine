@@ -229,7 +229,7 @@ class Room(BaseModel, BaseConfigurableModel):
 
         self._update_agent_service_status(is_new)
 
-    def send_automatic_message(self):
+    def send_automatic_message(self, delay: int = 0):
         from chats.apps.sectors.tasks import send_automatic_message
 
         if (
@@ -238,8 +238,13 @@ class Room(BaseModel, BaseConfigurableModel):
             and self.queue.sector.is_automatic_message_active
             and self.queue.sector.automatic_message_text
         ):
-            send_automatic_message.delay(
-                self.uuid, self.queue.sector.automatic_message_text, self.user.id
+            send_automatic_message.apply_async(
+                args=[
+                    self.uuid,
+                    self.queue.sector.automatic_message_text,
+                    self.user.id,
+                ],
+                countdown=delay,
             )
 
     def get_permission(self, user):

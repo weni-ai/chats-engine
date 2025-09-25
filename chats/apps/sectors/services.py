@@ -50,7 +50,8 @@ class AutomaticMessagesService:
                     message=message,
                 )
 
-                message.notify_room("create", True)
+                transaction.on_commit(lambda: message.notify_room("create", True))
+
                 logger.info(
                     "[AUTOMATIC MESSAGES SERVICE] Automatic message sent to room %s",
                     room.pk,
