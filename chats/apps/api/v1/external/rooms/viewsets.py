@@ -213,6 +213,8 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         notification_method = getattr(instance, f"notify_{notify_level}")
         notification_method(notification_type)
 
+        instance.refresh_from_db()
+
         if instance.user:
             create_room_assigned_from_queue_feedback(instance, instance.user)
 
