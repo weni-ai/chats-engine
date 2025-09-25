@@ -234,7 +234,8 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
                 )  # 30 seconds delay
 
         if (
-            instance.queue.sector.is_automatic_message_active
+            instance.user
+            and instance.queue.sector.is_automatic_message_active
             and instance.queue.sector.automatic_message_text
         ):
             instance.send_automatic_message(delay=1)
