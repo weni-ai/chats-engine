@@ -267,7 +267,7 @@ class TestRoomModel(TransactionTestCase):
         self.assertEqual(room.full_transfer_history, [feedback, other_feedback])
         self.assertEqual(room.transfer_history, other_feedback)
 
-    @patch("chats.apps.sectors.tasks.send_automatic_message.delay")
+    @patch("chats.apps.sectors.tasks.send_automatic_message.apply_async")
     def test_send_automatic_message_when_room_is_created_with_user(
         self, mock_send_automatic_message
     ):
@@ -287,7 +287,7 @@ class TestRoomModel(TransactionTestCase):
             room.uuid, self.sector.automatic_message_text, user.id
         )
 
-    @patch("chats.apps.sectors.tasks.send_automatic_message.delay")
+    @patch("chats.apps.sectors.tasks.send_automatic_message.apply_async")
     def test_send_automatic_message_when_room_is_updated_with_user(
         self, mock_send_automatic_message
     ):
@@ -309,10 +309,11 @@ class TestRoomModel(TransactionTestCase):
         room.send_automatic_message()
 
         mock_send_automatic_message.assert_called_once_with(
-            room.uuid, self.sector.automatic_message_text, user.id
+            args=[room.uuid, self.sector.automatic_message_text, user.id],
+            countdown=0,
         )
 
-    @patch("chats.apps.sectors.tasks.send_automatic_message.delay")
+    @patch("chats.apps.sectors.tasks.send_automatic_message.apply_async")
     def test_do_not_send_automatic_message_when_sector_automatic_message_is_not_active(
         self, mock_send_automatic_message
     ):
