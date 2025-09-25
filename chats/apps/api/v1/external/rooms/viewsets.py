@@ -218,12 +218,6 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         if instance.user:
             create_room_assigned_from_queue_feedback(instance, instance.user)
 
-            if (
-                instance.queue.sector.is_automatic_message_active
-                and instance.queue.sector.automatic_message_text
-            ):
-                instance.send_automatic_message()
-
         room.notify_billing()
 
         if room.queue.sector.project.has_chats_summary:
@@ -238,6 +232,12 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
                 cancel_history_summary_generation.apply_async(
                     args=[history_summary.uuid], countdown=30
                 )  # 30 seconds delay
+
+        if (
+            instance.queue.sector.is_automatic_message_active
+            and instance.queue.sector.automatic_message_text
+        ):
+            instance.send_automatic_message(delay=1)
 
     def perform_update(self, serializer):
         serializer.save()
