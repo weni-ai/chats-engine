@@ -284,7 +284,8 @@ class TestRoomModel(TransactionTestCase):
         room.send_automatic_message()
 
         mock_send_automatic_message.assert_called_once_with(
-            room.uuid, self.sector.automatic_message_text, user.id
+            args=[room.uuid, self.sector.automatic_message_text, user.id],
+            countdown=0,
         )
 
     @patch("chats.apps.sectors.tasks.send_automatic_message.apply_async")
