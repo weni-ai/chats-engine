@@ -38,7 +38,7 @@ from chats.apps.ai_features.history_summary.models import (
 )
 from chats.apps.api.utils import verify_user_room
 from chats.apps.api.v1 import permissions as api_permissions
-from chats.apps.api.v1.msgs.permissions import  MessagePermission
+from chats.apps.api.v1.rooms.permissions import RoomNotePermission
 from chats.apps.api.v1.internal.rest_clients.openai_rest_client import OpenAIClient
 from chats.apps.api.v1.msgs.serializers import ChatCompletionSerializer
 from chats.apps.api.v1.rooms import filters as room_filters
@@ -952,7 +952,7 @@ class RoomNoteViewSet(
     """
     queryset = RoomNote.objects.all()
     serializer_class = RoomNoteSerializer
-    permission_classes = [permissions.IsAuthenticated, MessagePermission]
+    permission_classes = [permissions.IsAuthenticated, RoomNotePermission]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["room"]
     lookup_field = "uuid"
