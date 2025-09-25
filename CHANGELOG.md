@@ -1,3 +1,7 @@
+# 3.26.5
+# Add
+  - Internal note feature
+        
 # 3.26.4
 # Add
   - first_user_assigned_at field to room
@@ -749,6 +753,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 
