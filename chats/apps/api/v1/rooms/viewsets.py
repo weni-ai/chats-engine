@@ -38,6 +38,7 @@ from chats.apps.ai_features.history_summary.models import (
 )
 from chats.apps.api.utils import verify_user_room
 from chats.apps.api.v1 import permissions as api_permissions
+from chats.apps.api.v1.msgs.permissions import  MessagePermission
 from chats.apps.api.v1.internal.rest_clients.openai_rest_client import OpenAIClient
 from chats.apps.api.v1.msgs.serializers import ChatCompletionSerializer
 from chats.apps.api.v1.rooms import filters as room_filters
@@ -949,10 +950,9 @@ class RoomNoteViewSet(
     """
     ViewSet for Room Notes
     """
-
     queryset = RoomNote.objects.all()
     serializer_class = RoomNoteSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, MessagePermission]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["room"]
     lookup_field = "uuid"
@@ -971,6 +971,20 @@ class RoomNoteViewSet(
         return queryset.filter(
             Q(room__user=user) | Q(room__queue__sector__project__permissions__user=user)
         ).distinct().order_by("created_on")
+
+    def list(self, request, *args, **kwargs):
+        """
+        List room notes with additional validations
+        """
+
+        room_uuid = request.query_params.get("room")
+        if not room_uuid:
+            raise ValidationError({"detail": "Room UUID is required"})
+        
+        if not Room.objects.filter(uuid=room_uuid).exists():
+            raise ValidationError({"detail": "Room not found"})
+        
+        return super().list(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
         """
