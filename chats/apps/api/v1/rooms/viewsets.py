@@ -17,6 +17,7 @@ from django.db.models import (
 from django.utils import timezone
 from django.utils.timezone import make_aware
 from django.utils.translation import gettext_lazy as _
+from chats.apps.api.v1.rooms.permissions import CanAddOrRemoveRoomTagPermission
 from chats.core.cache_utils import get_user_id_by_email_cached
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
@@ -25,6 +26,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError, NotFoun
 from rest_framework.filters import OrderingFilter
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 
@@ -44,7 +46,9 @@ from chats.apps.api.v1.msgs.serializers import ChatCompletionSerializer
 from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1.rooms.pagination import RoomListPagination
 from chats.apps.api.v1.rooms.serializers import (
+    AddRoomTagSerializer,
     ListRoomSerializer,
+    RemoveRoomTagSerializer,
     RoomHistorySummaryFeedbackSerializer,
     RoomHistorySummarySerializer,
     PinRoomSerializer,
@@ -52,6 +56,7 @@ from chats.apps.api.v1.rooms.serializers import (
     RoomMessageStatusSerializer,
     RoomNoteSerializer,
     RoomSerializer,
+    RoomTagSerializer,
     RoomsReportSerializer,
     TransferRoomSerializer,
 )
@@ -102,7 +107,11 @@ class RoomViewset(
 
     def get_permissions(self):
         permission_classes = [permissions.IsAuthenticated]
-        if self.action != "list":
+
+        if self.action == "tags":
+            permission_classes.append(api_permissions.HasObjectProjectPermission)
+
+        elif self.action != "list":
             permission_classes = (
                 permissions.IsAuthenticated,
                 api_permissions.IsQueueAgent,
@@ -894,6 +903,75 @@ class RoomViewset(
         # Return serialized note
         return Response(RoomNoteSerializer(note).data, status=status.HTTP_201_CREATED)
 
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="tags",
+        serializer_class=RoomTagSerializer,
+    )
+    def tags(self, request: Request, pk=None) -> Response:
+        room: Room = self.get_object()
+
+        tags = room.tags.all()
+
+        page = self.paginate_queryset(tags)
+
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(tags, many=True)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="tags/add",
+        url_name="add-tag",
+        serializer_class=AddRoomTagSerializer,
+        permission_classes=[IsAuthenticated, CanAddOrRemoveRoomTagPermission],
+    )
+    def add_tag(self, request: Request, pk=None) -> Response:
+        room: Room = self.get_object()
+
+        if not room.is_active == True:
+            raise ValidationError(
+                {"detail": "Room is not active."},
+                code="room_is_not_active",
+            )
+
+        serializer = self.get_serializer(data=request.data, context={"room": room})
+        serializer.is_valid(raise_exception=True)
+
+        sector_tag = serializer.validated_data.get("sector_tag")
+        room.tags.add(sector_tag)
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="tags/remove",
+        url_name="remove-tag",
+        serializer_class=RemoveRoomTagSerializer,
+        permission_classes=[IsAuthenticated, CanAddOrRemoveRoomTagPermission],
+    )
+    def remove_tag(self, request: Request, pk=None) -> Response:
+        room: Room = self.get_object()
+
+        if not room.is_active == True:
+            raise ValidationError(
+                {"detail": "Room is not active."},
+                code="room_is_not_active",
+            )
+
+        serializer = self.get_serializer(data=request.data, context={"room": room})
+        serializer.is_valid(raise_exception=True)
+        sector_tag = serializer.validated_data.get("sector_tag")
+        room.tags.remove(sector_tag)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class RoomsReportViewSet(APIView):
     """
@@ -950,6 +1028,7 @@ class RoomNoteViewSet(
     """
     ViewSet for Room Notes
     """
+
     queryset = RoomNote.objects.all()
     serializer_class = RoomNoteSerializer
     permission_classes = [permissions.IsAuthenticated, RoomNotePermission]
@@ -968,9 +1047,14 @@ class RoomNoteViewSet(
         if room_uuid:
             queryset = queryset.filter(room__uuid=room_uuid)
 
-        return queryset.filter(
-            Q(room__user=user) | Q(room__queue__sector__project__permissions__user=user)
-        ).distinct().order_by("created_on")
+        return (
+            queryset.filter(
+                Q(room__user=user)
+                | Q(room__queue__sector__project__permissions__user=user)
+            )
+            .distinct()
+            .order_by("created_on")
+        )
 
     def list(self, request, *args, **kwargs):
         """
@@ -980,10 +1064,10 @@ class RoomNoteViewSet(
         room_uuid = request.query_params.get("room")
         if not room_uuid:
             raise ValidationError({"detail": "Room UUID is required"})
-        
+
         if not Room.objects.filter(uuid=room_uuid).exists():
             raise ValidationError({"detail": "Room not found"})
-        
+
         return super().list(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):

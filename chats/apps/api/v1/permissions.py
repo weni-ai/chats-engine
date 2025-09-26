@@ -105,6 +105,18 @@ class ProjectAnyPermission(permissions.BasePermission):
             return obj.get_permission(request.user)
 
 
+class HasObjectProjectPermission(permissions.BasePermission):
+    def has_object_permission(self, request, view, obj):
+        project = getattr(obj, "project", None)
+
+        if not project:
+            return False
+
+        return ProjectPermission.objects.filter(
+            project=project, user=request.user
+        ).exists()
+
+
 class AnyQueueAgentPermission(permissions.BasePermission):
     def has_permission(self, request, view):
         try:

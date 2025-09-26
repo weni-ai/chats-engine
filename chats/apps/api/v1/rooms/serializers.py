@@ -20,6 +20,7 @@ from chats.apps.history.filters.rooms_filter import (
 )
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room, RoomNote, RoomPin
+from chats.apps.sectors.models import SectorTag
 
 
 logger = logging.getLogger(__name__)
@@ -493,3 +494,60 @@ class RoomNoteSerializer(serializers.ModelSerializer):
             "name": obj.user.full_name,
             "email": obj.user.email,
         }
+
+
+class RoomTagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SectorTag
+        fields = ["uuid", "name"]
+
+
+class AddOrRemoveTagFromRoomSerializer(serializers.Serializer):
+    uuid = serializers.UUIDField(required=True, allow_null=False)
+
+    def validate(self, attrs):
+        room = self.context.get("room")
+        tag_uuid = attrs.get("uuid")
+
+        sector_tag = SectorTag.objects.filter(
+            uuid=tag_uuid, sector=room.queue.sector
+        ).first()
+
+        if not sector_tag:
+            raise serializers.ValidationError(
+                {"uuid": ["Tag not found for the room's sector"]}, code="tag_not_found"
+            )
+
+        attrs["sector_tag"] = sector_tag
+
+        return super().validate(attrs)
+
+
+class AddRoomTagSerializer(AddOrRemoveTagFromRoomSerializer):
+    uuid = serializers.UUIDField(required=True, allow_null=False)
+
+    def validate(self, attrs):
+        room = self.context.get("room")
+        attrs = super().validate(attrs)
+
+        if room.tags.filter(uuid=attrs["sector_tag"].uuid).exists():
+            raise serializers.ValidationError(
+                {"uuid": ["Tag already exists for the room"]}, code="tag_already_exists"
+            )
+
+        return attrs
+
+
+class RemoveRoomTagSerializer(AddOrRemoveTagFromRoomSerializer):
+    uuid = serializers.UUIDField(required=True, allow_null=False)
+
+    def validate(self, attrs):
+        room = self.context.get("room")
+        attrs = super().validate(attrs)
+
+        if not room.tags.filter(uuid=attrs["sector_tag"].uuid).exists():
+            raise serializers.ValidationError(
+                {"uuid": ["Tag not found for the room"]}, code="tag_not_found"
+            )
+
+        return attrs
