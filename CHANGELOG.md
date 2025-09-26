@@ -1,3 +1,18 @@
+# 3.26.5
+# Add
+  - Internal note feature
+# Fix
+  - Automatic message retry on callback response and optional delay
+        
+# 3.26.4
+# Add
+  - first_user_assigned_at field to room
+  - time_to_send_automatic_message field to rooms metrics endpoint
+
+# 3.26.3
+# Fix
+  - Missing uuid field in the sector's serializer
+
 # 3.26.2
 # Add
   - sectors automatic messages
@@ -740,6 +755,9 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
+
+
 
 
 

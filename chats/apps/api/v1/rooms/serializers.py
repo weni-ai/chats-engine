@@ -15,7 +15,7 @@ from chats.apps.api.v1.msgs.serializers import MessageSerializer
 from chats.apps.api.v1.queues.serializers import QueueSerializer
 from chats.apps.api.v1.sectors.serializers import DetailSectorTagSerializer
 from chats.apps.queues.models import Queue
-from chats.apps.rooms.models import Room, RoomPin
+from chats.apps.rooms.models import Room, RoomPin, RoomNote
 from chats.apps.sectors.models import SectorTag
 
 
@@ -418,3 +418,24 @@ class RoomTagSerializer(serializers.ModelSerializer):
     class Meta:
         model = SectorTag
         fields = ["uuid", "name"]
+
+
+class RoomNoteSerializer(serializers.ModelSerializer):
+    """
+    Serializer for room notes
+    """
+
+    user = serializers.SerializerMethodField()
+    is_deletable = serializers.ReadOnlyField()
+
+    class Meta:
+        model = RoomNote
+        fields = ["uuid", "created_on", "user", "text", "is_deletable"]
+        read_only_fields = ["uuid", "created_on", "user", "is_deletable"]
+
+    def get_user(self, obj):
+        return {
+            "uuid": str(obj.user.pk),
+            "name": obj.user.full_name,
+            "email": obj.user.email,
+        }

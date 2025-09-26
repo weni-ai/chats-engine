@@ -213,14 +213,10 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         notification_method = getattr(instance, f"notify_{notify_level}")
         notification_method(notification_type)
 
+        instance.refresh_from_db()
+
         if instance.user:
             create_room_assigned_from_queue_feedback(instance, instance.user)
-
-            if (
-                instance.queue.sector.is_automatic_message_active
-                and instance.queue.sector.automatic_message_text
-            ):
-                instance.send_automatic_message()
 
         room.notify_billing()
 
@@ -236,6 +232,13 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
                 cancel_history_summary_generation.apply_async(
                     args=[history_summary.uuid], countdown=30
                 )  # 30 seconds delay
+
+        if (
+            instance.user
+            and instance.queue.sector.is_automatic_message_active
+            and instance.queue.sector.automatic_message_text
+        ):
+            instance.send_automatic_message(delay=1)
 
     def perform_update(self, serializer):
         serializer.save()

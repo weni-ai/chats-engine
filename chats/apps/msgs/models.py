@@ -115,7 +115,7 @@ class Message(BaseModelWithManualCreatedOn):
                 status_forcelist=getattr(
                     settings,
                     "CALLBACK_RETRYABLE_STATUS_CODES",
-                    [429, 500, 502, 503, 504],
+                    [429, 500, 502, 503, 504, 404],
                 ),
                 method_whitelist=["POST"],
             )
