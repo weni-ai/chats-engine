@@ -291,7 +291,7 @@ class RoomViewset(
         if tags is not None:
             sector_tags = SectorTag.objects.filter(
                 pk=instance.queue.sector.pk
-            ).values_list("id", flat=True)
+            ).values_list("uuid", flat=True)
 
             if set(tags) - set(sector_tags):
                 raise ValidationError(
