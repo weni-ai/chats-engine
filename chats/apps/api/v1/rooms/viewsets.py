@@ -83,7 +83,6 @@ from chats.apps.rooms.views import (
     update_custom_fields,
     update_flows_custom_fields,
 )
-from chats.core.cache_utils import get_user_id_by_email_cached
 
 logger = logging.getLogger(__name__)
 
