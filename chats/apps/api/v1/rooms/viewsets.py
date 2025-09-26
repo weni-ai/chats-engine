@@ -103,7 +103,6 @@ class RoomViewset(
     search_fields = ["contact__name", "urn", "protocol", "service_chat"]
     ordering_fields = "__all__"
     ordering = ["user", "-last_interaction", "created_on", "added_to_queue_at"]
-    pagination_class = RoomListPagination
 
     def get_permissions(self):
         permission_classes = [permissions.IsAuthenticated]
@@ -117,6 +116,13 @@ class RoomViewset(
                 api_permissions.IsQueueAgent,
             )
         return [permission() for permission in permission_classes]
+
+    @property
+    def pagination_class(self):
+        if self.action == "list":
+            return RoomListPagination
+
+        return super().pagination_class
 
     def get_queryset(
         self,
