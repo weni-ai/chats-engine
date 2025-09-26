@@ -66,6 +66,7 @@ from chats.apps.msgs.models import Message
 from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
+from chats.apps.sectors.models import SectorTag
 from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.exceptions import (
     MaxPinRoomLimitReachedError,
