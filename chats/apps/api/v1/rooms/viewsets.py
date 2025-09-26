@@ -287,6 +287,17 @@ class RoomViewset(
 
         tags = request.data.get("tags", None)
 
+        if tags is not None:
+            sector_tags = SectorTag.objects.filter(
+                pk=instance.queue.sector.pk
+            ).values_list("id", flat=True)
+
+            if set(tags) - set(sector_tags):
+                raise ValidationError(
+                    {"tags": ["Tag not found for the room's sector"]},
+                    code="tag_not_found",
+                )
+
         with transaction.atomic():
             instance.close(tags, "agent")
 
