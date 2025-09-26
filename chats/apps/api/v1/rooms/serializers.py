@@ -454,3 +454,18 @@ class AddRoomTagSerializer(AddOrRemoveTagFromRoomSerializer):
             )
 
         return attrs
+
+
+class RemoveRoomTagSerializer(AddOrRemoveTagFromRoomSerializer):
+    uuid = serializers.UUIDField(required=True, allow_null=False)
+
+    def validate(self, attrs):
+        room = self.context.get("room")
+        attrs = super().validate(attrs)
+
+        if not room.tags.filter(uuid=attrs["sector_tag"].uuid).exists():
+            raise serializers.ValidationError(
+                {"uuid": ["Tag not found for the room"]}, code="tag_not_found"
+            )
+
+        return attrs
