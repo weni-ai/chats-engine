@@ -935,7 +935,7 @@ class RoomViewset(
     def add_tag(self, request: Request, pk=None) -> Response:
         room: Room = self.get_object()
 
-        if not room.is_active == True:
+        if not room.is_active:
             raise ValidationError(
                 {"detail": "Room is not active."},
                 code="room_is_not_active",
@@ -960,7 +960,7 @@ class RoomViewset(
     def remove_tag(self, request: Request, pk=None) -> Response:
         room: Room = self.get_object()
 
-        if not room.is_active == True:
+        if not room.is_active:
             raise ValidationError(
                 {"detail": "Room is not active."},
                 code="room_is_not_active",
