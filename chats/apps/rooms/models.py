@@ -130,6 +130,12 @@ class Room(BaseModel, BaseConfigurableModel):
         """
         return self.get_config("is_billing_notified", False)
 
+    def mark_notes_as_non_deletable(self):
+        """
+        Mark all notes in this room as non-deletable when room is transferred
+        """
+        self.notes.update(is_deletable=False)
+
     def notify_billing(self):
         """
         Notify the billing system and set the is_billing_notified flag to True
@@ -223,7 +229,7 @@ class Room(BaseModel, BaseConfigurableModel):
 
         self._update_agent_service_status(is_new)
 
-    def send_automatic_message(self):
+    def send_automatic_message(self, delay: int = 0):
         from chats.apps.sectors.tasks import send_automatic_message
 
         if (
@@ -232,8 +238,13 @@ class Room(BaseModel, BaseConfigurableModel):
             and self.queue.sector.is_automatic_message_active
             and self.queue.sector.automatic_message_text
         ):
-            send_automatic_message.delay(
-                self.uuid, self.queue.sector.automatic_message_text, self.user.id
+            send_automatic_message.apply_async(
+                args=[
+                    self.uuid,
+                    self.queue.sector.automatic_message_text,
+                    self.user.id,
+                ],
+                countdown=delay,
             )
 
     def get_permission(self, user):
@@ -621,3 +632,99 @@ class RoomPin(BaseModel):
                 name="unique_room_user_room_pin",
             )
         ]
+
+
+class RoomNote(BaseModel):
+    """
+    Internal notes for rooms that can be created by agents
+    """
+
+    room = models.ForeignKey(
+        "rooms.Room",
+        related_name="notes",
+        verbose_name=_("room"),
+        on_delete=models.CASCADE,
+    )
+    user = models.ForeignKey(
+        "accounts.User",
+        related_name="room_notes",
+        verbose_name=_("user"),
+        on_delete=models.CASCADE,
+    )
+    text = models.TextField(_("text"))
+    is_deletable = models.BooleanField(_("is deletable"), default=True)
+    message = models.OneToOneField(
+        "msgs.Message",
+        related_name="internal_note",
+        verbose_name=_("message"),
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        verbose_name = _("Room Note")
+        verbose_name_plural = _("Room Notes")
+        ordering = ["-created_on"]
+
+    @property
+    def serialized_ws_data(self):
+        """
+        Return serialized data for WebSocket notifications
+        """
+        return {
+            "uuid": str(self.uuid),
+            "room": str(self.room.uuid),
+            "user": {"uuid": str(self.user.pk), "name": self.user.name},
+            "text": self.text,
+            "created_on": self.created_on.isoformat(),
+            "is_deletable": self.is_deletable,
+        }
+
+    def notify_websocket(self, action):
+        """
+        Send WebSocket notification for note actions
+        """
+        if action == "create":
+            event_name = "room_note.create"
+            content = self.serialized_ws_data
+        elif action == "delete":
+            event_name = "room_note.delete"
+            content = {"uuid": str(self.uuid), "room": str(self.room.uuid)}
+        else:
+            return
+
+        # Send to room group
+        send_channels_group(
+            group_name=f"room_{self.room.uuid}",
+            call_type="notify",
+            content=content,
+            action=event_name,
+        )
+
+        # Send to queue or user permission group
+        if self.room.user:
+            permission = self.room.get_permission(self.room.user)
+            if permission:
+                send_channels_group(
+                    group_name=f"permission_{permission.pk}",
+                    call_type="notify",
+                    content=content,
+                    action=event_name,
+                )
+        elif self.room.queue:
+            send_channels_group(
+                group_name=f"queue_{self.room.queue.pk}",
+                call_type="notify",
+                content=content,
+                action=event_name,
+            )
+
+    def delete(self, *args, **kwargs):
+        """
+        Ensure the associated blank message is also removed when deleting the note
+        """
+        msg = self.message
+        super().delete(*args, **kwargs)
+        if msg:
+            msg.delete()
