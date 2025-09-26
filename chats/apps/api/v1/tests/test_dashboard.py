@@ -98,12 +98,7 @@ class DashboardTests(APITestCase):
         url_close = f"/v1/room/{room_created.uuid}/close/"
         close_client = self.client
         close_client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
-        data_close = {
-            "tags": [
-                "f4b8aa78-7735-4dd2-9999-941ebb8e4e35",
-                "1a84b46e-0f91-41da-ac9d-a68c0b9753ab",
-            ]
-        }
+        data_close = {"tags": []}
         client.patch(url_close, data=data_close, format="json")
 
         room_closed = Room.objects.get(queue_id=data["queue_uuid"])
@@ -170,12 +165,7 @@ class DashboardTests(APITestCase):
         url_close = f"/v1/room/{room_created.uuid}/close/"
         close_client = self.client
         close_client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
-        data_close = {
-            "tags": [
-                "f4b8aa78-7735-4dd2-9999-941ebb8e4e35",
-                "1a84b46e-0f91-41da-ac9d-a68c0b9753ab",
-            ]
-        }
+        data_close = {"tags": []}
         client.patch(url_close, data=data_close, format="json")
 
         room_closed = Room.objects.get(queue_id=data["queue_uuid"])
