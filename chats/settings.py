@@ -426,7 +426,9 @@ CELERY_BEAT_SCHEDULE = {
 
 # Disable report emails unless explicitly enabled
 REPORTS_SEND_EMAILS = env.bool("REPORTS_SEND_EMAILS", default=True)
-REPORTS_SAVE_DIR = env.str("REPORTS_SAVE_DIR", default=str(BASE_DIR / "media" / "reports"))
+REPORTS_SAVE_DIR = env.str(
+    "REPORTS_SAVE_DIR", default=str(BASE_DIR / "media" / "reports")
+)
 REPORTS_CHUNK_SIZE = env.int("REPORTS_CHUNK_SIZE", default=5000)
 REPORTS_SAVE_LOCALLY = env.bool("REPORTS_SAVE_LOCALLY", default=False)
 
@@ -556,3 +558,6 @@ FEEDBACK_FEATURE_FLAG_KEY = env.str(
 AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY = env.str(
     "AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY", default="weniChatsAutomaticMessage"
 )
+
+# CSAT
+CSAT_FEATURE_FLAG_KEY = env.str("CSAT_FEATURE_FLAG_KEY", default="weniChatsCSAT")

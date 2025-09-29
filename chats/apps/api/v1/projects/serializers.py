@@ -1,6 +1,8 @@
+from django.conf import settings
 from rest_framework import serializers
 from timezone_field.rest_framework import TimeZoneSerializerField
 
+from chats.apps.feature_flags.utils import is_feature_active
 from chats.apps.projects.models import (
     CustomStatus,
     CustomStatusType,
@@ -25,6 +27,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "config",
             "org",
             "room_routing_type",
+            "is_csat_enabled",
         ]
         read_only_fields = [
             "timezone",
@@ -33,11 +36,30 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def get_config(self, project: Project):
         from chats.core.cache_utils import get_project_config_cached
+
         config = get_project_config_cached(str(project.uuid)) or project.config
         if config is not None and "chat_gpt_token" in config.keys():
             config = config.copy()
             config.pop("chat_gpt_token", None)
         return config
+
+    def validate_is_csat_enabled(self, value: bool):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+
+        project = self.instance
+
+        if (
+            value is True
+            and not self.instance.is_csat_enabled
+            and not is_feature_active(settings.CSAT_FEATURE_FLAG_KEY, user, project)
+        ):
+            raise serializers.ValidationError(
+                _("The CSAT feature is not available for this project"),
+                code="csat_feature_flag_is_off",
+            )
+
+        return value
 
 
 class LinkContactSerializer(serializers.ModelSerializer):
