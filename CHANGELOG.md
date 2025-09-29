@@ -1,3 +1,7 @@
+# 3.26.6
+# Add
+  - Cursor pagination on messages list endpoint
+
 # 3.26.5
 # Add
   - Internal note feature
@@ -755,6 +759,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 
