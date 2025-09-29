@@ -41,6 +41,7 @@ from chats.apps.api.v1.projects.serializers import (
     ProjectFlowStartSerializer,
     ProjectSerializer,
     SectorDiscussionSerializer,
+    UpdateProjectSerializer,
 )
 from chats.apps.contacts.models import Contact
 from chats.apps.projects.models import (
@@ -487,13 +488,13 @@ class ProjectViewset(
 
     def partial_update(self, request, uuid=None):
         project = self.get_object()
-        config = request.data.get("config")
 
-        if config:
-            config = json.loads(config)
-            project.config = project.config or {}
-            project.config.update(config)
-            project.save()
+        serializer = UpdateProjectSerializer(
+            project, data=request.data, partial=True, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+        project = serializer.save()
+
         return Response(ProjectSerializer(project).data, status=status.HTTP_200_OK)
 
     @action(
