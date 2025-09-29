@@ -1,3 +1,9 @@
+# 3.26.5
+# Add
+  - Internal note feature
+# Fix
+  - Automatic message retry on callback response and optional delay
+        
 # 3.26.4
 # Add
   - first_user_assigned_at field to room
@@ -749,6 +755,8 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
+
 
 
 

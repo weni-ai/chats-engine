@@ -104,6 +104,7 @@ class Project(BaseConfigurableModel, BaseModel):
         default=dict,
         help_text=_("Internal flags for the project"),
     )
+    is_csat_enabled = models.BooleanField(_("is CSAT enabled?"), default=False)
 
     class Meta:
         verbose_name = _("Project")

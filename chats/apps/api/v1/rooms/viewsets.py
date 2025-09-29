@@ -22,7 +22,7 @@ from chats.core.cache_utils import get_user_id_by_email_cached
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied, ValidationError, NotFound
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.filters import OrderingFilter
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -45,13 +45,14 @@ from chats.apps.api.v1.internal.rest_clients.openai_rest_client import OpenAICli
 from chats.apps.api.v1.msgs.serializers import ChatCompletionSerializer
 from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1.rooms.pagination import RoomListPagination
+from chats.apps.api.v1.rooms.permissions import RoomNotePermission
 from chats.apps.api.v1.rooms.serializers import (
     AddRoomTagSerializer,
     ListRoomSerializer,
     RemoveRoomTagSerializer,
+    PinRoomSerializer,
     RoomHistorySummaryFeedbackSerializer,
     RoomHistorySummarySerializer,
-    PinRoomSerializer,
     RoomInfoSerializer,
     RoomMessageStatusSerializer,
     RoomNoteSerializer,
@@ -83,6 +84,7 @@ from chats.apps.rooms.views import (
     update_custom_fields,
     update_flows_custom_fields,
 )
+from chats.core.cache_utils import get_user_id_by_email_cached
 
 logger = logging.getLogger(__name__)
 
@@ -652,10 +654,7 @@ class RoomViewset(
                 room.notify_queue("update")
 
                 room.update_ticket()
-
-                # Mark all notes as non-deletable when room is transferred
                 room.mark_notes_as_non_deletable()
-
                 if (
                     not old_user_assigned_at
                     and room.queue.sector.is_automatic_message_active
@@ -711,8 +710,8 @@ class RoomViewset(
         if not project_uuid:
             return Response({"error": "'project_uuid' is required."}, status=400)
 
-        default_start_date = make_aware(datetime.now() - timedelta(days=30))
-        default_end_date = make_aware(datetime.now())
+        default_start_date = timezone.now() - timedelta(days=30)
+        default_end_date = timezone.now()
 
         try:
             if start_date:

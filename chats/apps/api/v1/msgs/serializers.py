@@ -216,6 +216,7 @@ class MessageSerializer(BaseMessageSerializer):
             "replied_message",
             "is_read",
             "is_delivered",
+            "internal_note",
             "is_automatic_message",
             "internal_note",
         ]
@@ -288,14 +289,6 @@ class MessageSerializer(BaseMessageSerializer):
 
         if not note:
             return None
-
-        user = note.user
-        user_data = None
-        if user:
-            user_data = {
-                "uuid": str(user.pk),
-                "name": user.name,
-            }
 
         return {
             "uuid": str(note.uuid),
