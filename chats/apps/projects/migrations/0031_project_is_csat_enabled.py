@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('projects', '0030_agentdisconnectlog'),
+        ("projects", "0031_agentdisconnectlog"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='project',
-            name='is_csat_enabled',
-            field=models.BooleanField(default=False, verbose_name='is CSAT enabled?'),
+            model_name="project",
+            name="is_csat_enabled",
+            field=models.BooleanField(default=False, verbose_name="is CSAT enabled?"),
         ),
     ]
