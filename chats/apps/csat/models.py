@@ -12,8 +12,8 @@ class CSATSurvey(BaseModel):
         on_delete=models.CASCADE,
         related_name="csat_survey",
     )
-    score = models.PositiveSmallIntegerField(
-        _("Score"), validators=[MinValueValidator(1), MaxValueValidator(5)]
+    rating = models.PositiveSmallIntegerField(
+        _("Rating"), validators=[MinValueValidator(1), MaxValueValidator(5)]
     )
     comment = models.TextField(_("Comment"), blank=True, null=True)
     answered_on = models.DateTimeField(_("Answered on"))
@@ -23,7 +23,7 @@ class CSATSurvey(BaseModel):
         verbose_name_plural = _("CSAT Surveys")
 
     def __str__(self):
-        return f"{self.room.uuid} - {self.score}"
+        return f"{self.room.uuid} - {self.rating}"
 
     def save(self, *args, **kwargs):
         self.full_clean()
