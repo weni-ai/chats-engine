@@ -1,3 +1,4 @@
+import json
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
@@ -33,6 +34,7 @@ def validate_is_csat_enabled(instance: Project, value: bool, context: dict):
 class ProjectSerializer(serializers.ModelSerializer):
     timezone = TimeZoneSerializerField(use_pytz=False)
     config = serializers.SerializerMethodField()
+    is_csat_enabled = serializers.BooleanField(required=False, allow_null=False)
 
     class Meta:
         model = Project
@@ -64,6 +66,8 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 
 class UpdateProjectSerializer(serializers.ModelSerializer):
+    is_csat_enabled = serializers.BooleanField(required=False, allow_null=False)
+
     class Meta:
         model = Project
         fields = [
@@ -85,6 +89,15 @@ class UpdateProjectSerializer(serializers.ModelSerializer):
         attrs["config"] = self.instance.config or {}
 
         if config is not None:
+            # Ensure config is a dictionary before updating
+            if not isinstance(config, dict):
+                try:
+                    config = json.loads(config)
+                except Exception:
+                    raise serializers.ValidationError(
+                        {"config": "Config must be a JSON"}
+                    )
+
             attrs["config"].update(config)
 
         return attrs
