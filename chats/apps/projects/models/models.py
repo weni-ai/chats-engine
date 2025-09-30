@@ -95,6 +95,7 @@ class Project(BaseConfigurableModel, BaseModel):
             "Whether to route rooms using the queue priority or general routing"
         ),
     )
+    is_csat_enabled = models.BooleanField(_("is CSAT enabled?"), default=False)
 
     class Meta:
         verbose_name = _("Project")
@@ -106,6 +107,7 @@ class Project(BaseConfigurableModel, BaseModel):
     def get_cached_config(self):
         """Try to get config from cache first"""
         from chats.core.cache_utils import get_project_config_cached
+
         cached = get_project_config_cached(str(self.uuid))
         if cached is not None:
             return cached
