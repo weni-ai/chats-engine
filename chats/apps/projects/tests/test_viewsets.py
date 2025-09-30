@@ -10,6 +10,7 @@ from rest_framework import status
 
 from chats.apps.accounts.models import User
 from chats.apps.projects.models import Project
+from chats.apps.projects.models.models import ProjectPermission
 from chats.apps.projects.tests.decorators import with_project_permission
 
 
@@ -109,13 +110,17 @@ class BaseTestUpdateProjectViewSetAuthenticatedUser(BaseTestUpdateProjectViewSet
         self.project.refresh_from_db(fields=["name"])
         self.assertEqual(self.project.name, new_name)
 
-    @with_project_permission
-    @patch("chats.apps.feature_flags.utils.is_feature_active")
+    @patch("chats.apps.api.v1.projects.serializers.is_feature_active")
     def test_cannot_enable_csat_when_feature_flag_is_off(self, mock_is_feature_active):
+        mock_is_feature_active.return_value = False
         self.project.is_csat_enabled = False
         self.project.save(update_fields=["is_csat_enabled"])
 
-        mock_is_feature_active.return_value = False
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=self.user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
 
         response = self.update(self.project.uuid, {"is_csat_enabled": True})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -123,13 +128,20 @@ class BaseTestUpdateProjectViewSetAuthenticatedUser(BaseTestUpdateProjectViewSet
             response.data["is_csat_enabled"][0].code, "csat_feature_flag_is_off"
         )
 
-    @with_project_permission
-    @patch("chats.apps.feature_flags.utils.is_feature_active")
+    @patch("chats.apps.api.v1.projects.serializers.is_feature_active")
     def test_can_enable_csat_when_feature_flag_is_on(self, mock_is_feature_active):
         mock_is_feature_active.return_value = True
-        response = self.update(self.project.uuid, {"is_csat_enabled": True})
+        self.project.is_csat_enabled = False
+        self.project.save(update_fields=["is_csat_enabled"])
 
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=self.user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+
+        response = self.update(self.project.uuid, {"is_csat_enabled": True})
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        self.project.refresh_from_db(update_fields=["is_csat_enabled"])
+        self.project.refresh_from_db(fields=["is_csat_enabled"])
         self.assertTrue(self.project.is_csat_enabled)

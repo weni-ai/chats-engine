@@ -15,6 +15,21 @@ from chats.apps.projects.models import (
 from chats.apps.sectors.models import Sector
 
 
+def validate_is_csat_enabled(instance: Project, value: bool, context: dict):
+    request = context.get("request")
+    user = getattr(request, "user", None)
+    project = instance
+
+    if value is True and not is_feature_active(
+        settings.CSAT_FEATURE_FLAG_KEY, user, project
+    ):
+        raise serializers.ValidationError(
+            _("The CSAT feature is not available for this project"),
+            code="csat_feature_flag_is_off",
+        )
+    return value
+
+
 class ProjectSerializer(serializers.ModelSerializer):
     timezone = TimeZoneSerializerField(use_pytz=False)
     config = serializers.SerializerMethodField()
@@ -47,22 +62,34 @@ class ProjectSerializer(serializers.ModelSerializer):
         return config
 
     def validate_is_csat_enabled(self, value: bool):
-        request = self.context.get("request")
-        user = getattr(request, "user", None)
+        return validate_is_csat_enabled(self.instance, value, self.context)
 
-        project = self.instance
 
-        if (
-            value is True
-            and not self.instance.is_csat_enabled
-            and not is_feature_active(settings.CSAT_FEATURE_FLAG_KEY, user, project)
-        ):
-            raise serializers.ValidationError(
-                _("The CSAT feature is not available for this project"),
-                code="csat_feature_flag_is_off",
-            )
+class UpdateProjectSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Project
+        fields = [
+            "name",
+            "date_format",
+            "timezone",
+            "config",
+            "org",
+            "room_routing_type",
+            "is_csat_enabled",
+        ]
+        read_only_fields = ["timezone", "room_routing_type"]
 
-        return value
+    def validate_is_csat_enabled(self, value: bool):
+        return validate_is_csat_enabled(self.instance, value, self.context)
+
+    def validate(self, attrs: dict):
+        config = attrs.pop("config", None)
+        attrs["config"] = self.instance.config or {}
+
+        if config is not None:
+            attrs["config"].update(config)
+
+        return attrs
 
 
 class LinkContactSerializer(serializers.ModelSerializer):
