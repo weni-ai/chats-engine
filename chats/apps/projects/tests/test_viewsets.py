@@ -110,7 +110,9 @@ class BaseTestUpdateProjectViewSetAuthenticatedUser(BaseTestUpdateProjectViewSet
         self.project.refresh_from_db(fields=["name"])
         self.assertEqual(self.project.name, new_name)
 
-    def test_cannot_enable_csat_when_feature_flag_is_off(self):
+    @patch("chats.apps.api.v1.projects.serializers.is_feature_active")
+    def test_cannot_enable_csat_when_feature_flag_is_off(self, mock_is_feature_active):
+        mock_is_feature_active.return_value = False
         self.project.is_csat_enabled = False
         self.project.save(update_fields=["is_csat_enabled"])
 
@@ -120,18 +122,15 @@ class BaseTestUpdateProjectViewSetAuthenticatedUser(BaseTestUpdateProjectViewSet
             role=ProjectPermission.ROLE_ADMIN,
         )
 
-        with patch(
-            "chats.apps.feature_flags.utils.is_feature_active"
-        ) as mock_is_feature_active:
-            mock_is_feature_active.return_value = False
+        response = self.update(self.project.uuid, {"is_csat_enabled": True})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["is_csat_enabled"][0].code, "csat_feature_flag_is_off"
+        )
 
-            response = self.update(self.project.uuid, {"is_csat_enabled": True})
-            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-            self.assertEqual(
-                response.data["is_csat_enabled"][0].code, "csat_feature_flag_is_off"
-            )
-
-    def test_can_enable_csat_when_feature_flag_is_on(self):
+    @patch("chats.apps.api.v1.projects.serializers.is_feature_active")
+    def test_can_enable_csat_when_feature_flag_is_on(self, mock_is_feature_active):
+        mock_is_feature_active.return_value = True
         self.project.is_csat_enabled = False
         self.project.save(update_fields=["is_csat_enabled"])
 
@@ -141,12 +140,8 @@ class BaseTestUpdateProjectViewSetAuthenticatedUser(BaseTestUpdateProjectViewSet
             role=ProjectPermission.ROLE_ADMIN,
         )
 
-        with patch(
-            "chats.apps.feature_flags.utils.is_feature_active"
-        ) as mock_is_feature_active:
-            mock_is_feature_active.return_value = True
-            response = self.update(self.project.uuid, {"is_csat_enabled": True})
-            self.assertEqual(response.status_code, status.HTTP_200_OK)
+        response = self.update(self.project.uuid, {"is_csat_enabled": True})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-            self.project.refresh_from_db(update_fields=["is_csat_enabled"])
-            self.assertTrue(self.project.is_csat_enabled)
+        self.project.refresh_from_db(fields=["is_csat_enabled"])
+        self.assertTrue(self.project.is_csat_enabled)
