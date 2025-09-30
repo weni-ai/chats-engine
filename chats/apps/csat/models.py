@@ -16,6 +16,7 @@ class CSATSurvey(BaseModel):
         _("Score"), validators=[MinValueValidator(1), MaxValueValidator(5)]
     )
     comment = models.TextField(_("Comment"), blank=True, null=True)
+    answered_on = models.DateTimeField(_("Answered on"))
 
     class Meta:
         verbose_name = _("CSAT Survey")

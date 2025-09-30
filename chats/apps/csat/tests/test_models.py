@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.test import TestCase
+from django.utils import timezone
 
 from chats.apps.csat.models import CSATSurvey
 from chats.apps.rooms.models import Room
@@ -27,7 +28,10 @@ class CSATSurveyModelTest(TestCase):
 
     def test_create_csat_survey(self):
         csat_survey = CSATSurvey.objects.create(
-            room=self.room, score=5, comment="Great service!"
+            room=self.room,
+            score=5,
+            comment="Great service!",
+            answered_on=timezone.now(),
         )
         self.assertEqual(csat_survey.room, self.room)
         self.assertEqual(csat_survey.score, 5)
@@ -35,7 +39,12 @@ class CSATSurveyModelTest(TestCase):
 
     def test_create_csat_survey_with_invalid_score(self):
         with self.assertRaises(ValidationError) as context:
-            CSATSurvey.objects.create(room=self.room, score=6, comment="Great service!")
+            CSATSurvey.objects.create(
+                room=self.room,
+                score=6,
+                comment="Great service!",
+                answered_on=timezone.now(),
+            )
 
         self.assertIn("score", context.exception.__dict__["error_dict"])
 
@@ -47,5 +56,7 @@ class CSATSurveyModelTest(TestCase):
         self.assertIn("score", context.exception.__dict__["error_dict"])
 
     def test_create_csat_survey_without_comment(self):
-        csat_survey = CSATSurvey.objects.create(room=self.room, score=5)
+        csat_survey = CSATSurvey.objects.create(
+            room=self.room, score=5, answered_on=timezone.now()
+        )
         self.assertIsNone(csat_survey.comment)
