@@ -7,7 +7,10 @@ from chats.core.models import BaseModel
 
 class CSATSurvey(BaseModel):
     room = models.OneToOneField(
-        "rooms.Room", verbose_name=_("Room"), on_delete=models.CASCADE
+        "rooms.Room",
+        verbose_name=_("Room"),
+        on_delete=models.CASCADE,
+        related_name="csat_survey",
     )
     score = models.PositiveSmallIntegerField(
         _("Score"), validators=[MinValueValidator(1), MaxValueValidator(5)]
@@ -20,3 +23,7 @@ class CSATSurvey(BaseModel):
 
     def __str__(self):
         return f"{self.room.uuid} - {self.score}"
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
