@@ -29,34 +29,34 @@ class CSATSurveyModelTest(TestCase):
     def test_create_csat_survey(self):
         csat_survey = CSATSurvey.objects.create(
             room=self.room,
-            score=5,
+            rating=5,
             comment="Great service!",
             answered_on=timezone.now(),
         )
         self.assertEqual(csat_survey.room, self.room)
-        self.assertEqual(csat_survey.score, 5)
+        self.assertEqual(csat_survey.rating, 5)
         self.assertEqual(csat_survey.comment, "Great service!")
 
-    def test_create_csat_survey_with_invalid_score(self):
+    def test_create_csat_survey_with_invalid_rating(self):
         with self.assertRaises(ValidationError) as context:
             CSATSurvey.objects.create(
                 room=self.room,
-                score=6,
+                rating=6,
                 comment="Great service!",
                 answered_on=timezone.now(),
             )
 
-        self.assertIn("score", context.exception.__dict__["error_dict"])
+        self.assertIn("rating", context.exception.__dict__["error_dict"])
 
         with self.assertRaises(ValidationError) as context:
             CSATSurvey.objects.create(
-                room=self.room, score=0, comment="Terrible service!"
+                room=self.room, rating=0, comment="Terrible service!"
             )
 
-        self.assertIn("score", context.exception.__dict__["error_dict"])
+        self.assertIn("rating", context.exception.__dict__["error_dict"])
 
     def test_create_csat_survey_without_comment(self):
         csat_survey = CSATSurvey.objects.create(
-            room=self.room, score=5, answered_on=timezone.now()
+            room=self.room, rating=5, answered_on=timezone.now()
         )
         self.assertIsNone(csat_survey.comment)
