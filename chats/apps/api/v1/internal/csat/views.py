@@ -22,7 +22,7 @@ class CSATWebhookView(GenericViewSet):
         CSATSurvey.objects.create(
             room=validated_data["room"],
             rating=validated_data["rating"],
-            comment=validated_data["comment"],
+            comment=validated_data.get("comment"),
             answered_on=validated_data["answered_on"],
         )
 
