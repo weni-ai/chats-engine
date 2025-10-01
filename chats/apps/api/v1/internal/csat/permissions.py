@@ -1,7 +1,17 @@
 from rest_framework.permissions import BasePermission
 
+from chats.apps.rooms.models import Room
+
 
 class CSATWebhookPermission(BasePermission):
     def has_permission(self, request, view):
-        # TODO: Add permission logic
-        return True
+        project_uuid = request.auth.get("project")
+
+        if not project_uuid:
+            return False
+
+        room_uuid = request.data.get("room")
+
+        return Room.objects.filter(
+            uuid=room_uuid, queue__sector__project__uuid=project_uuid
+        ).exists()
