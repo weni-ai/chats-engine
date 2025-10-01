@@ -5,7 +5,7 @@ from chats.apps.api.authentication.token import JWTTokenGenerator
 
 def with_project_jwt_token(func):
     """
-    Decorator to create a JWT token for the project.
+    Decorator to create a JWT token for the project in a test.
 
     Usage:
     @with_project_jwt_token
@@ -26,7 +26,7 @@ def with_project_jwt_token(func):
 
 def with_closed_room(func):
     """
-    Decorator to create a closed room for the project.
+    Decorator to close a room in a test.
     """
 
     @functools.wraps(func)
