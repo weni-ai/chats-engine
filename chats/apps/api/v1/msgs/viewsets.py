@@ -60,7 +60,7 @@ class MessageViewset(
                 previous_agent_messages = message.room.messages.filter(
                     user__isnull=False,
                     created_on__lt=message.created_on
-                ).exists()
+                ).exclude(automatic_message__isnull=False).exists()
                 
                 print(f"DEBUG - Previous messages: {previous_agent_messages}")
                 
