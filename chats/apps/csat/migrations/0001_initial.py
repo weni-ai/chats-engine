@@ -11,24 +11,55 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('rooms', '0021_roomnote'),
+        ("rooms", "0020_roomnote"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='CSATSurvey',
+            name="CSATSurvey",
             fields=[
-                ('uuid', models.UUIDField(default=uuid.uuid4, primary_key=True, serialize=False)),
-                ('created_on', models.DateTimeField(auto_now_add=True, verbose_name='Created on')),
-                ('modified_on', models.DateTimeField(auto_now=True, verbose_name='Modified on')),
-                ('rating', models.PositiveSmallIntegerField(validators=[django.core.validators.MinValueValidator(1), django.core.validators.MaxValueValidator(5)], verbose_name='Rating')),
-                ('comment', models.TextField(blank=True, null=True, verbose_name='Comment')),
-                ('answered_on', models.DateTimeField(verbose_name='Answered on')),
-                ('room', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='csat_survey', to='rooms.room', verbose_name='Room')),
+                (
+                    "uuid",
+                    models.UUIDField(
+                        default=uuid.uuid4, primary_key=True, serialize=False
+                    ),
+                ),
+                (
+                    "created_on",
+                    models.DateTimeField(auto_now_add=True, verbose_name="Created on"),
+                ),
+                (
+                    "modified_on",
+                    models.DateTimeField(auto_now=True, verbose_name="Modified on"),
+                ),
+                (
+                    "rating",
+                    models.PositiveSmallIntegerField(
+                        validators=[
+                            django.core.validators.MinValueValidator(1),
+                            django.core.validators.MaxValueValidator(5),
+                        ],
+                        verbose_name="Rating",
+                    ),
+                ),
+                (
+                    "comment",
+                    models.TextField(blank=True, null=True, verbose_name="Comment"),
+                ),
+                ("answered_on", models.DateTimeField(verbose_name="Answered on")),
+                (
+                    "room",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="csat_survey",
+                        to="rooms.room",
+                        verbose_name="Room",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'CSAT Survey',
-                'verbose_name_plural': 'CSAT Surveys',
+                "verbose_name": "CSAT Survey",
+                "verbose_name_plural": "CSAT Surveys",
             },
         ),
     ]
