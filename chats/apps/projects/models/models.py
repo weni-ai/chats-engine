@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING, Optional
+from uuid import UUID
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import (
@@ -22,7 +24,9 @@ from .permission_managers import UserPermissionsManager
 
 User = get_user_model()
 
-# Create your models here.
+
+if TYPE_CHECKING:
+    from chats.apps.csat.models import CSATFlowProjectConfig
 
 
 class TemplateType(BaseSoftDeleteModel, BaseModel):
@@ -270,6 +274,17 @@ class Project(BaseConfigurableModel, BaseModel):
         return self.permissions.filter(
             user=user, role=ProjectPermission.ROLE_ADMIN
         ).exists()
+
+    @property
+    def csat_flow_uuid(self) -> Optional[UUID]:
+        csat_flow_config: Optional["CSATFlowProjectConfig"] = getattr(
+            self, "csat_flow_project_config", None
+        )
+
+        if not csat_flow_config:
+            return None
+
+        return csat_flow_config.flow_uuid
 
 
 class ProjectPermission(
