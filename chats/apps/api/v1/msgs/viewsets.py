@@ -51,6 +51,17 @@ class MessageViewset(
         with transaction.atomic():
             serializer.save()
             serializer.instance.notify_room("create", True)
+            
+            message = serializer.instance
+            if message.user and message.room.first_user_assigned_at:
+                previous_agent_messages = message.room.messages.filter(
+                    user__isnull=False,
+                    created_on__lt=message.created_on
+                ).exists()
+                
+                if not previous_agent_messages:
+                    from chats.apps.dashboard.tasks import calculate_first_response_time_task
+                    calculate_first_response_time_task.delay(str(message.room.uuid))
 
     def perform_update(self, serializer):
         serializer.save()
