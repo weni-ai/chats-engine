@@ -11,7 +11,7 @@ class CSATWebhookPermission(BasePermission):
         if not project_uuid:
             return False
 
-        room_uuid = request.data.get("room")
+        room_uuid = request.auth.get("room")
 
         room = Room.objects.filter(
             uuid=room_uuid, queue__sector__project__uuid=project_uuid
