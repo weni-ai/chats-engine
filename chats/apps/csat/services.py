@@ -63,7 +63,7 @@ class CSATFlowService(BaseCSATService):
         )
 
         data = {
-            "flow": flow_uuid,
+            "flow": str(flow_uuid),
             "urns": [room.urn],
             "params": {"room": str(room.uuid), "token": token},
         }
