@@ -54,13 +54,18 @@ class MessageViewset(
             serializer.instance.notify_room("create", True)
             
             message = serializer.instance
+            print(f"DEBUG - User: {message.user}, first_user_assigned_at: {message.room.first_user_assigned_at}")
+            
             if message.user and message.room.first_user_assigned_at:
                 previous_agent_messages = message.room.messages.filter(
                     user__isnull=False,
                     created_on__lt=message.created_on
                 ).exists()
                 
+                print(f"DEBUG - Previous messages: {previous_agent_messages}")
+                
                 if not previous_agent_messages:
+                    print("DEBUG - Disparando task!")
                     from chats.apps.dashboard.tasks import calculate_first_response_time_task
                     calculate_first_response_time_task.delay(str(message.room.uuid))
 
