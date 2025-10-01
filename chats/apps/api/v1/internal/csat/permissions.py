@@ -6,6 +6,8 @@ from chats.apps.csat.models import CSATSurvey
 
 class CSATWebhookPermission(BasePermission):
     def has_permission(self, request, view):
+        print("[CSATWebhookPermission] request", vars(request))
+
         project_uuid = request.auth.get("project")
 
         print("[CSATWebhookPermission] project_uuid", project_uuid)
