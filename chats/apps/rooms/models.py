@@ -336,7 +336,7 @@ class Room(BaseModel, BaseConfigurableModel):
         return self.is_waiting or check_flowstarts
 
     @property
-    def project(self):
+    def project(self) -> "Project":
         return self.queue.project
 
     @property
@@ -444,6 +444,9 @@ class Room(BaseModel, BaseConfigurableModel):
                     project = sector.project
             if project:
                 InServiceStatusService.room_closed(self.user, project)
+
+        if self.project.is_csat_enabled:
+            transaction.on_commit(lambda: self.start_csat_flow())
 
     def request_callback(self, room_data: dict):
         if self.callback_url is None:
@@ -692,6 +695,14 @@ class Room(BaseModel, BaseConfigurableModel):
         self.full_transfer_history.append(transfer)
         self.transfer_history = transfer  # legacy
         self.save(update_fields=["full_transfer_history", "transfer_history"])
+
+    def start_csat_flow(self):
+        """
+        Starts the CSAT flow for a room.
+        """
+        from chats.apps.csat.tasks import start_csat_flow
+
+        start_csat_flow.delay(self.uuid)
 
 
 class RoomPin(BaseModel):
