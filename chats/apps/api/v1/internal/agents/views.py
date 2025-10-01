@@ -2,12 +2,12 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import permissions, status
-from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from chats.apps.api.v1.internal.agents.utils import validate_agent_disconnect
 from chats.apps.api.v1.permissions import ProjectBodyIsAdmin
-from chats.apps.projects.models import Project, ProjectPermission, CustomStatus
+from chats.apps.projects.models import CustomStatus, ProjectPermission
 from chats.apps.projects.tasks import create_agent_disconnect_log
 from chats.utils.websockets import send_channels_group
 from chats.apps.api.v1.internal.agents.utils import validate_agent_disconnect
@@ -39,9 +39,10 @@ class AgentDisconnectView(APIView):
                 for custom_status in statuses:
                     local_created_on = custom_status.created_on.astimezone(project_tz)
                     local_end_time = end_time.astimezone(project_tz)
-                    custom_status.break_time = int((local_end_time - local_created_on).total_seconds())
+                    custom_status.break_time = int(
+                        (local_end_time - local_created_on).total_seconds()
+                    )
                     custom_status.save(update_fields=["break_time"])
- 
 
             if closed_count > 0:
                 permission_pk = target_perm.pk

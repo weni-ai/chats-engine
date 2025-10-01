@@ -17,6 +17,7 @@ from chats.apps.dashboard.models import ReportStatus, RoomMetrics
 from chats.apps.dashboard.utils import (
     calculate_last_queue_waiting_time,
     calculate_response_time,
+    calculate_first_response_time,
 )
 from chats.apps.projects.models import Project
 from chats.apps.rooms.models import Room
@@ -89,6 +90,33 @@ def close_metrics(room_uuid: UUID):
     Close metrics for a room.
     """
     generate_metrics(room_uuid)
+
+
+@app.task(name="calculate_first_response_time_task")
+def calculate_first_response_time_task(room_uuid: UUID):
+    """
+    Calculate and save the first response time for a room.
+    Called when the agent sends their first message.
+    """
+    try:
+        room = Room.objects.get(uuid=room_uuid)
+        
+        metric_room = RoomMetrics.objects.get_or_create(room=room)[0]
+        
+        if metric_room.first_response_time == 0:
+            metric_room.first_response_time = calculate_first_response_time(room)
+            metric_room.save(update_fields=['first_response_time'])
+            
+            logger.info(
+                f"First response time calculated for room {room_uuid}: "
+                f"{metric_room.first_response_time} seconds"
+            )
+    except Room.DoesNotExist:
+        logger.error(f"Room {room_uuid} not found when calculating first response time")
+    except Exception as e:
+        logger.error(
+            f"Error calculating first response time for room {room_uuid}: {str(e)}"
+        )
 
 
 @app.task
