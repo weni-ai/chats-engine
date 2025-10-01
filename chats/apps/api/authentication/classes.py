@@ -14,8 +14,13 @@ class JWTAuthentication(BaseAuthentication):
         """
         token = request.headers.get("Authorization")
 
-        if not token:
+        if not token or not token.startswith("Token "):
             raise AuthenticationFailed("No authentication token provided.")
+
+        try:
+            token = token.split(" ")[1]
+        except IndexError:
+            raise AuthenticationFailed("Invalid authentication token.")
 
         return self.authenticate_credentials(token)
 
