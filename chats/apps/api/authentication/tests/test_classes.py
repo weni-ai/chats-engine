@@ -28,7 +28,7 @@ class JWTAuthenticationTests(TestCase):
     def test_authenticate(self):
         authentication = JWTAuthentication()
         request = HttpRequest()
-        request.META["HTTP_AUTHORIZATION"] = self.valid_token
+        request.META["HTTP_AUTHORIZATION"] = f"Token {self.valid_token}"
         result = authentication.authenticate(request)
         self.assertIsNotNone(result)
         self.assertEqual(len(result), 2)
@@ -73,7 +73,9 @@ class MockViewAPITestCase(APITestCase):
 
     def test_authenticated_request_with_valid_token(self):
         """Test that a request with a valid JWT token is authenticated and token data is available."""
-        response = self.client.get("/mock/", HTTP_AUTHORIZATION=self.valid_token)
+        response = self.client.get(
+            "/mock/", HTTP_AUTHORIZATION=f"Token {self.valid_token}"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data["authenticated"])
@@ -97,14 +99,18 @@ class MockViewAPITestCase(APITestCase):
     def test_unauthenticated_request_with_invalid_token(self):
         """Test that a request with an invalid token is not authenticated."""
         invalid_token = "invalid.jwt.token"
-        response = self.client.get("/mock/", HTTP_AUTHORIZATION=invalid_token)
+        response = self.client.get(
+            "/mock/", HTTP_AUTHORIZATION=f"Token {invalid_token}"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_unauthenticated_request_with_malformed_token(self):
         """Test that a request with a malformed token is not authenticated."""
         malformed_token = "Bearer invalid.jwt.token"
-        response = self.client.get("/mock/", HTTP_AUTHORIZATION=malformed_token)
+        response = self.client.get(
+            "/mock/", HTTP_AUTHORIZATION=f"Token {malformed_token}"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
@@ -123,13 +129,17 @@ class MockViewAPITestCase(APITestCase):
             algorithm=self.token_generator.algorithm,
         )
 
-        response = self.client.get("/mock/", HTTP_AUTHORIZATION=expired_token)
+        response = self.client.get(
+            "/mock/", HTTP_AUTHORIZATION=f"Token {expired_token}"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_token_data_structure(self):
         """Test that the token data structure is correct and complete."""
-        response = self.client.get("/mock/", HTTP_AUTHORIZATION=self.valid_token)
+        response = self.client.get(
+            "/mock/", HTTP_AUTHORIZATION=f"Token {self.valid_token}"
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         token_data = response.data["token_data"]
