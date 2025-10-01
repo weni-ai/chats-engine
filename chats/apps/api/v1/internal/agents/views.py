@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -16,7 +17,7 @@ class AgentDisconnectView(APIView):
 
     def post(self, request):
         project_uuid = request.data.get("project_uuid")
-        agent_email = request.data.get("agent")
+        agent_email = request.data.get("agent") or request.data.get("agent_email")
 
         project, target_user, target_perm = validate_agent_disconnect(
             request.user, project_uuid, agent_email
@@ -29,7 +30,18 @@ class AgentDisconnectView(APIView):
                 is_active=True,
                 status_type__config__created_by_system__isnull=True,
             )
+            statuses = list(active_qs)
             closed_count = active_qs.update(is_active=False)
+            if statuses:
+                end_time = timezone.now()
+                project_tz = project.timezone
+                for custom_status in statuses:
+                    local_created_on = custom_status.created_on.astimezone(project_tz)
+                    local_end_time = end_time.astimezone(project_tz)
+                    custom_status.break_time = int(
+                        (local_end_time - local_created_on).total_seconds()
+                    )
+                    custom_status.save(update_fields=["break_time"])
 
             if closed_count > 0:
                 permission_pk = target_perm.pk
