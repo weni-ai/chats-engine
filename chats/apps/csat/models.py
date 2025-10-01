@@ -28,3 +28,14 @@ class CSATSurvey(BaseModel):
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
+
+
+class CSATFlowProjectConfig(BaseModel):
+    project = models.OneToOneField(
+        "projects.Project",
+        verbose_name=_("Project"),
+        on_delete=models.CASCADE,
+        related_name="csat_flow_project_config",
+    )
+    flow_uuid = models.UUIDField(_("Flow UUID"))
+    version = models.IntegerField(_("Version"))
