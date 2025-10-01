@@ -121,7 +121,7 @@ class TestCSATFlowService(TestCase):
         self.service.flows_client.start_flow.assert_called_once_with(
             room.project,
             {
-                "flow": mock_get_flow_uuid.return_value,
+                "flow": str(mock_get_flow_uuid.return_value),
                 "urns": [room.urn],
                 "params": {
                     "room": str(room.uuid),
