@@ -32,7 +32,7 @@ from chats.core.excel_storage import ExcelStorage
 
 from .dto import Filters, should_exclude_admin_domains
 from .presenter import ModelFieldsPresenter
-from .service import AgentsService, RawDataService, RoomsDataService, SectorService
+from .service import AgentsService, RawDataService, RoomsDataService, SectorService, TimeMetricsService
 
 logger = logging.getLogger(__name__)
 
@@ -386,6 +386,35 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             data_frame_3.to_csv(response, index=False, mode="a", sep=";")
 
             return response
+
+    @action(
+        detail=True,
+        methods=["GET"],
+        url_name="time_metrics",
+    )
+    def time_metrics(self, request, *args, **kwargs):
+        """Time metrics for the project - real-time data"""
+        project = self.get_object()
+        params = request.query_params.dict()
+        
+        filters = Filters(
+            start_date=params.get("start_date"),
+            end_date=params.get("end_date"),
+            agent=params.get("agent"),
+            sector=params.get("sector"),
+            tag=params.get("tag"),
+            queue=params.get("queue"),
+            user_request=request.user,
+            project=project,
+            is_weni_admin=should_exclude_admin_domains(
+                request.user.email if request.user else ""
+            ),
+        )
+
+        time_metrics_service = TimeMetricsService()
+        metrics_data = time_metrics_service.get_time_metrics(filters, project)
+
+        return Response(metrics_data, status.HTTP_200_OK)
 
     @action(detail=True, methods=["get"])
     def report_status(self, request, **kwargs):

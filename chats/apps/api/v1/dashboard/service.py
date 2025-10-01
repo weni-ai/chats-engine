@@ -98,3 +98,161 @@ class RoomsDataService:
             rooms_dto,
         )
         return rooms_dto
+
+
+class TimeMetricsService:
+    def get_time_metrics(self, filters: Filters, project):
+        from django.db.models import Q
+        from django.utils import timezone
+        import pendulum
+        import pytz
+        from chats.apps.rooms.models import Room
+        from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
+
+        # Convert timezone string to timezone object
+        tz = pytz.timezone(str(project.timezone))
+        rooms_filter = Q(queue__sector__project=project)
+
+        # Define filtro de data
+        if filters.start_date and filters.end_date:
+            start_time = pendulum.parse(filters.start_date).replace(tzinfo=tz)
+            end_time = pendulum.parse(filters.end_date + " 23:59:59").replace(tzinfo=tz)
+            rooms_filter &= Q(created_on__range=[start_time, end_time])
+        else:
+            # Sem filtro de data = apenas do dia atual (tempo real)
+            initial_datetime = timezone.now().astimezone(tz).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            rooms_filter &= Q(created_on__gte=initial_datetime)
+
+        if filters.agent:
+            rooms_filter &= Q(user=filters.agent)
+
+        if filters.sector:
+            rooms_filter &= Q(queue__sector=filters.sector)
+            if filters.tag:
+                rooms_filter &= Q(tags__uuid=filters.tag)
+
+        if filters.queue:
+            rooms_filter &= Q(queue__uuid=filters.queue)
+
+        # 1. TEMPO MÉDIO EM ESPERA (salas ativas na fila)
+        waiting_filter = Q(queue__sector__project=project)
+        
+        if filters.agent:
+            waiting_filter &= Q(user=filters.agent)
+        if filters.sector:
+            waiting_filter &= Q(queue__sector=filters.sector)
+            if filters.tag:
+                waiting_filter &= Q(tags__uuid=filters.tag)
+        if filters.queue:
+            waiting_filter &= Q(queue__uuid=filters.queue)
+
+        active_rooms_in_queue = Room.objects.filter(
+            waiting_filter,
+            is_active=True,
+            user__isnull=True,
+            added_to_queue_at__isnull=False
+        )
+
+        waiting_times = []
+        for room in active_rooms_in_queue:
+            waiting_time = calculate_last_queue_waiting_time(room)
+            waiting_times.append(waiting_time)
+
+        avg_waiting_time = int(sum(waiting_times) / len(waiting_times)) if waiting_times else 0
+        max_waiting_time = int(max(waiting_times)) if waiting_times else 0
+
+        # 2. TEMPO MÉDIO PARA PRIMEIRA RESPOSTA (usando campo first_response_time)
+        try:
+            rooms_with_first_response = Room.objects.filter(
+                rooms_filter,
+                metric__isnull=False,
+                metric__first_response_time__gt=0
+            ).select_related('metric')
+
+            first_response_times = [
+                room.metric.first_response_time 
+                for room in rooms_with_first_response
+            ]
+        except Exception:
+            # Campo first_response_time ainda não existe
+            first_response_times = []
+        
+        avg_first_response_time = int(sum(first_response_times) / len(first_response_times)) if first_response_times else 0
+        max_first_response_time = int(max(first_response_times)) if first_response_times else 0
+
+        # 3. DURAÇÃO MÉDIA DA CONVERSA (user_assigned_at até now/ended_at)
+        active_conversation_filter = Q(queue__sector__project=project)
+        
+        if filters.agent:
+            active_conversation_filter &= Q(user=filters.agent)
+        if filters.sector:
+            active_conversation_filter &= Q(queue__sector=filters.sector)
+            if filters.tag:
+                active_conversation_filter &= Q(tags__uuid=filters.tag)
+        if filters.queue:
+            active_conversation_filter &= Q(queue__uuid=filters.queue)
+
+        active_rooms_with_user = Room.objects.filter(
+            active_conversation_filter,
+            is_active=True,
+            user__isnull=False,
+            user_assigned_at__isnull=False
+        )
+
+        # Salas fechadas: usa o filtro de data baseado em ended_at
+        closed_conversation_filter = Q(queue__sector__project=project)
+        
+        if filters.start_date and filters.end_date:
+            start_time = pendulum.parse(filters.start_date).replace(tzinfo=tz)
+            end_time = pendulum.parse(filters.end_date + " 23:59:59").replace(tzinfo=tz)
+            closed_conversation_filter &= Q(ended_at__range=[start_time, end_time])
+        else:
+            # Sem filtro de data = apenas fechadas hoje (tempo real)
+            initial_datetime = timezone.now().astimezone(tz).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            closed_conversation_filter &= Q(ended_at__gte=initial_datetime)
+
+        if filters.agent:
+            closed_conversation_filter &= Q(user=filters.agent)
+        if filters.sector:
+            closed_conversation_filter &= Q(queue__sector=filters.sector)
+            if filters.tag:
+                closed_conversation_filter &= Q(tags__uuid=filters.tag)
+        if filters.queue:
+            closed_conversation_filter &= Q(queue__uuid=filters.queue)
+
+        closed_rooms_with_user = Room.objects.filter(
+            closed_conversation_filter,
+            is_active=False,
+            user__isnull=False,
+            user_assigned_at__isnull=False,
+            ended_at__isnull=False
+        )
+
+        conversation_durations = []
+        now = timezone.now()
+
+        # Calcula duração para salas ativas
+        for room in active_rooms_with_user:
+            duration = (now - room.user_assigned_at).total_seconds()
+            conversation_durations.append(int(duration))
+
+        # Calcula duração para salas fechadas
+        for room in closed_rooms_with_user:
+            duration = (room.ended_at - room.user_assigned_at).total_seconds()
+            conversation_durations.append(int(duration))
+
+        avg_conversation_duration = int(sum(conversation_durations) / len(conversation_durations)) if conversation_durations else 0
+        max_conversation_duration = int(max(conversation_durations)) if conversation_durations else 0
+
+        return {
+            "avg_waiting_time": avg_waiting_time,
+            "max_waiting_time": max_waiting_time,
+            "avg_first_response_time": avg_first_response_time,
+            "max_first_response_time": max_first_response_time,
+            "avg_conversation_duration": avg_conversation_duration,
+            "max_conversation_duration": max_conversation_duration,
+        }
