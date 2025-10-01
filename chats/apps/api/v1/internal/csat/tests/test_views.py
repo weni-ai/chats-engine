@@ -133,3 +133,16 @@ class TestCSATWebhookView(BaseTestCSATWebhookView):
         response = self.create({"room": self.room.uuid, "rating": 5})
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+    @with_project_jwt_token
+    @with_closed_room
+    def test_cannot_create_csat_if_already_exists(self):
+        CSATSurvey.objects.create(
+            room=self.room, rating=5, comment="Test Comment", answered_on=timezone.now()
+        )
+
+        response = self.create(
+            {"room": self.room.uuid, "rating": 5, "comment": "Test Comment"}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

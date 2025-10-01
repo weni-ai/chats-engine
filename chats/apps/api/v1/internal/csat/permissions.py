@@ -1,6 +1,7 @@
 from rest_framework.permissions import BasePermission
 
 from chats.apps.rooms.models import Room
+from chats.apps.csat.models import CSATSurvey
 
 
 class CSATWebhookPermission(BasePermission):
@@ -16,4 +17,8 @@ class CSATWebhookPermission(BasePermission):
             uuid=room_uuid, queue__sector__project__uuid=project_uuid
         ).first()
 
-        return room and not room.is_active
+        return (
+            room
+            and not room.is_active
+            and not CSATSurvey.objects.filter(room=room).exists()
+        )
