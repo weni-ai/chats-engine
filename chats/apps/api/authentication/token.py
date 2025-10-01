@@ -75,7 +75,7 @@ class JWTTokenGenerator:
         self,
         service_name: str,
         permissions: Optional[list] = None,
-        expires_in_hours: int = 168,  # 7 days for API tokens
+        expires_in_hours: int = 2,
         additional_claims: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
@@ -84,7 +84,7 @@ class JWTTokenGenerator:
         Args:
             service_name: Name of the service using the token.
             permissions: List of permissions granted to the service.
-            expires_in_hours: Token expiration time in hours (default: 168).
+            expires_in_hours: Token expiration time in hours (default: 2).
             additional_claims: Additional claims to include in the token.
 
         Returns:
