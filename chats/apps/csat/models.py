@@ -39,3 +39,10 @@ class CSATFlowProjectConfig(BaseModel):
     )
     flow_uuid = models.UUIDField(_("Flow UUID"))
     version = models.IntegerField(_("Version"))
+
+    class Meta:
+        verbose_name = _("CSAT Flow Project Config")
+        verbose_name_plural = _("CSAT Flow Project Configs")
+
+    def __str__(self):
+        return f"{self.project.name} - {self.flow_uuid}"
