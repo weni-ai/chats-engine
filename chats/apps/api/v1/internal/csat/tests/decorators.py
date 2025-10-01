@@ -17,7 +17,7 @@ def with_project_jwt_token(func):
     def wrapper(self, *args, **kwargs):
         self.jwt_generator = JWTTokenGenerator()
         self.token = self.jwt_generator.generate_token(
-            {"project": str(self.project.uuid)}
+            {"project": str(self.project.uuid), "room": str(self.room.uuid)}
         )
         return func(self, *args, **kwargs)
 

@@ -16,7 +16,7 @@ class CSATWebhookPermission(BasePermission):
             print("[CSATWebhookPermission] project_uuid not found")
             return False
 
-        room_uuid = request.data.get("room")
+        room_uuid = request.auth.get("room")
 
         print("[CSATWebhookPermission] room_uuid", room_uuid)
 
