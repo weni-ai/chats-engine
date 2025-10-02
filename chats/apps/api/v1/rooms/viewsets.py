@@ -290,7 +290,7 @@ class RoomViewset(
 
         if tags is not None:
             sector_tags = SectorTag.objects.filter(
-                sector=instance.queue.sector.pk
+                sector=instance.queue.sector
             ).values_list("uuid", flat=True)
 
             if set(tags) - set(sector_tags):
