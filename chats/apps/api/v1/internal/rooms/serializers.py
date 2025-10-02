@@ -63,23 +63,15 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
         return None
 
     def get_first_response_time(self, obj: Room) -> int:
-        if not obj.first_user_assigned_at:
-            return None
-        
-        first_response_at = getattr(obj, 'first_response_at', None)
-        
-        if first_response_at:
-            return int((first_response_at - obj.first_user_assigned_at).total_seconds())
-        
+        try:
+            if hasattr(obj, 'metric') and obj.metric.first_response_time > 0:
+                return obj.metric.first_response_time
+        except Exception:
+            pass
         return None
 
     def get_waiting_time(self, obj: Room) -> int:
-        if not obj.added_to_queue_at:
+        if not obj.added_to_queue_at or not obj.user_assigned_at:
             return None
         
-        if obj.is_active and not obj.user:
-            return int((timezone.now() - obj.added_to_queue_at).total_seconds())
-        elif obj.first_user_assigned_at:
-            return int((obj.first_user_assigned_at - obj.added_to_queue_at).total_seconds())
-        
-        return None
+        return int((obj.user_assigned_at - obj.added_to_queue_at).total_seconds())
