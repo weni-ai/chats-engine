@@ -551,3 +551,24 @@ class RemoveRoomTagSerializer(AddOrRemoveTagFromRoomSerializer):
             )
 
         return attrs
+
+
+class RoomNoteSerializer(serializers.ModelSerializer):
+    """
+    Serializer for room notes
+    """
+
+    user = serializers.SerializerMethodField()
+    is_deletable = serializers.ReadOnlyField()
+
+    class Meta:
+        model = RoomNote
+        fields = ["uuid", "created_on", "user", "text", "is_deletable"]
+        read_only_fields = ["uuid", "created_on", "user", "is_deletable"]
+
+    def get_user(self, obj):
+        return {
+            "uuid": str(obj.user.pk),
+            "name": obj.user.full_name,
+            "email": obj.user.email,
+        }
