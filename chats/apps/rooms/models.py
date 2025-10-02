@@ -396,9 +396,11 @@ class Room(BaseModel, BaseConfigurableModel):
         )
 
     def _handle_close_tags(self, tags: list):
-        current_tag_ids = set(self.tags.values_list("uuid", flat=True))
+        current_tag_ids = set(
+            [str(tag_uuid) for tag_uuid in self.tags.values_list("uuid", flat=True)]
+        )
         new_tag_ids = set(tags) - current_tag_ids
-        tags_to_remove_ids = current_tag_ids - set(tags)
+        tags_to_remove_ids = current_tag_ids - set([str(tag_uuid) for tag_uuid in tags])
 
         self.tags.add(*new_tag_ids)
         self.tags.remove(*tags_to_remove_ids)
