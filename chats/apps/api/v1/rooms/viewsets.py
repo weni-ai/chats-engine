@@ -294,6 +294,9 @@ class RoomViewset(
                 sector=instance.queue.sector
             ).values_list("uuid", flat=True)
 
+            print(f"DEBUG tags: {tags}")
+            print(f"DEBUG sector_tags: {sector_tags}")
+
             if set(tags) - set(sector_tags):
                 raise ValidationError(
                     {"tags": ["Tag not found for the room's sector"]},
