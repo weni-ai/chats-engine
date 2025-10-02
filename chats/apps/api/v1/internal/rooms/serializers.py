@@ -15,6 +15,7 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
     duration = serializers.SerializerMethodField()
     first_response_time = serializers.SerializerMethodField()
     waiting_time = serializers.SerializerMethodField()
+    queue_time = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -33,6 +34,7 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
             "duration",
             "first_response_time",
             "waiting_time",
+            "queue_time",
         ]
 
     def get_agent(self, obj):
@@ -73,5 +75,10 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
     def get_waiting_time(self, obj: Room) -> int:
         if not obj.added_to_queue_at or not obj.user_assigned_at:
             return None
-        
         return int((obj.user_assigned_at - obj.added_to_queue_at).total_seconds())
+
+    def get_queue_time(self, obj: Room) -> int:
+        if obj.is_active and not obj.user:
+            queue_start = obj.added_to_queue_at
+            return int((timezone.now() - queue_start).total_seconds())
+        return None
