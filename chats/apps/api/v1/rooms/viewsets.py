@@ -84,7 +84,6 @@ from chats.apps.rooms.views import (
     update_custom_fields,
     update_flows_custom_fields,
 )
-from chats.core.cache_utils import get_user_id_by_email_cached
 
 logger = logging.getLogger(__name__)
 
@@ -291,9 +290,8 @@ class RoomViewset(
         tags = request.data.get("tags", None)
 
         if tags is not None:
-
             sector_tags = SectorTag.objects.filter(
-                pk=instance.queue.sector.pk
+                sector=instance.queue.sector.pk
             ).values_list("uuid", flat=True)
 
             if set(tags) - set(sector_tags):
@@ -989,6 +987,53 @@ class RoomViewset(
         sector_tag = serializer.validated_data.get("sector_tag")
         room.tags.remove(sector_tag)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="room_note",
+        serializer_class=RoomNoteSerializer,
+    )
+    def create_note(self, request, pk=None):
+        """
+        Create a note for the room
+        """
+        room = self.get_object()
+
+        # Verify user has access to the room
+        if not verify_user_room(room, request.user):
+            raise PermissionDenied(
+                "You don't have permission to add notes to this room"
+            )
+
+        # Room must be active
+        if not room.is_active:
+            raise ValidationError({"detail": "Cannot add notes to closed rooms"})
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # Create a blank message to attach the internal note
+        msg = Message.objects.create(
+            room=room,
+            user=request.user,
+            contact=None,
+            text="",
+        )
+
+        # Create the note attached to the message
+        note = RoomNote.objects.create(
+            room=room,
+            user=request.user,
+            text=serializer.validated_data["text"],
+            message=msg,
+        )
+
+        # Notify message creation for clients listening to messages
+        msg.notify_room("create", True)
+
+        # Return serialized note
+        return Response(RoomNoteSerializer(note).data, status=status.HTTP_201_CREATED)
 
 
 class RoomsReportViewSet(APIView):
