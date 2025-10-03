@@ -1,6 +1,6 @@
 from django.contrib.postgres.aggregates import JSONBAgg
 from django.contrib.postgres.fields import JSONField
-from django.db.models import Count, F, OuterRef, Q, Subquery
+from django.db.models import Avg, Count, F, OuterRef, Q, Subquery
 from django.db.models.functions import JSONObject
 from django.utils import timezone
 
@@ -121,6 +121,21 @@ class AgentRepository:
                     distinct=True,
                     filter=Q(**opened_rooms, **rooms_filter),
                 ),
+                avg_first_response_time=Avg(
+                    "rooms__metric__first_response_time",
+                    filter=Q(**closed_rooms, **rooms_filter)
+                    & Q(rooms__metric__first_response_time__gt=0),
+                ),
+                avg_message_response_time=Avg(
+                    "rooms__metric__message_response_time",
+                    filter=Q(**closed_rooms, **rooms_filter)
+                    & Q(rooms__metric__message_response_time__gt=0),
+                ),
+                avg_interaction_time=Avg(
+                    "rooms__metric__interaction_time",
+                    filter=Q(**closed_rooms, **rooms_filter)
+                    & Q(rooms__metric__interaction_time__gt=0),
+                ),
                 custom_status=custom_status_subquery,
             )
             .distinct()
@@ -131,6 +146,9 @@ class AgentRepository:
                 "status",
                 "closed",
                 "opened",
+                "avg_first_response_time",
+                "avg_message_response_time",
+                "avg_interaction_time",
                 "custom_status",
             )
         )
