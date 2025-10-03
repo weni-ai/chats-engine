@@ -7,11 +7,13 @@ class DashboardAgentsSerializer(serializers.Serializer):
     link = serializers.SerializerMethodField()
     opened = serializers.IntegerField(allow_null=True, required=False)
     agent = serializers.SerializerMethodField()
+    agent_email = serializers.EmailField(source="email", allow_null=True, required=False)
     closed = serializers.IntegerField(allow_null=True, required=False)
     status = serializers.SerializerMethodField()
-    agent_email = serializers.EmailField(
-        source="email", allow_null=True, required=False
-    )
+    avg_first_response_time = serializers.IntegerField(allow_null=True, required=False)
+    avg_message_response_time = serializers.IntegerField(allow_null=True, required=False)
+    avg_interaction_time = serializers.IntegerField(allow_null=True, required=False)
+    in_service_time = serializers.SerializerMethodField()
 
     def get_link(self, obj):
         return {
@@ -25,6 +27,7 @@ class DashboardAgentsSerializer(serializers.Serializer):
         if custom_status_list:
             for status_item in custom_status_list:
                 status_type = status_item.get("status_type")
+                break_time = status_item.get("break_time", 0)
                 is_active = status_item.get("is_active", False)
 
                 if status_type != "In-Service" and is_active:
@@ -39,6 +42,11 @@ class DashboardAgentsSerializer(serializers.Serializer):
 
     def get_agent(self, obj):
         return f"{obj.get('first_name')} {obj.get('last_name')}"
+
+    def get_in_service_time(self, obj):
+        return calculate_in_service_time(
+            obj.get("custom_status"), user_status=obj.get("status")
+        )
 
 
 class DashboardCustomAgentStatusSerializer(serializers.Serializer):
