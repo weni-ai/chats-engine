@@ -264,6 +264,42 @@ class SectorTests(APITestCase):
         response = client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active")
+    def test_update_sector_csat_enabled_when_feature_flag_is_off(
+        self, mock_is_feature_active
+    ):
+        """
+        Verify if the endpoint for update in sector is working with correctly.
+        """
+        mock_is_feature_active.return_value = False
+        url = reverse("sector-detail", args=[self.sector.pk])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = client.patch(url, data={"is_csat_enabled": True})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["is_csat_enabled"][0].code,
+            "csat_feature_flag_is_off",
+        )
+        self.sector.refresh_from_db()
+        self.assertFalse(self.sector.is_csat_enabled)
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active")
+    def test_update_sector_csat_enabled_when_feature_flag_is_on(
+        self, mock_is_feature_active
+    ):
+        """
+        Verify if the endpoint for update in sector is working with correctly.
+        """
+        mock_is_feature_active.return_value = True
+        url = reverse("sector-detail", args=[self.sector.pk])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = client.patch(url, data={"is_csat_enabled": True})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.sector.refresh_from_db()
+        self.assertTrue(self.sector.is_csat_enabled)
+
 
 class RoomsExternalTests(APITestCase):
     fixtures = ["chats/fixtures/fixture_app.json"]
