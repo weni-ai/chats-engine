@@ -1,7 +1,7 @@
 from datetime import date, datetime, time
 from unittest.mock import patch
 
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.test import TestCase, TransactionTestCase
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APITestCase
