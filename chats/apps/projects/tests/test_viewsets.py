@@ -1,5 +1,4 @@
 import uuid
-from unittest.mock import patch
 
 from django.urls import reverse
 from django.utils.crypto import get_random_string
@@ -10,7 +9,6 @@ from rest_framework import status
 
 from chats.apps.accounts.models import User
 from chats.apps.projects.models import Project
-from chats.apps.projects.models.models import ProjectPermission
 from chats.apps.projects.tests.decorators import with_project_permission
 
 

@@ -1,10 +1,7 @@
 import json
-from django.conf import settings
-from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from timezone_field.rest_framework import TimeZoneSerializerField
 
-from chats.apps.feature_flags.utils import is_feature_active
 from chats.apps.projects.models import (
     CustomStatus,
     CustomStatusType,
