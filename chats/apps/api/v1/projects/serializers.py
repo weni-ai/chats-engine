@@ -16,25 +16,9 @@ from chats.apps.projects.models import (
 from chats.apps.sectors.models import Sector
 
 
-def validate_is_csat_enabled(instance: Project, value: bool, context: dict):
-    request = context.get("request")
-    user = getattr(request, "user", None)
-    project = instance
-
-    if value is True and not is_feature_active(
-        settings.CSAT_FEATURE_FLAG_KEY, user, project
-    ):
-        raise serializers.ValidationError(
-            _("The CSAT feature is not available for this project"),
-            code="csat_feature_flag_is_off",
-        )
-    return value
-
-
 class ProjectSerializer(serializers.ModelSerializer):
     timezone = TimeZoneSerializerField(use_pytz=False)
     config = serializers.SerializerMethodField()
-    is_csat_enabled = serializers.BooleanField(required=False, allow_null=False)
 
     class Meta:
         model = Project
@@ -45,7 +29,6 @@ class ProjectSerializer(serializers.ModelSerializer):
             "config",
             "org",
             "room_routing_type",
-            "is_csat_enabled",
         ]
         read_only_fields = [
             "timezone",
@@ -61,13 +44,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             config.pop("chat_gpt_token", None)
         return config
 
-    def validate_is_csat_enabled(self, value: bool):
-        return validate_is_csat_enabled(self.instance, value, self.context)
-
 
 class UpdateProjectSerializer(serializers.ModelSerializer):
-    is_csat_enabled = serializers.BooleanField(required=False, allow_null=False)
-
     class Meta:
         model = Project
         fields = [
@@ -77,12 +55,8 @@ class UpdateProjectSerializer(serializers.ModelSerializer):
             "config",
             "org",
             "room_routing_type",
-            "is_csat_enabled",
         ]
         read_only_fields = ["timezone", "room_routing_type"]
-
-    def validate_is_csat_enabled(self, value: bool):
-        return validate_is_csat_enabled(self.instance, value, self.context)
 
     def validate(self, attrs: dict):
         config = attrs.pop("config", None)
