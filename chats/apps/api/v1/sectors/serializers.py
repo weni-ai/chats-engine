@@ -224,6 +224,7 @@ class SectorReadOnlyListSerializer(serializers.ModelSerializer):
             "created_on",
             "has_group_sector",
             "automatic_message",
+            "is_csat_enabled",
         ]
 
     def get_agents(self, sector: Sector):
@@ -255,6 +256,7 @@ class SectorReadOnlyRetrieveSerializer(serializers.ModelSerializer):
             "can_edit_custom_fields",
             "config",
             "automatic_message",
+            "is_csat_enabled",
         ]
 
     def get_automatic_message(self, sector: Sector):
