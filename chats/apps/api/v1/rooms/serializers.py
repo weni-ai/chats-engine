@@ -201,6 +201,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
                 "name": room.queue.name,
                 "sector": str(room.queue.sector.uuid),
                 "sector_name": room.queue.sector.name,
+                "required_tags": room.queue.required_tags,
             }
         except AttributeError:
             return None

@@ -751,20 +751,21 @@ class CloseRoomTestCase(APITestCase):
         )
 
         self.room = Room.objects.create(
-            queue=self.queue,
-            user=self.agent,
+            queue=self.queue, user=self.agent, config={"is_billing_notified": True}
         )
 
         self.client.force_authenticate(user=self.agent)
 
-    def close_room(self, room_pk: str) -> Response:
+    def close_room(self, room_pk: str, payload: dict = None) -> Response:
         url = reverse("room-close", kwargs={"pk": room_pk})
 
-        return self.client.patch(url)
+        return self.client.patch(url, data=payload, format="json")
 
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_close_room_when_billing_was_not_previously_notified(self, mock_get_room):
         mock_get_room.return_value = None
+        self.room.set_config("is_billing_notified", False)
+        self.room.save(update_fields=["config"])
 
         self.assertFalse(self.room.is_billing_notified)
 
@@ -781,8 +782,6 @@ class CloseRoomTestCase(APITestCase):
     def test_close_room_when_billing_was_previously_notified(self, mock_get_room):
         mock_get_room.return_value = None
 
-        self.room.set_config("is_billing_notified", True)
-        self.room.save(update_fields=["config"])
         self.assertTrue(self.room.is_billing_notified)
 
         response = self.close_room(self.room.uuid)
@@ -793,6 +792,41 @@ class CloseRoomTestCase(APITestCase):
         self.assertEqual(self.room.is_active, False)
 
         mock_get_room.assert_not_called()
+
+    def test_close_room_when_sector_has_required_tags_and_no_tags_are_provided(self):
+        self.sector.required_tags = True
+        self.sector.save()
+
+        response = self.close_room(self.room.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["tags"][0].code, "tags_required")
+
+    def test_close_room_when_sector_has_required_tags_and_room_already_has_tags(self):
+        self.sector.required_tags = True
+        self.sector.save()
+        self.room.tags.add(
+            SectorTag.objects.create(name="Test Tag", sector=self.sector)
+        )
+
+        response = self.close_room(self.room.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.is_active, False)
+
+    def test_close_room_when_sector_has_required_tags_and_tags_are_provided(self):
+        self.sector.required_tags = True
+        self.sector.save()
+
+        tag = SectorTag.objects.create(name="Test Tag", sector=self.sector)
+
+        response = self.close_room(self.room.uuid, payload={"tags": [tag.uuid]})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.is_active, False)
 
 
 class RoomHistorySummaryTestCase(APITestCase):

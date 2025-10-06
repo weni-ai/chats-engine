@@ -1,8 +1,8 @@
 from datetime import date, datetime, time
 from unittest.mock import patch
 
-from django.db import IntegrityError
-from django.test import TestCase
+from django.db import IntegrityError, transaction
+from django.test import TestCase, TransactionTestCase
 from rest_framework.exceptions import ValidationError
 from rest_framework.test import APITestCase
 
@@ -360,3 +360,29 @@ class SectorHolidayCacheInvalidationTests(TestCase):
 
         # Esperado: invalidação -> agora deve passar (sem feriado)
         self.validator.validate_working_hours(self.sector, self.monday_dt)
+
+
+class SectorRequiredTagsTests(TransactionTestCase):
+    def setUp(self):
+        self.project = Project.objects.create(
+            name="Required Tags Project",
+            room_routing_type=RoomRoutingType.QUEUE_PRIORITY,
+        )
+        self.sector = Sector.objects.create(
+            name="Required Tags Sector",
+            project=self.project,
+            required_tags=True,
+            rooms_limit=1,
+        )
+        self.sector_tag = SectorTag.objects.create(
+            name="Required Tags Tag",
+            sector=self.sector,
+        )
+
+    def test_disable_required_tags_when_tag_is_deleted(self):
+        self.assertTrue(self.sector.required_tags)
+
+        self.sector_tag.delete()
+        self.sector.refresh_from_db()
+
+        self.assertFalse(self.sector.required_tags)
