@@ -103,12 +103,14 @@ class SectorSerializer(serializers.ModelSerializer):
                 # For now, tags are created after the sector is created
                 # This may change in the future
                 raise serializers.ValidationError(
-                    {"detail": _("Sector must have at least one tag to require tags.")}
+                    [_("Sector must have at least one tag to require tags.")],
+                    code="sector_must_have_at_least_one_tag_to_require_tags",
                 )
 
             if not self.instance.tags.exists():
                 raise serializers.ValidationError(
-                    {"detail": _("Sector must have at least one tag to require tags.")}
+                    [_("Sector must have at least one tag to require tags.")],
+                    code="sector_must_have_at_least_one_tag_to_require_tags",
                 )
 
         return value
@@ -192,7 +194,8 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
         """
         if value is True and not self.instance.tags.exists():
             raise serializers.ValidationError(
-                {"detail": _("Sector must have at least one tag to require tags.")}
+                [_("Sector must have at least one tag to require tags.")],
+                code="sector_must_have_at_least_one_tag_to_require_tags",
             )
 
         return value
