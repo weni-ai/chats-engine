@@ -106,6 +106,7 @@ class Project(BaseConfigurableModel, BaseModel):
     def get_cached_config(self):
         """Try to get config from cache first"""
         from chats.core.cache_utils import get_project_config_cached
+
         cached = get_project_config_cached(str(self.uuid))
         if cached is not None:
             return cached

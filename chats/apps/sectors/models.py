@@ -60,6 +60,7 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
     is_automatic_message_active = models.BooleanField(
         _("is automatic message active?"), default=False
     )
+    is_csat_enabled = models.BooleanField(_("is CSAT enabled?"), default=False)
 
     tracker = FieldTracker(fields=["rooms_limit"])
 
