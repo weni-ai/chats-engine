@@ -95,7 +95,6 @@ class Project(BaseConfigurableModel, BaseModel):
             "Whether to route rooms using the queue priority or general routing"
         ),
     )
-    is_csat_enabled = models.BooleanField(_("is CSAT enabled?"), default=False)
 
     class Meta:
         verbose_name = _("Project")
