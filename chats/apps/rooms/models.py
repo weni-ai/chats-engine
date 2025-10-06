@@ -447,7 +447,7 @@ class Room(BaseModel, BaseConfigurableModel):
             if project:
                 InServiceStatusService.room_closed(self.user, project)
 
-        if self.project.is_csat_enabled and self.user:
+        if self.queue.sector.is_csat_enabled and self.user:
             transaction.on_commit(lambda: self.start_csat_flow())
 
     def request_callback(self, room_data: dict):
