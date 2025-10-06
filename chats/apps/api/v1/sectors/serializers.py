@@ -4,6 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from chats.apps.api.v1.accounts.serializers import UserSerializer
+from chats.apps.projects.models.models import Project
 from chats.apps.sectors.models import (
     Sector,
     SectorAuthorization,
@@ -13,6 +14,28 @@ from chats.apps.sectors.models import (
 from chats.apps.feature_flags.utils import is_feature_active
 
 User = get_user_model()
+
+
+def validate_is_csat_enabled(project: Project, value: bool, context: dict) -> bool:
+    """
+    Validate if the CSAT feature is enabled for the sector.
+    """
+    request = context.get("request")
+    user = getattr(request, "user", None)
+    project = project
+
+    if value is True and not is_feature_active(
+        settings.CSAT_FEATURE_FLAG_KEY, user, project
+    ):
+        raise serializers.ValidationError(
+            {
+                "is_csat_enabled": [
+                    _("The CSAT feature is not available for this sector")
+                ]
+            },
+            code="csat_feature_flag_is_off",
+        )
+    return value
 
 
 class SectorAutomaticMessageSerializer(serializers.ModelSerializer):
@@ -26,6 +49,7 @@ class SectorAutomaticMessageSerializer(serializers.ModelSerializer):
 
 class SectorSerializer(serializers.ModelSerializer):
     automatic_message = serializers.JSONField(required=False)
+    is_csat_enabled = serializers.BooleanField(required=False, allow_null=False)
 
     class Meta:
         model = Sector
@@ -44,6 +68,7 @@ class SectorSerializer(serializers.ModelSerializer):
             "can_edit_custom_fields",
             "working_day",
             "automatic_message",
+            "is_csat_enabled",
         ]
         extra_kwargs = {
             "work_start": {"required": False, "allow_null": True},
@@ -90,6 +115,10 @@ class SectorSerializer(serializers.ModelSerializer):
             data["is_automatic_message_active"] = automatic_message.get("is_active")
             data["automatic_message_text"] = automatic_message.get("text")
 
+        project = self.instance.project if self.instance else data.get("project")
+
+        validate_is_csat_enabled(project, data.get("is_csat_enabled"), self.context)
+
         return data
 
     def to_representation(self, instance):
@@ -101,6 +130,7 @@ class SectorSerializer(serializers.ModelSerializer):
 
 class SectorUpdateSerializer(serializers.ModelSerializer):
     automatic_message = serializers.JSONField(required=False)
+    is_csat_enabled = serializers.BooleanField(required=False, allow_null=False)
 
     class Meta:
         model = Sector
@@ -115,6 +145,7 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
             "can_edit_custom_fields",
             "config",
             "automatic_message",
+            "is_csat_enabled",
         ]
         extra_kwargs = {field: {"required": False} for field in fields}
 
@@ -161,6 +192,10 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
             attrs.pop("automatic_message")
             attrs["is_automatic_message_active"] = new_is_automatic_message_active
             attrs["automatic_message_text"] = automatic_message.get("text")
+
+        project = self.instance.project
+
+        validate_is_csat_enabled(project, attrs.get("is_csat_enabled"), self.context)
 
         return attrs
 
