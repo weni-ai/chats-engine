@@ -427,6 +427,26 @@ class ModelFieldsPresenter:
             "custom_fields": rooms.get(
                 "custom_fields", {"type": "JSONField", "required": False}
             ),
+            "metric__waiting_time": {
+                "type": "IntegerField",
+                "required": False,
+                "related_model": "dashboard.roommetrics",
+            },
+            "metric__first_response_time": {
+                "type": "IntegerField",
+                "required": False,
+                "related_model": "dashboard.roommetrics",
+            },
+            "metric__message_response_time": {
+                "type": "IntegerField",
+                "required": False,
+                "related_model": "dashboard.roommetrics",
+            },
+            "metric__interaction_time": {
+                "type": "IntegerField",
+                "required": False,
+                "related_model": "dashboard.roommetrics",
+            },
         }
         models_info["rooms"] = ordered_rooms
         cache.set(cache_key, models_info, timeout=86400)
