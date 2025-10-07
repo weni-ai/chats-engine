@@ -11,6 +11,9 @@ User = get_user_model()
 class QueueSerializer(serializers.ModelSerializer):
 
     sector_name = serializers.CharField(source="sector.name", read_only=True)
+    required_tags = serializers.BooleanField(
+        source="sector.required_tags", read_only=True
+    )
 
     class Meta:
         model = Queue
