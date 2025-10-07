@@ -44,6 +44,7 @@ class SectorSerializer(serializers.ModelSerializer):
             "can_edit_custom_fields",
             "working_day",
             "automatic_message",
+            "required_tags",
         ]
         extra_kwargs = {
             "work_start": {"required": False, "allow_null": True},
@@ -92,6 +93,28 @@ class SectorSerializer(serializers.ModelSerializer):
 
         return data
 
+    def validate_required_tags(self, value) -> bool:
+        """
+        Check if the sector has at least one tag to require tags.
+        """
+
+        if value is True:
+            if not self.instance:
+                # For now, tags are created after the sector is created
+                # This may change in the future
+                raise serializers.ValidationError(
+                    [_("Sector must have at least one tag to require tags.")],
+                    code="sector_must_have_at_least_one_tag_to_require_tags",
+                )
+
+            if not self.instance.tags.exists():
+                raise serializers.ValidationError(
+                    [_("Sector must have at least one tag to require tags.")],
+                    code="sector_must_have_at_least_one_tag_to_require_tags",
+                )
+
+        return value
+
     def to_representation(self, instance):
         data = super().to_representation(instance)
         data["automatic_message"] = SectorAutomaticMessageSerializer(instance).data
@@ -115,6 +138,7 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
             "can_edit_custom_fields",
             "config",
             "automatic_message",
+            "required_tags",
         ]
         extra_kwargs = {field: {"required": False} for field in fields}
 
@@ -164,6 +188,18 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
 
         return attrs
 
+    def validate_required_tags(self, value) -> bool:
+        """
+        Check if the sector has at least one tag to require tags.
+        """
+        if value is True and not self.instance.tags.exists():
+            raise serializers.ValidationError(
+                [_("Sector must have at least one tag to require tags.")],
+                code="sector_must_have_at_least_one_tag_to_require_tags",
+            )
+
+        return value
+
     def to_representation(self, instance):
         data = super().to_representation(instance)
 
@@ -189,6 +225,7 @@ class SectorReadOnlyListSerializer(serializers.ModelSerializer):
             "created_on",
             "has_group_sector",
             "automatic_message",
+            "required_tags",
         ]
 
     def get_agents(self, sector: Sector):
@@ -220,6 +257,7 @@ class SectorReadOnlyRetrieveSerializer(serializers.ModelSerializer):
             "can_edit_custom_fields",
             "config",
             "automatic_message",
+            "required_tags",
         ]
 
     def get_automatic_message(self, sector: Sector):

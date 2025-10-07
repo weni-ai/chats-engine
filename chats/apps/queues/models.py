@@ -176,6 +176,10 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
     def project(self):
         return self.sector.project
 
+    @property
+    def required_tags(self) -> bool:
+        return self.sector.required_tags
+
 
 class QueueAuthorization(BaseModel):
     ROLE_NOT_SETTED = 0

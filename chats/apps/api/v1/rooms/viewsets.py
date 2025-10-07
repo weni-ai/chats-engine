@@ -302,6 +302,12 @@ class RoomViewset(
                     code="tag_not_found",
                 )
 
+        if instance.queue.required_tags and (not tags and not instance.tags.exists()):
+            raise ValidationError(
+                {"tags": ["Tags are required for this queue"]},
+                code="tags_required",
+            )
+
         with transaction.atomic():
             instance.close(tags, "agent")
 
