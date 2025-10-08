@@ -284,15 +284,15 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         elif "rooms." in event.get("action"):
             content = event.get("content", {})
 
-            if isinstance(content, str):
-                content = json.loads(content)
-
-            room_uuid = content.get("uuid")
-
-            if not room_uuid:
-                return self.send_json(event)
-
             try:
+                if isinstance(content, str):
+                    content = json.loads(content)
+
+                room_uuid = content.get("uuid")
+
+                if not room_uuid:
+                    return self.send_json(event)
+
                 has_history = await self.get_has_history_by_room_uuid(room_uuid)
                 content["has_history"] = has_history
 
