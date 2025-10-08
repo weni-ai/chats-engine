@@ -28,18 +28,17 @@ class DashboardAgentsSerializer(serializers.Serializer):
         if custom_status_list:
             for status_item in custom_status_list:
                 status_type = status_item.get("status_type")
-                break_time = status_item.get("break_time", 0)
                 is_active = status_item.get("is_active", False)
 
                 if status_type != "In-Service" and is_active:
-                    return {"status": "orange", "label": status_type}
+                    return {"status": "custom", "label": status_type}
 
         if obj.get("status") == "ONLINE":
-            return {"status": "green", "label": None}
+            return {"status": "online", "label": None}
         elif obj.get("status") == "OFFLINE":
-            return {"status": "gray", "label": None}
+            return {"status": "offline", "label": None}
 
-        return {"status": "gray", "label": None}
+        return {"status": "offline", "label": None}
 
     def get_agent(self, obj):
         return f"{obj.get('first_name')} {obj.get('last_name')}"
@@ -75,18 +74,17 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
         if custom_status_list:
             for status_item in custom_status_list:
                 status_type = status_item.get("status_type")
-                break_time = status_item.get("break_time", 0)
                 is_active = status_item.get("is_active", False)
 
                 if status_type != "In-Service" and is_active:
-                    return {"status": "orange", "label": status_type}
+                    return {"status": "custom", "label": status_type}
 
         if obj.get("status") == "ONLINE":
-            return {"status": "green", "label": None}
+            return {"status": "online", "label": None}
         elif obj.get("status") == "OFFLINE":
-            return {"status": "gray", "label": None}
+            return {"status": "offline", "label": None}
 
-        return {"status": "gray", "label": None}
+        return {"status": "offline", "label": None}
 
     def get_agent(self, obj):
         return f"{obj.get('first_name')} {obj.get('last_name')}"
