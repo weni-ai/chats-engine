@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
@@ -14,8 +15,14 @@ from chats.apps.api.v1.contacts.serializers import ContactRelationsSerializer
 from chats.apps.api.v1.msgs.serializers import MessageSerializer
 from chats.apps.api.v1.queues.serializers import QueueSerializer
 from chats.apps.api.v1.sectors.serializers import DetailSectorTagSerializer
+from chats.apps.history.filters.rooms_filter import (
+    get_history_rooms_queryset_by_contact,
+)
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room, RoomNote, RoomPin
+
+
+logger = logging.getLogger(__name__)
 
 
 class RoomMessageStatusSerializer(serializers.Serializer):
@@ -47,6 +54,7 @@ class RoomSerializer(serializers.ModelSerializer):
         required=False, read_only=True, default=list
     )
     added_to_queue_at = serializers.DateTimeField(read_only=True)
+    has_history = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -63,6 +71,7 @@ class RoomSerializer(serializers.ModelSerializer):
             "imported_history_url",
             "full_transfer_history",
             "added_to_queue_at",
+            "has_history",
         ]
 
     def get_is_24h_valid(self, room: Room) -> bool:
@@ -106,6 +115,23 @@ class RoomSerializer(serializers.ModelSerializer):
     def get_can_edit_custom_fields(self, room: Room):
         return room.queue.sector.can_edit_custom_fields
 
+    def get_has_history(self, room: Room) -> bool:
+        request = self.context.get("request")
+
+        if not request:
+            logger.info("[RoomSerializer] No request found for has_history method")
+            return False
+
+        user = getattr(request, "user", None)
+
+        if not user:
+            logger.info("[RoomSerializer] No user found for has_history method")
+            return False
+
+        return get_history_rooms_queryset_by_contact(
+            room.contact, user, room.queue.sector.project
+        ).exists()
+
 
 class ListRoomSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
@@ -124,6 +150,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
     imported_history_url = serializers.CharField(read_only=True, default="")
     is_pinned = serializers.SerializerMethodField()
     added_to_queue_at = serializers.DateTimeField(read_only=True)
+    has_history = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -148,6 +175,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
             "imported_history_url",
             "is_pinned",
             "added_to_queue_at",
+            "has_history",
         ]
 
     def get_user(self, room: Room):
@@ -197,6 +225,23 @@ class ListRoomSerializer(serializers.ModelSerializer):
             return False
 
         return RoomPin.objects.filter(room=room, user=request.user).exists()
+
+    def get_has_history(self, room: Room) -> bool:
+        request = self.context.get("request")
+
+        if not request:
+            logger.info("[RoomSerializer] No request found for has_history method")
+            return False
+
+        user = getattr(request, "user", None)
+
+        if not user:
+            logger.info("[RoomSerializer] No user found for has_history method")
+            return False
+
+        return get_history_rooms_queryset_by_contact(
+            room.contact, user, room.queue.sector.project
+        ).exists()
 
 
 class TransferRoomSerializer(serializers.ModelSerializer):

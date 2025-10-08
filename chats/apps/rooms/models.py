@@ -200,7 +200,7 @@ class Room(BaseModel, BaseConfigurableModel):
         ]
 
     def save(self, *args, **kwargs) -> None:
-        if self.__original_is_active is False:
+        if self._state.adding is False and self.__original_is_active is False:
             raise ValidationError({"detail": _("Closed rooms cannot receive updates")})
 
         if self._state.adding:
