@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from typing import List
-
 from chats.apps.projects.models import Project, ProjectPermission
 
 
@@ -15,3 +14,4 @@ class Filters:
     is_weni_admin: bool = None
     user_request: ProjectPermission = None
     project: Project = None
+    ordering: str = None
