@@ -14,7 +14,7 @@ class DashboardAgentsSerializer(serializers.Serializer):
     avg_first_response_time = serializers.IntegerField(allow_null=True, required=False)
     avg_message_response_time = serializers.IntegerField(allow_null=True, required=False)
     avg_interaction_time = serializers.IntegerField(allow_null=True, required=False)
-    time_in_service = serializers.IntegerField(allow_null=True, required=False)
+    time_in_service = serializers.SerializerMethodField()
 
     def get_link(self, obj):
         return {

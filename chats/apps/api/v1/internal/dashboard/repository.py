@@ -147,10 +147,10 @@ class AgentRepository:
                     & Q(rooms__metric__interaction_time__gt=0),
                 ),
                 custom_status=custom_status_subquery,
-                time_in_service=Coalesce(
+                time_in_service_order=Coalesce(  # Nome diferente: só para ORDER BY
                     Subquery(in_service_time_subquery, output_field=IntegerField()),
                     Value(0)
-                ),  # Adicione este campo
+                ),
             )
             .distinct()
             .values(
@@ -164,12 +164,16 @@ class AgentRepository:
                 "avg_message_response_time",
                 "avg_interaction_time",
                 "custom_status",
-                "time_in_service",  # Adicione este campo nos values()
             )
         )
 
         if filters.ordering:
-            agents_query = agents_query.order_by(filters.ordering)
+            # Se ordenar por time_in_service, usa o campo annotado
+            if "time_in_service" in filters.ordering:
+                ordering_field = filters.ordering.replace("time_in_service", "time_in_service_order")
+                agents_query = agents_query.order_by(ordering_field)
+            else:
+                agents_query = agents_query.order_by(filters.ordering)
 
         return agents_query
 
