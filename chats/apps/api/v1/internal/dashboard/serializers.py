@@ -44,6 +44,11 @@ class DashboardAgentsSerializer(serializers.Serializer):
     def get_agent(self, obj):
         return f"{obj.get('first_name')} {obj.get('last_name')}"
 
+    def get_time_in_service(self, obj):
+        return calculate_in_service_time(
+            obj.get("custom_status"), user_status=obj.get("status")
+        )
+
 
 class DashboardCustomAgentStatusSerializer(serializers.Serializer):
     link = serializers.SerializerMethodField()
