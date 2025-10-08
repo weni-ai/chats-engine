@@ -1,4 +1,4 @@
-# 3.27.1
+# 3.27.0
 # Add
   - flag to indicate if contact has history
 
