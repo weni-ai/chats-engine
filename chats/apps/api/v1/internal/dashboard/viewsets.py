@@ -38,6 +38,7 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
             queue=params.get("queue"),
             user_request=params.get("user_request", ""),
             is_weni_admin=should_exclude_admin_domains(params.get("user_request", "")),
+            ordering=params.get("ordering"),
         )
 
         agents_service = AgentsService()
@@ -64,6 +65,7 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
             queue=params.get("queue"),
             user_request=params.get("user_request", ""),
             is_weni_admin=should_exclude_admin_domains(params.get("user_request", "")),
+            ordering=params.get("ordering"),
         )
 
         agents_service = AgentsService()

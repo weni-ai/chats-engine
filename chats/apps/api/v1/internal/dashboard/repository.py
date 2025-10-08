@@ -1,6 +1,6 @@
 from django.contrib.postgres.aggregates import JSONBAgg
 from django.contrib.postgres.fields import JSONField
-from django.db.models import Count, F, OuterRef, Q, Subquery
+from django.db.models import Avg, Count, F, OuterRef, Q, Subquery
 from django.db.models.functions import JSONObject
 from django.utils import timezone
 
@@ -30,24 +30,12 @@ class AgentRepository:
         agents_filters = Q(project_permissions__project=project) & Q(is_active=True)
 
         if filters.queue:
-            # If filtering by queue, the agents list will include:
-            # - Agents with authorization to the queue
-            #   (even if they were never assigned to a room from the queue)
-            # - Agents that are linked to rooms related to the queue
-            #   (even if they don't have authorization to the queue anymore)
-
             rooms_filter["rooms__queue"] = filters.queue
             agents_filters &= Q(
                 project_permissions__queue_authorizations__queue=filters.queue
             ) | Q(rooms__queue=filters.queue)
 
         elif filters.sector:
-            # If filtering by sector, the agents list will include:
-            # - Agents with authorization to the sector
-            #   (even if they were never assigned to a room from the sector)
-            # - Agents that are linked to rooms related to the sector
-            #   (even if they don't have authorization to the sector anymore)
-
             rooms_filter["rooms__queue__sector__in"] = filters.sector
             agents_filters &= Q(
                 project_permissions__sector_authorizations__sector__in=filters.sector
@@ -59,13 +47,9 @@ class AgentRepository:
         if filters.start_date and filters.end_date:
             start_time = filters.start_date
             end_time = filters.end_date
-            # We want to count rooms that were created before the end date
-            # and are still active (still in progress)
             opened_rooms["rooms__is_active"] = True
             opened_rooms["rooms__created_on__lte"] = end_time
 
-            # We want to count rooms that were ended between the start and end date
-            # and are not active (they are closed)
             closed_rooms["rooms__ended_at__range"] = [start_time, end_time]
             closed_rooms["rooms__is_active"] = False
         else:
@@ -121,6 +105,21 @@ class AgentRepository:
                     distinct=True,
                     filter=Q(**opened_rooms, **rooms_filter),
                 ),
+                avg_first_response_time=Avg(
+                    "rooms__metric__first_response_time",
+                    filter=Q(**closed_rooms, **rooms_filter)
+                    & Q(rooms__metric__first_response_time__gt=0),
+                ),
+                avg_message_response_time=Avg(
+                    "rooms__metric__message_response_time",
+                    filter=Q(**closed_rooms, **rooms_filter)
+                    & Q(rooms__metric__message_response_time__gt=0),
+                ),
+                avg_interaction_time=Avg(
+                    "rooms__metric__interaction_time",
+                    filter=Q(**closed_rooms, **rooms_filter)
+                    & Q(rooms__metric__interaction_time__gt=0),
+                ),
                 custom_status=custom_status_subquery,
             )
             .distinct()
@@ -131,9 +130,15 @@ class AgentRepository:
                 "status",
                 "closed",
                 "opened",
+                "avg_first_response_time",
+                "avg_message_response_time",
+                "avg_interaction_time",
                 "custom_status",
             )
         )
+
+        if filters.ordering:
+            agents_query = agents_query.order_by(filters.ordering)
 
         return agents_query
 
@@ -250,5 +255,8 @@ class AgentRepository:
                 "custom_status",
             )
         )
+
+        if filters.ordering:
+            agents_query = agents_query.order_by(filters.ordering)
 
         return agents_query

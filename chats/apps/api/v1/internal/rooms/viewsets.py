@@ -1,3 +1,5 @@
+from django.db.models import F, ExpressionWrapper, fields
+from django.db.models.functions import Now
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, permissions, viewsets
 from rest_framework.pagination import LimitOffsetPagination
@@ -21,6 +23,25 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
         DjangoFilterBackend,
     ]
     ordering = ["-created_on"]
+    ordering_fields = [
+        "created_on",
+        "ended_at",
+        "is_active",
+        "urn",
+        "uuid",
+        "user__email",
+        "user__first_name",
+        "user__last_name",
+        "contact__name",
+        "queue__name",
+        "queue__sector__name",
+        "first_user_assigned_at",
+        "user_assigned_at",
+        "added_to_queue_at",
+        "queue_time",
+        "waiting_time",
+        "duration",
+    ]
     search_fields = [
         "contact__external_id",
         "contact__name",
@@ -31,3 +52,23 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
 
     pagination_class = LimitOffsetPagination
     pagination_class.page_size = 5
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        queryset = queryset.annotate(
+            queue_time=ExpressionWrapper(
+                Now() - F('added_to_queue_at'),
+                output_field=fields.DurationField()
+            ),
+            waiting_time=ExpressionWrapper(
+                F('user_assigned_at') - F('added_to_queue_at'),
+                output_field=fields.DurationField()
+            ),
+            duration=ExpressionWrapper(
+                Now() - F('first_user_assigned_at'),
+                output_field=fields.DurationField()
+            )
+        )
+        
+        return queryset
