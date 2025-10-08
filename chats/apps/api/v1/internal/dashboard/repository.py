@@ -147,7 +147,7 @@ class AgentRepository:
                     & Q(rooms__metric__interaction_time__gt=0),
                 ),
                 custom_status=custom_status_subquery,
-                in_service_time=Coalesce(
+                time_in_service=Coalesce(
                     Subquery(in_service_time_subquery, output_field=IntegerField()),
                     Value(0)
                 ),  # Adicione este campo
@@ -164,7 +164,7 @@ class AgentRepository:
                 "avg_message_response_time",
                 "avg_interaction_time",
                 "custom_status",
-                "in_service_time",  # Adicione este campo nos values()
+                "time_in_service",  # Adicione este campo nos values()
             )
         )
 

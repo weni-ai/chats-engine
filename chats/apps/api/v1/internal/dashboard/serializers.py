@@ -14,7 +14,7 @@ class DashboardAgentsSerializer(serializers.Serializer):
     avg_first_response_time = serializers.IntegerField(allow_null=True, required=False)
     avg_message_response_time = serializers.IntegerField(allow_null=True, required=False)
     avg_interaction_time = serializers.IntegerField(allow_null=True, required=False)
-    in_service_time = serializers.SerializerMethodField()
+    time_in_service = serializers.IntegerField(allow_null=True, required=False)
 
     def get_link(self, obj):
         return {
@@ -43,11 +43,6 @@ class DashboardAgentsSerializer(serializers.Serializer):
 
     def get_agent(self, obj):
         return f"{obj.get('first_name')} {obj.get('last_name')}"
-
-    def get_in_service_time(self, obj):
-        return calculate_in_service_time(
-            obj.get("custom_status"), user_status=obj.get("status")
-        )
 
 
 class DashboardCustomAgentStatusSerializer(serializers.Serializer):
