@@ -165,10 +165,11 @@ class TimeMetricsService:
         # 2. TEMPO MÉDIO PARA PRIMEIRA RESPOSTA (salas ativas AGORA com agente)
         first_response_times = []
 
-        # 2.1. Salas que JÁ têm first_response_time salvo (agente já respondeu)
+        # 2.1. Salas ativas que JÁ têm first_response_time salvo
         try:
             rooms_with_saved_response = Room.objects.filter(
                 queue__sector__project=project,
+                is_active=True,
                 metric__isnull=False,
                 metric__first_response_time__gt=0,
                 queue__is_deleted=False,
