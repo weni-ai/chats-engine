@@ -96,7 +96,7 @@ flow_data = {
                                 "Content-Type": "application/json",
                             },
                             "type": "call_webhook",
-                            "url": "https://engine-chats.stg.cloud.weni.ai/v1/internal/csat/",
+                            "url": "@trigger.params.webhook_url",
                             "body": '@(json(object(\n  "contact", object(\n    "uuid", contact.uuid, \n    "name", contact.name, \n    "urn", contact.urn\n  ),\n  "flow", object(\n    "uuid", run.flow.uuid, \n    "name", run.flow.name\n  ),\n  "room", trigger.params.room,\n  "rating", results.rating.value\n)))',
                             "method": "POST",
                             "result_name": "Result",
@@ -130,11 +130,11 @@ flow_data = {
                     "exits": [
                         {
                             "uuid": "afd8cfa0-45ef-467b-9ad5-859969f2c55c",
-                            "destination_uuid": null,
+                            "destination_uuid": None,
                         },
                         {
                             "uuid": "cfa92737-bbcc-43ed-b9c9-10c6bfb6d678",
-                            "destination_uuid": null,
+                            "destination_uuid": None,
                         },
                     ],
                 },
@@ -161,7 +161,7 @@ flow_data = {
                     },
                 }
             },
-            "revision": 58,
+            "revision": 59,
             "expire_after_minutes": 10080,
             "metadata": {"expires": 10080},
             "localization": {},
