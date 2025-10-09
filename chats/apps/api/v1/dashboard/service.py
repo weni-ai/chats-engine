@@ -213,7 +213,6 @@ class TimeMetricsService:
             if filters.agent:
                 rooms_waiting_response = rooms_waiting_response.filter(user=filters.agent)
             
-s
         except Exception:
             pass
 
