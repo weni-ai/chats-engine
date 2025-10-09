@@ -72,6 +72,7 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
             )
         )
         
+        # Verifica se vai ordenar por first_response_time
         ordering = self.request.query_params.get('ordering', '')
         if 'first_response_time' in ordering:
             queryset = queryset.annotate(
@@ -90,10 +91,23 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
                     output_field=IntegerField()
                 )
             )
-            ordering = ordering.replace('first_response_time', 'first_response_time_order')
-            queryset = queryset.order_by(ordering)
         
         return queryset.filter(
             queue__is_deleted=False,
             queue__sector__is_deleted=False
         )
+    
+    def filter_queryset(self, queryset):
+        # Aplica todos os filtros normalmente
+        queryset = super().filter_queryset(queryset)
+        
+        # Se ordenou por first_response_time, substitui pelo campo correto
+        ordering = self.request.query_params.get('ordering', '')
+        if 'first_response_time' in ordering:
+            # Remove o ordering que veio (field não existe)
+            queryset = queryset.order_by()
+            # Aplica com o nome correto
+            ordering_field = ordering.replace('first_response_time', 'first_response_time_order')
+            queryset = queryset.order_by(ordering_field)
+        
+        return queryset
