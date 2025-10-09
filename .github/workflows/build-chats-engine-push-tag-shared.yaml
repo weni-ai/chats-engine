@@ -33,7 +33,7 @@ jobs:
       - setup
     with:
       image_repository: chats
-      dockerfile: "Dockerfile"
+      dockerfile: "docker/Dockerfile"
       target_repository: weni-ai/kubernetes-manifests-connect
       target_application: chats-engine
       target_patch_file: deployment.json
