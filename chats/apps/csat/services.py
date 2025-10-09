@@ -1,8 +1,14 @@
 from abc import ABC, abstractmethod
 from uuid import UUID
-
+import logging
 from django.conf import settings
+from rest_framework import status
 
+from chats.apps.csat.flows.definitions.flow import (
+    CSAT_FLOW_DEFINITION_DATA,
+    CSAT_FLOW_VERSION,
+)
+from chats.apps.projects.models.models import Project
 from chats.apps.rooms.models import Room
 from django.core.exceptions import ValidationError
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
@@ -13,6 +19,8 @@ from chats.apps.csat.models import (
 )
 from chats.core.cache import BaseCacheClient
 from chats.apps.api.authentication.token import JWTTokenGenerator
+
+logger = logging.getLogger(__name__)
 
 
 class BaseCSATService(ABC):
@@ -77,3 +85,68 @@ class CSATFlowService(BaseCSATService):
         }
 
         return self.flows_client.start_flow(room.project, data)
+
+    def create_csat_flow(self, project: Project):
+        version = CSAT_FLOW_VERSION
+        definition = CSAT_FLOW_DEFINITION_DATA
+
+        logger.info(
+            "[CSAT FLOW SERVICE] Creating / updating CSAT flow for project %s (%s)",
+            project.name,
+            project.uuid,
+        )
+
+        response = self.flows_client.create_flow_or_update_flow(project, definition)
+
+        logger.info(
+            "[CSAT FLOW SERVICE] Flow creation / update response status: %s",
+            response.status_code,
+        )
+
+        if not status.is_success(response.status_code):
+            raise Exception(
+                f"Failed to create CSAT flow [{response.status_code}]: {response.content}"
+            )
+
+        flow_uuid = response.json().get("uuid")
+
+        logger.info(
+            "[CSAT FLOW SERVICE] Flow UUID: %s",
+            flow_uuid,
+        )
+
+        current_config = CSATFlowProjectConfig.objects.filter(project=project).first()
+
+        logger.info(
+            "[CSAT FLOW SERVICE] Saving CSAT flow config for project %s (%s)",
+            project.name,
+            project.uuid,
+        )
+
+        if current_config:
+            fields_to_update = []
+
+            if current_config.flow_uuid != flow_uuid:
+                current_config.flow_uuid = flow_uuid
+                fields_to_update.append("flow_uuid")
+
+            if current_config.version != version:
+                current_config.version = version
+                fields_to_update.append("version")
+
+            if fields_to_update:
+                current_config.save(update_fields=fields_to_update)
+        else:
+            current_config = CSATFlowProjectConfig.objects.create(
+                project=project, flow_uuid=flow_uuid, version=version
+            )
+
+            current_config.flow_uuid = flow_uuid
+            current_config.version = version
+            current_config.save()
+
+        logger.info(
+            "[CSAT FLOW SERVICE] CSAT flow config saved for project %s (%s)",
+            project.name,
+            project.uuid,
+        )

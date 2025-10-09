@@ -1,5 +1,6 @@
 import logging
 from datetime import timedelta
+from typing import Optional
 
 import pendulum
 from django.contrib.auth import get_user_model
@@ -10,6 +11,8 @@ from django.db.models.functions import Concat
 from django.utils.translation import gettext_lazy as _
 from model_utils import FieldTracker
 
+from chats.apps.csat.flows.definitions.flow import CSAT_FLOW_VERSION
+from chats.apps.csat.models import CSATFlowProjectConfig
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
 from chats.utils.websockets import send_channels_group
@@ -63,7 +66,7 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
     is_csat_enabled = models.BooleanField(_("is CSAT enabled?"), default=False)
     required_tags = models.BooleanField(_("required tags?"), default=False)
 
-    tracker = FieldTracker(fields=["rooms_limit"])
+    tracker = FieldTracker(fields=["rooms_limit", "is_csat_enabled"])
 
     objects = SectorManager()
     all_objects = SectorManager(include_deleted=True)
@@ -274,6 +277,8 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         return perm.is_admin or self.authorizations.filter(permission=perm).exists()
 
     def save(self, *args, **kwargs):
+        from chats.apps.csat.tasks import create_csat_flow
+
         # Detecting if the rooms limit has increased.
         # If so, we need to trigger the queue priority routing for all queues in the sector,
         # to distribute the rooms among the available agents.
@@ -286,6 +291,8 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         ):
             should_trigger_queue_priority_routing = True
 
+        is_csat_enabled_has_changed = self.tracker.has_changed("is_csat_enabled")
+
         super().save(*args, **kwargs)
 
         if should_trigger_queue_priority_routing:
@@ -296,6 +303,18 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
             )
             for queue in self.queues.all():
                 start_queue_priority_routing(queue)
+
+        if is_csat_enabled_has_changed and self.is_csat_enabled:
+            config: Optional[CSATFlowProjectConfig] = (
+                CSATFlowProjectConfig.objects.filter(project=self.project).first()
+            )
+
+            if (
+                not config
+                or config.flow_uuid is None
+                or config.version != CSAT_FLOW_VERSION
+            ):
+                create_csat_flow.delay(str(self.project.uuid))
 
     def delete(self):
         super().delete()
