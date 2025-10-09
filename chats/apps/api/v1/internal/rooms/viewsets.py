@@ -41,7 +41,7 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
         "queue_time",
         "waiting_time",
         "duration",
-        "first_response_time",
+        "first_response_time_order",
     ]
     search_fields = [
         "contact__external_id",
@@ -57,6 +57,7 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         
+        # Sempre anota os campos calculados
         queryset = queryset.annotate(
             queue_time=ExpressionWrapper(
                 Now() - F('added_to_queue_at'),
@@ -69,45 +70,24 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
             duration=ExpressionWrapper(
                 Now() - F('first_user_assigned_at'),
                 output_field=fields.DurationField()
+            ),
+            first_response_time_order=Case(
+                When(
+                    metric__first_response_time__gt=0,
+                    then=F('metric__first_response_time')
+                ),
+                When(
+                    is_active=True,
+                    user__isnull=False,
+                    first_user_assigned_at__isnull=False,
+                    then=Extract(Now() - F('first_user_assigned_at'), 'epoch')
+                ),
+                default=Value(None),
+                output_field=IntegerField()
             )
         )
-        
-        # Verifica se vai ordenar por first_response_time
-        ordering = self.request.query_params.get('ordering', '')
-        if 'first_response_time' in ordering:
-            queryset = queryset.annotate(
-                first_response_time_order=Case(
-                    When(
-                        metric__first_response_time__gt=0,
-                        then=F('metric__first_response_time')
-                    ),
-                    When(
-                        is_active=True,
-                        user__isnull=False,
-                        first_user_assigned_at__isnull=False,
-                        then=Extract(Now() - F('first_user_assigned_at'), 'epoch')
-                    ),
-                    default=Value(None),
-                    output_field=IntegerField()
-                )
-            )
         
         return queryset.filter(
             queue__is_deleted=False,
             queue__sector__is_deleted=False
         )
-    
-    def filter_queryset(self, queryset):
-        # Aplica todos os filtros normalmente
-        queryset = super().filter_queryset(queryset)
-        
-        # Se ordenou por first_response_time, substitui pelo campo correto
-        ordering = self.request.query_params.get('ordering', '')
-        if 'first_response_time' in ordering:
-            # Remove o ordering que veio (field não existe)
-            queryset = queryset.order_by()
-            # Aplica com o nome correto
-            ordering_field = ordering.replace('first_response_time', 'first_response_time_order')
-            queryset = queryset.order_by(ordering_field)
-        
-        return queryset

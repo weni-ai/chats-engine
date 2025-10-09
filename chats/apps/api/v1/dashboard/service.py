@@ -170,6 +170,7 @@ class TimeMetricsService:
             rooms_with_saved_response = Room.objects.filter(
                 queue__sector__project=project,
                 is_active=True,
+                user__isnull=False,
                 metric__isnull=False,
                 metric__first_response_time__gt=0,
                 queue__is_deleted=False,
