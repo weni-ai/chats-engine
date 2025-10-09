@@ -57,7 +57,6 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         
-        # Annotates que sempre são usados
         queryset = queryset.annotate(
             queue_time=ExpressionWrapper(
                 Now() - F('added_to_queue_at'),
@@ -73,10 +72,8 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
             )
         )
         
-        # Verifica se vai ordenar por first_response_time
         ordering = self.request.query_params.get('ordering', '')
         if 'first_response_time' in ordering:
-            # SÓ faz o annotate se for ordenar por esse campo
             queryset = queryset.annotate(
                 first_response_time_order=Case(
                     When(
@@ -93,7 +90,6 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
                     output_field=IntegerField()
                 )
             )
-            # Substitui no ordering
             ordering = ordering.replace('first_response_time', 'first_response_time_order')
             queryset = queryset.order_by(ordering)
         
