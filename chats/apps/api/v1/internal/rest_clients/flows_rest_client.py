@@ -337,7 +337,7 @@ class FlowRESTClient(
             project=project,
             request_method=requests.post,
             url=f"{self.base_url}/api/v2/internals/flows/import",
-            json=json.dumps(payload, sort_keys=True, indent=1, cls=DjangoJSONEncoder),
+            json=payload,
             headers=self.headers,
         )
         return response
