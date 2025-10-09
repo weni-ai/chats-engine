@@ -163,42 +163,68 @@ class TimeMetricsService:
         max_waiting_time = int(max(waiting_times)) if waiting_times else 0
 
         # 2. TEMPO MÉDIO PARA PRIMEIRA RESPOSTA (salas ativas AGORA com agente)
+        first_response_times = []
+
+        # 2.1. Salas que JÁ têm first_response_time salvo (agente já respondeu)
         try:
-            rooms_with_first_response = Room.objects.filter(
+            rooms_with_saved_response = Room.objects.filter(
                 queue__sector__project=project,
-                is_active=True,                          # Ativas AGORA
-                user__isnull=False,                      # Com agente
                 metric__isnull=False,
                 metric__first_response_time__gt=0,
-                queue__is_deleted=False,                 # Não deletadas
-                queue__sector__is_deleted=False          # Setor não deletado
+                queue__is_deleted=False,
+                queue__sector__is_deleted=False
             ).select_related('metric')
             
             # Aplica filtros opcionais
             if filters.sector:
-                rooms_with_first_response = rooms_with_first_response.filter(
-                    queue__sector=filters.sector
-                )
+                rooms_with_saved_response = rooms_with_saved_response.filter(queue__sector=filters.sector)
                 if filters.tag:
-                    rooms_with_first_response = rooms_with_first_response.filter(
-                        tags__uuid=filters.tag
-                    )
+                    rooms_with_saved_response = rooms_with_saved_response.filter(tags__uuid=filters.tag)
             if filters.queue:
-                rooms_with_first_response = rooms_with_first_response.filter(
-                    queue__uuid=filters.queue
-                )
+                rooms_with_saved_response = rooms_with_saved_response.filter(queue__uuid=filters.queue)
             if filters.agent:
-                rooms_with_first_response = rooms_with_first_response.filter(
-                    user=filters.agent
-                )
+                rooms_with_saved_response = rooms_with_saved_response.filter(user=filters.agent)
 
-            first_response_times = [
-                room.metric.first_response_time 
-                for room in rooms_with_first_response
-            ]
+            for room in rooms_with_saved_response:
+                first_response_times.append(room.metric.first_response_time)
         except Exception:
-            first_response_times = []
-        
+            pass
+
+        # 2.2. Salas ativas onde o agente AINDA NÃO respondeu (calcula dinamicamente)
+        try:
+            rooms_waiting_response = Room.objects.filter(
+                queue__sector__project=project,
+                is_active=True,
+                user__isnull=False,
+                first_user_assigned_at__isnull=False,
+                queue__is_deleted=False,
+                queue__sector__is_deleted=False
+            ).filter(
+                Q(metric__isnull=True) | Q(metric__first_response_time=0)
+            )
+            
+            if filters.sector:
+                rooms_waiting_response = rooms_waiting_response.filter(queue__sector=filters.sector)
+                if filters.tag:
+                    rooms_waiting_response = rooms_waiting_response.filter(tags__uuid=filters.tag)
+            if filters.queue:
+                rooms_waiting_response = rooms_waiting_response.filter(queue__uuid=filters.queue)
+            if filters.agent:
+                rooms_waiting_response = rooms_waiting_response.filter(user=filters.agent)
+            
+            for room in rooms_waiting_response:
+                has_agent_messages = room.messages.filter(
+                    user__isnull=False,
+                    created_on__gte=room.first_user_assigned_at
+                ).exclude(automatic_message__isnull=False).exists()
+                
+                if has_agent_messages:
+                    continue
+                time_waiting = int((timezone.now() - room.first_user_assigned_at).total_seconds())
+                first_response_times.append(time_waiting)
+        except Exception:
+            pass
+
         avg_first_response_time = int(sum(first_response_times) / len(first_response_times)) if first_response_times else 0
         max_first_response_time = int(max(first_response_times)) if first_response_times else 0
 
