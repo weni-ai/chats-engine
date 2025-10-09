@@ -118,7 +118,12 @@ class CSATFlowService(BaseCSATService):
             )
             raise Exception(f"Invalid JSON response from flows API: {str(e)}")
 
-        flow_uuid = response_data.get("uuid")
+        results = response_data.get("results", [])
+
+        if not results:
+            raise Exception("No results found in the response")
+
+        flow_uuid = results[0].get("uuid")
 
         logger.info(
             "[CSAT FLOW SERVICE] Flow UUID: %s",
