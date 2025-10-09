@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from uuid import UUID
 
+from django.conf import settings
+
 from chats.apps.rooms.models import Room
 from django.core.exceptions import ValidationError
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
@@ -62,10 +64,16 @@ class CSATFlowService(BaseCSATService):
             {"project": str(room.project.uuid), "room": str(room.uuid)}
         )
 
+        webhook_url = f"{settings.CHATS_BASE_URL}/v1/internal/csat/"
+
         data = {
             "flow": str(flow_uuid),
             "urns": [room.urn],
-            "params": {"room": str(room.uuid), "token": token},
+            "params": {
+                "room": str(room.uuid),
+                "token": token,
+                "webhook_url": webhook_url,
+            },
         }
 
         return self.flows_client.start_flow(room.project, data)

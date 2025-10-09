@@ -563,5 +563,4 @@ AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY = env.str(
 # CSAT
 CSAT_FEATURE_FLAG_KEY = env.str("CSAT_FEATURE_FLAG_KEY", default="weniChatsCSAT")
 
-# Chats base url
 CHATS_BASE_URL = env.str("CHATS_BASE_URL", default="http://localhost:8000")
