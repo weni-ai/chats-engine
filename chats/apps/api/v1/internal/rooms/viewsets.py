@@ -41,7 +41,7 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
         "queue_time",
         "waiting_time",
         "duration",
-        "first_response_time_order",
+        "first_response_time",
     ]
     search_fields = [
         "contact__external_id",
@@ -71,7 +71,7 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
                 Now() - F('first_user_assigned_at'),
                 output_field=fields.DurationField()
             ),
-            first_response_time_order=Case(
+            first_response_time=Case(
                 When(
                     metric__first_response_time__gt=0,
                     then=F('metric__first_response_time')

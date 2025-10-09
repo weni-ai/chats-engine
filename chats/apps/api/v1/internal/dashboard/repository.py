@@ -148,33 +148,35 @@ class AgentRepository:
                     & Q(rooms__metric__interaction_time__gt=0),
                 ),
                 custom_status=custom_status_subquery,
-                time_in_service_order=Coalesce(  # Nome diferente: só para ORDER BY
+                time_in_service_order=Coalesce(
                     Subquery(in_service_time_subquery, output_field=IntegerField()),
                     Value(0)
                 ),
             )
             .distinct()
-            .values(
-                "first_name",
-                "last_name",
-                "email",
-                "status",
-                "closed",
-                "opened",
-                "avg_first_response_time",
-                "avg_message_response_time",
-                "avg_interaction_time",
-                "custom_status",
-            )
         )
 
+        # APLICA ORDER_BY ANTES DO .VALUES()
         if filters.ordering:
-            # Se ordenar por time_in_service, usa o campo annotado
             if "time_in_service" in filters.ordering:
                 ordering_field = filters.ordering.replace("time_in_service", "time_in_service_order")
                 agents_query = agents_query.order_by(ordering_field)
             else:
                 agents_query = agents_query.order_by(filters.ordering)
+
+        # DEPOIS aplica .values()
+        agents_query = agents_query.values(
+            "first_name",
+            "last_name",
+            "email",
+            "status",
+            "closed",
+            "opened",
+            "avg_first_response_time",
+            "avg_message_response_time",
+            "avg_interaction_time",
+            "custom_status",
+        )
 
         return agents_query
 
@@ -281,18 +283,22 @@ class AgentRepository:
                 ),
                 custom_status=custom_status_subquery,
             )
-            .values(
-                "first_name",
-                "last_name",
-                "email",
-                "status",
-                "closed",
-                "opened",
-                "custom_status",
-            )
+            .distinct()
         )
 
+        # APLICA ORDER_BY ANTES DO .VALUES()
         if filters.ordering:
             agents_query = agents_query.order_by(filters.ordering)
+
+        # DEPOIS aplica .values()
+        agents_query = agents_query.values(
+            "first_name",
+            "last_name",
+            "email",
+            "status",
+            "closed",
+            "opened",
+            "custom_status",
+        )
 
         return agents_query
