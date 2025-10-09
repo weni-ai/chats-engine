@@ -213,6 +213,21 @@ class TimeMetricsService:
             if filters.agent:
                 rooms_waiting_response = rooms_waiting_response.filter(user=filters.agent)
             
+            # ADICIONE ESTE LOOP:
+            for room in rooms_waiting_response:
+                # Verifica se tem mensagens do agente (ignora salas legadas)
+                has_any_agent_messages = room.messages.filter(
+                    user__isnull=False
+                ).exclude(automatic_message__isnull=False).exists()
+                
+                if has_any_agent_messages:
+                    # Sala já foi respondida (legada) - pula
+                    continue
+                
+                # Calcula tempo desde atribuição até agora (dinâmico)
+                time_waiting = int((timezone.now() - room.first_user_assigned_at).total_seconds())
+                first_response_times.append(time_waiting)
+            
         except Exception:
             pass
 
