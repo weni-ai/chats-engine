@@ -1,8 +1,12 @@
-flow_data = {
+# This is a placeholder and will be changed later to the actual flow definition
+
+CSAT_FLOW_VERSION = 1
+CSAT_FLOW_NAME = "Weni Chats CSAT Flow"
+CSAT_FLOW_DEFINITION_DATA = {
     "version": "13",
     "flows": [
         {
-            "name": "Weni Chats CSAT Flow",
+            "name": CSAT_FLOW_NAME,
             "uuid": "23308449-eeb1-4980-8b90-b46b56a84a8a",
             "spec_version": "13.1.0",
             "language": "base",

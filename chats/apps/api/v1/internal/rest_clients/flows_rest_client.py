@@ -12,6 +12,11 @@ from chats.apps.api.v1.internal.rest_clients.internal_authorization import (
 )
 from chats.core.requests import get_request_session_with_retries
 
+
+if TYPE_CHECKING:
+    from chats.apps.projects.models.models import Project
+
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -276,3 +281,18 @@ class FlowRESTClient(
             ),
             headers=self.headers,
         )
+
+    def create_flow_or_update_flow(self, project: "Project", definition: dict):
+        payload = {
+            "project_uuid": str(project.uuid),
+            "definition": definition,
+        }
+
+        response = retry_request_and_refresh_flows_auth_token(
+            project=project,
+            request_method=requests.post,
+            url=f"{self.base_url}/api/v2/definitions.json",
+            json=json.dumps(payload, sort_keys=True, indent=1, cls=DjangoJSONEncoder),
+            headers=self.headers,
+        )
+        return response.json()
