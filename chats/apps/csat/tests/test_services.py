@@ -1,6 +1,7 @@
 import uuid
 from unittest.mock import patch
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from unittest.mock import MagicMock
@@ -126,6 +127,7 @@ class TestCSATFlowService(TestCase):
                 "params": {
                     "room": str(room.uuid),
                     "token": mock_generate_token.return_value,
+                    "webhook_url": f"{settings.CHATS_BASE_URL}/v1/internal/csat/",
                 },
             },
         )
