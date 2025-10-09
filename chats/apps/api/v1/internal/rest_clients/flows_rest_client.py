@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Callable
+from typing import Callable, TYPE_CHECKING
 
 import requests
 from django.conf import settings

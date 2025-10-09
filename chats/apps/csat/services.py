@@ -104,7 +104,9 @@ class CSATFlowService(BaseCSATService):
         )
 
         if not status.is_success(response.status_code):
-            raise Exception(f"Failed to create CSAT flow: {response.content}")
+            raise Exception(
+                f"Failed to create CSAT flow [{response.status_code}]: {response.content}"
+            )
 
         flow_uuid = response.json().get("uuid")
 
@@ -122,18 +124,20 @@ class CSATFlowService(BaseCSATService):
         )
 
         if current_config:
-            fields = ["flow_uuid", "version"]
             fields_to_update = []
 
-            for field in fields:
-                if getattr(current_config, field) != getattr(flow_uuid, field):
-                    setattr(current_config, field, getattr(flow_uuid, field))
-                    fields_to_update.append(field)
+            if current_config.flow_uuid != flow_uuid:
+                current_config.flow_uuid = flow_uuid
+                fields_to_update.append("flow_uuid")
+
+            if current_config.version != version:
+                current_config.version = version
+                fields_to_update.append("version")
 
             if fields_to_update:
                 current_config.save(update_fields=fields_to_update)
         else:
-            CSATFlowProjectConfig.objects.create(
+            current_config = CSATFlowProjectConfig.objects.create(
                 project=project, flow_uuid=flow_uuid, version=version
             )
 

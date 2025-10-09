@@ -7,6 +7,10 @@ from django.test import TestCase
 
 from chats.apps.api.authentication.token import JWTTokenGenerator
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
+from chats.apps.csat.flows.definitions.flow import (
+    CSAT_FLOW_DEFINITION_DATA,
+    CSAT_FLOW_VERSION,
+)
 from chats.apps.csat.models import CSATFlowProjectConfig
 from chats.apps.csat.services import CSATFlowService
 from chats.apps.projects.models.models import Project
@@ -125,4 +129,74 @@ class TestCSATFlowService(TestCase):
                     "webhook_url": f"{settings.CHATS_BASE_URL}/v1/internal/csat/",
                 },
             },
+        )
+
+    def test_create_csat_flow(self):
+        self.assertFalse(
+            CSATFlowProjectConfig.objects.filter(project=self.project).exists()
+        )
+        flow_uuid = uuid.uuid4()
+        self.mock_flows_client.create_flow_or_update_flow.return_value = Mock(
+            status_code=200,
+            json=Mock(return_value={"uuid": flow_uuid}),
+        )
+        self.service.create_csat_flow(self.project)
+        self.mock_flows_client.create_flow_or_update_flow.assert_called_once_with(
+            self.project,
+            CSAT_FLOW_DEFINITION_DATA,
+        )
+
+        config = CSATFlowProjectConfig.objects.filter(project=self.project).first()
+
+        self.assertIsNotNone(config)
+
+        self.assertEqual(
+            config.flow_uuid,
+            flow_uuid,
+        )
+        self.assertEqual(
+            config.version,
+            CSAT_FLOW_VERSION,
+        )
+
+    def test_create_csat_flow_when_config_already_exists(self):
+        CSATFlowProjectConfig.objects.create(
+            project=self.project,
+            flow_uuid=uuid.uuid4(),
+            version=CSAT_FLOW_VERSION - 1,
+        )
+        self.assertTrue(
+            CSATFlowProjectConfig.objects.filter(project=self.project).exists()
+        )
+        flow_uuid = uuid.uuid4()
+        self.mock_flows_client.create_flow_or_update_flow.return_value = Mock(
+            status_code=200,
+            json=Mock(return_value={"uuid": flow_uuid}),
+        )
+        self.service.create_csat_flow(self.project)
+        self.mock_flows_client.create_flow_or_update_flow.assert_called_once_with(
+            self.project,
+            CSAT_FLOW_DEFINITION_DATA,
+        )
+
+        config = CSATFlowProjectConfig.objects.filter(project=self.project).first()
+
+        self.assertIsNotNone(config)
+        self.assertEqual(config.flow_uuid, flow_uuid)
+        self.assertEqual(config.version, CSAT_FLOW_VERSION)
+
+    def test_cannot_create_csat_flow_when_flow_creation_fails(self):
+        status_code = 500
+        response_content = "Failed to create CSAT flow"
+        self.mock_flows_client.create_flow_or_update_flow.return_value = Mock(
+            status_code=status_code,
+            content=response_content,
+            json=Mock(return_value={"detail": response_content}),
+        )
+        with self.assertRaises(Exception) as context:
+            self.service.create_csat_flow(self.project)
+
+        self.assertEqual(
+            str(context.exception),
+            f"Failed to create CSAT flow [{status_code}]: {response_content}",
         )
