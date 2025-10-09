@@ -138,7 +138,7 @@ class TestCSATFlowService(TestCase):
         flow_uuid = uuid.uuid4()
         self.mock_flows_client.create_or_update_flow.return_value = Mock(
             status_code=200,
-            json=Mock(return_value={"uuid": flow_uuid}),
+            json=Mock(return_value={"results": [{"uuid": flow_uuid}]}),
         )
         self.service.create_csat_flow(self.project)
         self.mock_flows_client.create_or_update_flow.assert_called_once_with(
@@ -171,7 +171,7 @@ class TestCSATFlowService(TestCase):
         flow_uuid = uuid.uuid4()
         self.mock_flows_client.create_or_update_flow.return_value = Mock(
             status_code=200,
-            json=Mock(return_value={"uuid": flow_uuid}),
+            json=Mock(return_value={"results": [{"uuid": flow_uuid}]}),
         )
         self.service.create_csat_flow(self.project)
         self.mock_flows_client.create_or_update_flow.assert_called_once_with(
