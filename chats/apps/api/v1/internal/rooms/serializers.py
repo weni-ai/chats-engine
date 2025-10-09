@@ -66,21 +66,20 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
 
     def get_first_response_time(self, obj: Room) -> int:
         try:
-            # 1. Se tem metric salvo, usa
+            # 1. Se tem métrica salva, usa
             if hasattr(obj, 'metric') and obj.metric.first_response_time > 0:
                 return obj.metric.first_response_time
             
-            # 2. Se está ativa com agente, verifica se já respondeu
+            # 2. Se está ativa com agente
             if obj.first_user_assigned_at and obj.is_active and obj.user:
-                # Verifica se já tem mensagens do agente
-                has_agent_messages = obj.messages.filter(
-                    user__isnull=False,
-                    created_on__gte=obj.first_user_assigned_at
+                # Verifica se tem mensagens do agente (em qualquer momento)
+                has_any_agent_messages = obj.messages.filter(
+                    user__isnull=False
                 ).exclude(automatic_message__isnull=False).exists()
                 
-                if has_agent_messages:
-                    # Já respondeu mas metric não foi calculado (sala antiga)
-                    return None  # Ou retorna 0 - não mostra na tabela
+                if has_any_agent_messages:
+                    # Sala legada ou já respondida - ignora
+                    return None
                 
                 # Ainda não respondeu - calcula dinamicamente
                 return int((timezone.now() - obj.first_user_assigned_at).total_seconds())
