@@ -129,7 +129,15 @@ class FlowsContactsAndGroupsMixin:
             params=query_filters,
             url=f"{self.base_url}/api/v2/contacts.json?cursor={cursor}",
         )
-        contacts = response.json()
+        try:
+            contacts = response.json()
+        except ValueError as e:
+            LOGGER.error(
+                "Failed to parse JSON response from list_contacts: %s. Response content: %s",
+                str(e),
+                response.content,
+            )
+            raise
         contacts["next"] = get_cursor(contacts.get("next") or "")
         contacts["previous"] = get_cursor(contacts.get("previous") or "")
         return contacts
@@ -168,7 +176,15 @@ class FlowsContactsAndGroupsMixin:
             params=query_filters,
             url=f"{self.base_url}/api/v2/groups.json?cursor={cursor}",
         )
-        groups = response.json()
+        try:
+            groups = response.json()
+        except ValueError as e:
+            LOGGER.error(
+                "Failed to parse JSON response from list_contact_groups: %s. Response content: %s",
+                str(e),
+                response.content,
+            )
+            raise
         groups["next"] = get_cursor(groups.get("next") or "")
         groups["previous"] = get_cursor(groups.get("previous") or "")
         return groups
@@ -232,7 +248,15 @@ class FlowRESTClient(
             headers=self.project_headers(project.flows_authorization),
             url=f"{self.base_url}/api/v2/flows.json?cursor={cursor}",
         )
-        flows = response.json()
+        try:
+            flows = response.json()
+        except ValueError as e:
+            LOGGER.error(
+                "Failed to parse JSON response from list_flows: %s. Response content: %s",
+                str(e),
+                response.content,
+            )
+            raise
         flows["next"] = get_cursor(flows.get("next") or "")
         flows["previous"] = get_cursor(flows.get("previous") or "")
         results = flows["results"]
@@ -250,7 +274,15 @@ class FlowRESTClient(
             headers=self.project_headers(project.flows_authorization),
             url=f"{self.base_url}/api/v2/definitions.json?flow={flow_uuid}",
         )
-        flows = response.json()
+        try:
+            flows = response.json()
+        except ValueError as e:
+            LOGGER.error(
+                "Failed to parse JSON response from retrieve_flow_definitions: %s. Response content: %s",
+                str(e),
+                response.content,
+            )
+            raise
         return flows
 
     def start_flow(self, project, data):
@@ -262,7 +294,15 @@ class FlowRESTClient(
             json=data,
             headers=self.project_headers(project.flows_authorization),
         )
-        return response.json()
+        try:
+            return response.json()
+        except ValueError as e:
+            LOGGER.error(
+                "Failed to parse JSON response from start_flow: %s. Response content: %s",
+                str(e),
+                response.content,
+            )
+            raise
 
     def update_ticket_assignee(self, ticket_uuid: str, user_email: str):
         url = f"{self.base_url}/api/v2/internals/ticket_assignee"
@@ -287,7 +327,7 @@ class FlowRESTClient(
             headers=self.headers,
         )
 
-    def create_flow_or_update_flow(self, project: "Project", definition: dict):
+    def create_or_update_flow(self, project: "Project", definition: dict):
         payload = {
             "project_uuid": str(project.uuid),
             "definition": definition,
@@ -300,4 +340,4 @@ class FlowRESTClient(
             json=json.dumps(payload, sort_keys=True, indent=1, cls=DjangoJSONEncoder),
             headers=self.headers,
         )
-        return response.json()
+        return response

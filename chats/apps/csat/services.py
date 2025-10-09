@@ -96,7 +96,7 @@ class CSATFlowService(BaseCSATService):
             project.uuid,
         )
 
-        response = self.flows_client.create_flow_or_update_flow(project, definition)
+        response = self.flows_client.create_or_update_flow(project, definition)
 
         logger.info(
             "[CSAT FLOW SERVICE] Flow creation / update response status: %s",
@@ -108,7 +108,17 @@ class CSATFlowService(BaseCSATService):
                 f"Failed to create CSAT flow [{response.status_code}]: {response.content}"
             )
 
-        flow_uuid = response.json().get("uuid")
+        try:
+            response_data = response.json()
+        except ValueError as e:
+            logger.error(
+                "[CSAT FLOW SERVICE] Failed to parse JSON response: %s. Response content: %s",
+                str(e),
+                response.content,
+            )
+            raise Exception(f"Invalid JSON response from flows API: {str(e)}")
+
+        flow_uuid = response_data.get("uuid")
 
         logger.info(
             "[CSAT FLOW SERVICE] Flow UUID: %s",

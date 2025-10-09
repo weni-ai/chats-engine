@@ -136,12 +136,12 @@ class TestCSATFlowService(TestCase):
             CSATFlowProjectConfig.objects.filter(project=self.project).exists()
         )
         flow_uuid = uuid.uuid4()
-        self.mock_flows_client.create_flow_or_update_flow.return_value = Mock(
+        self.mock_flows_client.create_or_update_flow.return_value = Mock(
             status_code=200,
             json=Mock(return_value={"uuid": flow_uuid}),
         )
         self.service.create_csat_flow(self.project)
-        self.mock_flows_client.create_flow_or_update_flow.assert_called_once_with(
+        self.mock_flows_client.create_or_update_flow.assert_called_once_with(
             self.project,
             CSAT_FLOW_DEFINITION_DATA,
         )
@@ -169,12 +169,12 @@ class TestCSATFlowService(TestCase):
             CSATFlowProjectConfig.objects.filter(project=self.project).exists()
         )
         flow_uuid = uuid.uuid4()
-        self.mock_flows_client.create_flow_or_update_flow.return_value = Mock(
+        self.mock_flows_client.create_or_update_flow.return_value = Mock(
             status_code=200,
             json=Mock(return_value={"uuid": flow_uuid}),
         )
         self.service.create_csat_flow(self.project)
-        self.mock_flows_client.create_flow_or_update_flow.assert_called_once_with(
+        self.mock_flows_client.create_or_update_flow.assert_called_once_with(
             self.project,
             CSAT_FLOW_DEFINITION_DATA,
         )
@@ -188,7 +188,7 @@ class TestCSATFlowService(TestCase):
     def test_cannot_create_csat_flow_when_flow_creation_fails(self):
         status_code = 500
         response_content = "Failed to create CSAT flow"
-        self.mock_flows_client.create_flow_or_update_flow.return_value = Mock(
+        self.mock_flows_client.create_or_update_flow.return_value = Mock(
             status_code=status_code,
             content=response_content,
             json=Mock(return_value={"detail": response_content}),
