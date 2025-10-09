@@ -1,5 +1,5 @@
-from django.db.models import F, ExpressionWrapper, fields
-from django.db.models.functions import Now
+from django.db.models import F, ExpressionWrapper, fields, Case, When, Value, IntegerField
+from django.db.models.functions import Now, Extract
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, permissions, viewsets
 from rest_framework.pagination import LimitOffsetPagination
@@ -41,6 +41,7 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
         "queue_time",
         "waiting_time",
         "duration",
+        "first_response_time",
     ]
     search_fields = [
         "contact__external_id",
@@ -56,6 +57,7 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         
+        # Annotates que sempre são usados
         queryset = queryset.annotate(
             queue_time=ExpressionWrapper(
                 Now() - F('added_to_queue_at'),
@@ -70,6 +72,30 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
                 output_field=fields.DurationField()
             )
         )
+        
+        # Verifica se vai ordenar por first_response_time
+        ordering = self.request.query_params.get('ordering', '')
+        if 'first_response_time' in ordering:
+            # SÓ faz o annotate se for ordenar por esse campo
+            queryset = queryset.annotate(
+                first_response_time_order=Case(
+                    When(
+                        metric__first_response_time__gt=0,
+                        then=F('metric__first_response_time')
+                    ),
+                    When(
+                        is_active=True,
+                        user__isnull=False,
+                        first_user_assigned_at__isnull=False,
+                        then=Extract(Now() - F('first_user_assigned_at'), 'epoch')
+                    ),
+                    default=Value(None),
+                    output_field=IntegerField()
+                )
+            )
+            # Substitui no ordering
+            ordering = ordering.replace('first_response_time', 'first_response_time_order')
+            queryset = queryset.order_by(ordering)
         
         return queryset.filter(
             queue__is_deleted=False,

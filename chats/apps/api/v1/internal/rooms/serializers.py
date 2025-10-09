@@ -13,7 +13,7 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
     queue = serializers.CharField(source="queue.name")
     link = serializers.SerializerMethodField()
     duration = serializers.SerializerMethodField()
-    first_response_time = serializers.SerializerMethodField()
+    first_response_time = serializers.SerializerMethodField()  # VOLTA para SerializerMethodField
     waiting_time = serializers.SerializerMethodField()
     queue_time = serializers.SerializerMethodField()
 
@@ -65,9 +65,14 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
         return None
 
     def get_first_response_time(self, obj: Room) -> int:
+        # MANTÉM a lógica original que já funciona
         try:
             if hasattr(obj, 'metric') and obj.metric.first_response_time > 0:
                 return obj.metric.first_response_time
+            
+            # Calcula dinamicamente se ainda não respondeu
+            if obj.first_user_assigned_at and obj.is_active and obj.user:
+                return int((timezone.now() - obj.first_user_assigned_at).total_seconds())
         except Exception:
             pass
         return None
