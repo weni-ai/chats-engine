@@ -35,9 +35,7 @@ class Command(BaseCommand):
 
         # Validate arguments
         if not options["all"] and not options["project_uuid"]:
-            self.stdout.write(
-                self.style.ERROR("You must specify either --all or --project-uuid")
-            )
+            self.stdout.write("You must specify either --all or --project-uuid")
             return
 
         # Build query based on options
@@ -47,9 +45,7 @@ class Command(BaseCommand):
             )
             if not projects_configs.exists():
                 self.stdout.write(
-                    self.style.ERROR(
-                        f"No project config found for UUID: {options['project_uuid']}"
-                    )
+                    ("No project config found for UUID: " f"{options['project_uuid']}")
                 )
                 return
         else:  # --all option
@@ -58,15 +54,11 @@ class Command(BaseCommand):
             )
 
         self.stdout.write(
-            self.style.INFO(
-                f"Found {projects_configs.count()} projects configs to update"
-            )
+            f"Found {projects_configs.count()} projects configs to update"
         )
 
         if projects_configs.count() == 0:
-            self.stdout.write(
-                self.style.INFO("There are no projects configs to update")
-            )
+            self.stdout.write("There are no projects configs to update")
             return
 
         # Dry run mode
@@ -76,9 +68,7 @@ class Command(BaseCommand):
             )
             for project_config in projects_configs:
                 self.stdout.write(
-                    self.style.INFO(
-                        f"Would update project config {project_config.project.name} ({project_config.project.uuid})"
-                    )
+                    f"Would update project config {project_config.project.name} ({project_config.project.uuid})"
                 )
             return
 
@@ -86,9 +76,7 @@ class Command(BaseCommand):
 
         for project_config in projects_configs:
             self.stdout.write(
-                self.style.INFO(
-                    f"Updating project config {project_config.project.name} ({project_config.project.uuid})"
-                )
+                f"Updating project config {project_config.project.name} ({project_config.project.uuid})"
             )
 
             response = flows_client.create_or_update_flow(
