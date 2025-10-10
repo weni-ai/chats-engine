@@ -13,7 +13,8 @@ EMAIL_LOOKUP_CACHE_ENABLED = getattr(settings, "EMAIL_LOOKUP_CACHE_ENABLED", Tru
 PROJECT_LOOKUP_TTL = getattr(settings, "PROJECT_LOOKUP_TTL", 600)
 PROJECT_CONFIG_TTL = getattr(settings, "PROJECT_CONFIG_TTL", 900)
 PROJECT_CACHE_ENABLED = getattr(settings, "PROJECT_CACHE_ENABLED", True)
-
+USER_OBJECT_CACHE_TTL = getattr(settings, "USER_OBJECT_CACHE_TTL", 300)
+USER_OBJECT_CACHE_ENABLED = getattr(settings, "USER_OBJECT_CACHE_ENABLED", True)
 
 def _normalize_email(email: Optional[str]) -> Optional[str]:
     """
@@ -230,4 +231,113 @@ def invalidate_project_cache_by_id(project_id: int) -> None:
         project = Project.objects.only("uuid").get(pk=project_id)
         invalidate_project_cache(str(project.uuid))
     except Project.DoesNotExist:
+        pass
+
+
+def get_cached_user(email: str) -> Optional[User]:
+    """
+    Get full User object by email from cache or database.
+    Caches the entire user object to avoid database queries.
+    
+    Args:
+        email: User email address
+        
+    Returns:
+        User object if found, None if not found
+    """
+    normalized_email = _normalize_email(email)
+    if not normalized_email:
+        return None
+    
+    if not USER_OBJECT_CACHE_ENABLED:
+        try:
+            return User.objects.get(email=normalized_email)
+        except User.DoesNotExist:
+            return None
+    
+    try:
+        redis_conn = get_redis_connection()
+    except Exception:
+        redis_conn = None
+    
+    cache_key = f"user:object:{normalized_email}"
+    
+    # Try to get from cache
+    if redis_conn:
+        cached_value = redis_conn.get(cache_key)
+        if cached_value:
+            if cached_value == b"-1":
+                # Negative cache - user doesn't exist
+                return None
+            try:
+                # Deserialize user data
+                user_data = json.loads(cached_value)
+                user = User(
+                    id=user_data['id'],
+                    email=user_data['email'],
+                    first_name=user_data['first_name'],
+                    last_name=user_data['last_name'],
+                    is_staff=user_data['is_staff'],
+                    is_active=user_data['is_active'],
+                    is_superuser=user_data['is_superuser'],
+                    language=user_data.get('language'),
+                    photo_url=user_data.get('photo_url'),
+                )
+                # Mark as existing in database
+                user._state.adding = False
+                return user
+            except (json.JSONDecodeError, KeyError):
+                # Cache corrupted, delete it
+                redis_conn.delete(cache_key)
+    
+    # Cache miss - query database
+    try:
+        user = User.objects.get(email=normalized_email)
+        
+        # Cache the user object
+        if redis_conn:
+            user_data = {
+                'id': user.id,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'is_staff': user.is_staff,
+                'is_active': user.is_active,
+                'is_superuser': user.is_superuser,
+                'language': user.language,
+                'photo_url': user.photo_url,
+            }
+            redis_conn.setex(cache_key, USER_OBJECT_CACHE_TTL, json.dumps(user_data))
+        
+        return user
+    except User.DoesNotExist:
+        # Cache negative result
+        if redis_conn:
+            redis_conn.setex(cache_key, EMAIL_LOOKUP_NEG_TTL, -1)
+        return None
+
+def invalidate_cached_user(email: str) -> None:
+    """
+    Invalidate the cached user object for a specific email.
+    Also invalidates the email lookup cache.
+    
+    Args:
+        email: User email address to invalidate
+    """
+    if not USER_OBJECT_CACHE_ENABLED:
+        return
+    
+    normalized_email = _normalize_email(email)
+    if not normalized_email:
+        return
+    
+    try:
+        redis_conn = get_redis_connection()
+        cache_key = f"user:object:{normalized_email}"
+        redis_conn.delete(cache_key)
+        # Also invalidate the email lookup cache
+        invalidate_user_email_cache(email)
+    except Exception:
+        # If Redis is down, we can't invalidate, but that's ok
+        # because the fallback will query the database anyway
         pass
