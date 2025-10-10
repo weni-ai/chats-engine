@@ -65,7 +65,7 @@ class Command(BaseCommand):
 
         if projects_configs.count() == 0:
             self.stdout.write(
-                self.style.INFO(f"There are no projects configs to update")
+                self.style.INFO("There are no projects configs to update")
             )
             return
 
@@ -99,7 +99,11 @@ class Command(BaseCommand):
             if not status.is_success(response.status_code):
                 self.stdout.write(
                     self.style.ERROR(
-                        f"Failed to update flow for project {project_config.project.name} ({project_config.project.uuid})"
+                        (
+                            "Failed to update flow for project "
+                            f"{project_config.project.name} "
+                            f"({project_config.project.uuid})"
+                        )
                     )
                 )
                 continue
