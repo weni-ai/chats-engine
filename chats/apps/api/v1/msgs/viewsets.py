@@ -86,9 +86,7 @@ class MessageViewset(
 class MessageMediaViewset(
     mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
 ):
-    queryset = MessageMedia.objects.all().select_related(
-        "message", "message__room", "message__room__contact"
-    )
+    queryset = MessageMedia.objects.all()
     serializer_class = MessageMediaSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = MessageMediaFilter
