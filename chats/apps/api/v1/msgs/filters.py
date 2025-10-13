@@ -125,6 +125,7 @@ class MessageMediaFilter(filters.FilterSet):
             return queryset.filter(
                 ~Q(content_type__startswith="image")
                 & ~Q(content_type__startswith="video")
+                & ~Q(content_type__startswith="audio")
             )
 
         return queryset
