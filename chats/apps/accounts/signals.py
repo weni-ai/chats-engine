@@ -3,7 +3,7 @@ from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 
 from chats.apps.accounts.models import User
-from chats.core.cache_utils import invalidate_user_email_cache
+from chats.core.cache_utils import invalidate_cached_user, invalidate_user_email_cache
 
 
 @receiver(pre_save, sender=User)
@@ -24,19 +24,16 @@ def capture_old_email(sender, instance, **kwargs):
 @receiver(post_save, sender=User)
 def invalidate_user_cache_on_save(sender, instance, created, **kwargs):
     """
-    Invalidate cache when user email is updated
+    Invalidate cache when user is updated
     """
     if created:
         return
 
+    transaction.on_commit(lambda email=instance.email: invalidate_cached_user(email))
+
     old_email = getattr(instance, "_old_email", None)
     if old_email and old_email != instance.email:
-        transaction.on_commit(
-            lambda oe=old_email, ne=instance.email: (
-                invalidate_user_email_cache(oe),
-                invalidate_user_email_cache(ne),
-            )
-        )
+        transaction.on_commit(lambda oe=old_email: invalidate_user_email_cache(oe))
 
 
 @receiver(post_delete, sender=User)
