@@ -105,13 +105,16 @@ class WeniOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         user = get_cached_user(email)
         
         if user:
-            user.first_name = user_info.get("given_name", "")
-            user.last_name = user_info.get("family_name", "")
-            user.save()
+            first_name = user_info.get("given_name", "")
+            last_name = user_info.get("family_name", "")
             
-            invalidate_cached_user(email)
+            if user.first_name != first_name or user.last_name != last_name:
+                user.first_name = first_name
+                user.last_name = last_name
+                user.save()
+                invalidate_cached_user(email)
+            
             check_module_permission(user_info, user)
-            
             return user
         
         user, created = self.UserModel.objects.get_or_create(email=email)
