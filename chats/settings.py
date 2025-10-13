@@ -588,14 +588,11 @@ AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY = env.str(
     "AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY", default="weniChatsAutomaticMessage"
 )
 
-<<<<<<< HEAD
 # CSAT
 CSAT_FEATURE_FLAG_KEY = env.str("CSAT_FEATURE_FLAG_KEY", default="weniChatsCSAT")
 
 CHATS_BASE_URL = env.str("CHATS_BASE_URL", default="http://localhost:8000")
-=======
 
 # USER CACHE
 USER_OBJECT_CACHE_TTL = env.int("USER_OBJECT_CACHE_TTL", default=300)
 USER_OBJECT_CACHE_ENABLED = env.bool("USER_OBJECT_CACHE_ENABLED", default=True)
->>>>>>> fix/cache-in-drf-user-verification
