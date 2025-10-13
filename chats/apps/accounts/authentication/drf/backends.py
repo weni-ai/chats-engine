@@ -97,32 +97,31 @@ class WeniOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         This eliminates the expensive UPPER(email) database query on every request.
         """
         user_info = self.get_userinfo(access_token, id_token, payload)
-        claims = self.get_claims(access_token, id_token, user_info)
         
-        email = claims.get('email')
+        email = user_info.get('email')
         if not email:
             return None
         
         user = get_cached_user(email)
         
         if user:
-            user.first_name = claims.get("given_name", "")
-            user.last_name = claims.get("family_name", "")
+            user.first_name = user_info.get("given_name", "")
+            user.last_name = user_info.get("family_name", "")
             user.save()
             
             invalidate_cached_user(email)
-            check_module_permission(claims, user)
+            check_module_permission(user_info, user)
             
             return user
         
         user, created = self.UserModel.objects.get_or_create(email=email)
         
-        user.first_name = claims.get("given_name", "")
-        user.last_name = claims.get("family_name", "")
+        user.first_name = user_info.get("given_name", "")
+        user.last_name = user_info.get("family_name", "")
         user.save()
         
         invalidate_cached_user(email)
-        check_module_permission(claims, user)
+        check_module_permission(user_info, user)
         
         if created:
             LOGGER.info(f"Created new user: {email}")
