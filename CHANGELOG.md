@@ -1,3 +1,11 @@
+# 3.27.0
+# Add
+  - flag to indicate if contact has history
+
+# 3.26.7
+# Add
+  - disconnect agents with custom breaks
+
 # 3.26.6
 # Add
   - Cursor pagination on messages list endpoint
@@ -759,6 +767,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 

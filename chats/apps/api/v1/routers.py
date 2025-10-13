@@ -118,7 +118,7 @@ router.register("quick_messages", QuickMessageViewset)
 router.register(
     "sector_quick_messages", SectorQuickMessageViewset, basename="sector_quick_message"
 )
-router.register("media", MessageMediaViewset)
+router.register("media", MessageMediaViewset, basename="media")
 router.register("contact", ContactViewset)
 router.register("history/rooms", HistoryRoomViewset, basename="history_room")
 router.register("discussion", DiscussionViewSet, basename="discussion")
