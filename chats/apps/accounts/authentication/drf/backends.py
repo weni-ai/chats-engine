@@ -77,7 +77,6 @@ class WeniOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         Override complete method to use cache and avoid filter_users_by_claims query.
         This eliminates the expensive UPPER(email) database query on every request.
         """
-        # Get userinfo from token (uses cache if enabled)
         user_info = self.get_userinfo(access_token, id_token, payload)
         claims = self.get_claims(access_token, id_token, user_info)
         
@@ -85,30 +84,24 @@ class WeniOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         if not email:
             return None
         
-        # Try to get user from cache first - NO DATABASE QUERY
         user = get_cached_user(email)
         
         if user:
-            # User found in cache - update and return
             user.first_name = claims.get("given_name", "")
             user.last_name = claims.get("family_name", "")
             user.save()
             
-            # Invalidate cache after update to ensure fresh data on next request
             invalidate_cached_user(email)
             check_module_permission(claims, user)
             
             return user
         
-        # Cache miss - get or create from database
         user, created = self.UserModel.objects.get_or_create(email=email)
         
-        # Update user information from claims
         user.first_name = claims.get("given_name", "")
         user.last_name = claims.get("family_name", "")
         user.save()
         
-        # Invalidate cache to populate on next request
         invalidate_cached_user(email)
         check_module_permission(claims, user)
         

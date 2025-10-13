@@ -250,6 +250,7 @@ def get_cached_user(email: str) -> Optional[User]:
         return None
     
     if not USER_OBJECT_CACHE_ENABLED:
+        print(f"[CACHE] User object cache DISABLED - querying DB for: {normalized_email}")
         try:
             return User.objects.get(email=normalized_email)
         except User.DoesNotExist:
@@ -259,18 +260,17 @@ def get_cached_user(email: str) -> Optional[User]:
         redis_conn = get_redis_connection()
     except Exception:
         redis_conn = None
+        print(f"[CACHE ERROR] Failed to connect to Redis for email: {normalized_email}")
     
     cache_key = f"user:object:{normalized_email}"
     
-    # Try to get from cache
     if redis_conn:
         cached_value = redis_conn.get(cache_key)
         if cached_value:
             if cached_value == b"-1":
-                # Negative cache - user doesn't exist
+                print(f"[CACHE HIT] Negative cache for user object: {normalized_email}")
                 return None
             try:
-                # Deserialize user data
                 user_data = json.loads(cached_value)
                 user = User(
                     id=user_data['id'],
@@ -283,18 +283,17 @@ def get_cached_user(email: str) -> Optional[User]:
                     language=user_data.get('language'),
                     photo_url=user_data.get('photo_url'),
                 )
-                # Mark as existing in database
                 user._state.adding = False
+                print(f"[CACHE HIT] Found user object id={user_data['id']} for email: {normalized_email}")
                 return user
             except (json.JSONDecodeError, KeyError):
-                # Cache corrupted, delete it
+                print(f"[CACHE ERROR] Invalid cached data for email: {normalized_email}, deleting")
                 redis_conn.delete(cache_key)
     
-    # Cache miss - query database
     try:
         user = User.objects.get(email=normalized_email)
+        print(f"[CACHE MISS] Queried DB and found user id={user.id} for email: {normalized_email}")
         
-        # Cache the user object
         if redis_conn:
             user_data = {
                 'id': user.id,
@@ -308,12 +307,14 @@ def get_cached_user(email: str) -> Optional[User]:
                 'photo_url': user.photo_url,
             }
             redis_conn.setex(cache_key, USER_OBJECT_CACHE_TTL, json.dumps(user_data))
+            print(f"[CACHE CREATE] Cached user object with TTL={USER_OBJECT_CACHE_TTL}s")
         
         return user
     except User.DoesNotExist:
-        # Cache negative result
+        print(f"[CACHE MISS] User object not found in DB for email: {normalized_email}")
         if redis_conn:
             redis_conn.setex(cache_key, EMAIL_LOOKUP_NEG_TTL, -1)
+            print(f"[CACHE CREATE] Created negative cache with TTL={EMAIL_LOOKUP_NEG_TTL}s")
         return None
 
 def invalidate_cached_user(email: str) -> None:
@@ -335,9 +336,6 @@ def invalidate_cached_user(email: str) -> None:
         redis_conn = get_redis_connection()
         cache_key = f"user:object:{normalized_email}"
         redis_conn.delete(cache_key)
-        # Also invalidate the email lookup cache
         invalidate_user_email_cache(email)
     except Exception:
-        # If Redis is down, we can't invalidate, but that's ok
-        # because the fallback will query the database anyway
         pass

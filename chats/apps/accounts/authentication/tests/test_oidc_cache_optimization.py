@@ -92,14 +92,12 @@ class CacheFunctionUnitTest(TestCase):
     def test_cache_invalidation(self):
         """Test that invalidation works correctly"""
         invalidate_cached_user(self.test_email)
-        get_cached_user(self.test_email)  # Populate cache
+        get_cached_user(self.test_email)       
         
-        # Verify cache is being used
         with CaptureQueriesContext(connection) as context:
             get_cached_user(self.test_email)
         self.assertEqual(self._count_user_queries(context.captured_queries), 0)
 
-        # Invalidate and verify DB is queried again (without UPPER)
         invalidate_cached_user(self.test_email)
         
         with CaptureQueriesContext(connection) as context:
@@ -161,11 +159,9 @@ class IntegrationTest(TestCase):
         
         upper_queries = self._count_upper_queries(context.captured_queries)
         
-        # Contar queries à tabela de TOKEN (prova que autenticação rodou)
         token_queries = sum(1 for q in context.captured_queries 
                         if "authtoken_token" in q["sql"])
         
-        # Contar queries à tabela de USER
         user_queries = sum(1 for q in context.captured_queries 
                         if "accounts_user" in q["sql"])
         
@@ -175,13 +171,11 @@ class IntegrationTest(TestCase):
         print(f"  User lookups: {user_queries}")
         print(f"  UPPER(email) queries: {upper_queries}")
         
-        # Mostrar as queries
         for i, query in enumerate(context.captured_queries, 1):
             if "authtoken_token" in query["sql"] or "accounts_user" in query["sql"]:
                 print(f"\n  Query {i}:")
                 print(f"    {query['sql'][:150]}...")
         
-        # Validações
         self.assertGreater(len(context.captured_queries), 0, 
                         "❌ FALHA: Nenhuma query foi executada!")
         self.assertGreater(token_queries, 0, 
@@ -268,14 +262,12 @@ class ComparisonTest(TestCase):
         print("SIDE-BY-SIDE COMPARISON")
         print("="*80)
         
-        # OLD implementation
         with CaptureQueriesContext(connection) as old_context:
             old_user = User.objects.filter(email__iexact=self.test_email).first()
         
         old_upper = self._count_upper_queries(old_context.captured_queries)
         old_total = self._count_user_queries(old_context.captured_queries)
         
-        # NEW implementation
         invalidate_cached_user(self.test_email)
         with CaptureQueriesContext(connection) as new_context:
             new_user = get_cached_user(self.test_email)
@@ -283,13 +275,11 @@ class ComparisonTest(TestCase):
         new_upper = self._count_upper_queries(new_context.captured_queries)
         new_total = self._count_user_queries(new_context.captured_queries)
         
-        # Results
         print(f"\n📊 RESULTS:")
         print(f"   OLD: {old_upper} UPPER queries")
         print(f"   NEW: {new_upper} UPPER queries")
         print(f"   📉 Reduction: {old_upper - new_upper} ({100.0 if old_upper > 0 else 0:.1f}%)")
         
-        # Assertions
         self.assertGreater(old_upper, new_upper)
         self.assertEqual(new_upper, 0)
         self.assertEqual(old_user.email, new_user.email)
