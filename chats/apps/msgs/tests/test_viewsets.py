@@ -11,6 +11,7 @@ from chats.apps.rooms.models import Room
 from chats.apps.contacts.models import Contact
 from chats.apps.accounts.models import User
 from chats.apps.projects.tests.decorators import with_project_permission
+from chats.apps.msgs.models import Message, MessageMedia
 
 
 class BaseTestMessageMediaViewSet(APITestCase):
@@ -79,6 +80,19 @@ class TestMessageMediaViewSetAsAuthenticatedUser(BaseTestMessageMediaViewSet):
 
     @with_project_permission()
     def test_list_when_user_with_project_permission_and_room_query_param(self):
+        message = Message.objects.create(room=self.room, user=self.user)
+        MessageMedia.objects.create(message=message)
         response = self.list_media({"room": self.room.uuid})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    @with_project_permission()
+    def test_list_when_user_filtering_by_room_and_contact(self):
+        message = Message.objects.create(room=self.room, user=self.user)
+        message_media = MessageMedia.objects.create(message=message)
+        response = self.list_media(
+            {"room": self.room.uuid, "contact": self.room.contact.uuid}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["results"][0]["uuid"], str(message_media.uuid))

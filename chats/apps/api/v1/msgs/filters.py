@@ -118,12 +118,12 @@ class MessageMediaFilter(filters.FilterSet):
             return queryset.filter(content_type__startswith="audio")
         elif value == MessageMediaContentTypesFilterParams.MEDIA:
             return queryset.filter(
-                Q(content_type__startswith="audio")
+                Q(content_type__startswith="image")
                 | Q(content_type__startswith="video")
             )
         elif value == MessageMediaContentTypesFilterParams.DOCUMENTS:
             return queryset.filter(
-                ~Q(content_type__startswith="audio")
+                ~Q(content_type__startswith="image")
                 & ~Q(content_type__startswith="video")
             )
 
