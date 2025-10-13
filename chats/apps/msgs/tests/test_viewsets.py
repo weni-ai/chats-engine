@@ -89,7 +89,7 @@ class TestMessageMediaViewSetAsAuthenticatedUser(BaseTestMessageMediaViewSet):
     @with_project_permission()
     def test_list_when_user_filtering_by_room_and_contact(self):
         message = Message.objects.create(room=self.room, user=self.user)
-        message_media = MessageMedia.objects.create(message=message)
+        MessageMedia.objects.create(message=message)
         response = self.list_media(
             {"room": self.room.uuid, "contact": self.room.contact.uuid}
         )
