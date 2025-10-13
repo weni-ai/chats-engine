@@ -95,4 +95,4 @@ class TestMessageMediaViewSetAsAuthenticatedUser(BaseTestMessageMediaViewSet):
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["results"][0]["uuid"], str(message_media.uuid))
+        self.assertEqual(response.data["results"][0]["message"], message.uuid)
