@@ -1,3 +1,10 @@
+# 3.28.0
+# Add
+ - index to MessageMedia's content_type
+ - content_type filter in message media endpoint
+ - cursor pagination to message media endpoint
+ - user cache in OIDC authentication
+ 
 # 3.27.0
 # Add
   - flag to indicate if contact has history
@@ -767,6 +774,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 
