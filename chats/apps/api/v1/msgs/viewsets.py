@@ -1,5 +1,6 @@
 from django.db import transaction
 from django_filters.rest_framework import DjangoFilterBackend
+from django.core.exceptions import ObjectDoesNotExist
 from pydub.exceptions import CouldntDecodeError
 from rest_framework import filters, mixins, pagination, parsers, status, viewsets
 from rest_framework.decorators import action
@@ -54,12 +55,12 @@ class MessageViewset(
             
             message = serializer.instance
             if message.user and message.room.first_user_assigned_at:
-                previous_agent_messages = message.room.messages.filter(
-                    user__isnull=False,
-                    created_on__lt=message.created_on
-                ).exists()
-                
-                if not previous_agent_messages:
+                try:
+                    metric = message.room.metric
+                    if metric.first_response_time is None:
+                        from chats.apps.dashboard.tasks import calculate_first_response_time_task
+                        calculate_first_response_time_task.delay(str(message.room.uuid))
+                except ObjectDoesNotExist:
                     from chats.apps.dashboard.tasks import calculate_first_response_time_task
                     calculate_first_response_time_task.delay(str(message.room.uuid))
 
