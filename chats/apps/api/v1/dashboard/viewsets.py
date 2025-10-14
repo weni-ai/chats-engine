@@ -32,7 +32,15 @@ from chats.core.excel_storage import ExcelStorage
 
 from .dto import Filters, should_exclude_admin_domains
 from .presenter import ModelFieldsPresenter
-from .service import AgentsService, RawDataService, RoomsDataService, SectorService, TimeMetricsService
+from .service import (
+    AgentsService,
+    RawDataService,
+    RoomsDataService,
+    SectorService,
+    TimeMetricsService,
+)
+
+logger = logging.getLogger(__name__)
 
 logger = logging.getLogger(__name__)
 
@@ -396,7 +404,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         """Time metrics for the project - real-time data"""
         project = self.get_object()
         params = request.query_params.dict()
-        
+
         filters = Filters(
             start_date=params.get("start_date"),
             end_date=params.get("end_date"),
@@ -473,10 +481,6 @@ class ReportFieldsValidatorViewSet(APIView):
 
         common_apps = [
             "sectors",
-            "queues",
-            "rooms",
-            "accounts",
-            "contacts",
             "msgs",
             "projects",
         ]
@@ -877,7 +881,6 @@ class ReportFieldsValidatorViewSet(APIView):
         return report_data
 
     def post(self, request):
-
         project_uuid = request.data.get("project_uuid")
         if not project_uuid:
             raise ValidationError({"project_uuid": "This field is required."})
@@ -929,18 +932,12 @@ class ReportFieldsValidatorViewSet(APIView):
                 if root_end_date and "end_date" not in fields_config["rooms"]:
                     fields_config["rooms"]["end_date"] = root_end_date
 
-            root_sectors = request.data.get("sectors") or request.data.get("sector")
-            root_queues = request.data.get("queues") or request.data.get("queue")
             root_agents = request.data.get("agents") or request.data.get("agent")
             root_tags = request.data.get("tags") or request.data.get("tag")
             if "rooms" not in fields_config or not isinstance(
                 fields_config["rooms"], dict
             ):
                 fields_config["rooms"] = {}
-            if root_sectors is not None:
-                fields_config["rooms"]["sectors"] = root_sectors
-            if root_queues is not None:
-                fields_config["rooms"]["queues"] = root_queues
             if root_agents is not None:
                 fields_config["rooms"]["agents"] = root_agents
             if root_tags is not None:
@@ -979,12 +976,12 @@ class ReportFieldsValidatorViewSet(APIView):
 
         project = get_object_or_404(Project, uuid=project_uuid)
         has_completed_export = ReportStatus.objects.filter(
-            project=project, status="completed"
+            project=project, status="ready"
         ).exists()
         if not has_completed_export:
             return Response(
                 {
-                    "status": "READY",
+                    "status": "ready",
                     "email": None,
                     "report_uuid": None,
                 },
@@ -995,16 +992,9 @@ class ReportFieldsValidatorViewSet(APIView):
             ReportStatus.objects.filter(project=project).order_by("-created_on").first()
         )
 
-        status_map = {
-            "pending": "PENDING",
-            "processing": "IN_PROGRESS",
-            "completed": "READY",
-            "failed": "FAILED",
-        }
-
         return Response(
             {
-                "status": status_map.get(report_status.status, "PENDING"),
+                "status": report_status.status,
                 "email": report_status.user.email,
                 "report_uuid": str(report_status.uuid),
             },
