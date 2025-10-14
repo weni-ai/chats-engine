@@ -7,7 +7,9 @@ from chats.celery import app
 
 
 @app.task
-def send_automatic_message(room_uuid: UUID, message: str, user_id: int):
+def send_automatic_message(
+    room_uuid: UUID, message: str, user_id: int, check_ticket: bool = False
+):
     """
     Send an automatic message to a room.
     """
@@ -16,4 +18,4 @@ def send_automatic_message(room_uuid: UUID, message: str, user_id: int):
     room = Room.objects.get(uuid=room_uuid)
     user = User.objects.get(id=user_id)
 
-    AutomaticMessagesService().send_automatic_message(room, message, user)
+    AutomaticMessagesService().send_automatic_message(room, message, user, check_ticket)
