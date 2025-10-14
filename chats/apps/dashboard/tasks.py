@@ -103,7 +103,7 @@ def calculate_first_response_time_task(room_uuid: UUID):
         
         metric_room = RoomMetrics.objects.get_or_create(room=room)[0]
         
-        if metric_room.first_response_time == 0:
+        if metric_room.first_response_time is None:
             metric_room.first_response_time = calculate_first_response_time(room)
             metric_room.save(update_fields=['first_response_time'])
             
