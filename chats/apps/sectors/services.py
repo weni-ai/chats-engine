@@ -36,6 +36,8 @@ class AutomaticMessagesService:
 
         ticket_uuid = room.ticket_uuid
 
+        ticket_found = False
+
         if ticket_uuid and check_ticket:
             logger.info("[AUTOMATIC MESSAGES SERVICE] Checking ticket %s", ticket_uuid)
             wait_time = 1
@@ -61,6 +63,7 @@ class AutomaticMessagesService:
                                 "[AUTOMATIC MESSAGES SERVICE] Ticket %s found",
                                 ticket_uuid,
                             )
+                            ticket_found = True
                             break
 
                 logger.info(
@@ -71,6 +74,17 @@ class AutomaticMessagesService:
 
                 time.sleep(wait_time)
                 wait_time *= 2
+
+            if not ticket_found:
+                logger.info(
+                    "[AUTOMATIC MESSAGES SERVICE] Ticket %s not found after %s attempts",
+                    ticket_uuid,
+                    FLOWS_GET_TICKET_RETRIES,
+                )
+                raise Exception(
+                    "Automatic Message cannot be send because ticket %s not found for room %s"
+                    % (ticket_uuid, room.pk)
+                )
 
         if (
             room.queue.sector.is_automatic_message_active is False
