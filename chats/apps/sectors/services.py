@@ -55,6 +55,10 @@ class AutomaticMessagesService:
                 if response.status_code == 200:
                     try:
                         results = response.json().get("results")
+                        logger.info(
+                            "[AUTOMATIC MESSAGES SERVICE] Flows response: %s.",
+                            response.json(),
+                        )
                     except Exception as e:
                         capture_exception(e)
                     else:
