@@ -202,6 +202,15 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
             ):
                 instance.send_automatic_message(delay=1)
 
+            # [STAGING] Just testing
+            urn_with_delay = CacheClient().get(f"urn_with_delay")
+            if urn_with_delay and instance.urn == (
+                urn_with_delay.decode()
+                if isinstance(urn_with_delay, bytes)
+                else urn_with_delay
+            ):
+                time.sleep(5)
+
             return Response(
                 serializer.data, status=status.HTTP_201_CREATED, headers=headers
             )
