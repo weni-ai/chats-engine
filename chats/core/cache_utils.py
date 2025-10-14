@@ -16,6 +16,7 @@ PROJECT_CACHE_ENABLED = getattr(settings, "PROJECT_CACHE_ENABLED", True)
 USER_OBJECT_CACHE_TTL = getattr(settings, "USER_OBJECT_CACHE_TTL", 300)
 USER_OBJECT_CACHE_ENABLED = getattr(settings, "USER_OBJECT_CACHE_ENABLED", True)
 
+
 def _normalize_email(email: Optional[str]) -> Optional[str]:
     """
     Normalize email string for consistent cache and DB lookups.
@@ -238,32 +239,33 @@ def get_cached_user(email: str) -> Optional[User]:
     """
     Get full User object by email from cache or database.
     Caches the entire user object to avoid database queries.
-    
+
     Args:
         email: User email address
-        
+
     Returns:
         User object if found, None if not found
     """
     normalized_email = _normalize_email(email)
     if not normalized_email:
         return None
-    
+
     if not USER_OBJECT_CACHE_ENABLED:
-        print(f"[CACHE] User object cache DISABLED - querying DB for: {normalized_email}")
+        print(
+            f"[CACHE] User object cache DISABLED - querying DB for: {normalized_email}"
+        )
         try:
             return User.objects.get(email=normalized_email)
         except User.DoesNotExist:
             return None
-    
     try:
         redis_conn = get_redis_connection()
     except Exception:
         redis_conn = None
         print(f"[CACHE ERROR] Failed to connect to Redis for email: {normalized_email}")
-    
+
     cache_key = f"user:object:{normalized_email}"
-    
+
     if redis_conn:
         cached_value = redis_conn.get(cache_key)
         if cached_value:
@@ -273,65 +275,75 @@ def get_cached_user(email: str) -> Optional[User]:
             try:
                 user_data = json.loads(cached_value)
                 user = User(
-                    id=user_data['id'],
-                    email=user_data['email'],
-                    first_name=user_data['first_name'],
-                    last_name=user_data['last_name'],
-                    is_staff=user_data['is_staff'],
-                    is_active=user_data['is_active'],
-                    is_superuser=user_data['is_superuser'],
-                    language=user_data.get('language'),
-                    photo_url=user_data.get('photo_url'),
+                    id=user_data["id"],
+                    email=user_data["email"],
+                    first_name=user_data["first_name"],
+                    last_name=user_data["last_name"],
+                    is_staff=user_data["is_staff"],
+                    is_active=user_data["is_active"],
+                    is_superuser=user_data["is_superuser"],
+                    language=user_data.get("language"),
+                    photo_url=user_data.get("photo_url"),
                 )
                 user._state.adding = False
-                print(f"[CACHE HIT] Found user object id={user_data['id']} for email: {normalized_email}")
+                print(
+                    f"[CACHE HIT] Found user object id={user_data['id']} for email: {normalized_email}"
+                )
                 return user
             except (json.JSONDecodeError, KeyError):
-                print(f"[CACHE ERROR] Invalid cached data for email: {normalized_email}, deleting")
+                print(
+                    f"[CACHE ERROR] Invalid cached data for email: {normalized_email}, deleting"
+                )
                 redis_conn.delete(cache_key)
-    
+
     try:
         user = User.objects.get(email=normalized_email)
-        print(f"[CACHE MISS] Queried DB and found user id={user.id} for email: {normalized_email}")
-        
+        print(
+            f"[CACHE MISS] Queried DB and found user id={user.id} for email: {normalized_email}"
+        )
+
         if redis_conn:
             user_data = {
-                'id': user.id,
-                'email': user.email,
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-                'is_staff': user.is_staff,
-                'is_active': user.is_active,
-                'is_superuser': user.is_superuser,
-                'language': user.language,
-                'photo_url': user.photo_url,
+                "id": user.id,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "is_staff": user.is_staff,
+                "is_active": user.is_active,
+                "is_superuser": user.is_superuser,
+                "language": user.language,
+                "photo_url": user.photo_url,
             }
             redis_conn.setex(cache_key, USER_OBJECT_CACHE_TTL, json.dumps(user_data))
-            print(f"[CACHE CREATE] Cached user object with TTL={USER_OBJECT_CACHE_TTL}s")
-        
+            print(
+                f"[CACHE CREATE] Cached user object with TTL={USER_OBJECT_CACHE_TTL}s"
+            )
+
         return user
     except User.DoesNotExist:
         print(f"[CACHE MISS] User object not found in DB for email: {normalized_email}")
         if redis_conn:
             redis_conn.setex(cache_key, EMAIL_LOOKUP_NEG_TTL, -1)
-            print(f"[CACHE CREATE] Created negative cache with TTL={EMAIL_LOOKUP_NEG_TTL}s")
+            print(
+                f"[CACHE CREATE] Created negative cache with TTL={EMAIL_LOOKUP_NEG_TTL}s"
+            )
         return None
+
 
 def invalidate_cached_user(email: str) -> None:
     """
     Invalidate the cached user object for a specific email.
     Also invalidates the email lookup cache.
-    
     Args:
         email: User email address to invalidate
     """
     if not USER_OBJECT_CACHE_ENABLED:
         return
-    
+
     normalized_email = _normalize_email(email)
     if not normalized_email:
         return
-    
+
     try:
         redis_conn = get_redis_connection()
         cache_key = f"user:object:{normalized_email}"
