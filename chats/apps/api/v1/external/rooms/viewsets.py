@@ -255,6 +255,7 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         # [STAGING] Just a test
         urn_with_delay = CacheClient().get("urn_with_delay")
         if urn_with_delay and instance.urn == urn_with_delay:
+            print(f"{urn_with_delay} found in cache, delaying for 5 seconds")
             time.sleep(5)
 
     def perform_update(self, serializer):
