@@ -284,7 +284,7 @@ class TestRoomModel(TransactionTestCase):
         room.send_automatic_message()
 
         mock_send_automatic_message.assert_called_once_with(
-            args=[room.uuid, self.sector.automatic_message_text, user.id],
+            args=[room.uuid, self.sector.automatic_message_text, user.id, False],
             countdown=0,
         )
 
@@ -310,7 +310,7 @@ class TestRoomModel(TransactionTestCase):
         room.send_automatic_message()
 
         mock_send_automatic_message.assert_called_once_with(
-            args=[room.uuid, self.sector.automatic_message_text, user.id],
+            args=[room.uuid, self.sector.automatic_message_text, user.id, False],
             countdown=0,
         )
 
