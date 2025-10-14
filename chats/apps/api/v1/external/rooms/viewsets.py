@@ -200,7 +200,9 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
                 and instance.queue.sector.is_automatic_message_active
                 and instance.queue.sector.automatic_message_text
             ):
-                transaction.on_commit(lambda: instance.send_automatic_message(delay=1))
+                transaction.on_commit(
+                    lambda: instance.send_automatic_message(delay=1, check_ticket=True)
+                )
 
             # [STAGING] Just testing
             urn_with_delay = CacheClient().get(f"urn_with_delay")

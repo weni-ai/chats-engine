@@ -295,7 +295,7 @@ class Room(BaseModel, BaseConfigurableModel):
 
         self._update_agent_service_status(is_new)
 
-    def send_automatic_message(self, delay: int = 0):
+    def send_automatic_message(self, delay: int = 0, check_ticket: bool = False):
         from chats.apps.sectors.tasks import send_automatic_message
 
         if (
@@ -309,6 +309,7 @@ class Room(BaseModel, BaseConfigurableModel):
                     self.uuid,
                     self.queue.sector.automatic_message_text,
                     self.user.id,
+                    check_ticket,
                 ],
                 countdown=delay,
             )
