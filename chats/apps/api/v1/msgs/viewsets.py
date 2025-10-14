@@ -1,5 +1,6 @@
 from django.db import transaction
 from django_filters.rest_framework import DjangoFilterBackend
+from django.core.exceptions import ObjectDoesNotExist
 from pydub.exceptions import CouldntDecodeError
 from rest_framework import filters, mixins, parsers, status, viewsets
 from rest_framework.decorators import action
@@ -53,6 +54,23 @@ class MessageViewset(
         with transaction.atomic():
             serializer.save()
             serializer.instance.notify_room("create", True)
+
+            message = serializer.instance
+            if message.user and message.room.first_user_assigned_at:
+                try:
+                    metric = message.room.metric
+                    if metric.first_response_time is None:
+                        from chats.apps.dashboard.tasks import (
+                            calculate_first_response_time_task,
+                        )
+
+                        calculate_first_response_time_task.delay(str(message.room.uuid))
+                except ObjectDoesNotExist:
+                    from chats.apps.dashboard.tasks import (
+                        calculate_first_response_time_task,
+                    )
+
+                    calculate_first_response_time_task.delay(str(message.room.uuid))
 
     def perform_update(self, serializer):
         serializer.save()
