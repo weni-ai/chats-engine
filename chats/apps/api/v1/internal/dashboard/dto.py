@@ -14,3 +14,4 @@ class Filters:
     is_weni_admin: bool = None
     user_request: ProjectPermission = None
     project: Project = None
+    ordering: str = None

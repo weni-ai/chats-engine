@@ -1,5 +1,5 @@
-from rest_framework import serializers
 from django.utils import timezone
+from rest_framework import serializers
 
 from chats.apps.api.v1.sectors.serializers import TagSimpleSerializer
 from chats.apps.rooms.models import Room
@@ -56,18 +56,32 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
     def get_duration(self, obj: Room) -> int:
         if not obj.first_user_assigned_at:
             return None
-        
+
         if obj.is_active and obj.user:
             return int((timezone.now() - obj.first_user_assigned_at).total_seconds())
         elif not obj.is_active and obj.ended_at:
             return int((obj.ended_at - obj.first_user_assigned_at).total_seconds())
-        
+
         return None
 
     def get_first_response_time(self, obj: Room) -> int:
         try:
-            if hasattr(obj, 'metric') and obj.metric.first_response_time > 0:
+            if hasattr(obj, "metric") and obj.metric.first_response_time > 0:
                 return obj.metric.first_response_time
+
+            if obj.first_user_assigned_at and obj.is_active and obj.user:
+                has_any_agent_messages = (
+                    obj.messages.filter(user__isnull=False)
+                    .exclude(automatic_message__isnull=False)
+                    .exists()
+                )
+
+                if has_any_agent_messages:
+                    return None
+
+                return int(
+                    (timezone.now() - obj.first_user_assigned_at).total_seconds()
+                )
         except Exception:
             pass
         return None
