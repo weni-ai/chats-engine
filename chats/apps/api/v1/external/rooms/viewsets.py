@@ -1,5 +1,6 @@
 from functools import cached_property
 import logging
+import time
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
@@ -11,6 +12,7 @@ from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import CursorPagination, LimitOffsetPagination
 from rest_framework.response import Response
+
 
 from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
@@ -51,6 +53,7 @@ from chats.apps.rooms.views import (
     update_custom_fields,
     update_flows_custom_fields,
 )
+from chats.core.cache import CacheClient
 
 from .filters import RoomFilter, RoomMetricsFilter
 
@@ -248,6 +251,11 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
             and instance.queue.sector.automatic_message_text
         ):
             instance.send_automatic_message(delay=1)
+
+        # [STAGING] Just a test
+        urn_with_delay = CacheClient().get("urn_with_delay")
+        if urn_with_delay and instance.urn == urn_with_delay:
+            time.sleep(5)
 
     def perform_update(self, serializer):
         serializer.save()
