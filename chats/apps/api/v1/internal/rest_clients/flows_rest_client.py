@@ -280,7 +280,7 @@ class FlowRESTClient(
     def get_ticket(self, project, ticket_uuid: str):
         url = f"{self.base_url}/api/v2/tickets.json"
         query_params = {
-            "uuid": ticket_uuid,
+            "uuid": str(ticket_uuid),
         }
         headers = self.project_headers(project.flows_authorization)
 
