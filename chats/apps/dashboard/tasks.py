@@ -2,15 +2,16 @@ import io
 import logging
 import os
 import zipfile
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
 import pandas as pd
 from django.conf import settings
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
 
+from chats.apps.dashboard.email_templates import get_report_ready_email
 from chats.apps.dashboard.models import ReportStatus, RoomMetrics
 from chats.apps.dashboard.utils import (
     calculate_last_queue_waiting_time,
@@ -107,7 +108,7 @@ def generate_custom_fields_report(
     report_status = ReportStatus.objects.get(uuid=report_status_id)
 
     try:
-        report_status.status = "processing"
+        report_status.status = "in_progress"
         report_status.save()
 
         from chats.apps.api.v1.dashboard.presenter import ModelFieldsPresenter
@@ -158,50 +159,57 @@ def generate_custom_fields_report(
         if getattr(settings, "REPORTS_SEND_EMAILS", False):
             try:
                 from chats.core.storages import ReportsStorage
-                
+
                 storage = ReportsStorage()
                 ext = "xlsx" if file_type == "xlsx" else "zip"
                 filename = f"custom_report_{project.uuid}_{dt}.{ext}"
-                
+
                 output.seek(0)
                 file_path = storage.save(filename, output)
-                
-                download_url = storage.get_download_url(file_path, expiration=int(timedelta(days=7).total_seconds()))
-                
+
+                download_url = storage.get_download_url(
+                    file_path, expiration=int(timedelta(days=7).total_seconds())
+                )
+
                 logger.info(
                     "Report uploaded to S3: %s | report_uuid=%s | url=%s",
                     file_path,
                     report_status.uuid,
-                    download_url
+                    download_url,
                 )
-                
+
                 subject = f"Custom report for the project {project.name} - {dt}"
-                message = (
-                    f"The custom report for the project {project.name} is ready.\n\n"
-                    f"Click the link below to download the report:\n"
-                    f"{download_url}\n\n"
-                    f"This link will expire in 7 days."
+
+                message_plain, message_html = get_report_ready_email(
+                    project.name, download_url
                 )
-                
-                email = EmailMessage(
+
+                email = EmailMultiAlternatives(
                     subject=subject,
-                    body=message,
+                    body=message_plain,
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     to=[user_email],
                 )
-                
+                email.attach_alternative(message_html, "text/html")
+
+                email.extra_headers = {
+                    "X-No-Track": "True",
+                    "X-Track-Click": "no",
+                    "o:tracking-clicks": "no",
+                }
+
                 email.send(fail_silently=False)
-                
+
                 logger.info(
                     "Report email sent successfully to %s | report_uuid=%s",
                     user_email,
                     report_status.uuid,
                 )
-                
+
             except Exception as e:
                 logger.exception("Error sending email report: %s", e)
 
-        report_status.status = "completed"
+        report_status.status = "ready"
         report_status.save()
 
     except Exception as e:
@@ -229,7 +237,7 @@ def process_pending_reports():
         if not report:
             logging.info("No pending reports to process.")
             return
-        report.status = "processing"
+        report.status = "in_progress"
         report.save()
 
     project = report.project
@@ -254,10 +262,18 @@ def process_pending_reports():
 
                 qs = (query_data or {}).get("queryset")
                 total_records = qs.count() if qs is not None else 0
-                
+
                 base_chunk_size = getattr(settings, "REPORTS_CHUNK_SIZE", 5000)
-                chunk_size = base_chunk_size * 2 if total_records > (base_chunk_size * 10) else base_chunk_size
-                logging.info("Report size: %s records, using chunk_size: %s", total_records, chunk_size)
+                chunk_size = (
+                    base_chunk_size * 2
+                    if total_records > (base_chunk_size * 10)
+                    else base_chunk_size
+                )
+                logging.info(
+                    "Report size: %s records, using chunk_size: %s",
+                    total_records,
+                    chunk_size,
+                )
 
                 def _write_queryset(sheet_name: str, qs):
                     total = qs.count()
@@ -307,10 +323,14 @@ def process_pending_reports():
                 if buf is None:
                     buf = io.StringIO()
                     csv_buffers[sheet_name] = buf
-                    
+
                 base_chunk_size = getattr(settings, "REPORTS_CHUNK_SIZE", 5000)
-                chunk_size = base_chunk_size * 2 if total > (base_chunk_size * 10) else base_chunk_size
-                
+                chunk_size = (
+                    base_chunk_size * 2
+                    if total > (base_chunk_size * 10)
+                    else base_chunk_size
+                )
+
                 for start in range(0, total, chunk_size):
                     end = min(start + chunk_size, total)
                     logging.info(
@@ -370,50 +390,57 @@ def process_pending_reports():
         if getattr(settings, "REPORTS_SEND_EMAILS", False):
             try:
                 from chats.core.storages import ReportsStorage
-                
+
                 storage = ReportsStorage()
                 ext = "xlsx" if file_type == "xlsx" else "zip"
                 filename = f"custom_report_{project.uuid}_{dt}.{ext}"
-                
+
                 output.seek(0)
                 file_path = storage.save(filename, output)
-                
-                download_url = storage.get_download_url(file_path, expiration=int(timedelta(days=7).total_seconds()))
-                
+
+                download_url = storage.get_download_url(
+                    file_path, expiration=int(timedelta(days=7).total_seconds())
+                )
+
                 logging.info(
                     "Report uploaded to S3: %s | report_uuid=%s | url=%s",
                     file_path,
                     report.uuid,
-                    download_url
+                    download_url,
                 )
-                
+
                 subject = f"Custom report for the project {project.name} - {dt}"
-                message = (
-                    f"The custom report for the project {project.name} is ready.\n\n"
-                    f"Click the link below to download the report:\n"
-                    f"{download_url}\n\n"
-                    f"This link will expire in 7 days."
+
+                message_plain, message_html = get_report_ready_email(
+                    project.name, download_url
                 )
-                
-                email = EmailMessage(
+
+                email = EmailMultiAlternatives(
                     subject=subject,
-                    body=message,
+                    body=message_plain,
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     to=[user_email],
                 )
-                
+                email.attach_alternative(message_html, "text/html")
+
+                email.extra_headers = {
+                    "X-No-Track": "True",
+                    "X-Track-Click": "no",
+                    "o:tracking-clicks": "no",
+                }
+
                 email.send(fail_silently=False)
-                
+
                 logging.info(
                     "Report email sent successfully to %s | report_uuid=%s",
                     user_email,
                     report.uuid,
                 )
-                
+
             except Exception as e:
                 logging.exception("Error sending email report: %s", e)
 
-        report.status = "completed"
+        report.status = "ready"
         report.save()
 
     except Exception as e:
