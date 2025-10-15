@@ -131,15 +131,12 @@ def generate_custom_fields_report(
     project = Project.objects.get(uuid=project_uuid)
     report_generator = ReportFieldsValidatorViewSet()
 
-    # Search the status object
     report_status = ReportStatus.objects.get(uuid=report_status_id)
 
     try:
-        # Update to in_progress
-        report_status.status = "in_progress"
+        report_status.status = "processing"
         report_status.save()
 
-        # Generate the report: filter only known models and ignore auxiliary keys (ex.: 'type')
         from chats.apps.api.v1.dashboard.presenter import ModelFieldsPresenter
 
         available_fields = ModelFieldsPresenter.get_models_info()
@@ -148,12 +145,10 @@ def generate_custom_fields_report(
         }
         report_data = report_generator._generate_report_data(models_config, project)
 
-        # Generate in XLSX (default) or CSV
         file_type = _norm_file_type(fields_config.get("_file_type"))
         output = io.BytesIO()
         if file_type == "xlsx":
             with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-                # Write only the rooms sheet
                 model_data = report_data.get("rooms", {})
                 df_data = _strip_tz(model_data.get("data", []))
                 df = pd.DataFrame(df_data)
@@ -185,41 +180,56 @@ def generate_custom_fields_report(
                 f.write(output.getvalue())
             logger.info("Custom report saved at: %s", file_path)
 
-        subject = f"Custom report for the project {project.name} - {dt}"
-        message = (
-            f"The custom report for the project {project.name} "
-            "is ready and has been attached to this email."
-        )
-
         if getattr(settings, "REPORTS_SEND_EMAILS", False):
             try:
+                from chats.core.storages import ReportsStorage
+                
+                storage = ReportsStorage()
+                ext = "xlsx" if file_type == "xlsx" else "zip"
+                filename = f"custom_report_{project.uuid}_{dt}.{ext}"
+                
+                output.seek(0)
+                file_path = storage.save(filename, output)
+                
+                download_url = storage.get_download_url(file_path, expiration=int(timedelta(days=7).total_seconds()))
+                
+                logger.info(
+                    "Report uploaded to S3: %s | report_uuid=%s | url=%s",
+                    file_path,
+                    report_status.uuid,
+                    download_url
+                )
+                
+                subject = f"Custom report for the project {project.name} - {dt}"
+                message = (
+                    f"The custom report for the project {project.name} is ready.\n\n"
+                    f"Click the link below to download the report:\n"
+                    f"{download_url}\n\n"
+                    f"This link will expire in 7 days."
+                )
+                
                 email = EmailMessage(
                     subject=subject,
                     body=message,
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     to=[user_email],
                 )
-                output.seek(0)
-                if file_type == "xlsx":
-                    email.attach(
-                        f"custom_report_{dt}.xlsx",
-                        output.getvalue(),
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    )
-                else:
-                    email.attach(
-                        f"custom_report_{dt}.csv", output.getvalue(), "text/csv"
-                    )
+                
                 email.send(fail_silently=False)
+                
+                logger.info(
+                    "Report email sent successfully to %s | report_uuid=%s",
+                    user_email,
+                    report_status.uuid,
+                )
+                
             except Exception as e:
                 logger.exception("Error sending email report: %s", e)
 
-        # Update to ready
-        report_status.status = "ready"
+        report_status.status = "completed"
         report_status.save()
 
     except Exception as e:
-        # Update to failed
         report_status.status = "failed"
         report_status.error_message = str(e)
         report_status.save()
@@ -234,7 +244,6 @@ def process_pending_reports():
     from chats.apps.api.v1.dashboard.presenter import ModelFieldsPresenter
     from chats.apps.api.v1.dashboard.viewsets import ReportFieldsValidatorViewSet
 
-    # Select a pending report safely (avoid concurrency)
     with transaction.atomic():
         # Também reprocessa relatórios 'failed' e 'processing' estagnados
         stale_seconds = getattr(settings, "REPORTS_STALE_SECONDS", None)
@@ -262,13 +271,11 @@ def process_pending_reports():
     project = report.project
     fields_config = report.fields_config or {}
     user_email = report.user.email
-    chunk_size = getattr(settings, "REPORTS_CHUNK_SIZE", 1)
 
     try:
         view = ReportFieldsValidatorViewSet()
         available_fields = ModelFieldsPresenter.get_models_info()
 
-        # Formato final (xlsx ou csv)
         file_type = _norm_file_type(fields_config.get("type"))
         storage = ExcelStorage()
         dt = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
@@ -283,103 +290,54 @@ def process_pending_reports():
             )
         qs = (query_data or {}).get("queryset")
 
-        # Listar partes já existentes para retomar
-        def _list_existing_parts():
-            try:
-                # retorna (subdirs, files) relativos a parts_dir
-                subdirs, files = storage.listdir(parts_dir)
-            except Exception:
-                subdirs, files = [], []
-            files = sorted(
-                [f for f in files if f.startswith("rooms.part") and f.endswith(".csv")]
-            )
-            # reconstruir caminhos completos
-            return [f"{parts_dir}/{name}" for name in files]
+        if file_type == "xlsx":
+            with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+                rooms_cfg = (fields_config or {}).get("rooms") or {}
+                query_data = None
+                if rooms_cfg:
+                    query_data = view._process_model_fields(
+                        "rooms", rooms_cfg, project, available_fields
+                    )
 
-        existing_parts = _list_existing_parts()
-        existing_count = len(existing_parts)
+                qs = (query_data or {}).get("queryset")
+                total_records = qs.count() if qs is not None else 0
+                
+                base_chunk_size = getattr(settings, "REPORTS_CHUNK_SIZE", 5000)
+                chunk_size = base_chunk_size * 2 if total_records > (base_chunk_size * 10) else base_chunk_size
+                logging.info("Report size: %s records, using chunk_size: %s", total_records, chunk_size)
 
-        # Conta exatamente quantas linhas já persistimos nas partes
-        def _count_processed_rows() -> int:
-            total_rows = 0
-            first = True
-            for p in existing_parts:
-                try:
-                    with storage.open(p, "rb") as f:
-                        content = f.read().decode("utf-8")
-                except Exception:
-                    first = False
-                    continue
-                if not content:
-                    first = False
-                    continue
-                lines = [ln for ln in content.splitlines() if ln.strip()]
-                if not lines:
-                    first = False
-                    continue
-                if first:
-                    # primeira parte inclui header
-                    total_rows += max(0, len(lines) - 1)
-                else:
-                    total_rows += len(lines)
-                first = False
-            return total_rows
+                def _write_queryset(sheet_name: str, qs):
+                    total = qs.count()
+                    row_offset = 0
+                    for start in range(0, total, chunk_size):
+                        end = min(start + chunk_size, total)
+                        logging.info(
+                            "Writing chunk: sheet=%s start=%s end=%s total=%s chunk_size=%s",
+                            sheet_name,
+                            start,
+                            end,
+                            total,
+                            chunk_size,
+                        )
+                        chunk = list(qs[start:end])
+                        chunk = _strip_tz(chunk)
+                        if not chunk:
+                            continue
+                        df = pd.DataFrame(chunk)
+                        df = _excel_safe_dataframe(df)
+                        df.to_excel(
+                            writer,
+                            sheet_name=sheet_name[:31],
+                            index=False,
+                            header=(row_offset == 0),
+                            startrow=row_offset if row_offset > 0 else 0,
+                        )
+                        row_offset += len(df)
 
-        next_start = _count_processed_rows()
-        logging.info(
-            "Resuming report: parts=%s, processed_rows=%s, chunk_size=%s",
-            existing_count,
-            next_start,
-            chunk_size,
-        )
-
-        # Função para escrever partes de CSV (header só na primeira parte)
-        def _write_parts_from_queryset(qs):
-            total = qs.count()
-            if total == 0:
-                return
-            part_idx = existing_count
-            header_written = existing_count > 0
-            for start in range(next_start, total, chunk_size):
-                end = min(start + chunk_size, total)
-                # Heartbeat: atualiza modified_on para não ser considerado 'stale'
-                try:
-                    report.save(update_fields=["modified_on"])
-                except Exception:
-                    pass
-                logging.info(
-                    "Writing chunk (part): sheet=%s start=%s end=%s total=%s chunk_size=%s",
-                    "rooms",
-                    start,
-                    end,
-                    total,
-                    chunk_size,
-                )
-                chunk = list(qs[start:end])
-                chunk = _strip_tz(chunk)
-                if not chunk:
-                    continue
-                df = pd.DataFrame(chunk)
-                df = _excel_safe_dataframe(df)
-                csv_str = df.to_csv(index=False, header=(not header_written))
-                part_name = f"{parts_dir}/rooms.part{part_idx:06d}.csv"
-                storage.save(part_name, ContentFile(csv_str.encode("utf-8")))
-                header_written = True
-                part_idx += 1
-
-        # Geração de partes (se houver queryset)
-        if qs is not None:
-            _write_parts_from_queryset(qs)
-
-        # Finalização: montar arquivo final a partir das partes
-        def _finalize_from_parts() -> bytes:
-            parts = _list_existing_parts()
-            if file_type == "xlsx":
-                out = io.BytesIO()
-                with pd.ExcelWriter(out, engine="xlsxwriter") as writer:
-                    current_row = 0
-                    if not parts:
-                        # somente headers (se fornecidos)
+                if qs is not None:
+                    if qs.count() > 0:
+                        _write_queryset("rooms", qs)
+                    else:
                         requested_fields = rooms_cfg.get("fields") or []
                         pd.DataFrame(columns=requested_fields).to_excel(
                             writer, sheet_name="rooms", index=False
@@ -419,22 +377,54 @@ def process_pending_reports():
                     if requested_fields:
                         combined.write(",".join(requested_fields) + "\n")
                 else:
-                    first = True
-                    for p in parts:
-                        with storage.open(p, "rb") as f:
-                            content = f.read().decode("utf-8")
-                        if not content:
-                            continue
-                        if first:
-                            combined.write(content)
-                            first = False
-                        else:
-                            content = content.split("\n", 1)[1] if "\n" in content else ""
-                            combined.write(content)
-                return combined.getvalue().encode("utf-8")
+                    pd.DataFrame().to_excel(writer, sheet_name="rooms", index=False)
+        else:
+            csv_buffers = {}
 
-        final_bytes = _finalize_from_parts()
-        output = io.BytesIO(final_bytes)
+            def _write_csv_queryset(sheet_name: str, qs):
+                total = qs.count()
+                row_offset = 0
+                buf = csv_buffers.get(sheet_name)
+                if buf is None:
+                    buf = io.StringIO()
+                    csv_buffers[sheet_name] = buf
+                    
+                base_chunk_size = getattr(settings, "REPORTS_CHUNK_SIZE", 5000)
+                chunk_size = base_chunk_size * 2 if total > (base_chunk_size * 10) else base_chunk_size
+                
+                for start in range(0, total, chunk_size):
+                    end = min(start + chunk_size, total)
+                    logging.info(
+                        "Writing chunk (csv): sheet=%s start=%s end=%s total=%s chunk_size=%s",
+                        sheet_name,
+                        start,
+                        end,
+                        total,
+                        chunk_size,
+                    )
+                    chunk = list(qs[start:end])
+                    chunk = _strip_tz(chunk)
+                    if not chunk:
+                        continue
+                    df = pd.DataFrame(chunk)
+                    df = _excel_safe_dataframe(df)
+                    df.to_csv(buf, index=False, header=(row_offset == 0))
+                    row_offset += len(df)
+
+            if "rooms" in (fields_config or {}):
+                query_data = view._process_model_fields(
+                    "rooms", fields_config["rooms"], project, available_fields
+                )
+                if "queryset" in (query_data or {}):
+                    _write_csv_queryset("rooms", query_data["queryset"])
+
+            zip_buf = io.BytesIO()
+            with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                for sheet_name, buf in csv_buffers.items():
+                    zf.writestr(
+                        f"{sheet_name[:31]}.csv", buf.getvalue().encode("utf-8")
+                    )
+            output = zip_buf
 
         if getattr(settings, "REPORTS_SAVE_LOCALLY", True):
             base_dir = getattr(
@@ -457,34 +447,49 @@ def process_pending_reports():
             "Processing report %s for project %s done.", report.uuid, project.uuid
         )
 
-        subject = f"Custom report for the project {project.name} - {dt}"
-        message = (
-            f"The custom report for the project {project.name} "
-            "is ready and has been attached to this email."
-        )
-
         if getattr(settings, "REPORTS_SEND_EMAILS", False):
             try:
+                from chats.core.storages import ReportsStorage
+                
+                storage = ReportsStorage()
+                ext = "xlsx" if file_type == "xlsx" else "zip"
+                filename = f"custom_report_{project.uuid}_{dt}.{ext}"
+                
+                output.seek(0)
+                file_path = storage.save(filename, output)
+                
+                download_url = storage.get_download_url(file_path, expiration=int(timedelta(days=7).total_seconds()))
+                
+                logging.info(
+                    "Report uploaded to S3: %s | report_uuid=%s | url=%s",
+                    file_path,
+                    report.uuid,
+                    download_url
+                )
+                
+                subject = f"Custom report for the project {project.name} - {dt}"
+                message = (
+                    f"The custom report for the project {project.name} is ready.\n\n"
+                    f"Click the link below to download the report:\n"
+                    f"{download_url}\n\n"
+                    f"This link will expire in 7 days."
+                )
+                
                 email = EmailMessage(
                     subject=subject,
                     body=message,
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     to=[user_email],
                 )
-                output.seek(0)
-                if file_type == "xlsx":
-                    email.attach(
-                        f"custom_report_{dt}.xlsx",
-                        output.getvalue(),
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    )
-                else:
-                    email.attach(
-                        f"custom_report_{dt}.csv",
-                        output.getvalue(),
-                        "text/csv",
-                    )
+                
                 email.send(fail_silently=False)
+                
+                logging.info(
+                    "Report email sent successfully to %s | report_uuid=%s",
+                    user_email,
+                    report.uuid,
+                )
+                
             except Exception as e:
                 logging.exception("Error sending email report: %s", e)
 

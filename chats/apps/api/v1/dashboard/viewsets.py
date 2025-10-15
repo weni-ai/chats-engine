@@ -28,7 +28,7 @@ from chats.apps.api.v1.dashboard.serializers import (
 )
 from chats.apps.dashboard.models import ReportStatus
 from chats.apps.projects.models import Project, ProjectPermission
-from chats.core.excel_storage import ExcelStorage
+from chats.core.storages import ExcelStorage
 
 from .dto import Filters, should_exclude_admin_domains
 from .presenter import ModelFieldsPresenter
