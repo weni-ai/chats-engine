@@ -464,341 +464,164 @@ class ModelFieldsViewSet(APIView):
 
 class ReportFieldsValidatorViewSet(APIView):
     """
-    Endpoint para validar campos e gerar consulta para relatório baseado nos campos disponíveis.
+    Endpoint to validate fields and generate rooms report.
     """
 
     permission_classes = [permissions.IsAuthenticated]
 
-    def _get_model_class(self, model_name):
+    def _estimate_execution_time(self, rooms_count):
         """
-        Find the Django model class based on the name
+        Estimate execution time based on rooms count.
         """
-        model_mapping = {
-            "sectors": ("sectors", "Sector"),
-            "queues": ("queues", "Queue"),
-            "rooms": ("rooms", "Room"),
-            "users": ("accounts", "User"),
-            "sector_tags": ("sectors", "SectorTag"),
-            "contacts": ("contacts", "Contact"),
-        }
-
-        if model_name in model_mapping:
-            app_label, model_class_name = model_mapping[model_name]
-            try:
-                return apps.get_model(app_label=app_label, model_name=model_class_name)
-            except LookupError:
-                pass
-
-        common_apps = [
-            "sectors",
-            "msgs",
-            "projects",
-        ]
-        for app in common_apps:
-            try:
-                return apps.get_model(app_label=app, model_name=model_name.capitalize())
-            except LookupError:
-                continue
-
-        return None
-
-    def _get_model_count_for_project(self, model_class, project):
-        """
-        Count records of a specific model for a project
-        """
-        try:
-            model_fields = {
-                field.name: field for field in model_class._meta.get_fields()
-            }
-
-            filters = Q()
-
-            if "project" in model_fields:
-                filters |= Q(project=project)
-            if "sector" in model_fields:
-                filters |= Q(sector__project=project)
-            if "queue" in model_fields:
-                filters |= Q(queue__sector__project=project)
-            if "user" in model_fields:
-                filters |= Q(user__project_permissions__project=project)
-
-            if filters:
-                return model_class.objects.filter(filters).distinct().count()
-            else:
-                total_count = model_class.objects.count()
-                return max(1, total_count // 10)
-
-        except Exception as e:
-            logger.error(f"Erro ao contar registros para {model_class.__name__}: {e}")
-            return 0
-
-    def _estimate_execution_time(self, fields_config, project):
-        """
-        Estimate the execution time based on the volume of data that will be processed
-        """
-        available_models = ModelFieldsPresenter.get_models_info()
-        invalid_models = [
-            model for model in fields_config.keys() if model not in available_models
-        ]
-
-        if invalid_models:
-            raise ValidationError(
-                f"Models not available: {', '.join(invalid_models)}. "
-                f"Models available: {', '.join(sorted(available_models.keys()))}"
-            )
-
-        total_records = 0
-        processed_models = []
-
-        for model_name in fields_config.keys():
-            try:
-                model_class = self._get_model_class(model_name)
-
-                if model_class:
-                    count = self._get_model_count_for_project(model_class, project)
-                    total_records += count
-                    processed_models.append({"model": model_name, "count": count})
-                    logger.info(f"Model {model_name}: {count} records")
-                else:
-                    logger.warning(f"Model {model_name} not found")
-
-            except Exception as e:
-                logger.error(f"Error processing model {model_name}: {e}")
-                continue
-
         base_time = 30
         time_per_1000_records = 45
 
-        complexity_factor = 1 + (len(processed_models) * 0.1)
-
-        if total_records > 0:
-            estimated_time = (
-                base_time + (total_records / 1000) * time_per_1000_records
-            ) * complexity_factor
+        if rooms_count > 0:
+            estimated_time = base_time + (rooms_count / 1000) * time_per_1000_records
         else:
             estimated_time = base_time
 
         final_estimate = max(30, min(int(estimated_time), 600))
-
-        logger.info(
-            f"Estimated time: {final_estimate}s for {total_records} records in {len(processed_models)} models"
-        )
-
+        logger.info(f"Estimated time: {final_estimate}s for {rooms_count} rooms")
         return final_estimate
 
-    def _get_base_queryset(self, model_name, project):
+    def _get_rooms_queryset(self, project):
         """
-        Return the base queryset for any model returned by the ModelFieldsPresenter
+        Return base queryset for rooms in the project.
         """
-        available_fields = ModelFieldsPresenter.get_models_info()
-
-        if model_name not in available_fields:
-            raise NotFound(f'Model "{model_name}" not found')
-
-        model = self._get_model_class(model_name)
-
-        if model is None:
-            raise NotFound(f'Model "{model_name}" not found')
-
-        queryset = model.objects.all()
-
-        if model_name == "sectors":
-            queryset = queryset.filter(project=project)
-        elif model_name == "queues":
-            queryset = queryset.filter(sector__project=project)
-        elif model_name == "rooms":
-            queryset = queryset.filter(queue__sector__project=project)
-        elif model_name == "contacts":
-            queryset = queryset.filter(rooms__queue__sector__project=project).distinct()
-        elif model_name == "users":
-            queryset = queryset.filter(project_permissions__project=project).distinct()
-        elif model_name == "sector_tags":
-            queryset = queryset.filter(sector__project=project)
-
-        return queryset
+        return Room.objects.filter(queue__sector__project=project)
 
     def _process_model_fields(self, model_name, field_data, project, available_fields):
         """
-        Process the fields of a model and its relationships
+        Process rooms fields and build queryset.
         """
+        if model_name != "rooms":
+            raise NotFound(f'Only "rooms" model is supported, got "{model_name}"')
+        
         if model_name not in available_fields:
             raise NotFound(f'Model "{model_name}" not found')
 
         model_fields = available_fields[model_name]
         query_fields = []
-        related_queries = {}
 
-        for key, value in field_data.items():
-            if key == "fields" and isinstance(value, list):
-                invalid_fields = []
-                for field in value:
-                    if field in model_fields:
-                        continue
-                    if "__" in field:
-                        base_field = field.split("__")[0]
-                        if base_field in model_fields:
-                            continue
-                    invalid_fields.append(field)
+        # Process requested fields
+        fields_list = field_data.get("fields", [])
+        if isinstance(fields_list, list):
+            invalid_fields = []
+            for field in fields_list:
+                if field in model_fields:
+                    continue
+                if "__" in field and field.split("__")[0] in model_fields:
+                    continue
+                invalid_fields.append(field)
 
-                if invalid_fields:
-                    raise NotFound(
-                        f'Invalid fields for {model_name}: {", ".join(invalid_fields)}'
-                    )
-                query_fields.extend(value)
-                if (
-                    model_name == "rooms"
-                    and "contact" in query_fields
-                    and "contact__name" not in query_fields
-                ):
-                    query_fields = [
-                        f if f != "contact" else "contact__name" for f in query_fields
-                    ]
-                if model_name == "rooms" and "queue" in query_fields:
-                    query_fields = [
-                        f if f != "queue" else "queue__name" for f in query_fields
-                    ]
-                if model_name == "rooms" and query_fields:
-                    order_rank = {
-                        "user__first_name": 1,
-                        "user__last_name": 2,
-                        "user__email": 3,
-                        "queue__sector__name": 4,
-                        "queue__name": 5,
-                        "uuid": 6,
-                        "contact__status": 7,
-                        "is_active": 7,
-                        "protocol": 8,
-                        "tags": 9,
-                        "created_on": 10,
-                        "ended_at": 11,
-                        "transfer_history": 12,
-                        "contact__name": 13,
-                        "contact__uuid": 14,
-                        "urn": 15,
-                        "custom_fields": 16,
-                    }
-                    query_fields = sorted(
-                        query_fields, key=lambda f: order_rank.get(f, 999)
-                    )
-            elif key in available_fields:
-                related_queries[key] = self._process_model_fields(
-                    key, value, project, available_fields
-                )
+            if invalid_fields:
+                raise NotFound(f'Invalid fields: {", ".join(invalid_fields)}')
+            
+            query_fields.extend(fields_list)
+            
+            # Replace shorthand fields with full paths
+            if "contact" in query_fields and "contact__name" not in query_fields:
+                query_fields = [f if f != "contact" else "contact__name" for f in query_fields]
+            if "queue" in query_fields:
+                query_fields = [f if f != "queue" else "queue__name" for f in query_fields]
+            
+            # Sort fields in preferred order
+            order_rank = {
+                "user__first_name": 1, "user__last_name": 2, "user__email": 3,
+                "queue__sector__name": 4, "queue__name": 5, "uuid": 6,
+                "contact__status": 7, "is_active": 7, "protocol": 8,
+                "tags": 9, "created_on": 10, "ended_at": 11,
+                "transfer_history": 12, "contact__name": 13, "contact__uuid": 14,
+                "urn": 15, "custom_fields": 16,
+            }
+            query_fields = sorted(query_fields, key=lambda f: order_rank.get(f, 999))
 
-        base_queryset = self._get_base_queryset(model_name, project)
+        # Start with base rooms queryset
+        base_queryset = self._get_rooms_queryset(project)
 
+        # Filter by UUIDs if provided
         uuids = field_data.get("uuids")
-        if isinstance(uuids, list) and uuids:
-            if "__all__" not in uuids:
-                base_queryset = base_queryset.filter(uuid__in=uuids)
+        if isinstance(uuids, list) and uuids and "__all__" not in uuids:
+            base_queryset = base_queryset.filter(uuid__in=uuids)
 
-        if model_name == "rooms":
-            open_chats = field_data.get("open_chats")
-            closed_chats = field_data.get("closed_chats")
-            if open_chats is True and closed_chats is True:
-                raise ValidationError(
-                    "open_chats and closed_chats cannot be used together."
+        # Validate open/closed chats filters
+        open_chats = field_data.get("open_chats")
+        closed_chats = field_data.get("closed_chats")
+        if open_chats is True and closed_chats is True:
+            raise ValidationError("open_chats and closed_chats cannot be used together.")
+
+        # Apply date filters
+        start_date = field_data.get("start_date")
+        end_date = field_data.get("end_date")
+        if start_date and end_date:
+            tz = project.timezone
+            start_dt = pendulum.parse(start_date).replace(tzinfo=tz)
+            end_dt = pendulum.parse(end_date + " 23:59:59").replace(tzinfo=tz)
+            
+            if open_chats is True:
+                base_queryset = base_queryset.filter(created_on__range=[start_dt, end_dt])
+            elif closed_chats and not open_chats:
+                base_queryset = base_queryset.filter(
+                    is_active=False,
+                    ended_at__range=[start_dt, end_dt],
+                )
+            else:
+                base_queryset = base_queryset.filter(
+                    Q(created_on__range=[start_dt, end_dt]) | Q(ended_at__range=[start_dt, end_dt])
                 )
 
-        if model_name == "rooms":
-            start_date = field_data.get("start_date")
-            end_date = field_data.get("end_date")
-            if start_date and end_date:
-                tz = project.timezone
-                start_dt = pendulum.parse(start_date).replace(tzinfo=tz)
-                end_dt = pendulum.parse(end_date + " 23:59:59").replace(tzinfo=tz)
-                if open_chats is True:
-                    base_queryset = base_queryset.filter(
-                        created_on__range=[start_dt, end_dt]
-                    )
-                elif closed_chats and not open_chats:
-                    base_queryset = base_queryset.filter(
-                        is_active=False,
-                        ended_at__range=[start_dt, end_dt],
-                    )
-                else:
-                    base_queryset = base_queryset.filter(
-                        Q(created_on__range=[start_dt, end_dt])
-                        | Q(ended_at__range=[start_dt, end_dt])
-                    )
-        else:
-            start_date = field_data.get("start_date")
-            end_date = field_data.get("end_date")
-            if start_date and end_date:
-                try:
-                    tz = project.timezone
-                    start_dt = pendulum.parse(start_date).replace(tzinfo=tz)
-                    end_dt = pendulum.parse(end_date + " 23:59:59").replace(tzinfo=tz)
-                    model_obj = base_queryset.model
-                    model_field_names = {f.name for f in model_obj._meta.get_fields()}
-                    if "created_on" in model_field_names:
-                        base_queryset = base_queryset.filter(
-                            created_on__range=[start_dt, end_dt]
-                        )
-                except Exception:
-                    pass
+        # Helper to normalize filter values
+        def _norm_list(value):
+            if value is None:
+                return []
+            if isinstance(value, (list, tuple, set)):
+                out = []
+                for item in value:
+                    if isinstance(item, dict):
+                        out.append(str(item.get("uuid") or item.get("value", "")))
+                    else:
+                        out.append(str(item))
+                return [] if any(str(x).strip() == "__all__" for x in out) else out
+            if isinstance(value, dict):
+                if "uuids" in value:
+                    vals = [str(v) for v in value["uuids"]]
+                    return [] if any(v.strip() == "__all__" for v in vals) else vals
+                if "uuid" in value:
+                    v = str(value["uuid"])
+                    return [] if v.strip() == "__all__" else [v]
+                if "value" in value:
+                    v = str(value["value"])
+                    return [] if v.strip() == "__all__" else [v]
+                return []
+            v = str(value)
+            return [] if v.strip() == "__all__" else [v]
 
-        if model_name == "rooms":
+        # Apply filters for sectors, queues, agents, tags
+        sectors = _norm_list(field_data.get("sectors") or field_data.get("sector"))
+        queues = _norm_list(field_data.get("queues") or field_data.get("queue"))
+        agents = _norm_list(field_data.get("agents") or field_data.get("agent"))
+        tags = _norm_list(field_data.get("tags") or field_data.get("tag"))
 
-            def _norm_list(value):
-                """
-                Accepts: list/tuple/set, single str/uuid, dicts like {'uuids': [...]} or {'uuid': '...'}.
-                Returns: flat list[str]. If contains "__all__", ignore the filter (return []).
-                """
-                if value is None:
-                    return []
-                if isinstance(value, (list, tuple, set)):
-                    out = []
-                    for item in value:
-                        if isinstance(item, dict):
-                            if "uuid" in item:
-                                out.append(str(item["uuid"]))
-                            elif "value" in item:
-                                out.append(str(item["value"]))
-                        else:
-                            out.append(str(item))
-                    if any(str(x).strip() == "__all__" for x in out):
-                        return []
-                    return out
-                if isinstance(value, dict):
-                    if "uuids" in value and isinstance(
-                        value["uuids"], (list, tuple, set)
-                    ):
-                        vals = [str(v) for v in value["uuids"]]
-                        return [] if any(v.strip() == "__all__" for v in vals) else vals
-                    if "uuid" in value:
-                        v = str(value["uuid"])
-                        return [] if v.strip() == "__all__" else [v]
-                    if "value" in value:
-                        v = str(value["value"])
-                        return [] if v.strip() == "__all__" else [v]
-                    return []
-                v = str(value)
-                return [] if v.strip() == "__all__" else [v]
+        if sectors:
+            base_queryset = base_queryset.filter(queue__sector__uuid__in=sectors)
+        if queues:
+            base_queryset = base_queryset.filter(queue__uuid__in=queues)
+        if agents:
+            base_queryset = base_queryset.filter(user__uuid__in=agents)
+        if tags:
+            base_queryset = base_queryset.filter(tags__name__in=tags)
 
-            sectors = _norm_list(field_data.get("sectors") or field_data.get("sector"))
-            queues = _norm_list(field_data.get("queues") or field_data.get("queue"))
-            agents = _norm_list(field_data.get("agents") or field_data.get("agent"))
-            tags = _norm_list(field_data.get("tags") or field_data.get("tag"))
-
-            if sectors:
-                base_queryset = base_queryset.filter(queue__sector__uuid__in=sectors)
-            if queues:
-                base_queryset = base_queryset.filter(queue__uuid__in=queues)
-            if agents:
-                base_queryset = base_queryset.filter(user__uuid__in=agents)
-            if tags:
-                base_queryset = base_queryset.filter(tags__name__in=tags)
-
+        # Apply field selection and special handling for tags
         if query_fields:
-            if model_name == "rooms" and "tags" in query_fields:
+            if "tags" in query_fields:
                 base_queryset = base_queryset.annotate(
                     tags_list=ArrayAgg("tags__name", distinct=True)
                 )
                 query_fields = ["tags_list" if f == "tags" else f for f in query_fields]
             base_queryset = base_queryset.values(*query_fields)
 
-        return {"queryset": base_queryset, "related": related_queries}
+        return {"queryset": base_queryset, "related": {}}
 
     def _group_duplicate_records(self, raw_data):
         """
