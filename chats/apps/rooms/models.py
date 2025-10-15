@@ -28,10 +28,10 @@ from chats.apps.rooms.exceptions import (
 )
 from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
+from chats.apps.queues.models import Queue
 
 if TYPE_CHECKING:
     from chats.apps.projects.models.models import Project
-    from chats.apps.queues.models import Queue
 
 
 logger = logging.getLogger(__name__)
@@ -121,7 +121,7 @@ class Room(BaseModel, BaseConfigurableModel):
         _("Added to queue at"), null=True, blank=True
     )
 
-    tracker = FieldTracker(fields=["user"])
+    tracker = FieldTracker(fields=["user", "queue"])
 
     @property
     def is_billing_notified(self) -> bool:
@@ -225,7 +225,16 @@ class Room(BaseModel, BaseConfigurableModel):
 
         is_new = self._state.adding
 
+        queue_has_changed = self.tracker.has_changed("queue")
+        old_queue = self.tracker.previous("queue")
+
         super().save(*args, **kwargs)
+
+        if queue_has_changed and old_queue and self.queue:
+            old_queue = Queue.objects.get(pk=old_queue)
+
+            if old_queue.sector != self.queue.sector:
+                self.tags.clear()
 
         self._update_agent_service_status(is_new)
 

@@ -330,6 +330,41 @@ class TestRoomModel(TransactionTestCase):
 
         mock_send_automatic_message.assert_not_called()
 
+    def test_change_queue_without_changing_sector(self):
+        other_queue = Queue.objects.create(sector=self.sector, name="Other Queue")
+        tags = SectorTag.objects.create(sector=self.sector, name="Test Tag")
+
+        room = Room.objects.create(queue=self.queue)
+        room.tags.add(tags)
+        self.assertEqual(room.tags.count(), 1)
+
+        room.queue = other_queue
+        room.save()
+
+        self.assertEqual(room.tags.count(), 1)
+
+    def test_change_queue_changing_sector(self):
+        other_queue = Queue.objects.create(
+            sector=Sector.objects.create(
+                project=self.project,
+                name="Other Sector",
+                rooms_limit=10,
+                work_start="09:00",
+                work_end="18:00",
+            ),
+            name="Other Queue",
+        )
+        tags = SectorTag.objects.create(sector=self.sector, name="Test Tag")
+
+        room = Room.objects.create(queue=self.queue)
+        room.tags.add(tags)
+        self.assertEqual(room.tags.count(), 1)
+
+        room.queue = other_queue
+        room.save()
+
+        self.assertEqual(room.tags.count(), 0)
+
 
 class TestHandleRoomCloseTags(TransactionTestCase):
     def setUp(self):
