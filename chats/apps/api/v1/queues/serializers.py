@@ -11,6 +11,9 @@ User = get_user_model()
 class QueueSerializer(serializers.ModelSerializer):
 
     sector_name = serializers.CharField(source="sector.name", read_only=True)
+    required_tags = serializers.BooleanField(
+        source="sector.required_tags", read_only=True
+    )
 
     class Meta:
         model = Queue
@@ -62,7 +65,15 @@ class QueueReadOnlyListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Queue
-        fields = ["uuid", "name", "agents", "created_on", "sector_name", "sector_uuid"]
+        fields = [
+            "uuid",
+            "name",
+            "agents",
+            "created_on",
+            "sector_name",
+            "sector_uuid",
+            "required_tags",
+        ]
 
     def get_agents(self, queue: Queue):
         return queue.agent_count
