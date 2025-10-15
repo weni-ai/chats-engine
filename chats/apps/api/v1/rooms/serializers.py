@@ -19,7 +19,8 @@ from chats.apps.history.filters.rooms_filter import (
     get_history_rooms_queryset_by_contact,
 )
 from chats.apps.queues.models import Queue
-from chats.apps.rooms.models import Room, RoomNote, RoomPin
+from chats.apps.rooms.models import Room, RoomPin, RoomNote
+from chats.apps.sectors.models import SectorTag
 
 
 logger = logging.getLogger(__name__)
@@ -456,6 +457,12 @@ class PinRoomSerializer(serializers.Serializer):
 
     # True to pin, False to unpin
     status = serializers.BooleanField(required=True)
+
+
+class RoomTagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SectorTag
+        fields = ["uuid", "name"]
 
 
 class RoomNoteSerializer(serializers.ModelSerializer):
