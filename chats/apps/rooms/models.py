@@ -9,7 +9,7 @@ import sentry_sdk
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_redis import get_redis_connection
@@ -28,10 +28,10 @@ from chats.apps.rooms.exceptions import (
 )
 from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
+from chats.apps.queues.models import Queue
 
 if TYPE_CHECKING:
     from chats.apps.projects.models.models import Project
-    from chats.apps.queues.models import Queue
 
 
 logger = logging.getLogger(__name__)
@@ -121,7 +121,7 @@ class Room(BaseModel, BaseConfigurableModel):
         _("Added to queue at"), null=True, blank=True
     )
 
-    tracker = FieldTracker(fields=["user"])
+    tracker = FieldTracker(fields=["user", "queue"])
 
     @property
     def is_billing_notified(self) -> bool:
@@ -200,7 +200,7 @@ class Room(BaseModel, BaseConfigurableModel):
         ]
 
     def save(self, *args, **kwargs) -> None:
-        if self.__original_is_active is False:
+        if self._state.adding is False and self.__original_is_active is False:
             raise ValidationError({"detail": _("Closed rooms cannot receive updates")})
 
         if self._state.adding:
@@ -225,11 +225,20 @@ class Room(BaseModel, BaseConfigurableModel):
 
         is_new = self._state.adding
 
+        queue_has_changed = self.tracker.has_changed("queue")
+        old_queue = self.tracker.previous("queue")
+
         super().save(*args, **kwargs)
+
+        if queue_has_changed and old_queue and self.queue:
+            old_queue = Queue.objects.get(pk=old_queue)
+
+            if old_queue.sector != self.queue.sector:
+                self.tags.clear()
 
         self._update_agent_service_status(is_new)
 
-    def send_automatic_message(self, delay: int = 0):
+    def send_automatic_message(self, delay: int = 0, check_ticket: bool = False):
         from chats.apps.sectors.tasks import send_automatic_message
 
         if (
@@ -243,6 +252,7 @@ class Room(BaseModel, BaseConfigurableModel):
                     self.uuid,
                     self.queue.sector.automatic_message_text,
                     self.user.id,
+                    check_ticket,
                 ],
                 countdown=delay,
             )
@@ -323,6 +333,16 @@ class Room(BaseModel, BaseConfigurableModel):
             .order_by("-created_on")[:5]
         )
 
+    def _handle_close_tags(self, tags: list):
+        current_tag_ids = set(
+            [str(tag_uuid) for tag_uuid in self.tags.values_list("uuid", flat=True)]
+        )
+        new_tag_ids = set(tags) - current_tag_ids
+        tags_to_remove_ids = current_tag_ids - set([str(tag_uuid) for tag_uuid in tags])
+
+        self.tags.add(*new_tag_ids)
+        self.tags.remove(*tags_to_remove_ids)
+
     def close(self, tags: list = [], end_by: str = ""):
         from chats.apps.projects.usecases.status_service import InServiceStatusService
 
@@ -330,12 +350,13 @@ class Room(BaseModel, BaseConfigurableModel):
         self.ended_at = timezone.now()
         self.ended_by = end_by
 
-        if tags is not None:
-            self.tags.add(*tags)
+        with transaction.atomic():
+            if tags is not None:
+                self._handle_close_tags(tags)
 
-        self.clear_pins()
+            self.clear_pins()
 
-        self.save()
+            self.save()
 
         if self.user:
             project = None
