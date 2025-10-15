@@ -10,19 +10,15 @@ import pandas as pd
 from django.conf import settings
 from django.core.mail import EmailMessage
 from django.db import transaction
-from django.db.models import Q
-from django.core.files.base import ContentFile
 
 from chats.apps.dashboard.models import ReportStatus, RoomMetrics
 from chats.apps.dashboard.utils import (
     calculate_last_queue_waiting_time,
     calculate_response_time,
-    calculate_first_response_time,
 )
 from chats.apps.projects.models import Project
 from chats.apps.rooms.models import Room
 from chats.celery import app
-from chats.core.excel_storage import ExcelStorage
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +77,10 @@ def generate_metrics(room_uuid: UUID):
     metric_room = RoomMetrics.objects.get_or_create(room=room)[0]
     metric_room.message_response_time = calculate_response_time(room)
     metric_room.interaction_time = interaction_time.total_seconds()
+
+    if not room.user:
+        metric_room.waiting_time += calculate_last_queue_waiting_time(room)
+
     metric_room.save()
 
 
@@ -90,33 +90,6 @@ def close_metrics(room_uuid: UUID):
     Close metrics for a room.
     """
     generate_metrics(room_uuid)
-
-
-@app.task(name="calculate_first_response_time_task")
-def calculate_first_response_time_task(room_uuid: UUID):
-    """
-    Calculate and save the first response time for a room.
-    Called when the agent sends their first message.
-    """
-    try:
-        room = Room.objects.get(uuid=room_uuid)
-        
-        metric_room = RoomMetrics.objects.get_or_create(room=room)[0]
-        
-        if metric_room.first_response_time is None:
-            metric_room.first_response_time = calculate_first_response_time(room)
-            metric_room.save(update_fields=['first_response_time'])
-            
-            logger.info(
-                f"First response time calculated for room {room_uuid}: "
-                f"{metric_room.first_response_time} seconds"
-            )
-    except Room.DoesNotExist:
-        logger.error(f"Room {room_uuid} not found when calculating first response time")
-    except Exception as e:
-        logger.error(
-            f"Error calculating first response time for room {room_uuid}: {str(e)}"
-        )
 
 
 @app.task
@@ -156,12 +129,14 @@ def generate_custom_fields_report(
                 if not df.empty:
                     df.to_excel(writer, sheet_name="rooms", index=False)
         else:
-            csv_buf = io.BytesIO()
-            df_data = _strip_tz(report_data.get("rooms", {}).get("data", []))
-            df = pd.DataFrame(df_data)
-            df = _excel_safe_dataframe(df)
-            csv_buf.write(df.to_csv(index=False).encode("utf-8"))
-            output = csv_buf
+            zip_buf = io.BytesIO()
+            with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                df_data = _strip_tz(report_data.get("rooms", {}).get("data", []))
+                df = pd.DataFrame(df_data)
+                df = _excel_safe_dataframe(df)
+                if not df.empty:
+                    zf.writestr("rooms.csv", df.to_csv(index=False).encode("utf-8"))
+            output = zip_buf
 
         dt = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
         if getattr(settings, "REPORTS_SAVE_LOCALLY", True):
@@ -171,7 +146,7 @@ def generate_custom_fields_report(
                 os.path.join(settings.MEDIA_ROOT, "reports"),
             )
             os.makedirs(base_dir, exist_ok=True)
-            ext = "xlsx" if file_type == "xlsx" else "csv"
+            ext = "xlsx" if file_type == "xlsx" else "zip"
             filename = f"custom_report_{project.uuid}_{dt}.{ext}"
             filename = filename.replace("/", "-").replace("\\", "-")
             output.seek(0)
@@ -245,27 +220,16 @@ def process_pending_reports():
     from chats.apps.api.v1.dashboard.viewsets import ReportFieldsValidatorViewSet
 
     with transaction.atomic():
-        # Também reprocessa relatórios 'failed' e 'processing' estagnados
-        stale_seconds = getattr(settings, "REPORTS_STALE_SECONDS", None)
-        if stale_seconds is not None:
-            stale_after = datetime.now(timezone.utc) - timedelta(seconds=stale_seconds)
-        else:
-            stale_after = datetime.now(timezone.utc) - timedelta(
-                minutes=getattr(settings, "REPORTS_STALE_MINUTES", 1)
-            )
         report = (
             ReportStatus.objects.select_for_update(skip_locked=True)
-            .filter(
-                Q(status__in=["pending", "failed"])
-                | Q(status="in_progress", modified_on__lt=stale_after)  # Corrigir aqui
-            )
+            .filter(status="pending")
             .order_by("created_on")
             .first()
         )
         if not report:
             logging.info("No pending reports to process.")
             return
-        report.status = "in_progress"
+        report.status = "processing"
         report.save()
 
     project = report.project
@@ -277,18 +241,7 @@ def process_pending_reports():
         available_fields = ModelFieldsPresenter.get_models_info()
 
         file_type = _norm_file_type(fields_config.get("type"))
-        storage = ExcelStorage()
-        dt = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
-        parts_dir = f"reports/{project.uuid}/{report.uuid}/tmp"
-
-        # rooms queryset (única aba suportada)
-        rooms_cfg = (fields_config or {}).get("rooms") or {}
-        query_data = None
-        if rooms_cfg:
-            query_data = view._process_model_fields(
-                "rooms", rooms_cfg, project, available_fields
-            )
-        qs = (query_data or {}).get("queryset")
+        output = io.BytesIO()
 
         if file_type == "xlsx":
             with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
@@ -342,40 +295,6 @@ def process_pending_reports():
                         pd.DataFrame(columns=requested_fields).to_excel(
                             writer, sheet_name="rooms", index=False
                         )
-                    else:
-                        first = True
-                        for p in parts:
-                            with storage.open(p, "rb") as f:
-                                content = f.read().decode("utf-8")
-                            if not content:
-                                continue
-                            if not first and "\n" in content:
-                                content = content.split("\n", 1)[1]
-                            if not content.strip():
-                                first = False
-                                continue
-                            df = pd.read_csv(io.StringIO(content))
-                            if df.empty:
-                                first = False
-                                continue
-                            df.to_excel(
-                                writer,
-                                sheet_name="rooms",
-                                index=False,
-                                header=(current_row == 0),
-                                startrow=current_row if current_row > 0 else 0,
-                            )
-                            current_row += len(df)
-                            first = False
-                out.seek(0)
-                return out.getvalue()
-            else:
-                # CSV puro (concatena partes, preserva header da primeira)
-                combined = io.StringIO()
-                if not parts:
-                    requested_fields = rooms_cfg.get("fields") or []
-                    if requested_fields:
-                        combined.write(",".join(requested_fields) + "\n")
                 else:
                     pd.DataFrame().to_excel(writer, sheet_name="rooms", index=False)
         else:
@@ -426,6 +345,7 @@ def process_pending_reports():
                     )
             output = zip_buf
 
+        dt = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
         if getattr(settings, "REPORTS_SAVE_LOCALLY", True):
             base_dir = getattr(
                 settings,
@@ -433,7 +353,7 @@ def process_pending_reports():
                 os.path.join(settings.MEDIA_ROOT, "reports"),
             )
             os.makedirs(base_dir, exist_ok=True)
-            ext = "xlsx" if file_type == "xlsx" else "csv"
+            ext = "xlsx" if file_type == "xlsx" else "zip"
             filename = f"custom_report_{project.uuid}_{dt}.{ext}"
             filename = filename.replace("/", "-").replace("\\", "-")
             output.seek(0)
@@ -493,7 +413,7 @@ def process_pending_reports():
             except Exception as e:
                 logging.exception("Error sending email report: %s", e)
 
-        report.status = "ready"
+        report.status = "completed"
         report.save()
 
     except Exception as e:
