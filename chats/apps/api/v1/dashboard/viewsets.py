@@ -781,7 +781,16 @@ class ReportFieldsValidatorViewSet(APIView):
 
             fields_config = {"rooms": fields_config.get("rooms", {})}
 
-            estimated_time = self._estimate_execution_time(fields_config, project)
+            # Calculate rooms count for time estimation
+            try:
+                available_fields = ModelFieldsPresenter.get_models_info()
+                rooms_config = fields_config.get("rooms", {})
+                query_data = self._process_model_fields("rooms", rooms_config, project, available_fields)
+                rooms_count = query_data["queryset"].count() if "queryset" in query_data else 0
+            except Exception:
+                rooms_count = self._get_rooms_queryset(project).count()
+            
+            estimated_time = self._estimate_execution_time(rooms_count)
 
             if file_type:
                 fields_config["type"] = file_type
