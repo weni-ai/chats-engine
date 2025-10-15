@@ -17,6 +17,8 @@ from django.db.models import (
 from django.utils import timezone
 from django.utils.timezone import make_aware
 from django.utils.translation import gettext_lazy as _
+from chats.apps.api.v1.rooms.permissions import CanAddOrRemoveRoomTagPermission
+from chats.core.cache_utils import get_user_id_by_email_cached
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
@@ -24,6 +26,7 @@ from rest_framework.exceptions import NotFound, PermissionDenied, ValidationErro
 from rest_framework.filters import OrderingFilter
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 
@@ -43,7 +46,9 @@ from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1.rooms.pagination import RoomListPagination
 from chats.apps.api.v1.rooms.permissions import RoomNotePermission
 from chats.apps.api.v1.rooms.serializers import (
+    AddRoomTagSerializer,
     ListRoomSerializer,
+    RemoveRoomTagSerializer,
     PinRoomSerializer,
     RoomHistorySummaryFeedbackSerializer,
     RoomHistorySummarySerializer,
@@ -61,6 +66,7 @@ from chats.apps.msgs.models import Message
 from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
+from chats.apps.sectors.models import SectorTag
 from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.exceptions import (
     MaxPinRoomLimitReachedError,
@@ -77,7 +83,6 @@ from chats.apps.rooms.views import (
     update_custom_fields,
     update_flows_custom_fields,
 )
-from chats.core.cache_utils import get_user_id_by_email_cached
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +104,6 @@ class RoomViewset(
     search_fields = ["contact__name", "urn", "protocol", "service_chat"]
     ordering_fields = "__all__"
     ordering = ["user", "-last_interaction", "created_on", "added_to_queue_at"]
-    pagination_class = RoomListPagination
 
     def get_permissions(self):
         permission_classes = [permissions.IsAuthenticated]
@@ -113,6 +117,13 @@ class RoomViewset(
                 api_permissions.IsQueueAgent,
             )
         return [permission() for permission in permission_classes]
+
+    @property
+    def pagination_class(self):
+        if self.action == "list":
+            return RoomListPagination
+
+        return super().pagination_class
 
     def get_queryset(
         self,
@@ -276,6 +287,20 @@ class RoomViewset(
         instance: Room = self.get_object()
 
         tags = request.data.get("tags", None)
+
+        if tags is not None:
+            sector_tags = [
+                str(tag_uuid)
+                for tag_uuid in SectorTag.objects.filter(
+                    sector=instance.queue.sector
+                ).values_list("uuid", flat=True)
+            ]
+
+            if set(tags) - set(sector_tags):
+                raise ValidationError(
+                    {"tags": ["Tag not found for the room's sector"]},
+                    code="tag_not_found",
+                )
 
         with transaction.atomic():
             instance.close(tags, "agent")
@@ -869,6 +894,66 @@ class RoomViewset(
         serializer = self.get_serializer(tags, many=True)
 
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="tags/add",
+        url_name="add-tag",
+        serializer_class=AddRoomTagSerializer,
+        permission_classes=[IsAuthenticated, CanAddOrRemoveRoomTagPermission],
+    )
+    def add_tag(self, request: Request, pk=None) -> Response:
+        room: Room = self.get_object()
+
+        if not room.is_active:
+            raise ValidationError(
+                {"detail": "Room is not active."},
+                code="room_is_not_active",
+            )
+
+        if not room.user or not room.user == request.user:
+            raise PermissionDenied(
+                {"detail": "You are not allowed to add tags to this room."},
+                code="user_is_not_the_room_user",
+            )
+
+        serializer = self.get_serializer(data=request.data, context={"room": room})
+        serializer.is_valid(raise_exception=True)
+
+        sector_tag = serializer.validated_data.get("sector_tag")
+        room.tags.add(sector_tag)
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="tags/remove",
+        url_name="remove-tag",
+        serializer_class=RemoveRoomTagSerializer,
+        permission_classes=[IsAuthenticated, CanAddOrRemoveRoomTagPermission],
+    )
+    def remove_tag(self, request: Request, pk=None) -> Response:
+        room: Room = self.get_object()
+
+        if not room.is_active:
+            raise ValidationError(
+                {"detail": "Room is not active."},
+                code="room_is_not_active",
+            )
+
+        if not room.user or not room.user == request.user:
+            raise PermissionDenied(
+                {"detail": "You are not allowed to remove tags from this room."},
+                code="user_is_not_the_room_user",
+            )
+
+        serializer = self.get_serializer(data=request.data, context={"room": room})
+        serializer.is_valid(raise_exception=True)
+        sector_tag = serializer.validated_data.get("sector_tag")
+        room.tags.remove(sector_tag)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(
         detail=True,

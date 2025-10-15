@@ -9,7 +9,7 @@ import sentry_sdk
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.serializers.json import DjangoJSONEncoder
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_redis import get_redis_connection
@@ -324,6 +324,16 @@ class Room(BaseModel, BaseConfigurableModel):
             .order_by("-created_on")[:5]
         )
 
+    def _handle_close_tags(self, tags: list):
+        current_tag_ids = set(
+            [str(tag_uuid) for tag_uuid in self.tags.values_list("uuid", flat=True)]
+        )
+        new_tag_ids = set(tags) - current_tag_ids
+        tags_to_remove_ids = current_tag_ids - set([str(tag_uuid) for tag_uuid in tags])
+
+        self.tags.add(*new_tag_ids)
+        self.tags.remove(*tags_to_remove_ids)
+
     def close(self, tags: list = [], end_by: str = ""):
         from chats.apps.projects.usecases.status_service import InServiceStatusService
 
@@ -331,12 +341,13 @@ class Room(BaseModel, BaseConfigurableModel):
         self.ended_at = timezone.now()
         self.ended_by = end_by
 
-        if tags is not None:
-            self.tags.add(*tags)
+        with transaction.atomic():
+            if tags is not None:
+                self._handle_close_tags(tags)
 
-        self.clear_pins()
+            self.clear_pins()
 
-        self.save()
+            self.save()
 
         if self.user:
             project = None
