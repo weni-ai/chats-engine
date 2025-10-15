@@ -58,10 +58,11 @@ class QueueUpdateSerializer(serializers.ModelSerializer):
 class QueueReadOnlyListSerializer(serializers.ModelSerializer):
     agents = serializers.SerializerMethodField()
     sector_name = serializers.CharField(source="sector.name", read_only=True)
+    sector_uuid = serializers.CharField(source="sector.uuid", read_only=True)
 
     class Meta:
         model = Queue
-        fields = ["uuid", "name", "agents", "created_on", "sector_name"]
+        fields = ["uuid", "name", "agents", "created_on", "sector_name", "sector_uuid"]
 
     def get_agents(self, queue: Queue):
         return queue.agent_count

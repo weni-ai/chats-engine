@@ -115,7 +115,7 @@ class Message(BaseModelWithManualCreatedOn):
                 status_forcelist=getattr(
                     settings,
                     "CALLBACK_RETRYABLE_STATUS_CODES",
-                    [429, 500, 502, 503, 504],
+                    [429, 500, 502, 503, 504, 404],
                 ),
                 method_whitelist=["POST"],
             )
@@ -200,6 +200,12 @@ class MessageMedia(BaseModelWithManualCreatedOn):
     class Meta:
         verbose_name = _("MessageMedia")
         verbose_name_plural = _("MessageMedias")
+        indexes = [
+            models.Index(
+                fields=["content_type"],
+                name="message_media_content_type_idx",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.message.pk} - {self.url}"

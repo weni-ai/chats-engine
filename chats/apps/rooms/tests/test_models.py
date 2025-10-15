@@ -267,7 +267,7 @@ class TestRoomModel(TransactionTestCase):
         self.assertEqual(room.full_transfer_history, [feedback, other_feedback])
         self.assertEqual(room.transfer_history, other_feedback)
 
-    @patch("chats.apps.sectors.tasks.send_automatic_message.delay")
+    @patch("chats.apps.sectors.tasks.send_automatic_message.apply_async")
     def test_send_automatic_message_when_room_is_created_with_user(
         self, mock_send_automatic_message
     ):
@@ -284,10 +284,11 @@ class TestRoomModel(TransactionTestCase):
         room.send_automatic_message()
 
         mock_send_automatic_message.assert_called_once_with(
-            room.uuid, self.sector.automatic_message_text, user.id
+            args=[room.uuid, self.sector.automatic_message_text, user.id, False],
+            countdown=0,
         )
 
-    @patch("chats.apps.sectors.tasks.send_automatic_message.delay")
+    @patch("chats.apps.sectors.tasks.send_automatic_message.apply_async")
     def test_send_automatic_message_when_room_is_updated_with_user(
         self, mock_send_automatic_message
     ):
@@ -309,10 +310,11 @@ class TestRoomModel(TransactionTestCase):
         room.send_automatic_message()
 
         mock_send_automatic_message.assert_called_once_with(
-            room.uuid, self.sector.automatic_message_text, user.id
+            args=[room.uuid, self.sector.automatic_message_text, user.id, False],
+            countdown=0,
         )
 
-    @patch("chats.apps.sectors.tasks.send_automatic_message.delay")
+    @patch("chats.apps.sectors.tasks.send_automatic_message.apply_async")
     def test_do_not_send_automatic_message_when_sector_automatic_message_is_not_active(
         self, mock_send_automatic_message
     ):
@@ -362,3 +364,65 @@ class TestRoomModel(TransactionTestCase):
         room.save()
 
         self.assertEqual(room.tags.count(), 0)
+
+
+class TestHandleRoomCloseTags(TransactionTestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(
+            name="Test Queue",
+            sector=self.sector,
+        )
+        self.room = Room.objects.create(queue=self.queue)
+        self.tags = [
+            SectorTag.objects.create(name="Test Tag 1", sector=self.sector),
+        ]
+        self.room.tags.add(self.tags[0])
+
+    def test_handle_close_tags_adding_a_new_tag_and_keeping_the_current(self):
+        close_tags = [
+            self.tags[0].uuid,
+            SectorTag.objects.create(name="Test Tag 2", sector=self.sector).uuid,
+        ]
+
+        self.assertEqual(
+            list(self.room.tags.values_list("uuid", flat=True)), [self.tags[0].uuid]
+        )
+        self.room._handle_close_tags(close_tags)
+
+        self.assertEqual(
+            list(self.room.tags.values_list("uuid", flat=True)), close_tags
+        )
+
+    def test_handle_close_tags_removing_the_current(self):
+        close_tags = []
+
+        self.assertEqual(
+            list(self.room.tags.values_list("uuid", flat=True)), [self.tags[0].uuid]
+        )
+        self.room._handle_close_tags(close_tags)
+
+        self.assertEqual(
+            list(self.room.tags.values_list("uuid", flat=True)), close_tags
+        )
+
+    def test_handle_close_tags_replacing_the_current(self):
+        close_tags = [
+            self.tags[0].uuid,
+        ]
+
+        self.assertEqual(
+            list(self.room.tags.values_list("uuid", flat=True)), [self.tags[0].uuid]
+        )
+        self.room._handle_close_tags(close_tags)
+
+        self.assertEqual(
+            list(self.room.tags.values_list("uuid", flat=True)), close_tags
+        )

@@ -36,7 +36,7 @@ from chats.apps.api.v1.quickmessages.viewsets import (
     QuickMessageViewset,
     SectorQuickMessageViewset,
 )
-from chats.apps.api.v1.rooms.viewsets import RoomViewset
+from chats.apps.api.v1.rooms.viewsets import RoomViewset, RoomNoteViewSet
 from chats.apps.api.v1.sectors.viewsets import (
     SectorAuthorizationViewset,
     SectorHolidayViewSet,
@@ -111,12 +111,13 @@ router.register("accounts/login", LoginViewset)
 router.register("accounts/profile", ProfileViewset)
 router.register("accounts/userdata", UserDataViewset, basename="user_data")
 router.register("room", RoomViewset)
+router.register("room_notes", RoomNoteViewSet)
 router.register("msg", MessageViewset)
 router.register("quick_messages", QuickMessageViewset)
 router.register(
     "sector_quick_messages", SectorQuickMessageViewset, basename="sector_quick_message"
 )
-router.register("media", MessageMediaViewset)
+router.register("media", MessageMediaViewset, basename="media")
 router.register("contact", ContactViewset)
 router.register("history/rooms", HistoryRoomViewset, basename="history_room")
 router.register("discussion", DiscussionViewSet, basename="discussion")

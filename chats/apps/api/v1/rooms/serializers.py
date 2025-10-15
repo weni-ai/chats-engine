@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
@@ -14,8 +15,15 @@ from chats.apps.api.v1.contacts.serializers import ContactRelationsSerializer
 from chats.apps.api.v1.msgs.serializers import MessageSerializer
 from chats.apps.api.v1.queues.serializers import QueueSerializer
 from chats.apps.api.v1.sectors.serializers import DetailSectorTagSerializer
+from chats.apps.history.filters.rooms_filter import (
+    get_history_rooms_queryset_by_contact,
+)
 from chats.apps.queues.models import Queue
-from chats.apps.rooms.models import Room, RoomPin
+from chats.apps.rooms.models import Room, RoomPin, RoomNote
+from chats.apps.sectors.models import SectorTag
+
+
+logger = logging.getLogger(__name__)
 
 
 class RoomMessageStatusSerializer(serializers.Serializer):
@@ -47,6 +55,7 @@ class RoomSerializer(serializers.ModelSerializer):
         required=False, read_only=True, default=list
     )
     added_to_queue_at = serializers.DateTimeField(read_only=True)
+    has_history = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -63,6 +72,7 @@ class RoomSerializer(serializers.ModelSerializer):
             "imported_history_url",
             "full_transfer_history",
             "added_to_queue_at",
+            "has_history",
         ]
 
     def get_is_24h_valid(self, room: Room) -> bool:
@@ -106,6 +116,23 @@ class RoomSerializer(serializers.ModelSerializer):
     def get_can_edit_custom_fields(self, room: Room):
         return room.queue.sector.can_edit_custom_fields
 
+    def get_has_history(self, room: Room) -> bool:
+        request = self.context.get("request")
+
+        if not request:
+            logger.info("[RoomSerializer] No request found for has_history method")
+            return False
+
+        user = getattr(request, "user", None)
+
+        if not user:
+            logger.info("[RoomSerializer] No user found for has_history method")
+            return False
+
+        return get_history_rooms_queryset_by_contact(
+            room.contact, user, room.queue.sector.project
+        ).exists()
+
 
 class ListRoomSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
@@ -124,6 +151,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
     imported_history_url = serializers.CharField(read_only=True, default="")
     is_pinned = serializers.SerializerMethodField()
     added_to_queue_at = serializers.DateTimeField(read_only=True)
+    has_history = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -148,6 +176,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
             "imported_history_url",
             "is_pinned",
             "added_to_queue_at",
+            "has_history",
         ]
 
     def get_user(self, room: Room):
@@ -197,6 +226,23 @@ class ListRoomSerializer(serializers.ModelSerializer):
             return False
 
         return RoomPin.objects.filter(room=room, user=request.user).exists()
+
+    def get_has_history(self, room: Room) -> bool:
+        request = self.context.get("request")
+
+        if not request:
+            logger.info("[RoomSerializer] No request found for has_history method")
+            return False
+
+        user = getattr(request, "user", None)
+
+        if not user:
+            logger.info("[RoomSerializer] No user found for has_history method")
+            return False
+
+        return get_history_rooms_queryset_by_contact(
+            room.contact, user, room.queue.sector.project
+        ).exists()
 
 
 class TransferRoomSerializer(serializers.ModelSerializer):
@@ -411,3 +457,81 @@ class PinRoomSerializer(serializers.Serializer):
 
     # True to pin, False to unpin
     status = serializers.BooleanField(required=True)
+
+
+class RoomTagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SectorTag
+        fields = ["uuid", "name"]
+
+
+class AddOrRemoveTagFromRoomSerializer(serializers.Serializer):
+    uuid = serializers.UUIDField(required=True, allow_null=False)
+
+    def validate(self, attrs):
+        room = self.context.get("room")
+        tag_uuid = attrs.get("uuid")
+
+        sector_tag = SectorTag.objects.filter(
+            uuid=tag_uuid, sector=room.queue.sector
+        ).first()
+
+        if not sector_tag:
+            raise serializers.ValidationError(
+                {"uuid": ["Tag not found for the room's sector"]}, code="tag_not_found"
+            )
+
+        attrs["sector_tag"] = sector_tag
+
+        return super().validate(attrs)
+
+
+class AddRoomTagSerializer(AddOrRemoveTagFromRoomSerializer):
+    uuid = serializers.UUIDField(required=True, allow_null=False)
+
+    def validate(self, attrs):
+        room = self.context.get("room")
+        attrs = super().validate(attrs)
+
+        if room.tags.filter(uuid=attrs["sector_tag"].uuid).exists():
+            raise serializers.ValidationError(
+                {"uuid": ["Tag already exists for the room"]}, code="tag_already_exists"
+            )
+
+        return attrs
+
+
+class RemoveRoomTagSerializer(AddOrRemoveTagFromRoomSerializer):
+    uuid = serializers.UUIDField(required=True, allow_null=False)
+
+    def validate(self, attrs):
+        room = self.context.get("room")
+        attrs = super().validate(attrs)
+
+        if not room.tags.filter(uuid=attrs["sector_tag"].uuid).exists():
+            raise serializers.ValidationError(
+                {"uuid": ["Tag not found for the room"]}, code="tag_not_found"
+            )
+
+        return attrs
+
+
+class RoomNoteSerializer(serializers.ModelSerializer):
+    """
+    Serializer for room notes
+    """
+
+    user = serializers.SerializerMethodField()
+    is_deletable = serializers.ReadOnlyField()
+
+    class Meta:
+        model = RoomNote
+        fields = ["uuid", "created_on", "user", "text", "is_deletable"]
+        read_only_fields = ["uuid", "created_on", "user", "is_deletable"]
+
+    def get_user(self, obj):
+        return {
+            "uuid": str(obj.user.pk),
+            "name": obj.user.full_name,
+            "email": obj.user.email,
+        }
