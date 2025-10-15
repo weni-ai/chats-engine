@@ -9,6 +9,7 @@ from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
+from django.core.serializers.json import DjangoJSONEncoder
 
 from chats.apps.api.v1.prometheus.metrics import (
     ws_active_connections,
@@ -17,8 +18,12 @@ from chats.apps.api.v1.prometheus.metrics import (
     ws_disconnects_total,
     ws_messages_received_total,
 )
+from chats.apps.history.filters.rooms_filter import (
+    get_history_rooms_queryset_by_contact,
+)
 from chats.apps.projects.models.models import ProjectPermission
 from chats.apps.projects.usecases.status_service import InServiceStatusService
+from chats.apps.rooms.models import Room
 from chats.core.cache import CacheClient
 
 logger = logging.getLogger(__name__)
@@ -274,6 +279,32 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             await self.set_connection_check_response(
                 connection_id=event["content"].get("connection_id"), response=True
             )
+        elif "rooms." in event.get("action"):
+            content = event.get("content", {})
+
+            try:
+                if isinstance(content, str):
+                    content = json.loads(content)
+
+                room_uuid = content.get("uuid")
+
+                if not room_uuid:
+                    return self.send_json(event)
+
+                has_history = await self.get_has_history_by_room_uuid(room_uuid)
+                content["has_history"] = has_history
+
+                event["content"] = json.dumps(
+                    content,
+                    sort_keys=True,
+                    indent=1,
+                    cls=DjangoJSONEncoder,
+                )
+            except Exception as e:
+                logger.error(f"Error getting history rooms queryset by contact: {e}")
+                return self.send_json(event)
+
+            await self.send_json(event)
         else:
             await self.send_json(event)
 
@@ -295,6 +326,13 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         """ """
         self.queues = self.permission.queue_ids
         return self.queues
+
+    @database_sync_to_async
+    def get_has_history_by_room_uuid(self, room_uuid: str):
+        room = Room.objects.get(uuid=room_uuid)
+        return get_history_rooms_queryset_by_contact(
+            room.contact, self.user, room.queue.sector.project
+        ).exists()
 
     async def has_other_active_connections(self):
         """
