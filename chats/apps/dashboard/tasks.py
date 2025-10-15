@@ -8,7 +8,7 @@ from uuid import UUID
 
 import pandas as pd
 from django.conf import settings
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
 
 from chats.apps.dashboard.models import ReportStatus, RoomMetrics
@@ -107,7 +107,7 @@ def generate_custom_fields_report(
     report_status = ReportStatus.objects.get(uuid=report_status_id)
 
     try:
-        report_status.status = "processing"
+        report_status.status = "in_progress"
         report_status.save()
 
         from chats.apps.api.v1.dashboard.presenter import ModelFieldsPresenter
@@ -178,20 +178,51 @@ def generate_custom_fields_report(
                 )
 
                 subject = f"Custom report for the project {project.name} - {dt}"
-                message = (
+                
+                # Plain text version (fallback)
+                message_plain = (
                     f"The custom report for the project {project.name} is ready.\n\n"
-                    f"Click the link below to download the report:\n"
+                    f"Copy and paste the URL below to download the report:\n\n"
                     f"{download_url}\n\n"
                     f"This link will expire in 7 days."
                 )
+                
+                # HTML version (primary)
+                message_html = f"""
+<html>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+    <h2>Custom Report Ready</h2>
+    <p>The custom report for the project <strong>{project.name}</strong> is ready.</p>
+    <p>Click the button below to download the report:</p>
+    <p style="margin: 30px 0;">
+        <a href="{download_url}" 
+           style="background-color: #4CAF50; color: white; padding: 12px 24px; 
+                  text-decoration: none; border-radius: 4px; display: inline-block;">
+            Download Report
+        </a>
+    </p>
+    <p style="font-size: 12px; color: #666;">
+        Or copy and paste this URL in your browser:
+    </p>
+    <p style="background: #f4f4f4; padding: 10px; border-left: 3px solid #4CAF50; 
+              word-wrap: break-word; font-family: monospace; font-size: 11px;">
+        {download_url}
+    </p>
+    <p style="font-size: 12px; color: #999;">
+        This link will expire in 7 days.
+    </p>
+</body>
+</html>
+"""
 
-                email = EmailMessage(
+                email = EmailMultiAlternatives(
                     subject=subject,
-                    body=message,
+                    body=message_plain,
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     to=[user_email],
                 )
-                # ADICIONAR ESTAS 5 LINHAS AQUI:
+                email.attach_alternative(message_html, "text/html")
+                
                 email.extra_headers = {
                     "X-No-Track": "True",
                     "X-Track-Click": "no",
@@ -209,7 +240,7 @@ def generate_custom_fields_report(
             except Exception as e:
                 logger.exception("Error sending email report: %s", e)
 
-        report_status.status = "completed"
+        report_status.status = "ready"
         report_status.save()
 
     except Exception as e:
@@ -237,7 +268,7 @@ def process_pending_reports():
         if not report:
             logging.info("No pending reports to process.")
             return
-        report.status = "processing"
+        report.status = "in_progress"
         report.save()
 
     project = report.project
@@ -410,19 +441,51 @@ def process_pending_reports():
                 )
 
                 subject = f"Custom report for the project {project.name} - {dt}"
-                message = (
+                
+                # Plain text version (fallback)
+                message_plain = (
                     f"The custom report for the project {project.name} is ready.\n\n"
-                    f"Click the link below to download the report:\n"
+                    f"Copy and paste the URL below to download the report:\n\n"
                     f"{download_url}\n\n"
                     f"This link will expire in 7 days."
                 )
+                
+                # HTML version (primary)
+                message_html = f"""
+<html>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+    <h2>Custom Report Ready</h2>
+    <p>The custom report for the project <strong>{project.name}</strong> is ready.</p>
+    <p>Click the button below to download the report:</p>
+    <p style="margin: 30px 0;">
+        <a href="{download_url}" 
+           style="background-color: #4CAF50; color: white; padding: 12px 24px; 
+                  text-decoration: none; border-radius: 4px; display: inline-block;">
+            Download Report
+        </a>
+    </p>
+    <p style="font-size: 12px; color: #666;">
+        Or copy and paste this URL in your browser:
+    </p>
+    <p style="background: #f4f4f4; padding: 10px; border-left: 3px solid #4CAF50; 
+              word-wrap: break-word; font-family: monospace; font-size: 11px;">
+        {download_url}
+    </p>
+    <p style="font-size: 12px; color: #999;">
+        This link will expire in 7 days.
+    </p>
+</body>
+</html>
+"""
 
-                email = EmailMessage(
+                email = EmailMultiAlternatives(
                     subject=subject,
-                    body=message,
+                    body=message_plain,
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     to=[user_email],
                 )
+                email.attach_alternative(message_html, "text/html")
+                
                 email.extra_headers = {
                     "X-No-Track": "True",
                     "X-Track-Click": "no",
@@ -440,7 +503,7 @@ def process_pending_reports():
             except Exception as e:
                 logging.exception("Error sending email report: %s", e)
 
-        report.status = "completed"
+        report.status = "ready"
         report.save()
 
     except Exception as e:
