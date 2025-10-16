@@ -82,7 +82,7 @@ class RoomBasicSerializer(serializers.ModelSerializer):
 class RoomDetailSerializer(serializers.ModelSerializer):
     user = UserNameSerializer(many=False, read_only=True)
     contact = serializers.SerializerMethodField()
-    tags = TagSimpleSerializer(many=True, read_only=True)
+    tags = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -103,3 +103,10 @@ class RoomDetailSerializer(serializers.ModelSerializer):
         if obj.protocol:
             contact_data["name"] = f"{contact_data['name']} | {obj.protocol}"
         return contact_data
+
+    def get_tags(self, obj):
+        return TagSimpleSerializer(
+            # Including the (soft) deleted tags
+            SectorTag.all_objects.filter(rooms__in=[obj]),
+            many=True,
+        ).data
