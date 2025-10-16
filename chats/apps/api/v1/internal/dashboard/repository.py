@@ -58,7 +58,11 @@ class AgentRepository:
             rooms_filter["rooms__tags__in"] = filters.tag.split(",")
         
         if filters.agent:
+            print(f"🔥 DEBUG REPOSITORY: filters.agent = '{filters.agent}'")
+            print(f"🔥 DEBUG REPOSITORY: tipo = {type(filters.agent)}")
+            print(f"🔥 DEBUG REPOSITORY: agents_filters ANTES = {agents_filters}")
             agents_filters &= Q(uuid=filters.agent)
+            print(f"🔥 DEBUG REPOSITORY: agents_filters DEPOIS = {agents_filters}")
         
         if filters.start_date and filters.end_date:
             start_time = filters.start_date
@@ -129,6 +133,8 @@ class AgentRepository:
             .values("total")
         )
 
+        print(f"🔥 DEBUG REPOSITORY: Aplicando filter com agents_filters = {agents_filters}")
+        
         agents_query = (
             agents_query.filter(agents_filters)
             .annotate(
@@ -188,6 +194,9 @@ class AgentRepository:
             "avg_interaction_time",
             "custom_status",
         )
+
+        print(f"🔥 DEBUG REPOSITORY: Query SQL = {agents_query.query}")
+        print(f"🔥 DEBUG REPOSITORY: Total resultados = {agents_query.count()}")
 
         return agents_query
 

@@ -31,6 +31,10 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         project = self.get_object()
         params = request.query_params.dict()
 
+        print(f"🔥 DEBUG VIEWSET: params completos = {params}")
+        print(f"🔥 DEBUG VIEWSET: agent param = '{params.get('agent')}'")
+        print(f"🔥 DEBUG VIEWSET: request.query_params = {dict(request.query_params)}")
+
         filters = Filters(
             start_date=params.get("start_date"),
             end_date=params.get("end_date"),
@@ -42,6 +46,8 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
             is_weni_admin=should_exclude_admin_domains(params.get("user_request", "")),
             ordering=params.get("ordering"),
         )
+
+        print(f"🔥 DEBUG VIEWSET: filters.agent = '{filters.agent}'")
 
         agents_service = AgentsService()
         agents_data = agents_service.get_agents_data(filters, project)
