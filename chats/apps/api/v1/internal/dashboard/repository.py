@@ -82,7 +82,7 @@ class AgentRepository:
             agents_query = agents_query.exclude(get_admin_domains_exclude_filter())
 
         if filters.agent:
-            agents_query = agents_query.filter(email=filters.agent)
+            agents_query = agents_query.filter(uuid=filters.agent)
 
         custom_status_subquery = Subquery(
             CustomStatus.objects.filter(
@@ -272,7 +272,7 @@ class AgentRepository:
         if not filters.is_weni_admin:
             agents_query = agents_query.exclude(get_admin_domains_exclude_filter())
         if filters.agent:
-            agents_query = agents_query.filter(email=filters.agent)
+            agents_query = agents_query.filter(uuid=filters.agent)
 
         if agents_filter:
             agents_query = agents_query.filter(**agents_filter).distinct()
