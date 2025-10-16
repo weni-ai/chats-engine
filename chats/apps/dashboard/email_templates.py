@@ -15,7 +15,7 @@ Copy and paste the URL below to download the report:
 
 {download_url}
 
-This link will expire in 7 days."""
+This link will expire in 6 hours."""
 
     html = f"""<html>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
@@ -29,7 +29,7 @@ This link will expire in 7 days."""
         {download_url}
     </p>
     <p style="font-size: 12px; color: #999;">
-        This link will expire in 7 days.
+        This link will expire in 6 hours.
     </p>
 </body>
 </html>"""
