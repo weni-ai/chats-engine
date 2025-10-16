@@ -384,7 +384,16 @@ class DetailSectorTagSerializer(serializers.ModelSerializer):
 class TagSimpleSerializer(serializers.ModelSerializer):
     class Meta:
         model = SectorTag
-        fields = ["uuid", "name"]
+        fields = ["uuid", "name", "is_deleted"]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+
+        if instance.is_deleted:
+            name = data.get("name").split("_is_deleted_")[0]
+            data["name"] = f"{name}"
+
+        return data
 
 
 class SectorAgentsSerializer(serializers.ModelSerializer):
