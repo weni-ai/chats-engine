@@ -50,7 +50,7 @@ class TestIntegratedTicketers(TestCase):
             rooms_limit=5,
             work_start=timezone.now().time(),
             work_end=timezone.now().time(),
-            config={"secondary_project": str(self.secondary_project.uuid)},
+            secondary_project=str(self.secondary_project.uuid),
         )
 
         self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
@@ -192,7 +192,7 @@ class TestIntegratedTicketers(TestCase):
             rooms_limit=5,
             work_start=timezone.now().time(),
             work_end=timezone.now().time(),
-            config={"secondary_project": str(self.secondary_project.uuid)},
+            secondary_project=str(self.secondary_project.uuid),
         )
 
         with self.assertRaises(Exception):
@@ -245,7 +245,7 @@ class TestIntegratedTicketers(TestCase):
             rooms_limit=5,
             work_start=timezone.now().time(),
             work_end=timezone.now().time(),
-            config={"secondary_project": str(another_secondary.uuid)},
+            secondary_project=str(another_secondary.uuid),
         )
 
         mock_response = Mock()
