@@ -1,3 +1,35 @@
+# 3.29.5
+# Add
+ - sector tags requirements for closing rooms
+
+# 3.29.4
+# Add
+ - remove room tags when transfering room to queue in another sector
+
+# 3.29.3
+# Fix
+ - automatic message Flows ticket
+
+# 3.29.2
+# Fix
+ - resolving url in table
+
+# 3.29.1
+# Add
+ - calc the first message from agent
+ - new average waiting time
+ - new fields for on going table
+ - new ordering fields for metrics dashboard
+# Fix
+ - send automatic message when room is created with user
+
+# 3.28.0
+# Add
+ - index to MessageMedia's content_type
+ - content_type filter in message media endpoint
+ - cursor pagination to message media endpoint
+ - user cache in OIDC authentication
+
 # 3.27.0
 # Add
   - flag to indicate if contact has history
