@@ -1,6 +1,6 @@
 from dataclasses import dataclass
-from typing import List
 from chats.apps.projects.models import Project, ProjectPermission
+from typing import List
 
 
 @dataclass

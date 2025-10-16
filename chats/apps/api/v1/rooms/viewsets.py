@@ -969,6 +969,12 @@ class RoomViewset(
                 code="room_is_not_active",
             )
 
+        if not room.user or not room.user == request.user:
+            raise PermissionDenied(
+                {"detail": "You are not allowed to add tags to this room."},
+                code="user_is_not_the_room_user",
+            )
+
         serializer = self.get_serializer(data=request.data, context={"room": room})
         serializer.is_valid(raise_exception=True)
 
@@ -992,6 +998,12 @@ class RoomViewset(
             raise ValidationError(
                 {"detail": "Room is not active."},
                 code="room_is_not_active",
+            )
+
+        if not room.user or not room.user == request.user:
+            raise PermissionDenied(
+                {"detail": "You are not allowed to remove tags from this room."},
+                code="user_is_not_the_room_user",
             )
 
         serializer = self.get_serializer(data=request.data, context={"room": room})

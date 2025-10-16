@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import serializers
 from django.utils import timezone
 
@@ -13,7 +14,7 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
     queue = serializers.CharField(source="queue.name")
     link = serializers.SerializerMethodField()
     duration = serializers.SerializerMethodField()
-    first_response_time = serializers.SerializerMethodField()  # VOLTA para SerializerMethodField
+    first_response_time = serializers.SerializerMethodField()
     waiting_time = serializers.SerializerMethodField()
     queue_time = serializers.SerializerMethodField()
 
@@ -46,7 +47,7 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
     def get_link(self, obj: Room) -> dict:
         return {
             "url": (
-                f"chats:dashboard/view-mode/{obj.user.email}/?room_uuid={obj.uuid}"
+                f"chats:dashboard/view-mode/{obj.user.email}"
                 if obj.user and obj.is_active
                 else None
             ),
@@ -56,33 +57,30 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
     def get_duration(self, obj: Room) -> int:
         if not obj.first_user_assigned_at:
             return None
-        
         if obj.is_active and obj.user:
             return int((timezone.now() - obj.first_user_assigned_at).total_seconds())
         elif not obj.is_active and obj.ended_at:
             return int((obj.ended_at - obj.first_user_assigned_at).total_seconds())
-        
         return None
 
     def get_first_response_time(self, obj: Room) -> int:
         try:
-            # 1. Se tem métrica salva, usa
-            if hasattr(obj, 'metric') and obj.metric.first_response_time > 0:
+            if hasattr(obj, "metric") and obj.metric.first_response_time > 0:
                 return obj.metric.first_response_time
-            
-            # 2. Se está ativa com agente
+
             if obj.first_user_assigned_at and obj.is_active and obj.user:
-                # Verifica se tem mensagens do agente (em qualquer momento)
-                has_any_agent_messages = obj.messages.filter(
-                    user__isnull=False
-                ).exclude(automatic_message__isnull=False).exists()
-                
+                has_any_agent_messages = (
+                    obj.messages.filter(user__isnull=False)
+                    .exclude(automatic_message__isnull=False)
+                    .exists()
+                )
+
                 if has_any_agent_messages:
-                    # Sala legada ou já respondida - ignora
                     return None
-                
-                # Ainda não respondeu - calcula dinamicamente
-                return int((timezone.now() - obj.first_user_assigned_at).total_seconds())
+
+                return int(
+                    (timezone.now() - obj.first_user_assigned_at).total_seconds()
+                )
         except Exception:
             pass
         return None

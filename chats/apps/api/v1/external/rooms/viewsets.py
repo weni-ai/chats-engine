@@ -201,7 +201,10 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
                 and instance.queue.sector.automatic_message_text
             ):
                 transaction.on_commit(
-                    lambda: instance.send_automatic_message(delay=1, check_ticket=True)
+                    lambda: instance.send_automatic_message(
+                        delay=1,
+                        check_ticket=settings.AUTOMATIC_MESSAGE_CHECK_TICKET_ON_ROOM_CREATE,
+                    )
                 )
 
             # [STAGING] Just testing

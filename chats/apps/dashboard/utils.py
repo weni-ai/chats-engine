@@ -72,25 +72,6 @@ def calculate_last_queue_waiting_time(room: "Room"):
     return int((timezone.now() - room.added_to_queue_at).total_seconds())
 
 
-def parse_date_filter(date_value, is_end_date=False, tz=None):
-    """Convert string or datetime to datetime with timezone"""
-    if isinstance(date_value, str):
-        if 'T' in date_value or ':' in date_value:
-            parsed_date = pendulum_parse(date_value)
-        else:
-            if is_end_date:
-                parsed_date = pendulum_parse(date_value + " 23:59:59")
-            else:
-                parsed_date = pendulum_parse(date_value)
-        
-        return parsed_date.replace(tzinfo=tz)
-    else:
-        if is_end_date:
-            return date_value.replace(
-                hour=23, minute=59, second=59, microsecond=999999, tzinfo=tz
-            )
-        return date_value.replace(tzinfo=tz)
-
 def calculate_first_response_time(room: "Room") -> int:
     """
     Calculate the time between agent assignment and first agent message.
@@ -99,10 +80,13 @@ def calculate_first_response_time(room: "Room") -> int:
     if not room.first_user_assigned_at:
         return 0
 
-    first_agent_message = room.messages.filter(
-        user__isnull=False,
-        created_on__gte=room.first_user_assigned_at
-    ).exclude(automatic_message__isnull=False).order_by("created_on").first()
+    first_agent_message = (
+        room.messages.filter(
+            user__isnull=False, created_on__gte=room.first_user_assigned_at
+        )
+        .order_by("created_on")
+        .first()
+    )
 
     if not first_agent_message:
         return 0

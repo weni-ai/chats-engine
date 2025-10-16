@@ -1,7 +1,19 @@
 from django.contrib.postgres.aggregates import JSONBAgg
 from django.contrib.postgres.fields import JSONField
-from django.db.models import Avg, Count, F, OuterRef, Q, Subquery, Case, When, Value, DurationField, Sum, IntegerField
-from django.db.models.functions import JSONObject, Coalesce, Extract
+from django.db.models import (
+    Avg,
+    Case,
+    Count,
+    F,
+    IntegerField,
+    OuterRef,
+    Q,
+    Subquery,
+    Sum,
+    Value,
+    When,
+)
+from django.db.models.functions import Coalesce, Extract, JSONObject
 from django.utils import timezone
 
 from chats.apps.accounts.models import User
@@ -92,31 +104,29 @@ class AgentRepository:
             output_field=JSONField(),
         )
 
-        # Subquery para calcular in_service_time
-        in_service_time_subquery = CustomStatus.objects.filter(
-            user=OuterRef("email"),
-            status_type__project=project,
-            status_type__name="In-Service",
-        ).annotate(
-            time_contribution=Case(
-                # Se está ativo e usuário está ONLINE, calcula tempo desde created_on
-                When(
-                    is_active=True,
-                    user__project_permissions__status="ONLINE",
-                    user__project_permissions__project=project,
-                    then=Extract(timezone.now() - F("created_on"), "epoch")
-                ),
-                # Se não está ativo, usa break_time salvo
-                When(
-                    is_active=False,
-                    then=F("break_time")
-                ),
-                default=Value(0),
-                output_field=IntegerField()
+        in_service_time_subquery = (
+            CustomStatus.objects.filter(
+                user=OuterRef("email"),
+                status_type__project=project,
+                status_type__name="In-Service",
             )
-        ).values("user").annotate(
-            total=Sum("time_contribution")
-        ).values("total")
+            .annotate(
+                time_contribution=Case(
+                    When(
+                        is_active=True,
+                        user__project_permissions__status="ONLINE",
+                        user__project_permissions__project=project,
+                        then=Extract(timezone.now() - F("created_on"), "epoch"),
+                    ),
+                    When(is_active=False, then=F("break_time")),
+                    default=Value(0),
+                    output_field=IntegerField(),
+                )
+            )
+            .values("user")
+            .annotate(total=Sum("time_contribution"))
+            .values("total")
+        )
 
         agents_query = (
             agents_query.filter(agents_filters)
@@ -150,21 +160,21 @@ class AgentRepository:
                 custom_status=custom_status_subquery,
                 time_in_service_order=Coalesce(
                     Subquery(in_service_time_subquery, output_field=IntegerField()),
-                    Value(0)
+                    Value(0),
                 ),
             )
             .distinct()
         )
 
-        # APLICA ORDER_BY ANTES DO .VALUES()
         if filters.ordering:
             if "time_in_service" in filters.ordering:
-                ordering_field = filters.ordering.replace("time_in_service", "time_in_service_order")
+                ordering_field = filters.ordering.replace(
+                    "time_in_service", "time_in_service_order"
+                )
                 agents_query = agents_query.order_by(ordering_field)
             else:
                 agents_query = agents_query.order_by(filters.ordering)
 
-        # DEPOIS aplica .values()
         agents_query = agents_query.values(
             "first_name",
             "last_name",
@@ -286,11 +296,9 @@ class AgentRepository:
             .distinct()
         )
 
-        # APLICA ORDER_BY ANTES DO .VALUES()
         if filters.ordering:
             agents_query = agents_query.order_by(filters.ordering)
 
-        # DEPOIS aplica .values()
         agents_query = agents_query.values(
             "first_name",
             "last_name",

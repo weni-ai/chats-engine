@@ -102,26 +102,26 @@ class RoomsDataService:
 
 class TimeMetricsService:
     def get_time_metrics(self, filters: Filters, project):
-        from django.db.models import Q
-        from django.utils import timezone
         import pendulum
         import pytz
-        from chats.apps.rooms.models import Room
-        from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
+        from django.db.models import Q
+        from django.utils import timezone
 
-        # Convert timezone string to timezone object
+        from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
+        from chats.apps.rooms.models import Room
+
         tz = pytz.timezone(str(project.timezone))
         rooms_filter = Q(queue__sector__project=project)
 
-        # Define filtro de data (para métricas históricas)
         if filters.start_date and filters.end_date:
             start_time = pendulum.parse(filters.start_date).replace(tzinfo=tz)
             end_time = pendulum.parse(filters.end_date + " 23:59:59").replace(tzinfo=tz)
             rooms_filter &= Q(created_on__range=[start_time, end_time])
         else:
-            # Sem filtro de data = apenas do dia atual (tempo real)
-            initial_datetime = timezone.now().astimezone(tz).replace(
-                hour=0, minute=0, second=0, microsecond=0
+            initial_datetime = (
+                timezone.now()
+                .astimezone(tz)
+                .replace(hour=0, minute=0, second=0, microsecond=0)
             )
             rooms_filter &= Q(created_on__gte=initial_datetime)
 
@@ -136,15 +136,13 @@ class TimeMetricsService:
         if filters.queue:
             rooms_filter &= Q(queue__uuid=filters.queue)
 
-        # 1. TEMPO MÉDIO EM ESPERA (salas ativas na fila AGORA - sem filtro de data/agent)
         waiting_filter = Q(
             queue__sector__project=project,
             is_active=True,
-            user__isnull=True,  # Salas em espera não têm agente
-            added_to_queue_at__isnull=False
+            user__isnull=True,
+            added_to_queue_at__isnull=False,
         )
-        
-        # Aplica apenas filtros de setor/fila/tag (não data, não agent)
+
         if filters.sector:
             waiting_filter &= Q(queue__sector=filters.sector)
             if filters.tag:
@@ -159,13 +157,13 @@ class TimeMetricsService:
             waiting_time = calculate_last_queue_waiting_time(room)
             waiting_times.append(waiting_time)
 
-        avg_waiting_time = int(sum(waiting_times) / len(waiting_times)) if waiting_times else 0
+        avg_waiting_time = (
+            int(sum(waiting_times) / len(waiting_times)) if waiting_times else 0
+        )
         max_waiting_time = int(max(waiting_times)) if waiting_times else 0
 
-        # 2. TEMPO MÉDIO PARA PRIMEIRA RESPOSTA (salas ativas AGORA com agente)
         first_response_times = []
 
-        # 2.1. Salas ativas que JÁ têm first_response_time salvo
         try:
             rooms_with_saved_response = Room.objects.filter(
                 queue__sector__project=project,
@@ -174,25 +172,31 @@ class TimeMetricsService:
                 metric__isnull=False,
                 metric__first_response_time__gt=0,
                 queue__is_deleted=False,
-                queue__sector__is_deleted=False
-            ).select_related('metric')
-            
-            # Aplica filtros opcionais
+                queue__sector__is_deleted=False,
+            ).select_related("metric")
+
             if filters.sector:
-                rooms_with_saved_response = rooms_with_saved_response.filter(queue__sector=filters.sector)
+                rooms_with_saved_response = rooms_with_saved_response.filter(
+                    queue__sector=filters.sector
+                )
                 if filters.tag:
-                    rooms_with_saved_response = rooms_with_saved_response.filter(tags__uuid=filters.tag)
+                    rooms_with_saved_response = rooms_with_saved_response.filter(
+                        tags__uuid=filters.tag
+                    )
             if filters.queue:
-                rooms_with_saved_response = rooms_with_saved_response.filter(queue__uuid=filters.queue)
+                rooms_with_saved_response = rooms_with_saved_response.filter(
+                    queue__uuid=filters.queue
+                )
             if filters.agent:
-                rooms_with_saved_response = rooms_with_saved_response.filter(user=filters.agent)
+                rooms_with_saved_response = rooms_with_saved_response.filter(
+                    user=filters.agent
+                )
 
             for room in rooms_with_saved_response:
                 first_response_times.append(room.metric.first_response_time)
         except Exception:
             pass
 
-        # 2.2. Salas ativas onde o agente AINDA NÃO respondeu (calcula dinamicamente)
         try:
             rooms_waiting_response = Room.objects.filter(
                 queue__sector__project=project,
@@ -200,49 +204,60 @@ class TimeMetricsService:
                 user__isnull=False,
                 first_user_assigned_at__isnull=False,
                 queue__is_deleted=False,
-                queue__sector__is_deleted=False
-            ).filter(
-                Q(metric__isnull=True) | Q(metric__first_response_time=0)
-            )
-            
+                queue__sector__is_deleted=False,
+            ).filter(Q(metric__isnull=True) | Q(metric__first_response_time=0))
+
             if filters.sector:
-                rooms_waiting_response = rooms_waiting_response.filter(queue__sector=filters.sector)
+                rooms_waiting_response = rooms_waiting_response.filter(
+                    queue__sector=filters.sector
+                )
                 if filters.tag:
-                    rooms_waiting_response = rooms_waiting_response.filter(tags__uuid=filters.tag)
+                    rooms_waiting_response = rooms_waiting_response.filter(
+                        tags__uuid=filters.tag
+                    )
             if filters.queue:
-                rooms_waiting_response = rooms_waiting_response.filter(queue__uuid=filters.queue)
+                rooms_waiting_response = rooms_waiting_response.filter(
+                    queue__uuid=filters.queue
+                )
             if filters.agent:
-                rooms_waiting_response = rooms_waiting_response.filter(user=filters.agent)
-            
-            # ADICIONE ESTE LOOP:
+                rooms_waiting_response = rooms_waiting_response.filter(
+                    user=filters.agent
+                )
+
             for room in rooms_waiting_response:
-                # Verifica se tem mensagens do agente (ignora salas legadas)
-                has_any_agent_messages = room.messages.filter(
-                    user__isnull=False
-                ).exclude(automatic_message__isnull=False).exists()
-                
+                has_any_agent_messages = (
+                    room.messages.filter(user__isnull=False)
+                    .exclude(automatic_message__isnull=False)
+                    .exists()
+                )
+
                 if has_any_agent_messages:
-                    # Sala já foi respondida (legada) - pula
                     continue
-                
-                # Calcula tempo desde atribuição até agora (dinâmico)
-                time_waiting = int((timezone.now() - room.first_user_assigned_at).total_seconds())
+
+                time_waiting = int(
+                    (timezone.now() - room.first_user_assigned_at).total_seconds()
+                )
                 first_response_times.append(time_waiting)
-            
+
         except Exception:
             pass
 
-        avg_first_response_time = int(sum(first_response_times) / len(first_response_times)) if first_response_times else 0
-        max_first_response_time = int(max(first_response_times)) if first_response_times else 0
+        avg_first_response_time = (
+            int(sum(first_response_times) / len(first_response_times))
+            if first_response_times
+            else 0
+        )
+        max_first_response_time = (
+            int(max(first_response_times)) if first_response_times else 0
+        )
 
-        # 3. DURAÇÃO MÉDIA DA CONVERSA (salas ativas AGORA com agente)
         active_conversation_filter = Q(
             queue__sector__project=project,
             is_active=True,
             user__isnull=False,
             first_user_assigned_at__isnull=False,
-            queue__is_deleted=False,              # ADICIONE
-            queue__sector__is_deleted=False       # ADICIONE
+            queue__is_deleted=False,
+            queue__sector__is_deleted=False,
         )
 
         if filters.agent:
@@ -261,8 +276,14 @@ class TimeMetricsService:
             duration = (timezone.now() - room.first_user_assigned_at).total_seconds()
             conversation_durations.append(int(duration))
 
-        avg_conversation_duration = int(sum(conversation_durations) / len(conversation_durations)) if conversation_durations else 0
-        max_conversation_duration = int(max(conversation_durations)) if conversation_durations else 0
+        avg_conversation_duration = (
+            int(sum(conversation_durations) / len(conversation_durations))
+            if conversation_durations
+            else 0
+        )
+        max_conversation_duration = (
+            int(max(conversation_durations)) if conversation_durations else 0
+        )
 
         return {
             "avg_waiting_time": avg_waiting_time,

@@ -1,5 +1,13 @@
-from django.db.models import F, ExpressionWrapper, fields, Case, When, Value, IntegerField
-from django.db.models.functions import Now, Extract
+from django.db.models import (
+    Case,
+    ExpressionWrapper,
+    F,
+    IntegerField,
+    Value,
+    When,
+    fields,
+)
+from django.db.models.functions import Extract, Now
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, permissions, viewsets
 from rest_framework.pagination import LimitOffsetPagination
@@ -56,38 +64,32 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        
-        # Sempre anota os campos calculados
+
         queryset = queryset.annotate(
             queue_time=ExpressionWrapper(
-                Now() - F('added_to_queue_at'),
-                output_field=fields.DurationField()
+                Now() - F("added_to_queue_at"), output_field=fields.DurationField()
             ),
             waiting_time=ExpressionWrapper(
-                F('user_assigned_at') - F('added_to_queue_at'),
-                output_field=fields.DurationField()
+                F("user_assigned_at") - F("added_to_queue_at"),
+                output_field=fields.DurationField(),
             ),
             duration=ExpressionWrapper(
-                Now() - F('first_user_assigned_at'),
-                output_field=fields.DurationField()
+                Now() - F("first_user_assigned_at"), output_field=fields.DurationField()
             ),
             first_response_time=Case(
                 When(
                     metric__first_response_time__gt=0,
-                    then=F('metric__first_response_time')
+                    then=F("metric__first_response_time"),
                 ),
                 When(
                     is_active=True,
                     user__isnull=False,
                     first_user_assigned_at__isnull=False,
-                    then=Extract(Now() - F('first_user_assigned_at'), 'epoch')
+                    then=Extract(Now() - F("first_user_assigned_at"), "epoch"),
                 ),
                 default=Value(None),
-                output_field=IntegerField()
-            )
+                output_field=IntegerField(),
+            ),
         )
-        
-        return queryset.filter(
-            queue__is_deleted=False,
-            queue__sector__is_deleted=False
-        )
+
+        return queryset.filter(queue__is_deleted=False, queue__sector__is_deleted=False)

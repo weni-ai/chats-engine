@@ -398,7 +398,7 @@ class SectorAuthorization(BaseModel):
         return self.sector.project
 
 
-class SectorTag(BaseModel):
+class SectorTag(BaseSoftDeleteModel, BaseModel):
     name = models.CharField(_("Name"), max_length=120)
     sector = models.ForeignKey(
         "sectors.Sector",

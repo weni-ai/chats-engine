@@ -33,23 +33,13 @@ from chats.core.storages import ExcelStorage
 
 from .dto import Filters, should_exclude_admin_domains
 from .presenter import ModelFieldsPresenter
-from .service import AgentsService, RawDataService, RoomsDataService, SectorService, TimeMetricsService
-from .presenter import ModelFieldsPresenter
-from rest_framework import permissions, status
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from rest_framework.exceptions import ValidationError
-from django.shortcuts import get_object_or_404
-from django.apps import apps
-from django.db.models import Q
-from chats.celery import app
-from django.core.mail import EmailMessage
-from django.conf import settings
-import logging
-from uuid import UUID
-from chats.apps.dashboard.models import ReportStatus
-import pendulum
-from django.contrib.postgres.aggregates import ArrayAgg
+from .service import (
+    AgentsService,
+    RawDataService,
+    RoomsDataService,
+    SectorService,
+    TimeMetricsService,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -415,7 +405,6 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         """Time metrics for the project - real-time data"""
         project = self.get_object()
         params = request.query_params.dict()
-        
         filters = Filters(
             start_date=params.get("start_date"),
             end_date=params.get("end_date"),
@@ -498,7 +487,7 @@ class ReportFieldsValidatorViewSet(APIView):
         """
         if model_name != "rooms":
             raise NotFound(f'Only "rooms" model is supported, got "{model_name}"')
-        
+
         if model_name not in available_fields:
             raise NotFound(f'Model "{model_name}" not found')
 
@@ -518,23 +507,38 @@ class ReportFieldsValidatorViewSet(APIView):
 
             if invalid_fields:
                 raise NotFound(f'Invalid fields: {", ".join(invalid_fields)}')
-            
+
             query_fields.extend(fields_list)
-            
+
             # Replace shorthand fields with full paths
             if "contact" in query_fields and "contact__name" not in query_fields:
-                query_fields = [f if f != "contact" else "contact__name" for f in query_fields]
+                query_fields = [
+                    f if f != "contact" else "contact__name" for f in query_fields
+                ]
             if "queue" in query_fields:
-                query_fields = [f if f != "queue" else "queue__name" for f in query_fields]
-            
+                query_fields = [
+                    f if f != "queue" else "queue__name" for f in query_fields
+                ]
+
             # Sort fields in preferred order
             order_rank = {
-                "user__first_name": 1, "user__last_name": 2, "user__email": 3,
-                "queue__sector__name": 4, "queue__name": 5, "uuid": 6,
-                "contact__status": 7, "is_active": 7, "protocol": 8,
-                "tags": 9, "created_on": 10, "ended_at": 11,
-                "transfer_history": 12, "contact__name": 13, "contact__uuid": 14,
-                "urn": 15, "custom_fields": 16,
+                "user__first_name": 1,
+                "user__last_name": 2,
+                "user__email": 3,
+                "queue__sector__name": 4,
+                "queue__name": 5,
+                "uuid": 6,
+                "contact__status": 7,
+                "is_active": 7,
+                "protocol": 8,
+                "tags": 9,
+                "created_on": 10,
+                "ended_at": 11,
+                "transfer_history": 12,
+                "contact__name": 13,
+                "contact__uuid": 14,
+                "urn": 15,
+                "custom_fields": 16,
             }
             query_fields = sorted(query_fields, key=lambda f: order_rank.get(f, 999))
 
@@ -550,7 +554,9 @@ class ReportFieldsValidatorViewSet(APIView):
         open_chats = field_data.get("open_chats")
         closed_chats = field_data.get("closed_chats")
         if open_chats is True and closed_chats is True:
-            raise ValidationError("open_chats and closed_chats cannot be used together.")
+            raise ValidationError(
+                "open_chats and closed_chats cannot be used together."
+            )
 
         # Apply date filters
         start_date = field_data.get("start_date")
@@ -559,9 +565,11 @@ class ReportFieldsValidatorViewSet(APIView):
             tz = project.timezone
             start_dt = pendulum.parse(start_date).replace(tzinfo=tz)
             end_dt = pendulum.parse(end_date + " 23:59:59").replace(tzinfo=tz)
-            
+
             if open_chats is True:
-                base_queryset = base_queryset.filter(created_on__range=[start_dt, end_dt])
+                base_queryset = base_queryset.filter(
+                    created_on__range=[start_dt, end_dt]
+                )
             elif closed_chats and not open_chats:
                 base_queryset = base_queryset.filter(
                     is_active=False,
@@ -569,7 +577,8 @@ class ReportFieldsValidatorViewSet(APIView):
                 )
             else:
                 base_queryset = base_queryset.filter(
-                    Q(created_on__range=[start_dt, end_dt]) | Q(ended_at__range=[start_dt, end_dt])
+                    Q(created_on__range=[start_dt, end_dt])
+                    | Q(ended_at__range=[start_dt, end_dt])
                 )
 
         # Helper to normalize filter values
@@ -766,8 +775,6 @@ class ReportFieldsValidatorViewSet(APIView):
                 if root_end_date and "end_date" not in fields_config["rooms"]:
                     fields_config["rooms"]["end_date"] = root_end_date
 
-            root_sectors = request.data.get("sectors") or request.data.get("sector")
-            root_queues = request.data.get("queues") or request.data.get("queue")
             root_agents = request.data.get("agents") or request.data.get("agent")
             root_tags = request.data.get("tags") or request.data.get("tag")
             if "rooms" not in fields_config or not isinstance(
@@ -785,11 +792,15 @@ class ReportFieldsValidatorViewSet(APIView):
             try:
                 available_fields = ModelFieldsPresenter.get_models_info()
                 rooms_config = fields_config.get("rooms", {})
-                query_data = self._process_model_fields("rooms", rooms_config, project, available_fields)
-                rooms_count = query_data["queryset"].count() if "queryset" in query_data else 0
+                query_data = self._process_model_fields(
+                    "rooms", rooms_config, project, available_fields
+                )
+                rooms_count = (
+                    query_data["queryset"].count() if "queryset" in query_data else 0
+                )
             except Exception:
                 rooms_count = self._get_rooms_queryset(project).count()
-            
+
             estimated_time = self._estimate_execution_time(rooms_count)
 
             if file_type:

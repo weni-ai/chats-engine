@@ -8,11 +8,15 @@ class DashboardAgentsSerializer(serializers.Serializer):
     link = serializers.SerializerMethodField()
     opened = serializers.IntegerField(allow_null=True, required=False)
     agent = serializers.SerializerMethodField()
-    agent_email = serializers.EmailField(source="email", allow_null=True, required=False)
+    agent_email = serializers.EmailField(
+        source="email", allow_null=True, required=False
+    )
     closed = serializers.IntegerField(allow_null=True, required=False)
     status = serializers.SerializerMethodField()
     avg_first_response_time = serializers.IntegerField(allow_null=True, required=False)
-    avg_message_response_time = serializers.IntegerField(allow_null=True, required=False)
+    avg_message_response_time = serializers.IntegerField(
+        allow_null=True, required=False
+    )
     avg_interaction_time = serializers.IntegerField(allow_null=True, required=False)
     time_in_service = serializers.SerializerMethodField()
 
@@ -53,7 +57,9 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
     link = serializers.SerializerMethodField()
     opened = serializers.IntegerField(allow_null=True, required=False)
     agent = serializers.SerializerMethodField()
-    agent_email = serializers.EmailField(source="email", allow_null=True, required=False)
+    agent_email = serializers.EmailField(
+        source="email", allow_null=True, required=False
+    )
     closed = serializers.IntegerField(allow_null=True, required=False)
     status = serializers.SerializerMethodField()
     custom_status = serializers.SerializerMethodField()
