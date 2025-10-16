@@ -56,6 +56,10 @@ class AgentRepository:
             rooms_filter["rooms__queue__sector__project"] = project
         if filters.tag:
             rooms_filter["rooms__tags__in"] = filters.tag.split(",")
+        
+        if filters.agent:
+            agents_filters &= Q(uuid=filters.agent)
+        
         if filters.start_date and filters.end_date:
             start_time = filters.start_date
             end_time = filters.end_date
@@ -80,9 +84,6 @@ class AgentRepository:
         agents_query = self.model
         if not filters.is_weni_admin:
             agents_query = agents_query.exclude(get_admin_domains_exclude_filter())
-
-        if filters.agent:
-            agents_query = agents_query.filter(uuid=filters.agent)
 
         custom_status_subquery = Subquery(
             CustomStatus.objects.filter(
@@ -271,14 +272,16 @@ class AgentRepository:
 
         if not filters.is_weni_admin:
             agents_query = agents_query.exclude(get_admin_domains_exclude_filter())
-        if filters.agent:
-            agents_query = agents_query.filter(uuid=filters.agent)
 
         if agents_filter:
             agents_query = agents_query.filter(**agents_filter).distinct()
 
+        agents_filters_custom = Q(project_permissions__project=project) & Q(is_active=True)
+        if filters.agent:
+            agents_filters_custom &= Q(uuid=filters.agent)
+
         agents_query = (
-            agents_query.filter(project_permissions__project=project, is_active=True)
+            agents_query.filter(agents_filters_custom)
             .annotate(
                 status=Subquery(project_permission_queryset),
                 closed=Count(
