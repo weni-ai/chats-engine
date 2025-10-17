@@ -1,7 +1,6 @@
 import json
 
 import pendulum
-from django.apps import apps
 from django.core.cache import cache
 from django.db.models import Avg, Count, F, Q, Sum
 from django.utils import timezone
@@ -380,7 +379,7 @@ class ModelFieldsPresenter:
                 "related_model": "dashboard.roommetrics",
             },
         }
-        
+
         models_info = {"rooms": rooms_fields}
         cache.set(cache_key, models_info, timeout=86400)
         return models_info

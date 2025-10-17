@@ -161,6 +161,7 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
     automatic_message_sent_at = serializers.SerializerMethodField()
     first_user_assigned_at = serializers.DateTimeField()
     time_to_send_automatic_message = serializers.SerializerMethodField()
+    sector = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -179,6 +180,7 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
             "automatic_message_sent_at",
             "first_user_assigned_at",
             "time_to_send_automatic_message",
+            "sector",
         ]
 
     def get_user_name(self, obj):
@@ -230,6 +232,17 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
                 ),
                 0,
             )
+
+        return None
+
+    def get_sector(self, obj: Room) -> Optional[dict]:
+        sector = obj.queue.sector if obj.queue else None
+
+        if sector:
+            return {
+                "uuid": sector.uuid,
+                "name": sector.name,
+            }
 
         return None
 

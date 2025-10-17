@@ -2,7 +2,7 @@ import io
 import logging
 import os
 import zipfile
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
@@ -14,9 +14,9 @@ from django.db import transaction
 from chats.apps.dashboard.email_templates import get_report_ready_email
 from chats.apps.dashboard.models import ReportStatus, RoomMetrics
 from chats.apps.dashboard.utils import (
+    calculate_first_response_time,
     calculate_last_queue_waiting_time,
     calculate_response_time,
-    calculate_first_response_time,
 )
 from chats.apps.projects.models import Project
 from chats.apps.rooms.models import Room
@@ -207,7 +207,6 @@ def generate_custom_fields_report(
                 )
 
                 subject = f"Custom report for the project {project.name} - {dt}"
-                
                 message_plain, message_html = get_report_ready_email(
                     project.name, download_url
                 )
@@ -219,7 +218,6 @@ def generate_custom_fields_report(
                     to=[user_email],
                 )
                 email.attach_alternative(message_html, "text/html")
-                
                 email.extra_headers = {
                     "X-No-Track": "True",
                     "X-Track-Click": "no",
@@ -438,7 +436,6 @@ def process_pending_reports():
                 )
 
                 subject = f"Custom report for the project {project.name} - {dt}"
-                
                 message_plain, message_html = get_report_ready_email(
                     project.name, download_url
                 )
@@ -450,7 +447,6 @@ def process_pending_reports():
                     to=[user_email],
                 )
                 email.attach_alternative(message_html, "text/html")
-                
                 email.extra_headers = {
                     "X-No-Track": "True",
                     "X-Track-Click": "no",

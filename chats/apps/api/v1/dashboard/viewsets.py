@@ -4,7 +4,6 @@ import logging
 
 import pandas
 import pendulum
-from django.apps import apps
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.db.models import Q
 from django.http import HttpResponse
