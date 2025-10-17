@@ -5,6 +5,7 @@ from chats.apps.api.v1.contacts.serializers import ContactSimpleSerializer
 from chats.apps.api.v1.sectors.serializers import TagSimpleSerializer
 from chats.apps.contacts.models import Contact
 from chats.apps.rooms.models import Room
+from chats.apps.sectors.models import SectorTag
 
 
 class ContactOptimizedSerializer(serializers.ModelSerializer):
@@ -28,7 +29,7 @@ class ContactOptimizedSerializer(serializers.ModelSerializer):
 class RoomHistorySerializer(serializers.ModelSerializer):
     user = UserNameSerializer(many=False, read_only=True)
     contact = ContactOptimizedSerializer(read_only=True)
-    tags = TagSimpleSerializer(many=True, read_only=True)
+    tags = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -42,6 +43,13 @@ class RoomHistorySerializer(serializers.ModelSerializer):
             "protocol",
             "service_chat",
         ]
+
+    def get_tags(self, obj):
+        return TagSimpleSerializer(
+            # Including the (soft) deleted tags
+            SectorTag.all_objects.filter(rooms__in=[obj]),
+            many=True,
+        ).data
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -61,7 +69,7 @@ class RoomBasicValuesSerializer(serializers.Serializer):
 class RoomDetailSerializer(serializers.ModelSerializer):
     user = UserNameSerializer(many=False, read_only=True)
     contact = serializers.SerializerMethodField()
-    tags = TagSimpleSerializer(many=True, read_only=True)
+    tags = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -82,3 +90,10 @@ class RoomDetailSerializer(serializers.ModelSerializer):
         if obj.protocol:
             contact_data["name"] = f"{contact_data['name']} | {obj.protocol}"
         return contact_data
+
+    def get_tags(self, obj):
+        return TagSimpleSerializer(
+            # Including the (soft) deleted tags
+            SectorTag.all_objects.filter(rooms__in=[obj]),
+            many=True,
+        ).data
