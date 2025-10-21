@@ -26,6 +26,10 @@ class RoomFilter(filters.FilterSet):
 class RoomMetricsFilter(RoomFilter):
     created_on__lte = filters.DateTimeFilter(field_name="created_on", lookup_expr="lte")
     created_on__gte = filters.DateTimeFilter(field_name="created_on", lookup_expr="gte")
+
+    ended_at__gte = filters.DateTimeFilter(field_name="ended_at", lookup_expr="gte")
+    ended_at__lte = filters.DateTimeFilter(field_name="ended_at", lookup_expr="lte")
+
     external_ids = filters.CharFilter(
         field_name="external_ids",
         required=False,
