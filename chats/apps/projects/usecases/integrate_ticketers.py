@@ -63,7 +63,7 @@ class IntegratedTicketers:
         for secondary_project in projects:
             sectors = Sector.objects.filter(
                 project=project,
-                config__secondary_project=str(secondary_project.uuid),
+                secondary_project=str(secondary_project.uuid),
             )
 
             for sector in sectors:
@@ -124,7 +124,7 @@ class IntegratedTicketers:
         for secondary_project in projects:
             queues = Queue.objects.filter(
                 sector__project=project,
-                sector__config__secondary_project=str(secondary_project.uuid),
+                sector__secondary_project=str(secondary_project.uuid),
             )
 
             for queue in queues:
@@ -172,7 +172,7 @@ class IntegratedTicketers:
         """Integrate a specific individual ticketer."""
         try:
             sector = Sector.objects.get(
-                project=project, config__secondary_project=str(integrated_token)
+                project=project, secondary_project=str(integrated_token)
             )
 
             # Check if already integrated
@@ -183,7 +183,7 @@ class IntegratedTicketers:
                 return {"status": "skipped", "reason": "already_integrated"}
 
             content = {
-                "project_uuid": str(sector.config.get("secondary_project")),
+                "project_uuid": sector.secondary_project,
                 "name": sector.name,
                 "config": {
                     "project_auth": str(sector.external_token.pk),
@@ -226,7 +226,7 @@ class IntegratedTicketers:
         try:
             queues = Queue.objects.filter(
                 sector__project=project,
-                sector__config__secondary_project=str(sector_integrated_token),
+                sector__secondary_project=str(sector_integrated_token),
             )
 
             integrated_count = 0
@@ -243,7 +243,7 @@ class IntegratedTicketers:
                     "uuid": str(queue.uuid),
                     "name": queue.name,
                     "sector_uuid": str(queue.sector.uuid),
-                    "project_uuid": str(queue.sector.config.get("secondary_project")),
+                    "project_uuid": queue.sector.secondary_project,
                 }
 
                 try:
