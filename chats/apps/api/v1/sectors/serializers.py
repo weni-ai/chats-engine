@@ -70,6 +70,7 @@ class SectorSerializer(serializers.ModelSerializer):
             "automatic_message",
             "is_csat_enabled",
             "required_tags",
+            "secondary_project",
         ]
         extra_kwargs = {
             "work_start": {"required": False, "allow_null": True},
@@ -119,6 +120,11 @@ class SectorSerializer(serializers.ModelSerializer):
         project = self.instance.project if self.instance else data.get("project")
 
         validate_is_csat_enabled(project, data.get("is_csat_enabled"), self.context)
+
+        # Extract secondary_project from config if present
+        config = data.get("config", {})
+        if "secondary_project" in config:
+            data["secondary_project"] = config.get("secondary_project")
 
         return data
 
@@ -170,6 +176,7 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
             "automatic_message",
             "is_csat_enabled",
             "required_tags",
+            "secondary_project",
         ]
         extra_kwargs = {field: {"required": False} for field in fields}
 
@@ -220,6 +227,10 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
         project = self.instance.project
 
         validate_is_csat_enabled(project, attrs.get("is_csat_enabled"), self.context)
+
+        config = attrs.get("config", {})
+        if "secondary_project" in config:
+            attrs["secondary_project"] = config.get("secondary_project")
 
         return attrs
 
