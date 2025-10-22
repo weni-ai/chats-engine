@@ -9,6 +9,7 @@ from sentry_sdk import capture_exception
 
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.msgs.models import Message, AutomaticMessage
+from chats.apps.projects.models.models import Project
 
 
 logger = logging.getLogger(__name__)
@@ -42,15 +43,22 @@ class AutomaticMessagesService:
             logger.info("[AUTOMATIC MESSAGES SERVICE] Checking ticket %s", ticket_uuid)
             wait_time = 1
 
+            secondary_project_config = room.queue.sector.secondary_project or {}
+
+            if secondary_project_config and (
+                secondary_project_uuid := secondary_project_config.get("uuid")
+            ):
+                project = Project.objects.get(uuid=secondary_project_uuid)
+            else:
+                project = room.queue.sector.project
+
             for i in range(FLOWS_GET_TICKET_RETRIES):
                 logger.info(
                     "[AUTOMATIC MESSAGES SERVICE] Checking ticket %s (attempt %s)",
                     ticket_uuid,
                     i + 1,
                 )
-                response = FlowRESTClient().get_ticket(
-                    room.queue.sector.project, ticket_uuid
-                )
+                response = FlowRESTClient().get_ticket(project, ticket_uuid)
 
                 if response.status_code == 200:
                     try:
