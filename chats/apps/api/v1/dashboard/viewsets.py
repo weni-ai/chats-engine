@@ -481,6 +481,159 @@ class ReportFieldsValidatorViewSet(APIView):
         """
         return Room.objects.filter(queue__sector__project=project)
 
+    def _is_all_filter(self, values):
+        if isinstance(values, list):
+            return any(str(x).strip() == "__all__" for x in values)
+        return str(values).strip() == "__all__"
+
+    def _normalize_list_filter(self, value):
+        out = []
+        for item in value:
+            if isinstance(item, dict):
+                out.append(str(item.get("uuid") or item.get("value", "")))
+            else:
+                out.append(str(item))
+        return [] if self._is_all_filter(out) else out
+
+    def _normalize_dict_filter(self, value):
+        if "uuids" in value:
+            uuid_list = [str(uuid_val) for uuid_val in value["uuids"]]
+            return [] if self._is_all_filter(uuid_list) else uuid_list
+        if "uuid" in value:
+            uuid_str = str(value["uuid"])
+            return [] if self._is_all_filter(uuid_str) else [uuid_str]
+        if "value" in value:
+            filter_value = str(value["value"])
+            return [] if self._is_all_filter(filter_value) else [filter_value]
+        return []
+
+    def _normalize_filter_value(self, value):
+        if value is None:
+            return []
+        if isinstance(value, (list, tuple, set)):
+            return self._normalize_list_filter(value)
+        if isinstance(value, dict):
+            return self._normalize_dict_filter(value)
+        
+        string_value = str(value)
+        return [] if self._is_all_filter(string_value) else [string_value]
+
+    def _validate_and_process_fields(self, fields_list, model_fields):
+        if not isinstance(fields_list, list):
+            return []
+
+        invalid_fields = []
+        for field in fields_list:
+            if field in model_fields:
+                continue
+            if "__" in field and field.split("__")[0] in model_fields:
+                continue
+            invalid_fields.append(field)
+
+        if invalid_fields:
+            raise NotFound(f'Invalid fields: {", ".join(invalid_fields)}')
+
+        query_fields = list(fields_list)
+        query_fields = self._replace_shorthand_fields(query_fields)
+        query_fields = self._sort_fields_by_priority(query_fields)
+        return query_fields
+
+    def _replace_shorthand_fields(self, query_fields):
+        if "contact" in query_fields and "contact__name" not in query_fields:
+            query_fields = [
+                f if f != "contact" else "contact__name" for f in query_fields
+            ]
+        if "queue" in query_fields:
+            query_fields = [
+                f if f != "queue" else "queue__name" for f in query_fields
+            ]
+        return query_fields
+
+    def _sort_fields_by_priority(self, query_fields):
+        order_rank = {
+            "user__first_name": 1,
+            "user__last_name": 2,
+            "user__email": 3,
+            "queue__sector__name": 4,
+            "queue__name": 5,
+            "uuid": 6,
+            "contact__status": 7,
+            "is_active": 7,
+            "protocol": 8,
+            "tags": 9,
+            "created_on": 10,
+            "ended_at": 11,
+            "transfer_history": 12,
+            "contact__name": 13,
+            "contact__uuid": 14,
+            "urn": 15,
+            "custom_fields": 16,
+        }
+        return sorted(query_fields, key=lambda f: order_rank.get(f, 999))
+
+    def _apply_date_filters(self, queryset, field_data, project):
+        start_date = field_data.get("start_date")
+        end_date = field_data.get("end_date")
+        if not (start_date and end_date):
+            return queryset
+
+        tz = project.timezone
+        start_dt = pendulum.parse(start_date).replace(tzinfo=tz)
+        end_dt = pendulum.parse(end_date + " 23:59:59").replace(tzinfo=tz)
+
+        open_chats = field_data.get("open_chats")
+        closed_chats = field_data.get("closed_chats")
+
+        if open_chats is True:
+            return queryset.filter(created_on__range=[start_dt, end_dt])
+        elif closed_chats and not open_chats:
+            return queryset.filter(
+                is_active=False,
+                ended_at__range=[start_dt, end_dt],
+            )
+        else:
+            return queryset.filter(
+                Q(created_on__range=[start_dt, end_dt])
+                | Q(ended_at__range=[start_dt, end_dt])
+            )
+
+    def _apply_entity_filters(self, queryset, field_data):
+        sectors = self._normalize_filter_value(
+            field_data.get("sectors") or field_data.get("sector")
+        )
+        queues = self._normalize_filter_value(
+            field_data.get("queues") or field_data.get("queue")
+        )
+        agents = self._normalize_filter_value(
+            field_data.get("agents") or field_data.get("agent")
+        )
+        tags = self._normalize_filter_value(
+            field_data.get("tags") or field_data.get("tag")
+        )
+
+        if sectors:
+            queryset = queryset.filter(queue__sector__uuid__in=sectors)
+        if queues:
+            queryset = queryset.filter(queue__uuid__in=queues)
+        if agents:
+            queryset = queryset.filter(user__uuid__in=agents)
+        if tags:
+            queryset = queryset.filter(tags__name__in=tags)
+
+        return queryset
+
+    def _apply_field_selection(self, queryset, query_fields):
+        if not query_fields:
+            return queryset
+
+        if "tags" in query_fields:
+            queryset = queryset.annotate(
+                tags_list=ArrayAgg("tags__name", distinct=True)
+            )
+            query_fields = ["tags_list" if f == "tags" else f for f in query_fields]
+        
+        return queryset.values(*query_fields)
+
     def _process_model_fields(self, model_name, field_data, project, available_fields):
         """
         Process rooms fields and build queryset.
@@ -492,65 +645,15 @@ class ReportFieldsValidatorViewSet(APIView):
             raise NotFound(f'Model "{model_name}" not found')
 
         model_fields = available_fields[model_name]
-        query_fields = []
-
-        # Process requested fields
         fields_list = field_data.get("fields", [])
-        if isinstance(fields_list, list):
-            invalid_fields = []
-            for field in fields_list:
-                if field in model_fields:
-                    continue
-                if "__" in field and field.split("__")[0] in model_fields:
-                    continue
-                invalid_fields.append(field)
+        query_fields = self._validate_and_process_fields(fields_list, model_fields)
 
-            if invalid_fields:
-                raise NotFound(f'Invalid fields: {", ".join(invalid_fields)}')
-
-            query_fields.extend(fields_list)
-
-            # Replace shorthand fields with full paths
-            if "contact" in query_fields and "contact__name" not in query_fields:
-                query_fields = [
-                    f if f != "contact" else "contact__name" for f in query_fields
-                ]
-            if "queue" in query_fields:
-                query_fields = [
-                    f if f != "queue" else "queue__name" for f in query_fields
-                ]
-
-            # Sort fields in preferred order
-            order_rank = {
-                "user__first_name": 1,
-                "user__last_name": 2,
-                "user__email": 3,
-                "queue__sector__name": 4,
-                "queue__name": 5,
-                "uuid": 6,
-                "contact__status": 7,
-                "is_active": 7,
-                "protocol": 8,
-                "tags": 9,
-                "created_on": 10,
-                "ended_at": 11,
-                "transfer_history": 12,
-                "contact__name": 13,
-                "contact__uuid": 14,
-                "urn": 15,
-                "custom_fields": 16,
-            }
-            query_fields = sorted(query_fields, key=lambda f: order_rank.get(f, 999))
-
-        # Start with base rooms queryset
         base_queryset = self._get_rooms_queryset(project)
 
-        # Filter by UUIDs if provided
         uuids = field_data.get("uuids")
         if isinstance(uuids, list) and uuids and "__all__" not in uuids:
             base_queryset = base_queryset.filter(uuid__in=uuids)
 
-        # Validate open/closed chats filters
         open_chats = field_data.get("open_chats")
         closed_chats = field_data.get("closed_chats")
         if open_chats is True and closed_chats is True:
@@ -558,78 +661,9 @@ class ReportFieldsValidatorViewSet(APIView):
                 "open_chats and closed_chats cannot be used together."
             )
 
-        # Apply date filters
-        start_date = field_data.get("start_date")
-        end_date = field_data.get("end_date")
-        if start_date and end_date:
-            tz = project.timezone
-            start_dt = pendulum.parse(start_date).replace(tzinfo=tz)
-            end_dt = pendulum.parse(end_date + " 23:59:59").replace(tzinfo=tz)
-
-            if open_chats is True:
-                base_queryset = base_queryset.filter(
-                    created_on__range=[start_dt, end_dt]
-                )
-            elif closed_chats and not open_chats:
-                base_queryset = base_queryset.filter(
-                    is_active=False,
-                    ended_at__range=[start_dt, end_dt],
-                )
-            else:
-                base_queryset = base_queryset.filter(
-                    Q(created_on__range=[start_dt, end_dt])
-                    | Q(ended_at__range=[start_dt, end_dt])
-                )
-
-        # Helper to normalize filter values
-        def _norm_list(value):
-            if value is None:
-                return []
-            if isinstance(value, (list, tuple, set)):
-                out = []
-                for item in value:
-                    if isinstance(item, dict):
-                        out.append(str(item.get("uuid") or item.get("value", "")))
-                    else:
-                        out.append(str(item))
-                return [] if any(str(x).strip() == "__all__" for x in out) else out
-            if isinstance(value, dict):
-                if "uuids" in value:
-                    vals = [str(v) for v in value["uuids"]]
-                    return [] if any(v.strip() == "__all__" for v in vals) else vals
-                if "uuid" in value:
-                    v = str(value["uuid"])
-                    return [] if v.strip() == "__all__" else [v]
-                if "value" in value:
-                    v = str(value["value"])
-                    return [] if v.strip() == "__all__" else [v]
-                return []
-            v = str(value)
-            return [] if v.strip() == "__all__" else [v]
-
-        # Apply filters for sectors, queues, agents, tags
-        sectors = _norm_list(field_data.get("sectors") or field_data.get("sector"))
-        queues = _norm_list(field_data.get("queues") or field_data.get("queue"))
-        agents = _norm_list(field_data.get("agents") or field_data.get("agent"))
-        tags = _norm_list(field_data.get("tags") or field_data.get("tag"))
-
-        if sectors:
-            base_queryset = base_queryset.filter(queue__sector__uuid__in=sectors)
-        if queues:
-            base_queryset = base_queryset.filter(queue__uuid__in=queues)
-        if agents:
-            base_queryset = base_queryset.filter(user__uuid__in=agents)
-        if tags:
-            base_queryset = base_queryset.filter(tags__name__in=tags)
-
-        # Apply field selection and special handling for tags
-        if query_fields:
-            if "tags" in query_fields:
-                base_queryset = base_queryset.annotate(
-                    tags_list=ArrayAgg("tags__name", distinct=True)
-                )
-                query_fields = ["tags_list" if f == "tags" else f for f in query_fields]
-            base_queryset = base_queryset.values(*query_fields)
+        base_queryset = self._apply_date_filters(base_queryset, field_data, project)
+        base_queryset = self._apply_entity_filters(base_queryset, field_data)
+        base_queryset = self._apply_field_selection(base_queryset, query_fields)
 
         return {"queryset": base_queryset, "related": {}}
 
