@@ -78,12 +78,6 @@ class QueueViewset(ModelViewSet):
 
         project = Project.objects.get(uuid=instance.sector.project.uuid)
 
-        content = {
-            "uuid": str(instance.uuid),
-            "name": instance.name,
-            "sector_uuid": str(instance.sector.uuid),
-            "project_uuid": str(instance.sector.project.uuid),
-        }
         use_group_sectors = SectorGroupSector.objects.filter(
             sector=instance.sector
         ).exists()
@@ -92,14 +86,27 @@ class QueueViewset(ModelViewSet):
 
         if not settings.USE_WENI_FLOWS:
             return super().perform_create(serializer)
-        response = FlowRESTClient().create_queue(**content)
-        if response.status_code not in [status.HTTP_200_OK, status.HTTP_201_CREATED]:
-            instance.delete()
-            raise exceptions.APIException(
-                detail=f"[{response.status_code}] Error posting the queue on flows. Exception: {response.content}"
-            )
 
-        if project.config and project.config.get("its_principal", False):
+        should_use_integration = (
+            project.config
+            and project.config.get("its_principal", False)
+            and instance.sector.secondary_project
+        )
+
+        if not should_use_integration:
+            content = {
+                "uuid": str(instance.uuid),
+                "name": instance.name,
+                "sector_uuid": str(instance.sector.uuid),
+                "project_uuid": str(instance.sector.project.uuid),
+            }
+            response = FlowRESTClient().create_queue(**content)
+            if response.status_code not in [status.HTTP_200_OK, status.HTTP_201_CREATED]:
+                instance.delete()
+                raise exceptions.APIException(
+                    detail=f"[{response.status_code}] Error posting the queue on flows. Exception: {response.content}"
+                )
+        else:
             integrate_use_case = IntegratedTicketers()
             integrate_use_case.integrate_individual_topic(
                 project, instance.sector.secondary_project
