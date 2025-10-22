@@ -50,7 +50,7 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
             url = f"chats:chats/{obj.uuid}"
         else:
             url = None
-        
+
         return {
             "url": url,
             "type": "internal",
