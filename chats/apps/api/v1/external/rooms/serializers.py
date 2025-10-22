@@ -162,6 +162,7 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
     first_user_assigned_at = serializers.DateTimeField()
     time_to_send_automatic_message = serializers.SerializerMethodField()
     sector = serializers.SerializerMethodField()
+    custom_fields = serializers.JSONField(read_only=True)
 
     class Meta:
         model = Room
@@ -181,6 +182,7 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
             "first_user_assigned_at",
             "time_to_send_automatic_message",
             "sector",
+            "custom_fields",
         ]
 
     def get_user_name(self, obj):
