@@ -1,3 +1,19 @@
+# 3.29.8
+# Add
+  - Removing unused verification when creating a sector without holidays
+  - New redirect for awaiting table
+  - Custom_fields on rooms_metrics endpoint
+    
+# 3.29.7
+# Add
+  - ended_on filter on rooms_metrics endpoint
+  - "sector" field on rooms_metrics endpoint
+  - sector tag soft-delete
+    
+# 3.29.6
+# Add
+  - New fields for data export
+
 # 3.29.5
 # Add
  - sector tags requirements for closing rooms
@@ -799,6 +815,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 
