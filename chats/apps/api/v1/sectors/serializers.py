@@ -45,6 +45,7 @@ class SectorSerializer(serializers.ModelSerializer):
             "working_day",
             "automatic_message",
             "required_tags",
+            "secondary_project",
         ]
         extra_kwargs = {
             "work_start": {"required": False, "allow_null": True},
@@ -90,6 +91,16 @@ class SectorSerializer(serializers.ModelSerializer):
 
             data["is_automatic_message_active"] = automatic_message.get("is_active")
             data["automatic_message_text"] = automatic_message.get("text")
+
+        # Extract secondary_project from config if present
+        config = data.get("config", {})
+        if "secondary_project" in config:
+            secondary_project_value = config.get("secondary_project")
+            # Save as dict instead of string
+            if isinstance(secondary_project_value, str):
+                data["secondary_project"] = {"uuid": secondary_project_value}
+            else:
+                data["secondary_project"] = secondary_project_value
 
         return data
 
@@ -139,6 +150,7 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
             "config",
             "automatic_message",
             "required_tags",
+            "secondary_project",
         ]
         extra_kwargs = {field: {"required": False} for field in fields}
 
@@ -185,6 +197,16 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
             attrs.pop("automatic_message")
             attrs["is_automatic_message_active"] = new_is_automatic_message_active
             attrs["automatic_message_text"] = automatic_message.get("text")
+
+        # Extract secondary_project from config if present
+        config = attrs.get("config", {})
+        if "secondary_project" in config:
+            secondary_project_value = config.get("secondary_project")
+            # Save as dict instead of string
+            if isinstance(secondary_project_value, str):
+                attrs["secondary_project"] = {"uuid": secondary_project_value}
+            else:
+                attrs["secondary_project"] = secondary_project_value
 
         return attrs
 
