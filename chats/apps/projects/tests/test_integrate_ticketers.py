@@ -130,7 +130,7 @@ class TestIntegratedTicketers(TestCase):
             self.integration.integrate_ticketer(self.principal_project)
 
         self.sector.refresh_from_db()
-        self.assertFalse(self.sector.config.get("ticketer_integrated", False))
+        self.assertFalse((self.sector.config or {}).get("ticketer_integrated", False))
 
     def test_integrate_topic_success(self):
         mock_response = Mock()
