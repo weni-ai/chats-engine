@@ -106,6 +106,7 @@ class Project(BaseConfigurableModel, BaseModel):
     def get_cached_config(self):
         """Try to get config from cache first"""
         from chats.core.cache_utils import get_project_config_cached
+
         cached = get_project_config_cached(str(self.uuid))
         if cached is not None:
             return cached
@@ -268,6 +269,10 @@ class Project(BaseConfigurableModel, BaseModel):
         return self.permissions.filter(
             user=user, role=ProjectPermission.ROLE_ADMIN
         ).exists()
+
+    @property
+    def is_csat_enabled(self):
+        return self.sectors.filter(is_csat_enabled=True).exists()
 
 
 class ProjectPermission(

@@ -35,6 +35,7 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
             "user_email",
             "ticketer",
             "queue",
+            "is_csat_enabled",
         ]
 
         extra_kwargs = {field: {"required": False} for field in fields}

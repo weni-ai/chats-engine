@@ -1,3 +1,4 @@
+import json
 from rest_framework import serializers
 from timezone_field.rest_framework import TimeZoneSerializerField
 
@@ -33,11 +34,44 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     def get_config(self, project: Project):
         from chats.core.cache_utils import get_project_config_cached
+
         config = get_project_config_cached(str(project.uuid)) or project.config
         if config is not None and "chat_gpt_token" in config.keys():
             config = config.copy()
             config.pop("chat_gpt_token", None)
         return config
+
+
+class UpdateProjectSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Project
+        fields = [
+            "name",
+            "date_format",
+            "timezone",
+            "config",
+            "org",
+            "room_routing_type",
+        ]
+        read_only_fields = ["timezone", "room_routing_type"]
+
+    def validate(self, attrs: dict):
+        config = attrs.pop("config", None)
+        attrs["config"] = self.instance.config or {}
+
+        if config is not None:
+            # Ensure config is a dictionary before updating
+            if not isinstance(config, dict):
+                try:
+                    config = json.loads(config)
+                except Exception:
+                    raise serializers.ValidationError(
+                        {"config": "Config must be a JSON"}
+                    )
+
+            attrs["config"].update(config)
+
+        return attrs
 
 
 class LinkContactSerializer(serializers.ModelSerializer):
