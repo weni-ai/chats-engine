@@ -614,12 +614,6 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if not selected_holidays:
-            return Response(
-                {"detail": "Field 'holidays' is required and must not be empty"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         try:
             sector = Sector.objects.get(uuid=sector_uuid)
             country_code = get_country_from_timezone(str(sector.project.timezone))
