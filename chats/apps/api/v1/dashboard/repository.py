@@ -156,10 +156,21 @@ class ClosedRoomsRepository:
 
         user_agents = []
         if filters.user_request:
+            manager_sectors = filters.user_request.manager_sectors()
+            print(f"🔥 CLOSED_ROOMS: manager_sectors count = {manager_sectors.count()}")
+            print(f"🔥 CLOSED_ROOMS: rooms_filter = {self.rooms_filter}")
+            
             rooms_query = self.model.filter(
-                queue__sector__in=filters.user_request.manager_sectors()
+                queue__sector__in=manager_sectors
             )
-            closed_rooms = rooms_query.filter(**self.rooms_filter).exclude(config__imported_room=True).count()
+            print(f"🔥 CLOSED_ROOMS: rooms after manager_sectors filter = {rooms_query.count()}")
+            
+            filtered_rooms = rooms_query.filter(**self.rooms_filter)
+            print(f"🔥 CLOSED_ROOMS: rooms after date/sector filter = {filtered_rooms.count()}")
+            
+            closed_rooms = filtered_rooms.exclude(config__imported_room=True).count()
+            print(f"🔥 CLOSED_ROOMS: final count = {closed_rooms}")
+            
             user_agents = [ClosedRoomData(closed_rooms=closed_rooms)]
             return user_agents
 

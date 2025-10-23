@@ -158,6 +158,15 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         user_permission = ProjectPermission.objects.select_related(
             "user", "project"
         ).get(user=request.user, project=project)
+        
+        print(f"🔥 RAW_DATA DEBUG: USER = {request.user.email}")
+        print(f"🔥 RAW_DATA DEBUG: USER ROLE = {user_permission.role} (1=ADMIN, 2=USER)")
+        print(f"🔥 RAW_DATA DEBUG: IS ADMIN = {user_permission.is_admin}")
+        manager_sectors_list = user_permission.manager_sectors()
+        print(f"🔥 RAW_DATA DEBUG: MANAGER_SECTORS COUNT = {manager_sectors_list.count()}")
+        print(f"🔥 RAW_DATA DEBUG: MANAGER_SECTORS = {list(manager_sectors_list.values_list('uuid', 'name'))}")
+        print(f"🔥 RAW_DATA DEBUG: PARAMS = {params}")
+        
         filters = Filters(
             start_date=params.get("start_date"),
             end_date=params.get("end_date"),
