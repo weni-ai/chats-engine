@@ -24,7 +24,7 @@ from chats.apps.queues.tests.decorators import with_queue_authorization
 from chats.apps.rooms.models import Room, RoomPin
 from chats.apps.rooms.services import RoomsReportService
 from chats.apps.rooms.tests.decorators import with_room_user
-from chats.apps.sectors.models import Sector, SectorAuthorization
+from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 from chats.apps.sectors.tests.decorators import with_sector_authorization
 from chats.core.cache import CacheClient
 
@@ -751,20 +751,21 @@ class CloseRoomTestCase(APITestCase):
         )
 
         self.room = Room.objects.create(
-            queue=self.queue,
-            user=self.agent,
+            queue=self.queue, user=self.agent, config={"is_billing_notified": True}
         )
 
         self.client.force_authenticate(user=self.agent)
 
-    def close_room(self, room_pk: str) -> Response:
+    def close_room(self, room_pk: str, payload: dict = None) -> Response:
         url = reverse("room-close", kwargs={"pk": room_pk})
 
-        return self.client.patch(url)
+        return self.client.patch(url, data=payload, format="json")
 
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_close_room_when_billing_was_not_previously_notified(self, mock_get_room):
         mock_get_room.return_value = None
+        self.room.set_config("is_billing_notified", False)
+        self.room.save(update_fields=["config"])
 
         self.assertFalse(self.room.is_billing_notified)
 
@@ -781,8 +782,6 @@ class CloseRoomTestCase(APITestCase):
     def test_close_room_when_billing_was_previously_notified(self, mock_get_room):
         mock_get_room.return_value = None
 
-        self.room.set_config("is_billing_notified", True)
-        self.room.save(update_fields=["config"])
         self.assertTrue(self.room.is_billing_notified)
 
         response = self.close_room(self.room.uuid)
@@ -793,6 +792,41 @@ class CloseRoomTestCase(APITestCase):
         self.assertEqual(self.room.is_active, False)
 
         mock_get_room.assert_not_called()
+
+    def test_close_room_when_sector_has_required_tags_and_no_tags_are_provided(self):
+        self.sector.required_tags = True
+        self.sector.save()
+
+        response = self.close_room(self.room.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["tags"][0].code, "tags_required")
+
+    def test_close_room_when_sector_has_required_tags_and_room_already_has_tags(self):
+        self.sector.required_tags = True
+        self.sector.save()
+        self.room.tags.add(
+            SectorTag.objects.create(name="Test Tag", sector=self.sector)
+        )
+
+        response = self.close_room(self.room.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.is_active, False)
+
+    def test_close_room_when_sector_has_required_tags_and_tags_are_provided(self):
+        self.sector.required_tags = True
+        self.sector.save()
+
+        tag = SectorTag.objects.create(name="Test Tag", sector=self.sector)
+
+        response = self.close_room(self.room.uuid, payload={"tags": [tag.uuid]})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.is_active, False)
 
 
 class RoomHistorySummaryTestCase(APITestCase):
@@ -1326,4 +1360,267 @@ class TestRoomPinAuthenticatedUser(BaseRoomPinTestCase):
             queue=self.queue,
         )
         response = self.pin_room(room.uuid, {"status": False})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class BaseTestListRoomTags(APITestCase):
+    def list_room_tags(self, room_pk: str) -> Response:
+        url = reverse("room-tags", kwargs={"pk": room_pk})
+
+        return self.client.get(url)
+
+
+class TestListRoomTagsAnonymousUser(BaseTestListRoomTags):
+    def test_cannot_list_room_tags_when_user_is_not_authenticated(self):
+        response = self.list_room_tags(uuid.uuid4())
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class TestListRoomTagsAuthenticatedUser(BaseTestListRoomTags):
+    def setUp(self):
+        self.project = Project.objects.create(
+            name="Test Project",
+        )
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=1,
+            work_start=time(hour=5, minute=0),
+            work_end=time(hour=23, minute=59),
+        )
+        self.tags = [
+            SectorTag.objects.create(
+                name="Test Tag 1",
+                sector=self.sector,
+            ),
+            SectorTag.objects.create(
+                name="Test Tag 2",
+                sector=self.sector,
+            ),
+        ]
+        self.queue = Queue.objects.create(
+            name="Test Queue",
+            sector=self.sector,
+        )
+        self.user = User.objects.create(
+            email="test_user_1@example.com",
+        )
+        self.room = Room.objects.create(
+            queue=self.queue,
+            user=self.user,
+        )
+        self.room.tags.set(self.tags)
+        self.client.force_authenticate(user=self.user)
+
+    def test_list_room_tags_without_permission(self):
+        response = self.list_room_tags(self.room.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
+    @with_queue_authorization(role=QueueAuthorization.ROLE_AGENT)
+    def test_list_room_tags_with_permission(self):
+        another_room = Room.objects.create(
+            queue=self.queue,
+            user=self.user,
+        )
+        tag = SectorTag.objects.create(
+            name="Test Tag 3",
+            sector=self.sector,
+        )
+        another_room.tags.add(tag)
+
+        response = self.list_room_tags(self.room.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.json().get("results"),
+            [
+                {
+                    "uuid": str(self.tags[0].uuid),
+                    "name": self.tags[0].name,
+                },
+                {
+                    "uuid": str(self.tags[1].uuid),
+                    "name": self.tags[1].name,
+                },
+            ],
+        )
+
+
+class BaseTestAddRoomTag(APITestCase):
+    def add_room_tag(self, room_pk: str, data: dict) -> Response:
+        url = reverse("room-add-tag", kwargs={"pk": room_pk})
+
+        return self.client.post(url, data=data, format="json")
+
+
+class TestAddRoomTagAnonymousUser(BaseTestAddRoomTag):
+    def test_cannot_add_room_tag_when_user_is_not_authenticated(self):
+        response = self.add_room_tag(uuid.uuid4(), {"uuid": uuid.uuid4()})
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class TestAddRoomTagAuthenticatedUser(BaseTestAddRoomTag):
+    def setUp(self):
+        self.project = Project.objects.create(
+            name="Test Project",
+        )
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=1,
+            work_start=time(hour=5, minute=0),
+            work_end=time(hour=23, minute=59),
+        )
+        self.queue = Queue.objects.create(
+            name="Test Queue",
+            sector=self.sector,
+        )
+        self.user = User.objects.create(
+            email="test_user_1@example.com",
+        )
+        self.tags = [
+            SectorTag.objects.create(
+                name="Test Tag 1",
+                sector=self.sector,
+            ),
+        ]
+        self.room = Room.objects.create(
+            queue=self.queue,
+            user=self.user,
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def test_add_room_tag(self):
+        response = self.add_room_tag(self.room.uuid, {"uuid": self.tags[0].uuid})
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.room.refresh_from_db()
+
+        self.assertEqual(self.room.tags.first().uuid, self.tags[0].uuid)
+
+    def test_cannot_add_room_tag_when_room_is_not_active(self):
+        self.room.is_active = False
+        self.room.save()
+        response = self.add_room_tag(self.room.uuid, {"uuid": self.tags[0].uuid})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["detail"].code, "room_is_not_active")
+
+    def test_cannot_add_room_tag_when_tag_already_exists(self):
+        self.room.tags.add(self.tags[0])
+        response = self.add_room_tag(self.room.uuid, {"uuid": self.tags[0].uuid})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["uuid"][0].code, "tag_already_exists")
+
+    def test_cannot_add_room_tag_when_tag_does_not_exist(self):
+        response = self.add_room_tag(self.room.uuid, {"uuid": uuid.uuid4()})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["uuid"][0].code, "tag_not_found")
+
+    def test_cannot_add_tag_from_another_sector(self):
+        another_sector = Sector.objects.create(
+            name="Another Sector",
+            project=self.project,
+            rooms_limit=1,
+            work_start=time(hour=5, minute=0),
+            work_end=time(hour=23, minute=59),
+        )
+
+        another_tag = SectorTag.objects.create(
+            name="Another Tag",
+            sector=another_sector,
+        )
+
+        response = self.add_room_tag(self.room.uuid, {"uuid": another_tag.uuid})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["uuid"][0].code, "tag_not_found")
+
+    def test_cannot_add_room_tag_when_user_is_not_the_room_user(self):
+        another_user = User.objects.create(
+            email="test_user_2@example.com",
+        )
+        self.room.user = another_user
+        self.room.save()
+
+        response = self.add_room_tag(self.room.uuid, {"uuid": self.tags[0].uuid})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class BaseTestRemoveRoomTag(APITestCase):
+    def remove_room_tag(self, room_pk: str, data: dict) -> Response:
+        url = reverse("room-remove-tag", kwargs={"pk": room_pk})
+
+        return self.client.post(url, data=data, format="json")
+
+
+class TestRemoveRoomTagAnonymousUser(BaseTestRemoveRoomTag):
+    def test_cannot_remove_room_tag_when_user_is_not_authenticated(self):
+        response = self.remove_room_tag(uuid.uuid4(), {"uuid": uuid.uuid4()})
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class TestRemoveRoomTagAuthenticatedUser(BaseTestRemoveRoomTag):
+    def setUp(self):
+        self.project = Project.objects.create(
+            name="Test Project",
+        )
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=1,
+            work_start=time(hour=5, minute=0),
+            work_end=time(hour=23, minute=59),
+        )
+        self.queue = Queue.objects.create(
+            name="Test Queue",
+            sector=self.sector,
+        )
+        self.user = User.objects.create(
+            email="test_user_1@example.com",
+        )
+        self.tags = [
+            SectorTag.objects.create(
+                name="Test Tag 1",
+                sector=self.sector,
+            ),
+        ]
+        self.room = Room.objects.create(
+            queue=self.queue,
+            user=self.user,
+        )
+        self.room.tags.add(self.tags[0])
+        self.client.force_authenticate(user=self.user)
+
+    def test_remove_room_tag(self):
+        response = self.remove_room_tag(self.room.uuid, {"uuid": self.tags[0].uuid})
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.room.refresh_from_db()
+
+        self.assertEqual(self.room.tags.count(), 0)
+
+    def test_cannot_remove_room_tag_when_room_is_not_active(self):
+        self.room.is_active = False
+        self.room.save()
+        response = self.remove_room_tag(self.room.uuid, {"uuid": self.tags[0].uuid})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["detail"].code, "room_is_not_active")
+
+    def test_cannot_remove_room_tag_when_tag_does_not_exist(self):
+        response = self.remove_room_tag(self.room.uuid, {"uuid": uuid.uuid4()})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["uuid"][0].code, "tag_not_found")
+
+    def test_cannot_remove_room_tag_when_user_is_not_the_room_user(self):
+        another_user = User.objects.create(
+            email="test_user_2@example.com",
+        )
+        self.room.user = another_user
+        self.room.save()
+
+        response = self.remove_room_tag(self.room.uuid, {"uuid": self.tags[0].uuid})
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
