@@ -68,3 +68,23 @@ def calculate_last_queue_waiting_time(room: "Room"):
         return (timezone.now() - room.created_on).total_seconds()
 
     return int((timezone.now() - room.added_to_queue_at).total_seconds())
+
+
+def calculate_first_response_time(room: "Room") -> int:
+    """
+    Calculate the time between agent assignment and first agent message.
+    Returns 0 if no agent message exists or if there's no assignment time.
+    """
+    if not room.first_user_assigned_at:
+        return 0
+
+    first_agent_message = room.messages.filter(
+        user__isnull=False,
+        created_on__gte=room.first_user_assigned_at
+    ).order_by("created_on").first()
+
+    if not first_agent_message:
+        return 0
+
+    response_duration = first_agent_message.created_on - room.first_user_assigned_at
+    return int(response_duration.total_seconds())

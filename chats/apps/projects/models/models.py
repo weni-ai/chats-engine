@@ -285,6 +285,10 @@ class Project(BaseConfigurableModel, BaseModel):
 
         return csat_flow_config.flow_uuid
 
+    @property
+    def is_csat_enabled(self):
+        return self.sectors.filter(is_csat_enabled=True).exists()
+
 
 class ProjectPermission(
     BaseModel
