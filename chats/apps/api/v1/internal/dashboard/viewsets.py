@@ -6,6 +6,8 @@ from chats.apps.api.v1.dashboard.dto import should_exclude_admin_domains
 from chats.apps.api.v1.internal.dashboard.serializers import (
     DashboardAgentsSerializer,
     DashboardCustomAgentStatusSerializer,
+    DashboardCSATScoreByAgentsSerializer,
+    DashboardCSATScoreGeneralSerializer,
 )
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.projects.models import Project
@@ -76,3 +78,39 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         )
 
         return Response({"results": agents.data}, status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["GET"],
+        url_name="csat_score",
+    )
+    def csat_score_by_agents(self, request, *args, **kwargs):
+        """CSAT score by agents for the project"""
+        # TODO: Add cursor pagination
+        project = self.get_object()
+        params = request.query_params.dict()
+        filters = Filters(
+            start_date=params.get("start_date"),
+            end_date=params.get("end_date"),
+            agent=params.get("agent"),
+            sector=request.query_params.getlist("sector"),
+            tag=params.get("tags"),
+            queue=params.get("queue"),
+            user_request=params.get("user_request", ""),
+            is_weni_admin=should_exclude_admin_domains(params.get("user_request", "")),
+            ordering=params.get("ordering"),
+        )
+
+        agents_service = AgentsService()
+        csat_metrics = agents_service.get_agents_csat_score(filters, project)
+        general_csat_metrics = DashboardCSATScoreGeneralSerializer(
+            csat_metrics.get("general")
+        )
+        agents_csat_metrics = DashboardCSATScoreByAgentsSerializer(
+            csat_metrics.get("agents"), many=True
+        )
+
+        return Response(
+            {"general": general_csat_metrics.data, "results": agents_csat_metrics.data},
+            status.HTTP_200_OK,
+        )

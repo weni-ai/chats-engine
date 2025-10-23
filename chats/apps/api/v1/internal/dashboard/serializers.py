@@ -128,3 +128,25 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
         return calculate_in_service_time(
             obj.get("custom_status"), user_status=obj.get("status")
         )
+
+
+class DashboardCSATScoreGeneralSerializer(serializers.Serializer):
+    rooms = serializers.IntegerField()
+    reviews = serializers.IntegerField()
+    avg_rating = serializers.DecimalField(
+        allow_null=True, max_digits=3, decimal_places=2
+    )
+
+
+class DashboardCSATScoreAgentSerializer(serializers.Serializer):
+    name = serializers.CharField(allow_null=True, required=False)
+    email = serializers.EmailField(allow_null=True, required=False)
+
+
+class DashboardCSATScoreByAgentsSerializer(serializers.Serializer):
+    agent = DashboardCSATScoreAgentSerializer()
+    rooms = serializers.IntegerField()
+    reviews = serializers.IntegerField()
+    avg_rating = serializers.DecimalField(
+        allow_null=True, max_digits=3, decimal_places=2
+    )
