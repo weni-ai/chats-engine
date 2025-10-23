@@ -1,5 +1,7 @@
 from django.contrib.auth.models import AnonymousUser
 from rest_framework import permissions
+from rest_framework.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _
 
 from chats.apps.rooms.models import Room
 
@@ -45,20 +47,45 @@ class MessageMediaPermission(permissions.BasePermission):
             room = Room.objects.get(messages__uuid=request.data.get("message"))
             return room.user == request.user
         elif action == "list":
-            try:
-                room = Room.objects.get(uuid=request.query_params.get("room"))
-                if room.user == request.user:
+            room_uuid = request.query_params.get("room")
+            project_uuid = request.query_params.get("project")
+
+            if not room_uuid and not project_uuid:
+                raise ValidationError(
+                    {
+                        "error": [
+                            _("Either room or project query parameter is required")
+                        ]
+                    },
+                    code="required",
+                )
+
+            room_query = Room.objects.filter(uuid=room_uuid)
+            room_user_pk, room_project_uuid = (
+                (
+                    room_query.values_list(
+                        "user__pk",
+                        "queue__sector__project__uuid",
+                    ).first()
+                )
+                if room_query.exists()
+                else (None, None)
+            )
+
+            if room_uuid and (room_project_uuid or project_uuid):
+                if room_user_pk == request.user.pk:
                     return True
                 else:
-                    permission = user.project_permissions.get(
-                        project=room.queue.sector.project
-                    )
-                    return permission.role > 0
-            except Room.DoesNotExist:
-                permission = user.project_permissions.get(
-                    project__uuid=request.query_params.get("project")
-                )
-                return permission.role > 0
+                    return user.project_permissions.filter(
+                        project__uuid=room_project_uuid, role__gt=0
+                    ).exists()
+            else:
+                if not project_uuid:
+                    return False
+
+                return user.project_permissions.filter(
+                    project__uuid=project_uuid, role__gt=0
+                ).exists()
         return super().has_permission(request, view)
 
     def has_object_permission(self, request, view, obj) -> bool:

@@ -80,7 +80,7 @@ class RoomsReportService:
             rooms = (
                 Room.objects.filter(queue__sector__project=self.project, **filters)
                 .order_by("created_on")
-                .select_related("user", "contact", "queue", "queue__sector")
+                .select_related("user", "contact", "queue", "queue__sector", "metric")
             ).prefetch_related("tags")
 
             if not rooms.exists():
@@ -107,6 +107,9 @@ class RoomsReportService:
                     "Agente",
                     "Quantidade de mensagens",
                     "Tempo de espera",
+                    "Tempo para primeira resposta",
+                    "Tempo de resposta",
+                    "Duração",
                     "Tags",
                 ]
             )
@@ -129,6 +132,9 @@ class RoomsReportService:
                         room.user.name if room.user else None,
                         room.messages.count(),
                         room.metric.waiting_time,
+                        room.metric.first_response_time,
+                        room.metric.message_response_time,
+                        room.metric.interaction_time,
                         tags,
                     ]
                 )
