@@ -176,7 +176,7 @@ class IntegratedTicketers:
                 token_uuid = integrated_token.get("uuid")
             else:
                 token_uuid = integrated_token
-            
+
             sector = Sector.objects.get(
                 project=project, secondary_project__uuid=token_uuid
             )
@@ -189,7 +189,10 @@ class IntegratedTicketers:
                 return {"status": "skipped", "reason": "already_integrated"}
 
             # Get UUID from secondary_project dict
-            secondary_project_uuid = sector.secondary_project.get("uuid") if isinstance(sector.secondary_project, dict) else sector.secondary_project
+            if isinstance(sector.secondary_project, dict):
+                secondary_project_uuid = sector.secondary_project.get("uuid")
+            else:
+                secondary_project_uuid = sector.secondary_project
 
             content = {
                 "project_uuid": str(secondary_project_uuid),
@@ -238,7 +241,7 @@ class IntegratedTicketers:
                 token_uuid = sector_integrated_token.get("uuid")
             else:
                 token_uuid = sector_integrated_token
-                
+
             queues = Queue.objects.filter(
                 sector__project=project,
                 sector__secondary_project__uuid=str(token_uuid),
@@ -255,7 +258,10 @@ class IntegratedTicketers:
                     continue
 
                 # Get UUID from secondary_project dict
-                secondary_project_uuid = queue.sector.secondary_project.get("uuid") if isinstance(queue.sector.secondary_project, dict) else queue.sector.secondary_project
+                if isinstance(queue.sector.secondary_project, dict):
+                    secondary_project_uuid = queue.sector.secondary_project.get("uuid")
+                else:
+                    secondary_project_uuid = queue.sector.secondary_project
 
                 content = {
                     "uuid": str(queue.uuid),
