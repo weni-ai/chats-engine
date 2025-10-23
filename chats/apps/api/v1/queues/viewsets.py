@@ -102,7 +102,7 @@ class QueueViewset(ModelViewSet):
         if project.config and project.config.get("its_principal", False):
             integrate_use_case = IntegratedTicketers()
             integrate_use_case.integrate_individual_topic(
-                project, instance.sector.config.get("secondary_project")
+                project, instance.sector.secondary_project
             )
 
         return instance
