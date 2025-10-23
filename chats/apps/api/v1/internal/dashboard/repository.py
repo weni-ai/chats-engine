@@ -421,8 +421,8 @@ class AgentRepository:
         csat_reviews_query["rooms__csat_survey__isnull"] = False
         csat_reviews_query["rooms__csat_survey__rating__isnull"] = False
 
-        agents.annotate(
-            rooms=Count(
+        agents = agents.annotate(
+            rooms_count=Count(
                 "rooms__uuid",
                 distinct=True,
                 filter=Q(**rooms_query),
@@ -439,5 +439,5 @@ class AgentRepository:
         ).order_by("-avg_rating")
 
         return self._get_csat_general(filters, project), agents.values(
-            "rooms", "reviews", "avg_rating"
+            "rooms_count", "reviews", "avg_rating"
         )

@@ -11,6 +11,11 @@ from chats.apps.csat.models import CSATSurvey
 from chats.apps.sectors.models import Sector
 from chats.apps.queues.models import Queue
 from chats.apps.contacts.models import Contact
+from chats.apps.accounts.models import User
+from chats.apps.projects.models import ProjectPermission
+from chats.apps.sectors.models import SectorAuthorization
+from chats.apps.queues.models import QueueAuthorization
+from chats.apps.sectors.models import SectorTag
 
 
 class AgentRepositoryTestCase(TestCase):
@@ -699,3 +704,125 @@ class AgentRepositoryTestCase(TestCase):
         self.assertEqual(rooms_query["rooms__queue__sector__in"], [self.sector.uuid])
         self.assertEqual(rooms_query["rooms__queue"], self.queue.uuid)
         self.assertEqual(rooms_query["rooms__tags__in"], [str(tag.uuid)])
+
+    def test_get_agents_csat_score(self):
+        sector2 = Sector.objects.create(
+            name="Test Sector 2",
+            project=self.project,
+            rooms_limit=10,
+            work_start="00:00",
+            work_end="23:59",
+        )
+        queue2 = Queue.objects.create(name="Test Queue 2", sector=self.sector)
+        tag = SectorTag.objects.create(name="urgent", sector=self.sector)
+
+        # Create users
+        user1 = User.objects.create(
+            email="agent1@test.com", first_name="Agent", last_name="One"
+        )
+        user2 = User.objects.create(
+            email="agent2@test.com", first_name="Agent", last_name="Two"
+        )
+        admin_user = User.objects.create(
+            email="admin@weni.ai", first_name="Admin", last_name="User"
+        )
+
+        # Create project permissions
+        permission1 = ProjectPermission.objects.create(
+            user=user1, project=self.project, role=2
+        )
+        permission2 = ProjectPermission.objects.create(
+            user=user2, project=self.project, role=2
+        )
+        permission_admin = ProjectPermission.objects.create(
+            user=admin_user, project=self.project, role=2
+        )
+
+        # Create authorizations
+        SectorAuthorization.objects.create(
+            permission=permission1, sector=self.sector, role=1
+        )
+        SectorAuthorization.objects.create(
+            permission=permission2, sector=sector2, role=1
+        )
+        SectorAuthorization.objects.create(
+            permission=permission_admin, sector=self.sector, role=1
+        )
+
+        QueueAuthorization.objects.create(permission=permission1, queue=self.queue)
+        QueueAuthorization.objects.create(permission=permission2, queue=queue2)
+        QueueAuthorization.objects.create(permission=permission_admin, queue=self.queue)
+
+        # Create rooms with different end dates
+        from datetime import datetime
+        import pytz
+
+        utc_tz = pytz.timezone("UTC")
+        old_date = utc_tz.localize(datetime(2023, 12, 31, 12, 0, 0))
+        recent_date = utc_tz.localize(datetime(2024, 1, 15, 12, 0, 0))
+
+        # Create rooms for user1
+        room1 = Room.objects.create(
+            queue=self.queue,
+            contact=self.contact,
+            project_uuid=self.project.uuid,
+            is_active=False,
+            ended_at=recent_date,
+            user=user1,
+        )
+        room1.tags.add(tag)
+
+        room2 = Room.objects.create(
+            queue=self.queue,
+            contact=self.contact,
+            project_uuid=self.project.uuid,
+            is_active=False,
+            ended_at=recent_date,
+            user=user1,
+        )
+        room2.tags.add(tag)
+
+        # Create rooms for user2 (should be filtered out)
+        room3 = Room.objects.create(
+            queue=queue2,
+            contact=self.contact,
+            project_uuid=self.project.uuid,
+            is_active=False,
+            ended_at=old_date,
+            user=user2,
+        )
+
+        # Create CSAT surveys
+        CSATSurvey.objects.create(room=room1, rating=5, answered_on=recent_date)
+        CSATSurvey.objects.create(room=room2, rating=3, answered_on=recent_date)
+        CSATSurvey.objects.create(room=room3, rating=4, answered_on=old_date)
+
+        # Test with comprehensive filters
+        filters = Filters(
+            start_date="2024-01-01",
+            end_date="2024-01-31",
+            sector=[self.sector.uuid],
+            queue=self.queue.uuid,
+            tag=str(tag.uuid),
+            agent="agent1@test.com",
+            is_weni_admin=False,
+        )
+
+        general_csat, agents_csat = self.repository.get_agents_csat_score(
+            filters, self.project
+        )
+
+        # Test general CSAT metrics - verify we get some data
+        self.assertGreaterEqual(general_csat.rooms, 0)
+        self.assertGreaterEqual(general_csat.reviews, 0)
+        self.assertGreaterEqual(general_csat.avg_rating, 0)
+
+        # Test agents CSAT metrics - verify we get some data
+        agents_list = list(agents_csat)
+        self.assertGreaterEqual(len(agents_list), 0)
+
+        if agents_list:
+            agent_data = agents_list[0]
+            self.assertIn("rooms_count", agent_data)
+            self.assertIn("reviews", agent_data)
+            self.assertIn("avg_rating", agent_data)

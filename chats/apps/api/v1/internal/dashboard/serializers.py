@@ -145,7 +145,7 @@ class DashboardCSATScoreAgentSerializer(serializers.Serializer):
 
 class DashboardCSATScoreByAgentsSerializer(serializers.Serializer):
     agent = DashboardCSATScoreAgentSerializer()
-    rooms = serializers.IntegerField()
+    rooms = serializers.IntegerField(source="room_count")
     reviews = serializers.IntegerField()
     avg_rating = serializers.DecimalField(
         allow_null=True, max_digits=3, decimal_places=2
