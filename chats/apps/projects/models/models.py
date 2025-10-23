@@ -270,6 +270,10 @@ class Project(BaseConfigurableModel, BaseModel):
             user=user, role=ProjectPermission.ROLE_ADMIN
         ).exists()
 
+    @property
+    def is_csat_enabled(self):
+        return self.sectors.filter(is_csat_enabled=True).exists()
+
 
 class ProjectPermission(
     BaseModel

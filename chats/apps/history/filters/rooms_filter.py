@@ -1,10 +1,65 @@
+from django.db.models import QuerySet
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 from rest_framework import exceptions
 
+from chats.apps.contacts.models import Contact
 from chats.apps.rooms.models import Room
+from chats.apps.projects.models import ProjectPermission
+from chats.apps.accounts.models import User
+from chats.apps.projects.models import Project
+
+
+def filter_history_rooms_queryset_by_project_permission(
+    queryset: QuerySet[Room],
+    user_permission: ProjectPermission,
+) -> QuerySet[Room]:
+
+    project: Project = user_permission.project
+    user: User = user_permission.user
+    base_queryset = queryset.filter(is_active=False, ended_at__isnull=False)
+
+    contacts_blocklist = project.history_contacts_blocklist
+
+    if contacts_blocklist:
+        base_queryset = base_queryset.exclude(
+            contact__external_id__in=contacts_blocklist
+        )
+
+    base_queryset = base_queryset.filter(queue__sector__project=project)
+
+    if user_permission.is_admin is False:
+        if project.agents_can_see_queue_history is False:
+            return base_queryset.filter(user=user)
+
+        return base_queryset.filter(
+            Q(queue__in=user_permission.queue_ids) | Q(user=user)
+        )
+
+    return base_queryset
+
+
+def get_history_rooms_queryset_by_contact(
+    contact: Contact,
+    user: User,
+    project: Project,
+) -> QuerySet[Room]:
+    user_permission = ProjectPermission.objects.filter(
+        user=user, project=project
+    ).first()
+
+    base_queryset = Room.objects.filter(
+        contact=contact, is_active=False, ended_at__isnull=False
+    )
+
+    if not user_permission:
+        return base_queryset.none()
+
+    return filter_history_rooms_queryset_by_project_permission(
+        base_queryset, user_permission
+    )
 
 
 class HistoryRoomFilter(filters.FilterSet):
@@ -61,26 +116,9 @@ class HistoryRoomFilter(filters.FilterSet):
                 detail="Access denied! Make sure you have the right permission to access this project"
             )
 
-        base_queryset = queryset.filter(is_active=False, ended_at__isnull=False)
-
-        project = user_permission.project
-        contacts_blocklist = project.history_contacts_blocklist
-        if contacts_blocklist:
-            base_queryset = base_queryset.exclude(
-                contact__external_id__in=contacts_blocklist
-            )
-
-        base_queryset = base_queryset.filter(queue__sector__project=value)
-
-        if user_permission.is_admin is False:
-            if project.agents_can_see_queue_history is False:
-                return base_queryset.filter(user=user)
-
-            return base_queryset.filter(
-                Q(queue__in=user_permission.queue_ids) | Q(user=user)
-            )
-
-        return base_queryset
+        return filter_history_rooms_queryset_by_project_permission(
+            queryset, user_permission
+        )
 
     def filter_tags(self, queryset, name, value):
         if not value:

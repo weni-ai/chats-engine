@@ -10,7 +10,7 @@ from chats.apps.contacts.models import Contact
 from chats.apps.projects.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
-from chats.apps.sectors.models import Sector
+from chats.apps.sectors.models import Sector, SectorTag
 
 
 class SectorTests(APITestCase):
@@ -299,6 +299,47 @@ class SectorTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.sector.refresh_from_db()
         self.assertTrue(self.sector.is_csat_enabled)
+
+    def test_update_sector_to_require_tags_when_no_tags_are_present(self):
+        """
+        Verify if the endpoint for update sector is working with correctly.
+        """
+        url = reverse("sector-detail", args=[self.sector.pk])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = client.patch(url, data={"required_tags": True})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["required_tags"][0].code,
+            "sector_must_have_at_least_one_tag_to_require_tags",
+        )
+        self.sector.refresh_from_db()
+        self.assertFalse(self.sector.required_tags)
+
+    def test_update_sector_to_require_tags_when_tags_are_present(self):
+        """
+        Verify if the endpoint for update sector is working with correctly.
+        """
+        url = reverse("sector-detail", args=[self.sector.pk])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        SectorTag.objects.create(name="Test Tag", sector=self.sector)
+        response = client.patch(url, data={"required_tags": True})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.sector.refresh_from_db()
+        self.assertTrue(self.sector.required_tags)
+
+    def test_update_sector_with_required_tags_as_false_and_no_tags_are_present(self):
+        """
+        Verify if the endpoint for update sector is working with correctly.
+        """
+        url = reverse("sector-detail", args=[self.sector.pk])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = client.patch(url, data={"required_tags": False})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.sector.refresh_from_db()
+        self.assertFalse(self.sector.required_tags)
 
 
 class RoomsExternalTests(APITestCase):

@@ -7,11 +7,17 @@ class DashboardAgentsSerializer(serializers.Serializer):
     link = serializers.SerializerMethodField()
     opened = serializers.IntegerField(allow_null=True, required=False)
     agent = serializers.SerializerMethodField()
-    closed = serializers.IntegerField(allow_null=True, required=False)
-    status = serializers.SerializerMethodField()
     agent_email = serializers.EmailField(
         source="email", allow_null=True, required=False
     )
+    closed = serializers.IntegerField(allow_null=True, required=False)
+    status = serializers.SerializerMethodField()
+    avg_first_response_time = serializers.IntegerField(allow_null=True, required=False)
+    avg_message_response_time = serializers.IntegerField(
+        allow_null=True, required=False
+    )
+    avg_interaction_time = serializers.IntegerField(allow_null=True, required=False)
+    time_in_service = serializers.SerializerMethodField()
 
     def get_link(self, obj):
         return {
@@ -28,23 +34,31 @@ class DashboardAgentsSerializer(serializers.Serializer):
                 is_active = status_item.get("is_active", False)
 
                 if status_type != "In-Service" and is_active:
-                    return {"status": "orange", "label": status_type}
+                    return {"status": "custom", "label": status_type}
 
         if obj.get("status") == "ONLINE":
-            return {"status": "green", "label": None}
+            return {"status": "online", "label": None}
         elif obj.get("status") == "OFFLINE":
-            return {"status": "gray", "label": None}
+            return {"status": "offline", "label": None}
 
-        return {"status": "gray", "label": None}
+        return {"status": "offline", "label": None}
 
     def get_agent(self, obj):
         return f"{obj.get('first_name')} {obj.get('last_name')}"
+
+    def get_time_in_service(self, obj):
+        return calculate_in_service_time(
+            obj.get("custom_status"), user_status=obj.get("status")
+        )
 
 
 class DashboardCustomAgentStatusSerializer(serializers.Serializer):
     link = serializers.SerializerMethodField()
     opened = serializers.IntegerField(allow_null=True, required=False)
     agent = serializers.SerializerMethodField()
+    agent_email = serializers.EmailField(
+        source="email", allow_null=True, required=False
+    )
     closed = serializers.IntegerField(allow_null=True, required=False)
     status = serializers.SerializerMethodField()
     custom_status = serializers.SerializerMethodField()
@@ -68,14 +82,14 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
                 is_active = status_item.get("is_active", False)
 
                 if status_type != "In-Service" and is_active:
-                    return {"status": "orange", "label": status_type}
+                    return {"status": "custom", "label": status_type}
 
         if obj.get("status") == "ONLINE":
-            return {"status": "green", "label": None}
+            return {"status": "online", "label": None}
         elif obj.get("status") == "OFFLINE":
-            return {"status": "gray", "label": None}
+            return {"status": "offline", "label": None}
 
-        return {"status": "gray", "label": None}
+        return {"status": "offline", "label": None}
 
     def get_agent(self, obj):
         return f"{obj.get('first_name')} {obj.get('last_name')}"
