@@ -121,10 +121,13 @@ class SectorSerializer(serializers.ModelSerializer):
 
         validate_is_csat_enabled(project, data.get("is_csat_enabled"), self.context)
 
-        # Extract secondary_project from config if present
         config = data.get("config", {})
         if "secondary_project" in config:
-            data["secondary_project"] = config.get("secondary_project")
+            secondary_project_value = config.get("secondary_project")
+            if isinstance(secondary_project_value, str):
+                data["secondary_project"] = {"uuid": secondary_project_value}
+            else:
+                data["secondary_project"] = secondary_project_value
 
         return data
 
@@ -230,7 +233,11 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
 
         config = attrs.get("config", {})
         if "secondary_project" in config:
-            attrs["secondary_project"] = config.get("secondary_project")
+            secondary_project_value = config.get("secondary_project")
+            if isinstance(secondary_project_value, str):
+                attrs["secondary_project"] = {"uuid": secondary_project_value}
+            else:
+                attrs["secondary_project"] = secondary_project_value
 
         return attrs
 
