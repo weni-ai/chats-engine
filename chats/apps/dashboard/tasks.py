@@ -2,20 +2,21 @@ import io
 import logging
 import os
 import zipfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID
 
 import pandas as pd
 from django.conf import settings
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
 
+from chats.apps.dashboard.email_templates import get_report_ready_email
 from chats.apps.dashboard.models import ReportStatus, RoomMetrics
 from chats.apps.dashboard.utils import (
+    calculate_first_response_time,
     calculate_last_queue_waiting_time,
     calculate_response_time,
-    calculate_first_response_time,
 )
 from chats.apps.projects.models import Project
 from chats.apps.rooms.models import Room
@@ -132,15 +133,12 @@ def generate_custom_fields_report(
     project = Project.objects.get(uuid=project_uuid)
     report_generator = ReportFieldsValidatorViewSet()
 
-    # Search the status object
     report_status = ReportStatus.objects.get(uuid=report_status_id)
 
     try:
-        # Update to processing
-        report_status.status = "processing"
+        report_status.status = "in_progress"
         report_status.save()
 
-        # Generate the report: filter only known models and ignore auxiliary keys (ex.: 'type')
         from chats.apps.api.v1.dashboard.presenter import ModelFieldsPresenter
 
         available_fields = ModelFieldsPresenter.get_models_info()
@@ -149,12 +147,10 @@ def generate_custom_fields_report(
         }
         report_data = report_generator._generate_report_data(models_config, project)
 
-        # Generate in XLSX (default) or CSV+ZIP
         file_type = _norm_file_type(fields_config.get("_file_type"))
         output = io.BytesIO()
         if file_type == "xlsx":
             with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-                # Write only the rooms sheet
                 model_data = report_data.get("rooms", {})
                 df_data = _strip_tz(model_data.get("data", []))
                 df = pd.DataFrame(df_data)
@@ -188,41 +184,63 @@ def generate_custom_fields_report(
                 f.write(output.getvalue())
             logger.info("Custom report saved at: %s", file_path)
 
-        subject = f"Custom report for the project {project.name} - {dt}"
-        message = (
-            f"The custom report for the project {project.name} "
-            "is ready and has been attached to this email."
-        )
-
         if getattr(settings, "REPORTS_SEND_EMAILS", False):
             try:
-                email = EmailMessage(
+                from chats.core.storages import ReportsStorage
+
+                storage = ReportsStorage()
+                ext = "xlsx" if file_type == "xlsx" else "zip"
+                filename = f"custom_report_{project.uuid}_{dt}.{ext}"
+
+                output.seek(0)
+                file_path = storage.save(filename, output)
+
+                download_url = storage.get_download_url(
+                    file_path, expiration=int(timedelta(days=7).total_seconds())
+                )
+
+                logger.info(
+                    "Report uploaded to S3: %s | report_uuid=%s | url=%s",
+                    file_path,
+                    report_status.uuid,
+                    download_url,
+                )
+
+                subject = f"Custom report for the project {project.name} - {dt}"
+
+                message_plain, message_html = get_report_ready_email(
+                    project.name, download_url
+                )
+
+                email = EmailMultiAlternatives(
                     subject=subject,
-                    body=message,
+                    body=message_plain,
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     to=[user_email],
                 )
-                output.seek(0)
-                if file_type == "xlsx":
-                    email.attach(
-                        f"custom_report_{dt}.xlsx",
-                        output.getvalue(),
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    )
-                else:
-                    email.attach(
-                        f"custom_report_{dt}.zip", output.getvalue(), "application/zip"
-                    )
+                email.attach_alternative(message_html, "text/html")
+
+                email.extra_headers = {
+                    "X-No-Track": "True",
+                    "X-Track-Click": "no",
+                    "o:tracking-clicks": "no",
+                }
+
                 email.send(fail_silently=False)
+
+                logger.info(
+                    "Report email sent successfully to %s | report_uuid=%s",
+                    user_email,
+                    report_status.uuid,
+                )
+
             except Exception as e:
                 logger.exception("Error sending email report: %s", e)
 
-        # Update to completed
-        report_status.status = "completed"
+        report_status.status = "ready"
         report_status.save()
 
     except Exception as e:
-        # Update to failed
         report_status.status = "failed"
         report_status.error_message = str(e)
         report_status.save()
@@ -237,7 +255,6 @@ def process_pending_reports():
     from chats.apps.api.v1.dashboard.presenter import ModelFieldsPresenter
     from chats.apps.api.v1.dashboard.viewsets import ReportFieldsValidatorViewSet
 
-    # Select a pending report safely (avoid concurrency)
     with transaction.atomic():
         report = (
             ReportStatus.objects.select_for_update(skip_locked=True)
@@ -248,31 +265,43 @@ def process_pending_reports():
         if not report:
             logging.info("No pending reports to process.")
             return
-        report.status = "processing"
+        report.status = "in_progress"
         report.save()
 
     project = report.project
     fields_config = report.fields_config or {}
     user_email = report.user.email
-    chunk_size = getattr(settings, "REPORTS_CHUNK_SIZE", 1)
 
     try:
         view = ReportFieldsValidatorViewSet()
         available_fields = ModelFieldsPresenter.get_models_info()
 
-        # Decide formato
         file_type = _norm_file_type(fields_config.get("type"))
         output = io.BytesIO()
 
         if file_type == "xlsx":
             with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-                # Sempre gerar apenas a aba 'rooms'
                 rooms_cfg = (fields_config or {}).get("rooms") or {}
                 query_data = None
                 if rooms_cfg:
                     query_data = view._process_model_fields(
                         "rooms", rooms_cfg, project, available_fields
                     )
+
+                qs = (query_data or {}).get("queryset")
+                total_records = qs.count() if qs is not None else 0
+
+                base_chunk_size = getattr(settings, "REPORTS_CHUNK_SIZE", 5000)
+                chunk_size = (
+                    base_chunk_size * 2
+                    if total_records > (base_chunk_size * 10)
+                    else base_chunk_size
+                )
+                logging.info(
+                    "Report size: %s records, using chunk_size: %s",
+                    total_records,
+                    chunk_size,
+                )
 
                 def _write_queryset(sheet_name: str, qs):
                     total = qs.count()
@@ -302,21 +331,17 @@ def process_pending_reports():
                         )
                         row_offset += len(df)
 
-                qs = (query_data or {}).get("queryset")
                 if qs is not None:
                     if qs.count() > 0:
                         _write_queryset("rooms", qs)
                     else:
-                        # Sem linhas: cria aba 'rooms' apenas com os headers escolhidos (se houver)
                         requested_fields = rooms_cfg.get("fields") or []
                         pd.DataFrame(columns=requested_fields).to_excel(
                             writer, sheet_name="rooms", index=False
                         )
                 else:
-                    # Nenhuma config de rooms: cria aba vazia para manter workbook válido
                     pd.DataFrame().to_excel(writer, sheet_name="rooms", index=False)
         else:
-            # CSV: gera um zip com um CSV por aba
             csv_buffers = {}
 
             def _write_csv_queryset(sheet_name: str, qs):
@@ -326,6 +351,14 @@ def process_pending_reports():
                 if buf is None:
                     buf = io.StringIO()
                     csv_buffers[sheet_name] = buf
+
+                base_chunk_size = getattr(settings, "REPORTS_CHUNK_SIZE", 5000)
+                chunk_size = (
+                    base_chunk_size * 2
+                    if total > (base_chunk_size * 10)
+                    else base_chunk_size
+                )
+
                 for start in range(0, total, chunk_size):
                     end = min(start + chunk_size, total)
                     logging.info(
@@ -382,38 +415,60 @@ def process_pending_reports():
             "Processing report %s for project %s done.", report.uuid, project.uuid
         )
 
-        subject = f"Custom report for the project {project.name} - {dt}"
-        message = (
-            f"The custom report for the project {project.name} "
-            "is ready and has been attached to this email."
-        )
-
         if getattr(settings, "REPORTS_SEND_EMAILS", False):
             try:
-                email = EmailMessage(
+                from chats.core.storages import ReportsStorage
+
+                storage = ReportsStorage()
+                ext = "xlsx" if file_type == "xlsx" else "zip"
+                filename = f"custom_report_{project.uuid}_{dt}.{ext}"
+
+                output.seek(0)
+                file_path = storage.save(filename, output)
+
+                download_url = storage.get_download_url(
+                    file_path, expiration=int(timedelta(days=7).total_seconds())
+                )
+
+                logging.info(
+                    "Report uploaded to S3: %s | report_uuid=%s | url=%s",
+                    file_path,
+                    report.uuid,
+                    download_url,
+                )
+
+                subject = f"Custom report for the project {project.name} - {dt}"
+
+                message_plain, message_html = get_report_ready_email(
+                    project.name, download_url
+                )
+
+                email = EmailMultiAlternatives(
                     subject=subject,
-                    body=message,
+                    body=message_plain,
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     to=[user_email],
                 )
-                output.seek(0)
-                if file_type == "xlsx":
-                    email.attach(
-                        f"custom_report_{dt}.xlsx",
-                        output.getvalue(),
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    )
-                else:
-                    email.attach(
-                        f"custom_report_{dt}.zip",
-                        output.getvalue(),
-                        "application/zip",
-                    )
+                email.attach_alternative(message_html, "text/html")
+
+                email.extra_headers = {
+                    "X-No-Track": "True",
+                    "X-Track-Click": "no",
+                    "o:tracking-clicks": "no",
+                }
+
                 email.send(fail_silently=False)
+
+                logging.info(
+                    "Report email sent successfully to %s | report_uuid=%s",
+                    user_email,
+                    report.uuid,
+                )
+
             except Exception as e:
                 logging.exception("Error sending email report: %s", e)
 
-        report.status = "completed"
+        report.status = "ready"
         report.save()
 
     except Exception as e:
