@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sectors', '0020_sector_required_tags'),
+        ('sectors', '0021_sectortag_is_deleted'),
     ]
 
     operations = [
