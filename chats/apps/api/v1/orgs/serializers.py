@@ -20,4 +20,4 @@ class OrgProjectSerializer(serializers.ModelSerializer):
             return None
 
     def get_has_sector_integration(self, obj):
-        return Sector.objects.filter(secondary_project=str(obj.uuid)).exists()
+        return Sector.objects.filter(secondary_project__uuid=str(obj.uuid)).exists()
