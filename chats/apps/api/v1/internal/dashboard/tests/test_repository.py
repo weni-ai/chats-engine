@@ -587,3 +587,115 @@ class AgentRepositoryTestCase(TestCase):
 
         self.assertEqual(agents.count(), 1)
         self.assertEqual(agents.first().email, "agent1@test.com")
+
+    def test_get_csat_rooms_query_basic(self):
+        filters = Filters()
+        rooms_query = self.repository._get_csat_rooms_query(filters, self.project)
+
+        expected_query = {"is_active": False}
+        self.assertEqual(rooms_query, expected_query)
+
+    def test_get_csat_rooms_query_date_filtering(self):
+        filters = Filters(start_date="2024-01-01", end_date="2024-01-31")
+        rooms_query = self.repository._get_csat_rooms_query(filters, self.project)
+
+        self.assertEqual(rooms_query["is_active"], False)
+        self.assertIn("rooms__ended_at__gte", rooms_query)
+        self.assertIn("rooms__ended_at__lte", rooms_query)
+
+        filters_start_only = Filters(start_date="2024-01-01")
+        rooms_query_start = self.repository._get_csat_rooms_query(
+            filters_start_only, self.project
+        )
+
+        self.assertEqual(rooms_query_start["is_active"], False)
+        self.assertIn("rooms__ended_at__gte", rooms_query_start)
+        self.assertNotIn("rooms__ended_at__lte", rooms_query_start)
+
+        filters_end_only = Filters(end_date="2024-01-31")
+        rooms_query_end = self.repository._get_csat_rooms_query(
+            filters_end_only, self.project
+        )
+
+        self.assertEqual(rooms_query_end["is_active"], False)
+        self.assertNotIn("rooms__ended_at__gte", rooms_query_end)
+        self.assertIn("rooms__ended_at__lte", rooms_query_end)
+
+    def test_get_csat_rooms_query_sector_filtering(self):
+        sector2 = Sector.objects.create(
+            name="Test Sector 2",
+            project=self.project,
+            rooms_limit=10,
+            work_start="00:00",
+            work_end="23:59",
+        )
+
+        filters = Filters(sector=[self.sector.uuid, sector2.uuid])
+        rooms_query = self.repository._get_csat_rooms_query(filters, self.project)
+
+        self.assertEqual(rooms_query["is_active"], False)
+        self.assertEqual(
+            rooms_query["rooms__queue__sector__in"], [self.sector.uuid, sector2.uuid]
+        )
+
+    def test_get_csat_rooms_query_queue_filtering(self):
+        Queue.objects.create(name="Test Queue 2", sector=self.sector)
+
+        filters = Filters(queue=self.queue.uuid)
+        rooms_query = self.repository._get_csat_rooms_query(filters, self.project)
+
+        self.assertEqual(rooms_query["is_active"], False)
+        self.assertEqual(rooms_query["rooms__queue"], self.queue.uuid)
+
+    def test_get_csat_rooms_query_tag_filtering(self):
+        from chats.apps.sectors.models import SectorTag
+
+        tag1 = SectorTag.objects.create(name="urgent", sector=self.sector)
+        tag2 = SectorTag.objects.create(name="support", sector=self.sector)
+
+        filters_single = Filters(tag=str(tag1.uuid))
+        rooms_query_single = self.repository._get_csat_rooms_query(
+            filters_single, self.project
+        )
+
+        self.assertEqual(rooms_query_single["is_active"], False)
+        self.assertEqual(rooms_query_single["rooms__tags__in"], [str(tag1.uuid)])
+
+        filters_multiple = Filters(tag=f"{tag1.uuid},{tag2.uuid}")
+        rooms_query_multiple = self.repository._get_csat_rooms_query(
+            filters_multiple, self.project
+        )
+
+        self.assertEqual(rooms_query_multiple["is_active"], False)
+        self.assertEqual(
+            rooms_query_multiple["rooms__tags__in"], [str(tag1.uuid), str(tag2.uuid)]
+        )
+
+    def test_get_csat_rooms_query_combined_filters(self):
+        from chats.apps.sectors.models import SectorTag
+
+        Sector.objects.create(
+            name="Test Sector 2",
+            project=self.project,
+            rooms_limit=10,
+            work_start="00:00",
+            work_end="23:59",
+        )
+        Queue.objects.create(name="Test Queue 2", sector=self.sector)
+        tag = SectorTag.objects.create(name="urgent", sector=self.sector)
+
+        filters = Filters(
+            start_date="2024-01-01",
+            end_date="2024-01-31",
+            sector=[self.sector.uuid],
+            queue=self.queue.uuid,
+            tag=str(tag.uuid),
+        )
+        rooms_query = self.repository._get_csat_rooms_query(filters, self.project)
+
+        self.assertEqual(rooms_query["is_active"], False)
+        self.assertIn("rooms__ended_at__gte", rooms_query)
+        self.assertIn("rooms__ended_at__lte", rooms_query)
+        self.assertEqual(rooms_query["rooms__queue__sector__in"], [self.sector.uuid])
+        self.assertEqual(rooms_query["rooms__queue"], self.queue.uuid)
+        self.assertEqual(rooms_query["rooms__tags__in"], [str(tag.uuid)])
