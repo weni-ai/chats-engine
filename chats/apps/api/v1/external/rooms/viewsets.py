@@ -172,10 +172,32 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
 
         return Response(status=status.HTTP_201_CREATED)
 
-    @transaction.atomic
     def create(self, request, *args, **kwargs):
         try:
-            return super().create(request, *args, **kwargs)
+            with transaction.atomic():
+                serializer = self.get_serializer(data=request.data)
+                serializer.is_valid(raise_exception=True)
+                self.perform_create(serializer)
+
+            headers = self.get_success_headers(serializer.data)
+
+            instance = serializer.instance
+
+            if (
+                instance.user
+                and instance.queue.sector.is_automatic_message_active
+                and instance.queue.sector.automatic_message_text
+            ):
+                transaction.on_commit(
+                    lambda: instance.send_automatic_message(
+                        delay=1,
+                        check_ticket=settings.AUTOMATIC_MESSAGE_CHECK_TICKET_ON_ROOM_CREATE,
+                    )
+                )
+
+            return Response(
+                serializer.data, status=status.HTTP_201_CREATED, headers=headers
+            )
 
         except IntegrityError:
             return Response(
@@ -232,13 +254,6 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
                 cancel_history_summary_generation.apply_async(
                     args=[history_summary.uuid], countdown=30
                 )  # 30 seconds delay
-
-        if (
-            instance.user
-            and instance.queue.sector.is_automatic_message_active
-            and instance.queue.sector.automatic_message_text
-        ):
-            instance.send_automatic_message(delay=1)
 
     def perform_update(self, serializer):
         serializer.save()

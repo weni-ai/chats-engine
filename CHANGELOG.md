@@ -1,3 +1,63 @@
+# 3.29.8
+# Add
+  - Removing unused verification when creating a sector without holidays
+  - New redirect for awaiting table
+  - Custom_fields on rooms_metrics endpoint
+    
+# 3.29.7
+# Add
+  - ended_on filter on rooms_metrics endpoint
+  - "sector" field on rooms_metrics endpoint
+  - sector tag soft-delete
+    
+# 3.29.6
+# Add
+  - New fields for data export
+
+# 3.29.5
+# Add
+ - sector tags requirements for closing rooms
+
+# 3.29.4
+# Add
+ - remove room tags when transfering room to queue in another sector
+
+# 3.29.3
+# Fix
+ - automatic message Flows ticket
+
+# 3.29.2
+# Fix
+ - resolving url in table
+
+# 3.29.1
+# Add
+ - calc the first message from agent
+ - new average waiting time
+ - new fields for on going table
+ - new ordering fields for metrics dashboard
+# Fix
+ - send automatic message when room is created with user
+
+# 3.28.0
+# Add
+ - index to MessageMedia's content_type
+ - content_type filter in message media endpoint
+ - cursor pagination to message media endpoint
+ - user cache in OIDC authentication
+
+# 3.27.0
+# Add
+  - flag to indicate if contact has history
+
+# 3.26.7
+# Add
+  - disconnect agents with custom breaks
+
+# 3.26.6
+# Add
+  - Cursor pagination on messages list endpoint
+
 # 3.26.5
 # Add
   - Internal note feature
@@ -755,6 +815,9 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
+
+
 
 
 
