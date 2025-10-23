@@ -11,6 +11,7 @@ from chats.apps.api.v1.internal.dashboard.serializers import (
 )
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.projects.models import Project
+from chats.apps.api.pagination import CustomCursorPagination
 
 from .dto import Filters
 from .service import AgentsService
@@ -86,7 +87,6 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
     )
     def csat_score_by_agents(self, request, *args, **kwargs):
         """CSAT score by agents for the project"""
-        # TODO: Add cursor pagination
         project = self.get_object()
         params = request.query_params.dict()
         filters = Filters(
@@ -102,15 +102,23 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         )
 
         agents_service = AgentsService()
-        csat_metrics = agents_service.get_agents_csat_score(filters, project)
-        general_csat_metrics = DashboardCSATScoreGeneralSerializer(
-            csat_metrics.get("general")
+        general_csat_metrics, agents_csat_metrics = (
+            agents_service.get_agents_csat_score(filters, project)
         )
-        agents_csat_metrics = DashboardCSATScoreByAgentsSerializer(
-            csat_metrics.get("agents"), many=True
+
+        self.ordering = "-avg_rating"
+        agents_csat_metrics_page = CustomCursorPagination().paginate_queryset(
+            agents_csat_metrics, request, view=self
         )
 
         return Response(
-            {"general": general_csat_metrics.data, "results": agents_csat_metrics.data},
+            {
+                "general": DashboardCSATScoreGeneralSerializer(
+                    general_csat_metrics
+                ).data,
+                "results": DashboardCSATScoreByAgentsSerializer(
+                    agents_csat_metrics_page.object_list, many=True
+                ).data,
+            },
             status.HTTP_200_OK,
         )

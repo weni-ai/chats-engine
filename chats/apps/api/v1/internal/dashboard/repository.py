@@ -16,7 +16,8 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce, Extract, JSONObject
 from django.utils import timezone
-import pendulum
+from datetime import datetime
+import pytz
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.dashboard.dto import get_admin_domains_exclude_filter
 from chats.apps.projects.models import ProjectPermission
@@ -320,13 +321,15 @@ class AgentRepository:
         end_date = None
 
         if filters.start_date:
-            start_date = pendulum.parse(
-                filters.start_date + " 00:00:00", tz=project_timezone
+            tz = pytz.timezone(project_timezone)
+            start_date = tz.localize(
+                datetime.strptime(filters.start_date + " 00:00:00", "%Y-%m-%d %H:%M:%S")
             )
 
         if filters.end_date:
-            end_date = pendulum.parse(
-                filters.end_date + " 23:59:59", tz=project_timezone
+            tz = pytz.timezone(project_timezone)
+            end_date = tz.localize(
+                datetime.strptime(filters.end_date + " 23:59:59", "%Y-%m-%d %H:%M:%S")
             )
 
         return start_date, end_date
@@ -433,11 +436,8 @@ class AgentRepository:
                 "rooms__csat_survey__rating",
                 filter=Q(**csat_reviews_query),
             ),
+        ).order_by("-avg_rating")
+
+        return self._get_csat_general(filters, project), agents.values(
+            "rooms", "reviews", "avg_rating"
         )
-
-        results = {
-            "general": self._get_csat_general(filters, project),
-            "agents": agents.values("rooms", "reviews", "avg_rating"),
-        }
-
-        return results
