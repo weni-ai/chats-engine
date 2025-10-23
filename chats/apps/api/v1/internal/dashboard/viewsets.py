@@ -83,7 +83,8 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
     @action(
         detail=True,
         methods=["GET"],
-        url_name="csat_score",
+        url_name="csat_score_by_agents",
+        url_path="csat-score-by-agents",
     )
     def csat_score_by_agents(self, request, *args, **kwargs):
         """CSAT score by agents for the project"""
@@ -106,19 +107,41 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
             agents_service.get_agents_csat_score(filters, project)
         )
 
-        self.ordering = "-avg_rating"
-        agents_csat_metrics_page = CustomCursorPagination().paginate_queryset(
+        paginator = CustomCursorPagination()
+        paginator.ordering = "-avg_rating"
+
+        # Apply pagination
+        paginated_agents = paginator.paginate_queryset(
             agents_csat_metrics, request, view=self
         )
 
-        return Response(
-            {
-                "general": DashboardCSATScoreGeneralSerializer(
-                    general_csat_metrics
-                ).data,
-                "results": DashboardCSATScoreByAgentsSerializer(
-                    agents_csat_metrics_page.object_list, many=True
-                ).data,
-            },
-            status.HTTP_200_OK,
-        )
+        if paginated_agents is not None:
+            # If pagination is applied, return paginated response
+            serializer = DashboardCSATScoreByAgentsSerializer(
+                paginated_agents, many=True
+            )
+            paginated_response = paginator.get_paginated_response(serializer.data)
+
+            return Response(
+                {
+                    "general": DashboardCSATScoreGeneralSerializer(
+                        general_csat_metrics
+                    ).data,
+                    **paginated_response.data,
+                },
+                status.HTTP_200_OK,
+            )
+        else:
+            # If no pagination, return simple response
+            serializer = DashboardCSATScoreByAgentsSerializer(
+                agents_csat_metrics, many=True
+            )
+            return Response(
+                {
+                    "general": DashboardCSATScoreGeneralSerializer(
+                        general_csat_metrics
+                    ).data,
+                    "results": serializer.data,
+                },
+                status.HTTP_200_OK,
+            )

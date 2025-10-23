@@ -144,9 +144,15 @@ class DashboardCSATScoreAgentSerializer(serializers.Serializer):
 
 
 class DashboardCSATScoreByAgentsSerializer(serializers.Serializer):
-    agent = DashboardCSATScoreAgentSerializer()
-    rooms = serializers.IntegerField(source="room_count")
+    agent = serializers.SerializerMethodField()
+    rooms = serializers.SerializerMethodField()
     reviews = serializers.IntegerField()
     avg_rating = serializers.DecimalField(
         allow_null=True, max_digits=3, decimal_places=2
     )
+
+    def get_agent(self, obj):
+        return DashboardCSATScoreAgentSerializer(obj).data
+
+    def get_rooms(self, obj):
+        return obj.get("rooms_count")
