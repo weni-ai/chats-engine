@@ -156,21 +156,10 @@ class ClosedRoomsRepository:
 
         user_agents = []
         if filters.user_request:
-            manager_sectors = filters.user_request.manager_sectors()
-            print(f"🔥 CLOSED_ROOMS: manager_sectors count = {manager_sectors.count()}")
-            print(f"🔥 CLOSED_ROOMS: rooms_filter = {self.rooms_filter}")
-            
             rooms_query = self.model.filter(
-                queue__sector__in=manager_sectors
+                queue__sector__in=filters.user_request.manager_sectors()
             )
-            print(f"🔥 CLOSED_ROOMS: rooms after manager_sectors filter = {rooms_query.count()}")
-            
-            filtered_rooms = rooms_query.filter(**self.rooms_filter)
-            print(f"🔥 CLOSED_ROOMS: rooms after date/sector filter = {filtered_rooms.count()}")
-            
-            closed_rooms = filtered_rooms.exclude(config__imported_room=True).count()
-            print(f"🔥 CLOSED_ROOMS: final count = {closed_rooms}")
-            
+            closed_rooms = rooms_query.filter(**self.rooms_filter).count()
             user_agents = [ClosedRoomData(closed_rooms=closed_rooms)]
             return user_agents
 
@@ -222,7 +211,7 @@ class TransferCountRepository:
                 queue__sector__in=filters.user_request.manager_sectors()
             )
 
-            transfer_metric = rooms_query.filter(**self.rooms_filter).exclude(config__imported_room=True).aggregate(
+            transfer_metric = rooms_query.filter(**self.rooms_filter).aggregate(
                 transfer_count=Sum("metric__transfer_count")
             )["transfer_count"]
             if transfer_metric is None:
@@ -268,7 +257,7 @@ class QueueRoomsRepository:
                 queue__sector__in=filters.user_request.manager_sectors()
             )
 
-            queue_rooms_metric = rooms_query.filter(**self.rooms_filter).exclude(config__imported_room=True).count()
+            queue_rooms_metric = rooms_query.filter(**self.rooms_filter).count()
             queue_rooms = [QueueRoomData(queue_rooms=queue_rooms_metric)]
             return queue_rooms
 
@@ -325,7 +314,7 @@ class ActiveChatsRepository:
             rooms_query = self.model.filter(
                 queue__sector__in=filters.user_request.manager_sectors()
             )
-            active_chats_count = rooms_query.filter(**self.rooms_filter).exclude(config__imported_room=True).count()
+            active_chats_count = rooms_query.filter(**self.rooms_filter).count()
             active_rooms = [ActiveRoomData(active_rooms=active_chats_count)]
             return active_rooms
 
@@ -381,7 +370,7 @@ class SectorRepository:
         )
 
         sector_query = (
-            room_metric_query.filter(**self.rooms_filter).exclude(room__config__imported_room=True)
+            room_metric_query.filter(**self.rooms_filter)
             .values(f"{self.division_level}__uuid")
             .annotate(
                 uuid=F(f"{self.division_level}__uuid"),
@@ -469,7 +458,7 @@ class ORMRoomsDataRepository(RoomsDataRepository):
                 queue__sector__in=filters.user_request.manager_sectors()
             )
 
-            general_data = rooms_query.filter(**self.rooms_filter).exclude(config__imported_room=True).aggregate(
+            general_data = rooms_query.filter(**self.rooms_filter).aggregate(
                 interact_time=interact_time_agg,
                 response_time=message_response_time_agg,
                 waiting_time=waiting_time_agg,
