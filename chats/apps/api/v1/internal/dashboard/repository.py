@@ -315,7 +315,7 @@ class AgentRepository:
         return agents_query
 
     def _get_converted_dates(self, filters: Filters, project: Project) -> dict:
-        project_timezone = project.timezone or "UTC"
+        project_timezone = project.timezone.key if project.timezone else "UTC"
 
         start_date = None
         end_date = None
