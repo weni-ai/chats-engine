@@ -138,11 +138,6 @@ class DashboardCSATScoreGeneralSerializer(serializers.Serializer):
     )
 
 
-class DashboardCSATScoreAgentSerializer(serializers.Serializer):
-    name = serializers.CharField(allow_null=True, required=False)
-    email = serializers.EmailField(allow_null=True, required=False)
-
-
 class DashboardCSATScoreByAgentsSerializer(serializers.Serializer):
     agent = serializers.SerializerMethodField()
     rooms = serializers.SerializerMethodField()
@@ -152,7 +147,12 @@ class DashboardCSATScoreByAgentsSerializer(serializers.Serializer):
     )
 
     def get_agent(self, obj):
-        return DashboardCSATScoreAgentSerializer(obj).data
+        name = f"{obj.get('first_name')} {obj.get('last_name')}".strip()
+
+        return {
+            "name": name,
+            "email": obj.get("email"),
+        }
 
     def get_rooms(self, obj):
         return obj.get("rooms_count")

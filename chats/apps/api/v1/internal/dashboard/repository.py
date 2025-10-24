@@ -441,5 +441,5 @@ class AgentRepository:
         ).order_by("-avg_rating")
 
         return self._get_csat_general(filters, project), agents.values(
-            "rooms_count", "reviews", "avg_rating"
+            "email", "first_name", "last_name", "rooms_count", "reviews", "avg_rating"
         )

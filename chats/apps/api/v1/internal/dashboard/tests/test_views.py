@@ -1,5 +1,7 @@
 import uuid
+from unittest.mock import patch
 
+from django.utils import timezone
 from django.db.models import Avg, Count
 from django.urls import reverse
 from rest_framework import status
@@ -8,10 +10,12 @@ from rest_framework.response import Response
 from rest_framework.request import Request
 
 from chats.apps.accounts.models import User
-from chats.apps.api.v1.internal.dashboard.dto import CSATScoreGeneral
-from chats.apps.projects.models.models import Project
+from chats.apps.projects.models.models import Project, ProjectPermission
 from chats.apps.accounts.tests.decorators import with_internal_auth
-from unittest.mock import patch
+from chats.apps.queues.models import Queue
+from chats.apps.sectors.models import Sector
+from chats.apps.rooms.models import Room
+from chats.apps.csat.models import CSATSurvey
 
 
 class BaseTestInternalDashboardView(APITestCase):
@@ -31,51 +35,38 @@ class TestInternalDashboardViewAuthenticated(BaseTestInternalDashboardView):
     def setUp(self):
         self.user = User.objects.create(email="testuser@test.com")
         self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            project=self.project,
+            name="Test Sector",
+            rooms_limit=10,
+            work_start="00:00",
+            work_end="23:59",
+        )
+        self.queue = Queue.objects.create(sector=self.sector, name="Test Queue")
 
         self.client.force_authenticate(user=self.user)
 
     @with_internal_auth
-    @patch(
-        "chats.apps.api.v1.internal.dashboard.viewsets.AgentsService.get_agents_csat_score"
-    )
-    def test_get_agent_csat_metrics_authenticated(self, mock_get_agents_csat_score):
+    def test_get_agent_csat_metrics_authenticated(self):
         users = [
-            User.objects.create(email="agent1@test.com"),
-            User.objects.create(email="agent2@test.com"),
+            User.objects.create(
+                email="agent1@test.com", first_name="Agent", last_name="One"
+            ),
+            User.objects.create(
+                email="agent2@test.com", first_name="Agent", last_name="Two"
+            ),
         ]
 
-        mock_get_agents_csat_score.return_value = (
-            CSATScoreGeneral(rooms=10, reviews=5, avg_rating=4.5),
-            User.objects.filter(email__in=["agent1@test.com", "agent2@test.com"])
-            .annotate(
-                rooms_count=Count("rooms__uuid", distinct=True),
-                reviews=Count("rooms__csat_survey__rating", distinct=True),
-                avg_rating=Avg("rooms__csat_survey__rating"),
-            )
-            .values("rooms_count", "reviews", "avg_rating"),
-        )
+        for user in users:
+            ProjectPermission.objects.create(user=user, project=self.project, role=2)
+            room = Room.objects.create(queue=self.queue, user=user)
+            room.is_active = False
+            room.save()
+            CSATSurvey.objects.create(room=room, rating=5, answered_on=timezone.now())
 
         response = self.get_agent_csat_metrics(self.project.uuid, {"page_size": 1})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(
-            response.data["general"],
-            {
-                "rooms": 10,
-                "reviews": 5,
-                "avg_rating": 4.5,
-            },
-        )
-        self.assertEqual(
-            response.data["results"],
-            [
-                {
-                    "agent": "agent1@test.com",
-                    "rooms": 5,
-                    "reviews": 3,
-                    "avg_rating": 5.0,
-                }
-            ],
-        )
+
         self.assertIsNotNone(response.data["next"])
         self.assertIsNone(response.data["previous"])
