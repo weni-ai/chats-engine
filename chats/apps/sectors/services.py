@@ -52,7 +52,7 @@ class AutomaticMessagesService:
             else:
                 project = room.queue.sector.project
 
-            for i in range(FLOWS_GET_TICKET_RETRIES):
+            for i in range(FLOWS_GET_TICKET_RETRIES + 1):
                 logger.info(
                     "[AUTOMATIC MESSAGES SERVICE] Checking ticket %s (attempt %s)",
                     ticket_uuid,
