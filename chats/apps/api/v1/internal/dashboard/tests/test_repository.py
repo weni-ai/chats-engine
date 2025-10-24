@@ -597,14 +597,14 @@ class AgentRepositoryTestCase(TestCase):
         filters = Filters()
         rooms_query = self.repository._get_csat_rooms_query(filters, self.project)
 
-        expected_query = {"is_active": False}
+        expected_query = {"rooms__is_active": False}
         self.assertEqual(rooms_query, expected_query)
 
     def test_get_csat_rooms_query_date_filtering(self):
         filters = Filters(start_date="2024-01-01", end_date="2024-01-31")
         rooms_query = self.repository._get_csat_rooms_query(filters, self.project)
 
-        self.assertEqual(rooms_query["is_active"], False)
+        self.assertEqual(rooms_query["rooms__is_active"], False)
         self.assertIn("rooms__ended_at__gte", rooms_query)
         self.assertIn("rooms__ended_at__lte", rooms_query)
 
@@ -613,7 +613,7 @@ class AgentRepositoryTestCase(TestCase):
             filters_start_only, self.project
         )
 
-        self.assertEqual(rooms_query_start["is_active"], False)
+        self.assertEqual(rooms_query_start["rooms__is_active"], False)
         self.assertIn("rooms__ended_at__gte", rooms_query_start)
         self.assertNotIn("rooms__ended_at__lte", rooms_query_start)
 
@@ -622,7 +622,7 @@ class AgentRepositoryTestCase(TestCase):
             filters_end_only, self.project
         )
 
-        self.assertEqual(rooms_query_end["is_active"], False)
+        self.assertEqual(rooms_query_end["rooms__is_active"], False)
         self.assertNotIn("rooms__ended_at__gte", rooms_query_end)
         self.assertIn("rooms__ended_at__lte", rooms_query_end)
 
@@ -638,7 +638,7 @@ class AgentRepositoryTestCase(TestCase):
         filters = Filters(sector=[self.sector.uuid, sector2.uuid])
         rooms_query = self.repository._get_csat_rooms_query(filters, self.project)
 
-        self.assertEqual(rooms_query["is_active"], False)
+        self.assertEqual(rooms_query["rooms__is_active"], False)
         self.assertEqual(
             rooms_query["rooms__queue__sector__in"], [self.sector.uuid, sector2.uuid]
         )
@@ -649,7 +649,7 @@ class AgentRepositoryTestCase(TestCase):
         filters = Filters(queue=self.queue.uuid)
         rooms_query = self.repository._get_csat_rooms_query(filters, self.project)
 
-        self.assertEqual(rooms_query["is_active"], False)
+        self.assertEqual(rooms_query["rooms__is_active"], False)
         self.assertEqual(rooms_query["rooms__queue"], self.queue.uuid)
 
     def test_get_csat_rooms_query_tag_filtering(self):
@@ -663,7 +663,7 @@ class AgentRepositoryTestCase(TestCase):
             filters_single, self.project
         )
 
-        self.assertEqual(rooms_query_single["is_active"], False)
+        self.assertEqual(rooms_query_single["rooms__is_active"], False)
         self.assertEqual(rooms_query_single["rooms__tags__in"], [str(tag1.uuid)])
 
         filters_multiple = Filters(tag=f"{tag1.uuid},{tag2.uuid}")
@@ -671,7 +671,7 @@ class AgentRepositoryTestCase(TestCase):
             filters_multiple, self.project
         )
 
-        self.assertEqual(rooms_query_multiple["is_active"], False)
+        self.assertEqual(rooms_query_multiple["rooms__is_active"], False)
         self.assertEqual(
             rooms_query_multiple["rooms__tags__in"], [str(tag1.uuid), str(tag2.uuid)]
         )
@@ -698,7 +698,7 @@ class AgentRepositoryTestCase(TestCase):
         )
         rooms_query = self.repository._get_csat_rooms_query(filters, self.project)
 
-        self.assertEqual(rooms_query["is_active"], False)
+        self.assertEqual(rooms_query["rooms__is_active"], False)
         self.assertIn("rooms__ended_at__gte", rooms_query)
         self.assertIn("rooms__ended_at__lte", rooms_query)
         self.assertEqual(rooms_query["rooms__queue__sector__in"], [self.sector.uuid])
