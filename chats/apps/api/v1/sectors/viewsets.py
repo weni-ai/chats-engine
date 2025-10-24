@@ -77,38 +77,45 @@ class SectorViewset(viewsets.ModelViewSet):
 
         project = Project.objects.get(uuid=instance.project.uuid)
 
-        content = {
-            "project_uuid": str(instance.project.uuid),
-            "name": instance.name,
-            "config": {
-                "project_auth": str(instance.external_token.pk),
-                "sector_uuid": str(instance.uuid),
-                "project_uuid": str(instance.project.uuid),
-                "project_name_origin": instance.name,
-            },
-        }
+        should_use_integration = (
+            project.config
+            and project.config.get("its_principal", False)
+            and instance.secondary_project
+        )
 
         if settings.USE_WENI_FLOWS:
-            flows_client = FlowRESTClient()
-            response = flows_client.create_ticketer(**content)
-            if response.status_code not in [
-                status.HTTP_200_OK,
-                status.HTTP_201_CREATED,
-            ]:
-                instance.delete()
+            if not should_use_integration:
+                content = {
+                    "project_uuid": str(instance.project.uuid),
+                    "name": instance.name,
+                    "config": {
+                        "project_auth": str(instance.external_token.pk),
+                        "sector_uuid": str(instance.uuid),
+                        "project_uuid": str(instance.project.uuid),
+                        "project_name_origin": instance.name,
+                    },
+                }
 
-                raise exceptions.APIException(
-                    detail=(
-                        f"[{response.status_code}] Error posting the sector/ticketer on flows. "
-                        f"Exception: {response.content}"
+                flows_client = FlowRESTClient()
+                response = flows_client.create_ticketer(**content)
+                if response.status_code not in [
+                    status.HTTP_200_OK,
+                    status.HTTP_201_CREATED,
+                ]:
+                    instance.delete()
+
+                    raise exceptions.APIException(
+                        detail=(
+                            f"[{response.status_code}] Error posting the sector/ticketer on flows. "
+                            f"Exception: {response.content}"
+                        )
                     )
-                )
 
-        if project.config and project.config.get("its_principal", False):
-            integrate_use_case = IntegratedTicketers()
-            integrate_use_case.integrate_individual_ticketer(
-                project, instance.secondary_project
-            )
+            else:
+                integrate_use_case = IntegratedTicketers()
+                integrate_use_case.integrate_individual_ticketer(
+                    project, instance.secondary_project
+                )
 
     def update(self, request, *args, **kwargs):
         sector = self.get_object()
