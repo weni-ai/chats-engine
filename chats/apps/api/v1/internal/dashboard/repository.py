@@ -1,3 +1,5 @@
+from zoneinfo import ZoneInfo
+
 from django.contrib.postgres.aggregates import JSONBAgg
 from django.contrib.postgres.fields import JSONField
 from django.db.models import (
@@ -16,8 +18,6 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce, Extract, JSONObject
 from django.utils import timezone
-from datetime import datetime
-import pytz
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.dashboard.dto import get_admin_domains_exclude_filter
 from chats.apps.projects.models import ProjectPermission
@@ -25,6 +25,7 @@ from chats.apps.projects.models.models import CustomStatus, Project
 from chats.apps.rooms.models import Room
 
 from chats.apps.api.v1.internal.dashboard.dto import CSATScoreGeneral, Filters
+from chats.apps.projects.dates import parse_date_with_timezone
 
 
 class AgentRepository:
@@ -349,21 +350,22 @@ class AgentRepository:
         return agents_query
 
     def _get_converted_dates(self, filters: Filters, project: Project) -> dict:
-        project_timezone = project.timezone or "UTC"
+        project_timezone = project.timezone if project.timezone else "UTC"
+
+        if isinstance(project_timezone, ZoneInfo):
+            project_timezone = project_timezone.key
 
         start_date = None
         end_date = None
 
         if filters.start_date:
-            tz = pytz.timezone(project_timezone)
-            start_date = tz.localize(
-                datetime.strptime(filters.start_date + " 00:00:00", "%Y-%m-%d %H:%M:%S")
+            start_date = parse_date_with_timezone(
+                filters.start_date, project_timezone, is_end_date=False
             )
 
         if filters.end_date:
-            tz = pytz.timezone(project_timezone)
-            end_date = tz.localize(
-                datetime.strptime(filters.end_date + " 23:59:59", "%Y-%m-%d %H:%M:%S")
+            end_date = parse_date_with_timezone(
+                filters.end_date, project_timezone, is_end_date=True
             )
 
         return start_date, end_date

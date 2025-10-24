@@ -64,6 +64,41 @@ class AgentRepositoryTestCase(TestCase):
         self.assertEqual(start_date, expected_start)
         self.assertEqual(end_date, expected_end)
 
+    def test_get_converted_dates_with_different_formats(self):
+        """Test _get_converted_dates with different date formats"""
+        project = Project(timezone="America/Sao_Paulo")
+        expected_tz = pytz.timezone("America/Sao_Paulo")
+
+        # Test with date-only format
+        filters = Filters(start_date="2024-01-01", end_date="2024-01-01")
+        start_date, end_date = self.repository._get_converted_dates(filters, project)
+
+        expected_start = expected_tz.localize(
+            datetime.strptime("2024-01-01 00:00:00", "%Y-%m-%d %H:%M:%S")
+        )
+        expected_end = expected_tz.localize(
+            datetime.strptime("2024-01-01 23:59:59", "%Y-%m-%d %H:%M:%S")
+        )
+
+        self.assertEqual(start_date, expected_start)
+        self.assertEqual(end_date, expected_end)
+
+        # Test with datetime format
+        filters = Filters(
+            start_date="2024-01-01T14:30:00", end_date="2024-01-01T16:45:00"
+        )
+        start_date, end_date = self.repository._get_converted_dates(filters, project)
+
+        expected_start = expected_tz.localize(
+            datetime.strptime("2024-01-01 14:30:00", "%Y-%m-%d %H:%M:%S")
+        )
+        expected_end = expected_tz.localize(
+            datetime.strptime("2024-01-01 16:45:00", "%Y-%m-%d %H:%M:%S")
+        )
+
+        self.assertEqual(start_date, expected_start)
+        self.assertEqual(end_date, expected_end)
+
     def test_get_csat_general_empty_data(self):
         """Test CSAT general metrics with no rooms or surveys"""
         filters = Filters(
