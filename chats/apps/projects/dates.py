@@ -36,7 +36,10 @@ def parse_date_with_timezone(
         if (
             "+" in date_str
             or date_str.endswith("Z")
-            or re.search(r"[+-]\d{4}$", date_str)
+            or re.search(
+                r"[+-]\d{2}:\d{2}$", date_str
+            )  # Matches formats like -03:00, +05:30
+            or re.search(r"[+-]\d{4}$", date_str)  # Matches formats like -0300, +0530
         ):
             # Handle timezone-aware formats
             dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
