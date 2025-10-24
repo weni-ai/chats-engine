@@ -1,5 +1,3 @@
-from zoneinfo import ZoneInfo
-
 from django.contrib.postgres.aggregates import JSONBAgg
 from django.contrib.postgres.fields import JSONField
 from django.db.models import (
@@ -352,7 +350,7 @@ class AgentRepository:
     def _get_converted_dates(self, filters: Filters, project: Project) -> dict:
         project_timezone = project.timezone if project.timezone else "UTC"
 
-        if isinstance(project_timezone, ZoneInfo):
+        if not isinstance(project_timezone, str) and hasattr(project_timezone, "key"):
             project_timezone = project_timezone.key
 
         start_date = None
