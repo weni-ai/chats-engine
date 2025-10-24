@@ -159,4 +159,7 @@ class DashboardCSATScoreByAgentsSerializer(serializers.Serializer):
         return obj.get("rooms_count")
 
     def get_avg_rating(self, obj):
+        if not obj.get("avg_rating"):
+            return None
+
         return round(obj.get("avg_rating"), 2)
