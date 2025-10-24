@@ -117,6 +117,10 @@ class SectorSerializer(serializers.ModelSerializer):
             data["is_automatic_message_active"] = automatic_message.get("is_active")
             data["automatic_message_text"] = automatic_message.get("text")
 
+        project = self.instance.project if self.instance else data.get("project")
+
+        validate_is_csat_enabled(project, data.get("is_csat_enabled"), self.context)
+
         config = data.get("config", {})
         if "secondary_project" in config:
             secondary_project_value = config.get("secondary_project")
@@ -222,6 +226,10 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
             attrs.pop("automatic_message")
             attrs["is_automatic_message_active"] = new_is_automatic_message_active
             attrs["automatic_message_text"] = automatic_message.get("text")
+
+        project = self.instance.project
+
+        validate_is_csat_enabled(project, attrs.get("is_csat_enabled"), self.context)
 
         config = attrs.get("config", {})
         if "secondary_project" in config:

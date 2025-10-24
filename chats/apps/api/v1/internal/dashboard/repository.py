@@ -72,10 +72,18 @@ class AgentRepository:
 
             closed_rooms["rooms__ended_at__range"] = [start_time, end_time]
             closed_rooms["rooms__is_active"] = False
+            
+            # Filter for CustomStatus
+            custom_status_start = start_time
+            custom_status_end = end_time
         else:
             closed_rooms["rooms__ended_at__gte"] = initial_datetime
             opened_rooms["rooms__is_active"] = True
             closed_rooms["rooms__is_active"] = False
+            
+            # Default: from start of day until now
+            custom_status_start = initial_datetime
+            custom_status_end = timezone.now()
 
         if filters.agent:
             rooms_filter["rooms__user"] = filters.agent
@@ -93,6 +101,8 @@ class AgentRepository:
             CustomStatus.objects.filter(
                 user=OuterRef("email"),
                 status_type__project=project,
+                created_on__gte=custom_status_start,
+                created_on__lte=custom_status_end,
             )
             .values("user")
             .annotate(
@@ -114,6 +124,8 @@ class AgentRepository:
                 user=OuterRef("email"),
                 status_type__project=project,
                 status_type__name="In-Service",
+                created_on__gte=custom_status_start,
+                created_on__lte=custom_status_end,
             )
             .annotate(
                 time_contribution=Case(
@@ -244,10 +256,18 @@ class AgentRepository:
             rooms_filter["rooms__created_on__range"] = [start_time, end_time]
             rooms_filter["rooms__is_active"] = False
             closed_rooms["rooms__ended_at__range"] = [start_time, end_time]
+            
+            # Filter for CustomStatus
+            custom_status_start = start_time
+            custom_status_end = end_time
         else:
             closed_rooms["rooms__ended_at__gte"] = initial_datetime
             opened_rooms["rooms__is_active"] = True
             closed_rooms["rooms__is_active"] = False
+            
+            # Default: from start of day until now
+            custom_status_start = initial_datetime
+            custom_status_end = timezone.now()
 
         if filters.agent:
             rooms_filter["rooms__user"] = filters.agent
@@ -261,6 +281,8 @@ class AgentRepository:
             CustomStatus.objects.filter(
                 user=OuterRef("email"),
                 status_type__project=project,
+                created_on__gte=custom_status_start,
+                created_on__lte=custom_status_end,
             )
             .values("user")
             .annotate(
