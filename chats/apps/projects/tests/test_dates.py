@@ -71,6 +71,37 @@ class TestParseDateWithTimezone(TestCase):
         expected = utc_datetime.astimezone(expected_tz)
         self.assertEqual(result, expected)
 
+    def test_parse_date_with_timezone_offset_format(self):
+        """Test parsing datetime format with timezone offset (e.g., -03:00)"""
+        project_timezone = "America/Sao_Paulo"
+
+        # Test negative timezone offset
+        result = parse_date_with_timezone(
+            "2025-01-01T00:00:00-03:00", project_timezone, is_end_date=False
+        )
+        expected_tz = pytz.timezone(project_timezone)
+        # The input is 2025-01-01 00:00:00 in -03:00 timezone
+        # This should convert to the project timezone
+        input_dt = datetime.fromisoformat("2025-01-01T00:00:00-03:00")
+        expected = input_dt.astimezone(expected_tz)
+        self.assertEqual(result, expected)
+
+        # Test positive timezone offset
+        result = parse_date_with_timezone(
+            "2025-01-01T12:30:00+05:30", project_timezone, is_end_date=False
+        )
+        input_dt = datetime.fromisoformat("2025-01-01T12:30:00+05:30")
+        expected = input_dt.astimezone(expected_tz)
+        self.assertEqual(result, expected)
+
+        # Test UTC timezone (Z format)
+        result = parse_date_with_timezone(
+            "2025-01-01T15:45:00Z", project_timezone, is_end_date=False
+        )
+        input_dt = datetime.fromisoformat("2025-01-01T15:45:00+00:00")
+        expected = input_dt.astimezone(expected_tz)
+        self.assertEqual(result, expected)
+
     def test_parse_date_with_timezone_edge_cases(self):
         """Test edge cases for date parsing"""
         project_timezone = "America/Sao_Paulo"
