@@ -93,12 +93,13 @@ class SectorSerializer(serializers.ModelSerializer):
             data["automatic_message_text"] = automatic_message.get("text")
 
         config = data.get("config", {})
-        if "secondary_project" in config:
-            secondary_project_value = config.get("secondary_project")
+        if config and "secondary_project" in config:
+            secondary_project_value = config.pop("secondary_project")
             if isinstance(secondary_project_value, str):
                 data["secondary_project"] = {"uuid": secondary_project_value}
             else:
                 data["secondary_project"] = secondary_project_value
+            data["config"] = config
 
         return data
 
@@ -197,12 +198,13 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
             attrs["automatic_message_text"] = automatic_message.get("text")
 
         config = attrs.get("config", {})
-        if "secondary_project" in config:
-            secondary_project_value = config.get("secondary_project")
+        if config and "secondary_project" in config:
+            secondary_project_value = config.pop("secondary_project")
             if isinstance(secondary_project_value, str):
                 attrs["secondary_project"] = {"uuid": secondary_project_value}
             else:
                 attrs["secondary_project"] = secondary_project_value
+            attrs["config"] = config
 
         return attrs
 
