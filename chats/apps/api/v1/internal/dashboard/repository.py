@@ -392,7 +392,7 @@ class AgentRepository:
 
     def _get_csat_rooms_query(self, filters: Filters, project: Project) -> dict:
         rooms_query = {
-            "is_active": False,
+            "rooms__is_active": False,
         }
         start_date, end_date = self._get_converted_dates(filters, project)
 

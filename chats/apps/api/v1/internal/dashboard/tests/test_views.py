@@ -57,16 +57,28 @@ class TestInternalDashboardViewAuthenticated(BaseTestInternalDashboardView):
             ),
         ]
 
-        for user in users:
-            ProjectPermission.objects.create(user=user, project=self.project, role=2)
-            room = Room.objects.create(queue=self.queue, user=user)
-            room.is_active = False
-            room.save()
-            CSATSurvey.objects.create(room=room, rating=5, answered_on=timezone.now())
+        ProjectPermission.objects.create(user=users[0], project=self.project, role=2)
+        room = Room.objects.create(queue=self.queue, user=users[0])
+        room.is_active = False
+        room.save()
+        CSATSurvey.objects.create(room=room, rating=4, answered_on=timezone.now())
+
+        ProjectPermission.objects.create(user=users[1], project=self.project, role=2)
+        room = Room.objects.create(queue=self.queue, user=users[1])
+        room.is_active = False
+        room.save()
+        CSATSurvey.objects.create(room=room, rating=5, answered_on=timezone.now())
 
         response = self.get_agent_csat_metrics(self.project.uuid, {"page_size": 1})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-
         self.assertIsNotNone(response.data["next"])
         self.assertIsNone(response.data["previous"])
+
+        self.assertEqual(response.data["results"][0]["agent"]["name"], "Agent Two")
+        self.assertEqual(
+            response.data["results"][0]["agent"]["email"], "agent2@test.com"
+        )
+        self.assertEqual(response.data["results"][0]["rooms"], 1)
+        self.assertEqual(response.data["results"][0]["reviews"], 1)
+        self.assertEqual(response.data["results"][0]["avg_rating"], 5.0)
