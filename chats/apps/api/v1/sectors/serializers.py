@@ -117,14 +117,13 @@ class SectorSerializer(serializers.ModelSerializer):
             data["is_automatic_message_active"] = automatic_message.get("is_active")
             data["automatic_message_text"] = automatic_message.get("text")
 
-        project = self.instance.project if self.instance else data.get("project")
-
-        validate_is_csat_enabled(project, data.get("is_csat_enabled"), self.context)
-
-        # Extract secondary_project from config if present
         config = data.get("config", {})
         if "secondary_project" in config:
-            data["secondary_project"] = config.get("secondary_project")
+            secondary_project_value = config.get("secondary_project")
+            if isinstance(secondary_project_value, str):
+                data["secondary_project"] = {"uuid": secondary_project_value}
+            else:
+                data["secondary_project"] = secondary_project_value
 
         return data
 
@@ -224,13 +223,13 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
             attrs["is_automatic_message_active"] = new_is_automatic_message_active
             attrs["automatic_message_text"] = automatic_message.get("text")
 
-        project = self.instance.project
-
-        validate_is_csat_enabled(project, attrs.get("is_csat_enabled"), self.context)
-
         config = attrs.get("config", {})
         if "secondary_project" in config:
-            attrs["secondary_project"] = config.get("secondary_project")
+            secondary_project_value = config.get("secondary_project")
+            if isinstance(secondary_project_value, str):
+                attrs["secondary_project"] = {"uuid": secondary_project_value}
+            else:
+                attrs["secondary_project"] = secondary_project_value
 
         return attrs
 
