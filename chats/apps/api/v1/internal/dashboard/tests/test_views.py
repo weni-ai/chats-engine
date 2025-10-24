@@ -1,13 +1,9 @@
 import uuid
-from unittest.mock import patch
 
 from django.utils import timezone
-from django.db.models import Avg, Count
-from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework.response import Response
-from rest_framework.request import Request
 
 from chats.apps.accounts.models import User
 from chats.apps.projects.models.models import Project, ProjectPermission
