@@ -413,9 +413,7 @@ class AgentRepository:
 
         return rooms_query
 
-    def get_agents_csat_score(
-        self, filters: Filters, project: Project
-    ) -> tuple[CSATScoreGeneral, QuerySet[User]]:
+    def get_agents_csat_score(self, filters: Filters, project: Project) -> tuple:
         agents = self._get_csat_agents(filters, project)
         rooms_query = self._get_csat_rooms_query(filters, project)
 
