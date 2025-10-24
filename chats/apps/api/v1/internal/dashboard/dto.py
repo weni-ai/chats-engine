@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from chats.apps.projects.models import Project, ProjectPermission
-from typing import List
+from typing import List, Optional
 
 
 @dataclass
@@ -15,3 +15,12 @@ class Filters:
     user_request: ProjectPermission = None
     project: Project = None
     ordering: str = None
+    page_size: Optional[int] = None
+    cursor: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class CSATScoreGeneral:
+    rooms: int
+    reviews: int
+    avg_rating: Optional[float] = None

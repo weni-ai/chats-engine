@@ -1,6 +1,7 @@
 from django.contrib.postgres.aggregates import JSONBAgg
 from django.contrib.postgres.fields import JSONField
 from django.db.models import (
+    QuerySet,
     Avg,
     Case,
     Count,
@@ -15,13 +16,15 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce, Extract, JSONObject
 from django.utils import timezone
-
+from datetime import datetime
+import pytz
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.dashboard.dto import get_admin_domains_exclude_filter
 from chats.apps.projects.models import ProjectPermission
-from chats.apps.projects.models.models import CustomStatus
+from chats.apps.projects.models.models import CustomStatus, Project
+from chats.apps.rooms.models import Room
 
-from .dto import Filters
+from chats.apps.api.v1.internal.dashboard.dto import CSATScoreGeneral, Filters
 
 
 class AgentRepository:
@@ -344,3 +347,133 @@ class AgentRepository:
         )
 
         return agents_query
+
+    def _get_converted_dates(self, filters: Filters, project: Project) -> dict:
+        project_timezone = project.timezone or "UTC"
+
+        start_date = None
+        end_date = None
+
+        if filters.start_date:
+            tz = pytz.timezone(project_timezone)
+            start_date = tz.localize(
+                datetime.strptime(filters.start_date + " 00:00:00", "%Y-%m-%d %H:%M:%S")
+            )
+
+        if filters.end_date:
+            tz = pytz.timezone(project_timezone)
+            end_date = tz.localize(
+                datetime.strptime(filters.end_date + " 23:59:59", "%Y-%m-%d %H:%M:%S")
+            )
+
+        return start_date, end_date
+
+    def _get_csat_general(self, filters: Filters, project: Project) -> CSATScoreGeneral:
+        rooms_query = {
+            "is_active": False,
+        }
+        start_date, end_date = self._get_converted_dates(filters, project)
+
+        if filters.start_date:
+            rooms_query["ended_at__gte"] = start_date
+
+        if filters.end_date:
+            rooms_query["ended_at__lte"] = end_date
+
+        if filters.sector:
+            rooms_query["queue__sector__in"] = filters.sector
+
+        if filters.queue:
+            rooms_query["queue"] = filters.queue
+
+        if filters.tag:
+            rooms_query["tags__in"] = filters.tag.split(",")
+
+        return CSATScoreGeneral(
+            rooms=Room.objects.filter(**rooms_query).count(),
+            reviews=Room.objects.filter(
+                csat_survey__isnull=False,
+                csat_survey__rating__isnull=False,
+                **rooms_query
+            ).count(),
+            avg_rating=Room.objects.filter(
+                csat_survey__isnull=False,
+                csat_survey__rating__isnull=False,
+                **rooms_query
+            ).aggregate(avg_rating=Avg("csat_survey__rating"))["avg_rating"],
+        )
+
+    def _get_csat_agents(self, filters: Filters, project: Project) -> QuerySet[User]:
+        agents = User.objects.filter(project_permissions__project=project)
+
+        if not filters.is_weni_admin:
+            agents = agents.exclude(get_admin_domains_exclude_filter())
+
+        if filters.sector:
+            agents = agents.filter(
+                project_permissions__sector_authorizations__sector__in=filters.sector
+            )
+
+        if filters.queue:
+            agents = agents.filter(
+                project_permissions__queue_authorizations__queue=filters.queue
+            )
+
+        if filters.agent:
+            agents = agents.filter(email=filters.agent)
+
+        return agents
+
+    def _get_csat_rooms_query(self, filters: Filters, project: Project) -> dict:
+        rooms_query = {
+            "rooms__is_active": False,
+        }
+        start_date, end_date = self._get_converted_dates(filters, project)
+
+        if filters.start_date:
+            rooms_query["rooms__ended_at__gte"] = start_date
+
+        if filters.end_date:
+            rooms_query["rooms__ended_at__lte"] = end_date
+
+        if filters.sector:
+            rooms_query["rooms__queue__sector__in"] = filters.sector
+
+        if filters.queue:
+            rooms_query["rooms__queue"] = filters.queue
+
+        if filters.tag:
+            rooms_query["rooms__tags__in"] = filters.tag.split(",")
+
+        return rooms_query
+
+    def get_agents_csat_score(
+        self, filters: Filters, project: Project
+    ) -> tuple[CSATScoreGeneral, QuerySet[User]]:
+        agents = self._get_csat_agents(filters, project)
+        rooms_query = self._get_csat_rooms_query(filters, project)
+
+        csat_reviews_query = rooms_query.copy()
+        csat_reviews_query["rooms__csat_survey__isnull"] = False
+        csat_reviews_query["rooms__csat_survey__rating__isnull"] = False
+
+        agents = agents.annotate(
+            rooms_count=Count(
+                "rooms__uuid",
+                distinct=True,
+                filter=Q(**rooms_query),
+            ),
+            reviews=Count(
+                "rooms__csat_survey__rating",
+                distinct=True,
+                filter=Q(**csat_reviews_query),
+            ),
+            avg_rating=Avg(
+                "rooms__csat_survey__rating",
+                filter=Q(**csat_reviews_query),
+            ),
+        ).order_by("-avg_rating")
+
+        return self._get_csat_general(filters, project), agents.values(
+            "email", "first_name", "last_name", "rooms_count", "reviews", "avg_rating"
+        )

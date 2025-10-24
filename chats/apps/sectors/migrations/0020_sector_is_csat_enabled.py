@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sectors', '0019_sector_automatic_message_text_and_more'),
+        ("sectors", "0019_sector_automatic_message_text_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='sector',
-            name='is_csat_enabled',
-            field=models.BooleanField(default=False, verbose_name='is CSAT enabled?'),
+            model_name="sector",
+            name="is_csat_enabled",
+            field=models.BooleanField(default=False, verbose_name="is CSAT enabled?"),
         ),
     ]
