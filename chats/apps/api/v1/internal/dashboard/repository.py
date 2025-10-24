@@ -18,9 +18,6 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce, Extract, JSONObject
 from django.utils import timezone
-from datetime import datetime
-import pytz
-import re
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.dashboard.dto import get_admin_domains_exclude_filter
 from chats.apps.projects.models import ProjectPermission
@@ -28,6 +25,7 @@ from chats.apps.projects.models.models import CustomStatus, Project
 from chats.apps.rooms.models import Room
 
 from chats.apps.api.v1.internal.dashboard.dto import CSATScoreGeneral, Filters
+from chats.apps.projects.dates import parse_date_with_timezone
 
 
 class AgentRepository:
@@ -317,75 +315,6 @@ class AgentRepository:
 
         return agents_query
 
-    def _parse_date_with_timezone(
-        self, date_str: str, project_timezone: str, is_end_date: bool = False
-    ) -> datetime:
-        """
-        Parse date string with different formats and handle timezone conversion.
-
-        Args:
-            date_str: Date string in various formats (YYYY-MM-DD, YYYY-MM-DDTHH:MM:SS, etc.)
-            project_timezone: Project's timezone key
-            is_end_date: If True, sets time to 23:59:59, otherwise 00:00:00
-
-        Returns:
-            datetime object with project timezone
-        """
-        if not date_str:
-            return None
-
-        tz = pytz.timezone(project_timezone)
-
-        # Check if it's just a date (YYYY-MM-DD)
-        date_only_pattern = r"^\d{4}-\d{2}-\d{2}$"
-        if re.match(date_only_pattern, date_str):
-            time_str = " 23:59:59" if is_end_date else " 00:00:00"
-            naive_dt = datetime.strptime(date_str + time_str, "%Y-%m-%d %H:%M:%S")
-            return tz.localize(naive_dt)
-
-        # Try to parse as ISO datetime format with timezone
-        try:
-            # First try to parse as timezone-aware datetime
-            if (
-                "+" in date_str
-                or date_str.endswith("Z")
-                or re.search(r"[+-]\d{4}$", date_str)
-            ):
-                # Handle timezone-aware formats
-                dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-                # Convert to project timezone
-                return dt.astimezone(tz)
-        except ValueError:
-            pass
-
-        # Try to parse as naive datetime formats
-        try:
-            datetime_formats = [
-                "%Y-%m-%dT%H:%M:%S",  # 2025-01-01T00:00:00
-                "%Y-%m-%dT%H:%M:%S.%f",  # 2025-01-01T00:00:00.000000
-                "%Y-%m-%d %H:%M:%S",  # 2025-01-01 00:00:00
-                "%Y-%m-%d %H:%M:%S.%f",  # 2025-01-01 00:00:00.000000
-            ]
-
-            naive_dt = None
-            for fmt in datetime_formats:
-                try:
-                    naive_dt = datetime.strptime(date_str, fmt)
-                    break
-                except ValueError:
-                    continue
-
-            if naive_dt is not None:
-                # Localize with project timezone
-                return tz.localize(naive_dt)
-
-        except ValueError:
-            pass
-
-        time_str = " 23:59:59" if is_end_date else " 00:00:00"
-        naive_dt = datetime.strptime(date_str + time_str, "%Y-%m-%d %H:%M:%S")
-        return tz.localize(naive_dt)
-
     def _get_converted_dates(self, filters: Filters, project: Project) -> dict:
         project_timezone = project.timezone if project.timezone else "UTC"
 
@@ -396,12 +325,12 @@ class AgentRepository:
         end_date = None
 
         if filters.start_date:
-            start_date = self._parse_date_with_timezone(
+            start_date = parse_date_with_timezone(
                 filters.start_date, project_timezone, is_end_date=False
             )
 
         if filters.end_date:
-            end_date = self._parse_date_with_timezone(
+            end_date = parse_date_with_timezone(
                 filters.end_date, project_timezone, is_end_date=True
             )
 
