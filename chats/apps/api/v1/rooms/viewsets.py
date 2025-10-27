@@ -611,7 +611,9 @@ class RoomViewset(
             user = User.objects.get(email=user_email)
             queue = Queue.objects.get(uuid=queue_uuid)
 
-            projects = rooms_list.values_list("project__uuid", flat=True).distinct()
+            projects = rooms_list.values_list(
+                "queue__sector__project__uuid", flat=True
+            ).distinct()
 
             for project in projects:
                 if project != queue.project.uuid:
