@@ -1,6 +1,7 @@
 from unittest.mock import patch
 
 from django.test import RequestFactory, TestCase
+from rest_framework import status
 from rest_framework.test import force_authenticate
 
 from chats.apps.accounts.models import User
@@ -94,3 +95,26 @@ class RoomViewsetBulkTransferTests(TestCase):
         force_authenticate(req, user=self.admin)
         resp = view(req)
         self.assertEqual(resp.status_code, 400)
+
+    def test_transfer_to_both_user_and_queue(self):
+        view = RoomViewset.as_view({"patch": "bulk_transfer"})
+
+        self.room.user = self.agent
+        self.room.save()
+
+        other_agent = User.objects.create(email="test@email.com")
+        ProjectPermission.objects.create(project=self.project, user=other_agent, role=1)
+        other_queue = self.sector.queues.create(name="Other Queue", sector=self.sector)
+
+        req = self.factory.patch(
+            f"/x?user_email={other_agent.email}&queue_uuid={other_queue.uuid}",
+            data={"rooms_list": [str(self.room.uuid)]},
+            content_type="application/json",
+        )
+        force_authenticate(req, user=self.admin)
+        resp = view(req)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.user, other_agent)
+        self.assertEqual(self.room.queue, other_queue)
