@@ -603,7 +603,60 @@ class RoomViewset(
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if user_email:
+        if user_email and queue_uuid:
+            user = User.objects.get(email=user_email)
+            queue = Queue.objects.get(uuid=queue_uuid)
+
+            if not queue.authorizations.filter(permission__user=user).exists():
+                return Response(
+                    {"error": _("User is not an agent for the selected queue")},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            projects = rooms_list.values_list("project__uuid", flat=True).distinct()
+
+            for project in projects:
+                if project != queue.project.uuid:
+                    return Response(
+                        {"error": "Cannot transfer rooms from a project to another"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            for room in rooms_list:
+                old_queue = room.queue
+                old_user = room.user
+
+                room.queue = queue
+                room.user = user
+
+                room.save()
+
+                feedback_queue = create_transfer_json(
+                    action="transfer",
+                    from_=old_queue,
+                    to=queue,
+                )
+                feedback_user = create_transfer_json(
+                    action="transfer",
+                    from_=old_user,
+                    to=user,
+                )
+                create_room_feedback_message(
+                    room, feedback_queue, method=RoomFeedbackMethods.ROOM_TRANSFER
+                )
+                create_room_feedback_message(
+                    room, feedback_user, method=RoomFeedbackMethods.ROOM_TRANSFER
+                )
+                room.notify_queue("update")
+                room.notify_user("update", user=old_user)
+                room.notify_user("update")
+
+                start_queue_priority_routing(queue)
+
+                room.mark_notes_as_non_deletable()
+                room.update_ticket_async()
+
+        elif user_email and not queue_uuid:
             email_l = (user_email or "").lower()
             uid = get_user_id_by_email_cached(email_l)
 
@@ -668,7 +721,7 @@ class RoomViewset(
                 ):
                     room.send_automatic_message()
 
-        if queue_uuid:
+        elif queue_uuid and not user_email:
             queue = Queue.objects.get(uuid=queue_uuid)
             for room in rooms_list:
                 if queue.project != room.project:
