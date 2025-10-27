@@ -611,12 +611,6 @@ class RoomViewset(
             user = User.objects.get(email=user_email)
             queue = Queue.objects.get(uuid=queue_uuid)
 
-            if not queue.authorizations.filter(permission__user=user).exists():
-                return Response(
-                    {"error": _("User is not an agent for the selected queue")},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
             projects = rooms_list.values_list("project__uuid", flat=True).distinct()
 
             for project in projects:
