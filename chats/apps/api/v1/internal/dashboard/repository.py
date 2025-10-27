@@ -24,7 +24,8 @@ from chats.apps.rooms.models import Room
 
 from chats.apps.api.v1.internal.dashboard.dto import CSATScoreGeneral, Filters
 from chats.apps.projects.dates import parse_date_with_timezone
-
+from django.db.models.functions import Coalesce
+from django.db.models import Exists
 
 class AgentRepository:
     def __init__(self):
@@ -37,58 +38,69 @@ class AgentRepository:
             .astimezone(tz)
             .replace(hour=0, minute=0, second=0, microsecond=0)
         )
-        rooms_filter = {}
-        closed_rooms = {}
-        opened_rooms = {}
-
-        agents_filters = Q(project_permissions__project=project) & Q(is_active=True)
-
-        if filters.queue:
-            rooms_filter["rooms__queue"] = filters.queue
-            agents_filters &= Q(
-                project_permissions__queue_authorizations__queue=filters.queue
-            ) | Q(rooms__queue=filters.queue)
-
-        elif filters.sector:
-            rooms_filter["rooms__queue__sector__in"] = filters.sector
-            agents_filters &= Q(
-                project_permissions__sector_authorizations__sector__in=filters.sector
-            ) | Q(rooms__queue__sector__in=filters.sector)
-        else:
-            rooms_filter["rooms__queue__sector__project"] = project
-        if filters.tag:
-            rooms_filter["rooms__tags__in"] = filters.tag.split(",")
         
-        if filters.agent:
-            print(f"🔥 DEBUG REPOSITORY: filters.agent = '{filters.agent}'")
-            print(f"🔥 DEBUG REPOSITORY: tipo = {type(filters.agent)}")
-            print(f"🔥 DEBUG REPOSITORY: agents_filters ANTES = {agents_filters}")
-            agents_filters &= Q(uuid=filters.agent)
-            print(f"🔥 DEBUG REPOSITORY: agents_filters DEPOIS = {agents_filters}")
-        
+        # Definir filtros de data
         if filters.start_date and filters.end_date:
             start_time = filters.start_date
             end_time = filters.end_date
-            opened_rooms["rooms__is_active"] = True
-            opened_rooms["rooms__created_on__lte"] = end_time
-
-            closed_rooms["rooms__ended_at__range"] = [start_time, end_time]
-            closed_rooms["rooms__is_active"] = False
-            
-            # Filter for CustomStatus
+            closed_date_filter = Q(is_active=False, ended_at__range=[start_time, end_time])
+            opened_date_filter = Q(is_active=True, created_on__lte=end_time)
             custom_status_start = start_time
             custom_status_end = end_time
         else:
-            closed_rooms["rooms__ended_at__gte"] = initial_datetime
-            opened_rooms["rooms__is_active"] = True
-            closed_rooms["rooms__is_active"] = False
-            
-            # Default: from start of day until now
+            closed_date_filter = Q(is_active=False, ended_at__gte=initial_datetime)
+            opened_date_filter = Q(is_active=True)
             custom_status_start = initial_datetime
             custom_status_end = timezone.now()
-
+        
+        # Filtros de rooms
+        room_filter = Q(queue__sector__project=project, queue__is_deleted=False)
+        
+        # Filtro de agentes - apenas project_permissions
+        agents_filters = Q(project_permissions__project=project) & Q(is_active=True)
+        
+        if filters.queue:
+            # Subquery: verifica se tem autorização na fila
+            has_queue_auth = ProjectPermission.objects.filter(
+                user_id=OuterRef('email'),
+                project=project,
+                queue_authorizations__queue=filters.queue
+            ).values('user_id')[:1]
+            
+            # Filtro: tem autorização OU atendeu na fila
+            agents_filters &= Q(Exists(has_queue_auth)) | Q(rooms__queue=filters.queue)
+            room_filter &= Q(queue=filters.queue)
+            
+        elif filters.sector:
+            # Subquery: verifica se tem autorização no setor
+            has_sector_auth = ProjectPermission.objects.filter(
+                user_id=OuterRef('email'),
+                project=project,
+                sector_authorizations__sector__in=filters.sector
+            ).values('user_id')[:1]
+            
+            # Filtro: tem autorização OU atendeu no setor
+            agents_filters &= Q(Exists(has_sector_auth)) | Q(rooms__queue__sector__in=filters.sector)
+            room_filter &= Q(queue__sector__in=filters.sector)
+            
+        if filters.tag:
+            room_filter &= Q(tags__in=filters.tag.split(","))
+        
         if filters.agent:
-            rooms_filter["rooms__user"] = filters.agent
+            agents_filters &= Q(uuid=filters.agent)
+        
+        # Subqueries para contar salas (evita duplicação de JOINs)
+        closed_subquery = Room.objects.filter(
+            user=OuterRef('email')
+        ).filter(closed_date_filter & room_filter).values('user').annotate(
+            cnt=Count('uuid', distinct=True)
+        ).values('cnt')
+        
+        opened_subquery = Room.objects.filter(
+            user=OuterRef('email')
+        ).filter(opened_date_filter & room_filter).values('user').annotate(
+            cnt=Count('uuid', distinct=True)
+        ).values('cnt')
 
         project_permission_subquery = ProjectPermission.objects.filter(
             project_id=project,
@@ -147,36 +159,29 @@ class AgentRepository:
             .values("total")
         )
 
-        print(f"🔥 DEBUG REPOSITORY: Aplicando filter com agents_filters = {agents_filters}")
-        
         agents_query = (
             agents_query.filter(agents_filters)
             .annotate(
                 status=Subquery(project_permission_subquery),
-                closed=Count(
-                    "rooms__uuid",
-                    distinct=True,
-                    filter=Q(**closed_rooms, **rooms_filter),
+                closed=Coalesce(
+                    Subquery(closed_subquery, output_field=IntegerField()),
+                    0
                 ),
-                opened=Count(
-                    "rooms__uuid",
-                    distinct=True,
-                    filter=Q(**opened_rooms, **rooms_filter),
+                opened=Coalesce(
+                    Subquery(opened_subquery, output_field=IntegerField()),
+                    0
                 ),
                 avg_first_response_time=Avg(
                     "rooms__metric__first_response_time",
-                    filter=Q(**closed_rooms, **rooms_filter)
-                    & Q(rooms__metric__first_response_time__gt=0),
+                    filter=closed_date_filter & room_filter & Q(rooms__metric__first_response_time__gt=0),
                 ),
                 avg_message_response_time=Avg(
                     "rooms__metric__message_response_time",
-                    filter=Q(**closed_rooms, **rooms_filter)
-                    & Q(rooms__metric__message_response_time__gt=0),
+                    filter=closed_date_filter & room_filter & Q(rooms__metric__message_response_time__gt=0),
                 ),
                 avg_interaction_time=Avg(
                     "rooms__metric__interaction_time",
-                    filter=Q(**closed_rooms, **rooms_filter)
-                    & Q(rooms__metric__interaction_time__gt=0),
+                    filter=closed_date_filter & room_filter & Q(rooms__metric__interaction_time__gt=0),
                 ),
                 custom_status=custom_status_subquery,
                 time_in_service_order=Coalesce(
@@ -208,9 +213,6 @@ class AgentRepository:
             "avg_interaction_time",
             "custom_status",
         )
-
-        print(f"🔥 DEBUG REPOSITORY: Query SQL = {agents_query.query}")
-        print(f"🔥 DEBUG REPOSITORY: Total resultados = {agents_query.count()}")
 
         return agents_query
 
