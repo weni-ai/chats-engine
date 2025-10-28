@@ -1,0 +1,284 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-10-28 16:14-0300\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+#: chats/apps/rooms/models.py:49 chats/apps/rooms/models.py:633
+#: chats/apps/rooms/models.py:663
+msgid "user"
+msgstr ""
+
+#: chats/apps/rooms/models.py:58
+msgid "contact"
+msgstr ""
+
+#: chats/apps/rooms/models.py:66
+msgid "Queue"
+msgstr ""
+
+#: chats/apps/rooms/models.py:73
+msgid "custom fields"
+msgstr ""
+
+#: chats/apps/rooms/models.py:77
+msgid "urn"
+msgstr ""
+
+#: chats/apps/rooms/models.py:80
+msgid "project_uuid"
+msgstr ""
+
+#: chats/apps/rooms/models.py:82
+msgid "ticket uuid"
+msgstr ""
+
+#: chats/apps/rooms/models.py:84
+msgid "Callback URL"
+msgstr ""
+
+#: chats/apps/rooms/models.py:87
+msgid "Ended at"
+msgstr ""
+
+#: chats/apps/rooms/models.py:90
+msgid "Ended by"
+msgstr ""
+
+#: chats/apps/rooms/models.py:92
+msgid "is active?"
+msgstr ""
+
+#: chats/apps/rooms/models.py:93
+msgid "is waiting for answer?"
+msgstr ""
+
+#: chats/apps/rooms/models.py:96
+msgid "Transfer History"
+msgstr ""
+
+#: chats/apps/rooms/models.py:99
+msgid "Full Transfer History"
+msgstr ""
+
+#: chats/apps/rooms/models.py:105
+msgid "tags"
+msgstr ""
+
+#: chats/apps/rooms/models.py:108
+msgid "protocol"
+msgstr ""
+
+#: chats/apps/rooms/models.py:111
+msgid "service chat"
+msgstr ""
+
+#: chats/apps/rooms/models.py:115
+msgid "First user assigned at"
+msgstr ""
+
+#: chats/apps/rooms/models.py:118
+msgid "User assigned at"
+msgstr ""
+
+#: chats/apps/rooms/models.py:121
+msgid "Added to queue at"
+msgstr ""
+
+#: chats/apps/rooms/models.py:189
+msgid "Room"
+msgstr ""
+
+#: chats/apps/rooms/models.py:190
+msgid "Rooms"
+msgstr ""
+
+#: chats/apps/rooms/models.py:204
+msgid "Closed rooms cannot receive updates"
+msgstr ""
+
+#: chats/apps/rooms/models.py:627 chats/apps/rooms/models.py:657
+msgid "room"
+msgstr ""
+
+#: chats/apps/rooms/models.py:636
+msgid "created on"
+msgstr ""
+
+#: chats/apps/rooms/models.py:639
+msgid "Room Pin"
+msgstr ""
+
+#: chats/apps/rooms/models.py:640
+msgid "Room Pins"
+msgstr ""
+
+#: chats/apps/rooms/models.py:666
+msgid "text"
+msgstr ""
+
+#: chats/apps/rooms/models.py:667
+msgid "is deletable"
+msgstr ""
+
+#: chats/apps/rooms/models.py:671
+msgid "message"
+msgstr ""
+
+#: chats/apps/rooms/models.py:678
+msgid "Room Note"
+msgstr ""
+
+#: chats/apps/rooms/models.py:679
+msgid "Room Notes"
+msgstr ""
+
+#: chats/apps/rooms/services.py:164
+#, python-format
+msgid "Relatório de salas do projeto %(project)s - %(date)s"
+msgstr ""
+
+#: chats/apps/rooms/services.py:177
+#, python-format
+msgid ""
+"O relatório de salas do projeto %(project)s está pronto e foi anexado a este "
+"email."
+msgstr ""
+
+#: chats/apps/rooms/services.py:211
+#, python-format
+msgid "Erro ao gerar relatório de salas do projeto %(project)s - %(date)s"
+msgstr ""
+
+#: chats/apps/rooms/services.py:224
+#, python-format
+msgid ""
+"Ocorreu um erro ao gerar o relatório de salas do projeto %(project)s.\n"
+"\n"
+"Erro: %(error)s\n"
+"\n"
+"Por favor, tente novamente mais tarde ou entre em contato com o suporte."
+msgstr ""
+
+#: chats/apps/rooms/templates/rooms/emails/base.html:8
+#: chats/apps/rooms/templates/rooms/emails/base.html:74
+msgid "Notificação"
+msgstr ""
+
+#: chats/apps/rooms/templates/rooms/emails/base.html:82
+msgid "Este é um e-mail automático, por favor não responda."
+msgstr ""
+
+#: chats/apps/rooms/templates/rooms/emails/base.html:83
+msgid "Todos os direitos reservados."
+msgstr ""
+
+#: chats/apps/rooms/templates/rooms/emails/report_failed.html:4
+msgid "Erro ao Gerar Relatório de Salas"
+msgstr ""
+
+#: chats/apps/rooms/templates/rooms/emails/report_failed.html:6
+msgid "Erro na Geração do Relatório"
+msgstr ""
+
+#: chats/apps/rooms/templates/rooms/emails/report_failed.html:9
+#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:9
+msgid "Olá,"
+msgstr ""
+
+#: chats/apps/rooms/templates/rooms/emails/report_failed.html:11
+#, python-format
+msgid ""
+"Infelizmente, ocorreu um erro durante a geração do relatório de salas\n"
+"    do projeto <strong>%(project_name)s</strong>."
+msgstr ""
+
+#: chats/apps/rooms/templates/rooms/emails/report_failed.html:17
+msgid "⚠️ Detalhes do erro:"
+msgstr ""
+
+#: chats/apps/rooms/templates/rooms/emails/report_failed.html:25
+msgid "O que fazer agora?"
+msgstr ""
+
+#: chats/apps/rooms/templates/rooms/emails/report_failed.html:27
+msgid "Tente gerar o relatório novamente em alguns minutos"
+msgstr ""
+
+#: chats/apps/rooms/templates/rooms/emails/report_failed.html:28
+msgid "Verifique se os filtros aplicados estão corretos"
+msgstr ""
+
+#: chats/apps/rooms/templates/rooms/emails/report_failed.html:29
+msgid "Se o problema persistir, entre em contato com o suporte técnico"
+msgstr ""
+
+#: chats/apps/rooms/templates/rooms/emails/report_failed.html:35
+msgid "Pedimos desculpas pelo inconveniente."
+msgstr ""
+
+#: chats/apps/rooms/templates/rooms/emails/report_failed.html:37
+#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:30
+msgid "Atenciosamente,"
+msgstr ""
+
+#: chats/apps/rooms/templates/rooms/emails/report_failed.html:38
+#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:31
+msgid "Equipe de Suporte"
+msgstr ""
+
+#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:4
+msgid "Relatório de Salas Pronto"
+msgstr ""
+
+#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:6
+msgid "Relatório Pronto"
+msgstr ""
+
+#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:11
+#, python-format
+msgid ""
+"O relatório de salas do projeto <strong>%(project_name)s</strong>\n"
+"    está pronto e foi anexado a este e-mail."
+msgstr ""
+
+#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:14
+msgid ""
+"Você pode fazer o download do arquivo CSV em anexo para visualizar todos os "
+"dados solicitados."
+msgstr ""
+
+#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:18
+msgid "Informações do relatório:"
+msgstr ""
+
+#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:20
+msgid "Projeto:"
+msgstr ""
+
+#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:21
+msgid "Data de geração:"
+msgstr ""
+
+#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:23
+msgid "Total de salas:"
+msgstr ""
+
+#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:28
+msgid ""
+"Se você tiver alguma dúvida ou precisar de assistência, entre em contato com "
+"o suporte."
+msgstr ""
