@@ -65,7 +65,9 @@ class TestInternalDashboardViewAuthenticated(BaseTestInternalDashboardView):
         room.save()
         CSATSurvey.objects.create(room=room, rating=5, answered_on=timezone.now())
 
-        response = self.get_agent_csat_metrics(self.project.uuid, {"page_size": 1})
+        response = self.get_agent_csat_metrics(
+            self.project.uuid, {"page_size": 1}
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIsNotNone(response.data["next"])
