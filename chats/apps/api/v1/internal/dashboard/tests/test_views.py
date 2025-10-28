@@ -51,6 +51,9 @@ class TestInternalDashboardViewAuthenticated(BaseTestInternalDashboardView):
             User.objects.create(
                 email="agent2@test.com", first_name="Agent", last_name="Two"
             ),
+            User.objects.create(
+                email="agent3@test.com", first_name="Agent", last_name="Three"
+            ),
         ]
 
         ProjectPermission.objects.create(user=users[0], project=self.project, role=2)
@@ -65,9 +68,9 @@ class TestInternalDashboardViewAuthenticated(BaseTestInternalDashboardView):
         room.save()
         CSATSurvey.objects.create(room=room, rating=5, answered_on=timezone.now())
 
-        response = self.get_agent_csat_metrics(
-            self.project.uuid, {"page_size": 1}
-        )
+        ProjectPermission.objects.create(user=users[2], project=self.project, role=2)
+
+        response = self.get_agent_csat_metrics(self.project.uuid, {"page_size": 1})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIsNotNone(response.data["next"])

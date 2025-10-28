@@ -467,9 +467,12 @@ class AgentRepository:
                 distinct=True,
                 filter=Q(**csat_reviews_query),
             ),
-            avg_rating=Avg(
-                "rooms__csat_survey__rating",
-                filter=Q(**csat_reviews_query),
+            avg_rating=Coalesce(
+                Avg(
+                    "rooms__csat_survey__rating",
+                    filter=Q(**csat_reviews_query),
+                ),
+                Value(0.0),
             ),
         )
 
