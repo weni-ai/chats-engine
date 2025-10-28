@@ -480,6 +480,13 @@ class ReportFieldsValidatorViewSet(APIView):
         """
         return Room.objects.filter(queue__sector__project=project)
 
+    def _get_agent_status_logs_queryset(self, project):
+        """
+        Return base queryset for agent status logs in the project.
+        """
+        from chats.apps.projects.models.models import AgentStatusLog
+        return AgentStatusLog.objects.filter(project=project)
+
     def _is_all_filter(self, values):
         if isinstance(values, list):
             return any(str(x).strip() == "__all__" for x in values)
@@ -633,13 +640,30 @@ class ReportFieldsValidatorViewSet(APIView):
         
         return queryset.values(*query_fields)
 
+    def _apply_agent_status_logs_filters(self, queryset, field_data, project):
+        """
+        Apply specific filters for agent status logs.
+        """
+        start_date = field_data.get("start_date")
+        end_date = field_data.get("end_date")
+        if start_date and end_date:
+            tz = project.timezone
+            start_dt = pendulum.parse(start_date).replace(tzinfo=tz).date()
+            end_dt = pendulum.parse(end_date).replace(tzinfo=tz).date()
+            queryset = queryset.filter(log_date__range=[start_dt, end_dt])
+
+        agents = self._normalize_filter_value(
+            field_data.get("agents") or field_data.get("agent")
+        )
+        if agents:
+            queryset = queryset.filter(agent__uuid__in=agents)
+
+        return queryset
+
     def _process_model_fields(self, model_name, field_data, project, available_fields):
         """
-        Process rooms fields and build queryset.
+        Process model fields and build queryset for rooms or agent_status_logs.
         """
-        if model_name != "rooms":
-            raise NotFound(f'Only "rooms" model is supported, got "{model_name}"')
-
         if model_name not in available_fields:
             raise NotFound(f'Model "{model_name}" not found')
 
@@ -647,21 +671,32 @@ class ReportFieldsValidatorViewSet(APIView):
         fields_list = field_data.get("fields", [])
         query_fields = self._validate_and_process_fields(fields_list, model_fields)
 
-        base_queryset = self._get_rooms_queryset(project)
+        # Get base queryset based on model
+        if model_name == "rooms":
+            base_queryset = self._get_rooms_queryset(project)
+        elif model_name == "agent_status_logs":
+            base_queryset = self._get_agent_status_logs_queryset(project)
+        else:
+            raise NotFound(f'Model "{model_name}" is not supported')
 
+        # Apply UUID filter if present
         uuids = field_data.get("uuids")
         if isinstance(uuids, list) and uuids and "__all__" not in uuids:
             base_queryset = base_queryset.filter(uuid__in=uuids)
 
-        open_chats = field_data.get("open_chats")
-        closed_chats = field_data.get("closed_chats")
-        if open_chats is True and closed_chats is True:
-            raise ValidationError(
-                "open_chats and closed_chats cannot be used together."
-            )
+        # Apply model-specific filters
+        if model_name == "rooms":
+            open_chats = field_data.get("open_chats")
+            closed_chats = field_data.get("closed_chats")
+            if open_chats is True and closed_chats is True:
+                raise ValidationError(
+                    "open_chats and closed_chats cannot be used together."
+                )
+            base_queryset = self._apply_date_filters(base_queryset, field_data, project)
+            base_queryset = self._apply_entity_filters(base_queryset, field_data)
+        elif model_name == "agent_status_logs":
+            base_queryset = self._apply_agent_status_logs_filters(base_queryset, field_data, project)
 
-        base_queryset = self._apply_date_filters(base_queryset, field_data, project)
-        base_queryset = self._apply_entity_filters(base_queryset, field_data)
         base_queryset = self._apply_field_selection(base_queryset, query_fields)
 
         return {"queryset": base_queryset, "related": {}}
