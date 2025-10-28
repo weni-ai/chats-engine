@@ -471,7 +471,7 @@ class AgentRepository:
                 "rooms__csat_survey__rating",
                 filter=Q(**csat_reviews_query),
             ),
-        ).order_by("-avg_rating")
+        )
 
         return self._get_csat_general(filters, project), agents.values(
             "email", "first_name", "last_name", "rooms_count", "reviews", "avg_rating"
