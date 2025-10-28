@@ -1,57 +1,14 @@
-{% extends "rooms/emails/base.html" %}
+{% extends 'rooms/emails/base.html' %}
 {% load i18n %}
 
-{% block title %}{% trans "Rooms Report Ready" %}{% endblock %}
-
-{% block header_title %}{% trans "Report Ready" %}{% endblock %}
-
 {% block content %}
-<p>{% trans "Hello," %}</p>
-
-{% if download_url %}
-<p>{% blocktrans with project_name=project_name %}The report for the project <strong>{{ project_name }}</strong> is
-    ready.{% endblocktrans %}</p>
-
-<p>{% trans "Click the link below to download the report:" %}</p>
-
-<div style="margin: 20px 0; text-align: center;">
-    <a href="{{ download_url }}"
-        style="display: inline-block; padding: 12px 24px; background-color: #009E96; color: #ffffff; text-decoration: none; border-radius: 4px; font-weight: 600;">
-        {% trans "Download Report" %}
-    </a>
-</div>
-
 <div
-    style="margin: 20px 0; padding: 15px; background-color: #f4f4f4; border-left: 4px solid #009E96; border-radius: 4px; word-wrap: break-word;">
-    <p style="margin: 0; font-size: 12px; color: #666; font-family: monospace;">
-        {{ download_url }}
+    style="font-family: 'Lato'; font-size: 14px; line-height: 22px; color: #3B414D; width: 616px; margin: 24px auto auto auto;">
+    <span style="font-size: 16px; font-weight: 700; line-height: 24px;">{% trans 'Hi,' %}</span>
+    <p>
+        {% blocktrans with project_name=project_name file_link=download_url %}The data export for the {{ project_name }}
+        project is ready and you can download it by <a clicktracking=off style="color: #00A49F; text-decoration: none;"
+            href="{{ file_link }}" target="_blank">clicking here</a>.{% endblocktrans %}
     </p>
 </div>
-
-<p style="font-size: 13px; color: #666;">
-    {% trans "This link will expire in 7 days." %}
-</p>
-{% else %}
-<p>{% blocktrans with project_name=project_name %}The rooms report for the project <strong>{{ project_name }}</strong>
-    is ready and attached to this email.{% endblocktrans %}</p>
-
-<p>{% trans "You can download the attached CSV file to view all the requested data." %}</p>
-
-<div
-    style="margin: 20px 0; padding: 15px; background-color: #e7f5f4; border-left: 4px solid #009E96; border-radius: 4px;">
-    <p style="margin: 0;"><strong>{% trans "Report information:" %}</strong></p>
-    <ul style="margin: 10px 0 0 0; padding-left: 20px;">
-        <li>{% trans "Project:" %} {{ project_name }}</li>
-        <li>{% trans "Generation date:" %} {{ generation_date }}</li>
-        {% if total_rooms %}
-        <li>{% trans "Total rooms:" %} {{ total_rooms }}</li>
-        {% endif %}
-    </ul>
-</div>
-{% endif %}
-
-<p>{% trans "If you have any questions or need assistance, please contact support." %}</p>
-
-<p>{% trans "Best regards," %}<br>
-    {% trans "Support Team" %}</p>
 {% endblock %}

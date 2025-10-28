@@ -1,0 +1,75 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-10-28 17:38-0300\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+#: chats/apps/dashboard/email_templates.py:27
+#, python-format
+msgid ""
+"The custom report for the project %(project)s is ready.\n"
+"\n"
+"Copy and paste the URL below to download the report:\n"
+"\n"
+"%(url)s"
+msgstr ""
+
+#: chats/apps/dashboard/email_templates.py:54
+#, python-format
+msgid ""
+"An error occurred while generating the custom report for project "
+"%(project)s.\n"
+"\n"
+"Error: %(error)s\n"
+"\n"
+"Please try again later or contact support."
+msgstr ""
+
+#: chats/apps/dashboard/email_templates.py:56
+msgid "Unknown error"
+msgstr ""
+
+#: chats/apps/dashboard/models.py:11 chats/apps/dashboard/models.py:22
+msgid "Room Metric"
+msgstr ""
+
+#: chats/apps/dashboard/models.py:14
+msgid "Room Waiting time"
+msgstr ""
+
+#: chats/apps/dashboard/models.py:15
+msgid "Queued count"
+msgstr ""
+
+#: chats/apps/dashboard/models.py:16
+msgid "Messages response time"
+msgstr ""
+
+#: chats/apps/dashboard/models.py:17
+msgid "First response time"
+msgstr ""
+
+#: chats/apps/dashboard/models.py:18
+msgid "Room interaction time"
+msgstr ""
+
+#: chats/apps/dashboard/models.py:19
+msgid "Room transfer count"
+msgstr ""
+
+#: chats/apps/dashboard/models.py:23
+msgid "Rooms Metrics"
+msgstr ""
