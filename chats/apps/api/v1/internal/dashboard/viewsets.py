@@ -115,6 +115,7 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
             agents_service.get_agents_csat_score(filters, project)
         )
 
+        agents_csat_metrics = agents_csat_metrics.order_by("-avg_rating")
         paginator = CustomCursorPagination()
         paginator.ordering = "-avg_rating"
 
