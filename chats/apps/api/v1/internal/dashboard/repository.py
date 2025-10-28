@@ -420,16 +420,6 @@ class AgentRepository:
         if not filters.is_weni_admin:
             agents = agents.exclude(get_admin_domains_exclude_filter())
 
-        if filters.sector:
-            agents = agents.filter(
-                project_permissions__sector_authorizations__sector__in=filters.sector
-            )
-
-        if filters.queue:
-            agents = agents.filter(
-                project_permissions__queue_authorizations__queue=filters.queue
-            )
-
         if filters.agent:
             agents = agents.filter(email=filters.agent)
 
