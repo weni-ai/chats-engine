@@ -244,6 +244,28 @@ def generate_custom_fields_report(
         report_status.status = "failed"
         report_status.error_message = str(e)
         report_status.save()
+        
+        if getattr(settings, "REPORTS_SEND_EMAILS", False):
+            try:
+                from chats.apps.dashboard.email_templates import get_report_failed_email
+                
+                dt = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
+                subject = f"Error generating custom report for project {project.name} - {dt}"
+                message_plain, message_html = get_report_failed_email(project.name, str(e))
+                
+                email = EmailMultiAlternatives(
+                    subject=subject,
+                    body=message_plain,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    to=[user_email],
+                )
+                email.attach_alternative(message_html, "text/html")
+                email.send(fail_silently=False)
+                
+                logger.info("Error notification sent to %s | report_uuid=%s", user_email, report_status.uuid)
+            except Exception as email_error:
+                logger.exception("Error sending error notification email: %s", email_error)
+        
         raise
 
 
@@ -476,3 +498,24 @@ def process_pending_reports():
         report.status = "failed"
         report.error_message = str(e)
         report.save()
+        
+        if getattr(settings, "REPORTS_SEND_EMAILS", False):
+            try:
+                from chats.apps.dashboard.email_templates import get_report_failed_email
+                
+                dt = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
+                subject = f"Error generating custom report for project {project.name} - {dt}"
+                message_plain, message_html = get_report_failed_email(project.name, str(e))
+                
+                email = EmailMultiAlternatives(
+                    subject=subject,
+                    body=message_plain,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    to=[user_email],
+                )
+                email.attach_alternative(message_html, "text/html")
+                email.send(fail_silently=False)
+                
+                logging.info("Error notification sent to %s | report_uuid=%s", user_email, report.uuid)
+            except Exception as email_error:
+                logging.exception("Error sending error notification email: %s", email_error)
