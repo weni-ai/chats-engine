@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-10-28 16:15-0300\n"
+"POT-Creation-Date: 2025-10-28 17:38-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,6 +17,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
 #: chats/apps/rooms/models.py:49 chats/apps/rooms/models.py:633
 #: chats/apps/rooms/models.py:663
 msgid "user"
@@ -148,137 +149,75 @@ msgstr ""
 
 #: chats/apps/rooms/services.py:164
 #, python-format
-msgid "Relatório de salas do projeto %(project)s - %(date)s"
+msgid "Rooms report for project %(project)s - %(date)s"
 msgstr ""
 
 #: chats/apps/rooms/services.py:177
 #, python-format
 msgid ""
-"O relatório de salas do projeto %(project)s está pronto e foi anexado a este "
-"email."
+"The rooms report for project %(project)s is ready and attached to this email."
 msgstr ""
 
 #: chats/apps/rooms/services.py:211
 #, python-format
-msgid "Erro ao gerar relatório de salas do projeto %(project)s - %(date)s"
+msgid "Error generating rooms report for project %(project)s - %(date)s"
 msgstr ""
 
 #: chats/apps/rooms/services.py:224
 #, python-format
 msgid ""
-"Ocorreu um erro ao gerar o relatório de salas do projeto %(project)s.\n"
+"An error occurred while generating the rooms report for project "
+"%(project)s.\n"
 "\n"
-"Erro: %(error)s\n"
+"Error: %(error)s\n"
 "\n"
-"Por favor, tente novamente mais tarde ou entre em contato com o suporte."
+"Please try again later or contact support."
 msgstr ""
 
-#: chats/apps/rooms/templates/rooms/emails/base.html:8
-#: chats/apps/rooms/templates/rooms/emails/base.html:74
-msgid "Notificação"
+#: chats/apps/rooms/templates/rooms/emails/base.html:30
+msgid "Our site"
 msgstr ""
 
-#: chats/apps/rooms/templates/rooms/emails/base.html:82
-msgid "Este é um e-mail automático, por favor não responda."
+#: chats/apps/rooms/templates/rooms/emails/base.html:48
+msgid "2025 © Weni by VTEX. All rights reserved."
 msgstr ""
 
-#: chats/apps/rooms/templates/rooms/emails/base.html:83
-msgid "Todos os direitos reservados."
+#: chats/apps/rooms/templates/rooms/emails/base.html:54
+msgid ""
+"You are receiving this mail because you registered in Weni platform. This "
+"also shows that\n"
+"            you agree to our Terms of use and Privacy Policies."
 msgstr ""
 
-#: chats/apps/rooms/templates/rooms/emails/report_failed.html:4
-msgid "Erro ao Gerar Relatório de Salas"
+#: chats/apps/rooms/templates/rooms/emails/base.html:59
+msgid "Privacy Policy"
 msgstr ""
 
-#: chats/apps/rooms/templates/rooms/emails/report_failed.html:6
-msgid "Erro na Geração do Relatório"
+#: chats/apps/rooms/templates/rooms/emails/base.html:65
+msgid "Terms of use"
+msgstr ""
+
+#: chats/apps/rooms/templates/rooms/emails/base.html:71
+msgid "Help Center"
+msgstr ""
+
+#: chats/apps/rooms/templates/rooms/emails/report_failed.html:7
+#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:7
+msgid "Hi,"
 msgstr ""
 
 #: chats/apps/rooms/templates/rooms/emails/report_failed.html:9
+#, python-format
+msgid ""
+"Unable to generate export of %(project_name)s project\n"
+"        data."
+msgstr ""
+
 #: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:9
-msgid "Olá,"
-msgstr ""
-
-#: chats/apps/rooms/templates/rooms/emails/report_failed.html:11
 #, python-format
 msgid ""
-"Infelizmente, ocorreu um erro durante a geração do relatório de salas\n"
-"    do projeto <strong>%(project_name)s</strong>."
-msgstr ""
-
-#: chats/apps/rooms/templates/rooms/emails/report_failed.html:17
-msgid "⚠️ Detalhes do erro:"
-msgstr ""
-
-#: chats/apps/rooms/templates/rooms/emails/report_failed.html:25
-msgid "O que fazer agora?"
-msgstr ""
-
-#: chats/apps/rooms/templates/rooms/emails/report_failed.html:27
-msgid "Tente gerar o relatório novamente em alguns minutos"
-msgstr ""
-
-#: chats/apps/rooms/templates/rooms/emails/report_failed.html:28
-msgid "Verifique se os filtros aplicados estão corretos"
-msgstr ""
-
-#: chats/apps/rooms/templates/rooms/emails/report_failed.html:29
-msgid "Se o problema persistir, entre em contato com o suporte técnico"
-msgstr ""
-
-#: chats/apps/rooms/templates/rooms/emails/report_failed.html:35
-msgid "Pedimos desculpas pelo inconveniente."
-msgstr ""
-
-#: chats/apps/rooms/templates/rooms/emails/report_failed.html:37
-#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:30
-msgid "Atenciosamente,"
-msgstr ""
-
-#: chats/apps/rooms/templates/rooms/emails/report_failed.html:38
-#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:31
-msgid "Equipe de Suporte"
-msgstr ""
-
-#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:4
-msgid "Relatório de Salas Pronto"
-msgstr ""
-
-#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:6
-msgid "Relatório Pronto"
-msgstr ""
-
-#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:11
-#, python-format
-msgid ""
-"O relatório de salas do projeto <strong>%(project_name)s</strong>\n"
-"    está pronto e foi anexado a este e-mail."
-msgstr ""
-
-#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:14
-msgid ""
-"Você pode fazer o download do arquivo CSV em anexo para visualizar todos os "
-"dados solicitados."
-msgstr ""
-
-#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:18
-msgid "Informações do relatório:"
-msgstr ""
-
-#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:20
-msgid "Projeto:"
-msgstr ""
-
-#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:21
-msgid "Data de geração:"
-msgstr ""
-
-#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:23
-msgid "Total de salas:"
-msgstr ""
-
-#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:28
-msgid ""
-"Se você tiver alguma dúvida ou precisar de assistência, entre em contato com "
-"o suporte."
+"The data export for the %(project_name)s\n"
+"        project is ready and you can download it by <a clicktracking=off "
+"style=\"color: #00A49F; text-decoration: none;\"\n"
+"            href=\"%(file_link)s\" target=\"_blank\">clicking here</a>."
 msgstr ""
