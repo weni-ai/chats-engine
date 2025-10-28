@@ -788,6 +788,6 @@ class AgentRepositoryTestCase(TestCase):
 
         if agents_list:
             agent_data = agents_list[0]
-            self.assertIn("rooms_count", agent_data)
-            self.assertIn("reviews", agent_data)
-            self.assertIn("avg_rating", agent_data)
+            self.assertEqual(agent_data.rooms_count, 2)
+            self.assertEqual(agent_data.reviews, 2)
+            self.assertEqual(agent_data.avg_rating, 4.0)

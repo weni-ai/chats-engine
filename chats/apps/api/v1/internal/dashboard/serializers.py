@@ -1,6 +1,7 @@
 from chats.apps.api.utils import calculate_in_service_time
 from rest_framework import serializers
 
+from chats.apps.accounts.models import User
 from chats.apps.api.utils import calculate_in_service_time
 
 
@@ -151,19 +152,19 @@ class DashboardCSATScoreByAgentsSerializer(serializers.Serializer):
     reviews = serializers.IntegerField()
     avg_rating = serializers.SerializerMethodField()
 
-    def get_agent(self, obj):
-        name = f"{obj.get('first_name')} {obj.get('last_name')}".strip()
+    def get_agent(self, obj: User):
+        name = f"{obj.first_name} {obj.last_name}".strip()
 
         return {
             "name": name,
-            "email": obj.get("email"),
+            "email": obj.email,
         }
 
-    def get_rooms(self, obj):
-        return obj.get("rooms_count")
+    def get_rooms(self, obj: User):
+        return obj.rooms_count
 
     def get_avg_rating(self, obj):
-        if not obj.get("avg_rating"):
+        if obj.avg_rating is None:
             return None
 
-        return round(obj.get("avg_rating"), 2)
+        return round(obj.avg_rating, 2)

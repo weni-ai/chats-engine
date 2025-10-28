@@ -473,6 +473,4 @@ class AgentRepository:
             ),
         )
 
-        return self._get_csat_general(filters, project), agents.values(
-            "email", "first_name", "last_name", "rooms_count", "reviews", "avg_rating"
-        )
+        return self._get_csat_general(filters, project), agents
