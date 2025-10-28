@@ -375,16 +375,6 @@ class AgentRepository:
         if not filters.is_weni_admin:
             agents = agents.exclude(get_admin_domains_exclude_filter())
 
-        if filters.sector:
-            agents = agents.filter(
-                project_permissions__sector_authorizations__sector__in=filters.sector
-            )
-
-        if filters.queue:
-            agents = agents.filter(
-                project_permissions__queue_authorizations__queue=filters.queue
-            )
-
         if filters.agent:
             agents = agents.filter(email=filters.agent)
 
@@ -436,7 +426,9 @@ class AgentRepository:
                 "rooms__csat_survey__rating",
                 filter=Q(**csat_reviews_query),
             ),
-        ).order_by("-avg_rating")
+        )
+
+        agents = agents.order_by("-avg_rating")
 
         return self._get_csat_general(filters, project), agents.values(
             "email", "first_name", "last_name", "rooms_count", "reviews", "avg_rating"
