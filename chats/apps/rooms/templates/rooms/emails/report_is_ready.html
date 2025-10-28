@@ -8,6 +8,30 @@
 {% block content %}
 <p>{% trans "Hello," %}</p>
 
+{% if download_url %}
+<p>{% blocktrans with project_name=project_name %}The report for the project <strong>{{ project_name }}</strong> is
+    ready.{% endblocktrans %}</p>
+
+<p>{% trans "Click the link below to download the report:" %}</p>
+
+<div style="margin: 20px 0; text-align: center;">
+    <a href="{{ download_url }}"
+        style="display: inline-block; padding: 12px 24px; background-color: #009E96; color: #ffffff; text-decoration: none; border-radius: 4px; font-weight: 600;">
+        {% trans "Download Report" %}
+    </a>
+</div>
+
+<div
+    style="margin: 20px 0; padding: 15px; background-color: #f4f4f4; border-left: 4px solid #009E96; border-radius: 4px; word-wrap: break-word;">
+    <p style="margin: 0; font-size: 12px; color: #666; font-family: monospace;">
+        {{ download_url }}
+    </p>
+</div>
+
+<p style="font-size: 13px; color: #666;">
+    {% trans "This link will expire in 7 days." %}
+</p>
+{% else %}
 <p>{% blocktrans with project_name=project_name %}The rooms report for the project <strong>{{ project_name }}</strong>
     is ready and attached to this email.{% endblocktrans %}</p>
 
@@ -24,6 +48,7 @@
         {% endif %}
     </ul>
 </div>
+{% endif %}
 
 <p>{% trans "If you have any questions or need assistance, please contact support." %}</p>
 
