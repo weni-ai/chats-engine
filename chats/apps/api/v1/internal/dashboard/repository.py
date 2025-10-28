@@ -383,34 +383,34 @@ class AgentRepository:
         rooms_query = {
             "is_active": False,
         }
+
         start_date, end_date = self._get_converted_dates(filters, project)
 
-        if filters.start_date:
-            rooms_query["ended_at__gte"] = start_date
+        filters_mapping = {
+            "start_date": ("ended_at__gte", start_date),
+            "end_date": ("ended_at__lte", end_date),
+            "sector": ("queue__sector__in", filters.sector),
+            "queue": ("queue", filters.queue),
+            "tag": ("tags__in", filters.tags),
+            "tags": ("tags__in", filters.tags),
+            "queues": ("queue__in", filters.queues),
+        }
 
-        if filters.end_date:
-            rooms_query["ended_at__lte"] = end_date
-
-        if filters.sector:
-            rooms_query["queue__sector__in"] = filters.sector
-
-        if filters.queue:
-            rooms_query["queue"] = filters.queue
-
-        if filters.tag:
-            rooms_query["tags__in"] = filters.tag.split(",")
+        for filter_name, (query_expression, value) in filters_mapping.items():
+            if value:
+                rooms_query[query_expression] = value
 
         return CSATScoreGeneral(
             rooms=Room.objects.filter(**rooms_query).count(),
             reviews=Room.objects.filter(
                 csat_survey__isnull=False,
                 csat_survey__rating__isnull=False,
-                **rooms_query
+                **rooms_query,
             ).count(),
             avg_rating=Room.objects.filter(
                 csat_survey__isnull=False,
                 csat_survey__rating__isnull=False,
-                **rooms_query
+                **rooms_query,
             ).aggregate(avg_rating=Avg("csat_survey__rating"))["avg_rating"],
         )
 
@@ -439,22 +439,22 @@ class AgentRepository:
         rooms_query = {
             "rooms__is_active": False,
         }
+
         start_date, end_date = self._get_converted_dates(filters, project)
 
-        if filters.start_date:
-            rooms_query["rooms__ended_at__gte"] = start_date
+        filters_mapping = {
+            "start_date": ("rooms__ended_at__gte", start_date),
+            "end_date": ("rooms__ended_at__lte", end_date),
+            "sector": ("rooms__queue__sector__in", filters.sector),
+            "queue": ("rooms__queue", filters.queue),
+            "tag": ("rooms__tags__in", filters.tags),
+            "tags": ("rooms__tags__in", filters.tags),
+            "queues": ("rooms__queue__in", filters.queues),
+        }
 
-        if filters.end_date:
-            rooms_query["rooms__ended_at__lte"] = end_date
-
-        if filters.sector:
-            rooms_query["rooms__queue__sector__in"] = filters.sector
-
-        if filters.queue:
-            rooms_query["rooms__queue"] = filters.queue
-
-        if filters.tag:
-            rooms_query["rooms__tags__in"] = filters.tag.split(",")
+        for filter_name, (query_expression, value) in filters_mapping.items():
+            if value:
+                rooms_query[query_expression] = value
 
         return rooms_query
 

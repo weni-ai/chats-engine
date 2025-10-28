@@ -1,5 +1,5 @@
-from .dto import Filters
-from .repository import AgentRepository
+from chats.apps.api.v1.internal.dashboard.dto import Filters
+from chats.apps.api.v1.internal.dashboard.repository import AgentRepository
 
 
 class AgentsService:

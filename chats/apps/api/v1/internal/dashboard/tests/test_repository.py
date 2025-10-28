@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.utils import timezone
 from timezone_field.fields import pytz
 
-from chats.apps.api.v1.dashboard.dto import Filters
+from chats.apps.api.v1.internal.dashboard.dto import Filters
 from chats.apps.api.v1.internal.dashboard.repository import AgentRepository
 from chats.apps.projects.models.models import Project
 from chats.apps.rooms.models import Room
@@ -435,7 +435,7 @@ class AgentRepositoryTestCase(TestCase):
         )
 
         # Test filtering by single tag
-        filters = Filters(tag=str(tag1.uuid))
+        filters = Filters(tags=[str(tag1.uuid)])
         general_csat_metrics = self.repository._get_csat_general(filters, self.project)
         self.assertEqual(general_csat_metrics.rooms, 2)  # room_tag1 and room_both_tags
         self.assertEqual(general_csat_metrics.reviews, 2)
@@ -693,7 +693,7 @@ class AgentRepositoryTestCase(TestCase):
         tag1 = SectorTag.objects.create(name="urgent", sector=self.sector)
         tag2 = SectorTag.objects.create(name="support", sector=self.sector)
 
-        filters_single = Filters(tag=str(tag1.uuid))
+        filters_single = Filters(tags=[str(tag1.uuid)])
         rooms_query_single = self.repository._get_csat_rooms_query(
             filters_single, self.project
         )
@@ -701,7 +701,7 @@ class AgentRepositoryTestCase(TestCase):
         self.assertEqual(rooms_query_single["rooms__is_active"], False)
         self.assertEqual(rooms_query_single["rooms__tags__in"], [str(tag1.uuid)])
 
-        filters_multiple = Filters(tag=f"{tag1.uuid},{tag2.uuid}")
+        filters_multiple = Filters(tags=[str(tag1.uuid), str(tag2.uuid)])
         rooms_query_multiple = self.repository._get_csat_rooms_query(
             filters_multiple, self.project
         )
@@ -729,7 +729,7 @@ class AgentRepositoryTestCase(TestCase):
             end_date="2024-01-31",
             sector=[self.sector.uuid],
             queue=self.queue.uuid,
-            tag=str(tag.uuid),
+            tags=[str(tag.uuid)],
         )
         rooms_query = self.repository._get_csat_rooms_query(filters, self.project)
 
