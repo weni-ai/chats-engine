@@ -835,6 +835,7 @@ class ReportFieldsValidatorViewSet(APIView):
             root_start_date = fields_config.pop("start_date", None)
             root_end_date = fields_config.pop("end_date", None)
 
+            # Apply root-level filters to rooms if present
             if "rooms" in fields_config and isinstance(fields_config["rooms"], dict):
                 fields_config["rooms"]["open_chats"] = open_chats
                 fields_config["rooms"]["closed_chats"] = closed_chats
@@ -845,16 +846,26 @@ class ReportFieldsValidatorViewSet(APIView):
 
             root_agents = request.data.get("agents") or request.data.get("agent")
             root_tags = request.data.get("tags") or request.data.get("tag")
-            if "rooms" not in fields_config or not isinstance(
-                fields_config["rooms"], dict
-            ):
-                fields_config["rooms"] = {}
-            if root_agents is not None:
-                fields_config["rooms"]["agents"] = root_agents
-            if root_tags is not None:
-                fields_config["rooms"]["tags"] = root_tags
+            if "rooms" in fields_config:
+                if not isinstance(fields_config["rooms"], dict):
+                    fields_config["rooms"] = {}
+                if root_agents is not None:
+                    fields_config["rooms"]["agents"] = root_agents
+                if root_tags is not None:
+                    fields_config["rooms"]["tags"] = root_tags
 
-            fields_config = {"rooms": fields_config.get("rooms", {})}
+            # Preserve all valid models, not just rooms
+            available_fields = ModelFieldsPresenter.get_models_info()
+            filtered_config = {}
+            for model_name in available_fields.keys():
+                if model_name in fields_config:
+                    filtered_config[model_name] = fields_config[model_name]
+            
+            # If no valid model found, default to empty rooms for backward compatibility
+            if not filtered_config:
+                filtered_config["rooms"] = {}
+            
+            fields_config = filtered_config
 
             # Calculate rooms count for time estimation
             try:
