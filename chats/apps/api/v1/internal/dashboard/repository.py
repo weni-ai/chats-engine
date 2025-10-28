@@ -346,13 +346,13 @@ class AgentRepository:
             "end_date": ("ended_at__lte", end_date),
             "sector": ("queue__sector__in", filters.sector),
             "queue": ("queue", filters.queue),
-            "tag": ("tag", filters.tag),
+            "tag": ("tags__in", filters.tags),
             "tags": ("tags__in", filters.tags),
             "queues": ("queue__in", filters.queues),
         }
 
         for filter_name, (query_expression, value) in filters_mapping.items():
-            if value is not None:
+            if value:
                 rooms_query[query_expression] = value
 
         return CSATScoreGeneral(
@@ -402,13 +402,13 @@ class AgentRepository:
             "end_date": ("rooms__ended_at__lte", end_date),
             "sector": ("rooms__queue__sector__in", filters.sector),
             "queue": ("rooms__queue", filters.queue),
-            "tag": ("rooms__tag", filters.tag),
+            "tag": ("rooms__tags__in", filters.tags),
             "tags": ("rooms__tags__in", filters.tags),
             "queues": ("rooms__queue__in", filters.queues),
         }
 
         for filter_name, (query_expression, value) in filters_mapping.items():
-            if value is not None:
+            if value:
                 rooms_query[query_expression] = value
 
         return rooms_query

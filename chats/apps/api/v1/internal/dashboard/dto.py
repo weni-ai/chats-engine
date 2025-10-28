@@ -17,8 +17,6 @@ class Filters:
     user_request: ProjectPermission = None
     project: Project = None
     ordering: str = None
-    page_size: Optional[int] = None
-    cursor: Optional[str] = None
 
 
 @dataclass(frozen=True)

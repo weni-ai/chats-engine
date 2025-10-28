@@ -13,8 +13,8 @@ from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.projects.models import Project
 from chats.apps.api.pagination import CustomCursorPagination
 
-from .dto import Filters
-from .service import AgentsService
+from chats.apps.api.v1.internal.dashboard.dto import Filters
+from chats.apps.api.v1.internal.dashboard.service import AgentsService
 
 
 class InternalDashboardViewset(viewsets.GenericViewSet):
@@ -94,9 +94,11 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
             start_date=params.get("start_date"),
             end_date=params.get("end_date"),
             agent=params.get("agent"),
-            sector=request.query_params.getlist("sector"),
+            sector=request.query_params.getlist("sector", []),
             tag=params.get("tags"),
+            tags=request.query_params.getlist("tags", []),
             queue=params.get("queue"),
+            queues=request.query_params.getlist("queues", []),
             user_request=params.get("user_request", ""),
             is_weni_admin=should_exclude_admin_domains(params.get("user_request", "")),
             ordering=params.get("ordering"),
