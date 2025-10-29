@@ -1,7 +1,6 @@
 from rest_framework import serializers
 
 from chats.apps.api.utils import calculate_in_service_time
-from chats.apps.api.v1.internal.dashboard.dto import CSATRatingCount
 
 
 class DashboardAgentsSerializer(serializers.Serializer):
