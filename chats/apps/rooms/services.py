@@ -162,21 +162,23 @@ class RoomsReportService:
 
                 dt = timezone.now().strftime("%d/%m/%Y_%H-%M-%S")
                 subject = _("Rooms report for project %(project)s - %(date)s") % {
-                    'project': self.project.name,
-                    'date': dt
-                }
-                
-                context = {
-                    'project_name': self.project.name,
-                    'generation_date': timezone.now().strftime("%d/%m/%Y at %H:%M:%S"),
-                    'total_rooms': rooms.count(),
-                    'current_year': timezone.now().year,
+                    "project": self.project.name,
+                    "date": dt,
                 }
 
-                html_content = render_to_string('rooms/emails/report_is_ready.html', context)
-                text_content = _("The rooms report for project %(project)s is ready and attached to this email.") % {
-                    'project': self.project.name
+                context = {
+                    "project_name": self.project.name,
+                    "generation_date": timezone.now().strftime("%d/%m/%Y at %H:%M:%S"),
+                    "total_rooms": rooms.count(),
+                    "current_year": timezone.now().year,
                 }
+
+                html_content = render_to_string(
+                    "rooms/emails/report_is_ready.html", context
+                )
+                text_content = _(
+                    "The rooms report for project %(project)s is ready and attached to this email."
+                ) % {"project": self.project.name}
 
                 email = EmailMultiAlternatives(
                     subject=subject,
@@ -208,26 +210,24 @@ class RoomsReportService:
                 )
 
                 dt = timezone.now().strftime("%d/%m/%Y_%H-%M-%S")
-                subject = _("Error generating rooms report for project %(project)s - %(date)s") % {
-                    'project': self.project.name,
-                    'date': dt
-                }
-                
+                subject = _(
+                    "Error generating rooms report for project %(project)s - %(date)s"
+                ) % {"project": self.project.name, "date": dt}
+
                 context = {
-                    'project_name': self.project.name,
-                    'error_message': str(e),
-                    'current_year': timezone.now().year,
+                    "project_name": self.project.name,
+                    "error_message": str(e),
+                    "current_year": timezone.now().year,
                 }
 
-                html_content = render_to_string('rooms/emails/report_failed.html', context)
+                html_content = render_to_string(
+                    "rooms/emails/report_failed.html", context
+                )
                 text_content = _(
                     "An error occurred while generating the rooms report for project %(project)s.\n\n"
                     "Error: %(error)s\n\n"
                     "Please try again later or contact support."
-                ) % {
-                    'project': self.project.name,
-                    'error': str(e)
-                }
+                ) % {"project": self.project.name, "error": str(e)}
 
                 try:
                     email = EmailMultiAlternatives(

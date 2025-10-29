@@ -698,9 +698,10 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                 in_service_status.save(update_fields=["is_active", "break_time"])
 
             serializer.save(user=user)
-            
+
             # Log status change
             from chats.apps.projects.tasks import log_agent_status_change
+
             log_agent_status_change.delay(
                 agent_email=user.email,
                 project_uuid=str(project.uuid),
@@ -770,9 +771,10 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                         raise serializers.ValidationError(
                             {"status": "Can't update user status in project."}
                         )
-                    
+
                     # Log status change
                     from chats.apps.projects.tasks import log_agent_status_change
+
                     log_agent_status_change.delay(
                         agent_email=instance.user.email,
                         project_uuid=str(instance.status_type.project.uuid),
