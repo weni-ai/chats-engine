@@ -70,6 +70,7 @@ class SectorSerializer(serializers.ModelSerializer):
             "automatic_message",
             "is_csat_enabled",
             "required_tags",
+            "secondary_project",
         ]
         extra_kwargs = {
             "work_start": {"required": False, "allow_null": True},
@@ -119,6 +120,14 @@ class SectorSerializer(serializers.ModelSerializer):
         project = self.instance.project if self.instance else data.get("project")
 
         validate_is_csat_enabled(project, data.get("is_csat_enabled"), self.context)
+
+        config = data.get("config", {})
+        if "secondary_project" in config:
+            secondary_project_value = config.get("secondary_project")
+            if isinstance(secondary_project_value, str):
+                data["secondary_project"] = {"uuid": secondary_project_value}
+            else:
+                data["secondary_project"] = secondary_project_value
 
         return data
 
@@ -170,6 +179,7 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
             "automatic_message",
             "is_csat_enabled",
             "required_tags",
+            "secondary_project",
         ]
         extra_kwargs = {field: {"required": False} for field in fields}
 
@@ -220,6 +230,14 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
         project = self.instance.project
 
         validate_is_csat_enabled(project, attrs.get("is_csat_enabled"), self.context)
+
+        config = attrs.get("config", {})
+        if "secondary_project" in config:
+            secondary_project_value = config.get("secondary_project")
+            if isinstance(secondary_project_value, str):
+                attrs["secondary_project"] = {"uuid": secondary_project_value}
+            else:
+                attrs["secondary_project"] = secondary_project_value
 
         return attrs
 
