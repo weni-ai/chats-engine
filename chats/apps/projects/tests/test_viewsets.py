@@ -1,9 +1,15 @@
+import uuid
+
 from django.urls import reverse
+from django.utils.crypto import get_random_string
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
+from rest_framework.response import Response
+from rest_framework import status
 
 from chats.apps.accounts.models import User
 from chats.apps.projects.models import Project
+from chats.apps.projects.tests.decorators import with_project_permission
 
 
 class PermissionTests(APITestCase):
@@ -65,3 +71,39 @@ class PermissionTests(APITestCase):
         self.assertEqual(
             response.data["Detail"], "You dont have permission in this project."
         )
+
+
+class BaseTestUpdateProjectViewSet(APITestCase):
+    def update(self, project_uuid: str, data: dict) -> Response:
+        url = reverse("project-detail", kwargs={"uuid": project_uuid})
+
+        return self.client.patch(url, data, format="json")
+
+
+class BaseTestUpdateProjectViewSetAnonymousUser(BaseTestUpdateProjectViewSet):
+    def test_cannot_update_project_when_unauthenticated(self):
+        response = self.update(uuid.uuid4(), {"name": "test"})
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class BaseTestUpdateProjectViewSetAuthenticatedUser(BaseTestUpdateProjectViewSet):
+    def setUp(self):
+        self.user = User.objects.create(email="test@test.com")
+        self.project = Project.objects.create(name="test")
+
+        self.client.force_authenticate(self.user)
+
+    def test_cannot_update_project_without_permission(self):
+        response = self.update(self.project.uuid, {"name": "test"})
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    @with_project_permission
+    def test_update_project(self):
+        new_name = get_random_string(length=10)
+        response = self.update(self.project.uuid, {"name": new_name})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.project.refresh_from_db(fields=["name"])
+        self.assertEqual(self.project.name, new_name)
