@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-10-28 17:38-0300\n"
+"POT-Creation-Date: 2025-10-29 15:37-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -20,58 +20,61 @@ msgstr ""
 
 #: chats/apps/accounts/authentication/drf/authorization.py:44
 msgid "Invalid token header. No credentials provided."
-msgstr ""
+msgstr "Encabezado de token inválido. No se proporcionaron credenciales."
 
 #: chats/apps/accounts/authentication/drf/authorization.py:47
 msgid "Invalid token header. Token string should not contain spaces."
-msgstr ""
+msgstr "Encabezado de token inválido. La cadena de token no debe contener espacios."
 
 #: chats/apps/accounts/authentication/drf/authorization.py:54
 msgid ""
 "Invalid token header. Token string should not contain invalid characters."
 msgstr ""
+"Encabezado de token inválido. La cadena de token no debe contener caracteres inválidos."
 
 #: chats/apps/accounts/authentication/drf/authorization.py:77
 msgid "Invalid token."
-msgstr ""
+msgstr "Token inválido."
 
 #: chats/apps/accounts/models.py:68 chats/apps/contacts/models.py:14
 msgid "first name"
-msgstr ""
+msgstr "nombre"
 
 #: chats/apps/accounts/models.py:69
 msgid "last name"
-msgstr ""
+msgstr "apellido"
 
 #: chats/apps/accounts/models.py:70 chats/apps/contacts/models.py:16
 msgid "email"
-msgstr ""
+msgstr "correo electrónico"
 
 #: chats/apps/accounts/models.py:70
 msgid "User email"
-msgstr ""
+msgstr "Correo electrónico del usuario"
 
 #: chats/apps/accounts/models.py:74
 msgid "staff status"
-msgstr ""
+msgstr "estado del personal"
 
 #: chats/apps/accounts/models.py:75
 msgid "active"
-msgstr ""
+msgstr "activo"
 
 #: chats/apps/accounts/models.py:79
 msgid "date joined"
-msgstr ""
+msgstr "fecha de registro"
 
 #: chats/apps/accounts/models.py:87
 #: chats/apps/discussions/models/discussion_message.py:18
 #: chats/apps/msgs/models.py:27 chats/apps/projects/models/models.py:628
+#: chats/apps/rooms/models.py:49 chats/apps/rooms/models.py:633
+#: chats/apps/rooms/models.py:663
 msgid "user"
-msgstr ""
+msgstr "usuario"
 
 #: chats/apps/accounts/models.py:88 chats/apps/projects/models/models.py:307
 msgid "users"
-msgstr ""
+msgstr "usuarios"
 
 #: chats/apps/accounts/models.py:105
 #: chats/apps/ai_features/history_summary/models.py:62
@@ -79,86 +82,86 @@ msgstr ""
 #: chats/apps/projects/models/models.py:465 chats/apps/queues/models.py:205
 #: chats/apps/sectors/models.py:318
 msgid "User"
-msgstr ""
+msgstr "Usuario"
 
 #: chats/apps/accounts/models.py:108
 msgid "New room messages notification sound"
-msgstr ""
+msgstr "Sonido de notificación de mensajes de nueva sala"
 
 #: chats/apps/accounts/models.py:111
 msgid "Chat messages notification sound"
-msgstr ""
+msgstr "Sonido de notificación de mensajes de chat"
 
 #: chats/apps/accounts/models.py:113
 msgid "Action sound"
-msgstr ""
+msgstr "Sonido de acción"
 
 #: chats/apps/accounts/models.py:115 chats/core/models.py:78
 msgid "config"
-msgstr ""
+msgstr "configuración"
 
 #: chats/apps/accounts/models.py:121
 msgid "Profile"
-msgstr ""
+msgstr "Perfil"
 
 #: chats/apps/accounts/models.py:122
 msgid "Profiles"
-msgstr ""
+msgstr "Perfiles"
 
 #: chats/apps/ai_features/history_summary/models.py:38
 #: chats/apps/ai_features/history_summary/models.py:56
 msgid "History Summary"
-msgstr ""
+msgstr "Resumen del Historial"
 
 #: chats/apps/ai_features/history_summary/models.py:39
 msgid "History Summaries"
-msgstr ""
+msgstr "Resúmenes del Historial"
 
 #: chats/apps/ai_features/history_summary/models.py:66
 msgid "Liked?"
-msgstr ""
+msgstr "¿Le gustó?"
 
 #: chats/apps/ai_features/history_summary/models.py:67
 #: chats/apps/discussions/models/discussion_message.py:24
 #: chats/apps/msgs/models.py:41
 msgid "Text"
-msgstr ""
+msgstr "Texto"
 
 #: chats/apps/ai_features/history_summary/models.py:70
 msgid "History Summary Feedback"
-msgstr ""
+msgstr "Comentario del Resumen del Historial"
 
 #: chats/apps/ai_features/history_summary/models.py:71
 msgid "History Summary Feedbacks"
-msgstr ""
+msgstr "Comentarios del Resumen del Historial"
 
 #: chats/apps/ai_features/models.py:12
 msgid "Feature"
-msgstr ""
+msgstr "Característica"
 
 #: chats/apps/ai_features/models.py:13
 msgid "Model"
-msgstr ""
+msgstr "Modelo"
 
 #: chats/apps/ai_features/models.py:14
 msgid "Settings"
-msgstr ""
+msgstr "Configuraciones"
 
 #: chats/apps/ai_features/models.py:15
 msgid "Prompt"
-msgstr ""
+msgstr "Indicación"
 
 #: chats/apps/ai_features/models.py:16
 msgid "Version"
-msgstr ""
+msgstr "Versión"
 
 #: chats/apps/ai_features/models.py:21
 msgid "AI Feature Prompt"
-msgstr ""
+msgstr "Indicación de Característica de IA"
 
 #: chats/apps/ai_features/models.py:22
 msgid "AI Feature Prompts"
-msgstr ""
+msgstr "Indicaciones de Características de IA"
 
 #: chats/apps/api/v1/contacts/filters.py:20
 #: chats/apps/api/v1/external/msgs/filters.py:30
@@ -166,281 +169,350 @@ msgstr ""
 #: chats/apps/discussions/filters/discussion.py:28
 #: chats/apps/history/filters/rooms_filter.py:80
 msgid "Projects's UUID"
-msgstr ""
+msgstr "UUID del Proyecto"
 
 #: chats/apps/api/v1/contacts/filters.py:27
 #: chats/apps/api/v1/sectors/filters.py:49
 #: chats/apps/api/v1/sectors/filters.py:75
 #: chats/apps/history/filters/rooms_filter.py:86
 msgid "Sector's UUID"
-msgstr ""
+msgstr "UUID del Sector"
 
 #: chats/apps/api/v1/contacts/filters.py:33
 #: chats/apps/history/filters/rooms_filter.py:92
 msgid "Room Tags"
-msgstr ""
+msgstr "Etiquetas de la Sala"
 
 #: chats/apps/api/v1/contacts/filters.py:39
 #: chats/apps/history/filters/rooms_filter.py:98
 msgid "Room created on"
-msgstr ""
+msgstr "Sala creada el"
 
 #: chats/apps/api/v1/contacts/filters.py:44
 #: chats/apps/history/filters/rooms_filter.py:104
 msgid "Room ended at"
-msgstr ""
+msgstr "Sala finalizada el"
 
 #: chats/apps/api/v1/external/agents/filters.py:16
 msgid "Queue's ID"
-msgstr ""
+msgstr "ID de la Cola"
 
 #: chats/apps/api/v1/external/agents/filters.py:23
 msgid "Sector's ID"
-msgstr ""
+msgstr "ID del Sector"
 
 #: chats/apps/api/v1/external/msgs/filters.py:16
 #: chats/apps/api/v1/msgs/filters.py:18 chats/apps/api/v1/msgs/filters.py:74
 msgid "Contact's UUID"
-msgstr ""
+msgstr "UUID del Contacto"
 
 #: chats/apps/api/v1/external/msgs/filters.py:23
 #: chats/apps/api/v1/msgs/filters.py:25 chats/apps/api/v1/msgs/filters.py:81
 msgid "Room's UUID"
-msgstr ""
+msgstr "UUID de la Sala"
 
 #: chats/apps/api/v1/external/msgs/filters.py:37
 #: chats/apps/api/v1/msgs/filters.py:39
 msgid "Is room active"
-msgstr ""
+msgstr "¿Está la sala activa?"
 
 #: chats/apps/api/v1/external/msgs/serializers.py:26
 msgid "incoming"
-msgstr ""
+msgstr "entrante"
 
 #: chats/apps/api/v1/external/msgs/serializers.py:27
 msgid "outgoing"
-msgstr ""
+msgstr "saliente"
 
 #: chats/apps/api/v1/external/rooms/serializers.py:430
 msgid "The contact already have an open room in the project"
-msgstr ""
+msgstr "El contacto ya tiene una sala abierta en el proyecto"
 
 #: chats/apps/api/v1/external/rooms/serializers.py:444
 msgid "Cannot create a room without queue_uuid or sector_uuid"
-msgstr ""
+msgstr "No se puede crear una sala sin queue_uuid o sector_uuid"
 
 #: chats/apps/api/v1/external/rooms/serializers.py:453
 msgid "No active queue found for provided sector_uuid"
-msgstr ""
+msgstr "No se encontró ninguna cola activa para el sector_uuid proporcionado"
 
 #: chats/apps/api/v1/external/rooms/serializers.py:459
 msgid "queue_uuid does not belong to provided sector_uuid"
-msgstr ""
+msgstr "queue_uuid no pertenece al sector_uuid proporcionado"
 
 #: chats/apps/api/v1/external/rooms/serializers.py:489
 msgid "Contact cannot be done when agents are offline"
-msgstr ""
+msgstr "No se puede contactar cuando los agentes están desconectados"
 
 #: chats/apps/api/v1/msgs/filters.py:94
 msgid "Content type"
-msgstr ""
+msgstr "Tipo de contenido"
 
 #: chats/apps/api/v1/msgs/permissions.py:57
 msgid "Either room or project query parameter is required"
-msgstr ""
+msgstr "Se requiere el parámetro de consulta de sala o proyecto"
 
 #: chats/apps/api/v1/queues/filters.py:16
 #: chats/apps/api/v1/quickmessages/filters.py:16
 #: chats/apps/api/v1/rooms/filters.py:23
 msgid "Project's UUID"
-msgstr ""
+msgstr "UUID del Proyecto"
 
 #: chats/apps/api/v1/queues/filters.py:32
 msgid "queue's ID"
-msgstr ""
+msgstr "ID de la cola"
 
 #: chats/apps/api/v1/queues/filters.py:39
 #: chats/apps/api/v1/sectors/filters.py:56
 #: chats/apps/projects/models/models.py:318
 msgid "User Status"
-msgstr ""
+msgstr "Estado del Usuario"
 
 #: chats/apps/api/v1/queues/serializers.py:30
 msgid "The name field can't be blank."
-msgstr ""
+msgstr "El campo nombre no puede estar en blanco."
 
 #: chats/apps/api/v1/queues/serializers.py:37
 #: chats/apps/api/v1/queues/serializers.py:42
 msgid "This queue already exists."
-msgstr ""
+msgstr "Esta cola ya existe."
 
 #: chats/apps/api/v1/queues/serializers.py:98
 msgid "you cant add a user two times in same queue."
-msgstr ""
+msgstr "no puedes agregar un usuario dos veces en la misma cola."
 
 #: chats/apps/api/v1/rooms/filters.py:30
 #: chats/apps/discussions/models/discussion.py:32
 msgid "Is active?"
-msgstr ""
+msgstr "¿Está activo?"
 
 #: chats/apps/api/v1/rooms/filters.py:37
 msgid "Room status"
-msgstr ""
+msgstr "Estado de la sala"
 
 #: chats/apps/api/v1/rooms/viewsets.py:540
 msgid "Room is not queued"
-msgstr ""
+msgstr "La sala no está en cola"
 
 #: chats/apps/api/v1/rooms/viewsets.py:574
 msgid "Room picked successfully"
-msgstr ""
+msgstr "Sala seleccionada con éxito"
 
 #: chats/apps/api/v1/sectors/filters.py:18
 msgid "Project's ID"
-msgstr ""
+msgstr "ID del Proyecto"
 
 #: chats/apps/api/v1/sectors/filters.py:82
 msgid "Queue's UUID"
-msgstr ""
+msgstr "UUID de la Cola"
 
 #: chats/apps/api/v1/sectors/serializers.py:69
 msgid "work_end date must be greater than work_start date."
-msgstr ""
+msgstr "La fecha de fin de trabajo debe ser mayor que la fecha de inicio de trabajo."
 
 #: chats/apps/api/v1/sectors/serializers.py:83
 #: chats/apps/api/v1/sectors/serializers.py:179
 msgid "This feature is not available for this project."
-msgstr ""
+msgstr "Esta característica no está disponible para este proyecto."
 
 #: chats/apps/api/v1/sectors/serializers.py:106
 #: chats/apps/api/v1/sectors/serializers.py:112
 #: chats/apps/api/v1/sectors/serializers.py:197
 msgid "Sector must have at least one tag to require tags."
-msgstr ""
+msgstr "El sector debe tener al menos una etiqueta para requerir etiquetas."
 
 #: chats/apps/api/v1/sectors/serializers.py:327
 #: chats/apps/api/v1/sectors/serializers.py:334
 msgid "This tag already exists."
-msgstr ""
+msgstr "Esta etiqueta ya existe."
 
 #: chats/apps/api/v1/sectors/serializers.py:409
 msgid "Closed days should not have start_time or end_time"
-msgstr ""
+msgstr "Los días cerrados no deben tener hora de inicio o fin"
 
 #: chats/apps/api/v1/sectors/serializers.py:417
 msgid "Custom hours days must have both start_time and end_time"
-msgstr ""
+msgstr "Los días con horario personalizado deben tener hora de inicio y fin"
 
 #: chats/apps/api/v1/sectors/serializers.py:423
 msgid "End time must be greater than start time"
-msgstr ""
+msgstr "La hora de fin debe ser mayor que la hora de inicio"
 
 #: chats/apps/contacts/models.py:12 chats/apps/msgs/models.py:44
 #: chats/apps/msgs/models.py:313 chats/apps/projects/models/models.py:514
 #: chats/apps/projects/models/models.py:555
 msgid "External ID"
-msgstr ""
+msgstr "ID Externo"
 
 #: chats/apps/contacts/models.py:16
 msgid "Contact email"
-msgstr ""
+msgstr "Correo electrónico del contacto"
 
 #: chats/apps/contacts/models.py:18
 msgid "status"
-msgstr ""
+msgstr "estado"
 
 #: chats/apps/contacts/models.py:19
 msgid "phone"
-msgstr ""
+msgstr "teléfono"
 
-#: chats/apps/contacts/models.py:22
+#: chats/apps/contacts/models.py:22 chats/apps/rooms/models.py:73
 msgid "custom fields"
-msgstr ""
+msgstr "campos personalizados"
 
 #: chats/apps/contacts/models.py:27
 msgid "Imported History URL"
-msgstr ""
+msgstr "URL del Historial Importado"
 
 #: chats/apps/contacts/models.py:31 chats/apps/projects/models/models.py:473
 msgid "Contact"
-msgstr ""
+msgstr "Contacto"
 
 #: chats/apps/contacts/models.py:32
 msgid "Contacts"
+msgstr "Contactos"
+
+#: chats/apps/dashboard/email_templates.py:27
+#, python-format
+msgid ""
+"The custom report for the project %(project)s is ready.\n"
+"\n"
+"Copy and paste the URL below to download the report:\n"
+"\n"
+"%(url)s"
 msgstr ""
+"El informe personalizado para el proyecto %(project)s está listo.\n"
+"\n"
+"Copie y pegue la URL a continuación para descargar el informe:\n"
+"\n"
+"%(url)s"
+
+#: chats/apps/dashboard/email_templates.py:54
+#, python-format
+msgid ""
+"An error occurred while generating the custom report for project "
+"%(project)s.\n"
+"\n"
+"Error: %(error)s\n"
+"\n"
+"Please try again later or contact support."
+msgstr ""
+"Ocurrió un error al generar el informe personalizado para el proyecto "
+"%(project)s.\n"
+"\n"
+"Error: %(error)s\n"
+"\n"
+"Por favor, inténtelo de nuevo más tarde o contacte al soporte."
+
+#: chats/apps/dashboard/email_templates.py:56
+msgid "Unknown error"
+msgstr "Error desconocido"
+
+#: chats/apps/dashboard/models.py:11 chats/apps/dashboard/models.py:22
+msgid "Room Metric"
+msgstr "Métrica de Sala"
+
+#: chats/apps/dashboard/models.py:14
+msgid "Room Waiting time"
+msgstr "Tiempo de espera de la sala"
+
+#: chats/apps/dashboard/models.py:15
+msgid "Queued count"
+msgstr "Contador de cola"
+
+#: chats/apps/dashboard/models.py:16
+msgid "Messages response time"
+msgstr "Tiempo de respuesta de mensajes"
+
+#: chats/apps/dashboard/models.py:17
+msgid "First response time"
+msgstr "Tiempo de primera respuesta"
+
+#: chats/apps/dashboard/models.py:18
+msgid "Room interaction time"
+msgstr "Tiempo de interacción de la sala"
+
+#: chats/apps/dashboard/models.py:19
+msgid "Room transfer count"
+msgstr "Contador de transferencias de sala"
+
+#: chats/apps/dashboard/models.py:23
+msgid "Rooms Metrics"
+msgstr "Métricas de Salas"
 
 #: chats/apps/discussions/filters/discussion.py:21
 msgid "Filter discussions by subject or contact's name"
-msgstr ""
+msgstr "Filtrar discusiones por asunto o nombre del contacto"
 
 #: chats/apps/discussions/models/discussion.py:10
 msgid "Subject Text"
-msgstr ""
+msgstr "Texto del Asunto"
 
 #: chats/apps/discussions/models/discussion.py:16
 msgid "Created By"
-msgstr ""
+msgstr "Creado Por"
 
 #: chats/apps/discussions/models/discussion.py:23
+#: chats/apps/rooms/models.py:189
 msgid "Room"
-msgstr ""
+msgstr "Sala"
 
 #: chats/apps/discussions/models/discussion.py:29
-#: chats/apps/queues/models.py:195
+#: chats/apps/queues/models.py:195 chats/apps/rooms/models.py:66
 msgid "Queue"
-msgstr ""
+msgstr "Cola"
 
 #: chats/apps/discussions/models/discussion.py:31
 msgid "Is queued?"
-msgstr ""
+msgstr "¿Está en cola?"
 
 #: chats/apps/discussions/models/discussion_message.py:12
 msgid "discussion"
-msgstr ""
+msgstr "discusión"
 
 #: chats/apps/discussions/models/discussion_message.py:55
 msgid "discussion message"
-msgstr ""
+msgstr "mensaje de discusión"
 
 #: chats/apps/discussions/models/discussion_message.py:61
 #: chats/apps/msgs/models.py:191
 msgid "Content Type"
-msgstr ""
+msgstr "Tipo de Contenido"
 
 #: chats/apps/discussions/models/discussion_message.py:63
 #: chats/apps/msgs/models.py:193
 msgid "Media File"
-msgstr ""
+msgstr "Archivo Multimedia"
 
 #: chats/apps/discussions/models/discussion_message.py:71
 msgid "Discussion Message Media"
-msgstr ""
+msgstr "Multimedia de Mensaje de Discusión"
 
 #: chats/apps/discussions/models/discussion_message.py:72
 msgid "Discussion Message Medias"
-msgstr ""
+msgstr "Multimedias de Mensajes de Discusión"
 
 #: chats/apps/discussions/models/discussion_user.py:9
 msgid "Creator"
-msgstr ""
+msgstr "Creador"
 
 #: chats/apps/discussions/models/discussion_user.py:10
 msgid "Admin"
-msgstr ""
+msgstr "Administrador"
 
 #: chats/apps/discussions/models/discussion_user.py:11
 msgid "Participant"
-msgstr ""
+msgstr "Participante"
 
 #: chats/apps/discussions/models/discussion_user.py:23
 msgid "Discussion"
-msgstr ""
+msgstr "Discusión"
 
 #: chats/apps/discussions/models/discussion_user.py:26
 #: chats/apps/projects/models/models.py:314 chats/apps/queues/models.py:200
 #: chats/apps/sectors/models.py:329 chats/apps/sectors/models.py:503
 msgid "role"
-msgstr ""
+msgstr "rol"
 
 #: chats/apps/feature_version/models.py:10
 #: chats/apps/projects/models/models.py:100
@@ -448,443 +520,661 @@ msgstr ""
 #: chats/apps/projects/models/models.py:520 chats/apps/sectors/models.py:28
 #: chats/apps/sectors/models.py:453
 msgid "Project"
-msgstr ""
+msgstr "Proyecto"
 
 #: chats/apps/feature_version/models.py:14
 msgid "feature uuid"
-msgstr ""
+msgstr "uuid de característica"
 
 #: chats/apps/feature_version/models.py:16
 msgid "sectors list"
-msgstr ""
+msgstr "lista de sectores"
 
 #: chats/apps/history/filters/rooms_filter.py:73
 msgid "Contact's External ID"
-msgstr ""
+msgstr "ID Externo del Contacto"
 
 #: chats/apps/msgs/models.py:21 chats/apps/projects/models/models.py:533
+#: chats/apps/rooms/models.py:627 chats/apps/rooms/models.py:657
 msgid "room"
-msgstr ""
+msgstr "sala"
 
-#: chats/apps/msgs/models.py:36
+#: chats/apps/msgs/models.py:36 chats/apps/rooms/models.py:58
 msgid "contact"
-msgstr ""
+msgstr "contacto"
 
 #: chats/apps/msgs/models.py:42
 msgid "Was it seen?"
-msgstr ""
+msgstr "¿Fue visto?"
 
 #: chats/apps/msgs/models.py:47
 msgid "message metadata"
-msgstr ""
+msgstr "metadatos del mensaje"
 
 #: chats/apps/msgs/models.py:50
 msgid "message status"
-msgstr ""
+msgstr "estado del mensaje"
 
 #: chats/apps/msgs/models.py:55
 msgid "message is read"
-msgstr ""
+msgstr "mensaje leído"
 
 #: chats/apps/msgs/models.py:58
 msgid "message is delivered"
-msgstr ""
+msgstr "mensaje entregado"
 
 #: chats/apps/msgs/models.py:68 chats/apps/msgs/models.py:215
 msgid "Closed rooms cannot receive messages"
-msgstr ""
+msgstr "Las salas cerradas no pueden recibir mensajes"
 
 #: chats/apps/msgs/models.py:73
 msgid "You cannot send messages after 24h from the last contact message"
-msgstr ""
+msgstr "No puedes enviar mensajes después de 24h del último mensaje de contacto"
 
-#: chats/apps/msgs/models.py:188
+#: chats/apps/msgs/models.py:188 chats/apps/rooms/models.py:671
 msgid "message"
-msgstr ""
+msgstr "mensaje"
 
 #: chats/apps/msgs/models.py:198
 msgid "Media url"
-msgstr ""
+msgstr "URL de multimedia"
 
 #: chats/apps/msgs/models.py:201
 msgid "MessageMedia"
-msgstr ""
+msgstr "Multimedia de Mensaje"
 
 #: chats/apps/msgs/models.py:202
 msgid "MessageMedias"
-msgstr ""
+msgstr "Multimedias de Mensaje"
 
 #: chats/apps/projects/models/models.py:30
 msgid "Template Setup"
-msgstr ""
+msgstr "Configuración de Plantilla"
 
 #: chats/apps/projects/models/models.py:66 chats/apps/sectors/models.py:25
 msgid "name"
-msgstr ""
+msgstr "nombre"
 
 #: chats/apps/projects/models/models.py:67
 msgid "Timezone"
-msgstr ""
+msgstr "Zona Horaria"
 
 #: chats/apps/projects/models/models.py:69
 msgid "Flows Authorization Token"
-msgstr ""
+msgstr "Token de Autorización de Flujos"
 
 #: chats/apps/projects/models/models.py:72
 msgid "Date Format"
-msgstr ""
+msgstr "Formato de Fecha"
 
 #: chats/apps/projects/models/models.py:76
 msgid "Whether day comes first or month comes first in dates"
-msgstr ""
+msgstr "Si el día viene primero o el mes viene primero en las fechas"
 
 #: chats/apps/projects/models/models.py:78
 msgid "is template?"
-msgstr ""
+msgstr "¿es plantilla?"
 
 #: chats/apps/projects/models/models.py:81
 msgid "template type"
-msgstr ""
+msgstr "tipo de plantilla"
 
 #: chats/apps/projects/models/models.py:86
 msgid "org uuid"
-msgstr ""
+msgstr "uuid de organización"
 
 #: chats/apps/projects/models/models.py:88
 msgid "Room routing type"
-msgstr ""
+msgstr "Tipo de enrutamiento de sala"
 
 #: chats/apps/projects/models/models.py:95
 msgid "Whether to route rooms using the queue priority or general routing"
-msgstr ""
+msgstr "Si se deben enrutar salas usando la prioridad de cola o enrutamiento general"
 
 #: chats/apps/projects/models/models.py:101
 msgid "Projects"
-msgstr ""
+msgstr "Proyectos"
 
 #: chats/apps/projects/models/models.py:281 chats/apps/queues/models.py:189
 #: chats/apps/sectors/models.py:311 chats/apps/sectors/models.py:488
 msgid "not set"
-msgstr ""
+msgstr "no establecido"
 
 #: chats/apps/projects/models/models.py:282
 msgid "admin"
-msgstr ""
+msgstr "administrador"
 
 #: chats/apps/projects/models/models.py:283
 msgid "Attendant"
-msgstr ""
+msgstr "Atendente"
 
 #: chats/apps/projects/models/models.py:292
 msgid "online"
-msgstr ""
+msgstr "en línea"
 
 #: chats/apps/projects/models/models.py:293
 msgid "offline"
-msgstr ""
+msgstr "desconectado"
 
 #: chats/apps/projects/models/models.py:294
 msgid "away"
-msgstr ""
+msgstr "ausente"
 
 #: chats/apps/projects/models/models.py:295
 msgid "busy"
-msgstr ""
+msgstr "ocupado"
 
 #: chats/apps/projects/models/models.py:322
 msgid "Is it the first access of user?"
-msgstr ""
+msgstr "¿Es el primer acceso del usuario?"
 
 #: chats/apps/projects/models/models.py:329
 msgid "Project Permission"
-msgstr ""
+msgstr "Permiso de Proyecto"
 
 #: chats/apps/projects/models/models.py:330
 msgid "Project Permissions"
-msgstr ""
+msgstr "Permisos de Proyecto"
 
 #: chats/apps/projects/models/models.py:479
 #: chats/apps/projects/models/models.py:682
+#: chats/apps/projects/models/models.py:725
 msgid "project"
-msgstr ""
+msgstr "proyecto"
 
 #: chats/apps/projects/models/models.py:485
 msgid "Linked Contact"
-msgstr ""
+msgstr "Contacto Vinculado"
 
 #: chats/apps/projects/models/models.py:486
 msgid "Linked Contacts"
-msgstr ""
+msgstr "Contactos Vinculados"
 
 #: chats/apps/projects/models/models.py:516
 msgid "flow ID"
-msgstr ""
+msgstr "ID del flujo"
 
 #: chats/apps/projects/models/models.py:517
 msgid "flow name"
-msgstr ""
+msgstr "nombre del flujo"
 
 #: chats/apps/projects/models/models.py:526
 msgid "Permission"
-msgstr ""
+msgstr "Permiso"
 
 #: chats/apps/projects/models/models.py:539 chats/apps/sectors/models.py:47
 #: chats/core/models.py:59
 msgid "is deleted?"
-msgstr ""
+msgstr "¿está eliminado?"
 
 #: chats/apps/projects/models/models.py:540
 msgid "contact data"
-msgstr ""
+msgstr "datos del contacto"
 
 #: chats/apps/projects/models/models.py:543
 #: chats/apps/projects/models/models.py:559
 msgid "Flow Start"
-msgstr ""
+msgstr "Inicio de Flujo"
 
 #: chats/apps/projects/models/models.py:544
 msgid "Flow Starts"
-msgstr ""
+msgstr "Inicios de Flujo"
 
 #: chats/apps/projects/models/models.py:552
 msgid "Receiver Type"
-msgstr ""
+msgstr "Tipo de Receptor"
 
 #: chats/apps/projects/models/models.py:565
 msgid "Flow contact/group Reference"
-msgstr ""
+msgstr "Referencia de contacto/grupo de flujo"
 
 #: chats/apps/projects/models/models.py:566
 msgid "Flow contact/group References"
-msgstr ""
+msgstr "Referencias de contacto/grupo de flujo"
 
 #: chats/apps/projects/models/models.py:638
 msgid "Custom status timming"
-msgstr ""
+msgstr "Tiempo de estado personalizado"
 
-#: chats/apps/projects/models/models.py:688 chats/apps/queues/models.py:190
+#: chats/apps/projects/models/models.py:688
+#: chats/apps/projects/models/models.py:717 chats/apps/queues/models.py:190
 #: chats/apps/sectors/models.py:490
 msgid "agent"
-msgstr ""
+msgstr "agente"
 
 #: chats/apps/projects/models/models.py:695
 msgid "disconnected by"
+msgstr "desconectado por"
+
+#: chats/apps/projects/models/models.py:730
+msgid "log date"
+msgstr "fecha del registro"
+
+#: chats/apps/projects/models/models.py:731
+msgid "Date of the log (agent's local timezone)"
+msgstr "Fecha del registro (zona horaria local del agente)"
+
+#: chats/apps/projects/models/models.py:735
+msgid "status changes"
+msgstr "cambios de estado"
+
+#: chats/apps/projects/models/models.py:738
+msgid ""
+"List of status change events: [{'timestamp': '...', 'status': 'ONLINE|"
+"OFFLINE', 'custom_status': 'status_name or null', 'status_type_uuid': '...'}]"
 msgstr ""
+"Lista de eventos de cambio de estado: [{'timestamp': '...', 'status': 'ONLINE|"
+"OFFLINE', 'custom_status': 'nombre_estado o null', 'status_type_uuid': '...'}]"
+
+#: chats/apps/projects/models/models.py:745
+msgid "Agent Status Log"
+msgstr "Registro de Estado del Agente"
+
+#: chats/apps/projects/models/models.py:746
+msgid "Agent Status Logs"
+msgstr "Registros de Estado del Agente"
 
 #: chats/apps/queues/models.py:21 chats/apps/quickmessages/models.py:20
 msgid "sector"
-msgstr ""
+msgstr "sector"
 
 #: chats/apps/queues/models.py:25 chats/apps/sectors/models.py:382
 #: chats/apps/sectors/models.py:450
 msgid "Name"
-msgstr ""
+msgstr "Nombre"
 
 #: chats/apps/queues/models.py:27
 msgid "Default queue message"
-msgstr ""
+msgstr "Mensaje predeterminado de la cola"
 
 #: chats/apps/queues/models.py:33
 msgid "Sector Queue"
-msgstr ""
+msgstr "Cola del Sector"
 
 #: chats/apps/queues/models.py:34
 msgid "Sector Queues"
-msgstr ""
+msgstr "Colas del Sector"
 
 #: chats/apps/queues/models.py:211
 msgid "Sector Queue Authorization"
-msgstr ""
+msgstr "Autorización de Cola del Sector"
 
 #: chats/apps/queues/models.py:212
 msgid "Sector Queues Authorization"
-msgstr ""
+msgstr "Autorizaciones de Cola del Sector"
 
 #: chats/apps/quickmessages/models.py:11
 msgid "quick_messages"
-msgstr ""
+msgstr "mensajes_rápidos"
 
 #: chats/apps/quickmessages/models.py:15
 msgid "shortcut"
-msgstr ""
+msgstr "atajo"
 
 #: chats/apps/quickmessages/models.py:16
 msgid "title"
-msgstr ""
+msgstr "título"
 
-#: chats/apps/quickmessages/models.py:17
+#: chats/apps/quickmessages/models.py:17 chats/apps/rooms/models.py:666
 msgid "text"
-msgstr ""
+msgstr "texto"
 
 #: chats/apps/quickmessages/models.py:28
 msgid "Quick Message"
-msgstr ""
+msgstr "Mensaje Rápido"
 
 #: chats/apps/quickmessages/models.py:29
 msgid "Quick Messages"
+msgstr "Mensajes Rápidos"
+
+#: chats/apps/rooms/models.py:77
+msgid "urn"
+msgstr "urn"
+
+#: chats/apps/rooms/models.py:80
+msgid "project_uuid"
+msgstr "uuid_proyecto"
+
+#: chats/apps/rooms/models.py:82
+msgid "ticket uuid"
+msgstr "uuid de ticket"
+
+#: chats/apps/rooms/models.py:84
+msgid "Callback URL"
+msgstr "URL de Callback"
+
+#: chats/apps/rooms/models.py:87
+msgid "Ended at"
+msgstr "Finalizado en"
+
+#: chats/apps/rooms/models.py:90
+msgid "Ended by"
+msgstr "Finalizado por"
+
+#: chats/apps/rooms/models.py:92
+msgid "is active?"
+msgstr "¿está activo?"
+
+#: chats/apps/rooms/models.py:93
+msgid "is waiting for answer?"
+msgstr "¿está esperando respuesta?"
+
+#: chats/apps/rooms/models.py:96
+msgid "Transfer History"
+msgstr "Historial de Transferencias"
+
+#: chats/apps/rooms/models.py:99
+msgid "Full Transfer History"
+msgstr "Historial Completo de Transferencias"
+
+#: chats/apps/rooms/models.py:105
+msgid "tags"
+msgstr "etiquetas"
+
+#: chats/apps/rooms/models.py:108
+msgid "protocol"
+msgstr "protocolo"
+
+#: chats/apps/rooms/models.py:111
+msgid "service chat"
+msgstr "chat de servicio"
+
+#: chats/apps/rooms/models.py:115
+msgid "First user assigned at"
+msgstr "Primer usuario asignado en"
+
+#: chats/apps/rooms/models.py:118
+msgid "User assigned at"
+msgstr "Usuario asignado en"
+
+#: chats/apps/rooms/models.py:121
+msgid "Added to queue at"
+msgstr "Agregado a la cola en"
+
+#: chats/apps/rooms/models.py:190
+msgid "Rooms"
+msgstr "Salas"
+
+#: chats/apps/rooms/models.py:204
+msgid "Closed rooms cannot receive updates"
+msgstr "Las salas cerradas no pueden recibir actualizaciones"
+
+#: chats/apps/rooms/models.py:636
+msgid "created on"
+msgstr "creado en"
+
+#: chats/apps/rooms/models.py:639
+msgid "Room Pin"
+msgstr "Pin de Sala"
+
+#: chats/apps/rooms/models.py:640
+msgid "Room Pins"
+msgstr "Pines de Sala"
+
+#: chats/apps/rooms/models.py:667
+msgid "is deletable"
+msgstr "es eliminable"
+
+#: chats/apps/rooms/models.py:678
+msgid "Room Note"
+msgstr "Nota de Sala"
+
+#: chats/apps/rooms/models.py:679
+msgid "Room Notes"
+msgstr "Notas de Sala"
+
+#: chats/apps/rooms/services.py:164
+#, python-format
+msgid "Rooms report for project %(project)s - %(date)s"
+msgstr "Informe de salas para el proyecto %(project)s - %(date)s"
+
+#: chats/apps/rooms/services.py:177
+#, python-format
+msgid ""
+"The rooms report for project %(project)s is ready and attached to this email."
 msgstr ""
+"El informe de salas para el proyecto %(project)s está listo y adjunto a este correo."
+
+#: chats/apps/rooms/services.py:211
+#, python-format
+msgid "Error generating rooms report for project %(project)s - %(date)s"
+msgstr "Error al generar informe de salas para el proyecto %(project)s - %(date)s"
+
+#: chats/apps/rooms/services.py:224
+#, python-format
+msgid ""
+"An error occurred while generating the rooms report for project "
+"%(project)s.\n"
+"\n"
+"Error: %(error)s\n"
+"\n"
+"Please try again later or contact support."
+msgstr ""
+"Ocurrió un error al generar el informe de salas para el proyecto "
+"%(project)s.\n"
+"\n"
+"Error: %(error)s\n"
+"\n"
+"Por favor, inténtelo de nuevo más tarde o contacte al soporte."
+
+#: chats/apps/rooms/templates/rooms/emails/base.html:30
+msgid "Our site"
+msgstr "Nuestro sitio"
+
+#: chats/apps/rooms/templates/rooms/emails/base.html:48
+msgid "2025 © Weni by VTEX. All rights reserved."
+msgstr "2025 © Weni by VTEX. Todos los derechos reservados."
+
+#: chats/apps/rooms/templates/rooms/emails/base.html:54
+msgid ""
+"You are receiving this mail because you registered in Weni platform. This "
+"also shows that\n"
+"            you agree to our Terms of use and Privacy Policies."
+msgstr ""
+"Está recibiendo este correo porque se registró en la plataforma Weni. Esto "
+"también muestra que\n"
+"            acepta nuestros Términos de uso y Políticas de privacidad."
+
+#: chats/apps/rooms/templates/rooms/emails/base.html:59
+msgid "Privacy Policy"
+msgstr "Política de Privacidad"
+
+#: chats/apps/rooms/templates/rooms/emails/base.html:65
+msgid "Terms of use"
+msgstr "Términos de uso"
+
+#: chats/apps/rooms/templates/rooms/emails/base.html:71
+msgid "Help Center"
+msgstr "Centro de Ayuda"
+
+#: chats/apps/rooms/templates/rooms/emails/report_failed.html:7
+#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:7
+msgid "Hi,"
+msgstr "Hola,"
+
+#: chats/apps/rooms/templates/rooms/emails/report_failed.html:9
+#, python-format
+msgid ""
+"Unable to generate export of %(project_name)s project\n"
+"        data."
+msgstr ""
+"No se pudo generar la exportación de datos del proyecto %(project_name)s."
+
+#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:9
+#, python-format
+msgid ""
+"The data export for the %(project_name)s\n"
+"        project is ready and you can download it by <a clicktracking=off "
+"style=\"color: #00A49F; text-decoration: none;\"\n"
+"            href=\"%(file_link)s\" target=\"_blank\">clicking here</a>."
+msgstr ""
+"La exportación de datos del proyecto %(project_name)s\n"
+"        está lista y puede descargarla <a clicktracking=off "
+"style=\"color: #00A49F; text-decoration: none;\"\n"
+"            href=\"%(file_link)s\" target=\"_blank\">haciendo clic aquí</a>."
 
 #: chats/apps/sectors/models.py:32 chats/apps/sectors/models.py:463
 msgid "Rooms limit per employee"
-msgstr ""
+msgstr "Límite de salas por empleado"
 
 #: chats/apps/sectors/models.py:34
 msgid "work start"
-msgstr ""
+msgstr "inicio de trabajo"
 
 #: chats/apps/sectors/models.py:37
 msgid "work end"
-msgstr ""
+msgstr "fin de trabajo"
 
 #: chats/apps/sectors/models.py:40
 msgid "Can trigger flows?"
-msgstr ""
+msgstr "¿Puede activar flujos?"
 
 #: chats/apps/sectors/models.py:42
 msgid ""
 "Is it possible to trigger flows(weni flows integration) from this sector?"
 msgstr ""
+"¿Es posible activar flujos (integración de flujos weni) desde este sector?"
 
 #: chats/apps/sectors/models.py:46
 msgid "Sign messages?"
-msgstr ""
+msgstr "¿Firmar mensajes?"
 
 #: chats/apps/sectors/models.py:49
 msgid "Open room when all agents are offline?"
-msgstr ""
+msgstr "¿Abrir sala cuando todos los agentes estén desconectados?"
 
 #: chats/apps/sectors/models.py:52
 msgid "Can edit custom fields?"
-msgstr ""
+msgstr "¿Puede editar campos personalizados?"
 
 #: chats/apps/sectors/models.py:55
 msgid "working_day"
-msgstr ""
+msgstr "día_laboral"
 
 #: chats/apps/sectors/models.py:58
 msgid "automatic message text"
-msgstr ""
+msgstr "texto del mensaje automático"
 
 #: chats/apps/sectors/models.py:61
 msgid "is automatic message active?"
-msgstr ""
+msgstr "¿está activo el mensaje automático?"
 
 #: chats/apps/sectors/models.py:63
 msgid "required tags?"
-msgstr ""
+msgstr "¿etiquetas requeridas?"
 
 #: chats/apps/sectors/models.py:71 chats/apps/sectors/models.py:325
 #: chats/apps/sectors/models.py:385 chats/apps/sectors/models.py:550
 msgid "Sector"
-msgstr ""
+msgstr "Sector"
 
 #: chats/apps/sectors/models.py:72
 msgid "Sectors"
-msgstr ""
+msgstr "Sectores"
 
 #: chats/apps/sectors/models.py:312 chats/apps/sectors/models.py:489
 msgid "manager"
-msgstr ""
+msgstr "gerente"
 
 #: chats/apps/sectors/models.py:333
 msgid "Sector Authorization"
-msgstr ""
+msgstr "Autorización de Sector"
 
 #: chats/apps/sectors/models.py:334
 msgid "Sector Authorizations"
-msgstr ""
+msgstr "Autorizaciones de Sector"
 
 #: chats/apps/sectors/models.py:397
 msgid "Sector Tag"
-msgstr ""
+msgstr "Etiqueta de Sector"
 
 #: chats/apps/sectors/models.py:398
 msgid "Sector Tags"
-msgstr ""
+msgstr "Etiquetas de Sector"
 
 #: chats/apps/sectors/models.py:436
 msgid "Sector Group Sector"
-msgstr ""
+msgstr "Sector del Grupo de Sectores"
 
 #: chats/apps/sectors/models.py:437
 msgid "Sector Group Sectors"
-msgstr ""
+msgstr "Sectores del Grupo de Sectores"
 
 #: chats/apps/sectors/models.py:466
 msgid "Group Sector"
-msgstr ""
+msgstr "Grupo de Sectores"
 
 #: chats/apps/sectors/models.py:467
 msgid "Group Sectors"
-msgstr ""
+msgstr "Grupos de Sectores"
 
 #: chats/apps/sectors/models.py:507
 msgid "Group Sector Authorization"
-msgstr ""
+msgstr "Autorización de Grupo de Sectores"
 
 #: chats/apps/sectors/models.py:508
 msgid "Group Sector Authorizations"
-msgstr ""
+msgstr "Autorizaciones de Grupo de Sectores"
 
 #: chats/apps/sectors/models.py:544
 msgid "Closed"
-msgstr ""
+msgstr "Cerrado"
 
 #: chats/apps/sectors/models.py:545
 msgid "Custom Hours"
-msgstr ""
+msgstr "Horario Personalizado"
 
 #: chats/apps/sectors/models.py:554
 msgid "Date"
-msgstr ""
+msgstr "Fecha"
 
 #: chats/apps/sectors/models.py:556
 msgid "End Date"
-msgstr ""
+msgstr "Fecha de Fin"
 
 #: chats/apps/sectors/models.py:559
 msgid "End date for holiday range"
-msgstr ""
+msgstr "Fecha de fin para el rango de vacaciones"
 
 #: chats/apps/sectors/models.py:562
 msgid "Day Type"
-msgstr ""
+msgstr "Tipo de Día"
 
 #: chats/apps/sectors/models.py:565
 msgid "Start Time"
-msgstr ""
+msgstr "Hora de Inicio"
 
 #: chats/apps/sectors/models.py:568 chats/apps/sectors/models.py:574
 msgid "Leave empty if day is closed"
-msgstr ""
+msgstr "Deje vacío si el día está cerrado"
 
 #: chats/apps/sectors/models.py:571
 msgid "End Time"
-msgstr ""
+msgstr "Hora de Fin"
 
 #: chats/apps/sectors/models.py:577
 msgid "Description"
-msgstr ""
+msgstr "Descripción"
 
 #: chats/apps/sectors/models.py:580
 msgid "Holiday name or reason for special hours"
-msgstr ""
+msgstr "Nombre del feriado o motivo de horario especial"
 
 #: chats/apps/sectors/models.py:582
 msgid "Is Custom"
-msgstr ""
+msgstr "Es Personalizado"
 
 #: chats/apps/sectors/models.py:583
 msgid "Repeat Annually"
-msgstr ""
+msgstr "Repetir Anualmente"
 
 #: chats/apps/sectors/models.py:586
 msgid "Sector Holiday"
-msgstr ""
+msgstr "Feriado del Sector"
 
 #: chats/apps/sectors/models.py:587
 msgid "Sector Holidays"
-msgstr ""
+msgstr "Feriados del Sector"
 
 #: chats/apps/sectors/utils.py:48 chats/apps/sectors/utils.py:72
 #: chats/apps/sectors/utils.py:150 chats/apps/sectors/utils.py:162
@@ -894,16 +1184,16 @@ msgstr ""
 #: chats/apps/sectors/utils.py:276 chats/apps/sectors/utils.py:289
 #: chats/apps/sectors/utils.py:297
 msgid "Contact cannot be done outside working hours"
-msgstr ""
+msgstr "No se puede contactar fuera del horario laboral"
 
 #: chats/core/models.py:37 chats/core/models.py:51
 msgid "Created on"
-msgstr ""
+msgstr "Creado el"
 
 #: chats/core/models.py:39
 msgid "Modified on"
-msgstr ""
+msgstr "Modificado el"
 
 #: chats/core/models.py:101
 msgid "config to use in project integration"
-msgstr ""
+msgstr "configuración para usar en la integración del proyecto"
