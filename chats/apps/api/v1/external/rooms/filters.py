@@ -63,4 +63,4 @@ class RoomMetricsFilter(RoomFilter):
         return queryset.filter(contact__external_id__in=external_ids)
 
     def filter_secondary_project(self, queryset, name, value):
-        return queryset.filter(queue__sector__config__secondary_project=value)
+        return queryset.filter(queue__sector__secondary_project__uuid=value)
