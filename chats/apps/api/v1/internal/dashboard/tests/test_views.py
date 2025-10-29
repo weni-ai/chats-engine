@@ -1,3 +1,4 @@
+from unittest.mock import patch
 import uuid
 
 from django.utils import timezone
@@ -6,6 +7,7 @@ from rest_framework.test import APITestCase
 from rest_framework.response import Response
 
 from chats.apps.accounts.models import User
+from chats.apps.api.v1.internal.dashboard.dto import CSATRatingCount, CSATRatings
 from chats.apps.projects.models.models import Project, ProjectPermission
 from chats.apps.accounts.tests.decorators import with_internal_auth
 from chats.apps.queues.models import Queue
@@ -20,10 +22,20 @@ class BaseTestInternalDashboardView(APITestCase):
 
         return self.client.get(url, filters)
 
+    def get_csat_ratings(self, project_uuid: str, filters: dict = {}) -> Response:
+        url = f"/v1/internal/dashboard/{project_uuid}/csat_ratings/"
+
+        return self.client.get(url, filters)
+
 
 class TestInternalDashboardViewUnauthenticated(BaseTestInternalDashboardView):
     def test_get_agent_csat_metrics_unauthenticated(self):
         response = self.get_agent_csat_metrics(uuid.uuid4())
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_csat_ratings_unauthenticated(self):
+        response = self.get_csat_ratings(uuid.uuid4(), {})
+
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
@@ -83,3 +95,28 @@ class TestInternalDashboardViewAuthenticated(BaseTestInternalDashboardView):
         self.assertEqual(response.data["results"][0]["rooms"], 1)
         self.assertEqual(response.data["results"][0]["reviews"], 1)
         self.assertEqual(response.data["results"][0]["avg_rating"], 5.0)
+
+    def test_csat_ratings_without_permission(self):
+        response = self.get_csat_ratings(self.project.uuid, {})
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    @with_internal_auth
+    @patch("chats.apps.api.v1.internal.dashboard.service.CSATService.get_csat_ratings")
+    def test_csat_ratings_authenticated(self, mock_get_csat_ratings):
+        mock_get_csat_ratings.return_value = CSATRatings(
+            ratings=[CSATRatingCount(rating=5, count=1, percentage=100)]
+        )
+        response = self.get_csat_ratings(self.project.uuid, {})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data["csat_ratings"],
+            [
+                {
+                    "rating": 5,
+                    "value": 100.0,
+                    "full_value": 1,
+                }
+            ],
+        )

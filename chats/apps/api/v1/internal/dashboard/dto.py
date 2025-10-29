@@ -24,3 +24,15 @@ class CSATScoreGeneral:
     rooms: int
     reviews: int
     avg_rating: Optional[float] = None
+
+
+@dataclass
+class CSATRatingCount:
+    rating: int
+    count: int
+    percentage: float
+
+
+@dataclass
+class CSATRatings:
+    ratings: List[CSATRatingCount]

@@ -168,3 +168,9 @@ class DashboardCSATScoreByAgentsSerializer(serializers.Serializer):
             return None
 
         return round(obj.avg_rating, 2)
+
+
+class DashboardCSATRatingsSerializer(serializers.Serializer):
+    rating = serializers.IntegerField()
+    value = serializers.FloatField(source="percentage")
+    full_value = serializers.IntegerField(source="count")

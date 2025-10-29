@@ -8,13 +8,14 @@ from chats.apps.api.v1.internal.dashboard.serializers import (
     DashboardCustomAgentStatusSerializer,
     DashboardCSATScoreByAgentsSerializer,
     DashboardCSATScoreGeneralSerializer,
+    DashboardCSATRatingsSerializer,
 )
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.projects.models import Project
 from chats.apps.api.pagination import CustomCursorPagination
 
 from chats.apps.api.v1.internal.dashboard.dto import Filters
-from chats.apps.api.v1.internal.dashboard.service import AgentsService
+from chats.apps.api.v1.internal.dashboard.service import AgentsService, CSATService
 
 
 class InternalDashboardViewset(viewsets.GenericViewSet):
@@ -154,3 +155,35 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
                 },
                 status.HTTP_200_OK,
             )
+
+    @action(
+        detail=True,
+        methods=["GET"],
+        url_name="csat_ratings",
+    )
+    def csat_ratings(self, request, *args, **kwargs):
+        """CSAT ratings for the project"""
+        project = self.get_object()
+        params = request.query_params.dict()
+        filters = Filters(
+            start_date=params.get("start_date"),
+            end_date=params.get("end_date"),
+            queue=params.get("queue"),
+            queues=params.get("queues"),
+            sector=params.get("sector"),
+            tag=params.get("tag"),
+            tags=params.get("tags"),
+            agent=params.get("agent"),
+        )
+
+        csat_service = CSATService()
+        csat_ratings = csat_service.get_csat_ratings(filters, project)
+
+        return Response(
+            {
+                "csat_ratings": DashboardCSATRatingsSerializer(
+                    csat_ratings.ratings, many=True
+                ).data
+            },
+            status.HTTP_200_OK,
+        )

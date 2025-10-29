@@ -21,11 +21,19 @@ from chats.apps.api.v1.dashboard.dto import get_admin_domains_exclude_filter
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.projects.models.models import CustomStatus, Project
 from chats.apps.rooms.models import Room
+from chats.apps.csat.models import CSATSurvey
+
+from chats.apps.api.v1.internal.dashboard.dto import (
+    CSATRatingCount,
+    CSATRatings,
+    Filters,
+)
 
 from chats.apps.api.v1.internal.dashboard.dto import CSATScoreGeneral, Filters
 from chats.apps.projects.dates import parse_date_with_timezone
 from django.db.models.functions import Coalesce
 from django.db.models import Exists
+
 
 class AgentRepository:
     def __init__(self):
@@ -38,78 +46,92 @@ class AgentRepository:
             .astimezone(tz)
             .replace(hour=0, minute=0, second=0, microsecond=0)
         )
-        
+
         # Definir filtros de data para subqueries (sem prefixo rooms__)
         if filters.start_date and filters.end_date:
             start_time = filters.start_date
             end_time = filters.end_date
-            closed_date_filter = Q(is_active=False, ended_at__range=[start_time, end_time])
+            closed_date_filter = Q(
+                is_active=False, ended_at__range=[start_time, end_time]
+            )
             opened_date_filter = Q(is_active=True, created_on__lte=end_time)
             # Filtros para agregações diretas do User (COM prefixo rooms__)
-            closed_rooms_filter = Q(rooms__is_active=False, rooms__ended_at__range=[start_time, end_time])
+            closed_rooms_filter = Q(
+                rooms__is_active=False, rooms__ended_at__range=[start_time, end_time]
+            )
             custom_status_start = start_time
             custom_status_end = end_time
         else:
             closed_date_filter = Q(is_active=False, ended_at__gte=initial_datetime)
             opened_date_filter = Q(is_active=True)
             # Filtros para agregações diretas do User (COM prefixo rooms__)
-            closed_rooms_filter = Q(rooms__is_active=False, rooms__ended_at__gte=initial_datetime)
+            closed_rooms_filter = Q(
+                rooms__is_active=False, rooms__ended_at__gte=initial_datetime
+            )
             custom_status_start = initial_datetime
             custom_status_end = timezone.now()
-        
+
         # Filtros de rooms para subqueries (sem prefixo)
         room_filter = Q(queue__sector__project=project, queue__is_deleted=False)
         # Filtros para agregações diretas (com prefixo rooms__)
-        rooms_aggregate_filter = Q(rooms__queue__sector__project=project, rooms__queue__is_deleted=False)
-        
+        rooms_aggregate_filter = Q(
+            rooms__queue__sector__project=project, rooms__queue__is_deleted=False
+        )
+
         # Filtro de agentes - apenas project_permissions
         agents_filters = Q(project_permissions__project=project) & Q(is_active=True)
-        
+
         if filters.queue:
             # Subquery: verifica se tem autorização na fila
             has_queue_auth = ProjectPermission.objects.filter(
-                user_id=OuterRef('email'),
+                user_id=OuterRef("email"),
                 project=project,
-                queue_authorizations__queue=filters.queue
-            ).values('user_id')[:1]
-            
+                queue_authorizations__queue=filters.queue,
+            ).values("user_id")[:1]
+
             # Filtro: tem autorização OU atendeu na fila
             agents_filters &= Q(Exists(has_queue_auth)) | Q(rooms__queue=filters.queue)
             room_filter &= Q(queue=filters.queue)
             rooms_aggregate_filter &= Q(rooms__queue=filters.queue)
-            
+
         elif filters.sector:
             # Subquery: verifica se tem autorização no setor
             has_sector_auth = ProjectPermission.objects.filter(
-                user_id=OuterRef('email'),
+                user_id=OuterRef("email"),
                 project=project,
-                sector_authorizations__sector__in=filters.sector
-            ).values('user_id')[:1]
-            
+                sector_authorizations__sector__in=filters.sector,
+            ).values("user_id")[:1]
+
             # Filtro: tem autorização OU atendeu no setor
-            agents_filters &= Q(Exists(has_sector_auth)) | Q(rooms__queue__sector__in=filters.sector)
+            agents_filters &= Q(Exists(has_sector_auth)) | Q(
+                rooms__queue__sector__in=filters.sector
+            )
             room_filter &= Q(queue__sector__in=filters.sector)
             rooms_aggregate_filter &= Q(rooms__queue__sector__in=filters.sector)
-            
+
         if filters.tag:
             room_filter &= Q(tags__in=filters.tag.split(","))
             rooms_aggregate_filter &= Q(rooms__tags__in=filters.tag.split(","))
-        
+
         if filters.agent:
             agents_filters &= Q(uuid=filters.agent)
-        
+
         # Subqueries para contar salas (evita duplicação de JOINs)
-        closed_subquery = Room.objects.filter(
-            user=OuterRef('email')
-        ).filter(closed_date_filter & room_filter).values('user').annotate(
-            cnt=Count('uuid', distinct=True)
-        ).values('cnt')
-        
-        opened_subquery = Room.objects.filter(
-            user=OuterRef('email')
-        ).filter(opened_date_filter & room_filter).values('user').annotate(
-            cnt=Count('uuid', distinct=True)
-        ).values('cnt')
+        closed_subquery = (
+            Room.objects.filter(user=OuterRef("email"))
+            .filter(closed_date_filter & room_filter)
+            .values("user")
+            .annotate(cnt=Count("uuid", distinct=True))
+            .values("cnt")
+        )
+
+        opened_subquery = (
+            Room.objects.filter(user=OuterRef("email"))
+            .filter(opened_date_filter & room_filter)
+            .values("user")
+            .annotate(cnt=Count("uuid", distinct=True))
+            .values("cnt")
+        )
 
         project_permission_subquery = ProjectPermission.objects.filter(
             project_id=project,
@@ -173,24 +195,28 @@ class AgentRepository:
             .annotate(
                 status=Subquery(project_permission_subquery),
                 closed=Coalesce(
-                    Subquery(closed_subquery, output_field=IntegerField()),
-                    0
+                    Subquery(closed_subquery, output_field=IntegerField()), 0
                 ),
                 opened=Coalesce(
-                    Subquery(opened_subquery, output_field=IntegerField()),
-                    0
+                    Subquery(opened_subquery, output_field=IntegerField()), 0
                 ),
                 avg_first_response_time=Avg(
                     "rooms__metric__first_response_time",
-                    filter=closed_rooms_filter & rooms_aggregate_filter & Q(rooms__metric__first_response_time__gt=0),
+                    filter=closed_rooms_filter
+                    & rooms_aggregate_filter
+                    & Q(rooms__metric__first_response_time__gt=0),
                 ),
                 avg_message_response_time=Avg(
                     "rooms__metric__message_response_time",
-                    filter=closed_rooms_filter & rooms_aggregate_filter & Q(rooms__metric__message_response_time__gt=0),
+                    filter=closed_rooms_filter
+                    & rooms_aggregate_filter
+                    & Q(rooms__metric__message_response_time__gt=0),
                 ),
                 avg_interaction_time=Avg(
                     "rooms__metric__interaction_time",
-                    filter=closed_rooms_filter & rooms_aggregate_filter & Q(rooms__metric__interaction_time__gt=0),
+                    filter=closed_rooms_filter
+                    & rooms_aggregate_filter
+                    & Q(rooms__metric__interaction_time__gt=0),
                 ),
                 custom_status=custom_status_subquery,
                 time_in_service_order=Coalesce(
@@ -269,7 +295,7 @@ class AgentRepository:
             rooms_filter["rooms__created_on__range"] = [start_time, end_time]
             rooms_filter["rooms__is_active"] = False
             closed_rooms["rooms__ended_at__range"] = [start_time, end_time]
-            
+
             # Filter for CustomStatus
             custom_status_start = start_time
             custom_status_end = end_time
@@ -277,7 +303,7 @@ class AgentRepository:
             closed_rooms["rooms__ended_at__gte"] = initial_datetime
             opened_rooms["rooms__is_active"] = True
             closed_rooms["rooms__is_active"] = False
-            
+
             # Default: from start of day until now
             custom_status_start = initial_datetime
             custom_status_end = timezone.now()
@@ -320,7 +346,9 @@ class AgentRepository:
         if agents_filter:
             agents_query = agents_query.filter(**agents_filter).distinct()
 
-        agents_filters_custom = Q(project_permissions__project=project) & Q(is_active=True)
+        agents_filters_custom = Q(project_permissions__project=project) & Q(
+            is_active=True
+        )
         if filters.agent:
             agents_filters_custom &= Q(uuid=filters.agent)
 
@@ -477,3 +505,47 @@ class AgentRepository:
         )
 
         return self._get_csat_general(filters, project), agents
+
+
+class CSATRepository:
+    def get_csat_ratings(self, filters: Filters, project) -> CSATRatings:
+        filter_mapping = {
+            "start_date": ("room__ended_at__gte", filters.start_date),
+            "end_date": ("room__ended_at__lte", filters.end_date),
+            "queue": ("room__queue", filters.queue),
+            "queues": ("room__queue__in", filters.queues),
+            "sector": ("room__queue__sector__in", filters.sector),
+            "tag": ("room__tags", filters.tag),
+            "tags": ("room__tags__in", filters.tags),
+            "agent": ("room__user", filters.agent),
+        }
+
+        csat_query = {"room__queue__sector__project": project}
+
+        for key, (field_name, filter_value) in filter_mapping.items():
+            if filter_value is not None:
+                csat_query[field_name] = filter_value
+
+        csat_ratings = (
+            CSATSurvey.objects.filter(**csat_query)
+            .values("rating")
+            .annotate(count=Count("uuid"))
+            .order_by("rating")
+        )
+
+        total_count = csat_ratings.aggregate(total=Sum("count"))["total"]
+
+        ratings_counts = [
+            CSATRatingCount(
+                rating=rating["rating"],
+                count=rating["count"],
+                percentage=(
+                    round((rating["count"] / total_count) * 100, 2)
+                    if total_count
+                    else 0.0
+                ),
+            )
+            for rating in csat_ratings
+        ]
+
+        return CSATRatings(ratings=ratings_counts)
