@@ -1,12 +1,12 @@
 import logging
 
-from chats.celery import app
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 
 from chats.apps.projects.models import Project
 from chats.apps.projects.models.models import AgentDisconnectLog, AgentStatusLog
+from chats.celery import app
 
 logger = logging.getLogger(__name__)
 
@@ -114,12 +114,6 @@ def log_agent_status_change(
 
                 log.status_changes.append(status_entry)
                 log.save(update_fields=["status_changes", "modified_on"])
-
-            custom_status_part = (
-                f"({status_entry.get('custom_status')})"
-                if status_entry.get("custom_status")
-                else ""
-            )
 
     except Exception as e:
         logger.error(f"Error logging agent status change: {e}", exc_info=True)

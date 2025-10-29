@@ -486,6 +486,7 @@ class ReportFieldsValidatorViewSet(APIView):
         Return base queryset for agent status logs in the project.
         """
         from chats.apps.projects.models.models import AgentStatusLog
+
         return AgentStatusLog.objects.filter(project=project)
 
     def _is_all_filter(self, values):
@@ -521,7 +522,7 @@ class ReportFieldsValidatorViewSet(APIView):
             return self._normalize_list_filter(value)
         if isinstance(value, dict):
             return self._normalize_dict_filter(value)
-        
+
         string_value = str(value)
         return [] if self._is_all_filter(string_value) else [string_value]
 
@@ -551,9 +552,7 @@ class ReportFieldsValidatorViewSet(APIView):
                 f if f != "contact" else "contact__name" for f in query_fields
             ]
         if "queue" in query_fields:
-            query_fields = [
-                f if f != "queue" else "queue__name" for f in query_fields
-            ]
+            query_fields = [f if f != "queue" else "queue__name" for f in query_fields]
         return query_fields
 
     def _sort_fields_by_priority(self, query_fields):
@@ -638,7 +637,7 @@ class ReportFieldsValidatorViewSet(APIView):
                 tags_list=ArrayAgg("tags__name", distinct=True)
             )
             query_fields = ["tags_list" if f == "tags" else f for f in query_fields]
-        
+
         return queryset.values(*query_fields)
 
     def _apply_agent_status_logs_filters(self, queryset, field_data, project):
@@ -696,7 +695,9 @@ class ReportFieldsValidatorViewSet(APIView):
             base_queryset = self._apply_date_filters(base_queryset, field_data, project)
             base_queryset = self._apply_entity_filters(base_queryset, field_data)
         elif model_name == "agent_status_logs":
-            base_queryset = self._apply_agent_status_logs_filters(base_queryset, field_data, project)
+            base_queryset = self._apply_agent_status_logs_filters(
+                base_queryset, field_data, project
+            )
 
         base_queryset = self._apply_field_selection(base_queryset, query_fields)
 
@@ -861,11 +862,11 @@ class ReportFieldsValidatorViewSet(APIView):
             for model_name in available_fields.keys():
                 if model_name in fields_config:
                     filtered_config[model_name] = fields_config[model_name]
-            
+
             # If no valid model found, default to empty rooms for backward compatibility
             if not filtered_config:
                 filtered_config["rooms"] = {}
-            
+
             fields_config = filtered_config
 
             # Calculate rooms count for time estimation

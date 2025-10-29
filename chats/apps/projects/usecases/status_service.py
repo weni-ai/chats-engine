@@ -110,9 +110,10 @@ class InServiceStatusService:
             logger.info(
                 f"Status In-Service created for user {user.pk} in project {project.pk}"
             )
-            
+
             # Log status change
             from chats.apps.projects.tasks import log_agent_status_change
+
             log_agent_status_change.delay(
                 agent_email=user.email,
                 project_uuid=str(project.uuid),
@@ -159,9 +160,10 @@ class InServiceStatusService:
                 status.is_active = False
                 status.break_time = int(service_duration.total_seconds())
                 status.save(update_fields=["is_active", "break_time"])
-                
+
                 # Log status change (back to ONLINE without custom status)
                 from chats.apps.projects.tasks import log_agent_status_change
+
                 log_agent_status_change.delay(
                     agent_email=user.email,
                     project_uuid=str(project.uuid),
