@@ -48,19 +48,46 @@ def log_agent_status_change(
         agent = User.objects.get(email=agent_email)
         project = Project.objects.get(uuid=project_uuid)
         
+        # If custom_status is not provided, check if there's an active one
+        if custom_status_name is None and custom_status_type_uuid is None:
+            from chats.apps.projects.models.models import CustomStatus
+            
+            active_custom_status = CustomStatus.objects.filter(
+                user=agent,
+                project=project,
+                is_active=True
+            ).first()
+            
+            if active_custom_status:
+                custom_status_name = active_custom_status.status_type.name
+                custom_status_type_uuid = active_custom_status.status_type.uuid
+        
         # Get agent's local date based on project timezone
         project_tz = project.timezone
         now = timezone.now()
         local_now = now.astimezone(project_tz)
         log_date = local_now.date()
         
-        # Prepare status change entry
-        status_entry = {
-            "timestamp": now.isoformat(),
-            "status": status,
-            "custom_status": custom_status_name,
-            "status_type_uuid": str(custom_status_type_uuid) if custom_status_type_uuid else None,
-        }
+        # Prepare status change entry with cleaner format
+        if status == "ONLINE":
+            # ONLINE: only status and timestamp
+            status_entry = {
+                "status": "ONLINE",
+                "timestamp": local_now.isoformat(),
+            }
+        elif status == "OFFLINE" and custom_status_name is None:
+            # OFFLINE without custom status: only status and timestamp
+            status_entry = {
+                "status": "OFFLINE",
+                "timestamp": local_now.isoformat(),
+            }
+        else:
+            # OFFLINE with custom status: change to BREAK and include details
+            status_entry = {
+                "status": "BREAK",
+                "timestamp": local_now.isoformat(),
+                "custom_status": custom_status_name,
+            }
         
         with transaction.atomic():
             # Get or create log for today
@@ -72,13 +99,39 @@ def log_agent_status_change(
             )
             
             if not created:
+                # Check if the last status change is the same to avoid duplicates
+                last_change = log.status_changes[-1] if log.status_changes else None
+                
+                if last_change:
+                    # Compare entries considering the new format
+                    last_status = last_change.get("status")
+                    last_custom = last_change.get("custom_status")
+                    last_type_uuid = last_change.get("status_type_uuid")
+                    
+                    new_status = status_entry.get("status")
+                    new_custom = status_entry.get("custom_status")
+                    new_type_uuid = status_entry.get("status_type_uuid")
+                    
+                    is_duplicate = (
+                        last_status == new_status and
+                        last_custom == new_custom and
+                        last_type_uuid == new_type_uuid
+                    )
+                    
+                    if is_duplicate:
+                        logger.info(
+                            f"Skipping duplicate status change for agent {agent_email} in project {project.name}: "
+                            f"{new_status} {f'({new_custom})' if new_custom else ''}"
+                        )
+                        return
+                
                 # Append to existing log
                 log.status_changes.append(status_entry)
                 log.save(update_fields=["status_changes", "modified_on"])
                 
             logger.info(
                 f"Status change logged for agent {agent_email} in project {project.name}: "
-                f"{status} {f'({custom_status_name})' if custom_status_name else ''}"
+                f"{status_entry.get('status')} {f\"({status_entry.get('custom_status')})\" if status_entry.get('custom_status') else ''}"
             )
             
     except Exception as e:
