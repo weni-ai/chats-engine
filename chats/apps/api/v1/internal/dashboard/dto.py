@@ -10,8 +10,16 @@ class Filters:
     agent: str = None
     sector: List = None
     queue: str = None
+    queues: List = None
     tag: str = None
+    tags: List = None
     is_weni_admin: bool = None
     user_request: ProjectPermission = None
     project: Project = None
     ordering: str = None
+
+
+@dataclass
+class CSATRatings:
+    rating: int
+    count: int

@@ -20,9 +20,9 @@ from chats.apps.accounts.models import User
 from chats.apps.api.v1.dashboard.dto import get_admin_domains_exclude_filter
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.projects.models.models import CustomStatus
-from chats.apps.rooms.models import Room
+from chats.apps.csat.models import CSATSurvey
 
-from .dto import Filters
+from chats.apps.api.v1.internal.dashboard.dto import CSATRatings, Filters
 
 
 class AgentRepository:
@@ -315,4 +315,31 @@ class AgentRepository:
 
 class CSATRepository:
     def get_csat_ratings(self, filters: Filters, project):
-        pass
+        filter_mapping = {
+            "start_date": ("room__ended_at__gte", filters.start_date),
+            "end_date": ("room__ended_at__lte", filters.end_date),
+            "queue": ("room__queue", filters.queue),
+            "queues": ("room__queue__in", filters.queues),
+            "sector": ("room__queue__sector", filters.sector),
+            "tag": ("room__tags", filters.tag),
+            "tags": ("room__tags__in", filters.tags),
+            "agent": ("room__user", filters.agent),
+        }
+
+        csat_query = {"room__queue__sector__project": project}
+
+        for key, (field_name, filter_value) in filter_mapping.items():
+            if filter_value is not None:
+                csat_query[field_name] = filter_value
+
+        csat_ratings = (
+            CSATSurvey.objects.filter(**csat_query)
+            .values("rating")
+            .annotate(count=Count("uuid"))
+            .order_by("rating")
+        )
+
+        return [
+            CSATRatings(rating=rating["rating"], count=rating["count"])
+            for rating in csat_ratings
+        ]
