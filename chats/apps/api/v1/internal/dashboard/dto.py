@@ -20,6 +20,12 @@ class Filters:
 
 
 @dataclass
-class CSATRatings:
+class CSATRatingCount:
     rating: int
     count: int
+    percentage: float
+
+
+@dataclass
+class CSATRatings:
+    ratings: List[CSATRatingCount]

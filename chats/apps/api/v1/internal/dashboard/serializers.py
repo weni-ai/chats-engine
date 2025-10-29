@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from chats.apps.api.utils import calculate_in_service_time
+from chats.apps.api.v1.internal.dashboard.dto import CSATRatingCount
 
 
 class DashboardAgentsSerializer(serializers.Serializer):
@@ -128,3 +129,9 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
         return calculate_in_service_time(
             obj.get("custom_status"), user_status=obj.get("status")
         )
+
+
+class DashboardCSATRatingsSerializer(serializers.Serializer):
+    rating = serializers.IntegerField()
+    value = serializers.FloatField(source="percentage")
+    full_value = serializers.IntegerField(source="count")

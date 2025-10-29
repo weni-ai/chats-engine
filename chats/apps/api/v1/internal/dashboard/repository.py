@@ -22,7 +22,11 @@ from chats.apps.projects.models import ProjectPermission
 from chats.apps.projects.models.models import CustomStatus
 from chats.apps.csat.models import CSATSurvey
 
-from chats.apps.api.v1.internal.dashboard.dto import CSATRatings, Filters
+from chats.apps.api.v1.internal.dashboard.dto import (
+    CSATRatingCount,
+    CSATRatings,
+    Filters,
+)
 
 
 class AgentRepository:
@@ -314,7 +318,7 @@ class AgentRepository:
 
 
 class CSATRepository:
-    def get_csat_ratings(self, filters: Filters, project):
+    def get_csat_ratings(self, filters: Filters, project) -> CSATRatings:
         filter_mapping = {
             "start_date": ("room__ended_at__gte", filters.start_date),
             "end_date": ("room__ended_at__lte", filters.end_date),
@@ -339,7 +343,19 @@ class CSATRepository:
             .order_by("rating")
         )
 
-        return [
-            CSATRatings(rating=rating["rating"], count=rating["count"])
+        total_count = csat_ratings.aggregate(total=Sum("count"))["total"]
+
+        ratings_counts = [
+            CSATRatingCount(
+                rating=rating["rating"],
+                count=rating["count"],
+                percentage=(
+                    round((rating["count"] / total_count) * 100, 2)
+                    if total_count
+                    else 0.0
+                ),
+            )
             for rating in csat_ratings
         ]
+
+        return CSATRatings(ratings=ratings_counts)

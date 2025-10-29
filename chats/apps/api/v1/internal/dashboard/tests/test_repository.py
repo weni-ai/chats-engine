@@ -52,8 +52,14 @@ class CSATRepositoryTest(TestCase):
             Filters(project=self.project), self.project
         )
 
-        for rating in ratings:
+        total_count = sum(expected_ratings.values())
+
+        for rating in ratings.ratings:
             self.assertEqual(rating.count, expected_ratings[rating.rating])
+            self.assertEqual(
+                rating.percentage,
+                round((expected_ratings[rating.rating] / total_count) * 100, 2),
+            )
 
     def test_get_csat_ratings_filter_by_queue(self):
         queue2 = Queue.objects.create(name="Test Queue 2", sector=self.sector)
@@ -85,7 +91,7 @@ class CSATRepositoryTest(TestCase):
             Filters(project=self.project, queue=self.queue), self.project
         )
 
-        rating_dict = {r.rating: r.count for r in ratings}
+        rating_dict = {r.rating: r.count for r in ratings.ratings}
         self.assertEqual(rating_dict.get(5, 0), 5)
         self.assertEqual(rating_dict.get(4, 0), 0)
 
@@ -129,7 +135,7 @@ class CSATRepositoryTest(TestCase):
             Filters(project=self.project, queues=[self.queue, queue2]), self.project
         )
 
-        rating_dict = {r.rating: r.count for r in ratings}
+        rating_dict = {r.rating: r.count for r in ratings.ratings}
         self.assertEqual(rating_dict.get(5, 0), 3)
         self.assertEqual(rating_dict.get(4, 0), 2)
         self.assertEqual(rating_dict.get(3, 0), 0)  # queue3 excluded
@@ -170,7 +176,7 @@ class CSATRepositoryTest(TestCase):
             Filters(project=self.project, sector=[self.sector]), self.project
         )
 
-        rating_dict = {r.rating: r.count for r in ratings}
+        rating_dict = {r.rating: r.count for r in ratings.ratings}
         self.assertEqual(rating_dict.get(5, 0), 6)
         self.assertEqual(rating_dict.get(3, 0), 0)  # sector2 excluded
 
@@ -206,7 +212,7 @@ class CSATRepositoryTest(TestCase):
             Filters(project=self.project, tag=tag1), self.project
         )
 
-        rating_dict = {r.rating: r.count for r in ratings}
+        rating_dict = {r.rating: r.count for r in ratings.ratings}
         self.assertEqual(rating_dict.get(5, 0), 4)
         self.assertEqual(rating_dict.get(4, 0), 0)  # tag2 excluded
 
@@ -254,7 +260,7 @@ class CSATRepositoryTest(TestCase):
             Filters(project=self.project, tags=[tag1, tag2]), self.project
         )
 
-        rating_dict = {r.rating: r.count for r in ratings}
+        rating_dict = {r.rating: r.count for r in ratings.ratings}
         self.assertEqual(rating_dict.get(5, 0), 3)
         self.assertEqual(rating_dict.get(4, 0), 2)
         self.assertEqual(rating_dict.get(3, 0), 0)  # tag3 excluded
@@ -295,7 +301,7 @@ class CSATRepositoryTest(TestCase):
             Filters(project=self.project, agent=agent1), self.project
         )
 
-        rating_dict = {r.rating: r.count for r in ratings}
+        rating_dict = {r.rating: r.count for r in ratings.ratings}
         self.assertEqual(rating_dict.get(5, 0), 5)
         self.assertEqual(rating_dict.get(4, 0), 0)  # agent2 excluded
 
@@ -330,7 +336,7 @@ class CSATRepositoryTest(TestCase):
             Filters(project=self.project, start_date=start_date), self.project
         )
 
-        rating_dict = {r.rating: r.count for r in ratings}
+        rating_dict = {r.rating: r.count for r in ratings.ratings}
         self.assertEqual(rating_dict.get(5, 0), 6)
         self.assertEqual(rating_dict.get(2, 0), 0)  # old rooms excluded
 
@@ -365,7 +371,7 @@ class CSATRepositoryTest(TestCase):
             Filters(project=self.project, end_date=end_date), self.project
         )
 
-        rating_dict = {r.rating: r.count for r in ratings}
+        rating_dict = {r.rating: r.count for r in ratings.ratings}
         self.assertEqual(rating_dict.get(2, 0), 3)
         self.assertEqual(rating_dict.get(5, 0), 0)  # recent rooms excluded
 
@@ -425,7 +431,7 @@ class CSATRepositoryTest(TestCase):
             self.project,
         )
 
-        rating_dict = {r.rating: r.count for r in ratings}
+        rating_dict = {r.rating: r.count for r in ratings.ratings}
         self.assertEqual(rating_dict.get(2, 0), 3)  # old_rooms
         self.assertEqual(rating_dict.get(3, 0), 4)  # middle_rooms
         self.assertEqual(rating_dict.get(1, 0), 0)  # very_old excluded
@@ -476,7 +482,7 @@ class CSATRepositoryTest(TestCase):
             self.project,
         )
 
-        rating_dict = {r.rating: r.count for r in ratings}
+        rating_dict = {r.rating: r.count for r in ratings.ratings}
         self.assertEqual(rating_dict.get(5, 0), 4)  # Only matching rooms
         self.assertEqual(rating_dict.get(4, 0), 0)  # Wrong queue excluded
         self.assertEqual(rating_dict.get(3, 0), 0)  # Wrong agent excluded
@@ -533,7 +539,7 @@ class CSATRepositoryTest(TestCase):
             self.project,
         )
 
-        rating_dict = {r.rating: r.count for r in ratings}
+        rating_dict = {r.rating: r.count for r in ratings.ratings}
         self.assertEqual(rating_dict.get(5, 0), 5)  # Only tag1 + recent date
         self.assertEqual(rating_dict.get(2, 0), 0)  # Old date excluded
         self.assertEqual(rating_dict.get(4, 0), 0)  # No tag excluded
@@ -560,5 +566,5 @@ class CSATRepositoryTest(TestCase):
             Filters(project=self.project, tag=tag, agent=agent), self.project
         )
 
-        rating_dict = {r.rating: r.count for r in ratings}
+        rating_dict = {r.rating: r.count for r in ratings.ratings}
         self.assertEqual(rating_dict.get(5, 0), 0)
