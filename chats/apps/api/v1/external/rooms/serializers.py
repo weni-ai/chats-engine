@@ -155,6 +155,7 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
     first_user_message = serializers.SerializerMethodField()
     tags = TagSimpleSerializer(many=True, required=False)
     interaction_time = serializers.IntegerField(source="metric.interaction_time")
+    urn = serializers.CharField()
     contact_external_id = serializers.CharField(source="contact.external_id")
     protocol = serializers.CharField(read_only=True)
     callid = serializers.SerializerMethodField()
@@ -170,6 +171,7 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
             "created_on",
             "interaction_time",
             "ended_at",
+            "urn",
             "contact_external_id",
             "user",
             "user_name",
