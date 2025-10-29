@@ -126,9 +126,10 @@ def log_agent_status_change(
                     )
                     
                     if is_duplicate:
+                        custom_part = f'({new_custom})' if new_custom else ''
                         logger.info(
                             f"Skipping duplicate status change for agent {agent_email} in project {project.name}: "
-                            f"{new_status} {f'({new_custom})' if new_custom else ''}"
+                            f"{new_status} {custom_part}"
                         )
                         return
                 
@@ -136,9 +137,10 @@ def log_agent_status_change(
                 log.status_changes.append(status_entry)
                 log.save(update_fields=["status_changes", "modified_on"])
                 
+            custom_status_part = f"({status_entry.get('custom_status')})" if status_entry.get('custom_status') else ''
             logger.info(
                 f"Status change logged for agent {agent_email} in project {project.name}: "
-                f"{status_entry.get('status')} {f\"({status_entry.get('custom_status')})\" if status_entry.get('custom_status') else ''}"
+                f"{status_entry.get('status')} {custom_status_part}"
             )
             
     except Exception as e:
