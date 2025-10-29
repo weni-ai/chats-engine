@@ -166,6 +166,14 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
                             break_time=0,
                         )
 
+                # Log status change
+                from chats.apps.projects.tasks import log_agent_status_change
+                log_agent_status_change.delay(
+                    agent_email=instance.user.email,
+                    project_uuid=str(instance.project.uuid),
+                    status="ONLINE",
+                )
+
                 room_count = Room.objects.filter(
                     user=instance.user,
                     queue__sector__project=instance.project,
@@ -200,6 +208,14 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
             elif user_status.lower() == "offline":
                 instance.status = ProjectPermission.STATUS_OFFLINE
                 instance.save()
+
+                # Log status change
+                from chats.apps.projects.tasks import log_agent_status_change
+                log_agent_status_change.delay(
+                    agent_email=instance.user.email,
+                    project_uuid=str(instance.project.uuid),
+                    status="OFFLINE",
+                )
 
                 in_service_type = InServiceStatusService.get_or_create_status_type(
                     instance.project

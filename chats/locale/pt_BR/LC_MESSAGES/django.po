@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-10-28 16:14-0300\n"
+"POT-Creation-Date: 2025-10-28 17:36-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,6 +17,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
 #: chats/apps/accounts/authentication/drf/authorization.py:44
 msgid "Invalid token header. No credentials provided."
 msgstr ""
@@ -366,38 +367,6 @@ msgstr ""
 
 #: chats/apps/contacts/models.py:32
 msgid "Contacts"
-msgstr ""
-
-#: chats/apps/dashboard/models.py:11 chats/apps/dashboard/models.py:22
-msgid "Room Metric"
-msgstr ""
-
-#: chats/apps/dashboard/models.py:14
-msgid "Room Waiting time"
-msgstr ""
-
-#: chats/apps/dashboard/models.py:15
-msgid "Queued count"
-msgstr ""
-
-#: chats/apps/dashboard/models.py:16
-msgid "Messages response time"
-msgstr ""
-
-#: chats/apps/dashboard/models.py:17
-msgid "First response time"
-msgstr ""
-
-#: chats/apps/dashboard/models.py:18
-msgid "Room interaction time"
-msgstr ""
-
-#: chats/apps/dashboard/models.py:19
-msgid "Room transfer count"
-msgstr ""
-
-#: chats/apps/dashboard/models.py:23
-msgid "Rooms Metrics"
 msgstr ""
 
 #: chats/apps/discussions/filters/discussion.py:21

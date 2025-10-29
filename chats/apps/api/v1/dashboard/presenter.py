@@ -301,9 +301,9 @@ class ModelFieldsPresenter:
     @staticmethod
     def get_models_info():
         """
-        Return information about rooms fields with 1 day cache.
+        Return information about rooms and agent_status_logs fields with 1 day cache.
         """
-        cache_key = "model_fields_presenter_rooms_info"
+        cache_key = "model_fields_presenter_models_info"
         cached_data = cache.get(cache_key)
         if cached_data is not None:
             return cached_data
@@ -380,6 +380,43 @@ class ModelFieldsPresenter:
             },
         }
 
-        models_info = {"rooms": rooms_fields}
+        # Define all available fields for agent status logs export
+        agent_status_logs_fields = {
+            "uuid": {"type": "UUIDField", "required": True},
+            "agent__email": {
+                "type": "EmailField",
+                "required": False,
+                "related_model": "accounts.user",
+            },
+            "agent__first_name": {
+                "type": "CharField",
+                "required": False,
+                "related_model": "accounts.user",
+            },
+            "agent__last_name": {
+                "type": "CharField",
+                "required": False,
+                "related_model": "accounts.user",
+            },
+            "project__name": {
+                "type": "CharField",
+                "required": False,
+                "related_model": "projects.project",
+            },
+            "project__uuid": {
+                "type": "UUIDField",
+                "required": False,
+                "related_model": "projects.project",
+            },
+            "log_date": {"type": "DateField", "required": True},
+            "status_changes": {"type": "JSONField", "required": True},
+            "created_on": {"type": "DateTimeField", "required": True},
+            "modified_on": {"type": "DateTimeField", "required": True},
+        }
+
+        models_info = {
+            "rooms": rooms_fields,
+            "agent_status_logs": agent_status_logs_fields,
+        }
         cache.set(cache_key, models_info, timeout=86400)
         return models_info

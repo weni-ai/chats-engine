@@ -151,20 +151,29 @@ def generate_custom_fields_report(
         output = io.BytesIO()
         if file_type == "xlsx":
             with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-                model_data = report_data.get("rooms", {})
-                df_data = _strip_tz(model_data.get("data", []))
-                df = pd.DataFrame(df_data)
-                df = _excel_safe_dataframe(df)
-                if not df.empty:
-                    df.to_excel(writer, sheet_name="rooms", index=False)
+                # Process all models in report_data
+                for model_name in ["rooms", "agent_status_logs"]:
+                    model_data = report_data.get(model_name, {})
+                    if not model_data:
+                        continue
+                    df_data = _strip_tz(model_data.get("data", []))
+                    df = pd.DataFrame(df_data)
+                    df = _excel_safe_dataframe(df)
+                    if not df.empty:
+                        df.to_excel(writer, sheet_name=model_name[:31], index=False)
         else:
             zip_buf = io.BytesIO()
             with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
-                df_data = _strip_tz(report_data.get("rooms", {}).get("data", []))
-                df = pd.DataFrame(df_data)
-                df = _excel_safe_dataframe(df)
-                if not df.empty:
-                    zf.writestr("rooms.csv", df.to_csv(index=False).encode("utf-8"))
+                # Process all models in report_data
+                for model_name in ["rooms", "agent_status_logs"]:
+                    model_data = report_data.get(model_name, {})
+                    if not model_data:
+                        continue
+                    df_data = _strip_tz(model_data.get("data", []))
+                    df = pd.DataFrame(df_data)
+                    df = _excel_safe_dataframe(df)
+                    if not df.empty:
+                        zf.writestr(f"{model_name[:31]}.csv", df.to_csv(index=False).encode("utf-8"))
             output = zip_buf
 
         dt = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
@@ -242,6 +251,28 @@ def generate_custom_fields_report(
         report_status.status = "failed"
         report_status.error_message = str(e)
         report_status.save()
+        
+        if getattr(settings, "REPORTS_SEND_EMAILS", False):
+            try:
+                from chats.apps.dashboard.email_templates import get_report_failed_email
+                
+                dt = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
+                subject = f"Error generating custom report for project {project.name} - {dt}"
+                message_plain, message_html = get_report_failed_email(project.name, str(e))
+                
+                email = EmailMultiAlternatives(
+                    subject=subject,
+                    body=message_plain,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    to=[user_email],
+                )
+                email.attach_alternative(message_html, "text/html")
+                email.send(fail_silently=False)
+                
+                logger.info("Error notification sent to %s | report_uuid=%s", user_email, report_status.uuid)
+            except Exception as email_error:
+                logger.exception("Error sending error notification email: %s", email_error)
+        
         raise
 
 
@@ -279,66 +310,70 @@ def process_pending_reports():
 
         if file_type == "xlsx":
             with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-                rooms_cfg = (fields_config or {}).get("rooms") or {}
-                query_data = None
-                if rooms_cfg:
+                # Process all models in fields_config
+                for model_name in ["rooms", "agent_status_logs"]:
+                    model_cfg = (fields_config or {}).get(model_name) or {}
+                    if not model_cfg or model_name not in available_fields:
+                        continue
+
                     query_data = view._process_model_fields(
-                        "rooms", rooms_cfg, project, available_fields
+                        model_name, model_cfg, project, available_fields
                     )
 
-                qs = (query_data or {}).get("queryset")
-                total_records = qs.count() if qs is not None else 0
+                    qs = (query_data or {}).get("queryset")
+                    total_records = qs.count() if qs is not None else 0
 
-                base_chunk_size = getattr(settings, "REPORTS_CHUNK_SIZE", 5000)
-                chunk_size = (
-                    base_chunk_size * 2
-                    if total_records > (base_chunk_size * 10)
-                    else base_chunk_size
-                )
-                logging.info(
-                    "Report size: %s records, using chunk_size: %s",
-                    total_records,
-                    chunk_size,
-                )
+                    base_chunk_size = getattr(settings, "REPORTS_CHUNK_SIZE", 5000)
+                    chunk_size = (
+                        base_chunk_size * 2
+                        if total_records > (base_chunk_size * 10)
+                        else base_chunk_size
+                    )
+                    logging.info(
+                        "Report size for %s: %s records, using chunk_size: %s",
+                        model_name,
+                        total_records,
+                        chunk_size,
+                    )
 
-                def _write_queryset(sheet_name: str, qs):
-                    total = qs.count()
-                    row_offset = 0
-                    for start in range(0, total, chunk_size):
-                        end = min(start + chunk_size, total)
-                        logging.info(
-                            "Writing chunk: sheet=%s start=%s end=%s total=%s chunk_size=%s",
-                            sheet_name,
-                            start,
-                            end,
-                            total,
-                            chunk_size,
-                        )
-                        chunk = list(qs[start:end])
-                        chunk = _strip_tz(chunk)
-                        if not chunk:
-                            continue
-                        df = pd.DataFrame(chunk)
-                        df = _excel_safe_dataframe(df)
-                        df.to_excel(
-                            writer,
-                            sheet_name=sheet_name[:31],
-                            index=False,
-                            header=(row_offset == 0),
-                            startrow=row_offset if row_offset > 0 else 0,
-                        )
-                        row_offset += len(df)
+                    def _write_queryset(sheet_name: str, qs):
+                        total = qs.count()
+                        row_offset = 0
+                        for start in range(0, total, chunk_size):
+                            end = min(start + chunk_size, total)
+                            logging.info(
+                                "Writing chunk: sheet=%s start=%s end=%s total=%s chunk_size=%s",
+                                sheet_name,
+                                start,
+                                end,
+                                total,
+                                chunk_size,
+                            )
+                            chunk = list(qs[start:end])
+                            chunk = _strip_tz(chunk)
+                            if not chunk:
+                                continue
+                            df = pd.DataFrame(chunk)
+                            df = _excel_safe_dataframe(df)
+                            df.to_excel(
+                                writer,
+                                sheet_name=sheet_name[:31],
+                                index=False,
+                                header=(row_offset == 0),
+                                startrow=row_offset if row_offset > 0 else 0,
+                            )
+                            row_offset += len(df)
 
-                if qs is not None:
-                    if qs.count() > 0:
-                        _write_queryset("rooms", qs)
+                    if qs is not None:
+                        if qs.count() > 0:
+                            _write_queryset(model_name, qs)
+                        else:
+                            requested_fields = model_cfg.get("fields") or []
+                            pd.DataFrame(columns=requested_fields).to_excel(
+                                writer, sheet_name=model_name[:31], index=False
+                            )
                     else:
-                        requested_fields = rooms_cfg.get("fields") or []
-                        pd.DataFrame(columns=requested_fields).to_excel(
-                            writer, sheet_name="rooms", index=False
-                        )
-                else:
-                    pd.DataFrame().to_excel(writer, sheet_name="rooms", index=False)
+                        pd.DataFrame().to_excel(writer, sheet_name=model_name[:31], index=False)
         else:
             csv_buffers = {}
 
@@ -376,12 +411,14 @@ def process_pending_reports():
                     df.to_csv(buf, index=False, header=(row_offset == 0))
                     row_offset += len(df)
 
-            if "rooms" in (fields_config or {}):
-                query_data = view._process_model_fields(
-                    "rooms", fields_config["rooms"], project, available_fields
-                )
-                if "queryset" in (query_data or {}):
-                    _write_csv_queryset("rooms", query_data["queryset"])
+            # Process all models in fields_config
+            for model_name in ["rooms", "agent_status_logs"]:
+                if model_name in (fields_config or {}) and model_name in available_fields:
+                    query_data = view._process_model_fields(
+                        model_name, fields_config[model_name], project, available_fields
+                    )
+                    if "queryset" in (query_data or {}):
+                        _write_csv_queryset(model_name, query_data["queryset"])
 
             zip_buf = io.BytesIO()
             with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -472,3 +509,24 @@ def process_pending_reports():
         report.status = "failed"
         report.error_message = str(e)
         report.save()
+        
+        if getattr(settings, "REPORTS_SEND_EMAILS", False):
+            try:
+                from chats.apps.dashboard.email_templates import get_report_failed_email
+                
+                dt = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
+                subject = f"Error generating custom report for project {project.name} - {dt}"
+                message_plain, message_html = get_report_failed_email(project.name, str(e))
+                
+                email = EmailMultiAlternatives(
+                    subject=subject,
+                    body=message_plain,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    to=[user_email],
+                )
+                email.attach_alternative(message_html, "text/html")
+                email.send(fail_silently=False)
+                
+                logging.info("Error notification sent to %s | report_uuid=%s", user_email, report.uuid)
+            except Exception as email_error:
+                logging.exception("Error sending error notification email: %s", email_error)

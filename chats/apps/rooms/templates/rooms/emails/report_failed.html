@@ -1,38 +1,16 @@
-{% extends "rooms/emails/base.html" %}
+{% extends 'rooms/emails/base.html' %}
 {% load i18n %}
 
-{% block title %}{% trans "Error Generating Rooms Report" %}{% endblock %}
-
-{% block header_title %}{% trans "Report Generation Error" %}{% endblock %}
-
 {% block content %}
-<p>{% trans "Hello," %}</p>
-
-<p>{% blocktrans with project_name=project_name %}Unfortunately, an error occurred while generating the rooms report for
-    the project <strong>{{ project_name }}</strong>.{% endblocktrans %}</p>
-
 <div
-    style="margin: 20px 0; padding: 15px; background-color: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
-    <p style="margin: 0;"><strong>{% trans "⚠️ Error details:" %}</strong></p>
-    {% if error_message %}
-    <p style="margin: 10px 0 0 0; font-family: monospace; font-size: 13px; color: #856404;">
-        {{ error_message }}
+    style="font-family: 'Lato'; font-size: 14px; line-height: 22px; color: #3B414D; width: 616px; margin: 24px auto auto auto;">
+    <span style="font-size: 16px; font-weight: 700; line-height: 24px;">{% trans 'Hi,' %}</span>
+    <p>
+        {% blocktrans with project_name=project_name %}Unable to generate export of {{ project_name }} project
+        data.{%endblocktrans %}
     </p>
-    {% endif %}
+    <p>
+        Use the following information to report to support: {{ error_message }}.
+    </p>
 </div>
-
-<p><strong>{% trans "What to do now?" %}</strong></p>
-<ul>
-    <li>{% trans "Try generating the report again in a few minutes" %}</li>
-    <li>{% trans "Check if the applied filters are correct" %}</li>
-    <li>{% trans "If the problem persists, contact technical support" %}</li>
-</ul>
-
-<p>{% trans "Our technical team has been automatically notified of this error and is working to resolve the issue." %}
-</p>
-
-<p>{% trans "We apologize for the inconvenience." %}</p>
-
-<p>{% trans "Best regards," %}<br>
-    {% trans "Support Team" %}</p>
 {% endblock %}
