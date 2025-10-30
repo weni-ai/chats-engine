@@ -285,7 +285,7 @@ class TimeMetricsService:
             int(max(conversation_durations)) if conversation_durations else 0
         )
 
-        return {
+        result = {
             "avg_waiting_time": avg_waiting_time,
             "max_waiting_time": max_waiting_time,
             "avg_first_response_time": avg_first_response_time,
@@ -293,3 +293,23 @@ class TimeMetricsService:
             "avg_conversation_duration": avg_conversation_duration,
             "max_conversation_duration": max_conversation_duration,
         }
+
+        if filters.start_date and filters.end_date:
+            from django.db.models import Avg
+            
+            closed_rooms_filter = rooms_filter & Q(is_active=False)
+            
+            avg_message_response_time = Room.objects.filter(
+                closed_rooms_filter
+            ).filter(
+                metric__isnull=False,
+                metric__message_response_time__gt=0
+            ).aggregate(
+                avg=Avg("metric__message_response_time")
+            )["avg"]
+            
+            result["avg_message_response_time"] = (
+                int(avg_message_response_time) if avg_message_response_time else 0
+            )
+
+        return result
