@@ -20,6 +20,7 @@ from chats.apps.accounts.models import User
 from chats.apps.api.v1.dashboard.dto import get_admin_domains_exclude_filter
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.projects.models.models import CustomStatus
+from chats.apps.rooms.models import Room
 
 from .dto import Filters
 
