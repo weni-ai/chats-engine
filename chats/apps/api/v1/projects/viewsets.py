@@ -699,6 +699,17 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
 
             serializer.save(user=user)
 
+            # Log status change
+            from chats.apps.projects.tasks import log_agent_status_change
+
+            log_agent_status_change.delay(
+                agent_email=user.email,
+                project_uuid=str(project.uuid),
+                status="OFFLINE",
+                custom_status_name=status_type.name,
+                custom_status_type_uuid=str(status_type.uuid),
+            )
+
     @decorators.action(detail=False, methods=["get"])
     def last_status(self, request):
         serializer = LastStatusQueryParamsSerializer(data=request.query_params)
@@ -760,6 +771,15 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                         raise serializers.ValidationError(
                             {"status": "Can't update user status in project."}
                         )
+
+                    # Log status change
+                    from chats.apps.projects.tasks import log_agent_status_change
+
+                    log_agent_status_change.delay(
+                        agent_email=instance.user.email,
+                        project_uuid=str(instance.status_type.project.uuid),
+                        status="ONLINE",
+                    )
 
                 project_tz = instance.status_type.project.timezone
                 local_created_on = instance.created_on.astimezone(project_tz)
