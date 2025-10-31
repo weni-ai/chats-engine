@@ -53,7 +53,6 @@ class RoomFilter(filters.FilterSet):
         fields = [
             "is_active",
             "queue",
-            "protocol",
         ]
 
     def filter_project(self, queryset, name, value):

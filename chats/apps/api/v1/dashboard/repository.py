@@ -70,12 +70,8 @@ class AgentRepository:
         if not filters.is_weni_admin:
             agents_query = agents_query.exclude(get_admin_domains_exclude_filter())
 
-        base_filter = Q(project_permissions__project=project, is_active=True)
-        if filters.agent:
-            base_filter &= Q(uuid=filters.agent)
-
         agents_query = (
-            agents_query.filter(base_filter)
+            agents_query.filter(project_permissions__project=project, is_active=True)
             .select_related("project_permissions")
             .annotate(
                 agent_status=Subquery(project_permission_subquery),

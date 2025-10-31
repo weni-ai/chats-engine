@@ -4,7 +4,6 @@ from django.db.models import (
     Avg,
     Case,
     Count,
-    Exists,
     F,
     IntegerField,
     OuterRef,
@@ -21,7 +20,6 @@ from chats.apps.accounts.models import User
 from chats.apps.api.v1.dashboard.dto import get_admin_domains_exclude_filter
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.projects.models.models import CustomStatus
-from chats.apps.rooms.models import Room
 
 from .dto import Filters
 
@@ -37,81 +35,42 @@ class AgentRepository:
             .astimezone(tz)
             .replace(hour=0, minute=0, second=0, microsecond=0)
         )
-
-        if filters.start_date and filters.end_date:
-            start_time = filters.start_date
-            end_time = filters.end_date
-            closed_date_filter = Q(
-                is_active=False, ended_at__range=[start_time, end_time]
-            )
-            opened_date_filter = Q(is_active=True, created_on__lte=end_time)
-            closed_rooms_filter = Q(
-                rooms__is_active=False, rooms__ended_at__range=[start_time, end_time]
-            )
-            custom_status_start = start_time
-            custom_status_end = end_time
-        else:
-            closed_date_filter = Q(is_active=False, ended_at__gte=initial_datetime)
-            opened_date_filter = Q(is_active=True)
-            closed_rooms_filter = Q(
-                rooms__is_active=False, rooms__ended_at__gte=initial_datetime
-            )
-            custom_status_start = initial_datetime
-            custom_status_end = timezone.now()
-
-        room_filter = Q(queue__sector__project=project, queue__is_deleted=False)
-        rooms_aggregate_filter = Q(
-            rooms__queue__sector__project=project, rooms__queue__is_deleted=False
-        )
+        rooms_filter = {}
+        closed_rooms = {}
+        opened_rooms = {}
 
         agents_filters = Q(project_permissions__project=project) & Q(is_active=True)
 
         if filters.queue:
-            has_queue_auth = ProjectPermission.objects.filter(
-                user_id=OuterRef("email"),
-                project=project,
-                queue_authorizations__queue=filters.queue,
-            ).values("user_id")[:1]
-
-            agents_filters &= Q(Exists(has_queue_auth)) | Q(rooms__queue=filters.queue)
-            room_filter &= Q(queue=filters.queue)
-            rooms_aggregate_filter &= Q(rooms__queue=filters.queue)
+            rooms_filter["rooms__queue"] = filters.queue
+            agents_filters &= Q(
+                project_permissions__queue_authorizations__queue=filters.queue
+            ) | Q(rooms__queue=filters.queue)
 
         elif filters.sector:
-            has_sector_auth = ProjectPermission.objects.filter(
-                user_id=OuterRef("email"),
-                project=project,
-                sector_authorizations__sector__in=filters.sector,
-            ).values("user_id")[:1]
-
-            agents_filters &= Q(Exists(has_sector_auth)) | Q(
-                rooms__queue__sector__in=filters.sector
-            )
-            room_filter &= Q(queue__sector__in=filters.sector)
-            rooms_aggregate_filter &= Q(rooms__queue__sector__in=filters.sector)
-
+            rooms_filter["rooms__queue__sector__in"] = filters.sector
+            agents_filters &= Q(
+                project_permissions__sector_authorizations__sector__in=filters.sector
+            ) | Q(rooms__queue__sector__in=filters.sector)
+        else:
+            rooms_filter["rooms__queue__sector__project"] = project
         if filters.tag:
-            room_filter &= Q(tags__in=filters.tag.split(","))
-            rooms_aggregate_filter &= Q(rooms__tags__in=filters.tag.split(","))
+            rooms_filter["rooms__tags__in"] = filters.tag.split(",")
+        if filters.start_date and filters.end_date:
+            start_time = filters.start_date
+            end_time = filters.end_date
+            opened_rooms["rooms__is_active"] = True
+            opened_rooms["rooms__created_on__lte"] = end_time
+
+            closed_rooms["rooms__ended_at__range"] = [start_time, end_time]
+            closed_rooms["rooms__is_active"] = False
+        else:
+            closed_rooms["rooms__ended_at__gte"] = initial_datetime
+            opened_rooms["rooms__is_active"] = True
+            closed_rooms["rooms__is_active"] = False
 
         if filters.agent:
-            agents_filters &= Q(uuid=filters.agent)
-
-        closed_subquery = (
-            Room.objects.filter(user=OuterRef("email"))
-            .filter(closed_date_filter & room_filter)
-            .values("user")
-            .annotate(cnt=Count("uuid", distinct=True))
-            .values("cnt")
-        )
-
-        opened_subquery = (
-            Room.objects.filter(user=OuterRef("email"))
-            .filter(opened_date_filter & room_filter)
-            .values("user")
-            .annotate(cnt=Count("uuid", distinct=True))
-            .values("cnt")
-        )
+            rooms_filter["rooms__user"] = filters.agent
 
         project_permission_subquery = ProjectPermission.objects.filter(
             project_id=project,
@@ -122,12 +81,13 @@ class AgentRepository:
         if not filters.is_weni_admin:
             agents_query = agents_query.exclude(get_admin_domains_exclude_filter())
 
+        if filters.agent:
+            agents_query = agents_query.filter(email=filters.agent)
+
         custom_status_subquery = Subquery(
             CustomStatus.objects.filter(
                 user=OuterRef("email"),
                 status_type__project=project,
-                created_on__gte=custom_status_start,
-                created_on__lte=custom_status_end,
             )
             .values("user")
             .annotate(
@@ -149,8 +109,6 @@ class AgentRepository:
                 user=OuterRef("email"),
                 status_type__project=project,
                 status_type__name="In-Service",
-                created_on__gte=custom_status_start,
-                created_on__lte=custom_status_end,
             )
             .annotate(
                 time_contribution=Case(
@@ -174,28 +132,29 @@ class AgentRepository:
             agents_query.filter(agents_filters)
             .annotate(
                 status=Subquery(project_permission_subquery),
-                closed=Coalesce(
-                    Subquery(closed_subquery, output_field=IntegerField()), 0
+                closed=Count(
+                    "rooms__uuid",
+                    distinct=True,
+                    filter=Q(**closed_rooms, **rooms_filter),
                 ),
-                opened=Coalesce(
-                    Subquery(opened_subquery, output_field=IntegerField()), 0
+                opened=Count(
+                    "rooms__uuid",
+                    distinct=True,
+                    filter=Q(**opened_rooms, **rooms_filter),
                 ),
                 avg_first_response_time=Avg(
                     "rooms__metric__first_response_time",
-                    filter=closed_rooms_filter
-                    & rooms_aggregate_filter
+                    filter=Q(**closed_rooms, **rooms_filter)
                     & Q(rooms__metric__first_response_time__gt=0),
                 ),
                 avg_message_response_time=Avg(
                     "rooms__metric__message_response_time",
-                    filter=closed_rooms_filter
-                    & rooms_aggregate_filter
+                    filter=Q(**closed_rooms, **rooms_filter)
                     & Q(rooms__metric__message_response_time__gt=0),
                 ),
                 avg_interaction_time=Avg(
                     "rooms__metric__interaction_time",
-                    filter=closed_rooms_filter
-                    & rooms_aggregate_filter
+                    filter=Q(**closed_rooms, **rooms_filter)
                     & Q(rooms__metric__interaction_time__gt=0),
                 ),
                 custom_status=custom_status_subquery,
@@ -275,16 +234,10 @@ class AgentRepository:
             rooms_filter["rooms__created_on__range"] = [start_time, end_time]
             rooms_filter["rooms__is_active"] = False
             closed_rooms["rooms__ended_at__range"] = [start_time, end_time]
-
-            custom_status_start = start_time
-            custom_status_end = end_time
         else:
             closed_rooms["rooms__ended_at__gte"] = initial_datetime
             opened_rooms["rooms__is_active"] = True
             closed_rooms["rooms__is_active"] = False
-
-            custom_status_start = initial_datetime
-            custom_status_end = timezone.now()
 
         if filters.agent:
             rooms_filter["rooms__user"] = filters.agent
@@ -298,8 +251,6 @@ class AgentRepository:
             CustomStatus.objects.filter(
                 user=OuterRef("email"),
                 status_type__project=project,
-                created_on__gte=custom_status_start,
-                created_on__lte=custom_status_end,
             )
             .values("user")
             .annotate(
