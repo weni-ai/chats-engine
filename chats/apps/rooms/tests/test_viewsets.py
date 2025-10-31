@@ -502,6 +502,48 @@ class TestRoomsViewSet(APITestCase):
         self.assertEqual(rooms_uuids[3], str(room_1.uuid))
         self.assertEqual(results[3].get("is_pinned"), False)
 
+    def test_room_order_with_email(self):
+        another_user = User.objects.create(email="another_user@example.com")
+        QueueAuthorization.objects.create(
+            permission=ProjectPermission.objects.create(
+                user=another_user,
+                project=self.project,
+                role=ProjectPermission.ROLE_ADMIN,
+            ),
+            queue=self.queue,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        rooms = []
+
+        for i in range(3):
+            room = Room.objects.create(
+                queue=self.queue, contact=Contact.objects.create(), user=another_user
+            )
+            rooms.append(room)
+
+        RoomPin.objects.create(room=rooms[1], user=another_user)
+
+        response = self.list_rooms(
+            filters={
+                "project": str(self.project.uuid),
+                "is_active": True,
+                "ordering": "-created_on",
+                "email": another_user.email,
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        results = response.data.get("results")
+
+        self.assertEqual(results[0]["uuid"], str(rooms[1].uuid))
+        self.assertEqual(results[0].get("is_pinned"), True)
+        self.assertEqual(results[1]["uuid"], str(rooms[2].uuid))
+        self.assertEqual(results[1].get("is_pinned"), False)
+        self.assertEqual(results[2]["uuid"], str(rooms[0].uuid))
+        self.assertEqual(results[2].get("is_pinned"), False)
+
 
 class RoomPickTests(APITestCase):
     def setUp(self) -> None:

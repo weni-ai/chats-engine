@@ -74,6 +74,7 @@ class RoomFilter(filters.FilterSet):
         user_project = Q(user_id=user_email) & Q(project_uuid=value)
         queue_filter = Q(user__isnull=True) & Q(queue__in=project_permission.queue_ids)
         ff = user_project | queue_filter
+
         queryset = queryset.filter(
             ff,
             is_active=True,
