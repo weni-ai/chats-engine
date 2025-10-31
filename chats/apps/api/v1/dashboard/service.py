@@ -296,18 +296,15 @@ class TimeMetricsService:
 
         if filters.start_date and filters.end_date:
             from django.db.models import Avg
-            
+
             closed_rooms_filter = rooms_filter & Q(is_active=False)
-            
-            avg_message_response_time = Room.objects.filter(
-                closed_rooms_filter
-            ).filter(
-                metric__isnull=False,
-                metric__message_response_time__gt=0
-            ).aggregate(
-                avg=Avg("metric__message_response_time")
-            )["avg"]
-            
+
+            avg_message_response_time = (
+                Room.objects.filter(closed_rooms_filter)
+                .filter(metric__isnull=False, metric__message_response_time__gt=0)
+                .aggregate(avg=Avg("metric__message_response_time"))["avg"]
+            )
+
             result["avg_message_response_time"] = (
                 int(avg_message_response_time) if avg_message_response_time else 0
             )
