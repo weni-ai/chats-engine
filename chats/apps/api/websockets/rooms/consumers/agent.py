@@ -404,19 +404,19 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         except ProjectPermission.DoesNotExist:
             pass
 
-    async def log_status_change(
-        self,
-        status: str,
-        custom_status_name: str = None,
-        custom_status_type_uuid: str = None,
-    ):
-        """Log agent status change via Celery task"""
-        from chats.apps.projects.tasks import log_agent_status_change
+    # async def log_status_change(
+    #     self,
+    #     status: str,
+    #     custom_status_name: str = None,
+    #     custom_status_type_uuid: str = None,
+    # ):
+    #     """Log agent status change via Celery task"""
+    #     from chats.apps.projects.tasks import log_agent_status_change
 
-        log_agent_status_change.delay(
-            agent_email=self.user.email,
-            project_uuid=str(self.permission.project.uuid),
-            status=status,
-            custom_status_name=custom_status_name,
-            custom_status_type_uuid=custom_status_type_uuid,
-        )
+    #     log_agent_status_change.delay(
+    #         agent_email=self.user.email,
+    #         project_uuid=str(self.permission.project.uuid),
+    #         status=status,
+    #         custom_status_name=custom_status_name,
+    #         custom_status_type_uuid=custom_status_type_uuid,
+    #     )
