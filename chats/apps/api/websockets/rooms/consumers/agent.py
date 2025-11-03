@@ -122,7 +122,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                     )
                     await self.set_user_status("OFFLINE")
                     await self.finalize_in_service_if_needed()
-                    await self.log_status_change("OFFLINE")
+                    # await self.log_status_change("OFFLINE")
                 else:
                     logger.info(
                         "User %s has other active connections, not setting status to OFFLINE",
@@ -136,7 +136,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 )
                 await self.set_user_status("OFFLINE")
                 await self.finalize_in_service_if_needed()
-                await self.log_status_change("OFFLINE")
+                # await self.log_status_change("OFFLINE")
 
     async def set_connection_check_response(self, connection_id: str, response: bool):
         self.cache.set(
