@@ -1,26 +1,22 @@
 from rest_framework import status
-from rest_framework.views import APIView
-
+from rest_framework.mixins import ListModelMixin
+from rest_framework.viewsets import GenericViewSet
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from chats.apps.api.v1.internal.contacts.filters import RoomsContactsInternalFilter
 from chats.apps.api.v1.internal.contacts.serializers import (
-    RoomsContactsInternalQueryParamsSerializer,
     RoomsContactsInternalSerializer,
 )
+from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.contacts.models import Contact
 
 
-class RoomsContactsInternalViewset(APIView):
+class RoomsContactsInternalViewSet(ListModelMixin, GenericViewSet):
+    queryset = Contact.objects.all()
     serializer_class = RoomsContactsInternalSerializer
-
-    def get(self, request, *args, **kwargs):
-        serializer = RoomsContactsInternalQueryParamsSerializer(
-            data=request.query_params
-        )
-        serializer.is_valid(raise_exception=True)
-        project = serializer.validated_data["project"]
-
-        contacts = Contact.objects.filter(rooms__queue__sector__project=project)
-        return Response(
-            RoomsContactsInternalSerializer(contacts, many=True).data,
-            status=status.HTTP_200_OK,
-        )
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filterset_class = RoomsContactsInternalFilter
+    permission_classes = [IsAuthenticated, ModuleHasPermission]
+    search_fields = ["name"]

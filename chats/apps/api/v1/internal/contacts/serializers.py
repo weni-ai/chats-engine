@@ -3,10 +3,6 @@ from rest_framework import serializers
 from chats.apps.contacts.models import Contact
 
 
-class RoomsContactsInternalQueryParamsSerializer(serializers.Serializer):
-    project = serializers.UUIDField(required=True)
-
-
 class RoomsContactsInternalSerializer(serializers.ModelSerializer):
     class Meta:
         model = Contact
