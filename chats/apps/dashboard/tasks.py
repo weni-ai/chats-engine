@@ -173,7 +173,10 @@ def generate_custom_fields_report(
                     df = pd.DataFrame(df_data)
                     df = _excel_safe_dataframe(df)
                     if not df.empty:
-                        zf.writestr(f"{model_name[:31]}.csv", df.to_csv(index=False).encode("utf-8"))
+                        zf.writestr(
+                            f"{model_name[:31]}.csv",
+                            df.to_csv(index=False).encode("utf-8"),
+                        )
             output = zip_buf
 
         dt = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
@@ -251,15 +254,19 @@ def generate_custom_fields_report(
         report_status.status = "failed"
         report_status.error_message = str(e)
         report_status.save()
-        
+
         if getattr(settings, "REPORTS_SEND_EMAILS", False):
             try:
                 from chats.apps.dashboard.email_templates import get_report_failed_email
-                
+
                 dt = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
-                subject = f"Error generating custom report for project {project.name} - {dt}"
-                message_plain, message_html = get_report_failed_email(project.name, str(e))
-                
+                subject = (
+                    f"Error generating custom report for project {project.name} - {dt}"
+                )
+                message_plain, message_html = get_report_failed_email(
+                    project.name, str(e)
+                )
+
                 email = EmailMultiAlternatives(
                     subject=subject,
                     body=message_plain,
@@ -268,11 +275,17 @@ def generate_custom_fields_report(
                 )
                 email.attach_alternative(message_html, "text/html")
                 email.send(fail_silently=False)
-                
-                logger.info("Error notification sent to %s | report_uuid=%s", user_email, report_status.uuid)
+
+                logger.info(
+                    "Error notification sent to %s | report_uuid=%s",
+                    user_email,
+                    report_status.uuid,
+                )
             except Exception as email_error:
-                logger.exception("Error sending error notification email: %s", email_error)
-        
+                logger.exception(
+                    "Error sending error notification email: %s", email_error
+                )
+
         raise
 
 
@@ -373,7 +386,9 @@ def process_pending_reports():
                                 writer, sheet_name=model_name[:31], index=False
                             )
                     else:
-                        pd.DataFrame().to_excel(writer, sheet_name=model_name[:31], index=False)
+                        pd.DataFrame().to_excel(
+                            writer, sheet_name=model_name[:31], index=False
+                        )
         else:
             csv_buffers = {}
 
@@ -413,7 +428,10 @@ def process_pending_reports():
 
             # Process all models in fields_config
             for model_name in ["rooms", "agent_status_logs"]:
-                if model_name in (fields_config or {}) and model_name in available_fields:
+                if (
+                    model_name in (fields_config or {})
+                    and model_name in available_fields
+                ):
                     query_data = view._process_model_fields(
                         model_name, fields_config[model_name], project, available_fields
                     )
@@ -509,15 +527,19 @@ def process_pending_reports():
         report.status = "failed"
         report.error_message = str(e)
         report.save()
-        
+
         if getattr(settings, "REPORTS_SEND_EMAILS", False):
             try:
                 from chats.apps.dashboard.email_templates import get_report_failed_email
-                
+
                 dt = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
-                subject = f"Error generating custom report for project {project.name} - {dt}"
-                message_plain, message_html = get_report_failed_email(project.name, str(e))
-                
+                subject = (
+                    f"Error generating custom report for project {project.name} - {dt}"
+                )
+                message_plain, message_html = get_report_failed_email(
+                    project.name, str(e)
+                )
+
                 email = EmailMultiAlternatives(
                     subject=subject,
                     body=message_plain,
@@ -526,7 +548,13 @@ def process_pending_reports():
                 )
                 email.attach_alternative(message_html, "text/html")
                 email.send(fail_silently=False)
-                
-                logging.info("Error notification sent to %s | report_uuid=%s", user_email, report.uuid)
+
+                logging.info(
+                    "Error notification sent to %s | report_uuid=%s",
+                    user_email,
+                    report.uuid,
+                )
             except Exception as email_error:
-                logging.exception("Error sending error notification email: %s", email_error)
+                logging.exception(
+                    "Error sending error notification email: %s", email_error
+                )

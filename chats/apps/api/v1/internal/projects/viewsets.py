@@ -174,6 +174,14 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
                     status="ONLINE",
                 )
 
+                # Log status change
+                from chats.apps.projects.tasks import log_agent_status_change
+                log_agent_status_change.delay(
+                    agent_email=instance.user.email,
+                    project_uuid=str(instance.project.uuid),
+                    status="ONLINE",
+                )
+
                 room_count = Room.objects.filter(
                     user=instance.user,
                     queue__sector__project=instance.project,
