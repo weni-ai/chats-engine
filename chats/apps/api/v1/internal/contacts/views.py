@@ -10,6 +10,7 @@ from chats.apps.api.v1.internal.contacts.serializers import (
 )
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.contacts.models import Contact
+from chats.apps.api.pagination import CustomCursorPagination
 
 
 class RoomsContactsInternalViewSet(ListModelMixin, GenericViewSet):
@@ -21,3 +22,4 @@ class RoomsContactsInternalViewSet(ListModelMixin, GenericViewSet):
     search_fields = ["name"]
     ordering = ["-created_on"]
     ordering_fields = ["name", "created_on"]
+    pagination_class = CustomCursorPagination
