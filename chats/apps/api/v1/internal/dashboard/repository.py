@@ -89,6 +89,7 @@ class AgentRepository:
                 user=OuterRef("email"),
                 status_type__project=project,
             )
+            .exclude(status_type__name="In-Service")
             .values("user")
             .annotate(
                 aggregated=JSONBAgg(
@@ -206,17 +207,17 @@ class AgentRepository:
         if filters.queue and filters.sector:
             rooms_filter["rooms__queue"] = filters.queue
             rooms_filter["rooms__queue__sector__in"] = filters.sector
-            agents_filter[
-                "project_permissions__queue_authorizations__queue"
-            ] = filters.queue
+            agents_filter["project_permissions__queue_authorizations__queue"] = (
+                filters.queue
+            )
             agents_filter[
                 "project_permissions__queue_authorizations__queue__sector__in"
             ] = filters.sector
         elif filters.queue:
             rooms_filter["rooms__queue"] = filters.queue
-            agents_filter[
-                "project_permissions__queue_authorizations__queue"
-            ] = filters.queue
+            agents_filter["project_permissions__queue_authorizations__queue"] = (
+                filters.queue
+            )
         elif filters.sector:
             rooms_filter["rooms__queue__sector__in"] = filters.sector
             agents_filter[
