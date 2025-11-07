@@ -188,10 +188,17 @@ class RoomViewset(
             filtered_qs = self.filter_queryset(qs)
             return self._get_paginated_response(filtered_qs)
 
+        pins_query = {
+            "room__queue__sector__project": project,
+        }
+
+        if user_email := request.query_params.get("email"):
+            pins_query["user__email"] = user_email
+        else:
+            pins_query["user"] = request.user
+
         # Get pins for the user within the project
-        pins = RoomPin.objects.filter(
-            user=request.user, room__queue__sector__project=project
-        )
+        pins = RoomPin.objects.filter(**pins_query)
 
         pinned_rooms = Room.objects.filter(
             pk__in=pins.values_list("room__pk", flat=True)

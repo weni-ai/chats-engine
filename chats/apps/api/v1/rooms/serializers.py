@@ -236,7 +236,15 @@ class ListRoomSerializer(serializers.ModelSerializer):
         if not request:
             return False
 
-        return RoomPin.objects.filter(room=room, user=request.user).exists()
+        pins_query = {"room": room}
+
+        user_email = request.query_params.get("email")
+        if user_email:
+            pins_query["user__email"] = user_email
+        else:
+            pins_query["user"] = request.user
+
+        return RoomPin.objects.filter(**pins_query).exists()
 
     def get_has_history(self, room: Room) -> bool:
         request = self.context.get("request")
