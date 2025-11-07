@@ -1,5 +1,6 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from chats.apps.api.v2.external.rooms.filters import ExternalRoomMetricsFilter
@@ -20,6 +21,7 @@ class ExternalRoomMetricsViewSet(ReadOnlyModelViewSet):
     queryset = Room.objects.select_related("user").prefetch_related("messages", "tags")
     serializer_class = ExternalRoomMetricsSerializer
     authentication_classes = [ProjectAdminAuthentication]
+    permission_classes = [IsAuthenticated]
     throttle_classes = [
         ExternalSecondRateThrottle,
         ExternalMinuteRateThrottle,
