@@ -47,6 +47,7 @@ class ExternalRoomMetricsSerializer(serializers.ModelSerializer):
     automatic_message_sent_at = serializers.SerializerMethodField()
     time_to_send_automatic_message = serializers.SerializerMethodField()
     sector = RoomSectorSerializer(read_only=True, source="queue.sector")
+    first_user_message_sent_at = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -61,7 +62,6 @@ class ExternalRoomMetricsSerializer(serializers.ModelSerializer):
             "first_user_message_sent_at",
             "tags",
             "protocol",
-            "callid",
             "automatic_message_sent_at",
             "first_user_assigned_at",
             "time_to_send_automatic_message",
