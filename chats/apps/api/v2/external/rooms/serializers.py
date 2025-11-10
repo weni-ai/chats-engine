@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Optional
+from django.utils import timezone
 from rest_framework import serializers
 
 from chats.apps.accounts.models import User
@@ -7,6 +8,9 @@ from chats.apps.msgs.models import AutomaticMessage
 from chats.apps.rooms.models import Room
 from chats.apps.contacts.models import Contact
 from chats.apps.sectors.models import Sector, SectorTag
+
+
+SERVER_TZ = timezone.get_current_timezone()
 
 
 class RoomContactSerializer(serializers.ModelSerializer):
@@ -52,6 +56,7 @@ class ExternalRoomMetricsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Room
         fields = [
+            "uuid",
             "created_on",
             "interaction_time",
             "ended_at",
@@ -75,7 +80,7 @@ class ExternalRoomMetricsSerializer(serializers.ModelSerializer):
             .order_by("created_on")
             .first()
         ):
-            return first_msg.created_on
+            return first_msg.created_on.astimezone(SERVER_TZ)
 
         return None
 
@@ -85,7 +90,7 @@ class ExternalRoomMetricsSerializer(serializers.ModelSerializer):
         ).first()
 
         if automatic_message:
-            return automatic_message.message.created_on
+            return automatic_message.message.created_on.astimezone(SERVER_TZ)
 
         return None
 
