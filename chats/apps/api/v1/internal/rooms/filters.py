@@ -41,6 +41,10 @@ class RoomFilter(filters.FilterSet):
         required=False,
         method="filter_contact",
     )
+    contact_external_id = filters.CharFilter(
+        required=False,
+        field_name="contact__external_id",
+    )
 
     tags = filters.CharFilter(
         required=False,
