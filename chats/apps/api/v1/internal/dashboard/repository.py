@@ -15,13 +15,14 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce, Extract, JSONObject
 from django.utils import timezone
+from django.db.models import QuerySet
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.dashboard.dto import get_admin_domains_exclude_filter
 from chats.apps.projects.models import ProjectPermission
-from chats.apps.projects.models.models import CustomStatus
+from chats.apps.projects.models.models import CustomStatus, Project
 
-from .dto import Filters
+from chats.apps.api.v1.internal.dashboard.dto import Filters
 
 
 class AgentRepository:
@@ -310,3 +311,52 @@ class AgentRepository:
         )
 
         return agents_query
+
+    def get_agents_custom_status(
+        self, filters: Filters, project: Project
+    ) -> QuerySet[User]:
+        agents = self.model.filter(
+            project_permissions__project=project,
+        )
+
+        if not filters.is_weni_admin:
+            agents = agents.exclude(get_admin_domains_exclude_filter())
+
+        if filters.agent:
+            agents = agents.filter(email=filters.agent)
+
+        if filters.queue:
+            agents = agents.filter(
+                project_permissions__queue_authorizations__queue=filters.queue
+            )
+
+        elif filters.sector:
+            agents = agents.filter(
+                project_permissions__queue_authorizations__queue__sector__in=filters.sector
+            )
+
+        custom_Status_query = CustomStatus.objects.filter(
+            user=OuterRef("email"),
+            status_type__project=project,
+        )
+
+        if filters.start_date and filters.end_date:
+            custom_Status_query = custom_Status_query.filter(
+                created_on__range=[filters.start_date, filters.end_date]
+            )
+
+        custom_status_subquery = Subquery(
+            custom_Status_query.values("user")
+            .annotate(time_with_status=Sum("break_time"))
+            .values("time_with_status"),
+            output_field=IntegerField(),
+            default=Value(0),
+        )
+
+        agents = agents.annotate(
+            time_with_status=Subquery(
+                custom_status_subquery, output_field=IntegerField()
+            )
+        )
+
+        return agents
