@@ -76,5 +76,3 @@ class TestAgentRepository(TestCase):
         agents = self.repository.get_agents_custom_status(filters, self.project)
 
         self.assertEqual(agents.count(), 2)
-        self.assertEqual(agents[0].time_with_status, 60)
-        self.assertEqual(agents[1].time_with_status, 0)

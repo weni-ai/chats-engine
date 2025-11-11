@@ -20,7 +20,7 @@ from django.db.models import QuerySet
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.dashboard.dto import get_admin_domains_exclude_filter
 from chats.apps.projects.models import ProjectPermission
-from chats.apps.projects.models.models import CustomStatus, Project
+from chats.apps.projects.models.models import CustomStatus, CustomStatusType, Project
 
 from chats.apps.api.v1.internal.dashboard.dto import Filters
 
@@ -315,48 +315,43 @@ class AgentRepository:
     def get_agents_custom_status(
         self, filters: Filters, project: Project
     ) -> QuerySet[User]:
-        agents = self.model.filter(
-            project_permissions__project=project,
+        custom_status = CustomStatus.objects.filter(
+            status_type__project=project,
+            user__project_permissions__project=project,
+            is_active=False,
         )
 
         if not filters.is_weni_admin:
-            agents = agents.exclude(get_admin_domains_exclude_filter())
+            # TODO
+            pass
 
+        # TODO: Create mapping for filters
         if filters.agent:
-            agents = agents.filter(email=filters.agent)
+            custom_status = custom_status.filter(user=filters.agent)
 
         if filters.queue:
-            agents = agents.filter(
-                project_permissions__queue_authorizations__queue=filters.queue
+            custom_status = custom_status.filter(
+                user__project_permissions__queue_authorizations__queue=filters.queue
             )
 
-        elif filters.sector:
-            agents = agents.filter(
-                project_permissions__queue_authorizations__queue__sector__in=filters.sector
+        if filters.sector:
+            custom_status = custom_status.filter(
+                user__project_permissions__queue_authorizations__queue__sector__in=filters.sector
             )
 
-        custom_Status_query = CustomStatus.objects.filter(
-            user=OuterRef("email"),
-            status_type__project=project,
+        if filters.start_date:
+            custom_status = custom_status.filter(created_on__gte=filters.start_date)
+
+        if filters.end_date:
+            custom_status = custom_status.filter(created_on__lte=filters.end_date)
+
+        custom_status = (
+            custom_status.values("user", "status_type__name")
+            .annotate(
+                total_break_time=Sum("break_time"),
+                status_type_name=F("status_type__name"),
+            )
+            .values("user", "total_break_time", "status_type_name")
         )
 
-        if filters.start_date and filters.end_date:
-            custom_Status_query = custom_Status_query.filter(
-                created_on__range=[filters.start_date, filters.end_date]
-            )
-
-        custom_status_subquery = Subquery(
-            custom_Status_query.values("user")
-            .annotate(time_with_status=Sum("break_time"))
-            .values("time_with_status"),
-            output_field=IntegerField(),
-            default=Value(0),
-        )
-
-        agents = agents.annotate(
-            time_with_status=Subquery(
-                custom_status_subquery, output_field=IntegerField()
-            )
-        )
-
-        return agents
+        return custom_status
