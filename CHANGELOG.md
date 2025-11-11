@@ -1,3 +1,43 @@
+# 3.31.0
+# Add
+  - database index to contact name
+
+# 3.30.5
+# Fix
+  - rooms pins filtering by user
+
+# 3.30.4
+# Fix
+  - transfer room to both user and queue
+
+# 3.30.3
+# Fix
+  - set CELERY_RESULT_BACKEND to None in settings
+
+# 3.30.2
+# Remove
+  - status change log from websocket disconnect
+
+# 3.30.1
+# Fix
+  - Revert v2 version of new human dashboard
+
+# 3.30.0
+# Add
+  - v2 version of new human dashboard
+
+# 3.29.11
+# Refactor
+  - simplifying the code of the _process_model_fields function
+
+# 3.29.10
+# Fix
+  - check ticket on Flows when sending automatic message
+
+# 3.29.9
+# Add
+  - isolating secondary project field
+
 # 3.29.8
 # Add
   - Removing unused verification when creating a sector without holidays
@@ -815,6 +855,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 
