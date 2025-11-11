@@ -190,7 +190,7 @@ class AgentRepository:
 
         return agents_query
 
-    def get_agents_custom_status(self, filters: Filters, project):
+    def get_agents_custom_status_and_rooms(self, filters: Filters, project):
         tz = project.timezone
         initial_datetime = (
             timezone.now()
@@ -206,17 +206,17 @@ class AgentRepository:
         if filters.queue and filters.sector:
             rooms_filter["rooms__queue"] = filters.queue
             rooms_filter["rooms__queue__sector__in"] = filters.sector
-            agents_filter[
-                "project_permissions__queue_authorizations__queue"
-            ] = filters.queue
+            agents_filter["project_permissions__queue_authorizations__queue"] = (
+                filters.queue
+            )
             agents_filter[
                 "project_permissions__queue_authorizations__queue__sector__in"
             ] = filters.sector
         elif filters.queue:
             rooms_filter["rooms__queue"] = filters.queue
-            agents_filter[
-                "project_permissions__queue_authorizations__queue"
-            ] = filters.queue
+            agents_filter["project_permissions__queue_authorizations__queue"] = (
+                filters.queue
+            )
         elif filters.sector:
             rooms_filter["rooms__queue__sector__in"] = filters.sector
             agents_filter[
