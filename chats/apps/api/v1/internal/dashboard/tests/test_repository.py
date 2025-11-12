@@ -22,9 +22,14 @@ class TestAgentRepository(TestCase):
             date_format=Project.DATE_FORMAT_DAY_FIRST,
             config={"agents_can_see_queue_history": True, "routing_option": None},
         )
-        self.status_type = CustomStatusType.objects.create(
-            name="Test Status",
-            project=self.project,
+        self.status_types = CustomStatusType.objects.bulk_create(
+            [
+                CustomStatusType(
+                    name=f"Test Status {i}",
+                    project=self.project,
+                )
+                for i in range(2)
+            ]
         )
 
         self.users = [
@@ -50,18 +55,19 @@ class TestAgentRepository(TestCase):
         )
 
     def test_get_agents_custom_status(self):
-        CustomStatus.objects.bulk_create(
-            [
-                CustomStatus(
-                    project=self.project,
-                    user=self.users[0],
-                    status_type=self.status_type,
-                    break_time=30,
-                    is_active=False,
-                )
-                for i in range(2)
-            ]
-        )
+        for status_type in self.status_types:
+            CustomStatus.objects.bulk_create(
+                [
+                    CustomStatus(
+                        project=self.project,
+                        user=self.users[0],
+                        status_type=status_type,
+                        break_time=30,
+                        is_active=False,
+                    )
+                    for i in range(2)
+                ]
+            )
 
         filters = Filters(
             queue=None,

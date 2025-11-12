@@ -312,46 +312,62 @@ class AgentRepository:
 
         return agents_query
 
-    def get_agents_custom_status(
-        self, filters: Filters, project: Project
-    ) -> QuerySet[User]:
-        custom_status = CustomStatus.objects.filter(
-            status_type__project=project,
-            user__project_permissions__project=project,
-            is_active=False,
-        )
+    def _get_agents_query(self, filters: Filters, project: Project):
+        agents = self.model.filter(project_permissions__project=project)
 
         if not filters.is_weni_admin:
-            # TODO
-            pass
+            agents = agents.exclude(get_admin_domains_exclude_filter())
 
-        # TODO: Create mapping for filters
         if filters.agent:
-            custom_status = custom_status.filter(user=filters.agent)
+            agents = agents.filter(email=filters.agent)
 
         if filters.queue:
-            custom_status = custom_status.filter(
-                user__project_permissions__queue_authorizations__queue=filters.queue
+            agents = agents.filter(
+                project_permissions__queue_authorizations__queue=filters.queue
+            )
+        elif filters.sector:
+            agents = agents.filter(
+                project_permissions__queue_authorizations__queue__sector__in=filters.sector
             )
 
-        if filters.sector:
-            custom_status = custom_status.filter(
-                user__project_permissions__queue_authorizations__queue__sector__in=filters.sector
-            )
+        return agents
+
+    def _get_custom_status_query(self, filters: Filters, project: Project):
+        custom_status = CustomStatus.objects.filter(
+            user=OuterRef("email"),
+            status_type__project=project,
+        )
 
         if filters.start_date:
             custom_status = custom_status.filter(created_on__gte=filters.start_date)
-
         if filters.end_date:
             custom_status = custom_status.filter(created_on__lte=filters.end_date)
 
-        custom_status = (
-            custom_status.values("user", "status_type__name")
+        return custom_status
+
+    def get_agents_custom_status(
+        self, filters: Filters, project: Project
+    ) -> QuerySet[User]:
+        agents = self._get_agents_query(filters, project)
+
+        custom_status_base_query = self._get_custom_status_query(filters, project)
+
+        custom_status_subquery = Subquery(
+            custom_status_base_query.values("user")
             .annotate(
-                total_break_time=Sum("break_time"),
-                status_type_name=F("status_type__name"),
+                aggregated=JSONBAgg(
+                    JSONObject(
+                        status_type=F("status_type__name"),
+                        break_time=F("break_time"),
+                    )
+                )
             )
-            .values("user", "total_break_time", "status_type_name")
+            .values("aggregated"),
+            output_field=JSONField(),
         )
 
-        return custom_status
+        agents = agents.annotate(
+            custom_status=custom_status_subquery,
+        )
+
+        return agents
