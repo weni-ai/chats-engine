@@ -6,6 +6,7 @@ from chats.apps.api.v1.dashboard.dto import should_exclude_admin_domains
 from chats.apps.api.v1.internal.dashboard.serializers import (
     DashboardAgentsSerializer,
     DashboardCustomAgentStatusSerializer,
+    DashboardCustomStatusSerializer,
 )
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.projects.models import Project
@@ -70,9 +71,49 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         )
 
         agents_service = AgentsService()
-        agents_data = agents_service.get_agents_custom_status(filters, project)
+        agents_data = agents_service.get_agents_custom_status_and_rooms(
+            filters, project
+        )
         agents = DashboardCustomAgentStatusSerializer(
             agents_data, many=True, context={"project": project}
         )
 
         return Response({"results": agents.data}, status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["GET"],
+        url_name="custom_status_by_agent",
+        url_path="custom-status-by-agent",
+    )
+    def custom_status_by_agent(self, request, *args, **kwargs):
+        """Custom status metrics for the agent"""
+        project = self.get_object()
+        params = request.query_params.dict()
+        filters = Filters(
+            start_date=params.get("start_date"),
+            end_date=params.get("end_date"),
+            agent=params.get("agent"),
+            sector=request.query_params.getlist("sector"),
+            tag=params.get("tags"),
+            queue=params.get("queue"),
+            user_request=params.get("user_request", ""),
+            is_weni_admin=should_exclude_admin_domains(params.get("user_request", "")),
+            ordering=params.get("ordering"),
+        )
+
+        agents_service = AgentsService()
+        agents_data = agents_service.get_agents_custom_status(filters, project)
+
+        page = self.paginate_queryset(agents_data)
+        if page is not None:
+            serializer = DashboardCustomStatusSerializer(
+                page, many=True, context={"project": project}
+            )
+            return self.get_paginated_response(serializer.data)
+
+        serializer = DashboardCustomStatusSerializer(
+            agents_data, many=True, context={"project": project}
+        )
+
+        return Response({"results": serializer.data}, status.HTTP_200_OK)
