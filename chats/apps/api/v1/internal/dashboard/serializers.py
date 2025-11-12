@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.db.models import Q
 
 from chats.apps.api.utils import calculate_in_service_time
 from chats.apps.projects.models.models import CustomStatusType
@@ -140,7 +141,7 @@ class DashboardCustomStatusSerializer(serializers.Serializer):
     def get_custom_status(self, obj):
         project = self.context.get("project")
         custom_status_types = CustomStatusType.objects.filter(
-            project=project, is_deleted=False
+            Q(project=project) & Q(is_deleted=False) & ~Q(name__iexact="In-Service")
         ).values_list("name", flat=True)
 
         custom_status_list = getattr(obj, "custom_status", []) or []
