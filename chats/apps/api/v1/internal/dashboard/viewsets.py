@@ -6,6 +6,7 @@ from chats.apps.api.v1.dashboard.dto import should_exclude_admin_domains
 from chats.apps.api.v1.internal.dashboard.serializers import (
     DashboardAgentsSerializer,
     DashboardCustomAgentStatusSerializer,
+    DashboardCustomStatusSerializer,
 )
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.projects.models import Project
@@ -70,7 +71,9 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         )
 
         agents_service = AgentsService()
-        agents_data = agents_service.get_agents_custom_status(filters, project)
+        agents_data = agents_service.get_agents_custom_status_and_rooms(
+            filters, project
+        )
         agents = DashboardCustomAgentStatusSerializer(
             agents_data, many=True, context={"project": project}
         )

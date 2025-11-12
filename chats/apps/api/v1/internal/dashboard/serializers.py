@@ -132,9 +132,10 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
 
 
 class DashboardCustomStatusSerializer(serializers.Serializer):
-    agent = serializers.CharField(source="name")
+    agent = serializers.CharField(source="full_name")
     agent_email = serializers.EmailField(source="email")
     custom_status = serializers.SerializerMethodField()
+    link = serializers.SerializerMethodField()
 
     def get_custom_status(self, obj):
         project = self.context.get("project")
@@ -142,7 +143,7 @@ class DashboardCustomStatusSerializer(serializers.Serializer):
             project=project, is_deleted=False
         ).values_list("name", flat=True)
 
-        custom_status_list = obj.get("custom_status") or []
+        custom_status_list = getattr(obj, "custom_status", [])
 
         status_dict = {status_type: 0 for status_type in custom_status_types}
 
@@ -161,3 +162,9 @@ class DashboardCustomStatusSerializer(serializers.Serializer):
         ]
 
         return result
+
+    def get_link(self, obj):
+        return {
+            "url": f"chats:dashboard/view-mode/{obj.email}",
+            "type": "internal",
+        }
