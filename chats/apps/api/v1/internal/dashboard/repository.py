@@ -13,7 +13,7 @@ from django.db.models import (
     Value,
     When,
 )
-from django.db.models.functions import Coalesce, Extract, JSONObject
+from django.db.models.functions import Coalesce, Extract, JSONObject, Concat
 from django.utils import timezone
 from django.db.models import QuerySet
 
@@ -374,6 +374,14 @@ class AgentRepository:
 
         agents = agents.annotate(
             custom_status=custom_status_subquery,
+            agent=Concat(F("first_name"), Value(" "), F("last_name")),
         )
+
+        ordering_fields = ["-agent", "agent"]
+
+        if filters.ordering and filters.ordering in ordering_fields:
+            agents = agents.order_by(filters.ordering)
+        else:
+            agents = agents.order_by("agent")
 
         return agents

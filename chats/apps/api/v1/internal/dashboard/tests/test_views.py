@@ -96,7 +96,8 @@ class TestInternalDashboardViewSetAsAuthenticatedUser(BaseTestInternalDashboardV
 
     @with_internal_auth
     def test_list_custom_status_by_agent(self):
-
-        response = self.list_custom_status_by_agent(self.project.uuid)
+        response = self.list_custom_status_by_agent(
+            self.project.uuid, {"ordering": "agent"}
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
