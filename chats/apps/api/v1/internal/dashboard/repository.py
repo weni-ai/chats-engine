@@ -334,8 +334,14 @@ class AgentRepository:
 
     def _get_custom_status_query(self, filters: Filters, project: Project):
         custom_status = CustomStatus.objects.filter(
-            user=OuterRef("email"),
-            status_type__project=project,
+            Q(
+                user=OuterRef("email"),
+            )
+            & Q(
+                status_type__project=project,
+                status_type__is_deleted=False,
+            )
+            & ~Q(status_type__name__iexact="in-service")
         )
 
         if filters.start_date:

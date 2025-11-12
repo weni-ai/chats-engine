@@ -22,6 +22,10 @@ class TestAgentRepository(TestCase):
             date_format=Project.DATE_FORMAT_DAY_FIRST,
             config={"agents_can_see_queue_history": True, "routing_option": None},
         )
+        self.in_service_status_type = CustomStatusType.objects.create(
+            name="In-Service",
+            project=self.project,
+        )
         self.status_types = CustomStatusType.objects.bulk_create(
             [
                 CustomStatusType(
@@ -68,6 +72,14 @@ class TestAgentRepository(TestCase):
                     for i in range(2)
                 ]
             )
+
+        self.in_service_status = CustomStatus.objects.create(
+            project=self.project,
+            user=self.users[0],
+            status_type=self.in_service_status_type,
+            break_time=30,
+            is_active=False,
+        )
 
         filters = Filters(
             queue=None,
