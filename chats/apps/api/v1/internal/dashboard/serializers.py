@@ -143,7 +143,7 @@ class DashboardCustomStatusSerializer(serializers.Serializer):
             project=project, is_deleted=False
         ).values_list("name", flat=True)
 
-        custom_status_list = getattr(obj, "custom_status", [])
+        custom_status_list = getattr(obj, "custom_status", []) or []
 
         status_dict = {status_type: 0 for status_type in custom_status_types}
 
