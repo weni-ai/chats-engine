@@ -105,6 +105,13 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         agents_service = AgentsService()
         agents_data = agents_service.get_agents_custom_status(filters, project)
 
+        page = self.paginate_queryset(agents_data)
+        if page is not None:
+            serializer = DashboardCustomStatusSerializer(
+                page, many=True, context={"project": project}
+            )
+            return self.get_paginated_response(serializer.data)
+
         serializer = DashboardCustomStatusSerializer(
             agents_data, many=True, context={"project": project}
         )
