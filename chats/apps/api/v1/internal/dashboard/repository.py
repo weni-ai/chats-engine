@@ -20,7 +20,7 @@ from django.db.models import QuerySet
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.dashboard.dto import get_admin_domains_exclude_filter
 from chats.apps.projects.models import ProjectPermission
-from chats.apps.projects.models.models import CustomStatus, CustomStatusType, Project
+from chats.apps.projects.models.models import CustomStatus, Project
 
 from chats.apps.api.v1.internal.dashboard.dto import Filters
 
