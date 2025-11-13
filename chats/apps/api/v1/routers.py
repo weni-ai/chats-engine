@@ -21,7 +21,10 @@ from chats.apps.api.v1.groups_sectors.viewsets import (
 )
 from chats.apps.api.v1.internal.dashboard.viewsets import InternalDashboardViewset
 from chats.apps.api.v1.internal.projects import viewsets as project_internal_views
-from chats.apps.api.v1.internal.rooms.viewsets import InternalListRoomsViewSet
+from chats.apps.api.v1.internal.rooms.viewsets import (
+    InternalListRoomsViewSet,
+    InternalProtocolRoomsViewSet,
+)
 from chats.apps.api.v1.internal.users import viewsets as user_internal_views
 from chats.apps.api.v1.msgs.viewsets import MessageMediaViewset, MessageViewset
 from chats.apps.api.v1.orgs.viewsets import OrgProjectViewSet
@@ -177,10 +180,16 @@ router.register(
     basename="dash_internal",
 )
 router.register(
+    "internal/rooms/protocols",
+    InternalProtocolRoomsViewSet,
+    basename="protocols_internal",
+)
+router.register(
     "internal/rooms",
     InternalListRoomsViewSet,
     basename="room_internal",
 )
+
 
 # External
 router.register("external/msgs", MessageFlowViewset, basename="external_message")
