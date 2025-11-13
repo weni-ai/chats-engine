@@ -98,3 +98,9 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
             queue_start = obj.added_to_queue_at
             return int((timezone.now() - queue_start).total_seconds())
         return None
+
+
+class InternalProtocolRoomsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Room
+        fields = ["protocol"]
