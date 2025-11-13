@@ -7,6 +7,7 @@ from django.db.models import (
     When,
     fields,
 )
+from django.db.models import Q
 from django.db.models.functions import Extract, Now
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, permissions, viewsets
@@ -115,3 +116,6 @@ class InternalProtocolRoomsViewSet(ListModelMixin, GenericViewSet):
     ordering = ["protocol"]
     ordering_fields = ["protocol"]
     pagination_class = CustomCursorPagination
+
+    def get_queryset(self):
+        return super().get_queryset().exclude(Q(protocol__isnull=True) | Q(protocol=""))

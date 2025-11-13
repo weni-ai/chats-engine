@@ -5,6 +5,10 @@ from rest_framework.test import APITestCase
 from chats.apps.accounts.models import User
 from chats.apps.projects.models import Project
 from chats.apps.accounts.tests.decorators import with_internal_auth
+from chats.apps.queues.models import Queue
+from chats.apps.rooms.models import Room
+from chats.apps.sectors.models import Sector
+from chats.apps.contacts.models import Contact
 
 
 class BaseTestInternalProtocolRoomsViewSet(APITestCase):
@@ -27,6 +31,27 @@ class TestInternalProtocolRoomsViewSetAsAuthenticatedUser(
     def setUp(self):
         self.user = User.objects.create_user(email="internal@vtex.com")
         self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
+        self.room_with_protocol = Room.objects.create(
+            contact=Contact.objects.create(name="Test Contact", email="test@test.com"),
+            queue=self.queue,
+            user=self.user,
+            project_uuid=str(self.project.uuid),
+            protocol="test",
+        )
+        self.room_without_protocol = Room.objects.create(
+            contact=Contact.objects.create(name="Test Contact", email="test@test.com"),
+            queue=self.queue,
+            user=self.user,
+            project_uuid=str(self.project.uuid),
+        )
 
         self.client.force_authenticate(self.user)
 
@@ -40,3 +65,7 @@ class TestInternalProtocolRoomsViewSetAsAuthenticatedUser(
         response = self.list_protocols({"project": str(self.project.uuid)})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(
+            response.data["results"][0]["protocol"], self.room_with_protocol.protocol
+        )
