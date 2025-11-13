@@ -13,7 +13,7 @@ from chats.apps.contacts.models import Contact
 
 class BaseTestInternalProtocolRoomsViewSet(APITestCase):
     def list_protocols(self, filters: dict = {}) -> Response:
-        url = f"/v1/internal/rooms/protocols/"
+        url = "/v1/internal/rooms/protocols/"
         return self.client.get(url, filters)
 
 
