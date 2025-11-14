@@ -1,14 +1,9 @@
-import logging
-
 from rest_framework import serializers
 
 from chats.apps.msgs.models import ChatMessageReplyIndex
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
 from chats.apps.rooms.models import RoomNote
-
-LOGGER = logging.getLogger(__name__)
-
 
 class UserMinimalSerializer(serializers.Serializer):
     first_name = serializers.CharField(read_only=True)
@@ -128,8 +123,7 @@ class MessageSerializerV2(serializers.ModelSerializer):
                 }
 
             return result
-        except Exception as error:
-            LOGGER.error("Error getting replied message: %s", error)
+        except ChatMessage.DoesNotExist:
             return None
 
     def get_internal_note(self, obj):

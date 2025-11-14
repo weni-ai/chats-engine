@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
+from rest_framework.response import Response
 from rest_framework.test import APITestCase
 
 from chats.apps.contacts.models import Contact
@@ -13,11 +14,54 @@ from chats.apps.sectors.models import Sector
 User = get_user_model()
 
 
-class MessageViewSetV2Tests(APITestCase):
-    """
-    Tests for Messages ViewSet v2
-    Simulates an agent fetching messages from a room
-    """
+class BaseTestMessageViewSetV2(APITestCase):
+    """Base class with helper methods for Message ViewSet V2 tests"""
+
+    def list(self, params: dict = None) -> Response:
+        url = reverse("message-v2-list")
+        return self.client.get(url, params or {})
+
+
+class TestMessageViewSetV2AsAnonymousUser(BaseTestMessageViewSetV2):
+    """Tests for Messages ViewSet v2 as anonymous (unauthenticated) user"""
+
+    def setUp(self):
+        """Initial test setup"""
+        # Create contact
+        self.contact = Contact.objects.create(
+            name="Maria Cliente", email="cliente@test.com"
+        )
+
+        # Create project
+        self.project = Project.objects.create(name="Test Project")
+
+        # Create sector
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+        )
+
+        # Create queue
+        self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
+
+        # Create active room
+        self.room = Room.objects.create(
+            contact=self.contact,
+            is_active=True,
+            queue=self.queue,
+        )
+
+    def test_list_messages_as_anonymous_user(self):
+        """Tests that unauthenticated user cannot list messages"""
+        response = self.list({"room": str(self.room.uuid)})
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class TestMessageViewSetV2AsAuthenticatedUser(BaseTestMessageViewSetV2):
+    """Tests for Messages ViewSet v2 as authenticated user"""
 
     def setUp(self):
         """Initial test setup"""
@@ -73,21 +117,18 @@ class MessageViewSetV2Tests(APITestCase):
 
         # Authenticate agent
         self.client.force_authenticate(user=self.agent)
-        """
-        Tests listing messages filtering by room
-        Simulates agent fetching messages from room
-        """
-        url = reverse("message-v2-list")
-        response = self.client.get(url, {"room": str(self.room.uuid)})
+
+    def test_list_messages_by_room(self):
+        """Tests listing messages filtering by room - simulates agent fetching messages"""
+        response = self.list({"room": str(self.room.uuid)})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("results", response.data)
         self.assertEqual(len(response.data["results"]), 2)
-        """
-        Tests if response structure contains correct v2 fields
-        """
-        url = reverse("message-v2-list")
-        response = self.client.get(url, {"room": str(self.room.uuid)})
+
+    def test_response_structure_contains_correct_v2_fields(self):
+        """Tests if response structure contains correct v2 fields"""
+        response = self.list({"room": str(self.room.uuid)})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
@@ -119,11 +160,10 @@ class MessageViewSetV2Tests(APITestCase):
             self.assertNotIn(
                 field, message_data, f"Field '{field}' should not be in response"
             )
-        """
-        Tests if 'user' field has correct simplified structure
-        """
-        url = reverse("message-v2-list")
-        response = self.client.get(url, {"room": str(self.room.uuid)})
+
+    def test_user_field_has_correct_simplified_structure(self):
+        """Tests if 'user' field has correct simplified structure"""
+        response = self.list({"room": str(self.room.uuid)})
 
         # Find agent's message
         agent_message = None
@@ -142,11 +182,10 @@ class MessageViewSetV2Tests(APITestCase):
         self.assertEqual(user_data["first_name"], "João")
         self.assertEqual(user_data["last_name"], "Silva")
         self.assertEqual(user_data["email"], "agent@test.com")
-        """
-        Tests if 'contact' field has correct simplified structure
-        """
-        url = reverse("message-v2-list")
-        response = self.client.get(url, {"room": str(self.room.uuid)})
+
+    def test_contact_field_has_correct_simplified_structure(self):
+        """Tests if 'contact' field has correct simplified structure"""
+        response = self.list({"room": str(self.room.uuid)})
 
         # Find contact's message
         contact_message = None
@@ -162,32 +201,22 @@ class MessageViewSetV2Tests(APITestCase):
         self.assertIn("uuid", contact_data)
         self.assertIn("name", contact_data)
         self.assertEqual(contact_data["name"], "Maria Cliente")
-        """
-        Tests that unauthenticated user cannot list messages
-        """
-        self.client.force_authenticate(user=None)
-        url = reverse("message-v2-list")
-        response = self.client.get(url, {"room": str(self.room.uuid)})
 
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-        """
-        Tests that user without project permission cannot access
-        """
+    def test_user_without_project_permission_cannot_access(self):
+        """Tests that user without project permission cannot access"""
         # Create another user without project permission
         other_user = User.objects.create_user(
             email="other@test.com", password="testpass123"
         )
         self.client.force_authenticate(user=other_user)
 
-        url = reverse("message-v2-list")
-
         # Since user has no project permission, should return error
         # v1 permission raises exception when ProjectPermission not found
         with self.assertRaises(Exception):
-            self.client.get(url, {"room": str(self.room.uuid)})
-        """
-        Tests listing messages with media array
-        """
+            self.list({"room": str(self.room.uuid)})
+
+    def test_list_messages_with_media(self):
+        """Tests listing messages with media array"""
         # Create message with media
         message_with_media = Message.objects.create(
             room=self.room, user=self.agent, text="Here is the document"
@@ -200,8 +229,7 @@ class MessageViewSetV2Tests(APITestCase):
             media_url="https://example.com/image.jpg",
         )
 
-        url = reverse("message-v2-list")
-        response = self.client.get(url, {"room": str(self.room.uuid)})
+        response = self.list({"room": str(self.room.uuid)})
 
         # Find message with media
         msg_with_media = None
@@ -215,9 +243,9 @@ class MessageViewSetV2Tests(APITestCase):
         self.assertEqual(msg_with_media["media"][0]["content_type"], "image/jpeg")
         self.assertIn("url", msg_with_media["media"][0])
         self.assertIn("created_on", msg_with_media["media"][0])
-        """
-        Tests message with replied_message (with media array)
-        """
+
+    def test_message_with_replied_message(self):
+        """Tests message with replied_message (with media array)"""
         # Create original message
         original_message = Message.objects.create(
             room=self.room,
@@ -239,8 +267,7 @@ class MessageViewSetV2Tests(APITestCase):
             metadata={"context": {"id": "ext-123"}},
         )
 
-        url = reverse("message-v2-list")
-        response = self.client.get(url, {"room": str(self.room.uuid)})
+        response = self.list({"room": str(self.room.uuid)})
 
         # Find message with replied_message
         msg_with_reply = None
@@ -255,9 +282,9 @@ class MessageViewSetV2Tests(APITestCase):
             msg_with_reply["replied_message"]["text"], "What are your business hours?"
         )
         self.assertIn("media", msg_with_reply["replied_message"])
-        """
-        Tests message with internal note
-        """
+
+    def test_message_with_internal_note(self):
+        """Tests message with internal note"""
         # Create message with internal note
         message = Message.objects.create(room=self.room, user=self.agent, text="")
 
@@ -270,8 +297,7 @@ class MessageViewSetV2Tests(APITestCase):
             message=message,
         )
 
-        url = reverse("message-v2-list")
-        response = self.client.get(url, {"room": str(self.room.uuid)})
+        response = self.list({"room": str(self.room.uuid)})
 
         # Find message with note
         msg_with_note = None
@@ -286,26 +312,24 @@ class MessageViewSetV2Tests(APITestCase):
             msg_with_note["internal_note"]["text"], "Customer seems interested"
         )
         self.assertEqual(msg_with_note["internal_note"]["is_deletable"], False)
-        """
-        Tests that created_on field is present and correctly formatted
-        """
-        url = reverse("message-v2-list")
-        response = self.client.get(url, {"room": str(self.room.uuid)})
+
+    def test_created_on_field_present_and_formatted(self):
+        """Tests that created_on field is present and correctly formatted"""
+        response = self.list({"room": str(self.room.uuid)})
 
         message_data = response.data["results"][0]
         self.assertIn("created_on", message_data)
         self.assertIsNotNone(message_data["created_on"])
         # Check that it's an ISO date string
         self.assertIsInstance(message_data["created_on"], str)
-        """
-        Tests that pagination is working
-        """
+
+    def test_pagination_is_working(self):
+        """Tests that pagination is working"""
         # Create more messages
         for i in range(25):
             Message.objects.create(room=self.room, user=self.agent, text=f"Message {i}")
 
-        url = reverse("message-v2-list")
-        response = self.client.get(url, {"room": str(self.room.uuid)})
+        response = self.list({"room": str(self.room.uuid)})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("next", response.data)
