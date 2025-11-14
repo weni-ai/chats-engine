@@ -323,3 +323,19 @@ class TimeMetricsService:
         max_first_response_time = Room.objects.filter(rooms_filter).aggregate(
             Max("metric__first_response_time")
         )["metric__first_response_time__max"]
+
+        avg_conversation_duration = Room.objects.filter(**rooms_filter).aggregate(
+            Avg("metric__interaction_time")
+        )["metric__interaction_time__avg"]
+        max_conversation_duration = Room.objects.filter(**rooms_filter).aggregate(
+            Max("metric__interaction_time")
+        )["metric__interaction_time__max"]
+
+        return {
+            "max_waiting_time": max_waiting_time,
+            "avg_waiting_time": avg_waiting_time,
+            "max_first_response_time": max_first_response_time,
+            "avg_first_response_time": avg_first_response_time,
+            "max_conversation_duration": max_conversation_duration,
+            "avg_conversation_duration": avg_conversation_duration,
+        }
