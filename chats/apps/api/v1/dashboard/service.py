@@ -348,21 +348,11 @@ class TimeMetricsService:
         )
 
         return {
-            "max_waiting_time": int(max_waiting_time),
-            "avg_waiting_time": int(avg_waiting_time),
-            "max_first_response_time": (
-                int(max_first_response_time) if max_first_response_time else 0
-            ),
-            "avg_first_response_time": (
-                int(avg_first_response_time) if avg_first_response_time else 0
-            ),
-            "max_conversation_duration": (
-                int(max_conversation_duration) if max_conversation_duration else 0
-            ),
-            "avg_conversation_duration": (
-                int(avg_conversation_duration) if avg_conversation_duration else 0
-            ),
-            "avg_message_response_time": (
-                int(avg_message_response_time) if avg_message_response_time else 0
-            ),
+            "max_waiting_time": (int(max_waiting_time or 0)),
+            "avg_waiting_time": (int(avg_waiting_time or 0)),
+            "max_first_response_time": (int(max_first_response_time or 0)),
+            "avg_first_response_time": (int(avg_first_response_time or 0)),
+            "max_conversation_duration": (int(max_conversation_duration or 0)),
+            "avg_conversation_duration": (int(avg_conversation_duration or 0)),
+            "avg_message_response_time": (int(avg_message_response_time or 0)),
         }
