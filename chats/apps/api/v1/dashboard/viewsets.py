@@ -423,6 +423,30 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
 
         return Response(metrics_data, status.HTTP_200_OK)
 
+    @action(
+        detail=True,
+        methods=["GET"],
+        url_name="time_metrics_for_analysis",
+    )
+    def time_metrics_for_analysis(self, request, *args, **kwargs):
+        """Time metrics for the project - analysis data"""
+        project = self.get_object()
+        params = request.query_params.dict()
+
+        filters = Filters(
+            start_date=params.get("start_date"),
+            end_date=params.get("end_date"),
+            agent=params.get("agent"),
+            sector=params.get("sector"),
+        )
+
+        time_metrics_service = TimeMetricsService()
+        metrics_data = time_metrics_service.get_time_metrics_for_analysis(
+            filters, project
+        )
+
+        return Response(metrics_data, status.HTTP_200_OK)
+
     @action(detail=True, methods=["get"])
     def report_status(self, request, **kwargs):
         """Verifica o status de um relatório"""
