@@ -83,6 +83,10 @@ def generate_metrics(room_uuid: UUID):
     if not room.user:
         metric_room.waiting_time += calculate_last_queue_waiting_time(room)
 
+    if not room.is_active and room.first_user_assigned_at:
+        metric_room.conversation_duration = (
+            room.ended_at - room.first_user_assigned_at
+        ).total_seconds()
     metric_room.save()
 
 

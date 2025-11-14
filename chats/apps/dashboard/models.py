@@ -14,9 +14,20 @@ class RoomMetrics(BaseModel):
     waiting_time = models.IntegerField(_("Room Waiting time"), default=0)
     queued_count = models.IntegerField(_("Queued count"), default=0)
     message_response_time = models.IntegerField(_("Messages response time"), default=0)
-    first_response_time = models.IntegerField(_("First response time"), null=True, blank=True, default=None)
+    first_response_time = models.IntegerField(
+        _("First response time"), null=True, blank=True, default=None
+    )
     interaction_time = models.IntegerField(_("Room interaction time"), default=0)
     transfer_count = models.IntegerField(_("Room transfer count"), default=0)
+    conversation_duration = models.IntegerField(
+        _("Conversation duration"),
+        null=True,
+        blank=True,
+        default=None,
+        help_text=_(
+            "The duration of the conversation between user and contact in seconds"
+        ),
+    )
 
     class Meta:
         verbose_name = _("Room Metric")
