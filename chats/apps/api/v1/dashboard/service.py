@@ -304,8 +304,9 @@ class TimeMetricsService:
 
         if filters.sector:
             rooms_filter &= Q(queue__sector=filters.sector)
-            if filters.tag:
-                rooms_filter &= Q(tags__uuid=filters.tag)
+
+        if filters.tag:
+            rooms_filter &= Q(tags__uuid=filters.tag)
 
         if filters.queue:
             rooms_filter &= Q(queue__uuid=filters.queue)
