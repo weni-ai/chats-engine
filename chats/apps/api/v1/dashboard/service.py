@@ -297,7 +297,12 @@ class TimeMetricsService:
         if not filters.start_date and not filters.end_date:
             raise ValueError("Start date and end date are required")
 
-        rooms_filter = Q(queue__sector__project=project, is_active=False)
+        rooms_filter = (
+            Q(queue__sector__project=project)
+            & Q(is_active=False)
+            & Q(ended_at__gte=filters.start_date)
+            & Q(ended_at__lte=filters.end_date)
+        )
 
         if filters.agent:
             rooms_filter &= Q(user=filters.agent)
@@ -305,11 +310,11 @@ class TimeMetricsService:
         if filters.sector:
             rooms_filter &= Q(queue__sector=filters.sector)
 
-        if filters.tag:
-            rooms_filter &= Q(tags__uuid=filters.tag)
-
         if filters.queue:
             rooms_filter &= Q(queue__uuid=filters.queue)
+
+        if filters.tag:
+            rooms_filter &= Q(tags__uuid=filters.tag)
 
         max_waiting_time = Room.objects.filter(rooms_filter).aggregate(
             Max("metric__waiting_time")
@@ -343,11 +348,21 @@ class TimeMetricsService:
         )
 
         return {
-            "max_waiting_time": max_waiting_time,
-            "avg_waiting_time": avg_waiting_time,
-            "max_first_response_time": max_first_response_time,
-            "avg_first_response_time": avg_first_response_time,
-            "max_conversation_duration": max_conversation_duration,
-            "avg_conversation_duration": avg_conversation_duration,
-            "avg_message_response_time": avg_message_response_time or 0,
+            "max_waiting_time": int(max_waiting_time),
+            "avg_waiting_time": int(avg_waiting_time),
+            "max_first_response_time": (
+                int(max_first_response_time) if max_first_response_time else 0
+            ),
+            "avg_first_response_time": (
+                int(avg_first_response_time) if avg_first_response_time else 0
+            ),
+            "max_conversation_duration": (
+                int(max_conversation_duration) if max_conversation_duration else 0
+            ),
+            "avg_conversation_duration": (
+                int(avg_conversation_duration) if avg_conversation_duration else 0
+            ),
+            "avg_message_response_time": (
+                int(avg_message_response_time) if avg_message_response_time else 0
+            ),
         }
