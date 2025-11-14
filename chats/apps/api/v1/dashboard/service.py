@@ -324,12 +324,18 @@ class TimeMetricsService:
             Max("metric__first_response_time")
         )["metric__first_response_time__max"]
 
-        avg_conversation_duration = Room.objects.filter(**rooms_filter).aggregate(
-            Avg("metric__interaction_time")
-        )["metric__interaction_time__avg"]
-        max_conversation_duration = Room.objects.filter(**rooms_filter).aggregate(
-            Max("metric__interaction_time")
-        )["metric__interaction_time__max"]
+        avg_conversation_duration = Room.objects.filter(
+            first_user_assigned_at__isnull=False, **rooms_filter
+        ).aggregate(Avg("metric__interaction_time"))["metric__interaction_time__avg"]
+        max_conversation_duration = Room.objects.filter(
+            first_user_assigned_at__isnull=False, **rooms_filter
+        ).aggregate(Max("metric__interaction_time"))["metric__interaction_time__max"]
+
+        avg_message_response_time = (
+            Room.objects.filter(**rooms_filter)
+            .filter(metric__isnull=False, metric__message_response_time__gt=0)
+            .aggregate(avg=Avg("metric__message_response_time"))["avg"]
+        )
 
         return {
             "max_waiting_time": max_waiting_time,
@@ -338,4 +344,5 @@ class TimeMetricsService:
             "avg_first_response_time": avg_first_response_time,
             "max_conversation_duration": max_conversation_duration,
             "avg_conversation_duration": avg_conversation_duration,
+            "avg_message_response_time": avg_message_response_time or 0,
         }
