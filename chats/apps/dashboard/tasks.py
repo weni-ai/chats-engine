@@ -74,11 +74,11 @@ def generate_metrics(room_uuid: UUID):
 
     room = Room.objects.get(uuid=room_uuid)
 
-    interaction_time = room.ended_at - room.created_on
-
     metric_room = RoomMetrics.objects.get_or_create(room=room)[0]
     metric_room.message_response_time = calculate_response_time(room)
-    metric_room.interaction_time = interaction_time.total_seconds()
+
+    if not room.is_active and room.first_user_assigned_at:
+        metric_room.interaction_time = room.ended_at - room.first_user_assigned_at
 
     if not room.user:
         metric_room.waiting_time += calculate_last_queue_waiting_time(room)
