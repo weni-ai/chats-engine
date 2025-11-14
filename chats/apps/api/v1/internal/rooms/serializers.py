@@ -35,6 +35,7 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
             "first_response_time",
             "waiting_time",
             "queue_time",
+            "protocol",
         ]
 
     def get_agent(self, obj):
@@ -69,7 +70,7 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
 
     def get_first_response_time(self, obj: Room) -> int:
         try:
-            if hasattr(obj, "metric") and obj.metric.first_response_time > 0:
+            if hasattr(obj, "metric") and obj.metric.first_response_time is not None:
                 return obj.metric.first_response_time
 
             if obj.first_user_assigned_at and obj.is_active and obj.user:
