@@ -5,6 +5,7 @@ from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
 from chats.apps.rooms.models import RoomNote
 
+
 class UserMinimalSerializer(serializers.Serializer):
     first_name = serializers.CharField(read_only=True)
     last_name = serializers.CharField(read_only=True)
