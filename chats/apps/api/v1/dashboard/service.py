@@ -1,5 +1,10 @@
 from typing import List
 
+import pendulum
+import pytz
+from django.db.models import Q, Max, Avg
+from django.utils import timezone
+
 from chats.apps.api.utils import create_room_dto
 from chats.apps.api.v1.dashboard.interfaces import CacheRepository, RoomsDataRepository
 from chats.apps.api.v1.dashboard.serializers import (
@@ -9,6 +14,8 @@ from chats.apps.api.v1.dashboard.serializers import (
     DashboardRoomSerializer,
     DashboardTransferCountSerializer,
 )
+from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
+from chats.apps.rooms.models import Room
 
 from .dto import Agent, Filters, Sector
 from .repository import (
@@ -102,14 +109,6 @@ class RoomsDataService:
 
 class TimeMetricsService:
     def get_time_metrics(self, filters: Filters, project):
-        import pendulum
-        import pytz
-        from django.db.models import Q
-        from django.utils import timezone
-
-        from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
-        from chats.apps.rooms.models import Room
-
         tz = pytz.timezone(str(project.timezone))
         rooms_filter = Q(queue__sector__project=project)
 
@@ -293,3 +292,34 @@ class TimeMetricsService:
             "avg_conversation_duration": avg_conversation_duration,
             "max_conversation_duration": max_conversation_duration,
         }
+
+    def get_time_metrics_for_analysis(self, filters: Filters, project):
+        if not filters.start_date and not filters.end_date:
+            raise ValueError("Start date and end date are required")
+
+        rooms_filter = Q(queue__sector__project=project, is_active=False)
+
+        if filters.agent:
+            rooms_filter &= Q(user=filters.agent)
+
+        if filters.sector:
+            rooms_filter &= Q(queue__sector=filters.sector)
+            if filters.tag:
+                rooms_filter &= Q(tags__uuid=filters.tag)
+
+        if filters.queue:
+            rooms_filter &= Q(queue__uuid=filters.queue)
+
+        max_waiting_time = Room.objects.filter(rooms_filter).aggregate(
+            Max("metric__waiting_time")
+        )["metric__waiting_time__max"]
+        avg_waiting_time = Room.objects.filter(rooms_filter).aggregate(
+            Avg("metric__waiting_time")
+        )["metric__waiting_time__avg"]
+
+        avg_first_response_time = Room.objects.filter(rooms_filter).aggregate(
+            Avg("metric__first_response_time")
+        )["metric__first_response_time__avg"]
+        max_first_response_time = Room.objects.filter(rooms_filter).aggregate(
+            Max("metric__first_response_time")
+        )["metric__first_response_time__max"]
