@@ -72,15 +72,23 @@ class AgentRepository:
 
         base_filter = Q(project_permissions__project=project, is_active=True)
         if filters.agent:
-            base_filter &= Q(uuid=filters.agent)
+            base_filter &= Q(email=filters.agent)
 
         agents_query = (
             agents_query.filter(base_filter)
             .select_related("project_permissions")
             .annotate(
                 agent_status=Subquery(project_permission_subquery),
-                closed_rooms=Count("rooms", filter=Q(**closed_rooms, **rooms_filter) & ~Q(rooms__config__imported_room=True)),
-                opened_rooms=Count("rooms", filter=Q(**opened_rooms, **rooms_filter) & ~Q(rooms__config__imported_room=True)),
+                closed_rooms=Count(
+                    "rooms",
+                    filter=Q(**closed_rooms, **rooms_filter)
+                    & ~Q(rooms__config__imported_room=True),
+                ),
+                opened_rooms=Count(
+                    "rooms",
+                    filter=Q(**opened_rooms, **rooms_filter)
+                    & ~Q(rooms__config__imported_room=True),
+                ),
             )
             .values(
                 "first_name",
