@@ -116,7 +116,7 @@ class AgentRepository:
             rooms_aggregate_filter &= Q(rooms__tags__in=filters.tag.split(","))
 
         if filters.agent:
-            agents_filters &= Q(uuid=filters.agent)
+            agents_filters &= Q(email=filters.agent)
 
         # Subqueries para contar salas (evita duplicação de JOINs)
         closed_subquery = (
@@ -352,7 +352,7 @@ class AgentRepository:
             is_active=True
         )
         if filters.agent:
-            agents_filters_custom &= Q(uuid=filters.agent)
+            agents_filters_custom &= Q(email=filters.agent)
 
         agents_query = (
             agents_query.filter(agents_filters_custom)
