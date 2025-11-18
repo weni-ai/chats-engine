@@ -51,6 +51,10 @@ class RoomFilter(filters.FilterSet):
         method="filter_tags",
         help_text="Room Tags",
     )
+    protocol = filters.CharFilter(
+        required=False,
+        field_name="protocol",
+    )
 
     class Meta:
         model = Room
@@ -92,10 +96,6 @@ class InternalProtocolRoomsFilter(filters.FilterSet):
     project = filters.CharFilter(
         required=True,
         field_name="queue__sector__project",
-    )
-    protocol = filters.CharFilter(
-        required=False,
-        field_name="protocol",
     )
 
     class Meta:
