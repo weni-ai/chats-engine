@@ -93,6 +93,10 @@ class InternalProtocolRoomsFilter(filters.FilterSet):
         required=True,
         field_name="queue__sector__project",
     )
+    protocol = filters.CharFilter(
+        required=False,
+        field_name="protocol",
+    )
 
     class Meta:
         model = Room
