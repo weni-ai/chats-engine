@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -93,6 +94,7 @@ class RoomsExternalTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         mock_has_permission.assert_called_once()
 
+    @override_settings(SEND_ROOMS_INFO_ENABLED=True)
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_external_room(self, mock_get_room, mock_is_attending):
