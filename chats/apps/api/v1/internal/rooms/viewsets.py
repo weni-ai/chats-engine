@@ -7,7 +7,7 @@ from django.db.models import (
     When,
     fields,
 )
-from django.db.models.functions import Extract, Now
+from django.db.models.functions import Extract, Now, Concat
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, permissions, viewsets
 from rest_framework.pagination import LimitOffsetPagination
@@ -37,6 +37,7 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
         "is_active",
         "urn",
         "uuid",
+        "user_full_name",
         "user__email",
         "user__first_name",
         "user__last_name",
@@ -50,6 +51,7 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
         "waiting_time",
         "duration",
         "first_response_time",
+        "protocol",
     ]
     search_fields = [
         "contact__external_id",
@@ -66,6 +68,9 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
         queryset = super().get_queryset()
 
         queryset = queryset.annotate(
+            user_full_name=Concat(
+                F("user__first_name"), Value(" "), F("user__last_name")
+            ),
             queue_time=ExpressionWrapper(
                 Now() - F("added_to_queue_at"), output_field=fields.DurationField()
             ),
