@@ -283,16 +283,16 @@ class TestMessageViewSetV2AsAuthenticatedUser(BaseTestMessageViewSetV2):
 
         self.assertIsNotNone(msg_with_reply)
         self.assertIsNotNone(msg_with_reply["replied_message"])
-        
+
         # Check replied_message structure
         replied = msg_with_reply["replied_message"]
         self.assertEqual(replied["text"], "What are your business hours?")
         self.assertIn("uuid", replied)
         self.assertEqual(replied["uuid"], str(original_message.uuid))
-        
+
         # Media should NOT be present when there's no media (V2 behavior fixed)
         self.assertNotIn("media", replied)
-        
+
         # Contact should be present (original message is from contact)
         self.assertIn("contact", replied)
         self.assertEqual(replied["contact"]["uuid"], str(self.contact.uuid))
