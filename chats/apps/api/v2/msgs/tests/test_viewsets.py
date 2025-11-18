@@ -174,7 +174,7 @@ class TestMessageViewSetV2AsAuthenticatedUser(BaseTestMessageViewSetV2):
 
         self.assertIsNotNone(agent_message, "Agent message not found")
 
-        # Check user structure
+        # Check user structure - V2 simplified structure
         user_data = agent_message["user"]
         self.assertIn("first_name", user_data)
         self.assertIn("last_name", user_data)
@@ -182,6 +182,11 @@ class TestMessageViewSetV2AsAuthenticatedUser(BaseTestMessageViewSetV2):
         self.assertEqual(user_data["first_name"], "João")
         self.assertEqual(user_data["last_name"], "Silva")
         self.assertEqual(user_data["email"], "agent@test.com")
+        
+        # Fields that should NOT be present (full User object fields)
+        self.assertNotIn("photo_url", user_data)
+        self.assertNotIn("is_staff", user_data)
+        self.assertNotIn("date_joined", user_data)
 
     def test_contact_field_has_correct_simplified_structure(self):
         """Tests if 'contact' field has correct simplified structure"""
@@ -245,8 +250,8 @@ class TestMessageViewSetV2AsAuthenticatedUser(BaseTestMessageViewSetV2):
         self.assertIn("created_on", msg_with_media["media"][0])
 
     def test_message_with_replied_message(self):
-        """Tests message with replied_message (with media array)"""
-        # Create original message
+        """Tests message with replied_message (without media - media only added when exists)"""
+        # Create original message from contact
         original_message = Message.objects.create(
             room=self.room,
             contact=self.contact,
@@ -278,10 +283,20 @@ class TestMessageViewSetV2AsAuthenticatedUser(BaseTestMessageViewSetV2):
 
         self.assertIsNotNone(msg_with_reply)
         self.assertIsNotNone(msg_with_reply["replied_message"])
-        self.assertEqual(
-            msg_with_reply["replied_message"]["text"], "What are your business hours?"
-        )
-        self.assertIn("media", msg_with_reply["replied_message"])
+        
+        # Check replied_message structure
+        replied = msg_with_reply["replied_message"]
+        self.assertEqual(replied["text"], "What are your business hours?")
+        self.assertIn("uuid", replied)
+        self.assertEqual(replied["uuid"], str(original_message.uuid))
+        
+        # Media should NOT be present when there's no media (V2 behavior fixed)
+        self.assertNotIn("media", replied)
+        
+        # Contact should be present (original message is from contact)
+        self.assertIn("contact", replied)
+        self.assertEqual(replied["contact"]["uuid"], str(self.contact.uuid))
+        self.assertEqual(replied["contact"]["name"], "Maria Cliente")
 
     def test_message_with_internal_note(self):
         """Tests message with internal note"""
@@ -334,3 +349,142 @@ class TestMessageViewSetV2AsAuthenticatedUser(BaseTestMessageViewSetV2):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn("next", response.data)
         self.assertIn("previous", response.data)
+
+    def test_replied_message_with_media_includes_media_array(self):
+        """Tests that replied_message includes media array when original message has media"""
+        # Create original message with media
+        original_message = Message.objects.create(
+            room=self.room,
+            user=self.agent,
+            text="Here's the document",
+            external_id="ext-media-123",
+        )
+
+        # Add media to original message
+        MessageMedia.objects.create(
+            message=original_message,
+            content_type="application/pdf",
+            media_url="https://example.com/document.pdf",
+        )
+
+        # Create index for replied message
+        ChatMessageReplyIndex.objects.create(
+            external_id="ext-media-123", message=original_message
+        )
+
+        # Create reply message
+        replied_message = Message.objects.create(
+            room=self.room,
+            contact=self.contact,
+            text="Thanks for the document!",
+            metadata={"context": {"id": "ext-media-123"}},
+        )
+
+        response = self.list({"room": str(self.room.uuid)})
+
+        # Find message with replied_message
+        msg_with_reply = None
+        for msg in response.data["results"]:
+            if msg["uuid"] == str(replied_message.uuid):
+                msg_with_reply = msg
+                break
+
+        self.assertIsNotNone(msg_with_reply)
+        replied = msg_with_reply["replied_message"]
+
+        # Media SHOULD be present when original message has media
+        self.assertIn("media", replied)
+        self.assertEqual(len(replied["media"]), 1)
+        self.assertEqual(replied["media"][0]["content_type"], "application/pdf")
+        self.assertIn("url", replied["media"][0])
+
+    def test_replied_message_with_user_has_correct_structure(self):
+        """Tests that replied_message.user has correct structure (uuid + name)"""
+        # Create original message from agent
+        original_message = Message.objects.create(
+            room=self.room,
+            user=self.agent,
+            text="What's your order number?",
+            external_id="ext-user-123",
+        )
+
+        # Create index for replied message
+        ChatMessageReplyIndex.objects.create(
+            external_id="ext-user-123", message=original_message
+        )
+
+        # Create reply from contact
+        replied_message = Message.objects.create(
+            room=self.room,
+            contact=self.contact,
+            text="My order is #12345",
+            metadata={"context": {"id": "ext-user-123"}},
+        )
+
+        response = self.list({"room": str(self.room.uuid)})
+
+        # Find message with replied_message
+        msg_with_reply = None
+        for msg in response.data["results"]:
+            if msg["uuid"] == str(replied_message.uuid):
+                msg_with_reply = msg
+                break
+
+        self.assertIsNotNone(msg_with_reply)
+        replied = msg_with_reply["replied_message"]
+
+        # User should be present with correct structure (uuid + name)
+        self.assertIn("user", replied)
+        self.assertIn("uuid", replied["user"])
+        self.assertIn("name", replied["user"])
+        self.assertEqual(replied["user"]["uuid"], str(self.agent.pk))
+        self.assertEqual(replied["user"]["name"], "João Silva")
+
+    def test_message_with_invalid_replied_id_does_not_crash(self):
+        """Tests that message with invalid replied_message ID doesn't cause error 500"""
+        # Create message with metadata.context.id that doesn't exist in index
+        message = Message.objects.create(
+            room=self.room,
+            contact=self.contact,
+            text="This is a reply to non-existent message",
+            metadata={"context": {"id": "non-existent-id-12345"}},
+        )
+
+        # Should NOT raise exception, should return 200 with replied_message as None
+        response = self.list({"room": str(self.room.uuid)})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # Find our message
+        msg = None
+        for m in response.data["results"]:
+            if m["uuid"] == str(message.uuid):
+                msg = m
+                break
+
+        self.assertIsNotNone(msg)
+        # replied_message should be None since the ID doesn't exist
+        self.assertIsNone(msg["replied_message"])
+
+    def test_message_with_empty_metadata_does_not_crash(self):
+        """Tests that message with empty metadata doesn't cause errors"""
+        # Create messages with different metadata states
+        Message.objects.create(
+            room=self.room,
+            contact=self.contact,
+            text="Message with empty metadata dict",
+            metadata={},
+        )
+
+        Message.objects.create(
+            room=self.room,
+            contact=self.contact,
+            text="Message with null metadata",
+            metadata=None,
+        )
+
+        response = self.list({"room": str(self.room.uuid)})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # Should return messages without errors
+        self.assertGreaterEqual(len(response.data["results"]), 2)
