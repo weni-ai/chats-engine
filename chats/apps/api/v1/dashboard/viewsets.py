@@ -14,6 +14,7 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from chats.apps.core.filters import get_filters_from_query_params
 from chats.apps.api.v1.dashboard.presenter import get_export_data
 from chats.apps.api.v1.dashboard.repository import (
     ORMRoomsDataRepository,
@@ -403,7 +404,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
     def time_metrics(self, request, *args, **kwargs):
         """Time metrics for the project - real-time data"""
         project = self.get_object()
-        params = request.query_params.dict()
+        params = get_filters_from_query_params(request.query_params)
 
         filters = Filters(
             start_date=params.get("start_date"),
@@ -432,13 +433,20 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
     def time_metrics_for_analysis(self, request, *args, **kwargs):
         """Time metrics for the project - analysis data"""
         project = self.get_object()
-        params = request.query_params.dict()
+        params = get_filters_from_query_params(request.query_params)
 
         filters = Filters(
             start_date=params.get("start_date"),
             end_date=params.get("end_date"),
             agent=params.get("agent"),
             sector=params.get("sector"),
+            queue=params.get("queue"),
+            tag=params.get("tag"),
+            user_request=request.user,
+            project=project,
+            is_weni_admin=should_exclude_admin_domains(
+                request.user.email if request.user else ""
+            ),
         )
 
         time_metrics_service = TimeMetricsService()
