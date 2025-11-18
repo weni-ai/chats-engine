@@ -9,6 +9,7 @@ from chats.apps.rooms.models import RoomNote
 
 LOGGER = logging.getLogger(__name__)
 
+
 class UserMinimalSerializer(serializers.Serializer):
     first_name = serializers.CharField(read_only=True)
     last_name = serializers.CharField(read_only=True)
