@@ -182,7 +182,7 @@ class TestMessageViewSetV2AsAuthenticatedUser(BaseTestMessageViewSetV2):
         self.assertEqual(user_data["first_name"], "João")
         self.assertEqual(user_data["last_name"], "Silva")
         self.assertEqual(user_data["email"], "agent@test.com")
-        
+
         # Fields that should NOT be present (full User object fields)
         self.assertNotIn("photo_url", user_data)
         self.assertNotIn("is_staff", user_data)
