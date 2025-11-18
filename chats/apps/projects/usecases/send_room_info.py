@@ -1,4 +1,7 @@
 from typing import TYPE_CHECKING
+
+from django.conf import settings
+
 from chats.apps.api.v1.internal.eda_clients.billing_client import RoomsInfoMixin
 
 
@@ -11,6 +14,9 @@ class RoomInfoUseCase:
         self._rooms_client = RoomsInfoMixin()
 
     def get_room(self, room: "Room"):
+        if not getattr(settings, "SEND_ROOMS_INFO_ENABLED", True):
+            return
+
         project_uuid = self._get_project_uuid(room)
 
         room_data = {

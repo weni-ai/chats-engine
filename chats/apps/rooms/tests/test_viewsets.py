@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.test import override_settings
 from django.utils.crypto import get_random_string
 from django.urls import reverse
 from rest_framework import status
@@ -803,6 +804,7 @@ class CloseRoomTestCase(APITestCase):
 
         return self.client.patch(url, data=payload, format="json")
 
+    @override_settings(SEND_ROOMS_INFO_ENABLED=True)
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_close_room_when_billing_was_not_previously_notified(self, mock_get_room):
         mock_get_room.return_value = None
@@ -820,6 +822,7 @@ class CloseRoomTestCase(APITestCase):
         mock_get_room.assert_called_once_with(self.room)
         self.assertTrue(self.room.is_billing_notified)
 
+    @override_settings(SEND_ROOMS_INFO_ENABLED=True)
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_close_room_when_billing_was_previously_notified(self, mock_get_room):
         mock_get_room.return_value = None

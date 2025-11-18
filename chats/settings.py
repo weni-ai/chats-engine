@@ -441,6 +441,7 @@ CELERY_BEAT_MAX_LOOP_INTERVAL = 10
 # Event Driven Architecture configurations
 
 USE_EDA = env.bool("USE_EDA", default=False)
+SEND_ROOMS_INFO_ENABLED = env.bool("SEND_ROOMS_INFO_ENABLED", default=False)
 
 if USE_EDA:
     EDA_CONNECTION_BACKEND = "chats.apps.event_driven.backends.PyAMQPConnectionBackend"
