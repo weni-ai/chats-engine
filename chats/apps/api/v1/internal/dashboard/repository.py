@@ -242,11 +242,6 @@ class AgentRepository:
         if filters.agent:
             rooms_filter["rooms__user"] = filters.agent
 
-        project_permission_queryset = ProjectPermission.objects.filter(
-            project_id=project,
-            user_id=OuterRef("email"),
-        ).values("status")[:1]
-
         custom_status_subquery = Subquery(
             CustomStatus.objects.filter(
                 user=OuterRef("email"),
@@ -277,29 +272,33 @@ class AgentRepository:
         if agents_filter:
             agents_query = agents_query.filter(**agents_filter).distinct()
 
-        agents_query = (
+        project_permission_status = F("project_permissions__status")
+        closed_rooms_filter = {**rooms_filter, **closed_rooms}
+        opened_rooms_filter = {**rooms_filter, **opened_rooms}
+
+        optimized_query = (
             agents_query.filter(project_permissions__project=project, is_active=True)
+            .only("first_name", "last_name", "email")
             .annotate(
-                status=Subquery(project_permission_queryset),
+                status=project_permission_status,
                 closed=Count(
                     "rooms__uuid",
                     distinct=True,
-                    filter=Q(**closed_rooms, **rooms_filter),
+                    filter=Q(**closed_rooms_filter),
                 ),
                 opened=Count(
                     "rooms__uuid",
                     distinct=True,
-                    filter=Q(**opened_rooms, **rooms_filter),
+                    filter=Q(**opened_rooms_filter),
                 ),
                 custom_status=custom_status_subquery,
             )
-            .distinct()
         )
 
         if filters.ordering:
-            agents_query = agents_query.order_by(filters.ordering)
+            optimized_query = optimized_query.order_by(filters.ordering)
 
-        agents_query = agents_query.values(
+        optimized_query = optimized_query.values(
             "first_name",
             "last_name",
             "email",
@@ -309,4 +308,4 @@ class AgentRepository:
             "custom_status",
         )
 
-        return agents_query
+        return optimized_query
