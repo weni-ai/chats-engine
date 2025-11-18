@@ -105,6 +105,11 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
             return False
 
     @property
+    def can_close_chats_in_queue(self) -> bool:
+        config = self.config or {}
+        return config.get("can_close_chats_in_queue", False)
+
+    @property
     def sector(self):
         return self
 

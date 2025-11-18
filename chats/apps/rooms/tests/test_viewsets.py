@@ -870,6 +870,44 @@ class CloseRoomTestCase(APITestCase):
         self.room.refresh_from_db()
         self.assertEqual(self.room.is_active, False)
 
+    def test_close_room_queue_restriction_blocks_agents(self):
+        self.sector.config = {"can_close_chats_in_queue": True}
+        self.sector.save(update_fields=["config"])
+        self.room.user = None
+        self.room.save()
+
+        attendant = User.objects.create(email="queue_attendant@example.com")
+        attendant_perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=attendant,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status="ONLINE",
+        )
+        QueueAuthorization.objects.create(
+            queue=self.queue,
+            permission=attendant_perm,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        self.client.force_authenticate(user=attendant)
+
+        response = self.close_room(self.room.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data["detail"].code, "queued_room_close_disabled")
+
+    def test_close_room_queue_restriction_allows_admin(self):
+        self.sector.config = {"can_close_chats_in_queue": True}
+        self.sector.save(update_fields=["config"])
+        self.room.user = None
+        self.room.save()
+
+        self.client.force_authenticate(user=self.agent)
+
+        response = self.close_room(self.room.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
 
 class RoomHistorySummaryTestCase(APITestCase):
     def setUp(self) -> None:

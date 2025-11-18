@@ -15,6 +15,19 @@ from chats.apps.feature_flags.utils import is_feature_active
 User = get_user_model()
 
 
+def _apply_sector_config_defaults(instance: Sector, data: dict) -> dict:
+    config = data.get("config") or {}
+    if isinstance(config, dict):
+        if instance:
+            config.setdefault(
+                "can_close_chats_in_queue", instance.can_close_chats_in_queue
+            )
+        else:
+            config.setdefault("can_close_chats_in_queue", False)
+    data["config"] = config
+    return data
+
+
 class SectorAutomaticMessageSerializer(serializers.ModelSerializer):
     is_active = serializers.BooleanField(source="is_automatic_message_active")
     text = serializers.CharField(source="automatic_message_text")
@@ -127,6 +140,7 @@ class SectorSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
         data["automatic_message"] = SectorAutomaticMessageSerializer(instance).data
+        data = _apply_sector_config_defaults(instance, data)
 
         return data
 
@@ -222,6 +236,7 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
         data = super().to_representation(instance)
 
         data["automatic_message"] = SectorAutomaticMessageSerializer(instance).data
+        data = _apply_sector_config_defaults(instance, data)
 
         return data
 
@@ -280,6 +295,10 @@ class SectorReadOnlyRetrieveSerializer(serializers.ModelSerializer):
 
     def get_automatic_message(self, sector: Sector):
         return SectorAutomaticMessageSerializer(sector).data
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        return _apply_sector_config_defaults(instance, data)
 
 
 class SectorWSSerializer(serializers.ModelSerializer):
