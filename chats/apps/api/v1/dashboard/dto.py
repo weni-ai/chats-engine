@@ -54,9 +54,9 @@ class Filters:
     start_date: str = None
     end_date: str = None
     agent: str = None
-    sector: list[str] = None
-    queue: list[str] = None
-    tag: list[str] = None
+    sector: list = None
+    queue: list = None
+    tag: list = None
     is_weni_admin: bool = None
     user_request: ProjectPermission = None
     project: Project = None
