@@ -140,6 +140,9 @@ class Room(BaseModel, BaseConfigurableModel):
         """
         Notify the billing system and set the is_billing_notified flag to True
         """
+        if not getattr(settings, "SEND_ROOMS_INFO_ENABLED", True):
+            return
+
         logger.info("Notifying billing for room %s...", self.pk)
         room_client = RoomInfoUseCase()
         room_client.get_room(self)
