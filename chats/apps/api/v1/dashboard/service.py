@@ -128,12 +128,16 @@ class TimeMetricsService:
             rooms_filter &= Q(user=filters.agent)
 
         if filters.sector:
-            rooms_filter &= Q(queue__sector=filters.sector)
+            if not isinstance(filters.sector, list):
+                filters.sector = [filters.sector]
+            rooms_filter &= Q(queue__sector__in=filters.sector)
             if filters.tag:
                 rooms_filter &= Q(tags__uuid=filters.tag)
 
         if filters.queue:
-            rooms_filter &= Q(queue__uuid=filters.queue)
+            if not isinstance(filters.queue, list):
+                filters.queue = [filters.queue]
+            rooms_filter &= Q(queue__uuid__in=filters.queue)
 
         waiting_filter = Q(
             queue__sector__project=project,
@@ -143,11 +147,11 @@ class TimeMetricsService:
         )
 
         if filters.sector:
-            waiting_filter &= Q(queue__sector=filters.sector)
+            waiting_filter &= Q(queue__sector__in=filters.sector)
             if filters.tag:
-                waiting_filter &= Q(tags__uuid=filters.tag)
+                waiting_filter &= Q(tags__uuid__in=filters.tag)
         if filters.queue:
-            waiting_filter &= Q(queue__uuid=filters.queue)
+            waiting_filter &= Q(queue__uuid__in=filters.queue)
 
         active_rooms_in_queue = Room.objects.filter(waiting_filter)
 
@@ -176,15 +180,15 @@ class TimeMetricsService:
 
             if filters.sector:
                 rooms_with_saved_response = rooms_with_saved_response.filter(
-                    queue__sector=filters.sector
+                    queue__sector__in=filters.sector
                 )
                 if filters.tag:
                     rooms_with_saved_response = rooms_with_saved_response.filter(
-                        tags__uuid=filters.tag
+                        tags__uuid__in=filters.tag
                     )
             if filters.queue:
                 rooms_with_saved_response = rooms_with_saved_response.filter(
-                    queue__uuid=filters.queue
+                    queue__uuid__in=filters.queue
                 )
             if filters.agent:
                 rooms_with_saved_response = rooms_with_saved_response.filter(
@@ -208,15 +212,15 @@ class TimeMetricsService:
 
             if filters.sector:
                 rooms_waiting_response = rooms_waiting_response.filter(
-                    queue__sector=filters.sector
+                    queue__sector__in=filters.sector
                 )
                 if filters.tag:
                     rooms_waiting_response = rooms_waiting_response.filter(
-                        tags__uuid=filters.tag
+                        tags__uuid__in=filters.tag
                     )
             if filters.queue:
                 rooms_waiting_response = rooms_waiting_response.filter(
-                    queue__uuid=filters.queue
+                    queue__uuid__in=filters.queue
                 )
             if filters.agent:
                 rooms_waiting_response = rooms_waiting_response.filter(
@@ -262,11 +266,11 @@ class TimeMetricsService:
         if filters.agent:
             active_conversation_filter &= Q(user=filters.agent)
         if filters.sector:
-            active_conversation_filter &= Q(queue__sector=filters.sector)
+            active_conversation_filter &= Q(queue__sector__in=filters.sector)
             if filters.tag:
-                active_conversation_filter &= Q(tags__uuid=filters.tag)
+                active_conversation_filter &= Q(tags__uuid__in=filters.tag)
         if filters.queue:
-            active_conversation_filter &= Q(queue__uuid=filters.queue)
+            active_conversation_filter &= Q(queue__uuid__in=filters.queue)
 
         active_rooms_with_user = Room.objects.filter(active_conversation_filter)
 
@@ -308,13 +312,19 @@ class TimeMetricsService:
             rooms_filter &= Q(user=filters.agent)
 
         if filters.sector:
-            rooms_filter &= Q(queue__sector=filters.sector)
+            if not isinstance(filters.sector, list):
+                filters.sector = [filters.sector]
+            rooms_filter &= Q(queue__sector__in=filters.sector)
 
         if filters.queue:
-            rooms_filter &= Q(queue__uuid=filters.queue)
+            if not isinstance(filters.queue, list):
+                filters.queue = [filters.queue]
+            rooms_filter &= Q(queue__uuid__in=filters.queue)
 
         if filters.tag:
-            rooms_filter &= Q(tags__uuid=filters.tag)
+            if not isinstance(filters.tag, list):
+                filters.tag = [filters.tag]
+            rooms_filter &= Q(tags__uuid__in=filters.tag)
 
         max_waiting_time = Room.objects.filter(rooms_filter).aggregate(
             Max("metric__waiting_time")
