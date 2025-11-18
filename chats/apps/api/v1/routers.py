@@ -19,6 +19,7 @@ from chats.apps.api.v1.groups_sectors.viewsets import (
     GroupSectorAuthorizationViewset,
     GroupSectorViewset,
 )
+from chats.apps.api.v1.internal.contacts.views import RoomsContactsInternalViewSet
 from chats.apps.api.v1.internal.dashboard.viewsets import InternalDashboardViewset
 from chats.apps.api.v1.internal.projects import viewsets as project_internal_views
 from chats.apps.api.v1.internal.rooms.viewsets import InternalListRoomsViewSet
@@ -180,6 +181,11 @@ router.register(
     "internal/rooms",
     InternalListRoomsViewSet,
     basename="room_internal",
+)
+router.register(
+    "internal/contacts",
+    RoomsContactsInternalViewSet,
+    basename="contact_internal",
 )
 
 # External
