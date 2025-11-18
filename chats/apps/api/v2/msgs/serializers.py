@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import serializers
 
 from chats.apps.msgs.models import ChatMessageReplyIndex
@@ -5,6 +7,7 @@ from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
 from chats.apps.rooms.models import RoomNote
 
+LOGGER = logging.getLogger(__name__)
 
 class UserMinimalSerializer(serializers.Serializer):
     first_name = serializers.CharField(read_only=True)
@@ -97,8 +100,8 @@ class MessageSerializerV2(serializers.ModelSerializer):
             }
 
             media_items = replied_msg.message.medias.all()
-            media_data = []
             if media_items.exists():
+                media_data = []
                 for media in media_items:
                     media_data.append(
                         {
@@ -108,13 +111,12 @@ class MessageSerializerV2(serializers.ModelSerializer):
                             "created_on": media.created_on,
                         }
                     )
-            result["media"] = media_data
+                result["media"] = media_data
 
             if replied_msg.message.user:
                 result["user"] = {
-                    "first_name": replied_msg.message.user.first_name,
-                    "last_name": replied_msg.message.user.last_name,
-                    "email": replied_msg.message.user.email,
+                    "uuid": str(replied_msg.message.user.pk),
+                    "name": replied_msg.message.user.full_name,
                 }
 
             if replied_msg.message.contact:
@@ -124,7 +126,8 @@ class MessageSerializerV2(serializers.ModelSerializer):
                 }
 
             return result
-        except ChatMessage.DoesNotExist:
+        except Exception as error:
+            LOGGER.error("Error getting replied message: %s", error)
             return None
 
     def get_internal_note(self, obj):
