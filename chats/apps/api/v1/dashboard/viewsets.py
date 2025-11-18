@@ -433,6 +433,11 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         project = self.get_object()
         params = request.query_params.dict()
 
+        print(
+            "[time_metrics_for_analysis] request.query_params: ", request.query_params
+        )
+        print("[time_metrics_for_analysis] params: ", params)
+
         filters = Filters(
             start_date=params.get("start_date"),
             end_date=params.get("end_date"),
