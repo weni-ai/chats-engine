@@ -7,16 +7,27 @@ from django.db.models import (
     When,
     fields,
 )
+from django.db.models import Q
 from django.db.models.functions import Extract, Now
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, permissions, viewsets
 from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.mixins import ListModelMixin
+from rest_framework.viewsets import GenericViewSet
+from rest_framework.filters import SearchFilter, OrderingFilter
 
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
-from chats.apps.api.v1.internal.rooms.serializers import RoomInternalListSerializer
+from chats.apps.api.v1.internal.rooms.serializers import (
+    RoomInternalListSerializer,
+    InternalProtocolRoomsSerializer,
+)
 from chats.apps.rooms.models import Room
+from chats.apps.api.pagination import CustomCursorPagination
 
-from .filters import RoomFilter
+from chats.apps.api.v1.internal.rooms.filters import (
+    RoomFilter,
+    InternalProtocolRoomsFilter,
+)
 
 
 class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
@@ -93,3 +104,18 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
         )
 
         return queryset.filter(queue__is_deleted=False, queue__sector__is_deleted=False)
+
+
+class InternalProtocolRoomsViewSet(ListModelMixin, GenericViewSet):
+    queryset = Room.objects.all()
+    serializer_class = InternalProtocolRoomsSerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_class = InternalProtocolRoomsFilter
+    permission_classes = [permissions.IsAuthenticated, ModuleHasPermission]
+    search_fields = ["protocol"]
+    ordering = ["protocol"]
+    ordering_fields = ["protocol"]
+    pagination_class = CustomCursorPagination
+
+    def get_queryset(self):
+        return super().get_queryset().exclude(Q(protocol__isnull=True) | Q(protocol=""))
