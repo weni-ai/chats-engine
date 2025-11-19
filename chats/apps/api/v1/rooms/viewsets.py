@@ -132,8 +132,6 @@ class RoomViewset(
             self.filterset_class = None
         qs = super().get_queryset()
 
-        last_24h = timezone.now() - timedelta(days=1)
-
         qs = qs.annotate(
             last_interaction=Max("messages__created_on"),
             unread_msgs=Count("messages", filter=Q(messages__seen=False)),
