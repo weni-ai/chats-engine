@@ -13,6 +13,7 @@ from django.db.models import (
     Q,
     Subquery,
     When,
+    Exists,
 )
 from django.utils import timezone
 from django.utils.timezone import make_aware
@@ -134,37 +135,23 @@ class RoomViewset(
 
         last_24h = timezone.now() - timedelta(days=1)
 
-        # Conditional Subquery: only compute last_contact_interaction for WhatsApp rooms
-        last_contact_interaction_subquery = Subquery(
+        last_contact_interaction_exists = Exists(
             Message.objects.filter(
                 room=OuterRef("pk"),
+                room__urn__startswith="whatsapp",
                 contact__isnull=False,
+                created_on__gte=last_24h,
             )
-            .order_by("-created_on")
-            .values("created_on")[:1],
-            output_field=DateTimeField(),
         )
-
         qs = qs.annotate(
             last_interaction=Max("messages__created_on"),
             unread_msgs=Count("messages", filter=Q(messages__seen=False)),
-            last_contact_interaction=Case(
-                When(
-                    urn__startswith="whatsapp",
-                    then=last_contact_interaction_subquery,
-                ),
-                default=None,
-                output_field=DateTimeField(),
-            ),
             is_24h_valid_computed=Case(
                 When(
-                    Q(
-                        urn__startswith="whatsapp",
-                        last_contact_interaction__lt=last_24h,
-                    ),
-                    then=False,
+                    Q(urn__startswith="whatsapp") & Q(has_recent_contact_msg=False),
+                    then=Value(False),
                 ),
-                default=True,
+                default=Value(True),
                 output_field=BooleanField(),
             ),
             last_message_text=Subquery(
