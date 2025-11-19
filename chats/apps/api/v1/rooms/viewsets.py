@@ -14,6 +14,7 @@ from django.db.models import (
     Subquery,
     When,
     Exists,
+    Value,
 )
 from django.utils import timezone
 from django.utils.timezone import make_aware
