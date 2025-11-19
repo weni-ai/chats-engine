@@ -137,20 +137,6 @@ class RoomViewset(
         qs = qs.annotate(
             last_interaction=Max("messages__created_on"),
             unread_msgs=Count("messages", filter=Q(messages__seen=False)),
-            last_contact_interaction=Max(
-                "messages__created_on", filter=Q(messages__contact__isnull=False)
-            ),
-            is_24h_valid_computed=Case(
-                When(
-                    Q(
-                        urn__startswith="whatsapp",
-                        last_contact_interaction__lt=last_24h,
-                    ),
-                    then=False,
-                ),
-                default=True,
-                output_field=BooleanField(),
-            ),
             last_message_text=Subquery(
                 Message.objects.filter(room=OuterRef("pk"))
                 .exclude(user__isnull=True, contact__isnull=True)
