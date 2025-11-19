@@ -147,6 +147,7 @@ class RoomViewset(
         qs = qs.annotate(
             last_interaction=Max("messages__created_on"),
             unread_msgs=Count("messages", filter=Q(messages__seen=False)),
+            last_contact_interaction_exists=last_contact_interaction_exists,
             is_24h_valid_computed=Case(
                 When(
                     Q(urn__startswith="whatsapp")
