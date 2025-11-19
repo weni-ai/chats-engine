@@ -149,7 +149,8 @@ class RoomViewset(
             unread_msgs=Count("messages", filter=Q(messages__seen=False)),
             is_24h_valid_computed=Case(
                 When(
-                    Q(urn__startswith="whatsapp") & Q(has_recent_contact_msg=False),
+                    Q(urn__startswith="whatsapp")
+                    & Q(last_contact_interaction_exists=False),
                     then=Value(False),
                 ),
                 default=Value(True),
