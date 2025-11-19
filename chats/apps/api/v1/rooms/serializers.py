@@ -146,9 +146,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
     unread_msgs = serializers.IntegerField(required=False, default=0)
     last_message = serializers.SerializerMethodField()
     is_waiting = serializers.BooleanField()
-    is_24h_valid = serializers.BooleanField(
-        default=True, source="is_24h_valid_computed"
-    )
+    is_24h_valid = serializers.BooleanField()
     config = serializers.JSONField(required=False, read_only=True)
     last_interaction = serializers.DateTimeField(read_only=True)
     can_edit_custom_fields = serializers.SerializerMethodField()
