@@ -133,9 +133,41 @@ class RoomViewset(
             self.filterset_class = None
         qs = super().get_queryset()
 
+        last_24h = timezone.now() - timedelta(days=1)
+
+        # Conditional Subquery: only compute last_contact_interaction for WhatsApp rooms
+        last_contact_interaction_subquery = Subquery(
+            Message.objects.filter(
+                room=OuterRef("pk"),
+                contact__isnull=False,
+            )
+            .order_by("-created_on")
+            .values("created_on")[:1],
+            output_field=DateTimeField(),
+        )
+
         qs = qs.annotate(
             last_interaction=Max("messages__created_on"),
             unread_msgs=Count("messages", filter=Q(messages__seen=False)),
+            last_contact_interaction=Case(
+                When(
+                    urn__startswith="whatsapp",
+                    then=last_contact_interaction_subquery,
+                ),
+                default=None,
+                output_field=DateTimeField(),
+            ),
+            is_24h_valid_computed=Case(
+                When(
+                    Q(
+                        urn__startswith="whatsapp",
+                        last_contact_interaction__lt=last_24h,
+                    ),
+                    then=False,
+                ),
+                default=True,
+                output_field=BooleanField(),
+            ),
             last_message_text=Subquery(
                 Message.objects.filter(room=OuterRef("pk"))
                 .exclude(user__isnull=True, contact__isnull=True)
