@@ -871,8 +871,8 @@ class CloseRoomTestCase(APITestCase):
         self.assertEqual(self.room.is_active, False)
 
     def test_close_room_queue_restriction_blocks_agents(self):
-        self.sector.config = {"can_close_chats_in_queue": True}
-        self.sector.save(update_fields=["config"])
+        self.project.config = {"can_close_chats_in_queue": False}
+        self.project.save(update_fields=["config"])
         self.room.user = None
         self.room.save()
 
@@ -897,12 +897,37 @@ class CloseRoomTestCase(APITestCase):
         self.assertEqual(response.data["detail"].code, "queued_room_close_disabled")
 
     def test_close_room_queue_restriction_allows_admin(self):
-        self.sector.config = {"can_close_chats_in_queue": True}
-        self.sector.save(update_fields=["config"])
+        self.project.config = {"can_close_chats_in_queue": False}
+        self.project.save(update_fields=["config"])
         self.room.user = None
         self.room.save()
 
         self.client.force_authenticate(user=self.agent)
+
+        response = self.close_room(self.room.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_close_room_queue_restriction_allows_agent_when_flag_true(self):
+        self.project.config = {"can_close_chats_in_queue": True}
+        self.project.save(update_fields=["config"])
+        self.room.user = None
+        self.room.save()
+
+        attendant = User.objects.create(email="queue_attendant_flag@example.com")
+        attendant_perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=attendant,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status="ONLINE",
+        )
+        QueueAuthorization.objects.create(
+            queue=self.queue,
+            permission=attendant_perm,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        self.client.force_authenticate(user=attendant)
 
         response = self.close_room(self.room.uuid)
 
