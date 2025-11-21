@@ -328,7 +328,7 @@ class RoomViewset(
         if (
             instance.user is None
             and instance.queue
-            and instance.project.can_close_chats_in_queue
+            and not instance.project.can_close_chats_in_queue
         ):
             permission = instance.project.get_permission(request.user)
             if not permission or not permission.is_admin:
