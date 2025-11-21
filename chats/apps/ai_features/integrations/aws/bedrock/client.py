@@ -4,6 +4,10 @@ import boto3
 from botocore.exceptions import ClientError
 from django.conf import settings
 
+from chats.apps.ai_features.integrations.aws.bedrock.models.registries import (
+    ModelRequestBodyFormatterRegistry,
+    ModelResponseBodyParserRegistry,
+)
 from chats.apps.ai_features.integrations.base_client import BaseAIPlatformClient
 
 
@@ -15,74 +19,36 @@ class BedrockClient(BaseAIPlatformClient):
     Bedrock client for AWS Bedrock.
     """
 
-    def __init__(self, model_id: str):
+    def __init__(
+        self,
+        model_id: str,
+        request_body_formatter_registry: ModelRequestBodyFormatterRegistry = ModelRequestBodyFormatterRegistry(),
+        response_body_parser_registry: ModelResponseBodyParserRegistry = ModelResponseBodyParserRegistry(),
+    ):
         self.client = boto3.client(
             "bedrock-runtime",
             region_name=settings.AWS_BEDROCK_REGION_NAME,
         )
         self.model_id = model_id
+        self.request_body_formatter_registry = request_body_formatter_registry
+        self.response_body_parser_registry = response_body_parser_registry
 
     def get_text_from_response(self, response_body: dict) -> str:
         """
         Get the response text from the Bedrock client response body.
-        Handles different response formats from different models:
-        - Claude: response_body.get("content")[0].get("text")
-        - Nova: response_body.get("output").get("message").get("content")[0].get("text")
+        Handles different response formats from different models.
         """
-        # Try Claude format first
-        if (
-            "content" in response_body
-            and len(response_body.get("content")) > 0
-            and response_body.get("content")[0].get("text")
-        ):
-            return response_body.get("content")[0].get("text")
+        parser = self.response_body_parser_registry.get_parser(self.model_id)
 
-        # Try Nova format
-        if (
-            "output" in response_body
-            and response_body.get("output").get("message").get("content")
-            and len(response_body.get("output").get("message").get("content")) > 0
-            and response_body.get("output").get("message").get("content")[0].get("text")
-        ):
-            return (
-                response_body.get("output").get("message").get("content")[0].get("text")
-            )
-
-        # If neither format matches, raise an error
-        raise ValueError(f"Unsupported response format: {response_body}")
+        return parser.parse(response_body)
 
     def format_request_body(self, prompt_settings: dict, prompt: str) -> dict:
         """
         Format the request body for the Bedrock client.
         """
-        settings_body = {}
+        formatter = self.request_body_formatter_registry.get_formatter(self.model_id)
 
-        for setting, value in prompt_settings.items():
-            settings_body[setting] = value
-
-        if "anthropic.claude" in self.model_id:
-            return {
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [{"type": "text", "text": prompt}],
-                    }
-                ],
-                **settings_body,
-            }
-
-        if "amazon.nova" in self.model_id:
-            return {
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [{"text": prompt}],
-                    }
-                ],
-                **settings_body,
-            }
-
-        raise ValueError(f"Unsupported model: {self.model_id}")
+        return formatter.format(prompt_settings, prompt)
 
     def generate_text(self, prompt_settings: dict, prompt: str) -> str:
         """
