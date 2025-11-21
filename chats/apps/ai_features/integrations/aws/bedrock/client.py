@@ -45,9 +45,7 @@ class BedrockClient(BaseAIPlatformClient):
 
         return parser.parse(response_body)
 
-    def format_request_body(
-        self, prompt_settings: dict, prompt_msgs: List[PromptMessage]
-    ) -> dict:
+    def format_request_body(self, prompt_settings: dict, prompt: str) -> dict:
         """
         Format the request body for the Bedrock client.
         """
