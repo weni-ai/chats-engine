@@ -10,6 +10,12 @@ from chats.apps.ai_features.integrations.aws.bedrock.models.claude.formatters im
 from chats.apps.ai_features.integrations.aws.bedrock.models.claude.parsers import (
     ClaudeResponseBodyParser,
 )
+from chats.apps.ai_features.integrations.aws.bedrock.models.gpt.formatters import (
+    GPTRequestBodyFormatter,
+)
+from chats.apps.ai_features.integrations.aws.bedrock.models.gpt.parsers import (
+    GPTResponseBodyParser,
+)
 from chats.apps.ai_features.integrations.aws.bedrock.models.nova.formatters import (
     NovaRequestBodyFormatter,
 )
@@ -26,6 +32,7 @@ class ModelRequestBodyFormatterRegistry:
     _formatters: Dict[str, RequestBodyFormatter] = {
         "anthropic.claude": ClaudeRequestBodyFormatter,
         "amazon.nova": NovaRequestBodyFormatter,
+        "amazon.gpt": GPTRequestBodyFormatter,
     }
 
     @classmethod
@@ -45,6 +52,7 @@ class ModelResponseBodyParserRegistry:
     _parsers: Dict[str, ResponseBodyParser] = {
         "anthropic.claude": ClaudeResponseBodyParser,
         "amazon.nova": NovaResponseBodyParser,
+        "amazon.gpt": GPTResponseBodyParser,
     }
 
     @classmethod

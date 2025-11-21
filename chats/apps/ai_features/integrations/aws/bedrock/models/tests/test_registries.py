@@ -6,6 +6,12 @@ from chats.apps.ai_features.integrations.aws.bedrock.models.claude.formatters im
 from chats.apps.ai_features.integrations.aws.bedrock.models.claude.parsers import (
     ClaudeResponseBodyParser,
 )
+from chats.apps.ai_features.integrations.aws.bedrock.models.gpt.formatters import (
+    GPTRequestBodyFormatter,
+)
+from chats.apps.ai_features.integrations.aws.bedrock.models.gpt.parsers import (
+    GPTResponseBodyParser,
+)
 from chats.apps.ai_features.integrations.aws.bedrock.models.nova.formatters import (
     NovaRequestBodyFormatter,
 )
@@ -29,6 +35,11 @@ class TestModelRequestBodyFormatterRegistry(TestCase):
         formatter = registry.get_formatter("amazon.nova:1")
         self.assertIsInstance(formatter, NovaRequestBodyFormatter)
 
+    def test_get_formatter_gpt(self):
+        registry = ModelRequestBodyFormatterRegistry()
+        formatter = registry.get_formatter("amazon.gpt:1")
+        self.assertIsInstance(formatter, GPTRequestBodyFormatter)
+
     def test_get_formatter_invalid(self):
         registry = ModelRequestBodyFormatterRegistry()
         with self.assertRaises(ValueError):
@@ -45,6 +56,11 @@ class TestModelResponseBodyParserRegistry(TestCase):
         registry = ModelResponseBodyParserRegistry()
         parser = registry.get_parser("amazon.nova:1")
         self.assertIsInstance(parser, NovaResponseBodyParser)
+
+    def test_get_parser_gpt(self):
+        registry = ModelResponseBodyParserRegistry()
+        parser = registry.get_parser("amazon.gpt:1")
+        self.assertIsInstance(parser, GPTResponseBodyParser)
 
     def test_get_parser_invalid(self):
         registry = ModelResponseBodyParserRegistry()
