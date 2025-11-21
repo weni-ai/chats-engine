@@ -33,7 +33,7 @@ class ModelRequestBodyFormatterRegistry:
         """Get the appropriate formatter for a model ID."""
         for prefix, formatter in cls._formatters.items():
             if prefix in model_id:
-                return formatter
+                return formatter()
         raise ValueError(f"Unsupported model: {model_id}")
 
 
@@ -52,5 +52,5 @@ class ModelResponseBodyParserRegistry:
         """Get the appropriate parser for a model ID."""
         for prefix, parser in cls._parsers.items():
             if prefix in model_id:
-                return parser
+                return parser()
         raise ValueError(f"Unsupported model: {model_id}")
