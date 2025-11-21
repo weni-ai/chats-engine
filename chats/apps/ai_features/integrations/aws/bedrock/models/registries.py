@@ -32,7 +32,7 @@ class ModelRequestBodyFormatterRegistry:
     _formatters: Dict[str, RequestBodyFormatter] = {
         "anthropic.claude": ClaudeRequestBodyFormatter,
         "amazon.nova": NovaRequestBodyFormatter,
-        "amazon.gpt": GPTRequestBodyFormatter,
+        "openai.gpt": GPTRequestBodyFormatter,
     }
 
     @classmethod
@@ -52,7 +52,7 @@ class ModelResponseBodyParserRegistry:
     _parsers: Dict[str, ResponseBodyParser] = {
         "anthropic.claude": ClaudeResponseBodyParser,
         "amazon.nova": NovaResponseBodyParser,
-        "amazon.gpt": GPTResponseBodyParser,
+        "openai.gpt": GPTResponseBodyParser,
     }
 
     @classmethod
