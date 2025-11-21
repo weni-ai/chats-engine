@@ -325,6 +325,20 @@ class RoomViewset(
                 code="tags_required",
             )
 
+        if (
+            instance.user is None
+            and instance.queue
+            and instance.queue.sector.can_close_chats_in_queue
+        ):
+            permission = instance.project.get_permission(request.user)
+            if not permission or not permission.is_admin:
+                raise PermissionDenied(
+                    detail=_(
+                        "Agents cannot close queued rooms in this sector."
+                    ),
+                    code="queued_room_close_disabled",
+                )
+
         with transaction.atomic():
             instance.close(tags, "agent")
 

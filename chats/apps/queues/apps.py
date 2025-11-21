@@ -7,3 +7,4 @@ class QueuesConfig(AppConfig):
 
     def ready(self):
         import chats.apps.queues.signals  # NOQA
+        from chats.apps.projects.models import permission_signals  # noqa: F401
