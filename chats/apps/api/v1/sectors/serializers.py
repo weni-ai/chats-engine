@@ -36,6 +36,18 @@ def validate_is_csat_enabled(project: Project, value: bool, context: dict) -> bo
             code="csat_feature_flag_is_off",
         )
     return value
+    
+def _apply_sector_config_defaults(instance: Sector, data: dict) -> dict:
+    config = data.get("config") or {}
+    if isinstance(config, dict):
+        if instance:
+            config.setdefault(
+                "can_close_chats_in_queue", instance.can_close_chats_in_queue
+            )
+        else:
+            config.setdefault("can_close_chats_in_queue", False)
+    data["config"] = config
+    return data
 
 
 class SectorAutomaticMessageSerializer(serializers.ModelSerializer):
@@ -156,6 +168,7 @@ class SectorSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
         data["automatic_message"] = SectorAutomaticMessageSerializer(instance).data
+        data = _apply_sector_config_defaults(instance, data)
 
         return data
 
@@ -257,6 +270,7 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
         data = super().to_representation(instance)
 
         data["automatic_message"] = SectorAutomaticMessageSerializer(instance).data
+        data = _apply_sector_config_defaults(instance, data)
 
         return data
 
@@ -317,6 +331,10 @@ class SectorReadOnlyRetrieveSerializer(serializers.ModelSerializer):
 
     def get_automatic_message(self, sector: Sector):
         return SectorAutomaticMessageSerializer(sector).data
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        return _apply_sector_config_defaults(instance, data)
 
 
 class SectorWSSerializer(serializers.ModelSerializer):
