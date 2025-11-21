@@ -871,8 +871,8 @@ class CloseRoomTestCase(APITestCase):
         self.assertEqual(self.room.is_active, False)
 
     def test_close_room_queue_restriction_blocks_agents(self):
-        self.sector.config = {"can_close_chats_in_queue": True}
-        self.sector.save(update_fields=["config"])
+        self.project.config = {"can_close_chats_in_queue": True}
+        self.project.save(update_fields=["config"])
         self.room.user = None
         self.room.save()
 
@@ -897,8 +897,8 @@ class CloseRoomTestCase(APITestCase):
         self.assertEqual(response.data["detail"].code, "queued_room_close_disabled")
 
     def test_close_room_queue_restriction_allows_admin(self):
-        self.sector.config = {"can_close_chats_in_queue": True}
-        self.sector.save(update_fields=["config"])
+        self.project.config = {"can_close_chats_in_queue": True}
+        self.project.save(update_fields=["config"])
         self.room.user = None
         self.room.save()
 

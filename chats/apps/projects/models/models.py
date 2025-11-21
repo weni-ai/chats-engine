@@ -138,6 +138,14 @@ class Project(BaseConfigurableModel, BaseModel):
             return True
 
     @property
+    def can_close_chats_in_queue(self) -> bool:
+        try:
+            config = self.get_cached_config()
+            return config.get("can_close_chats_in_queue", False)
+        except AttributeError:
+            return False
+
+    @property
     def routing_option(self):
         """
         OPTIONS>
