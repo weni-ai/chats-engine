@@ -94,6 +94,7 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
             queue=params.get("queue"),
             queues=params.get("queues"),
             sector=params.get("sector"),
+            sectors=params.get("sectors"),
             tag=params.get("tag"),
             tags=params.get("tags"),
             agent=params.get("agent"),
