@@ -336,6 +336,9 @@ class CSATRepository:
             if filter_value is not None:
                 csat_query[field_name] = filter_value
 
+        if "sector" in csat_query and not isinstance(csat_query["sector"], list):
+            csat_query["sector"] = [csat_query["sector"]]
+
         csat_ratings = (
             CSATSurvey.objects.filter(**csat_query)
             .values("rating")
