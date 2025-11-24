@@ -589,7 +589,7 @@ class CSATRepository:
             "start_date": ("room__ended_at__gte", filters.start_date),
             "end_date": ("room__ended_at__lte", filters.end_date),
             "queues": ("room__queue__in", filters.queues),
-            "sectors": ("room__queue__sector__in", filters.sector),
+            "sectors": ("room__queue__sector__in", filters.sectors),
             "tags": ("room__tags__in", filters.tags),
             "agent": ("room__user", filters.agent),
         }
