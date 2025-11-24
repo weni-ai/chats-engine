@@ -584,6 +584,7 @@ class AgentRepository:
 
 class CSATRepository:
     def get_csat_ratings(self, filters: Filters, project) -> CSATRatings:
+        print(f"[csat_ratings repository] filters: {filters}")
         filter_mapping = {
             "start_date": ("room__ended_at__gte", filters.start_date),
             "end_date": ("room__ended_at__lte", filters.end_date),
@@ -603,6 +604,8 @@ class CSATRepository:
 
         if "sector" in csat_query and not isinstance(csat_query["sector"], list):
             csat_query["sector"] = [csat_query["sector"]]
+
+        print(f"[csat_ratings repository] csat_query: {csat_query}")
 
         csat_ratings = (
             CSATSurvey.objects.filter(**csat_query)

@@ -168,7 +168,9 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
     def csat_ratings(self, request, *args, **kwargs):
         """CSAT ratings for the project"""
         project = self.get_object()
+        print(f"[csat_ratings view] request.query_params: {request.query_params}")
         params = get_filters_from_query_params(request.query_params)
+        print(f"[csat_ratings view] params: {params}")
         filters = Filters(
             start_date=params.get("start_date"),
             end_date=params.get("end_date"),
@@ -179,6 +181,8 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
             tags=params.get("tags"),
             agent=params.get("agent"),
         )
+
+        print(f"[csat_ratings view] filters: {filters}")
 
         csat_service = CSATService()
         csat_ratings = csat_service.get_csat_ratings(filters, project)
