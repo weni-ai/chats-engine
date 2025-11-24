@@ -13,6 +13,7 @@ from chats.apps.projects.models import Project
 
 from chats.apps.api.v1.internal.dashboard.dto import Filters
 from chats.apps.api.v1.internal.dashboard.service import AgentsService, CSATService
+from chats.apps.core.filters import get_filters_from_query_params
 
 
 class InternalDashboardViewset(viewsets.GenericViewSet):
@@ -86,7 +87,7 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
     def csat_ratings(self, request, *args, **kwargs):
         """CSAT ratings for the project"""
         project = self.get_object()
-        params = request.query_params.dict()
+        params = get_filters_from_query_params(request.query_params)
         filters = Filters(
             start_date=params.get("start_date"),
             end_date=params.get("end_date"),
