@@ -1,8 +1,10 @@
+from typing import Optional
 from django.utils import timezone
 from rest_framework import serializers
 from django.utils import timezone
 
 from chats.apps.api.v1.sectors.serializers import TagSimpleSerializer
+from chats.apps.csat.models import CSATSurvey
 from chats.apps.rooms.models import Room
 
 
@@ -17,6 +19,7 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
     first_response_time = serializers.SerializerMethodField()
     waiting_time = serializers.SerializerMethodField()
     queue_time = serializers.SerializerMethodField()
+    csat_rating = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -37,6 +40,7 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
             "waiting_time",
             "queue_time",
             "protocol",
+            "csat_rating",
         ]
 
     def get_agent(self, obj):
@@ -98,6 +102,14 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
         if obj.is_active and not obj.user:
             queue_start = obj.added_to_queue_at
             return int((timezone.now() - queue_start).total_seconds())
+        return None
+
+    def get_csat_rating(self, obj: Room) -> int:
+        csat_survey: Optional[CSATSurvey] = getattr(obj, "csat_survey", None)
+
+        if csat_survey:
+            return csat_survey.rating
+
         return None
 
 
