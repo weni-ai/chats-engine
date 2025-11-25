@@ -14,6 +14,7 @@ from chats.core.cache import CacheClient
 
 
 class FeedbackViewSet(GenericViewSet):
+    swagger_tag = "Feedback"
     """
     Viewset for feedback creation.
     """

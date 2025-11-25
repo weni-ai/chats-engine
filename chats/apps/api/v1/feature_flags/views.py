@@ -12,6 +12,7 @@ from chats.apps.feature_flags.services import FeatureFlagService
 
 
 class FeatureFlagsViewSet(GenericViewSet):
+    swagger_tag = "Feature Flags"
     """
     View for getting the active features for a project.
     """

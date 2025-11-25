@@ -20,6 +20,7 @@ from .filters import RoomFilter
 
 
 class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
+    swagger_tag = "Rooms"
     queryset = Room.objects.all()
     serializer_class = RoomInternalListSerializer
     lookup_field = "uuid"

@@ -44,8 +44,11 @@ class ExternalRoomMetricsViewSet(ReadOnlyModelViewSet):
     filterset_class = ExternalRoomMetricsFilter
 
     def get_queryset(self):
-        return (
-            super()
-            .get_queryset()
-            .filter(queue__sector__project=self.request.auth.project)
-        )
+        if getattr(self, "swagger_fake_view", False):
+            return self.queryset.none()
+
+        auth = getattr(self.request, "auth", None)
+        if auth is None:
+            return self.queryset.none()
+
+        return super().get_queryset().filter(queue__sector__project=auth.project)
