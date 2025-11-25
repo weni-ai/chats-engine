@@ -93,6 +93,7 @@ class RoomViewset(
     mixins.UpdateModelMixin,
     GenericViewSet,
 ):
+    swagger_tag = "Rooms"
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
     filter_backends = [
@@ -1066,6 +1067,7 @@ class RoomViewset(
 
 
 class RoomsReportViewSet(APIView):
+    swagger_tag = "Rooms"
     """
     Viewset for generating rooms reports.
     """
@@ -1117,6 +1119,7 @@ class RoomNoteViewSet(
     mixins.DestroyModelMixin,
     GenericViewSet,
 ):
+    swagger_tag = "Rooms"
     """
     ViewSet for Room Notes
     """

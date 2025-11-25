@@ -8,6 +8,7 @@ from chats.apps.quickmessages.models import QuickMessage
 
 
 class QuickMessageViewset(viewsets.ModelViewSet):
+    swagger_tag = "Quick Messages"
     queryset = QuickMessage.objects.exclude(sector__isnull=False)
     serializer_class = QuickMessageSerializer
     permission_classes = [
@@ -37,6 +38,7 @@ class QuickMessageViewset(viewsets.ModelViewSet):
 
 
 class SectorQuickMessageViewset(viewsets.ModelViewSet):
+    swagger_tag = "Quick Messages"
     queryset = QuickMessage.objects.all()
     serializer_class = QuickMessageSerializer
 

@@ -11,6 +11,7 @@ from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 
 
 class SectorInternalViewset(viewsets.ModelViewSet):
+    swagger_tag = "Sectors"
     queryset = Sector.objects.exclude(is_deleted=True)
     serializer_class = sector_serializers.SectorSerializer
     filter_backends = [DjangoFilterBackend]
@@ -57,6 +58,7 @@ class SectorInternalViewset(viewsets.ModelViewSet):
 
 
 class SectorAuthorizationViewset(viewsets.ModelViewSet):
+    swagger_tag = "Sectors"
     queryset = SectorAuthorization.objects.all()
     serializer_class = sector_serializers.SectorAuthorizationSerializer
     permission_classes = [IsAuthenticated, ModuleHasPermission]
@@ -80,6 +82,7 @@ class SectorAuthorizationViewset(viewsets.ModelViewSet):
 
 
 class SectorTagsViewset(viewsets.ModelViewSet):
+    swagger_tag = "Sectors"
     queryset = SectorTag.objects.all().order_by("name")
     serializer_class = SectorTagSerializer
     permission_classes = [IsAuthenticated, ModuleHasPermission]

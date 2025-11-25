@@ -23,7 +23,9 @@ User = get_user_model()
 class DiscussionViewSet(
     viewsets.ModelViewSet, DiscussionMessageActionsMixin, DiscussionUserActionsMixin
 ):
+    swagger_tag = "Discussions"
     queryset = Discussion.objects.all()
+    serializer_class = DiscussionDetailSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = DiscussionFilter
     permission_classes = [IsAuthenticated, CanManageDiscussion]

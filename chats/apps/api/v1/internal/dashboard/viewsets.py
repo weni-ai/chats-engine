@@ -15,6 +15,7 @@ from .service import AgentsService
 
 
 class InternalDashboardViewset(viewsets.GenericViewSet):
+    swagger_tag = "Dashboard"
     lookup_field = "uuid"
     queryset = Project.objects.all()
     serializer_class = DashboardAgentsSerializer

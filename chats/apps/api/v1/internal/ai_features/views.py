@@ -14,6 +14,7 @@ from chats.apps.api.v1.internal.ai_features.serializers import (
 
 
 class FeaturePromptsView(APIView):
+    swagger_tag = "AI Features"
     """
     API view to create a new feature prompt.
     """

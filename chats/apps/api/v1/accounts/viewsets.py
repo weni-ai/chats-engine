@@ -16,6 +16,8 @@ from chats.core.cache_utils import get_user_id_by_email_cached
 )
 class LoginViewset(mixins.CreateModelMixin, viewsets.GenericViewSet):
 
+    swagger_tag = "Authentication"
+
     """
     Login Users
     """
@@ -43,6 +45,8 @@ class LoginViewset(mixins.CreateModelMixin, viewsets.GenericViewSet):
 
 
 class UserDataViewset(viewsets.GenericViewSet):
+
+    swagger_tag = "Users"
     queryset = User.objects.only("email", "first_name", "last_name").all()
     serializer_class = UserNameSerializer
     permission_classes = [IsAuthenticated]

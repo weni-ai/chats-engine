@@ -22,6 +22,7 @@ class MessageFlowViewset(
     mixins.UpdateModelMixin,
     viewsets.GenericViewSet,
 ):
+    swagger_tag = "Integrations"
     queryset = ChatMessage.objects.all()
     serializer_class = MsgFlowSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]

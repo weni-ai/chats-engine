@@ -8,7 +8,7 @@ from django.contrib.postgres.aggregates import ArrayAgg
 from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
-from rest_framework import permissions, status, viewsets
+from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
@@ -45,9 +45,15 @@ logger = logging.getLogger(__name__)
 logger = logging.getLogger(__name__)
 
 
+class _DashboardEmptySerializer(serializers.Serializer):
+    """Placeholder serializer to satisfy DRF assertions during schema generation."""
+
+
 class DashboardLiveViewset(viewsets.GenericViewSet):
+    swagger_tag = "Dashboard"
     lookup_field = "uuid"
     queryset = Project.objects.all()
+    serializer_class = _DashboardEmptySerializer
 
     @action(
         detail=True,
@@ -442,6 +448,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
 
 
 class ModelFieldsViewSet(APIView):
+    swagger_tag = "Dashboard"
     """
     Endpoint para retornar os campos disponíveis dos principais models do sistema.
     """
@@ -453,6 +460,7 @@ class ModelFieldsViewSet(APIView):
 
 
 class ReportFieldsValidatorViewSet(APIView):
+    swagger_tag = "Dashboard"
     """
     Endpoint to validate fields and generate rooms report.
     """
