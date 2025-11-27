@@ -45,20 +45,24 @@ class BedrockClient(BaseAIPlatformClient):
 
         return parser.parse(response_body)
 
-    def format_request_body(self, prompt_settings: dict, prompt: str) -> dict:
+    def format_request_body(
+        self, prompt_settings: dict, prompt_msgs: List[PromptMessage]
+    ) -> dict:
         """
         Format the request body for the Bedrock client.
         """
         formatter = self.request_body_formatter_registry.get_formatter(self.model_id)
 
-        return formatter.format(prompt_settings, prompt)
+        return formatter.format(prompt_settings, prompt_msgs)
 
-    def generate_text(self, prompt_settings: dict, prompt: str) -> str:
+    def generate_text(
+        self, prompt_settings: dict, prompt_msgs: List[PromptMessage]
+    ) -> str:
         """
         Generate text using the Bedrock client.
         """
         try:
-            request_body = self.format_request_body(prompt_settings, prompt)
+            request_body = self.format_request_body(prompt_settings, prompt_msgs)
 
             response = self.client.invoke_model(
                 modelId=self.model_id,
