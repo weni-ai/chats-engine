@@ -13,15 +13,16 @@ from django.db.models import (
     Value,
     When,
 )
-from django.db.models.functions import Coalesce, Extract, JSONObject
+from django.db.models.functions import Coalesce, Extract, JSONObject, Concat
 from django.utils import timezone
+from django.db.models import QuerySet
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.dashboard.dto import get_admin_domains_exclude_filter
 from chats.apps.projects.models import ProjectPermission
-from chats.apps.projects.models.models import CustomStatus
+from chats.apps.projects.models.models import CustomStatus, Project
 
-from .dto import Filters
+from chats.apps.api.v1.internal.dashboard.dto import Filters
 
 
 class AgentRepository:
@@ -190,7 +191,7 @@ class AgentRepository:
 
         return agents_query
 
-    def get_agents_custom_status(self, filters: Filters, project):
+    def get_agents_custom_status_and_rooms(self, filters: Filters, project):
         tz = project.timezone
         initial_datetime = (
             timezone.now()
@@ -206,17 +207,17 @@ class AgentRepository:
         if filters.queue and filters.sector:
             rooms_filter["rooms__queue"] = filters.queue
             rooms_filter["rooms__queue__sector__in"] = filters.sector
-            agents_filter[
-                "project_permissions__queue_authorizations__queue"
-            ] = filters.queue
+            agents_filter["project_permissions__queue_authorizations__queue"] = (
+                filters.queue
+            )
             agents_filter[
                 "project_permissions__queue_authorizations__queue__sector__in"
             ] = filters.sector
         elif filters.queue:
             rooms_filter["rooms__queue"] = filters.queue
-            agents_filter[
-                "project_permissions__queue_authorizations__queue"
-            ] = filters.queue
+            agents_filter["project_permissions__queue_authorizations__queue"] = (
+                filters.queue
+            )
         elif filters.sector:
             rooms_filter["rooms__queue__sector__in"] = filters.sector
             agents_filter[
@@ -310,3 +311,77 @@ class AgentRepository:
         )
 
         return agents_query
+
+    def _get_agents_query(self, filters: Filters, project: Project):
+        agents = self.model.filter(project_permissions__project=project)
+
+        if not filters.is_weni_admin:
+            agents = agents.exclude(get_admin_domains_exclude_filter())
+
+        if filters.agent:
+            agents = agents.filter(email=filters.agent)
+
+        if filters.queue:
+            agents = agents.filter(
+                project_permissions__queue_authorizations__queue=filters.queue
+            )
+        elif filters.sector:
+            agents = agents.filter(
+                project_permissions__queue_authorizations__queue__sector__in=filters.sector
+            )
+
+        return agents
+
+    def _get_custom_status_query(self, filters: Filters, project: Project):
+        custom_status = CustomStatus.objects.filter(
+            Q(
+                user=OuterRef("email"),
+            )
+            & Q(
+                status_type__project=project,
+                status_type__is_deleted=False,
+            )
+            & ~Q(status_type__name__iexact="in-service")
+        )
+
+        if filters.start_date:
+            custom_status = custom_status.filter(created_on__gte=filters.start_date)
+        if filters.end_date:
+            custom_status = custom_status.filter(created_on__lte=filters.end_date)
+
+        return custom_status
+
+    def get_agents_custom_status(
+        self, filters: Filters, project: Project
+    ) -> QuerySet[User]:
+        agents = self._get_agents_query(filters, project)
+
+        custom_status_base_query = self._get_custom_status_query(filters, project)
+
+        custom_status_subquery = Subquery(
+            custom_status_base_query.values("user")
+            .annotate(
+                aggregated=JSONBAgg(
+                    JSONObject(
+                        status_type=F("status_type__name"),
+                        break_time=F("break_time"),
+                    )
+                )
+            )
+            .values("aggregated"),
+            output_field=JSONField(),
+        )
+
+        agents = agents.annotate(
+            custom_status=custom_status_subquery,
+            agent=Concat(F("first_name"), Value(" "), F("last_name")),
+        )
+
+        ordering_fields = ["-agent", "agent"]
+
+        if filters.ordering and filters.ordering in ordering_fields:
+            agents = agents.order_by(filters.ordering)
+        else:
+            agents = agents.order_by("agent")
+
+        return agents
