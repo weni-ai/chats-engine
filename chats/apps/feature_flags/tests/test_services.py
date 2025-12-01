@@ -1,16 +1,15 @@
+from unittest.mock import MagicMock
 from django.test import TestCase
 
 from chats.apps.feature_flags.services import FeatureFlagService
-from chats.apps.feature_flags.integrations.growthbook.tests.mock import (
-    MockGrowthbookClient,
-)
 from chats.apps.accounts.models import User
 from chats.apps.projects.models.models import Project
 
 
 class TestFeatureFlagService(TestCase):
     def setUp(self):
-        self.service = FeatureFlagService(growthbook_client=MockGrowthbookClient())
+        mock_weni_service = MagicMock()
+        self.service = FeatureFlagService(feature_flags_service=mock_weni_service)
         self.user = User.objects.create(email="test@test.com")
         self.project = Project.objects.create()
 
@@ -20,7 +19,7 @@ class TestFeatureFlagService(TestCase):
             project=self.project,
         )
 
-        self.service.growthbook_client.get_active_feature_flags_for_attributes.assert_called_once_with(
+        self.service.feature_flags_service.get_active_feature_flags_for_attributes.assert_called_once_with(
             {
                 "userEmail": "test@test.com",
                 "projectUUID": str(self.project.uuid),
@@ -39,7 +38,7 @@ class TestFeatureFlagService(TestCase):
             project=self.project,
         )
 
-        self.service.growthbook_client.evaluate_feature_flag_by_attributes.assert_called_once_with(
+        self.service.feature_flags_service.evaluate_feature_flag_by_attributes.assert_called_once_with(
             "example",
             {
                 "projectUUID": str(self.project.uuid),
@@ -52,7 +51,7 @@ class TestFeatureFlagService(TestCase):
             user=self.user,
         )
 
-        self.service.growthbook_client.evaluate_feature_flag_by_attributes.assert_called_once_with(
+        self.service.feature_flags_service.evaluate_feature_flag_by_attributes.assert_called_once_with(
             "example",
             {
                 "userEmail": "test@test.com",
@@ -66,7 +65,7 @@ class TestFeatureFlagService(TestCase):
             project=self.project,
         )
 
-        self.service.growthbook_client.evaluate_feature_flag_by_attributes.assert_called_once_with(
+        self.service.feature_flags_service.evaluate_feature_flag_by_attributes.assert_called_once_with(
             "example",
             {
                 "userEmail": "test@test.com",
@@ -75,7 +74,7 @@ class TestFeatureFlagService(TestCase):
         )
 
     def test_get_feature_flag_rules(self):
-        self.service.growthbook_client.get_feature_flags.return_value = {
+        self.service.feature_flags_service.get_feature_flags.return_value = {
             "exampleEmail": {
                 "defaultValue": False,
                 "rules": [
@@ -92,7 +91,7 @@ class TestFeatureFlagService(TestCase):
             key="exampleEmail",
         )
 
-        self.service.growthbook_client.get_feature_flags.assert_called_once_with()
+        self.service.feature_flags_service.get_feature_flags.assert_called_once_with()
 
         self.assertEqual(
             rules,

@@ -1,52 +1,17 @@
-from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from weni.feature_flags.services import FeatureFlagsService as WeniFeatureFlagsService
 
 from chats.apps.accounts.models import User
 from chats.apps.projects.models.models import Project
 
 
-if TYPE_CHECKING:
-    from chats.apps.feature_flags.integrations.growthbook.clients import (
-        BaseGrowthbookClient,
-    )
-
-
-class BaseFeatureFlagService(ABC):
+class FeatureFlagService:
     """
-    Base service for feature flags.
+    Wrapper service for weni-commons feature flags service.
+    Adapts the weni-commons API to the chats-engine interface.
     """
 
-    @abstractmethod
-    def get_feature_flags_list_for_user_and_project(self, user: User, project: Project):
-        """
-        Get feature flags list.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def evaluate_feature_flag(
-        self, key: str, user: User = None, project: Project = None
-    ) -> bool:
-        """
-        Evaluate feature flag by project.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def get_feature_flag_rules(self, key: str) -> dict:
-        """
-        Get feature flag rules
-        """
-        raise NotImplementedError
-
-
-class FeatureFlagService(BaseFeatureFlagService):
-    """
-    Service for getting feature flags list.
-    """
-
-    def __init__(self, growthbook_client: "BaseGrowthbookClient"):
-        self.growthbook_client = growthbook_client
+    def __init__(self, feature_flags_service: WeniFeatureFlagsService = None):
+        self.feature_flags_service = feature_flags_service or WeniFeatureFlagsService()
 
     def get_feature_flags_list_for_user_and_project(self, user: User, project: Project):
         """
@@ -57,7 +22,7 @@ class FeatureFlagService(BaseFeatureFlagService):
             "projectUUID": str(project.uuid),
         }
 
-        return self.growthbook_client.get_active_feature_flags_for_attributes(
+        return self.feature_flags_service.get_active_feature_flags_for_attributes(
             attributes
         )
 
@@ -77,7 +42,7 @@ class FeatureFlagService(BaseFeatureFlagService):
         if not attributes:
             raise ValueError("No attributes provided to evaluate feature flag")
 
-        return self.growthbook_client.evaluate_feature_flag_by_attributes(
+        return self.feature_flags_service.evaluate_feature_flag_by_attributes(
             key, attributes
         )
 
@@ -85,6 +50,6 @@ class FeatureFlagService(BaseFeatureFlagService):
         """
         Get feature flag rules
         """
-        feature_flags = self.growthbook_client.get_feature_flags()
+        feature_flags = self.feature_flags_service.get_feature_flags()
 
         return feature_flags.get(key, {}).get("rules", [])

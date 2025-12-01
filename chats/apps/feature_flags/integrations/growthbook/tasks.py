@@ -5,9 +5,11 @@ from chats.celery import app
 def update_growthbook_feature_flags():
     """
     Update the growthbook feature flags definitions.
+    This task is now handled by weni-commons internally.
     """
     from chats.apps.feature_flags.integrations.growthbook.instance import (
-        GROWTHBOOK_CLIENT,
+        FEATURE_FLAGS_SERVICE,
     )
 
-    GROWTHBOOK_CLIENT.update_feature_flags_definitions()
+    if hasattr(FEATURE_FLAGS_SERVICE, 'update_feature_flags_definitions'):
+        FEATURE_FLAGS_SERVICE.update_feature_flags_definitions()
