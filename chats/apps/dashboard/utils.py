@@ -78,10 +78,14 @@ def calculate_first_response_time(room: "Room") -> int:
     if not room.first_user_assigned_at:
         return 0
 
-    first_agent_message = room.messages.filter(
-        user__isnull=False,
-        created_on__gte=room.first_user_assigned_at
-    ).order_by("created_on").first()
+    first_agent_message = (
+        room.messages.filter(
+            user__isnull=False, created_on__gte=room.first_user_assigned_at
+        )
+        .exclude(automatic_message__isnull=False)
+        .order_by("created_on")
+        .first()
+    )
 
     if not first_agent_message:
         return 0
