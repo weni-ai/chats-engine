@@ -13,6 +13,8 @@ from django.db.models import (
     Q,
     Subquery,
     When,
+    Exists,
+    Value,
 )
 from django.utils import timezone
 from django.utils.timezone import make_aware
@@ -134,21 +136,25 @@ class RoomViewset(
 
         last_24h = timezone.now() - timedelta(days=1)
 
+        last_contact_interaction_exists = Exists(
+            Message.objects.filter(
+                room=OuterRef("pk"),
+                room__urn__startswith="whatsapp",
+                contact__isnull=False,
+                created_on__gte=last_24h,
+            )
+        )
         qs = qs.annotate(
             last_interaction=Max("messages__created_on"),
             unread_msgs=Count("messages", filter=Q(messages__seen=False)),
-            last_contact_interaction=Max(
-                "messages__created_on", filter=Q(messages__contact__isnull=False)
-            ),
+            last_contact_interaction_exists=last_contact_interaction_exists,
             is_24h_valid_computed=Case(
                 When(
-                    Q(
-                        urn__startswith="whatsapp",
-                        last_contact_interaction__lt=last_24h,
-                    ),
-                    then=False,
+                    Q(urn__startswith="whatsapp")
+                    & Q(last_contact_interaction_exists=False),
+                    then=Value(False),
                 ),
-                default=True,
+                default=Value(True),
                 output_field=BooleanField(),
             ),
             last_message_text=Subquery(
