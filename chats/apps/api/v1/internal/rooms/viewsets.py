@@ -28,6 +28,7 @@ from chats.apps.api.v1.internal.rooms.filters import (
     RoomFilter,
     InternalProtocolRoomsFilter,
 )
+from datetime import timedelta
 
 
 class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
@@ -84,8 +85,19 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
                 F("user_assigned_at") - F("added_to_queue_at"),
                 output_field=fields.DurationField(),
             ),
-            duration=ExpressionWrapper(
-                Now() - F("first_user_assigned_at"), output_field=fields.DurationField()
+            duration=Case(
+                When(
+                    is_active=True,
+                    user__isnull=False,
+                    then=Now() - F("first_user_assigned_at"),
+                ),
+                When(
+                    is_active=False,
+                    ended_at__isnull=False,
+                    then=F("ended_at") - F("first_user_assigned_at"),
+                ),
+                default=Value(timedelta(0)),
+                output_field=fields.DurationField(),
             ),
             first_response_time=Case(
                 When(
@@ -98,7 +110,7 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
                     first_user_assigned_at__isnull=False,
                     then=Extract(Now() - F("first_user_assigned_at"), "epoch"),
                 ),
-                default=Value(None),
+                default=Value(0),
                 output_field=IntegerField(),
             ),
         )

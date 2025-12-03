@@ -1,8 +1,12 @@
 from django.utils import timezone
 from rest_framework import serializers
+from datetime import timedelta
 
 from chats.apps.api.v1.sectors.serializers import TagSimpleSerializer
 from chats.apps.rooms.models import Room
+from django.db.models import Case, When, F, Value, IntegerField
+from django.db.models.functions import Extract
+from django.db.models import Now
 
 
 class RoomInternalListSerializer(serializers.ModelSerializer):
@@ -59,14 +63,14 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
 
     def get_duration(self, obj: Room) -> int:
         if not obj.first_user_assigned_at:
-            return None
+            return 0
 
         if obj.is_active and obj.user:
             return int((timezone.now() - obj.first_user_assigned_at).total_seconds())
         elif not obj.is_active and obj.ended_at:
             return int((obj.ended_at - obj.first_user_assigned_at).total_seconds())
 
-        return None
+        return 0
 
     def get_first_response_time(self, obj: Room) -> int:
         try:
@@ -81,14 +85,14 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
                 )
 
                 if has_any_agent_messages:
-                    return None
+                    return 0
 
                 return int(
                     (timezone.now() - obj.first_user_assigned_at).total_seconds()
                 )
         except Exception:
             pass
-        return None
+        return 0
 
     def get_waiting_time(self, obj: Room) -> int:
         if not obj.added_to_queue_at or not obj.user_assigned_at:
