@@ -1,6 +1,5 @@
 from django.db.models import (
     Case,
-    ExpressionWrapper,
     F,
     IntegerField,
     Value,
@@ -78,22 +77,34 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
         queryset = super().get_queryset()
 
         queryset = queryset.annotate(
-            queue_time=ExpressionWrapper(
-                Now() - F("added_to_queue_at"), output_field=fields.DurationField()
+            queue_time=Case(
+                When(
+                    added_to_queue_at__isnull=False,
+                    then=Now() - F("added_to_queue_at"),
+                ),
+                default=Value(timedelta(0)),
+                output_field=fields.DurationField(),
             ),
-            waiting_time=ExpressionWrapper(
-                F("user_assigned_at") - F("added_to_queue_at"),
+            waiting_time=Case(
+                When(
+                    added_to_queue_at__isnull=False,
+                    user_assigned_at__isnull=False,
+                    then=F("user_assigned_at") - F("added_to_queue_at"),
+                ),
+                default=Value(timedelta(0)),
                 output_field=fields.DurationField(),
             ),
             duration=Case(
                 When(
                     is_active=True,
                     user__isnull=False,
+                    first_user_assigned_at__isnull=False,
                     then=Now() - F("first_user_assigned_at"),
                 ),
                 When(
                     is_active=False,
                     ended_at__isnull=False,
+                    first_user_assigned_at__isnull=False,
                     then=F("ended_at") - F("first_user_assigned_at"),
                 ),
                 default=Value(timedelta(0)),
