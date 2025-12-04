@@ -228,10 +228,22 @@ class TimeMetricsService:
                 )
 
             for room in rooms_waiting_response:
+                print("[get_time_metrics] room user: ", room.user)
+                print(
+                    "[get_time_metrics] room first_user_assigned_at: ",
+                    room.first_user_assigned_at,
+                )
+                print("[get_time_metrics] timezone.now(): ", timezone.now())
                 time_waiting = int(
                     (timezone.now() - room.first_user_assigned_at).total_seconds()
                 )
+                print("[get_time_metrics] time_waiting: ", time_waiting)
                 first_response_times.append(time_waiting)
+
+            print(
+                "[get_time_metrics] first_response_times length: ",
+                len(first_response_times),
+            )
 
         except Exception:
             pass
