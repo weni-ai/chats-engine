@@ -142,10 +142,22 @@ class RoomViewsetListTests(TestCase):
         self.feature_flag_patch = patch(
             "chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=True
         )
+        self.feature_flag_eval_patch = patch(
+            "chats.apps.feature_flags.services.FeatureFlagService.evaluate_feature_flag",
+            return_value=True,
+        )
+        self.feature_flag_rules_patch = patch(
+            "chats.apps.feature_flags.services.FeatureFlagService.get_feature_flag_rules",
+            return_value=[],
+        )
         self.feature_flag_patch.start()
+        self.feature_flag_eval_patch.start()
+        self.feature_flag_rules_patch.start()
 
     def tearDown(self):
         self.feature_flag_patch.stop()
+        self.feature_flag_eval_patch.stop()
+        self.feature_flag_rules_patch.stop()
         super().tearDown()
 
     def _new_contact(self):
