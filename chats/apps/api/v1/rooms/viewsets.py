@@ -271,8 +271,15 @@ class RoomViewset(
 
         annotation_pins_queryset = RoomPin.objects.filter(
             room__queue__sector__project=project,
-            user=request.user,
         )
+        if user_email:
+            annotation_pins_queryset = annotation_pins_queryset.filter(
+                user__email=user_email
+            )
+        else:
+            annotation_pins_queryset = annotation_pins_queryset.filter(
+                user=request.user
+            )
 
         pin_subquery = annotation_pins_queryset.filter(room=OuterRef("pk")).order_by(
             "-created_on"

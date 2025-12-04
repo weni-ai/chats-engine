@@ -177,8 +177,8 @@ class RoomViewsetListTests(TestCase):
         pinned_room = self._create_room("PINNED", user=self.other_user)
         regular_room = self._create_room("REGULAR", user=self.other_user)
 
-        RoomPin.objects.create(room=pinned_room, user=self.request_user)
-        RoomPin.objects.create(room=regular_room, user=self.other_user)
+        RoomPin.objects.create(room=pinned_room, user=self.other_user)
+        RoomPin.objects.create(room=regular_room, user=self.request_user)
 
         response = self._list({"email": self.other_user.email, "limit": 10})
 
