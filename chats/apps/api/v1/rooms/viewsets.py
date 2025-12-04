@@ -171,6 +171,13 @@ class RoomViewset(
             return ListRoomSerializer
         return super().get_serializer_class()
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["disable_has_history"] = getattr(
+            self, "disable_has_history", False
+        )
+        return context
+
     def list(self, request, *args, **kwargs):
         qs = self.get_queryset()
         project = request.query_params.get("project")
@@ -180,6 +187,8 @@ class RoomViewset(
             is_active = is_active.lower() == "true"
 
         room_status = request.query_params.get("room_status", None)
+
+        self.disable_has_history = False
 
         if (
             not project
@@ -200,6 +209,12 @@ class RoomViewset(
                     request.user,
                     project_instance,
                 )
+                if is_feature_active(
+                    settings.WENI_CHATS_DISABLE_HAS_HISTORY_FLAG_KEY,
+                    request.user,
+                    project_instance,
+                ):
+                    self.disable_has_history = True
 
         if use_pins_optimization:
             return self._list_with_optimized_pin_order(qs, request, project)
