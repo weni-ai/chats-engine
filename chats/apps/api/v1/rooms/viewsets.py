@@ -205,11 +205,19 @@ class RoomViewset(
         pin_subquery = annotation_pins_queryset.filter(room=OuterRef("pk")).order_by(
             "-created_on"
         )
+        target_pin_subquery = target_pins_queryset.filter(room=OuterRef("pk")).order_by(
+            "-created_on"
+        )
 
         annotated_qs = qs.annotate(
             is_pinned=Exists(pin_subquery),
             pin_created_on=Subquery(
                 pin_subquery.values("created_on")[:1],
+                output_field=DateTimeField(),
+            ),
+            list_is_pinned=Exists(target_pin_subquery),
+            list_pin_created_on=Subquery(
+                target_pin_subquery.values("created_on")[:1],
                 output_field=DateTimeField(),
             ),
         )
@@ -228,10 +236,10 @@ class RoomViewset(
 
         if secondary_sort:
             combined_qs = combined_qs.order_by(
-                "-is_pinned", "-pin_created_on", *secondary_sort
+                "-list_is_pinned", "-list_pin_created_on", *secondary_sort
             )
         else:
-            combined_qs = combined_qs.order_by("-is_pinned", "-pin_created_on")
+            combined_qs = combined_qs.order_by("-list_is_pinned", "-list_pin_created_on")
 
         return self._get_paginated_response(combined_qs)
 
