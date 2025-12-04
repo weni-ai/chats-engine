@@ -79,14 +79,12 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
         queryset = super().get_queryset()
 
         queryset = queryset.annotate(
-            user_full_name=Concat(
-                F("user__first_name"), Value(" "), F("user__last_name")
-            ),
-            queue_time=ExpressionWrapper(
-                Now() - F("added_to_queue_at"), output_field=fields.DurationField()
-            ),
-            waiting_time=ExpressionWrapper(
-                F("user_assigned_at") - F("added_to_queue_at"),
+            queue_time=Case(
+                When(
+                    added_to_queue_at__isnull=False,
+                    then=Now() - F("added_to_queue_at"),
+                ),
+                default=Value(timedelta(0)),
                 output_field=fields.DurationField(),
             ),
             waiting_time=Case(
