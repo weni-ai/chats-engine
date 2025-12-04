@@ -76,8 +76,8 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
 
-        queryset = queryset.annotate(
-            queue_time=Case(
+        annotations = {
+            "queue_time": Case(
                 When(
                     added_to_queue_at__isnull=False,
                     then=Now() - F("added_to_queue_at"),
@@ -85,7 +85,7 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
                 default=Value(timedelta(0)),
                 output_field=fields.DurationField(),
             ),
-            waiting_time=Case(
+            "waiting_time": Case(
                 When(
                     added_to_queue_at__isnull=False,
                     user_assigned_at__isnull=False,
@@ -94,7 +94,7 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
                 default=Value(timedelta(0)),
                 output_field=fields.DurationField(),
             ),
-            duration=Case(
+            "duration": Case(
                 When(
                     is_active=True,
                     user__isnull=False,
@@ -110,7 +110,7 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
                 default=Value(timedelta(0)),
                 output_field=fields.DurationField(),
             ),
-            first_response_time=Case(
+            "first_response_time": Case(
                 When(
                     metric__first_response_time__gt=0,
                     then=F("metric__first_response_time"),
@@ -124,7 +124,9 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
                 default=Value(0),
                 output_field=IntegerField(),
             ),
-        )
+        }
+
+        queryset = queryset.annotate(**annotations)
 
         return queryset.filter(queue__is_deleted=False, queue__sector__is_deleted=False)
 
