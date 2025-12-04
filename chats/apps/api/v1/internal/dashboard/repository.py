@@ -144,12 +144,17 @@ class AgentRepository:
         if not filters.is_weni_admin:
             agents_query = agents_query.exclude(get_admin_domains_exclude_filter())
 
+        if filters.agent:
+            agents_query = agents_query.filter(email=filters.agent)
+
+        custom_status_start_date = filters.start_date or initial_datetime
+        custom_status_end_date = filters.end_date or timezone.now()
+
         custom_status_subquery = Subquery(
             CustomStatus.objects.filter(
                 user=OuterRef("email"),
                 status_type__project=project,
-                created_on__gte=custom_status_start,
-                created_on__lte=custom_status_end,
+                created_on__range=[custom_status_start_date, custom_status_end_date],
             )
             .values("user")
             .annotate(
