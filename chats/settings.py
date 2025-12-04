@@ -566,7 +566,7 @@ AUTOMATIC_MESSAGE_CHECK_TICKET_ON_ROOM_CREATE = env.bool(
 )
 WENI_CHATS_PIN_ROOMS_OPTIMIZATION_FLAG_KEY = env.str(
     "WENI_CHATS_PIN_ROOMS_OPTIMIZATION_FLAG_KEY",
-    default="weniChatsPinRoomsOtimization",
+    default="weniChatsPinRoomsOptimization",
 )
 
 
