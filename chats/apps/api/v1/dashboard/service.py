@@ -208,7 +208,11 @@ class TimeMetricsService:
                 first_user_assigned_at__isnull=False,
                 queue__is_deleted=False,
                 queue__sector__is_deleted=False,
-            ).filter(Q(metric__isnull=True) | Q(metric__first_response_time=0))
+            ).filter(
+                Q(metric__isnull=True)
+                | Q(metric__first_response_time=0)
+                | Q(metric__first_response_time__isnull=True)
+            )
 
             if filters.sector:
                 rooms_waiting_response = rooms_waiting_response.filter(
@@ -228,15 +232,6 @@ class TimeMetricsService:
                 )
 
             for room in rooms_waiting_response:
-                has_any_agent_messages = (
-                    room.messages.filter(user__isnull=False)
-                    .exclude(automatic_message__isnull=False)
-                    .exists()
-                )
-
-                if has_any_agent_messages:
-                    continue
-
                 time_waiting = int(
                     (timezone.now() - room.first_user_assigned_at).total_seconds()
                 )
