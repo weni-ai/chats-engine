@@ -84,25 +84,25 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
                 )
 
                 if has_any_agent_messages:
-                    return None
+                    return 0
 
                 return int(
                     (timezone.now() - obj.first_user_assigned_at).total_seconds()
                 )
         except Exception:
             pass
-        return None
+        return 0
 
     def get_waiting_time(self, obj: Room) -> int:
         if not obj.added_to_queue_at or not obj.user_assigned_at:
-            return None
+            return 0
         return int((obj.user_assigned_at - obj.added_to_queue_at).total_seconds())
 
     def get_queue_time(self, obj: Room) -> int:
         if obj.is_active and not obj.user:
             queue_start = obj.added_to_queue_at
             return int((timezone.now() - queue_start).total_seconds())
-        return None
+        return 0
 
     def get_csat_rating(self, obj: Room) -> int:
         csat_survey: Optional[CSATSurvey] = getattr(obj, "csat_survey", None)
