@@ -244,13 +244,25 @@ class TimeMetricsService:
 
             print("[get_time_metrics] All rooms_with_saved_response:")
 
+            index = 0
+
             for room in rooms_with_saved_response:
                 print("[get_time_metrics] room user: ", room.user)
+                print(
+                    "[get_time_metrics] response time metric: ",
+                    first_response_times[index],
+                )
+                index += 1
 
             print("[get_time_metrics] All rooms_waiting_response:")
 
             for room in rooms_waiting_response:
                 print("[get_time_metrics] room user: ", room.user)
+                print(
+                    "[get_time_metrics] response time metric: ",
+                    first_response_times[index],
+                )
+                index += 1
 
         except Exception:
             pass
