@@ -228,15 +228,6 @@ class TimeMetricsService:
                 )
 
             for room in rooms_waiting_response:
-                has_any_agent_messages = (
-                    room.messages.filter(user__isnull=False)
-                    .exclude(automatic_message__isnull=False)
-                    .exists()
-                )
-
-                if has_any_agent_messages:
-                    continue
-
                 time_waiting = int(
                     (timezone.now() - room.first_user_assigned_at).total_seconds()
                 )

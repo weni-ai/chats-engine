@@ -14,7 +14,6 @@ from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.mixins import ListModelMixin
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.filters import SearchFilter, OrderingFilter
-from django.db.models import Count, ExpressionWrapper
 
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.api.v1.internal.rooms.serializers import (
@@ -111,14 +110,6 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
                 default=Value(timedelta(0)),
                 output_field=fields.DurationField(),
             ),
-            has_any_agent_messages=ExpressionWrapper(
-                Count(
-                    "messages",
-                    filter=Q(messages__user__isnull=False)
-                    & Q(messages__automatic_message__isnull=True),
-                ),
-                output_field=IntegerField(),
-            ),
             first_response_time=Case(
                 When(
                     metric__first_response_time__gt=0,
@@ -128,7 +119,6 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
                     is_active=True,
                     user__isnull=False,
                     first_user_assigned_at__isnull=False,
-                    has_any_agent_messages__gt=0,
                     then=Extract(Now() - F("first_user_assigned_at"), "epoch"),
                 ),
                 default=Value(0),
