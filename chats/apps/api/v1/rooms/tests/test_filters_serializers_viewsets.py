@@ -122,6 +122,7 @@ class RoomViewsetBulkTransferTests(TestCase):
 
 class RoomViewsetListTests(TestCase):
     def setUp(self):
+        super().setUp()
         self.factory = RequestFactory()
         self.request_user = User.objects.create(email="agent@acme.com")
         self.other_user = User.objects.create(email="other@acme.com")
@@ -138,6 +139,26 @@ class RoomViewsetListTests(TestCase):
         )
         self.view = RoomViewset.as_view({"get": "list"})
         self.contact_counter = 0
+        self.feature_flag_patch = patch(
+            "chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=True
+        )
+        self.feature_flag_eval_patch = patch(
+            "chats.apps.feature_flags.services.FeatureFlagService.evaluate_feature_flag",
+            return_value=True,
+        )
+        self.feature_flag_rules_patch = patch(
+            "chats.apps.feature_flags.services.FeatureFlagService.get_feature_flag_rules",
+            return_value=[],
+        )
+        self.feature_flag_patch.start()
+        self.feature_flag_eval_patch.start()
+        self.feature_flag_rules_patch.start()
+
+    def tearDown(self):
+        self.feature_flag_patch.stop()
+        self.feature_flag_eval_patch.stop()
+        self.feature_flag_rules_patch.stop()
+        super().tearDown()
 
     def _new_contact(self):
         self.contact_counter += 1
@@ -168,8 +189,8 @@ class RoomViewsetListTests(TestCase):
         pinned_room = self._create_room("PINNED", user=self.other_user)
         regular_room = self._create_room("REGULAR", user=self.other_user)
 
-        RoomPin.objects.create(room=pinned_room, user=self.request_user)
-        RoomPin.objects.create(room=regular_room, user=self.other_user)
+        RoomPin.objects.create(room=pinned_room, user=self.other_user)
+        RoomPin.objects.create(room=regular_room, user=self.request_user)
 
         response = self._list({"email": self.other_user.email, "limit": 10})
 
