@@ -188,16 +188,23 @@ class RoomViewset(
             filtered_qs = self.filter_queryset(qs)
             return self._get_paginated_response(filtered_qs)
 
-        pins_queryset = RoomPin.objects.filter(
+        target_pins_queryset = RoomPin.objects.filter(
             room__queue__sector__project=project,
         )
 
         if user_email := request.query_params.get("email"):
-            pins_queryset = pins_queryset.filter(user__email=user_email)
+            target_pins_queryset = target_pins_queryset.filter(user__email=user_email)
         else:
-            pins_queryset = pins_queryset.filter(user=request.user)
+            target_pins_queryset = target_pins_queryset.filter(user=request.user)
 
-        pin_subquery = pins_queryset.filter(room=OuterRef("pk")).order_by("-created_on")
+        annotation_pins_queryset = RoomPin.objects.filter(
+            room__queue__sector__project=project,
+            user=request.user,
+        )
+
+        pin_subquery = annotation_pins_queryset.filter(room=OuterRef("pk")).order_by(
+            "-created_on"
+        )
 
         annotated_qs = qs.annotate(
             is_pinned=Exists(pin_subquery),
@@ -212,8 +219,11 @@ class RoomViewset(
 
         secondary_sort = list(filtered_qs.query.order_by or self.ordering or [])
 
+        pinned_room_subquery = target_pins_queryset.values("room_id")
+
         combined_qs = annotated_qs.filter(
-            Q(pk__in=Subquery(filtered_room_ids)) | Q(is_pinned=True)
+            Q(pk__in=Subquery(filtered_room_ids))
+            | Q(pk__in=Subquery(pinned_room_subquery))
         ).distinct()
 
         if secondary_sort:
