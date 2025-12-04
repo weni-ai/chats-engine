@@ -208,7 +208,11 @@ class TimeMetricsService:
                 first_user_assigned_at__isnull=False,
                 queue__is_deleted=False,
                 queue__sector__is_deleted=False,
-            ).filter(Q(metric__isnull=True) | Q(metric__first_response_time=0))
+            ).filter(
+                Q(metric__isnull=True)
+                | Q(metric__first_response_time=0)
+                | Q(metric__first_response_time__isnull=True)
+            )
 
             if filters.sector:
                 rooms_waiting_response = rooms_waiting_response.filter(
