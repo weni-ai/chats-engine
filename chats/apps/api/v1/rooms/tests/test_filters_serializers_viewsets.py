@@ -122,6 +122,7 @@ class RoomViewsetBulkTransferTests(TestCase):
 
 class RoomViewsetListTests(TestCase):
     def setUp(self):
+        super().setUp()
         self.factory = RequestFactory()
         self.request_user = User.objects.create(email="agent@acme.com")
         self.other_user = User.objects.create(email="other@acme.com")
@@ -138,6 +139,14 @@ class RoomViewsetListTests(TestCase):
         )
         self.view = RoomViewset.as_view({"get": "list"})
         self.contact_counter = 0
+        self.feature_flag_patch = patch(
+            "chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=True
+        )
+        self.feature_flag_patch.start()
+
+    def tearDown(self):
+        self.feature_flag_patch.stop()
+        super().tearDown()
 
     def _new_contact(self):
         self.contact_counter += 1
