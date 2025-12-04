@@ -8,6 +8,7 @@ from django.db.models import (
     Case,
     Count,
     DateTimeField,
+    Exists,
     Max,
     OuterRef,
     Q,
@@ -187,61 +188,42 @@ class RoomViewset(
             filtered_qs = self.filter_queryset(qs)
             return self._get_paginated_response(filtered_qs)
 
-        pins_query = {
-            "room__queue__sector__project": project,
-        }
+        pins_queryset = RoomPin.objects.filter(
+            room__queue__sector__project=project,
+        )
 
         if user_email := request.query_params.get("email"):
-            pins_query["user__email"] = user_email
+            pins_queryset = pins_queryset.filter(user__email=user_email)
         else:
-            pins_query["user"] = request.user
+            pins_queryset = pins_queryset.filter(user=request.user)
 
-        # Get pins for the user within the project
-        pins = RoomPin.objects.filter(**pins_query)
+        pin_subquery = pins_queryset.filter(room=OuterRef("pk")).order_by("-created_on")
 
-        pinned_rooms = Room.objects.filter(
-            pk__in=pins.values_list("room__pk", flat=True)
+        annotated_qs = qs.annotate(
+            is_pinned=Exists(pin_subquery),
+            pin_created_on=Subquery(
+                pin_subquery.values("created_on")[:1],
+                output_field=DateTimeField(),
+            ),
         )
 
-        filtered_qs = self.filter_queryset(qs)
-        room_ids = set(filtered_qs.values_list("pk", flat=True)) | set(
-            pinned_rooms.values_list("pk", flat=True)
-        )
+        filtered_qs = self.filter_queryset(annotated_qs)
+        filtered_room_ids = filtered_qs.values("pk").order_by()
 
         secondary_sort = list(filtered_qs.query.order_by or self.ordering or [])
 
-        # Subquery to get the created_on of the pin for each room (or None)
-        pin_created_on_subquery = (
-            RoomPin.objects.filter(
-                user=request.user,
-                room=OuterRef("pk"),
-                room__queue__sector__project=project,
-            )
-            .order_by("-created_on")
-            .values("created_on")[:1]
-        )
-
-        annotated_qs = qs.filter(pk__in=room_ids).annotate(
-            is_pinned=Case(
-                When(pk__in=pinned_rooms, then=True),
-                default=False,
-                output_field=BooleanField(),
-            ),
-            pin_created_on=Subquery(
-                pin_created_on_subquery, output_field=DateTimeField()
-            ),
-        )
+        combined_qs = annotated_qs.filter(
+            Q(pk__in=Subquery(filtered_room_ids)) | Q(is_pinned=True)
+        ).distinct()
 
         if secondary_sort:
-            # Order pinned rooms first, then by pin_created_on (descending),
-            # then the rest ordered by secondary_sort
-            annotated_qs = annotated_qs.order_by(
+            combined_qs = combined_qs.order_by(
                 "-is_pinned", "-pin_created_on", *secondary_sort
             )
         else:
-            annotated_qs = annotated_qs.order_by("-is_pinned", "-pin_created_on")
+            combined_qs = combined_qs.order_by("-is_pinned", "-pin_created_on")
 
-        return self._get_paginated_response(annotated_qs)
+        return self._get_paginated_response(combined_qs)
 
     def _get_paginated_response(self, queryset):
         page = self.paginate_queryset(queryset)
