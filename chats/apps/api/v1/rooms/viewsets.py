@@ -306,10 +306,10 @@ class RoomViewset(
 
         if secondary_sort:
             combined_qs = combined_qs.order_by(
-                "-list_is_pinned", "-list_pin_created_on", *secondary_sort
+                "-is_pinned", "-pin_created_on", *secondary_sort
             )
         else:
-            combined_qs = combined_qs.order_by("-list_is_pinned", "-list_pin_created_on")
+            combined_qs = combined_qs.order_by("-is_pinned", "-pin_created_on")
 
         return self._get_paginated_response(combined_qs)
 
