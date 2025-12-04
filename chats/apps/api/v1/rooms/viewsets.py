@@ -84,6 +84,7 @@ from chats.apps.rooms.views import (
     update_custom_fields,
     update_flows_custom_fields,
 )
+from chats.apps.feature_flags.utils import is_feature_active
 
 logger = logging.getLogger(__name__)
 
@@ -188,6 +189,75 @@ class RoomViewset(
             filtered_qs = self.filter_queryset(qs)
             return self._get_paginated_response(filtered_qs)
 
+        project_instance = None
+        use_pins_optimization = False
+
+        if project:
+            project_instance = Project.objects.filter(uuid=project).first()
+            if project_instance:
+                use_pins_optimization = is_feature_active(
+                    "weniChatsPinRoomsOtimization", request.user, project_instance
+                )
+
+        if use_pins_optimization:
+            return self._list_with_optimized_pin_order(qs, request, project)
+
+        return self._list_with_legacy_pin_order(qs, request, project)
+
+    def _list_with_legacy_pin_order(self, qs, request, project):
+        pins_query = {
+            "room__queue__sector__project": project,
+        }
+
+        if user_email := request.query_params.get("email"):
+            pins_query["user__email"] = user_email
+        else:
+            pins_query["user"] = request.user
+
+        pins = RoomPin.objects.filter(**pins_query)
+
+        pinned_rooms = Room.objects.filter(
+            pk__in=pins.values_list("room__pk", flat=True)
+        )
+
+        filtered_qs = self.filter_queryset(qs)
+        room_ids = set(filtered_qs.values_list("pk", flat=True)) | set(
+            pinned_rooms.values_list("pk", flat=True)
+        )
+
+        secondary_sort = list(filtered_qs.query.order_by or self.ordering or [])
+
+        pin_created_on_subquery = (
+            RoomPin.objects.filter(
+                user=request.user,
+                room=OuterRef("pk"),
+                room__queue__sector__project=project,
+            )
+            .order_by("-created_on")
+            .values("created_on")[:1]
+        )
+
+        annotated_qs = qs.filter(pk__in=room_ids).annotate(
+            is_pinned=Case(
+                When(pk__in=pinned_rooms, then=True),
+                default=False,
+                output_field=BooleanField(),
+            ),
+            pin_created_on=Subquery(
+                pin_created_on_subquery, output_field=DateTimeField()
+            ),
+        )
+
+        if secondary_sort:
+            annotated_qs = annotated_qs.order_by(
+                "-is_pinned", "-pin_created_on", *secondary_sort
+            )
+        else:
+            annotated_qs = annotated_qs.order_by("-is_pinned", "-pin_created_on")
+
+        return self._get_paginated_response(annotated_qs)
+
+    def _list_with_optimized_pin_order(self, qs, request, project):
         target_pins_queryset = RoomPin.objects.filter(
             room__queue__sector__project=project,
         )
