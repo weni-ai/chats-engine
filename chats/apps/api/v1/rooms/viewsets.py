@@ -196,7 +196,9 @@ class RoomViewset(
             project_instance = Project.objects.filter(uuid=project).first()
             if project_instance:
                 use_pins_optimization = is_feature_active(
-                    "weniChatsPinRoomsOtimization", request.user, project_instance
+                    settings.WENI_CHATS_PIN_ROOMS_OPTIMIZATION_FLAG_KEY,
+                    request.user,
+                    project_instance,
                 )
 
         if use_pins_optimization:
