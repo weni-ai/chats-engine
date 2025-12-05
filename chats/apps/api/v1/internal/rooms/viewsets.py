@@ -6,7 +6,7 @@ from django.db.models import (
     When,
     fields,
 )
-from django.db.models import Q
+from django.db.models import Q, CharField
 from django.db.models.functions import Extract, Now, Concat
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, permissions, viewsets
@@ -79,6 +79,12 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
         queryset = super().get_queryset()
 
         annotations = {
+            "user_full_name": Concat(
+                F("user__first_name"),
+                Value(" "),
+                F("user__last_name"),
+                output_field=CharField(),
+            ),
             "queue_time": Case(
                 When(
                     added_to_queue_at__isnull=False,
