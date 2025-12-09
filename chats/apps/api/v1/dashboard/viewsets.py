@@ -448,10 +448,11 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
 
 
 class ModelFieldsViewSet(APIView):
-    swagger_tag = "Dashboard"
     """
     Endpoint para retornar os campos disponíveis dos principais models do sistema.
     """
+
+    swagger_tag = "Dashboard"
 
     permission_classes = [permissions.IsAuthenticated]
 
@@ -460,10 +461,11 @@ class ModelFieldsViewSet(APIView):
 
 
 class ReportFieldsValidatorViewSet(APIView):
-    swagger_tag = "Dashboard"
     """
     Endpoint to validate fields and generate rooms report.
     """
+
+    swagger_tag = "Dashboard"
 
     permission_classes = [permissions.IsAuthenticated]
 

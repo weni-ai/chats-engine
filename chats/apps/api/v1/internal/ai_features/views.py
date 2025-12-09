@@ -1,9 +1,9 @@
-from rest_framework.views import APIView
+from django.db.models import Max, OuterRef, Subquery
+from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.request import Request
 from rest_framework.response import Response
-from rest_framework import status
-from django.db.models import Max, OuterRef, Subquery
+from rest_framework.views import APIView
 
 from chats.apps.ai_features.models import FeaturePrompt
 from chats.apps.api.v1.internal.ai_features.auth.classes import AIFeaturesAuthentication
@@ -14,10 +14,11 @@ from chats.apps.api.v1.internal.ai_features.serializers import (
 
 
 class FeaturePromptsView(APIView):
-    swagger_tag = "AI Features"
     """
     API view to create a new feature prompt.
     """
+
+    swagger_tag = "AI Features"
 
     authentication_classes = [AIFeaturesAuthentication]
     permission_classes = [AllowAny]

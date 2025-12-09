@@ -13,6 +13,7 @@ from chats.apps.api.v1.internal.users.serializers import (
 
 class UserViewSet(ViewSet):
     swagger_tag = "Users"
+
     def get_serializer(self, *args, **kwargs):
         return BasicUserSerializer()
 
