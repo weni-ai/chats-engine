@@ -1,6 +1,6 @@
 import uuid
 from datetime import time
-from unittest.mock import patch
+from unittest.mock import patch, PropertyMock
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -1670,7 +1670,7 @@ class TestRemoveRoomTagAuthenticatedUser(BaseTestRemoveRoomTag):
 
 class BaseTestCanSendMessageStatus(APITestCase):
     def get_can_send_message_status(self, room_pk: str) -> Response:
-        url = reverse("can-send-message-status", kwargs={"pk": room_pk})
+        url = reverse("room-can-send-message-status", kwargs={"pk": room_pk})
 
         return self.client.get(url)
 
@@ -1703,14 +1703,33 @@ class TestCanSendMessageStatusAuthenticatedUser(BaseTestCanSendMessageStatus):
         self.room = Room.objects.create(
             queue=self.queue,
             user=self.user,
+            urn="whatsapp:1234567890",
         )
+
+        self.client.force_authenticate(user=self.user)
 
     def test_get_can_send_message_status_without_project_permission(self):
         response = self.get_can_send_message_status(self.room.uuid)
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
+    @patch("chats.apps.rooms.models.Room.is_24h_valid", new_callable=PropertyMock)
     @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
-    def test_get_can_send_message_status_with_project_permission(self):
+    def test_get_can_send_message_status_with_project_permission_when_true(
+        self, mock_is_24h_valid
+    ):
+        mock_is_24h_valid.return_value = True
         response = self.get_can_send_message_status(self.room.uuid)
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["can_send_message"], True)
+
+    @patch("chats.apps.rooms.models.Room.is_24h_valid", new_callable=PropertyMock)
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
+    def test_get_can_send_message_status_with_project_permission_when_false(
+        self, mock_is_24h_valid
+    ):
+        mock_is_24h_valid.return_value = False
+        response = self.get_can_send_message_status(self.room.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["can_send_message"], False)

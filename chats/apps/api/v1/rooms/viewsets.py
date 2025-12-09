@@ -132,7 +132,11 @@ class RoomViewset(
     ):  # TODO: sparate list and retrieve queries from update and close
         if self.action != "list":
             self.filterset_class = None
-        qs = super().get_queryset()
+        qs = (
+            super()
+            .get_queryset()
+            .filter(queue__sector__project__permissions__user=self.request.user)
+        )
 
         last_24h = timezone.now() - timedelta(days=1)
 
@@ -1160,6 +1164,7 @@ class RoomViewset(
         detail=True,
         methods=["get"],
         url_path="can-send-message-status",
+        url_name="can-send-message-status",
     )
     def can_send_message_status(self, request, pk=None):
         """
