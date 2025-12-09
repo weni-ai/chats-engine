@@ -14,6 +14,24 @@ from chats.core.requests import get_request_session_with_retries
 logger = logging.getLogger(__name__)
 
 
+def message_media_upload_to(instance, filename):
+    """
+    Generate unique file path for MessageMedia uploads using UUID.
+    This prevents file name collisions when multiple messages are sent
+    in the same second with the same original filename.
+    
+    Args:
+        instance: MessageMedia instance
+        filename: Original filename from upload
+        
+    Returns:
+        str: Unique file path in format: messagemedia/{uuid}{extension}
+    """
+    from pathlib import Path
+    ext = Path(filename).suffix.lower()
+    return f"messagemedia/{instance.uuid}{ext}"
+
+
 class Message(BaseModelWithManualCreatedOn):
     room = models.ForeignKey(
         "rooms.Room",
@@ -194,6 +212,7 @@ class MessageMedia(BaseModelWithManualCreatedOn):
         null=True,
         blank=True,
         max_length=300,
+        upload_to=message_media_upload_to,
     )
     media_url = models.TextField(_("Media url"), null=True, blank=True)
 
