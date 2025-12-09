@@ -173,9 +173,7 @@ class RoomViewset(
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        context["disable_has_history"] = getattr(
-            self, "disable_has_history", False
-        )
+        context["disable_has_history"] = getattr(self, "disable_has_history", False)
         return context
 
     def list(self, request, *args, **kwargs):
@@ -1157,6 +1155,22 @@ class RoomViewset(
 
         # Return serialized note
         return Response(RoomNoteSerializer(note).data, status=status.HTTP_201_CREATED)
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="can-send-message-status",
+    )
+    def can_send_message_status(self, request, pk=None):
+        """
+        Check if the user can send a message to the room
+        """
+
+        room: Room = self.get_object()
+
+        response = {"can_send_message": room.is_24h_valid}
+
+        return Response(response, status=status.HTTP_200_OK)
 
 
 class RoomsReportViewSet(APIView):

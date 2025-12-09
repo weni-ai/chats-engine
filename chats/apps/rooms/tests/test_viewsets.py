@@ -1666,3 +1666,51 @@ class TestRemoveRoomTagAuthenticatedUser(BaseTestRemoveRoomTag):
 
         response = self.remove_room_tag(self.room.uuid, {"uuid": self.tags[0].uuid})
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class BaseTestCanSendMessageStatus(APITestCase):
+    def get_can_send_message_status(self, room_pk: str) -> Response:
+        url = reverse("can-send-message-status", kwargs={"pk": room_pk})
+
+        return self.client.get(url)
+
+
+class TestCanSendMessageStatusAnonymousUser(BaseTestCanSendMessageStatus):
+    def test_cannot_get_can_send_message_status_when_user_is_not_authenticated(self):
+        response = self.get_can_send_message_status(uuid.uuid4())
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class TestCanSendMessageStatusAuthenticatedUser(BaseTestCanSendMessageStatus):
+    def setUp(self):
+        self.project = Project.objects.create(
+            name="Test Project",
+        )
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=1,
+            work_start=time(hour=5, minute=0),
+            work_end=time(hour=23, minute=59),
+        )
+        self.queue = Queue.objects.create(
+            name="Test Queue",
+            sector=self.sector,
+        )
+        self.user = User.objects.create(
+            email="test_user_1@example.com",
+        )
+        self.room = Room.objects.create(
+            queue=self.queue,
+            user=self.user,
+        )
+
+    def test_get_can_send_message_status_without_project_permission(self):
+        response = self.get_can_send_message_status(self.room.uuid)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
+    def test_get_can_send_message_status_with_project_permission(self):
+        response = self.get_can_send_message_status(self.room.uuid)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["can_send_message"], True)
