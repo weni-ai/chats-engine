@@ -6,8 +6,6 @@ from django.db.models import CharField, Value
 from django.db.models.functions import Concat
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
-from drf_yasg import openapi
-from drf_yasg.utils import swagger_auto_schema
 from rest_framework import decorators, filters, mixins, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import LimitOffsetPagination
@@ -71,6 +69,7 @@ class ProjectViewset(
     mixins.UpdateModelMixin,
     GenericViewSet,
 ):
+    swagger_tag = "Projects"
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
     permission_classes = [
@@ -87,17 +86,14 @@ class ProjectViewset(
         # Allow only projects where the user has access
         return super().get_queryset().filter(permissions__user=self.request.user)
 
-    @swagger_auto_schema(
-        manual_parameters=[
-            openapi.Parameter(
-                "contact",
-                openapi.IN_QUERY,
-                description="Contact's UUID",
-                type=openapi.TYPE_STRING,
-                format="uuid",
-            )
-        ]
-    )
+    def list(self, request, *args, **kwargs):
+        """List every project the authenticated user can access."""
+        return super().list(request, *args, **kwargs)
+
+    def retrieve(self, request, *args, **kwargs):
+        """Return the metadata and config for a single project."""
+        return super().retrieve(request, *args, **kwargs)
+
     @action(
         detail=True,
         methods=["GET"],
@@ -105,6 +101,7 @@ class ProjectViewset(
         serializer_class=LinkContactSerializer,
     )
     def retrieve_linked_contact(self, request, *args, **kwargs):
+        """Fetch the agent currently linked to the provided contact UUID."""
         project = self.get_object()
         try:
             contactuser = project.linked_contacts.get(contact=request.GET["contact"])
@@ -117,17 +114,6 @@ class ProjectViewset(
 
         return Response(data, status.HTTP_200_OK)
 
-    @swagger_auto_schema(
-        methods=["post"],
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            required=["contact"],
-            properties={
-                "contact": openapi.Schema(type=openapi.TYPE_STRING, format="uuid")
-            },
-        ),
-        operation_description="contact's uuid",
-    )
     @action(
         detail=True,
         methods=["POST"],
@@ -135,6 +121,7 @@ class ProjectViewset(
         serializer_class=LinkContactSerializer,
     )
     def create_linked_contact(self, request, *args, **kwargs):
+        """Link the authenticated agent to the provided contact."""
         project = self.get_object()
         contact = Contact.objects.get(pk=request.data["contact"])
 
@@ -149,19 +136,9 @@ class ProjectViewset(
             return Response(serializer.data, status.HTTP_201_CREATED)
         return Response(serializer.data, status.HTTP_200_OK)
 
-    @swagger_auto_schema(
-        manual_parameters=[
-            openapi.Parameter(
-                "contact",
-                openapi.IN_QUERY,
-                description="Contact's UUID",
-                type=openapi.TYPE_STRING,
-                format="uuid",
-            )
-        ]
-    )
     @action(detail=True, methods=["DELETE"], url_name="delete_linked_contact")
     def delete_linked_contact(self, request, *args, **kwargs):
+        """Remove the relation between the project and the provided contact UUID."""
         project = self.get_object()
         try:
             contactuser = project.linked_contacts.get(contact=request.GET["contact"])
@@ -176,9 +153,9 @@ class ProjectViewset(
 
         return Response({"deleted": True}, status.HTTP_200_OK)
 
-    @swagger_auto_schema(deprecated=True)
     @action(detail=True, methods=["GET"], url_name="can_trigger_flows")
     def can_trigger_flows(self, request, *args, **kwargs):
+        """(Deprecated) Tell whether the user can trigger flows in this project."""
         project = self.get_object()
         can_trigger_flows = project.get_sectors(
             user=request.user, custom_filters={"can_trigger_flows": True}
@@ -188,6 +165,7 @@ class ProjectViewset(
 
     @action(detail=True, methods=["GET"], url_name="list_access")
     def list_access(self, request, *args, **kwargs):
+        """Return feature flags describing what the requester can do in this project."""
         project = self.get_object()
         context = {}
         context["can_trigger_flows"] = project.get_sectors(
@@ -202,6 +180,7 @@ class ProjectViewset(
 
     @action(detail=True, methods=["GET"], url_name="contacts")
     def list_contacts(self, request, *args, **kwargs):
+        """Return the contact catalog from Weni Flows, respecting cursor pagination."""
         project = self.get_object()
         cursor = request.query_params.get("cursor", "")
         contact_list = FlowRESTClient().list_contacts(
@@ -212,6 +191,7 @@ class ProjectViewset(
 
     @action(detail=True, methods=["POST"], url_name="create_contact")
     def create_contacts(self, request, *args, **kwargs):
+        """Create a new contact upstream after validating the payload locally."""
         project = self.get_object()
         serializer = ProjectFlowContactSerializer(data=request.data)
         if serializer.is_valid() is False:
@@ -239,6 +219,7 @@ class ProjectViewset(
 
     @action(detail=True, methods=["PUT"], url_name="edit_contact")
     def edit_contact(self, request, *args, **kwargs):
+        """Update an existing contact in Weni Flows using the provided payload."""
         project = self.get_object()
         serializer = ProjectFlowContactSerializer(data=request.data)
         flows_client = FlowRESTClient()
@@ -266,6 +247,7 @@ class ProjectViewset(
 
     @action(detail=True, methods=["GET"], url_name="groups")
     def list_groups(self, request, *args, **kwargs):
+        """Return the Flow groups available to the project."""
         project = self.get_object()
         cursor = request.query_params.get("cursor", "")
 
@@ -277,6 +259,7 @@ class ProjectViewset(
 
     @action(detail=True, methods=["GET"], url_name="flows")
     def list_flows(self, request, *args, **kwargs):
+        """Return the Flow catalog for this project."""
         project = self.get_object()
         cursor = request.query_params.get("cursor", "")
 
@@ -286,6 +269,7 @@ class ProjectViewset(
 
     @action(detail=True, methods=["GET"], url_name="flows")
     def retrieve_flow_definitions(self, request, *args, **kwargs):
+        """Return the raw definition of the selected Flow UUID."""
         project = self.get_object()
         flow_uuid = request.query_params.get("flow", "")
 
@@ -321,6 +305,7 @@ class ProjectViewset(
     )
     @transaction.atomic  # revert room update if the flows request fails
     def start_flow(self, request, *args, **kwargs):
+        """Trigger a Flow for the provided contacts/groups."""
         project = self.get_object()
         serializer = ProjectFlowStartSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -380,6 +365,7 @@ class ProjectViewset(
 
     @action(detail=False, methods=["GET"], url_name="verify-flow-start")
     def retrieve_flow_warning(self, request, *args, **kwargs):
+        """Tell whether the contact already has an active room and who is handling it."""
         flows_start_verify = {}
         flows_start_verify["show_warning"] = False
 
@@ -430,6 +416,7 @@ class ProjectViewset(
         url_name="list-flows-start",
     )
     def list_flows_start(self, request, *args, **kwargs):
+        """Return the history of Flow starts initiated for this project."""
         project = self.get_object()
         permission = project.permissions.get(user=request.user)
         flow_starts_query = project.flowstarts.exclude(contact_data={}).order_by(
@@ -461,6 +448,7 @@ class ProjectViewset(
         url_name="list-sectors",
     )
     def list_discussion_sector(self, request, *args, **kwargs):
+        """Return the sectors that can host discussions within the project."""
         project = self.get_object()
         queryset = Sector.objects.filter(project=project)
 
@@ -477,6 +465,7 @@ class ProjectViewset(
         url_name="list-users",
     )
     def list_users(self, request, *args, **kwargs):
+        """Return the agents and managers assigned to this project."""
         project = self.get_object()
         queryset = project.permissions.all()
 
@@ -488,6 +477,7 @@ class ProjectViewset(
         return paginator.get_paginated_response(serializer.data)
 
     def partial_update(self, request, uuid=None):
+        """Partially update project metadata (used to merge config safely)."""
         project = self.get_object()
 
         serializer = UpdateProjectSerializer(
@@ -504,6 +494,7 @@ class ProjectViewset(
         url_path="set-project-principal",
     )
     def set_project_as_principal(self, request, *args, **kwargs):
+        """Mark this project as principal and unset the flag for the rest of the org."""
         project = self.get_object()
 
         config = project.config or {}
@@ -523,6 +514,7 @@ class ProjectViewset(
 
     @action(detail=False, methods=["POST"], url_name="integrate_sectors")
     def integrate_sectors(self, request, *args, **kwargs):
+        """Trigger ticketer/topic integration for the provided project UUID."""
         try:
             project_uuid = request.query_params.get("project")
 
@@ -545,6 +537,7 @@ class ProjectViewset(
 
 
 class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
+    swagger_tag = "Projects"
     queryset = (
         ProjectPermission.objects.all()
         .annotate(
@@ -573,8 +566,17 @@ class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
             permission_classes = (IsAuthenticated, IsProjectAdmin)
         return [permission() for permission in permission_classes]
 
+    def list(self, request, *args, **kwargs):
+        """List project permissions filtered by project, status, role or sector."""
+        return super().list(request, *args, **kwargs)
+
+    def retrieve(self, request, *args, **kwargs):
+        """Return the details of a single project permission."""
+        return super().retrieve(request, *args, **kwargs)
+
     @action(detail=False, methods=["GET"], url_name="verify_access")
     def verify_access(self, request, *args, **kwargs):
+        """Return the permission data for the current user in the provided project."""
         try:
             instance = ProjectPermission.objects.get(
                 user=request.user, project=request.query_params["project"]
@@ -589,6 +591,7 @@ class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=False, methods=["PUT", "PATCH"], url_name="update_access")
     def update_access(self, request, *args, **kwargs):
+        """Mark the user's first access as completed for the provided project."""
         try:
             instance = ProjectPermission.objects.get(
                 user=request.user, project=request.query_params["project"]
@@ -606,6 +609,7 @@ class ProjectPermissionViewset(viewsets.ReadOnlyModelViewSet):
 
 
 class CustomStatusTypeViewSet(viewsets.ModelViewSet):
+    swagger_tag = "Custom Status"
     queryset = CustomStatusType.objects.all()
     serializer_class = CustomStatusTypeSerializer
     permission_classes = [
@@ -666,6 +670,7 @@ class CustomStatusTypeViewSet(viewsets.ModelViewSet):
 
 
 class CustomStatusViewSet(viewsets.ModelViewSet):
+    swagger_tag = "Custom Status"
     queryset = CustomStatus.objects.all()
     serializer_class = CustomStatusSerializer
     permission_classes = [

@@ -93,6 +93,7 @@ def add_user_or_queue_to_room(instance: Room, request):
 
 
 class RoomFlowViewSet(viewsets.ModelViewSet):
+    swagger_tag = "Integrations"
     model = Room
     queryset = Room.objects.all()
     serializer_class = RoomFlowSerializer
@@ -290,6 +291,7 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
 
 
 class RoomUserExternalViewSet(viewsets.ViewSet):
+    swagger_tag = "Integrations"
     serializer_class = RoomFlowSerializer
     permission_classes = [
         IsAdminPermission,
@@ -379,6 +381,7 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
 
 
 class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
+    swagger_tag = "Integrations"
     serializer_class = RoomFlowSerializer
     authentication_classes = [ProjectAdminAuthentication]
     throttle_classes = [
@@ -440,6 +443,7 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
 
 
 class ExternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
+    swagger_tag = "Integrations"
     model = Room
     queryset = Room.objects
     serializer_class = RoomListSerializer
@@ -487,6 +491,7 @@ class ExternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class ExternalListWithPaginationRoomsViewSet(viewsets.ReadOnlyModelViewSet):
+    swagger_tag = "Integrations"
     model = Room
     queryset = Room.objects
     serializer_class = RoomListSerializer
@@ -570,6 +575,7 @@ class ExternalListWithPaginationRoomsViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class RoomMetricsViewSet(viewsets.ReadOnlyModelViewSet):
+    swagger_tag = "Integrations"
     model = Room
     queryset = Room.objects.select_related("user").prefetch_related("messages", "tags")
     serializer_class = RoomMetricsSerializer

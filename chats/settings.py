@@ -364,6 +364,38 @@ SWAGGER_SETTINGS = {
     "SECURITY_DEFINITIONS": {
         "api_key": {"type": "apiKey", "name": "Authorization", "in": "header"}
     },
+    "DEFAULT_AUTO_SCHEMA_CLASS": "chats.apps.api.swagger.TaggedSwaggerAutoSchema",
+    "DOC_EXPANSION": "list",
+    "DEFAULT_MODEL_RENDERING": "model",
+    "DISPLAY_OPERATION_ID": True,
+    "PERSIST_AUTHORIZATION": True,
+    "REFETCH_SCHEMA_WITH_AUTH": True,
+    "OPERATIONS_SORTER": "method",
+    "TAGS_SORTER": "alpha",
+    "SHOW_EXTENSIONS": True,
+    "VALIDATOR_URL": None,
+    "TAGS": [
+        {"name": "Authentication", "description": "Login and token workflow."},
+        {"name": "Users", "description": "User profile and preferences."},
+        {"name": "Projects", "description": "Projects, permissions and metadata."},
+        {"name": "Rooms", "description": "Chat rooms lifecycle and transfers."},
+        {"name": "Queues", "description": "Routing queues and authorizations."},
+        {"name": "Messages", "description": "Messages, history and media."},
+        {"name": "Dashboard", "description": "Real-time dashboards and metrics."},
+        {"name": "Sectors", "description": "Sectors, tags and authorizations."},
+        {"name": "Groups", "description": "Group-to-sector relationships."},
+        {"name": "Contacts", "description": "Contacts sourced from CRM."},
+        {"name": "Quick Messages", "description": "Reusable canned responses."},
+        {"name": "Integrations", "description": "External flows and connectors."},
+        {"name": "Custom Status", "description": "Custom status types and tracking."},
+        {"name": "Feature Flags", "description": "Experiments and Growthbook hooks."},
+        {"name": "Feedback", "description": "End-user satisfaction feedback."},
+        {"name": "Organizations", "description": "Organization level project access."},
+        {"name": "AI Features", "description": "Prompt templates and AI automations."},
+        {"name": "Agents", "description": "Agent administration workflows."},
+        {"name": "Discussions", "description": "Discussion threads and moderation."},
+        {"name": "History", "description": "Closed-room history retrieval."},
+    ],
 }
 
 # CORS CONFIG

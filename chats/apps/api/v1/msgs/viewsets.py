@@ -28,6 +28,7 @@ class MessageViewset(
     mixins.UpdateModelMixin,
     viewsets.GenericViewSet,
 ):
+    swagger_tag = "Messages"
     queryset = ChatMessage.objects.select_related(
         "room", "user", "contact", "internal_note", "internal_note__user"
     ).prefetch_related("medias")
@@ -120,6 +121,7 @@ class MessageViewset(
 class MessageMediaViewset(
     mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
 ):
+    swagger_tag = "Messages"
     queryset = MessageMedia.objects.all()
     serializer_class = MessageMediaSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]

@@ -32,7 +32,7 @@ class MessageMediaSimpleSerializer(serializers.ModelSerializer):
             "url",
             "created_on",
         ]
-
+        ref_name = "V1MessageMediaSimpleSerializer"
         extra_kwargs = {
             "media_file": {"write_only": True},
             "message": {"read_only": True, "required": False},

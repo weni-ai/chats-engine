@@ -38,6 +38,7 @@ class MessageMediaSimpleSerializer(serializers.ModelSerializer):
             "url",
             "created_on",
         ]
+        ref_name = "V2MessageMediaSimpleSerializer"
 
     def get_url(self, media: MessageMedia):
         return media.url

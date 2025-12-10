@@ -14,6 +14,7 @@ from chats.apps.api.v1.internal.agents.utils import validate_agent_disconnect
 
 
 class AgentDisconnectView(APIView):
+    swagger_tag = "Agents"
     permission_classes = [permissions.IsAuthenticated, ProjectBodyIsAdmin]
 
     def post(self, request):

@@ -34,6 +34,7 @@ User = get_user_model()
 
 
 class QueueViewset(ModelViewSet):
+    swagger_tag = "Queues"
     queryset = Queue.objects.all()
     serializer_class = queue_serializers.QueueSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
@@ -248,6 +249,7 @@ class QueueViewset(ModelViewSet):
 
 
 class QueueAuthorizationViewset(ModelViewSet):
+    swagger_tag = "Queues"
     queryset = QueueAuthorization.objects.all()
     serializer_class = queue_serializers.QueueAuthorizationSerializer
     filter_backends = [DjangoFilterBackend]

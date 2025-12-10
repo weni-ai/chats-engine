@@ -21,6 +21,7 @@ from chats.apps.core.filters import get_filters_from_query_params
 
 
 class InternalDashboardViewset(viewsets.GenericViewSet):
+    swagger_tag = "Dashboard"
     lookup_field = "uuid"
     queryset = Project.objects.all()
     serializer_class = DashboardAgentsSerializer
