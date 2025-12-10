@@ -1,8 +1,6 @@
 from typing import List
 
-import pendulum
-import pytz
-from django.db.models import Q, Max, Avg
+from django.db.models import Avg, Max, Q
 from django.utils import timezone
 
 from chats.apps.api.utils import create_room_dto
@@ -108,44 +106,50 @@ class RoomsDataService:
 
 
 class TimeMetricsService:
-    def get_time_metrics(self, filters: Filters, project):
-        tz = pytz.timezone(str(project.timezone))
-        rooms_filter = Q(queue__sector__project=project)
+    def _normalize_to_list(self, value):
+        """Ensure value is a list."""
+        if value is None:
+            return None
+        return value if isinstance(value, list) else [value]
 
-        if filters.start_date and filters.end_date:
-            start_time = pendulum.parse(filters.start_date).replace(tzinfo=tz)
-            end_time = pendulum.parse(filters.end_date + " 23:59:59").replace(tzinfo=tz)
-            rooms_filter &= Q(created_on__range=[start_time, end_time])
-        else:
-            initial_datetime = (
-                timezone.now()
-                .astimezone(tz)
-                .replace(hour=0, minute=0, second=0, microsecond=0)
-            )
-            rooms_filter &= Q(created_on__gte=initial_datetime)
-
-        if filters.agent:
-            rooms_filter &= Q(user=filters.agent)
-
+    def _apply_room_filters(self, queryset, filters: Filters):
+        """Apply common filters to a queryset."""
         if filters.sector:
-            if not isinstance(filters.sector, list):
-                filters.sector = [filters.sector]
-            rooms_filter &= Q(queue__sector__in=filters.sector)
+            queryset = queryset.filter(queue__sector__in=filters.sector)
             if filters.tag:
-                rooms_filter &= Q(tags__uuid=filters.tag)
-
+                queryset = queryset.filter(tags__uuid__in=filters.tag)
         if filters.queue:
-            if not isinstance(filters.queue, list):
-                filters.queue = [filters.queue]
-            rooms_filter &= Q(queue__uuid__in=filters.queue)
+            queryset = queryset.filter(queue__uuid__in=filters.queue)
+        if filters.agent:
+            queryset = queryset.filter(user=filters.agent)
+        return queryset
 
+    def _apply_q_filters(self, base_filter: Q, filters: Filters) -> Q:
+        """Apply common Q filters."""
+        if filters.sector:
+            base_filter &= Q(queue__sector__in=filters.sector)
+            if filters.tag:
+                base_filter &= Q(tags__uuid__in=filters.tag)
+        if filters.queue:
+            base_filter &= Q(queue__uuid__in=filters.queue)
+        if filters.agent:
+            base_filter &= Q(user=filters.agent)
+        return base_filter
+
+    def _calculate_avg_max(self, values: list) -> tuple:
+        """Calculate average and maximum from a list of values."""
+        if not values:
+            return 0, 0
+        return int(sum(values) / len(values)), int(max(values))
+
+    def _get_waiting_time_metrics(self, filters: Filters, project) -> tuple:
+        """Calculate waiting time metrics for rooms in queue."""
         waiting_filter = Q(
             queue__sector__project=project,
             is_active=True,
             user__isnull=True,
             added_to_queue_at__isnull=False,
         )
-
         if filters.sector:
             waiting_filter &= Q(queue__sector__in=filters.sector)
             if filters.tag:
@@ -154,21 +158,15 @@ class TimeMetricsService:
             waiting_filter &= Q(queue__uuid__in=filters.queue)
 
         active_rooms_in_queue = Room.objects.filter(waiting_filter)
+        waiting_times = [
+            calculate_last_queue_waiting_time(room) for room in active_rooms_in_queue
+        ]
+        return self._calculate_avg_max(waiting_times)
 
-        waiting_times = []
-        for room in active_rooms_in_queue:
-            waiting_time = calculate_last_queue_waiting_time(room)
-            waiting_times.append(waiting_time)
-
-        avg_waiting_time = (
-            int(sum(waiting_times) / len(waiting_times)) if waiting_times else 0
-        )
-        max_waiting_time = int(max(waiting_times)) if waiting_times else 0
-
-        first_response_times = []
-
+    def _get_saved_response_times(self, filters: Filters, project) -> list:
+        """Get first response times from rooms with saved metrics."""
         try:
-            rooms_with_saved_response = Room.objects.filter(
+            queryset = Room.objects.filter(
                 queue__sector__project=project,
                 is_active=True,
                 user__isnull=False,
@@ -177,31 +175,15 @@ class TimeMetricsService:
                 queue__is_deleted=False,
                 queue__sector__is_deleted=False,
             ).select_related("metric")
-
-            if filters.sector:
-                rooms_with_saved_response = rooms_with_saved_response.filter(
-                    queue__sector__in=filters.sector
-                )
-                if filters.tag:
-                    rooms_with_saved_response = rooms_with_saved_response.filter(
-                        tags__uuid__in=filters.tag
-                    )
-            if filters.queue:
-                rooms_with_saved_response = rooms_with_saved_response.filter(
-                    queue__uuid__in=filters.queue
-                )
-            if filters.agent:
-                rooms_with_saved_response = rooms_with_saved_response.filter(
-                    user=filters.agent
-                )
-
-            for room in rooms_with_saved_response:
-                first_response_times.append(room.metric.first_response_time)
+            queryset = self._apply_room_filters(queryset, filters)
+            return [room.metric.first_response_time for room in queryset]
         except Exception:
-            pass
+            return []
 
+    def _get_waiting_response_times(self, filters: Filters, project) -> list:
+        """Get first response times from rooms waiting for response."""
         try:
-            rooms_waiting_response = Room.objects.filter(
+            queryset = Room.objects.filter(
                 queue__sector__project=project,
                 is_active=True,
                 user__isnull=False,
@@ -213,69 +195,23 @@ class TimeMetricsService:
                 | Q(metric__first_response_time=0)
                 | Q(metric__first_response_time__isnull=True)
             )
-
-            if filters.sector:
-                rooms_waiting_response = rooms_waiting_response.filter(
-                    queue__sector__in=filters.sector
-                )
-                if filters.tag:
-                    rooms_waiting_response = rooms_waiting_response.filter(
-                        tags__uuid__in=filters.tag
-                    )
-            if filters.queue:
-                rooms_waiting_response = rooms_waiting_response.filter(
-                    queue__uuid__in=filters.queue
-                )
-            if filters.agent:
-                rooms_waiting_response = rooms_waiting_response.filter(
-                    user=filters.agent
-                )
-
-            for room in rooms_waiting_response:
-                time_waiting = int(
-                    (timezone.now() - room.first_user_assigned_at).total_seconds()
-                )
-                first_response_times.append(time_waiting)
-
-            print(
-                "[get_time_metrics] first_response_times length: ",
-                len(first_response_times),
-            )
-
-            print("[get_time_metrics] All rooms_with_saved_response:")
-
-            index = 0
-
-            for room in rooms_with_saved_response:
-                print("[get_time_metrics] room user: ", room.user)
-                print(
-                    "[get_time_metrics] response time metric: ",
-                    first_response_times[index],
-                )
-                index += 1
-
-            print("[get_time_metrics] All rooms_waiting_response:")
-
-            for room in rooms_waiting_response:
-                print("[get_time_metrics] room user: ", room.user)
-                print(
-                    "[get_time_metrics] response time metric: ",
-                    first_response_times[index],
-                )
-                index += 1
-
+            queryset = self._apply_room_filters(queryset, filters)
+            return [
+                int((timezone.now() - room.first_user_assigned_at).total_seconds())
+                for room in queryset
+            ]
         except Exception:
-            pass
+            return []
 
-        avg_first_response_time = (
-            int(sum(first_response_times) / len(first_response_times))
-            if first_response_times
-            else 0
-        )
-        max_first_response_time = (
-            int(max(first_response_times)) if first_response_times else 0
-        )
+    def _get_first_response_time_metrics(self, filters: Filters, project) -> tuple:
+        """Calculate first response time metrics."""
+        first_response_times = []
+        first_response_times.extend(self._get_saved_response_times(filters, project))
+        first_response_times.extend(self._get_waiting_response_times(filters, project))
+        return self._calculate_avg_max(first_response_times)
 
+    def _get_conversation_duration_metrics(self, filters: Filters, project) -> tuple:
+        """Calculate conversation duration metrics."""
         active_conversation_filter = Q(
             queue__sector__project=project,
             is_active=True,
@@ -284,31 +220,36 @@ class TimeMetricsService:
             queue__is_deleted=False,
             queue__sector__is_deleted=False,
         )
-
-        if filters.agent:
-            active_conversation_filter &= Q(user=filters.agent)
-        if filters.sector:
-            active_conversation_filter &= Q(queue__sector__in=filters.sector)
-            if filters.tag:
-                active_conversation_filter &= Q(tags__uuid__in=filters.tag)
-        if filters.queue:
-            active_conversation_filter &= Q(queue__uuid__in=filters.queue)
-
+        active_conversation_filter = self._apply_q_filters(
+            active_conversation_filter, filters
+        )
         active_rooms_with_user = Room.objects.filter(active_conversation_filter)
+        conversation_durations = [
+            int((timezone.now() - room.first_user_assigned_at).total_seconds())
+            for room in active_rooms_with_user
+        ]
+        return self._calculate_avg_max(conversation_durations)
 
-        conversation_durations = []
-        for room in active_rooms_with_user:
-            duration = (timezone.now() - room.first_user_assigned_at).total_seconds()
-            conversation_durations.append(int(duration))
+    def _normalize_filters(self, filters: Filters):
+        """Normalize filter values to lists."""
+        filters.sector = self._normalize_to_list(filters.sector)
+        filters.queue = self._normalize_to_list(filters.queue)
+        filters.tag = self._normalize_to_list(filters.tag)
 
-        avg_conversation_duration = (
-            int(sum(conversation_durations) / len(conversation_durations))
-            if conversation_durations
-            else 0
+    def get_time_metrics(self, filters: Filters, project):
+        self._normalize_filters(filters)
+
+        avg_waiting_time, max_waiting_time = self._get_waiting_time_metrics(
+            filters, project
         )
-        max_conversation_duration = (
-            int(max(conversation_durations)) if conversation_durations else 0
-        )
+        (
+            avg_first_response_time,
+            max_first_response_time,
+        ) = self._get_first_response_time_metrics(filters, project)
+        (
+            avg_conversation_duration,
+            max_conversation_duration,
+        ) = self._get_conversation_duration_metrics(filters, project)
 
         return {
             "avg_waiting_time": avg_waiting_time,
