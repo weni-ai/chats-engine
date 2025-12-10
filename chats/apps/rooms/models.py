@@ -377,7 +377,7 @@ class Room(BaseModel, BaseConfigurableModel):
         cache.set(
             self.room_24h_valid_cache_key,
             is_24h_valid,
-            ex=ROOM_24H_VALID_CACHE_TTL,
+            ROOM_24H_VALID_CACHE_TTL,
         )
 
     def get_24h_valid_from_cache(self) -> bool:
