@@ -1,5 +1,10 @@
 from typing import List
 
+import pendulum
+import pytz
+from django.db.models import Q, Max, Avg
+from django.utils import timezone
+
 from chats.apps.api.utils import create_room_dto
 from chats.apps.api.v1.dashboard.interfaces import CacheRepository, RoomsDataRepository
 from chats.apps.api.v1.dashboard.serializers import (
@@ -9,6 +14,8 @@ from chats.apps.api.v1.dashboard.serializers import (
     DashboardRoomSerializer,
     DashboardTransferCountSerializer,
 )
+from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
+from chats.apps.rooms.models import Room
 
 from .dto import Agent, Filters, Sector
 from .repository import (
@@ -102,14 +109,6 @@ class RoomsDataService:
 
 class TimeMetricsService:
     def get_time_metrics(self, filters: Filters, project):
-        import pendulum
-        import pytz
-        from django.db.models import Q
-        from django.utils import timezone
-
-        from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
-        from chats.apps.rooms.models import Room
-
         tz = pytz.timezone(str(project.timezone))
         rooms_filter = Q(queue__sector__project=project)
 
@@ -129,12 +128,16 @@ class TimeMetricsService:
             rooms_filter &= Q(user=filters.agent)
 
         if filters.sector:
-            rooms_filter &= Q(queue__sector=filters.sector)
+            if not isinstance(filters.sector, list):
+                filters.sector = [filters.sector]
+            rooms_filter &= Q(queue__sector__in=filters.sector)
             if filters.tag:
                 rooms_filter &= Q(tags__uuid=filters.tag)
 
         if filters.queue:
-            rooms_filter &= Q(queue__uuid=filters.queue)
+            if not isinstance(filters.queue, list):
+                filters.queue = [filters.queue]
+            rooms_filter &= Q(queue__uuid__in=filters.queue)
 
         waiting_filter = Q(
             queue__sector__project=project,
@@ -144,11 +147,11 @@ class TimeMetricsService:
         )
 
         if filters.sector:
-            waiting_filter &= Q(queue__sector=filters.sector)
+            waiting_filter &= Q(queue__sector__in=filters.sector)
             if filters.tag:
-                waiting_filter &= Q(tags__uuid=filters.tag)
+                waiting_filter &= Q(tags__uuid__in=filters.tag)
         if filters.queue:
-            waiting_filter &= Q(queue__uuid=filters.queue)
+            waiting_filter &= Q(queue__uuid__in=filters.queue)
 
         active_rooms_in_queue = Room.objects.filter(waiting_filter)
 
@@ -177,15 +180,15 @@ class TimeMetricsService:
 
             if filters.sector:
                 rooms_with_saved_response = rooms_with_saved_response.filter(
-                    queue__sector=filters.sector
+                    queue__sector__in=filters.sector
                 )
                 if filters.tag:
                     rooms_with_saved_response = rooms_with_saved_response.filter(
-                        tags__uuid=filters.tag
+                        tags__uuid__in=filters.tag
                     )
             if filters.queue:
                 rooms_with_saved_response = rooms_with_saved_response.filter(
-                    queue__uuid=filters.queue
+                    queue__uuid__in=filters.queue
                 )
             if filters.agent:
                 rooms_with_saved_response = rooms_with_saved_response.filter(
@@ -205,19 +208,23 @@ class TimeMetricsService:
                 first_user_assigned_at__isnull=False,
                 queue__is_deleted=False,
                 queue__sector__is_deleted=False,
-            ).filter(Q(metric__isnull=True) | Q(metric__first_response_time=0))
+            ).filter(
+                Q(metric__isnull=True)
+                | Q(metric__first_response_time=0)
+                | Q(metric__first_response_time__isnull=True)
+            )
 
             if filters.sector:
                 rooms_waiting_response = rooms_waiting_response.filter(
-                    queue__sector=filters.sector
+                    queue__sector__in=filters.sector
                 )
                 if filters.tag:
                     rooms_waiting_response = rooms_waiting_response.filter(
-                        tags__uuid=filters.tag
+                        tags__uuid__in=filters.tag
                     )
             if filters.queue:
                 rooms_waiting_response = rooms_waiting_response.filter(
-                    queue__uuid=filters.queue
+                    queue__uuid__in=filters.queue
                 )
             if filters.agent:
                 rooms_waiting_response = rooms_waiting_response.filter(
@@ -225,15 +232,6 @@ class TimeMetricsService:
                 )
 
             for room in rooms_waiting_response:
-                has_any_agent_messages = (
-                    room.messages.filter(user__isnull=False)
-                    .exclude(automatic_message__isnull=False)
-                    .exists()
-                )
-
-                if has_any_agent_messages:
-                    continue
-
                 time_waiting = int(
                     (timezone.now() - room.first_user_assigned_at).total_seconds()
                 )
@@ -263,11 +261,11 @@ class TimeMetricsService:
         if filters.agent:
             active_conversation_filter &= Q(user=filters.agent)
         if filters.sector:
-            active_conversation_filter &= Q(queue__sector=filters.sector)
+            active_conversation_filter &= Q(queue__sector__in=filters.sector)
             if filters.tag:
-                active_conversation_filter &= Q(tags__uuid=filters.tag)
+                active_conversation_filter &= Q(tags__uuid__in=filters.tag)
         if filters.queue:
-            active_conversation_filter &= Q(queue__uuid=filters.queue)
+            active_conversation_filter &= Q(queue__uuid__in=filters.queue)
 
         active_rooms_with_user = Room.objects.filter(active_conversation_filter)
 
@@ -292,4 +290,74 @@ class TimeMetricsService:
             "max_first_response_time": max_first_response_time,
             "avg_conversation_duration": avg_conversation_duration,
             "max_conversation_duration": max_conversation_duration,
+        }
+
+    def get_time_metrics_for_analysis(self, filters: Filters, project):
+        if not filters.start_date and not filters.end_date:
+            raise ValueError("Start date and end date are required")
+
+        rooms_filter = (
+            Q(queue__sector__project=project)
+            & Q(is_active=False)
+            & Q(ended_at__gte=filters.start_date)
+            & Q(ended_at__lte=filters.end_date)
+        )
+
+        if filters.agent:
+            rooms_filter &= Q(user=filters.agent)
+
+        if filters.sector:
+            if not isinstance(filters.sector, list):
+                filters.sector = [filters.sector]
+            rooms_filter &= Q(queue__sector__in=filters.sector)
+
+        if filters.queue:
+            if not isinstance(filters.queue, list):
+                filters.queue = [filters.queue]
+            rooms_filter &= Q(queue__uuid__in=filters.queue)
+
+        if filters.tag:
+            if not isinstance(filters.tag, list):
+                filters.tag = [filters.tag]
+            rooms_filter &= Q(tags__uuid__in=filters.tag)
+
+        max_waiting_time = Room.objects.filter(rooms_filter).aggregate(
+            Max("metric__waiting_time")
+        )["metric__waiting_time__max"]
+        avg_waiting_time = Room.objects.filter(rooms_filter).aggregate(
+            Avg("metric__waiting_time")
+        )["metric__waiting_time__avg"]
+
+        avg_first_response_time = Room.objects.filter(rooms_filter).aggregate(
+            Avg("metric__first_response_time")
+        )["metric__first_response_time__avg"]
+        max_first_response_time = Room.objects.filter(rooms_filter).aggregate(
+            Max("metric__first_response_time")
+        )["metric__first_response_time__max"]
+
+        avg_conversation_duration = (
+            Room.objects.filter(rooms_filter)
+            .filter(first_user_assigned_at__isnull=False)
+            .aggregate(Avg("metric__interaction_time"))["metric__interaction_time__avg"]
+        )
+        max_conversation_duration = (
+            Room.objects.filter(rooms_filter)
+            .filter(first_user_assigned_at__isnull=False)
+            .aggregate(Max("metric__interaction_time"))["metric__interaction_time__max"]
+        )
+
+        avg_message_response_time = (
+            Room.objects.filter(rooms_filter)
+            .filter(metric__isnull=False, metric__message_response_time__gt=0)
+            .aggregate(avg=Avg("metric__message_response_time"))["avg"]
+        )
+
+        return {
+            "max_waiting_time": (int(max_waiting_time or 0)),
+            "avg_waiting_time": (int(avg_waiting_time or 0)),
+            "max_first_response_time": (int(max_first_response_time or 0)),
+            "avg_first_response_time": (int(avg_first_response_time or 0)),
+            "max_conversation_duration": (int(max_conversation_duration or 0)),
+            "avg_conversation_duration": (int(avg_conversation_duration or 0)),
+            "avg_message_response_time": (int(avg_message_response_time or 0)),
         }

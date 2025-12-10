@@ -117,6 +117,8 @@ class RoomSerializer(serializers.ModelSerializer):
         return room.queue.sector.can_edit_custom_fields
 
     def get_has_history(self, room: Room) -> bool:
+        if self.context.get("disable_has_history"):
+            return False
         request = self.context.get("request")
 
         if not request:
@@ -237,6 +239,8 @@ class ListRoomSerializer(serializers.ModelSerializer):
         return RoomPin.objects.filter(**pins_query).exists()
 
     def get_has_history(self, room: Room) -> bool:
+        if self.context.get("disable_has_history"):
+            return False
         request = self.context.get("request")
 
         if not request:

@@ -54,7 +54,11 @@ class RoomFilter(filters.FilterSet):
         except ObjectDoesNotExist:
             return queryset.none()
 
-        user_param = self.request.query_params.get("email") or self.request.user
+        request_params = getattr(self.request, "query_params", None)
+        if request_params is None:
+            request_params = getattr(self.request, "GET", {})
+
+        user_param = request_params.get("email") or self.request.user
         if isinstance(user_param, User):
             user_email = (user_param.email or "").lower()
         else:
