@@ -1,12 +1,12 @@
 from rest_framework import status
-from rest_framework.viewsets import GenericViewSet
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.viewsets import GenericViewSet
 
-from chats.apps.api.v1.permissions import ProjectQueryParamPermission
 from chats.apps.api.v1.feature_flags.serializers import (
     FeatureFlagsQueryParamsSerializer,
 )
+from chats.apps.api.v1.permissions import ProjectQueryParamPermission
 from chats.apps.feature_flags.integrations.growthbook.instance import GROWTHBOOK_CLIENT
 from chats.apps.feature_flags.services import FeatureFlagService
 
@@ -15,6 +15,8 @@ class FeatureFlagsViewSet(GenericViewSet):
     """
     View for getting the active features for a project.
     """
+
+    swagger_tag = "Feature Flags"
 
     service = FeatureFlagService(growthbook_client=GROWTHBOOK_CLIENT)
     permission_classes = [IsAuthenticated, ProjectQueryParamPermission]

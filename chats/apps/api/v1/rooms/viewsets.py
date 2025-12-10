@@ -18,16 +18,14 @@ from django.db.models import (
 from django.utils import timezone
 from django.utils.timezone import make_aware
 from django.utils.translation import gettext_lazy as _
-from chats.apps.api.v1.rooms.permissions import CanAddOrRemoveRoomTagPermission
-from chats.core.cache_utils import get_user_id_by_email_cached
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.filters import OrderingFilter
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 
@@ -45,20 +43,23 @@ from chats.apps.api.v1.internal.rest_clients.openai_rest_client import OpenAICli
 from chats.apps.api.v1.msgs.serializers import ChatCompletionSerializer
 from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1.rooms.pagination import RoomListPagination
-from chats.apps.api.v1.rooms.permissions import RoomNotePermission
+from chats.apps.api.v1.rooms.permissions import (
+    CanAddOrRemoveRoomTagPermission,
+    RoomNotePermission,
+)
 from chats.apps.api.v1.rooms.serializers import (
     AddRoomTagSerializer,
     ListRoomSerializer,
-    RemoveRoomTagSerializer,
     PinRoomSerializer,
+    RemoveRoomTagSerializer,
     RoomHistorySummaryFeedbackSerializer,
     RoomHistorySummarySerializer,
     RoomInfoSerializer,
     RoomMessageStatusSerializer,
     RoomNoteSerializer,
     RoomSerializer,
-    RoomTagSerializer,
     RoomsReportSerializer,
+    RoomTagSerializer,
     TransferRoomSerializer,
 )
 from chats.apps.dashboard.models import RoomMetrics
@@ -67,7 +68,6 @@ from chats.apps.msgs.models import Message
 from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
-from chats.apps.sectors.models import SectorTag
 from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.exceptions import (
     MaxPinRoomLimitReachedError,
@@ -86,6 +86,10 @@ from chats.apps.rooms.views import (
 )
 from chats.apps.feature_flags.utils import is_feature_active
 
+
+from chats.apps.sectors.models import SectorTag
+from chats.core.cache_utils import get_user_id_by_email_cached
+
 logger = logging.getLogger(__name__)
 
 
@@ -95,6 +99,7 @@ class RoomViewset(
     mixins.UpdateModelMixin,
     GenericViewSet,
 ):
+    swagger_tag = "Rooms"
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
     filter_backends = [
@@ -1164,6 +1169,8 @@ class RoomsReportViewSet(APIView):
     Viewset for generating rooms reports.
     """
 
+    swagger_tag = "Rooms"
+
     authentication_classes = [ProjectAdminAuthentication]
     service = RoomsReportService
 
@@ -1214,6 +1221,8 @@ class RoomNoteViewSet(
     """
     ViewSet for Room Notes
     """
+
+    swagger_tag = "Rooms"
 
     queryset = RoomNote.objects.all()
     serializer_class = RoomNoteSerializer
