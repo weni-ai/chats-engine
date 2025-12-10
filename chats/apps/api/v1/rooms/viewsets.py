@@ -88,6 +88,10 @@ from chats.apps.rooms.views import (
 from chats.apps.sectors.models import SectorTag
 from chats.core.cache_utils import get_user_id_by_email_cached
 
+
+from chats.apps.sectors.models import SectorTag
+from chats.core.cache_utils import get_user_id_by_email_cached
+
 logger = logging.getLogger(__name__)
 
 
@@ -97,6 +101,7 @@ class RoomViewset(
     mixins.UpdateModelMixin,
     GenericViewSet,
 ):
+    swagger_tag = "Rooms"
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
     filter_backends = [
@@ -1164,6 +1169,8 @@ class RoomsReportViewSet(APIView):
     Viewset for generating rooms reports.
     """
 
+    swagger_tag = "Rooms"
+
     authentication_classes = [ProjectAdminAuthentication]
     service = RoomsReportService
 
@@ -1214,6 +1221,8 @@ class RoomNoteViewSet(
     """
     ViewSet for Room Notes
     """
+
+    swagger_tag = "Rooms"
 
     queryset = RoomNote.objects.all()
     serializer_class = RoomNoteSerializer

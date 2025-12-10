@@ -13,7 +13,9 @@ class GrowthbookWebhook(GenericViewSet):
     Note: Feature flag updates are now handled internally by weni-commons library.
     """
 
+    swagger_tag = "Feature Flags"
     authentication_classes = [GrowthbookWebhookSecretAuthentication]
+    serializer_class = serializers.Serializer
 
     def create(self, request, *args, **kwargs):
         return Response(status=status.HTTP_204_NO_CONTENT)
