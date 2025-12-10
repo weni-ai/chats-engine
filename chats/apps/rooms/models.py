@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import requests
 import sentry_sdk
 from django.conf import settings
+from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models, transaction
@@ -34,6 +35,9 @@ from chats.apps.queues.models import Queue
 
 if TYPE_CHECKING:
     from chats.apps.projects.models.models import Project
+
+
+ROOM_24H_VALID_CACHE_TTL = settings.ROOM_24H_VALID_CACHE_TTL
 
 
 logger = logging.getLogger(__name__)
@@ -363,18 +367,49 @@ class Room(BaseModel, BaseConfigurableModel):
         sent_message.notify_room("create", True)
 
     @property
+    def room_24h_valid_cache_key(self) -> str:
+        return f"room_24h_valid_cache:{self.pk}"
+
+    def save_24h_valid_to_cache(self, is_24h_valid: bool) -> None:
+        if ROOM_24H_VALID_CACHE_TTL == 0:
+            return
+
+        cache.set(
+            self.room_24h_valid_cache_key,
+            is_24h_valid,
+            ex=ROOM_24H_VALID_CACHE_TTL,
+        )
+
+    def get_24h_valid_from_cache(self) -> bool:
+        if ROOM_24H_VALID_CACHE_TTL == 0:
+            return None
+
+        return cache.get(self.room_24h_valid_cache_key)
+
+    def clear_24h_valid_cache(self) -> None:
+        cache.delete(self.room_24h_valid_cache_key)
+
+    @property
     def is_24h_valid(self) -> bool:
         """Validates is the last contact message was sent more than a day ago"""
         if not self.urn.startswith("whatsapp"):
             return True
+
+        if cached_is_24h_valid := self.get_24h_valid_from_cache():
+            return cached_is_24h_valid
+
+        is_24h_valid = True
 
         day_validation = self.messages.filter(
             created_on__gte=timezone.now() - timedelta(days=1),
             contact=self.contact,
         )
         if not day_validation.exists():
-            return self.created_on > timezone.now() - timedelta(days=1)
-        return True
+            is_24h_valid = self.created_on > timezone.now() - timedelta(days=1)
+
+        self.save_24h_valid_to_cache(is_24h_valid)
+
+        return is_24h_valid
 
     @property
     def imported_history_url(self):

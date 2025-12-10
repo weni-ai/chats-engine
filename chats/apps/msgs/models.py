@@ -81,7 +81,11 @@ class Message(BaseModelWithManualCreatedOn):
                 }
             )
 
-        return super().save(*args, **kwargs)
+        data = super().save(*args, **kwargs)
+
+        self.room.clear_24h_valid_cache()
+
+        return data
 
     @property
     def serialized_ws_data(self) -> dict:

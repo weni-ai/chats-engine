@@ -617,3 +617,9 @@ CHATS_BASE_URL = env.str("CHATS_BASE_URL", default="http://localhost:8000")
 # USER CACHE
 USER_OBJECT_CACHE_TTL = env.int("USER_OBJECT_CACHE_TTL", default=300)
 USER_OBJECT_CACHE_ENABLED = env.bool("USER_OBJECT_CACHE_ENABLED", default=True)
+
+
+# ROOM 24H VALID CACHE
+ROOM_24H_VALID_CACHE_TTL = env.int(
+    "ROOM_24H_VALID_CACHE_TTL", default=0
+)  # 0 means no cache
