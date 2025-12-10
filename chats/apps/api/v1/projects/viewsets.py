@@ -37,7 +37,6 @@ from chats.apps.api.v1.projects.serializers import (
     ListProjectUsersSerializer,
     ProjectFlowContactSerializer,
     ProjectFlowStartSerializer,
-    ProjectQuerySerializer,
     ProjectSerializer,
     SectorDiscussionSerializer,
 )
