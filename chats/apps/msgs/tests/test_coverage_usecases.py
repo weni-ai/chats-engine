@@ -94,7 +94,9 @@ class UpdateStatusMessageUseCaseTests(TestCase):
             "chats.apps.msgs.usecases.UpdateStatusMessageUseCase.ChatMessageReplyIndex.objects.get",
             side_effect=[ValueError("boom"), second_reply],
         ):
-            self.use_case.update_status_message(self.reply_index.external_id, "DELIVERED")
+            self.use_case.update_status_message(
+                self.reply_index.external_id, "DELIVERED"
+            )
             self.use_case.update_status_message(second_reply.external_id, "READ")
             self.use_case._bulk_create()
 
@@ -153,12 +155,8 @@ class MessageStatusNotifierTests(TestCase):
         )
 
     def test_notify_for_message_dispatches_when_permission_exists(self):
-        with patch.object(
-            MessageStatusNotifier, "notify_status_update"
-        ) as mock_notify:
-            result = MessageStatusNotifier.notify_for_message(
-                self.message, "delivered"
-            )
+        with patch.object(MessageStatusNotifier, "notify_status_update") as mock_notify:
+            result = MessageStatusNotifier.notify_for_message(self.message, "delivered")
 
         self.assertTrue(result)
         mock_notify.assert_called_once_with(
@@ -168,9 +166,7 @@ class MessageStatusNotifierTests(TestCase):
     def test_notify_for_message_returns_false_without_permission(self):
         ProjectPermission.objects.all().delete()
 
-        with patch.object(
-            MessageStatusNotifier, "notify_status_update"
-        ) as mock_notify:
+        with patch.object(MessageStatusNotifier, "notify_status_update") as mock_notify:
             result = MessageStatusNotifier.notify_for_message(self.message, "read")
 
         self.assertFalse(result)
@@ -183,4 +179,3 @@ class MessageStatusNotifierTests(TestCase):
         result = MessageStatusNotifier.notify_for_message(self.message, "read")
 
         self.assertFalse(result)
-

@@ -18,9 +18,7 @@ class TaggedSwaggerAutoSchema(SwaggerAutoSchema):
         method = self.method.lower()
 
         summary = (
-            summary_attr.get(method)
-            if isinstance(summary_attr, dict)
-            else summary_attr
+            summary_attr.get(method) if isinstance(summary_attr, dict) else summary_attr
         )
         description = (
             description_attr.get(method)
@@ -30,4 +28,3 @@ class TaggedSwaggerAutoSchema(SwaggerAutoSchema):
 
         parent_summary, parent_description = super().get_summary_and_description()
         return summary or parent_summary, description or parent_description
-

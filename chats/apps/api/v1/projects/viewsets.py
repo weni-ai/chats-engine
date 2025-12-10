@@ -29,23 +29,16 @@ from chats.apps.api.v1.projects.filters import (
     FlowStartFilter,
 )
 from chats.apps.api.v1.projects.serializers import (
-    ContactUUIDQuerySerializer,
-    CursorQuerySerializer,
     CustomStatusSerializer,
     CustomStatusTypeSerializer,
-    FlowStartListQuerySerializer,
-    FlowUUIDQuerySerializer,
     LastStatusQueryParamsSerializer,
     LinkContactSerializer,
     ListFlowStartSerializer,
     ListProjectUsersSerializer,
-    ProjectContactWarningQuerySerializer,
     ProjectFlowContactSerializer,
     ProjectFlowStartSerializer,
-    ProjectPermissionListQuerySerializer,
     ProjectQuerySerializer,
     ProjectSerializer,
-    ProjectVerifyAccessQuerySerializer,
     SectorDiscussionSerializer,
 )
 from chats.apps.contacts.models import Contact
