@@ -170,9 +170,9 @@ class InServiceStatusService:
                     status="ONLINE",
                 )
             else:
-                logger.error("room_closed: Não encontrou In-Service ativo")
+                logger.warning("room_closed: Não encontrou In-Service ativo")
         else:
-            logger.error(f"room_closed: Ainda tem {room_count} salas ativas")
+            logger.info(f"room_closed: Ainda tem {room_count} salas ativas")
 
     @classmethod
     @transaction.atomic
