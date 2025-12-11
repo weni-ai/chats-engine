@@ -87,8 +87,6 @@ from chats.apps.rooms.views import (
 )
 
 
-
-
 from chats.apps.sectors.models import SectorTag
 from chats.core.cache_utils import get_user_id_by_email_cached
 
