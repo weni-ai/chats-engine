@@ -1,18 +1,18 @@
+import logging
 import pickle
 from abc import ABC, abstractmethod
 from datetime import datetime
-import logging
 from typing import Optional
 
 from django.conf import settings
 from django.utils import timezone
+from weni.feature_flags.services import FeatureFlagsService
 
 from chats.apps.accounts.models import User
-from chats.apps.feature_flags.services import FeatureFlagService
-from chats.apps.projects.models.models import Project
-from chats.core.cache import CacheClient
 from chats.apps.feedbacks.models import LastFeedbackShownToUser, UserFeedback
+from chats.apps.projects.models.models import Project
 from chats.apps.rooms.models import Room
+from chats.core.cache import CacheClient
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ class UserFeedbackService(BaseUserFeedbackService):
     """
 
     def __init__(
-        self, cache_client: CacheClient, feature_flags_service: FeatureFlagService
+        self, cache_client: CacheClient, feature_flags_service: FeatureFlagsService
     ):
         self.cache_client = cache_client
         self.feature_flags_service = feature_flags_service
@@ -113,9 +113,8 @@ class UserFeedbackService(BaseUserFeedbackService):
                     e,
                 )
 
-        rules = self.feature_flags_service.get_feature_flag_rules(
-            self.feedback_feature_flag_key
-        )
+        feature_flags = self.feature_flags_service.get_feature_flags()
+        rules = feature_flags.get(self.feedback_feature_flag_key, {}).get("rules", [])
 
         if not rules:
             return None, None

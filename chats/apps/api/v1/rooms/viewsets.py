@@ -28,6 +28,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
+from weni.feature_flags.shortcuts import is_feature_active
 
 from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
@@ -84,7 +85,6 @@ from chats.apps.rooms.views import (
     update_custom_fields,
     update_flows_custom_fields,
 )
-from chats.apps.feature_flags.utils import is_feature_active
 
 
 from chats.apps.sectors.models import SectorTag
@@ -213,13 +213,13 @@ class RoomViewset(
             if project_instance:
                 use_pins_optimization = is_feature_active(
                     settings.WENI_CHATS_PIN_ROOMS_OPTIMIZATION_FLAG_KEY,
-                    request.user,
-                    project_instance,
+                    request.user.email,
+                    str(project_instance.uuid),
                 )
                 if is_feature_active(
                     settings.WENI_CHATS_DISABLE_HAS_HISTORY_FLAG_KEY,
-                    request.user,
-                    project_instance,
+                    request.user.email,
+                    str(project_instance.uuid),
                 ):
                     self.disable_has_history = True
 

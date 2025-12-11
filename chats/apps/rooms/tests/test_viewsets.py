@@ -4,8 +4,8 @@ from unittest.mock import patch, PropertyMock
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.utils.crypto import get_random_string
 from django.urls import reverse
+from django.utils.crypto import get_random_string
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.test import APITestCase
@@ -152,7 +152,8 @@ class RoomTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json().get("count"), 0)
 
-    def test_list_rooms_given_agents(self):
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_list_rooms_given_agents(self, mock_is_feature_active):
         self._ok_list_rooms(
             self.agent_token,
             [str(self.room_1.uuid)],
@@ -164,7 +165,8 @@ class RoomTests(APITestCase):
             {"project": self.project.uuid},
         )
 
-    def test_list_rooms_with_manager_and_admin_token(self):
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_list_rooms_with_manager_and_admin_token(self, mock_is_feature_active):
         self._ok_list_rooms(
             self.manager_token,
             [str(self.room_2.uuid), str(self.room_3.uuid)],
@@ -177,7 +179,8 @@ class RoomTests(APITestCase):
             {"project": self.project.uuid},
         )
 
-    def test_list_rooms_with_not_permitted_manager_token(self):
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_list_rooms_with_not_permitted_manager_token(self, mock_is_feature_active):
         self._not_ok_list_rooms(
             self.manager_3_token,
             {"project": self.project.uuid},
@@ -311,7 +314,8 @@ class RoomsManagerTests(APITestCase):
         results = response.json().get("results")
         return response, results
 
-    def test_admin_list_agent_rooms(self):
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_admin_list_agent_rooms(self, mock_is_feature_active):
         data = {"project": str(self.project.pk)}
         admin_data = {**data, **{"email": self.agent_1.email}}
         admin_response = self._request_list_rooms(
@@ -323,7 +327,8 @@ class RoomsManagerTests(APITestCase):
         self.assertEquals(admin_response.status_code, status.HTTP_200_OK)
         self.assertEquals(admin_content.get("count"), agent_content.get("count"))
 
-    def test_manager_list_agent_rooms(self):
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_manager_list_agent_rooms(self, mock_is_feature_active):
         data = {"project": str(self.project.pk)}
         manager_data = {**data, **{"email": self.agent_1.email}}
         manager_response = self._request_list_rooms(
@@ -385,7 +390,8 @@ class TestRoomsViewSet(APITestCase):
 
         return self.client.get(url, filters)
 
-    def test_room_order_by_created_on(self):
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_room_order_by_created_on(self, mock_is_feature_active):
         room_1 = Room.objects.create(
             project_uuid=str(self.project.uuid),
             is_active=True,
@@ -411,7 +417,8 @@ class TestRoomsViewSet(APITestCase):
             response.json().get("results")[1].get("uuid"), str(room_2.uuid)
         )
 
-    def test_room_order_by_inverted_created_on(self):
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_room_order_by_inverted_created_on(self, mock_is_feature_active):
         room_1 = Room.objects.create(
             project_uuid=str(self.project.uuid),
             is_active=True,
@@ -437,7 +444,8 @@ class TestRoomsViewSet(APITestCase):
             response.json().get("results")[1].get("uuid"), str(room_1.uuid)
         )
 
-    def test_room_order_with_pin(self):
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_room_order_with_pin(self, mock_is_feature_active):
         # Create rooms
         room_1 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
         room_2 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
@@ -502,7 +510,8 @@ class TestRoomsViewSet(APITestCase):
         self.assertEqual(rooms_uuids[3], str(room_1.uuid))
         self.assertEqual(results[3].get("is_pinned"), False)
 
-    def test_room_order_with_email(self):
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_room_order_with_email(self, mock_is_feature_active):
         another_user = User.objects.create(email="another_user@example.com")
         QueueAuthorization.objects.create(
             permission=ProjectPermission.objects.create(
