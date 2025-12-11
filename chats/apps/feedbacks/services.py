@@ -113,7 +113,7 @@ class UserFeedbackService(BaseUserFeedbackService):
                     e,
                 )
 
-        feature_flags = self.feature_flags_service.get_feature_flags()
+        feature_flags = self.feature_flags_service.get_features()
         rules = feature_flags.get(self.feedback_feature_flag_key, {}).get("rules", [])
 
         if not rules:
