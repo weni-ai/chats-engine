@@ -19,15 +19,16 @@ def message_media_upload_to(instance, filename):
     Generate unique file path for MessageMedia uploads using UUID.
     This prevents file name collisions when multiple messages are sent
     in the same second with the same original filename.
-    
+
     Args:
         instance: MessageMedia instance
         filename: Original filename from upload
-        
+
     Returns:
         str: Unique file path in format: messagemedia/{uuid}{extension}
     """
     from pathlib import Path
+
     ext = Path(filename).suffix.lower()
     return f"messagemedia/{instance.uuid}{ext}"
 
