@@ -283,7 +283,6 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             )
         elif "rooms." in event.get("action"):
             content = event.get("content", {})
-            action = event.get("action")
 
             try:
                 if isinstance(content, str):
@@ -303,14 +302,6 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                     indent=1,
                     cls=DjangoJSONEncoder,
                 )
-            except Room.DoesNotExist:
-                # Log detalhado para diagnosticar race condition
-                room_exists_after = await self.check_room_exists_after_delay(room_uuid)
-                logger.error(
-                    f"Room not found on action '{action}' for room_uuid={room_uuid}. "
-                    f"Room exists after 500ms delay: {room_exists_after}"
-                )
-                return self.send_json(event)
             except Exception as e:
                 logger.error(f"Error getting history rooms queryset by contact: {e}")
                 return self.send_json(event)
@@ -344,15 +335,6 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         return get_history_rooms_queryset_by_contact(
             room.contact, self.user, room.queue.sector.project
         ).exists()
-
-    async def check_room_exists_after_delay(self, room_uuid: str):
-        """Verifica se o room existe após um delay - usado para diagnosticar race condition"""
-        await asyncio.sleep(0.5)  # 500ms delay
-        return await self._check_room_exists(room_uuid)
-
-    @database_sync_to_async
-    def _check_room_exists(self, room_uuid: str):
-        return Room.objects.filter(uuid=room_uuid).exists()
 
     async def has_other_active_connections(self):
         """
