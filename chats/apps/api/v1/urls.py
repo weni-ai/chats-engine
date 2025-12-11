@@ -7,13 +7,22 @@ from chats.apps.api.v1.dashboard.viewsets import (
 from chats.apps.api.v1.internal.agents.views import AgentDisconnectView
 from chats.apps.api.v1.internal.ai_features.views import FeaturePromptsView
 from chats.apps.api.v1.rooms.viewsets import RoomsReportViewSet
-from chats.apps.api.v1.dashboard.viewsets import ModelFieldsViewSet, ReportFieldsValidatorViewSet
+from chats.apps.api.v1.dashboard.viewsets import (
+    ModelFieldsViewSet,
+    ReportFieldsValidatorViewSet,
+)
 from chats.apps.api.v1.routers import router
 from chats.apps.api.v1.internal.ai_features.views import FeaturePromptsView
 from chats.apps.api.v1.internal.agents.views import AgentDisconnectView
+from chats.apps.api.v1.ai_features.views import HistorySummaryFeedbackTagsView
 
 
 urlpatterns = [
+    path(
+        "ai_features/history_summary/feedback/tags/",
+        HistorySummaryFeedbackTagsView.as_view(),
+        name="history_summary_feedback_tags",
+    ),
     path("rooms/report/", RoomsReportViewSet.as_view(), name="rooms_report"),
     path("model-fields/", ModelFieldsViewSet.as_view(), name="model-fields"),
     path("chats/report/", ReportFieldsValidatorViewSet.as_view(), name="chats-report"),

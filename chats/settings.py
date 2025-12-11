@@ -189,6 +189,9 @@ USE_L10N = True
 
 USE_TZ = True
 
+DEFAULT_LANGUAGE = "en-us"
+LOCALE_PATHS = [os.path.join(BASE_DIR, "chats/locale")]
+
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.0/howto/static-files/
