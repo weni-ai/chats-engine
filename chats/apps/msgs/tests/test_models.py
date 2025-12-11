@@ -17,6 +17,11 @@ class TestMessageModel(TestCase):
     def setUp(self):
         self.room = Room.objects.create()
 
+    @patch("chats.apps.rooms.models.Room.clear_24h_valid_cache")
+    def test_create_message(self, mock_clear_24h_valid_cache):
+        Message.objects.create(room=self.room)
+        mock_clear_24h_valid_cache.assert_called_once()
+
     def test_create_message_passing_created_on(self):
         timestamp = timezone.now() - timedelta(days=2)
 

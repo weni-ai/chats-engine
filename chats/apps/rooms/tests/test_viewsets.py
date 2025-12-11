@@ -1,6 +1,6 @@
 import uuid
 from datetime import time
-from unittest.mock import patch
+from unittest.mock import patch, PropertyMock
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -566,8 +566,7 @@ class RoomPickTests(APITestCase):
     def test_cannot_pick_room_from_queue_without_project_permission(self):
         response = self.pick_room_from_queue()
 
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(response.data["detail"].code, "permission_denied")
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
     def test_cannot_pick_room_if_room_is_not_queued(self):
@@ -1337,26 +1336,28 @@ class TestRoomPinAuthenticatedUser(BaseRoomPinTestCase):
             name="Test Queue",
             sector=self.sector,
         )
-        self.agent = User.objects.create(
+        self.user = User.objects.create(
             email="test_agent_1@example.com",
         )
 
-        self.client.force_authenticate(user=self.agent)
+        self.client.force_authenticate(user=self.user)
 
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
     def test_pin_room(self):
         room = Room.objects.create(
             queue=self.queue,
-            user=self.agent,
+            user=self.user,
         )
 
         response = self.pin_room(room.uuid, {"status": True})
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
     def test_cannot_pin_room_when_room_is_not_active(self):
         room = Room.objects.create(
             queue=self.queue,
-            user=self.agent,
+            user=self.user,
         )
         room.close()
         response = self.pin_room(room.uuid, {"status": True})
@@ -1364,23 +1365,25 @@ class TestRoomPinAuthenticatedUser(BaseRoomPinTestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["code"], "room_is_not_active")
 
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
     def test_cannot_pin_room_when_max_pin_limit_reached(self):
         for _ in range(settings.MAX_ROOM_PINS_LIMIT):
             room = Room.objects.create(
                 queue=self.queue,
-                user=self.agent,
+                user=self.user,
             )
-            RoomPin.objects.create(room=room, user=self.agent)
+            RoomPin.objects.create(room=room, user=self.user)
 
         room = Room.objects.create(
             queue=self.queue,
-            user=self.agent,
+            user=self.user,
         )
         response = self.pin_room(room.uuid, {"status": True})
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["code"], "max_pin_limit")
 
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
     def test_cannot_pin_room_when_user_is_not_assigned(self):
         room = Room.objects.create(
             queue=self.queue,
@@ -1388,15 +1391,17 @@ class TestRoomPinAuthenticatedUser(BaseRoomPinTestCase):
         response = self.pin_room(room.uuid, {"status": True})
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
     def test_unpin_room(self):
         room = Room.objects.create(
             queue=self.queue,
-            user=self.agent,
+            user=self.user,
         )
         response = self.pin_room(room.uuid, {"status": False})
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
     def test_cannot_unpin_room_when_user_is_not_assigned(self):
         room = Room.objects.create(
             queue=self.queue,
@@ -1458,7 +1463,7 @@ class TestListRoomTagsAuthenticatedUser(BaseTestListRoomTags):
     def test_list_room_tags_without_permission(self):
         response = self.list_room_tags(self.room.uuid)
 
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
     @with_queue_authorization(role=QueueAuthorization.ROLE_AGENT)
@@ -1536,6 +1541,7 @@ class TestAddRoomTagAuthenticatedUser(BaseTestAddRoomTag):
         )
         self.client.force_authenticate(user=self.user)
 
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
     def test_add_room_tag(self):
         response = self.add_room_tag(self.room.uuid, {"uuid": self.tags[0].uuid})
 
@@ -1544,6 +1550,7 @@ class TestAddRoomTagAuthenticatedUser(BaseTestAddRoomTag):
 
         self.assertEqual(self.room.tags.first().uuid, self.tags[0].uuid)
 
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
     def test_cannot_add_room_tag_when_room_is_not_active(self):
         self.room.is_active = False
         self.room.save()
@@ -1551,17 +1558,20 @@ class TestAddRoomTagAuthenticatedUser(BaseTestAddRoomTag):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["detail"].code, "room_is_not_active")
 
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
     def test_cannot_add_room_tag_when_tag_already_exists(self):
         self.room.tags.add(self.tags[0])
         response = self.add_room_tag(self.room.uuid, {"uuid": self.tags[0].uuid})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["uuid"][0].code, "tag_already_exists")
 
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
     def test_cannot_add_room_tag_when_tag_does_not_exist(self):
         response = self.add_room_tag(self.room.uuid, {"uuid": uuid.uuid4()})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["uuid"][0].code, "tag_not_found")
 
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
     def test_cannot_add_tag_from_another_sector(self):
         another_sector = Sector.objects.create(
             name="Another Sector",
@@ -1580,6 +1590,7 @@ class TestAddRoomTagAuthenticatedUser(BaseTestAddRoomTag):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["uuid"][0].code, "tag_not_found")
 
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
     def test_cannot_add_room_tag_when_user_is_not_the_room_user(self):
         another_user = User.objects.create(
             email="test_user_2@example.com",
@@ -1637,6 +1648,7 @@ class TestRemoveRoomTagAuthenticatedUser(BaseTestRemoveRoomTag):
         self.room.tags.add(self.tags[0])
         self.client.force_authenticate(user=self.user)
 
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
     def test_remove_room_tag(self):
         response = self.remove_room_tag(self.room.uuid, {"uuid": self.tags[0].uuid})
 
@@ -1645,6 +1657,7 @@ class TestRemoveRoomTagAuthenticatedUser(BaseTestRemoveRoomTag):
 
         self.assertEqual(self.room.tags.count(), 0)
 
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
     def test_cannot_remove_room_tag_when_room_is_not_active(self):
         self.room.is_active = False
         self.room.save()
@@ -1652,11 +1665,13 @@ class TestRemoveRoomTagAuthenticatedUser(BaseTestRemoveRoomTag):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["detail"].code, "room_is_not_active")
 
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
     def test_cannot_remove_room_tag_when_tag_does_not_exist(self):
         response = self.remove_room_tag(self.room.uuid, {"uuid": uuid.uuid4()})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["uuid"][0].code, "tag_not_found")
 
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
     def test_cannot_remove_room_tag_when_user_is_not_the_room_user(self):
         another_user = User.objects.create(
             email="test_user_2@example.com",
@@ -1666,3 +1681,70 @@ class TestRemoveRoomTagAuthenticatedUser(BaseTestRemoveRoomTag):
 
         response = self.remove_room_tag(self.room.uuid, {"uuid": self.tags[0].uuid})
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class BaseTestCanSendMessageStatus(APITestCase):
+    def get_can_send_message_status(self, room_pk: str) -> Response:
+        url = reverse("room-can-send-message-status", kwargs={"pk": room_pk})
+
+        return self.client.get(url)
+
+
+class TestCanSendMessageStatusAnonymousUser(BaseTestCanSendMessageStatus):
+    def test_cannot_get_can_send_message_status_when_user_is_not_authenticated(self):
+        response = self.get_can_send_message_status(uuid.uuid4())
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class TestCanSendMessageStatusAuthenticatedUser(BaseTestCanSendMessageStatus):
+    def setUp(self):
+        self.project = Project.objects.create(
+            name="Test Project",
+        )
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=1,
+            work_start=time(hour=5, minute=0),
+            work_end=time(hour=23, minute=59),
+        )
+        self.queue = Queue.objects.create(
+            name="Test Queue",
+            sector=self.sector,
+        )
+        self.user = User.objects.create(
+            email="test_user_1@example.com",
+        )
+        self.room = Room.objects.create(
+            queue=self.queue,
+            user=self.user,
+            urn="whatsapp:1234567890",
+        )
+
+        self.client.force_authenticate(user=self.user)
+
+    def test_get_can_send_message_status_without_project_permission(self):
+        response = self.get_can_send_message_status(self.room.uuid)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    @patch("chats.apps.rooms.models.Room.is_24h_valid", new_callable=PropertyMock)
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
+    def test_get_can_send_message_status_with_project_permission_when_true(
+        self, mock_is_24h_valid
+    ):
+        mock_is_24h_valid.return_value = True
+        response = self.get_can_send_message_status(self.room.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["can_send_message"], True)
+
+    @patch("chats.apps.rooms.models.Room.is_24h_valid", new_callable=PropertyMock)
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
+    def test_get_can_send_message_status_with_project_permission_when_false(
+        self, mock_is_24h_valid
+    ):
+        mock_is_24h_valid.return_value = False
+        response = self.get_can_send_message_status(self.room.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["can_send_message"], False)
