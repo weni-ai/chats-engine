@@ -1,3 +1,15 @@
+# 3.34.0
+# Add
+  - Endpoint to check weather a room can receive new messages (based on WhatsApp 24h window rule)
+  - Weni commons in chats
+  - Avoid file colision when sending media
+  - Resolving error getting history 
+  
+# 3.33.7
+# Fix
+  - Reduce cyclomatic complexity of TimeMetricsService
+  - New chats documentation
+    
 # 3.33.6
 # Fix
   - Order internal rooms by user full name
@@ -898,6 +910,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 
