@@ -233,8 +233,10 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
 
         notify_level = "user" if instance.user else "queue"
 
+        # send notification after commit to avoid race condition
+        # where the consumer tries to find the room before it is committed to the database
         notification_method = getattr(instance, f"notify_{notify_level}")
-        notification_method(notification_type)
+        transaction.on_commit(lambda: notification_method(notification_type))
 
         instance.refresh_from_db()
 
