@@ -122,7 +122,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                     )
                     await self.set_user_status("OFFLINE")
                     await self.finalize_in_service_if_needed()
-                    # await self.log_status_change("OFFLINE")
+                    await self.log_status_change("OFFLINE")
                 else:
                     logger.info(
                         "User %s has other active connections, not setting status to OFFLINE",
@@ -136,7 +136,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 )
                 await self.set_user_status("OFFLINE")
                 await self.finalize_in_service_if_needed()
-                # await self.log_status_change("OFFLINE")
+                await self.log_status_change("OFFLINE")
 
     async def set_connection_check_response(self, connection_id: str, response: bool):
         self.cache.set(
@@ -404,19 +404,20 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         except ProjectPermission.DoesNotExist:
             pass
 
-    # async def log_status_change(
-    #     self,
-    #     status: str,
-    #     custom_status_name: str = None,
-    #     custom_status_type_uuid: str = None,
-    # ):
-    #     """Log agent status change via Celery task"""
-    #     from chats.apps.projects.tasks import log_agent_status_change
+    @database_sync_to_async
+    def log_status_change(
+        self,
+        status: str,
+        custom_status_name: str = None,
+        custom_status_type_uuid: str = None,
+    ):
+        """Log agent status change via Celery task"""
+        from chats.apps.projects.tasks import log_agent_status_change
 
-    #     log_agent_status_change.delay(
-    #         agent_email=self.user.email,
-    #         project_uuid=str(self.permission.project.uuid),
-    #         status=status,
-    #         custom_status_name=custom_status_name,
-    #         custom_status_type_uuid=custom_status_type_uuid,
-    #     )
+        log_agent_status_change.delay(
+            agent_email=self.user.email,
+            project_uuid=str(self.permission.project.uuid),
+            status=status,
+            custom_status_name=custom_status_name,
+            custom_status_type_uuid=custom_status_type_uuid,
+        )
