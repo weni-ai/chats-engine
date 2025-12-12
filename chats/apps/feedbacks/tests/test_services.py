@@ -1,22 +1,24 @@
 import pickle
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+
 from django.test import TestCase
 from django.utils import timezone
 from django.utils.timezone import timedelta
 
+from chats.apps.accounts.models import User
 from chats.apps.feedbacks.models import LastFeedbackShownToUser, UserFeedback
 from chats.apps.feedbacks.services import UserFeedbackService
-from chats.apps.feature_flags.tests.mock import MockFeatureFlagService
-from chats.core.tests.mock import MockCacheClient
-from chats.apps.accounts.models import User
 from chats.apps.projects.models.models import Project
+from chats.core.tests.mock import MockCacheClient
 
 
 class TestUserFeedbackService(TestCase):
     def setUp(self):
+        mock_feature_flags_service = MagicMock()
+        mock_feature_flags_service.get_feature_flags.return_value = {}
         self.service = UserFeedbackService(
             cache_client=MockCacheClient(),
-            feature_flags_service=MockFeatureFlagService(),
+            feature_flags_service=mock_feature_flags_service,
         )
 
     def test_get_feedback_form_shown_count_cache_key(self):
@@ -86,24 +88,26 @@ class TestUserFeedbackService(TestCase):
 
         dt = timezone.now()
 
-        self.service.feature_flags_service.get_feature_flag_rules.return_value = [
-            {
-                "condition": {
-                    "dateRange": {
-                        "$in": [dt.isoformat(), dt.isoformat()],
+        self.service.feature_flags_service.get_feature_flags.return_value = {
+            self.service.feedback_feature_flag_key: {
+                "rules": [
+                    {
+                        "condition": {
+                            "dateRange": {
+                                "$in": [dt.isoformat(), dt.isoformat()],
+                            },
+                        },
                     },
-                },
+                ],
             },
-        ]
+        }
 
         start_date, end_date = self.service.get_survey_date_range()
 
         self.assertEqual(start_date, dt)
         self.assertEqual(end_date, dt)
 
-        self.service.feature_flags_service.get_feature_flag_rules.assert_called_once_with(
-            self.service.feedback_feature_flag_key
-        )
+        self.service.feature_flags_service.get_feature_flags.assert_called_once()
 
     @patch(
         "chats.apps.feedbacks.services.UserFeedbackService.get_feedback_form_shown_count"

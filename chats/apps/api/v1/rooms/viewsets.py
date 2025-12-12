@@ -28,6 +28,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
+from weni.feature_flags.shortcuts import is_feature_active
 
 from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
@@ -84,7 +85,6 @@ from chats.apps.rooms.views import (
     update_custom_fields,
     update_flows_custom_fields,
 )
-from chats.apps.feature_flags.utils import is_feature_active
 
 
 from chats.apps.sectors.models import SectorTag
@@ -137,7 +137,11 @@ class RoomViewset(
     ):  # TODO: sparate list and retrieve queries from update and close
         if self.action != "list":
             self.filterset_class = None
-        qs = super().get_queryset()
+        qs = (
+            super()
+            .get_queryset()
+            .filter(queue__sector__project__permissions__user=self.request.user)
+        )
 
         last_24h = timezone.now() - timedelta(days=1)
 
@@ -178,9 +182,7 @@ class RoomViewset(
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        context["disable_has_history"] = getattr(
-            self, "disable_has_history", False
-        )
+        context["disable_has_history"] = getattr(self, "disable_has_history", False)
         return context
 
     def list(self, request, *args, **kwargs):
@@ -211,13 +213,13 @@ class RoomViewset(
             if project_instance:
                 use_pins_optimization = is_feature_active(
                     settings.WENI_CHATS_PIN_ROOMS_OPTIMIZATION_FLAG_KEY,
-                    request.user,
-                    project_instance,
+                    request.user.email,
+                    str(project_instance.uuid),
                 )
                 if is_feature_active(
                     settings.WENI_CHATS_DISABLE_HAS_HISTORY_FLAG_KEY,
-                    request.user,
-                    project_instance,
+                    request.user.email,
+                    str(project_instance.uuid),
                 ):
                     self.disable_has_history = True
 
@@ -1162,6 +1164,23 @@ class RoomViewset(
 
         # Return serialized note
         return Response(RoomNoteSerializer(note).data, status=status.HTTP_201_CREATED)
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="can-send-message-status",
+        url_name="can-send-message-status",
+    )
+    def can_send_message_status(self, request, pk=None):
+        """
+        Check if the user can send a message to the room
+        """
+
+        room: Room = self.get_object()
+
+        response = {"can_send_message": room.is_24h_valid}
+
+        return Response(response, status=status.HTTP_200_OK)
 
 
 class RoomsReportViewSet(APIView):
