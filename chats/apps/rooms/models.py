@@ -392,6 +392,7 @@ class Room(BaseModel, BaseConfigurableModel):
     @property
     def is_24h_valid(self) -> bool:
         """Validates is the last contact message was sent more than a day ago"""
+
         if not self.urn.startswith("whatsapp"):
             return True
 

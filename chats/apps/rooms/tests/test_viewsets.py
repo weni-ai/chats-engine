@@ -27,6 +27,7 @@ from chats.apps.rooms.tests.decorators import with_room_user
 from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 from chats.apps.sectors.tests.decorators import with_sector_authorization
 from chats.core.cache import CacheClient
+from chats.apps.ai_features.history_summary.enums import HistorySummaryFeedbackTags
 
 User = get_user_model()
 
@@ -152,7 +153,8 @@ class RoomTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json().get("count"), 0)
 
-    def test_list_rooms_given_agents(self):
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_list_rooms_given_agents(self, mock_is_feature_active):
         self._ok_list_rooms(
             self.agent_token,
             [str(self.room_1.uuid)],
@@ -164,7 +166,8 @@ class RoomTests(APITestCase):
             {"project": self.project.uuid},
         )
 
-    def test_list_rooms_with_manager_and_admin_token(self):
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_list_rooms_with_manager_and_admin_token(self, mock_is_feature_active):
         self._ok_list_rooms(
             self.manager_token,
             [str(self.room_2.uuid), str(self.room_3.uuid)],
@@ -177,7 +180,8 @@ class RoomTests(APITestCase):
             {"project": self.project.uuid},
         )
 
-    def test_list_rooms_with_not_permitted_manager_token(self):
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_list_rooms_with_not_permitted_manager_token(self, mock_is_feature_active):
         self._not_ok_list_rooms(
             self.manager_3_token,
             {"project": self.project.uuid},
@@ -311,7 +315,8 @@ class RoomsManagerTests(APITestCase):
         results = response.json().get("results")
         return response, results
 
-    def test_admin_list_agent_rooms(self):
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_admin_list_agent_rooms(self, mock_is_feature_active):
         data = {"project": str(self.project.pk)}
         admin_data = {**data, **{"email": self.agent_1.email}}
         admin_response = self._request_list_rooms(
@@ -323,7 +328,8 @@ class RoomsManagerTests(APITestCase):
         self.assertEquals(admin_response.status_code, status.HTTP_200_OK)
         self.assertEquals(admin_content.get("count"), agent_content.get("count"))
 
-    def test_manager_list_agent_rooms(self):
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_manager_list_agent_rooms(self, mock_is_feature_active):
         data = {"project": str(self.project.pk)}
         manager_data = {**data, **{"email": self.agent_1.email}}
         manager_response = self._request_list_rooms(
@@ -385,7 +391,8 @@ class TestRoomsViewSet(APITestCase):
 
         return self.client.get(url, filters)
 
-    def test_room_order_by_created_on(self):
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_room_order_by_created_on(self, mock_is_feature_active):
         room_1 = Room.objects.create(
             project_uuid=str(self.project.uuid),
             is_active=True,
@@ -411,7 +418,8 @@ class TestRoomsViewSet(APITestCase):
             response.json().get("results")[1].get("uuid"), str(room_2.uuid)
         )
 
-    def test_room_order_by_inverted_created_on(self):
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_room_order_by_inverted_created_on(self, mock_is_feature_active):
         room_1 = Room.objects.create(
             project_uuid=str(self.project.uuid),
             is_active=True,
@@ -437,7 +445,8 @@ class TestRoomsViewSet(APITestCase):
             response.json().get("results")[1].get("uuid"), str(room_1.uuid)
         )
 
-    def test_room_order_with_pin(self):
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_room_order_with_pin(self, mock_is_feature_active):
         # Create rooms
         room_1 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
         room_2 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
@@ -502,7 +511,8 @@ class TestRoomsViewSet(APITestCase):
         self.assertEqual(rooms_uuids[3], str(room_1.uuid))
         self.assertEqual(results[3].get("is_pinned"), False)
 
-    def test_room_order_with_email(self):
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_room_order_with_email(self, mock_is_feature_active):
         another_user = User.objects.create(email="another_user@example.com")
         QueueAuthorization.objects.create(
             permission=ProjectPermission.objects.create(
@@ -1083,6 +1093,46 @@ class RoomHistorySummaryTestCase(APITestCase):
 
         self.assertEqual(feedback.liked, False)
         self.assertEqual(feedback.text, None)
+
+    @with_room_user
+    def test_post_room_history_summary_feedback_with_liked_as_false_with_tags(self):
+        history_summary = self.create_history_summary(self.room)
+
+        self.assertFalse(history_summary.feedbacks.filter(user=self.user).exists())
+
+        response = self.post_room_history_summary_feedback(
+            self.room.uuid,
+            {"liked": False, "tags": [HistorySummaryFeedbackTags.INCORRECT_SUMMARY]},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["liked"], False)
+        self.assertEqual(
+            response.data["tags"], [HistorySummaryFeedbackTags.INCORRECT_SUMMARY]
+        )
+
+        self.assertTrue(history_summary.feedbacks.filter(user=self.user).exists())
+        feedback = history_summary.feedbacks.filter(user=self.user).first()
+
+        self.assertEqual(feedback.liked, False)
+        self.assertEqual(feedback.text, None)
+        self.assertEqual(feedback.tags, [HistorySummaryFeedbackTags.INCORRECT_SUMMARY])
+
+    @with_room_user
+    def test_post_room_history_summary_feedback_with_liked_as_false_with_invalid_tag(
+        self,
+    ):
+        history_summary = self.create_history_summary(self.room)
+
+        self.assertFalse(history_summary.feedbacks.filter(user=self.user).exists())
+
+        response = self.post_room_history_summary_feedback(
+            self.room.uuid,
+            {"liked": False, "tags": ["INVALID_TAG"]},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["tags"][0].code, "invalid")
 
     @with_room_user
     def test_post_room_history_summary_feedback_with_text(self):

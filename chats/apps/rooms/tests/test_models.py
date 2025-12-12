@@ -7,6 +7,7 @@ from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError
 from django.test import TransactionTestCase, override_settings
 from django.utils import timezone
+from django.utils.timezone import timedelta
 from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
@@ -19,6 +20,7 @@ from chats.apps.rooms.exceptions import (
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.utils import create_transfer_json
 from chats.apps.sectors.models import Sector, SectorTag
+from chats.apps.msgs.models import Message
 
 
 class ConstraintTests(APITestCase):
@@ -386,6 +388,86 @@ class TestRoomModel(TransactionTestCase):
         room.save()
 
         self.assertEqual(room.tags.count(), 0)
+
+    @patch("chats.apps.rooms.models.Room.get_24h_valid_from_cache")
+    @patch("chats.apps.rooms.models.Room.save_24h_valid_to_cache")
+    def test_room_24h_valid_when_room_urn_is_not_whatsapp(
+        self, save_24h_valid_to_cache, get_24h_valid_from_cache
+    ):
+        room = Room.objects.create(queue=self.queue, urn="test")
+        self.assertTrue(room.is_24h_valid)
+
+        get_24h_valid_from_cache.assert_not_called()
+        save_24h_valid_to_cache.assert_not_called()
+
+    @patch("chats.apps.rooms.models.Room.get_24h_valid_from_cache")
+    @patch("chats.apps.rooms.models.Room.save_24h_valid_to_cache")
+    def test_room_24h_valid_when_room_response_is_cached(
+        self, save_24h_valid_to_cache, get_24h_valid_from_cache
+    ):
+        get_24h_valid_from_cache.return_value = True
+        room = Room.objects.create(queue=self.queue, urn="whatsapp:1234567890")
+        self.assertTrue(room.is_24h_valid)
+
+        get_24h_valid_from_cache.assert_called_once()
+        save_24h_valid_to_cache.assert_not_called()
+
+    @patch("chats.apps.rooms.models.Room.get_24h_valid_from_cache")
+    @patch("chats.apps.rooms.models.Room.save_24h_valid_to_cache")
+    def test_room_24h_valid_when_room_contact_messages_are_in_24_hour_window(
+        self, save_24h_valid_to_cache, get_24h_valid_from_cache
+    ):
+        get_24h_valid_from_cache.return_value = None
+        room = Room.objects.create(queue=self.queue, urn="whatsapp:1234567890")
+        Message.objects.create(room=room, contact=room.contact, text="Test Message")
+        self.assertTrue(room.is_24h_valid)
+
+        get_24h_valid_from_cache.assert_called()
+        save_24h_valid_to_cache.assert_called()
+
+    @patch("chats.apps.rooms.models.Room.get_24h_valid_from_cache")
+    @patch("chats.apps.rooms.models.Room.save_24h_valid_to_cache")
+    def test_room_24h_valid_when_room_contact_messages_are_not_in_24_hour_window(
+        self, save_24h_valid_to_cache, get_24h_valid_from_cache
+    ):
+        get_24h_valid_from_cache.return_value = None
+
+        now = timezone.now()
+        yesterday = now - timedelta(days=1, hours=1)
+
+        with patch("chats.apps.rooms.models.timezone.now") as mock_now:
+            mock_now.return_value = yesterday
+            room = Room.objects.create(queue=self.queue, urn="whatsapp:1234567890")
+            Message.objects.create(
+                room=room,
+                contact=room.contact,
+                text="Test Message",
+                created_on=yesterday,
+            )
+
+        self.assertFalse(room.is_24h_valid)
+
+        get_24h_valid_from_cache.assert_called()
+        save_24h_valid_to_cache.assert_called()
+
+    @patch("chats.apps.rooms.models.cache")
+    @patch("chats.apps.rooms.models.ROOM_24H_VALID_CACHE_TTL")
+    def test_get_24h_valid_from_cache(self, mock_room_24h_valid_cache_ttl, mock_cache):
+        mock_room_24h_valid_cache_ttl.return_value = 30
+        mock_cache.get.return_value = True
+        room = Room.objects.create(queue=self.queue, urn="whatsapp:1234567890")
+        self.assertTrue(room.get_24h_valid_from_cache())
+
+        mock_cache.get.assert_called_once_with(room.room_24h_valid_cache_key)
+
+    @patch("chats.apps.rooms.models.cache")
+    @patch("chats.apps.rooms.models.ROOM_24H_VALID_CACHE_TTL")
+    def test_save_24h_valid_to_cache(self, mock_room_24h_valid_cache_ttl, mock_cache):
+        mock_room_24h_valid_cache_ttl.return_value = 30
+        mock_cache.set.return_value = True
+        room = Room.objects.create(queue=self.queue, urn="whatsapp:1234567890")
+        room.save_24h_valid_to_cache(True)
+        mock_cache.set.assert_called()
 
 
 class TestHandleRoomCloseTags(TransactionTestCase):
