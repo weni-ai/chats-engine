@@ -49,6 +49,8 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
             url = f"chats:dashboard/view-mode/{obj.user.email}"
         elif not obj.user and obj.is_active:
             url = f"chats:chats/{obj.uuid}"
+        elif not obj.is_active:
+            url = "chats:"
         else:
             url = None
 
