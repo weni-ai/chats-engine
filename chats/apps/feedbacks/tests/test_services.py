@@ -78,17 +78,13 @@ class TestUserFeedbackService(TestCase):
         self.assertIsNone(start_date)
         self.assertIsNone(end_date)
 
-    @patch("chats.core.tests.mock.MockCacheClient.get")
-    @patch("chats.core.tests.mock.MockCacheClient.set")
-    def test_get_survey_date_range_not_cached_and_rules(
-        self, mock_cache_set, mock_cache_get
-    ):
-        mock_cache_get.return_value = None
-        mock_cache_set.return_value = True
+    def test_get_survey_date_range_not_cached_and_rules(self):
+        self.service.cache_client.get = MagicMock(return_value=None)
+        self.service.cache_client.set = MagicMock(return_value=True)
 
         dt = timezone.now()
 
-        self.service.feature_flags_service.get_feature_flags.return_value = {
+        self.service.feature_flags_service.get_features.return_value = {
             self.service.feedback_feature_flag_key: {
                 "rules": [
                     {
@@ -107,7 +103,7 @@ class TestUserFeedbackService(TestCase):
         self.assertEqual(start_date, dt)
         self.assertEqual(end_date, dt)
 
-        self.service.feature_flags_service.get_feature_flags.assert_called_once()
+        self.service.feature_flags_service.get_features.assert_called_once()
 
     @patch(
         "chats.apps.feedbacks.services.UserFeedbackService.get_feedback_form_shown_count"
