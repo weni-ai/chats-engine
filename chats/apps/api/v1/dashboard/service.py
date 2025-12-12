@@ -260,72 +260,54 @@ class TimeMetricsService:
             "max_conversation_duration": max_conversation_duration,
         }
 
-    def get_time_metrics_for_analysis(self, filters: Filters, project):
-        if not filters.start_date and not filters.end_date:
-            raise ValueError("Start date and end date are required")
-
-        rooms_filter = (
+    def _build_analysis_base_filter(self, filters: Filters, project) -> Q:
+        """Build base Q filter for closed rooms analysis."""
+        base_filter = (
             Q(queue__sector__project=project)
             & Q(is_active=False)
             & Q(ended_at__gte=filters.start_date)
             & Q(ended_at__lte=filters.end_date)
         )
-
         if filters.agent:
-            rooms_filter &= Q(user=filters.agent)
-
+            base_filter &= Q(user=filters.agent)
         if filters.sector:
-            if not isinstance(filters.sector, list):
-                filters.sector = [filters.sector]
-            rooms_filter &= Q(queue__sector__in=filters.sector)
-
+            base_filter &= Q(queue__sector__in=filters.sector)
         if filters.queue:
-            if not isinstance(filters.queue, list):
-                filters.queue = [filters.queue]
-            rooms_filter &= Q(queue__uuid__in=filters.queue)
-
+            base_filter &= Q(queue__uuid__in=filters.queue)
         if filters.tag:
-            if not isinstance(filters.tag, list):
-                filters.tag = [filters.tag]
-            rooms_filter &= Q(tags__uuid__in=filters.tag)
+            base_filter &= Q(tags__uuid__in=filters.tag)
+        return base_filter
 
-        max_waiting_time = Room.objects.filter(rooms_filter).aggregate(
-            Max("metric__waiting_time")
-        )["metric__waiting_time__max"]
-        avg_waiting_time = Room.objects.filter(rooms_filter).aggregate(
-            Avg("metric__waiting_time")
-        )["metric__waiting_time__avg"]
+    def _get_analysis_aggregates(self, rooms_filter: Q) -> dict:
+        """Get all metric aggregates in optimized queries."""
+        base_qs = Room.objects.filter(rooms_filter)
 
-        avg_first_response_time = Room.objects.filter(rooms_filter).aggregate(
-            Avg("metric__first_response_time")
-        )["metric__first_response_time__avg"]
-        max_first_response_time = Room.objects.filter(rooms_filter).aggregate(
-            Max("metric__first_response_time")
-        )["metric__first_response_time__max"]
-
-        avg_conversation_duration = (
-            Room.objects.filter(rooms_filter)
-            .filter(first_user_assigned_at__isnull=False)
-            .aggregate(Avg("metric__interaction_time"))["metric__interaction_time__avg"]
-        )
-        max_conversation_duration = (
-            Room.objects.filter(rooms_filter)
-            .filter(first_user_assigned_at__isnull=False)
-            .aggregate(Max("metric__interaction_time"))["metric__interaction_time__max"]
+        time_metrics = base_qs.aggregate(
+            max_waiting_time=Max("metric__waiting_time"),
+            avg_waiting_time=Avg("metric__waiting_time"),
+            max_first_response_time=Max("metric__first_response_time"),
+            avg_first_response_time=Avg("metric__first_response_time"),
         )
 
-        avg_message_response_time = (
-            Room.objects.filter(rooms_filter)
-            .filter(metric__isnull=False, metric__message_response_time__gt=0)
-            .aggregate(avg=Avg("metric__message_response_time"))["avg"]
+        duration_metrics = base_qs.filter(
+            first_user_assigned_at__isnull=False
+        ).aggregate(
+            max_conversation_duration=Max("metric__interaction_time"),
+            avg_conversation_duration=Avg("metric__interaction_time"),
         )
 
-        return {
-            "max_waiting_time": (int(max_waiting_time or 0)),
-            "avg_waiting_time": (int(avg_waiting_time or 0)),
-            "max_first_response_time": (int(max_first_response_time or 0)),
-            "avg_first_response_time": (int(avg_first_response_time or 0)),
-            "max_conversation_duration": (int(max_conversation_duration or 0)),
-            "avg_conversation_duration": (int(avg_conversation_duration or 0)),
-            "avg_message_response_time": (int(avg_message_response_time or 0)),
-        }
+        response_metrics = base_qs.filter(
+            metric__isnull=False, metric__message_response_time__gt=0
+        ).aggregate(avg_message_response_time=Avg("metric__message_response_time"))
+
+        return {**time_metrics, **duration_metrics, **response_metrics}
+
+    def get_time_metrics_for_analysis(self, filters: Filters, project):
+        if not filters.start_date and not filters.end_date:
+            raise ValueError("Start date and end date are required")
+
+        self._normalize_filters(filters)
+        rooms_filter = self._build_analysis_base_filter(filters, project)
+        aggregates = self._get_analysis_aggregates(rooms_filter)
+
+        return {key: int(value or 0) for key, value in aggregates.items()}
