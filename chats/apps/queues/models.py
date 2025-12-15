@@ -126,15 +126,48 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
 
         return online_agents.order_by("active_rooms_count")
 
+    def _get_agent_with_least_rooms_closed_today(self, agents):
+        """
+        Returns the agent that closed the fewest rooms today.
+        If there is a tie, returns a random agent.
+        """
+        from datetime import timedelta
+
+        from chats.apps.rooms.models import Room
+
+        today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        tomorrow_start = today_start + timedelta(days=1)
+
+        rooms_closed_counts = (
+            Room.objects.filter(
+                user__in=agents,
+                queue__sector=self.sector,
+                ended_at__gte=today_start,
+                ended_at__lt=tomorrow_start,
+                is_active=False,
+            )
+            .values("user_id")
+            .annotate(count=models.Count("uuid"))
+        )
+
+        # user_id is the email (to_field="email" in Room.user ForeignKey)
+        rooms_closed_today = {item["user_id"]: item["count"] for item in rooms_closed_counts}
+        min_closed_today = min(rooms_closed_today.get(agent.email, 0) for agent in agents)
+
+        eligible_agents = [agent for agent in agents if rooms_closed_today.get(agent.email, 0) == min_closed_today]
+
+        return random.choice(eligible_agents)
+
     def get_available_agent(self):
         """
         Get an available agent for a queue, based on the number of active rooms.
 
         If the active rooms count is the same for different agents,
-        a random agent, among the ones with the rooms count, is returned.
+        the agent with the least rooms closed today is selected.
+        If there is still a tie, a random agent is returned.
         """
         agents = list(self.available_agents)
-
+        print('agents', agents)
         if not agents:
             return None
 
@@ -146,12 +179,17 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         )
 
         min_rooms_count = min(getattr(agent, field_name) for agent in agents)
-
+        print('min_rooms_count', min_rooms_count)
         eligible_agents = [
             agent for agent in agents if getattr(agent, field_name) == min_rooms_count
         ]
+        print('eligible_agents', eligible_agents)
+        if len(eligible_agents) == 1:
+            print('verificando se tem agente')
+            return eligible_agents[0]
 
-        return random.choice(eligible_agents)
+        print('chamando _get_agent_with_least_rooms_closed_today')
+        return self._get_agent_with_least_rooms_closed_today(eligible_agents)
 
     def is_agent(self, user):
         return self.authorizations.filter(permission__user=user).exists()
