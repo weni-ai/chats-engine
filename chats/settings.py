@@ -72,7 +72,7 @@ INSTALLED_APPS = [
     "chats.apps.ai_features.history_summary",
     "chats.apps.feature_flags",
     "chats.apps.feedbacks",
-    # third party apps
+    "weni.feature_flags",  # weni-commons feature flags
     "channels",
     "drf_yasg",
     "django_filters",
@@ -609,3 +609,9 @@ WENI_CHATS_DISABLE_HAS_HISTORY_FLAG_KEY = env.str(
 # USER CACHE
 USER_OBJECT_CACHE_TTL = env.int("USER_OBJECT_CACHE_TTL", default=300)
 USER_OBJECT_CACHE_ENABLED = env.bool("USER_OBJECT_CACHE_ENABLED", default=True)
+
+
+# ROOM 24H VALID CACHE
+ROOM_24H_VALID_CACHE_TTL = env.int(
+    "ROOM_24H_VALID_CACHE_TTL", default=0
+)  # 0 means no cache
