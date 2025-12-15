@@ -146,6 +146,9 @@ CACHES = {
 
 DATABASES = dict(default=env.db(var="DATABASE_URL"))
 
+DB_TIMEOUT = env.int("DB_TIMEOUT", default=(10 * 60 * 1000))  # 10 minutes
+DATABASES["OPTIONS"] = {"options": f"-c statement_timeout={DB_TIMEOUT}"}
+
 # User
 
 AUTH_USER_MODEL = "accounts.User"
