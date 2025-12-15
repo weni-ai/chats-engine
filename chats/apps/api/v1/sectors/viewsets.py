@@ -6,6 +6,7 @@ from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import exceptions, filters, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -228,6 +229,10 @@ class SectorViewset(viewsets.ModelViewSet):
         return Response({"working_hours": working_hours}, status=status.HTTP_200_OK)
 
 
+class SectorTagPagination(LimitOffsetPagination):
+    default_limit = 20
+
+
 class SectorTagsViewset(viewsets.ModelViewSet):
     swagger_tag = "Sectors"
     queryset = SectorTag.objects.all().order_by("name")
@@ -235,6 +240,7 @@ class SectorTagsViewset(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_class = SectorTagFilter
     lookup_field = "uuid"
+    pagination_class = SectorTagPagination
 
     def get_queryset(self):
         queryset = super().get_queryset()
