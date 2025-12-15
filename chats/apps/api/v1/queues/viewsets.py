@@ -227,11 +227,15 @@ class QueueViewset(ModelViewSet):
         if get_user_id_by_email_cached(email_l) is None:
             return Response({"user_permissions": []}, status=status.HTTP_200_OK)
 
-        queue_permissions = QueueAuthorization.objects.filter(
-            permission__user_id=email_l,
-            queue__sector__project=project,
-            queue__is_deleted=False,
-        )
+        query_params = {
+            "permission__user_id": email_l,
+            "queue__is_deleted": False,
+        }
+
+        if project:
+            query_params["queue__sector__project"] = project
+
+        queue_permissions = QueueAuthorization.objects.filter(**query_params)
         serializer_data = queue_serializers.QueueAuthorizationSerializer(
             queue_permissions, many=True
         )
