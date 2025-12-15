@@ -143,9 +143,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
     unread_msgs = serializers.IntegerField(required=False, default=0)
     last_message = serializers.SerializerMethodField()
     is_waiting = serializers.BooleanField()
-    is_24h_valid = serializers.BooleanField(
-        default=True, source="is_24h_valid_computed"
-    )
+    is_24h_valid = serializers.SerializerMethodField()
     config = serializers.JSONField(required=False, read_only=True)
     last_interaction = serializers.DateTimeField(read_only=True)
     can_edit_custom_fields = serializers.SerializerMethodField()
@@ -256,6 +254,19 @@ class ListRoomSerializer(serializers.ModelSerializer):
         return get_history_rooms_queryset_by_contact(
             room.contact, user, room.queue.sector.project
         ).exists()
+
+    def get_is_24h_valid(self, room: Room) -> bool:
+        if room_24h_valid := getattr(room, "is_24h_valid_computed", None):
+            return room_24h_valid
+
+        return None
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if data.get("is_24h_valid") is None:
+            data.pop("is_24h_valid")
+
+        return data
 
 
 class TransferRoomSerializer(serializers.ModelSerializer):
