@@ -167,7 +167,7 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         If there is still a tie, a random agent is returned.
         """
         agents = list(self.available_agents)
-
+        print('agents', agents)
         if not agents:
             return None
 
@@ -179,13 +179,16 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         )
 
         min_rooms_count = min(getattr(agent, field_name) for agent in agents)
+        print('min_rooms_count', min_rooms_count)
         eligible_agents = [
             agent for agent in agents if getattr(agent, field_name) == min_rooms_count
         ]
-
+        print('eligible_agents', eligible_agents)
         if len(eligible_agents) == 1:
+            print('verificando se tem agente')
             return eligible_agents[0]
 
+        print('chamando _get_agent_with_least_rooms_closed_today')
         return self._get_agent_with_least_rooms_closed_today(eligible_agents)
 
     def is_agent(self, user):
