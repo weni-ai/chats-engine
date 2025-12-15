@@ -1,11 +1,13 @@
 import random
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.db.models import OuterRef, Q, Subquery
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from weni.feature_flags.shortcuts import is_feature_active
 
 from chats.apps.projects.models.models import CustomStatus
 from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
@@ -151,10 +153,18 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         )
 
         # user_id is the email (to_field="email" in Room.user ForeignKey)
-        rooms_closed_today = {item["user_id"]: item["count"] for item in rooms_closed_counts}
-        min_closed_today = min(rooms_closed_today.get(agent.email, 0) for agent in agents)
+        rooms_closed_today = {
+            item["user_id"]: item["count"] for item in rooms_closed_counts
+        }
+        min_closed_today = min(
+            rooms_closed_today.get(agent.email, 0) for agent in agents
+        )
 
-        eligible_agents = [agent for agent in agents if rooms_closed_today.get(agent.email, 0) == min_closed_today]
+        eligible_agents = [
+            agent
+            for agent in agents
+            if rooms_closed_today.get(agent.email, 0) == min_closed_today
+        ]
 
         return random.choice(eligible_agents)
 
@@ -186,7 +196,14 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         if len(eligible_agents) == 1:
             return eligible_agents[0]
 
-        return self._get_agent_with_least_rooms_closed_today(eligible_agents)
+        if is_feature_active(
+            settings.LEAST_ROOMS_CLOSED_TODAY_FEATURE_FLAG_KEY,
+            None,
+            str(self.project.uuid),
+        ):
+            return self._get_agent_with_least_rooms_closed_today(eligible_agents)
+
+        return random.choice(eligible_agents)
 
     def is_agent(self, user):
         return self.authorizations.filter(permission__user=user).exists()

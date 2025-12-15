@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.test import TestCase
@@ -406,7 +408,10 @@ class TestQueueGetAvailableAgent(TestCase):
         available_agent = self.queue.get_available_agent()
         self.assertEqual(available_agent, self.agent_3)
 
-    def test_get_available_agent_returns_random_agent_if_rooms_count_is_equal(self):
+    @patch("chats.apps.queues.models.is_feature_active", return_value=False)
+    def test_get_available_agent_returns_random_agent_if_rooms_count_is_equal(
+        self, mock_is_feature_active
+    ):
         for i in range(3):
             # Agent 1 has 3 active rooms
             Room.objects.create(user=self.agent_1, queue=self.queue, is_active=True)
@@ -442,8 +447,9 @@ class TestQueueGetAvailableAgent(TestCase):
             "Agent 3 was never picked, suggesting non-random selection.",
         )
 
+    @patch("chats.apps.queues.models.is_feature_active", return_value=False)
     def test_get_available_agent_returns_random_agent_if_rooms_count_is_equal_for_general_routing_option(
-        self,
+        self, mock_is_feature_active
     ):
         self.project.config = {"routing_option": "general"}
         self.project.save()
@@ -487,7 +493,10 @@ class TestQueueGetAvailableAgent(TestCase):
             "Agent 3 was never picked, suggesting non-random selection.",
         )
 
-    def test_get_available_agent_tiebreaker_by_rooms_closed_today(self):
+    @patch("chats.apps.queues.models.is_feature_active", return_value=True)
+    def test_get_available_agent_tiebreaker_by_rooms_closed_today(
+        self, mock_is_feature_active
+    ):
         """
         When agents have the same number of active rooms,
         the agent with fewer rooms closed today should be selected.
@@ -516,7 +525,10 @@ class TestQueueGetAvailableAgent(TestCase):
         available_agent = self.queue.get_available_agent()
         self.assertEqual(available_agent, self.agent_3)
 
-    def test_get_available_agent_random_when_all_tiebreakers_equal(self):
+    @patch("chats.apps.queues.models.is_feature_active", return_value=True)
+    def test_get_available_agent_random_when_all_tiebreakers_equal(
+        self, mock_is_feature_active
+    ):
         """
         When agents have the same number of active rooms AND the same number
         of rooms closed today, the selection should be random.

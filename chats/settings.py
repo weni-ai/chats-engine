@@ -604,6 +604,10 @@ WENI_CHATS_DISABLE_HAS_HISTORY_FLAG_KEY = env.str(
     "WENI_CHATS_DISABLE_HAS_HISTORY_FLAG_KEY",
     default="weniChatsDisableHasHistory",
 )
+LEAST_ROOMS_CLOSED_TODAY_FEATURE_FLAG_KEY = env.str(
+    "LEAST_ROOMS_CLOSED_TODAY_FEATURE_FLAG_KEY",
+    default="weniChatsLeastRoomsClosedToday",
+)
 
 
 # USER CACHE
