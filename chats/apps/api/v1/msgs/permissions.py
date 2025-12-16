@@ -33,6 +33,9 @@ class MessagePermission(permissions.BasePermission):
                 project__uuid=project_uuid
             ).first()
 
+            if not permission:
+                return False
+
         return permission.role > 0 if view.action == "list" else False
 
     def has_object_permission(self, request, view, message) -> bool:
