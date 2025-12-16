@@ -6,6 +6,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from chats.apps.accounts.models import User
+from chats.apps.ai_features.history_summary.enums import HistorySummaryFeedbackTags
 from chats.apps.ai_features.history_summary.models import (
     HistorySummary,
     HistorySummaryFeedback,
@@ -406,10 +407,23 @@ class RoomHistorySummaryFeedbackSerializer(serializers.ModelSerializer):
     text = serializers.CharField(
         required=False, allow_blank=True, allow_null=True, max_length=150
     )
+    tags = serializers.ListField(
+        required=False,
+        child=serializers.CharField(),
+    )
 
     class Meta:
         model = HistorySummaryFeedback
-        fields = ["liked", "text"]
+        fields = ["liked", "text", "tags"]
+
+    def validate_tags(self, tags):
+        for tag in tags:
+            if tag not in HistorySummaryFeedbackTags.values:
+                raise serializers.ValidationError(
+                    [f"Invalid tag: {tag}"],
+                )
+
+        return tags
 
     def validate(self, attrs):
         attrs["user"] = self.context["request"].user
