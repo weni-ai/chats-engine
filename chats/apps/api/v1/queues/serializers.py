@@ -149,7 +149,7 @@ class QueueAgentsSerializer(serializers.ModelSerializer):
 
 class QueuePermissionsListQueryParamsSerializer(serializers.Serializer):
     user_email = serializers.EmailField()
-    project = serializers.UUIDField(required=False, allow_null=True, allow_blank=True)
+    project = serializers.UUIDField(required=False, allow_null=True)
 
     def validate(self, data: dict) -> dict:
         project = data.get("project")
