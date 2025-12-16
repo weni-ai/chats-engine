@@ -386,6 +386,7 @@ class RoomViewset(
         serializer.is_valid(raise_exception=True)
 
         room.clear_unread_messages_count()
+        room.refresh_from_db()
         room.notify_user("update")
 
         return Response(
