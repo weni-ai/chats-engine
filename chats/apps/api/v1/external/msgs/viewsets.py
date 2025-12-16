@@ -1,5 +1,6 @@
 from functools import cached_property
 
+from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, viewsets
 
@@ -61,6 +62,7 @@ class MessageFlowViewset(
         instance = serializer.save()
         instance.notify_room("create")
         room = instance.room
+        room.increment_unread_messages_count(1, timezone.now())
         if room.user is None and instance.contact:
             room.trigger_default_message()
 
