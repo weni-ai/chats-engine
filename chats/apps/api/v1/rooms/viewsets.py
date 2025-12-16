@@ -6,7 +6,6 @@ from django.db import transaction
 from django.db.models import (
     BooleanField,
     Case,
-    Count,
     DateTimeField,
     Exists,
     Max,
