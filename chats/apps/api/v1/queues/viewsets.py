@@ -26,7 +26,10 @@ from chats.apps.sectors.usecases.group_sector_authorization import (
 )
 from chats.core.cache_utils import get_user_id_by_email_cached
 
-from .serializers import QueueAgentsSerializer
+from .serializers import (
+    QueueAgentsSerializer,
+    QueuePermissionsListQueryParamsSerializer,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -227,8 +230,13 @@ class QueueViewset(ModelViewSet):
 
     @action(detail=False, methods=["GET"])
     def list_queue_permissions(self, request, *args, **kwargs):
-        user_email = request.query_params.get("user_email")
-        project = request.query_params.get("project")
+        query_params = QueuePermissionsListQueryParamsSerializer(
+            data=request.query_params
+        )
+        query_params.is_valid(raise_exception=True)
+
+        user_email = query_params.validated_data["user_email"]
+        project = query_params.validated_data.get("project")
 
         email_l = (user_email or "").lower()
         if get_user_id_by_email_cached(email_l) is None:
