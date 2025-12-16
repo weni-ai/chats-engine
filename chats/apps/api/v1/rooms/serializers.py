@@ -41,7 +41,9 @@ class RoomSerializer(serializers.ModelSerializer):
     contact = ContactRelationsSerializer(many=False, read_only=True)
     queue = QueueSerializer(many=False, read_only=True)
     tags = DetailSectorTagSerializer(many=True, read_only=True)
-    unread_msgs = serializers.SerializerMethodField()
+    unread_msgs = serializers.IntegerField(
+        source="unread_messages_count", read_only=True
+    )
     last_message = serializers.SerializerMethodField()
     is_waiting = serializers.SerializerMethodField()
     linked_user = serializers.SerializerMethodField()
@@ -73,6 +75,7 @@ class RoomSerializer(serializers.ModelSerializer):
             "full_transfer_history",
             "added_to_queue_at",
             "has_history",
+            "unread_msgs",
         ]
 
     def get_is_24h_valid(self, room: Room) -> bool:
@@ -97,9 +100,6 @@ class RoomSerializer(serializers.ModelSerializer):
 
     def get_is_waiting(self, room: Room):
         return room.get_is_waiting()
-
-    def get_unread_msgs(self, room: Room):
-        return room.messages.filter(seen=False).count()
 
     def get_last_message(self, room: Room):
         last_message = (
