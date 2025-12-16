@@ -530,3 +530,45 @@ class TestHandleRoomCloseTags(TransactionTestCase):
         self.assertEqual(
             list(self.room.tags.values_list("uuid", flat=True)), close_tags
         )
+
+
+class TestRoomUnreadMessagesCount(TransactionTestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(
+            name="Test Queue",
+            sector=self.sector,
+        )
+        self.room = Room.objects.create(queue=self.queue)
+
+    def test_increment_unread_messages_count(self):
+        self.assertIsNone(self.room.last_unread_message_at)
+        self.assertEqual(self.room.unread_messages_count, 0)
+
+        self.room.increment_unread_messages_count(1, timezone.now())
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.unread_messages_count, 1)
+        self.assertIsNone(self.room.last_unread_message_at)
+
+        self.room.increment_unread_messages_count(2, timezone.now())
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.unread_messages_count, 3)
+        self.assertIsNone(self.room.last_unread_message_at)
+
+    def test_clear_unread_messages_count(self):
+        self.room.increment_unread_messages_count(1, timezone.now())
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.unread_messages_count, 1)
+        self.assertIsNone(self.room.last_unread_message_at)
+
+        self.room.clear_unread_messages_count()
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.unread_messages_count, 0)
+        self.assertIsNotNone(self.room.last_unread_message_at)

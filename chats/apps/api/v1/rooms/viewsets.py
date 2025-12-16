@@ -6,7 +6,6 @@ from django.db import transaction
 from django.db.models import (
     BooleanField,
     Case,
-    Count,
     DateTimeField,
     Exists,
     Max,
@@ -148,7 +147,6 @@ class RoomViewset(
 
         annotations = {
             "last_interaction": Max("messages__created_on"),
-            "unread_msgs": Count("messages", filter=Q(messages__seen=False)),
             "last_contact_interaction": Max(
                 "messages__created_on", filter=Q(messages__contact__isnull=False)
             ),
@@ -386,18 +384,12 @@ class RoomViewset(
             )
         serializer = RoomMessageStatusSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serialized_data = serializer.validated_data
 
-        message_filter = {"seen": not serialized_data.get("seen")}
-        if request.data.get("messages", []):
-            message_filter["pk__in"] = request.data.get("messages")
-
-        room.messages.filter(**message_filter).update(
-            modified_on=timezone.now(), seen=serialized_data.get("seen")
-        )
+        room.clear_unread_messages_count()
         room.notify_user("update")
+
         return Response(
-            {"detail": "All the given messages have been marked as read"},
+            {"detail": "Unread messages count cleared"},
             status=status.HTTP_200_OK,
         )
 
@@ -444,9 +436,7 @@ class RoomViewset(
             permission = instance.project.get_permission(request.user)
             if not permission or not permission.is_admin:
                 raise PermissionDenied(
-                    detail=_(
-                        "Agents cannot close queued rooms in this sector."
-                    ),
+                    detail=_("Agents cannot close queued rooms in this sector."),
                     code="queued_room_close_disabled",
                 )
 

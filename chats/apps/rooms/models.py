@@ -1,8 +1,10 @@
 import json
 import logging
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
+
+from django.db.models import Q
 
 import requests
 import sentry_sdk
@@ -11,6 +13,7 @@ from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models, transaction
+from django.db.models import F
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_redis import get_redis_connection
@@ -125,6 +128,10 @@ class Room(BaseModel, BaseConfigurableModel):
     )
     added_to_queue_at = models.DateTimeField(
         _("Added to queue at"), null=True, blank=True
+    )
+    unread_messages_count = models.IntegerField(_("Unread messages count"), default=0)
+    last_unread_message_at = models.DateTimeField(
+        _("Last unread message at"), null=True, blank=True
     )
 
     tracker = FieldTracker(fields=["user", "is_active", "queue"])
@@ -742,6 +749,28 @@ class Room(BaseModel, BaseConfigurableModel):
         from chats.apps.csat.tasks import start_csat_flow
 
         start_csat_flow.delay(self.uuid)
+
+    def increment_unread_messages_count(
+        self, count: int, last_unread_message_at: datetime
+    ):
+        """
+        Updates the unread messages count for a room.
+        """
+        Room.objects.filter(
+            Q(pk=self.pk)
+            & (
+                Q(last_unread_message_at__lt=last_unread_message_at)
+                | Q(last_unread_message_at__isnull=True)
+            ),
+        ).update(unread_messages_count=F("unread_messages_count") + count)
+
+    def clear_unread_messages_count(self):
+        """
+        Clears the unread messages count for a room.
+        """
+        Room.objects.filter(pk=self.pk).update(
+            unread_messages_count=0, last_unread_message_at=timezone.now()
+        )
 
 
 class RoomPin(BaseModel):

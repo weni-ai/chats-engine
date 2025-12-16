@@ -146,7 +146,9 @@ class ListRoomSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
     contact = serializers.SerializerMethodField()
     queue = serializers.SerializerMethodField()
-    unread_msgs = serializers.IntegerField(required=False, default=0)
+    unread_msgs = serializers.IntegerField(
+        source="unread_messages_count", read_only=True
+    )
     last_message = serializers.SerializerMethodField()
     is_waiting = serializers.BooleanField()
     is_24h_valid = serializers.SerializerMethodField()

@@ -565,7 +565,9 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             room.save()
 
         if messages_to_create:
-            created_messages = Message.objects.bulk_create(messages_to_create)
+            created_messages: list[Message] = Message.objects.bulk_create(
+                messages_to_create
+            )
 
             all_media = []
             for message_index, message in enumerate(created_messages):
@@ -586,3 +588,6 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
             if room.user is None and room.contact and any_incoming_msgs:
                 room.trigger_default_message()
+
+            created_messages_count = len(created_messages)
+            room.increment_unread_messages_count(created_messages_count, timezone.now())
