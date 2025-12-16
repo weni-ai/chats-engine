@@ -25,7 +25,13 @@ class MessagePermission(permissions.BasePermission):
             permission = user.project_permissions.get(project=project)
         else:
             project_uuid = request.query_params.get("project")
-            permission = user.project_permissions.get(project__uuid=project_uuid)
+
+            if not project_uuid:
+                return False
+
+            permission = user.project_permissions.filter(
+                project__uuid=project_uuid
+            ).first()
 
         return permission.role > 0 if view.action == "list" else False
 
