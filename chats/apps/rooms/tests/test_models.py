@@ -508,3 +508,87 @@ class TestHandleRoomCloseTags(TransactionTestCase):
         self.assertEqual(
             list(self.room.tags.values_list("uuid", flat=True)), close_tags
         )
+
+
+class TestUpdateAgentServiceStatus(TransactionTestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
+        self.user1 = User.objects.create(email="agent1@test.com")
+        self.user2 = User.objects.create(email="agent2@test.com")
+
+    @patch("chats.apps.projects.usecases.status_service.InServiceStatusService.room_assigned")
+    def test_room_assigned_called_on_new_room_with_user(self, mock_room_assigned):
+        room = Room(queue=self.queue, user=self.user1)
+        room._update_agent_service_status(is_new=True)
+
+        mock_room_assigned.assert_called_once_with(self.user1, self.project)
+
+    @patch("chats.apps.projects.usecases.status_service.InServiceStatusService.room_assigned")
+    def test_room_assigned_not_called_on_new_room_without_user(self, mock_room_assigned):
+        room = Room(queue=self.queue, user=None)
+        room._update_agent_service_status(is_new=True)
+
+        mock_room_assigned.assert_not_called()
+
+    @patch("chats.apps.projects.usecases.status_service.InServiceStatusService.room_assigned")
+    def test_room_assigned_called_when_user_assigned(self, mock_room_assigned):
+        room = Room(queue=self.queue, user=None)
+        room._original_user = None
+        room.user = self.user1
+        room._update_agent_service_status(is_new=False)
+
+        mock_room_assigned.assert_called_once_with(self.user1, self.project)
+
+    @patch("chats.apps.projects.usecases.status_service.InServiceStatusService.room_closed")
+    def test_room_closed_called_when_user_removed(self, mock_room_closed):
+        room = Room(queue=self.queue, user=None)
+        room._original_user = self.user1
+        room.user = None
+        room._update_agent_service_status(is_new=False)
+
+        mock_room_closed.assert_called_once_with(self.user1, self.project)
+
+    @patch("chats.apps.projects.usecases.status_service.InServiceStatusService.room_assigned")
+    @patch("chats.apps.projects.usecases.status_service.InServiceStatusService.room_closed")
+    def test_both_called_when_user_changed(self, mock_room_closed, mock_room_assigned):
+        room = Room(queue=self.queue, user=self.user2)
+        room._original_user = self.user1
+        room._update_agent_service_status(is_new=False)
+
+        mock_room_closed.assert_called_once_with(self.user1, self.project)
+        mock_room_assigned.assert_called_once_with(self.user2, self.project)
+
+    @patch("chats.apps.projects.usecases.status_service.InServiceStatusService.room_assigned")
+    @patch("chats.apps.projects.usecases.status_service.InServiceStatusService.room_closed")
+    def test_nothing_called_when_same_user(self, mock_room_closed, mock_room_assigned):
+        room = Room(queue=self.queue, user=self.user1)
+        room._original_user = self.user1
+        room._update_agent_service_status(is_new=False)
+
+        mock_room_closed.assert_not_called()
+        mock_room_assigned.assert_not_called()
+
+    @patch("chats.apps.projects.usecases.status_service.InServiceStatusService.room_assigned")
+    def test_nothing_called_when_no_project(self, mock_room_assigned):
+        room = Room(queue=None, user=self.user1)
+        room._update_agent_service_status(is_new=True)
+
+        mock_room_assigned.assert_not_called()
+
+    @patch("chats.apps.projects.usecases.status_service.InServiceStatusService.room_assigned")
+    @patch("chats.apps.projects.usecases.status_service.InServiceStatusService.room_closed")
+    def test_nothing_called_when_both_users_none(self, mock_room_closed, mock_room_assigned):
+        room = Room(queue=self.queue, user=None)
+        room._original_user = None
+        room._update_agent_service_status(is_new=False)
+
+        mock_room_closed.assert_not_called()
+        mock_room_assigned.assert_not_called()

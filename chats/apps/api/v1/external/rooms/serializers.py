@@ -62,6 +62,52 @@ def get_active_room_flow_start(contact, flow_uuid, project):
     return None
 
 
+def _get_user_from_flowstart(contact: Contact, groups, flow_uuid, project: Project, is_created: bool):
+    """Get user from last flow start if online."""
+    reference_filter = [group["uuid"] for group in groups]
+    reference_filter.append(contact.external_id)
+    query_filters = {"references__external_id__in": reference_filter}
+    if flow_uuid:
+        query_filters["flow"] = flow_uuid
+
+    last_flow_start = project.flowstarts.order_by("-created_on").filter(**query_filters).first()
+    if not last_flow_start:
+        return None
+
+    has_newer_room = contact.rooms.filter(
+        queue__sector__project=project, created_on__gt=last_flow_start.created_on
+    ).exists()
+
+    if is_created or not has_newer_room:
+        if last_flow_start.permission.status == "ONLINE":
+            return last_flow_start.permission.user
+    return None
+
+
+def _get_linked_user(contact: Contact, project: Project, is_created: bool):
+    """Get linked user if not a new room and user is online."""
+    if is_created:
+        return None
+    linked_user = contact.get_linked_user(project)
+    if linked_user and linked_user.is_online:
+        return linked_user.user
+    return None
+
+
+def _get_user_with_priority_routing(queue: Queue):
+    """Handle queue priority routing logic."""
+    queue_is_empty = not queue.rooms.filter(is_active=True, user__isnull=True).exists()
+    if queue_is_empty:
+        return queue.get_available_agent()
+
+    logger.info(
+        "Calling start_queue_priority_routing for queue %s from get_room_user because the queue is not empty",
+        queue.uuid,
+    )
+    start_queue_priority_routing(queue)
+    return None
+
+
 def get_room_user(
     contact: Contact,
     queue: Queue,
@@ -71,58 +117,23 @@ def get_room_user(
     flow_uuid,
     project: Project,
 ):
-    # User that started the flow, if any
-    reference_filter = [group["uuid"] for group in groups]
-    reference_filter.append(contact.external_id)
-    query_filters = {"references__external_id__in": reference_filter}
-    if flow_uuid:
-        query_filters["flow"] = flow_uuid
+    flowstart_user = _get_user_from_flowstart(contact, groups, flow_uuid, project, is_created)
+    if flowstart_user:
+        return flowstart_user
 
-    last_flow_start = (
-        project.flowstarts.order_by("-created_on").filter(**query_filters).first()
-    )
-
-    if last_flow_start:
-        if is_created is True or not contact.rooms.filter(
-            queue__sector__project=project, created_on__gt=last_flow_start.created_on
-        ):
-            if last_flow_start.permission.status == "ONLINE":
-                return last_flow_start.permission.user
-
-    # User linked to the contact
-    if not is_created:
-        linked_user = contact.get_linked_user(project)
-        if linked_user is not None and linked_user.is_online:
-            return linked_user.user
+    linked_user = _get_linked_user(contact, project, is_created)
+    if linked_user:
+        return linked_user
 
     if user and project.permissions.filter(user=user, status="ONLINE").exists():
         return user
 
     if project.use_queue_priority_routing:
-        current_queue_size = queue.rooms.filter(
-            is_active=True, user__isnull=True
-        ).count()
-
-        if current_queue_size == 0:
-            # If the queue is empty, the available user with the least number
-            # of rooms will be selected, if any.
-            return queue.get_available_agent()
-
-        logger.info(
-            "Calling start_queue_priority_routing for queue %s from get_room_user because the queue is not empty",
-            queue.uuid,
-        )
-        start_queue_priority_routing(queue)
-
-        # If the queue is not empty, the room must stay in the queue,
-        # so that, when a agent becomes available, the first room in the queue
-        # will be assigned to the them. This logic is not done here.
-        return None
+        return _get_user_with_priority_routing(queue)
 
     if queue.rooms.filter(is_active=True, user__isnull=True).exists():
         return None
 
-    # General room routing type
     return queue.get_available_agent()
 
 
@@ -518,66 +529,80 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             external_id=contact_external_id, defaults=contact_data
         )
 
+    def _validate_message_data(self, msg_data):
+        """Validate message has text or media."""
+        text = msg_data.get("text")
+        medias = msg_data.get("attachments", [])
+        if text is None and not medias:
+            raise serializers.ValidationError(
+                {"detail": "Cannot create message without text or media"}
+            )
+
+    def _prepare_message(self, room, msg_data, is_waiting, was_24h_valid):
+        """Prepare a single message and determine if room needs update."""
+        direction = msg_data.pop("direction")
+        medias = msg_data.pop("attachments", [])
+        need_update = False
+        is_incoming = direction == "incoming"
+
+        if is_incoming:
+            msg_data["contact"] = room.contact
+            if is_waiting:
+                need_update = True
+                room.is_waiting = False
+            elif not was_24h_valid:
+                need_update = True
+
+        msg_data["room"] = room
+        return Message(**msg_data), medias, is_incoming, need_update
+
+    def _create_media_objects(self, created_messages, media_data_map):
+        """Create MessageMedia objects for bulk insert."""
+        all_media = []
+        for idx, message in enumerate(created_messages):
+            for media_data in media_data_map.get(idx, []):
+                all_media.append(
+                    MessageMedia(
+                        content_type=media_data["content_type"],
+                        media_url=media_data["url"],
+                        message=message,
+                    )
+                )
+        return all_media
+
     def process_message_history(self, room, messages_data):
+        if not messages_data:
+            return
+
         is_waiting = room.get_is_waiting()
         was_24h_valid = room.is_24h_valid
         need_update_room = False
         any_incoming_msgs = False
-
         messages_to_create = []
         media_data_map = {}
 
-        for message_index, msg_data in enumerate(messages_data):
-            direction = msg_data.pop("direction")
-            medias = msg_data.pop("attachments", [])
-            text = msg_data.get("text")
-            created_on = msg_data.get("created_on")
-
-            if text is None and not medias:
-                raise serializers.ValidationError(
-                    {"detail": "Cannot create message without text or media"}
-                )
-
-            if direction == "incoming":
-                msg_data["contact"] = room.contact
-                any_incoming_msgs = True
-
-                if is_waiting:
-                    need_update_room = True
-                    room.is_waiting = False
-                elif not was_24h_valid:
-                    need_update_room = True
-
-            msg_data["room"] = room
-            msg_data["created_on"] = created_on
-            message = Message(**msg_data)
+        for idx, msg_data in enumerate(messages_data):
+            self._validate_message_data(msg_data)
+            message, medias, is_incoming, needs_update = self._prepare_message(
+                room, msg_data, is_waiting, was_24h_valid
+            )
             messages_to_create.append(message)
-
             if medias:
-                media_data_map[message_index] = medias
+                media_data_map[idx] = medias
+            if is_incoming:
+                any_incoming_msgs = True
+            if needs_update:
+                need_update_room = True
 
         if need_update_room:
             room.save()
 
-        if messages_to_create:
-            created_messages = Message.objects.bulk_create(messages_to_create)
+        created_messages = Message.objects.bulk_create(messages_to_create)
+        all_media = self._create_media_objects(created_messages, media_data_map)
+        if all_media:
+            MessageMedia.objects.bulk_create(all_media)
 
-            all_media = []
-            for message_index, message in enumerate(created_messages):
-                if message_index in media_data_map:
-                    for media_data in media_data_map[message_index]:
-                        all_media.append(
-                            MessageMedia(
-                                content_type=media_data["content_type"],
-                                media_url=media_data["url"],
-                                message=message,
-                            )
-                        )
+        room.notify_room("create")
 
-            if all_media:
-                MessageMedia.objects.bulk_create(all_media)
-
-            room.notify_room("create")
-
-            if room.user is None and room.contact and any_incoming_msgs:
-                room.trigger_default_message()
+        if room.user is None and room.contact and any_incoming_msgs:
+            room.trigger_default_message()

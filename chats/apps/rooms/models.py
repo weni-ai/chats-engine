@@ -154,40 +154,38 @@ class Room(BaseModel, BaseConfigurableModel):
             self.pk,
         )
 
+    def _get_project(self):
+        """Get project from room's queue sector."""
+        if not self.queue or not hasattr(self.queue, "sector"):
+            return None
+        sector = self.queue.sector
+        if not sector or not hasattr(sector, "project"):
+            return None
+        return sector.project
+
     def _update_agent_service_status(self, is_new):
         """
         Atualiza o status 'In-Service' dos agentes baseado nas mudanças na sala
         Args:
             is_new: Boolean indicando se é uma sala nova
         """
-        old_user = self._original_user
-        new_user = self.user
-
-        project = None
-        if self.queue and hasattr(self.queue, "sector"):
-            sector = self.queue.sector
-            if sector and hasattr(sector, "project"):
-                project = sector.project
-
+        project = self._get_project()
         if not project:
             return
 
-        if is_new and new_user:
-            InServiceStatusService.room_assigned(new_user, project)
-            return
+        old_user = self._original_user
+        new_user = self.user
+        user_assigned = new_user and (is_new or old_user is None)
+        user_changed = old_user and new_user and old_user != new_user
+        user_removed = old_user and new_user is None
 
-        if old_user is None and new_user is not None:
+        if user_assigned:
             InServiceStatusService.room_assigned(new_user, project)
-            return
-
-        if old_user is not None and new_user is not None and old_user != new_user:
+        elif user_changed:
             InServiceStatusService.room_closed(old_user, project)
             InServiceStatusService.room_assigned(new_user, project)
-            return
-
-        if old_user is not None and new_user is None:
+        elif user_removed:
             InServiceStatusService.room_closed(old_user, project)
-            return
 
     class Meta:
         verbose_name = _("Room")
