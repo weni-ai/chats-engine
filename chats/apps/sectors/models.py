@@ -29,6 +29,12 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         related_name="sectors",
         on_delete=models.CASCADE,
     )
+    secondary_project = models.JSONField(
+        _("Secondary Project"),
+        null=True,
+        blank=True,
+        help_text=_("Secondary project configuration for integrated ticketers"),
+    )
     rooms_limit = models.PositiveIntegerField(_("Rooms limit per employee"))
     work_start = models.TimeField(
         _("work start"), auto_now=False, auto_now_add=False, null=True, blank=True
