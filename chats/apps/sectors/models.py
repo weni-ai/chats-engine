@@ -4,7 +4,7 @@ from datetime import timedelta
 import pendulum
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Count, F, Q, Value
 from django.db.models.functions import Concat
 from django.utils.translation import gettext_lazy as _
@@ -28,6 +28,12 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         verbose_name=_("Project"),
         related_name="sectors",
         on_delete=models.CASCADE,
+    )
+    secondary_project = models.JSONField(
+        _("Secondary Project"),
+        null=True,
+        blank=True,
+        help_text=_("Secondary project configuration for integrated ticketers"),
     )
     rooms_limit = models.PositiveIntegerField(_("Rooms limit per employee"))
     work_start = models.TimeField(
@@ -60,6 +66,7 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
     is_automatic_message_active = models.BooleanField(
         _("is automatic message active?"), default=False
     )
+    required_tags = models.BooleanField(_("required tags?"), default=False)
 
     tracker = FieldTracker(fields=["rooms_limit"])
 
@@ -377,7 +384,7 @@ class SectorAuthorization(BaseModel):
         return self.sector.project
 
 
-class SectorTag(BaseModel):
+class SectorTag(BaseSoftDeleteModel, BaseModel):
     name = models.CharField(_("Name"), max_length=120)
     sector = models.ForeignKey(
         "sectors.Sector",
@@ -407,6 +414,16 @@ class SectorTag(BaseModel):
     @property
     def project(self):
         return self.sector.project
+
+    def _disable_required_tags(self):
+        if self.sector.required_tags and not self.sector.tags.exists():
+            self.sector.required_tags = False
+            self.sector.save(update_fields=["required_tags"])
+
+    def delete(self):
+        super().delete()
+
+        transaction.on_commit(lambda: self._disable_required_tags())
 
 
 class SectorGroupSector(BaseModel):

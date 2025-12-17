@@ -1,0 +1,16 @@
+{% extends 'rooms/emails/base.html' %}
+{% load i18n %}
+
+{% block content %}
+<div
+    style="font-family: 'Lato'; font-size: 14px; line-height: 22px; color: #3B414D; width: 616px; margin: 24px auto auto auto;">
+    <span style="font-size: 16px; font-weight: 700; line-height: 24px;">{% trans 'Hi,' %}</span>
+    <p>
+        {% blocktrans with project_name=project_name %}Unable to generate export of {{ project_name }} project
+        data.{%endblocktrans %}
+    </p>
+    <p>
+        Use the following information to report to support: {{ error_message }}.
+    </p>
+</div>
+{% endblock %}

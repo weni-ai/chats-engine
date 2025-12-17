@@ -1,7 +1,6 @@
 import json
 
 import pendulum
-from django.apps import apps
 from django.core.cache import cache
 from django.db.models import Avg, Count, F, Q, Sum
 from django.utils import timezone
@@ -294,78 +293,21 @@ def get_sector_data(project, filter):
 
 class ModelFieldsPresenter:
     """
-    Presenter para retornar os campos disponíveis dos principais models do sistema.
+    Presenter to return available fields for rooms export.
     """
-
-    @staticmethod
-    def _allowed_fields_map():
-        return {
-            "sectors": {"name", "rooms_limit", "config"},
-            "queues": {"name", "is_deleted", "config"},
-            "sector_tags": {"name"},
-            "rooms": {
-                "created_on",
-                "ended_at",
-                "ended_by",
-                "is_active",
-                "is_waiting",
-                "urn",
-                "protocol",
-                "config",
-                "transfer_history",
-                "service_chat",
-                "custom_fields",
-                "tags",
-                "contact",
-                "user",
-                "queue",
-                "uuid",
-                "sector",
-                "status",
-                "contact_uuid",
-                "contact_id",
-            },
-            "contacts": {
-                "name",
-                "email",
-                "status",
-                "phone",
-                "custom_fields",
-                "external_id",
-            },
-            "users": {"email", "first_name", "last_name"},
-        }
-
-    @staticmethod
-    def _filter_allowed(model_key, fields_dict):
-        """
-        Filtra o dicionário de campos baseado no mapa permitido.
-        Mantém a estrutura {'field_name': {'type': ..., 'required': ...}}
-        """
-        allowed = ModelFieldsPresenter._allowed_fields_map().get(model_key, set())
-        if not allowed:
-            return {}
-        return {k: v for k, v in fields_dict.items() if k in allowed}
 
     @staticmethod
     def get_models_info():
         """
-        Return information about the fields of each model, with a 1 day cache.
+        Return information about rooms and agent_status_logs fields with 1 day cache.
         """
         cache_key = "model_fields_presenter_models_info"
         cached_data = cache.get(cache_key)
         if cached_data is not None:
             return cached_data
 
-        raw_models_info = {
-            "rooms": ModelFieldsPresenter._get_model_fields("rooms", "Room"),
-        }
-        models_info = {
-            key: ModelFieldsPresenter._filter_allowed(key, value)
-            for key, value in raw_models_info.items()
-        }
-        rooms = models_info.get("rooms", {})
-        ordered_rooms = {
+        # Define all available fields for rooms export
+        rooms_fields = {
             "user__first_name": {
                 "type": "CharField",
                 "required": False,
@@ -392,27 +334,16 @@ class ModelFieldsPresenter:
                 "related_model": "queues.queue",
             },
             "uuid": {"type": "UUIDField", "required": True},
-            "is_active": rooms.get(
-                "is_active", {"type": "BooleanField", "required": True}
-            ),
-            "protocol": rooms.get("protocol", {"type": "TextField", "required": False}),
-            "tags": rooms.get(
-                "tags",
-                {
-                    "type": "ManyToManyField",
-                    "required": True,
-                    "related_model": "sectors.sectortag",
-                },
-            ),
-            "created_on": rooms.get(
-                "created_on", {"type": "DateTimeField", "required": True}
-            ),
-            "ended_at": rooms.get(
-                "ended_at", {"type": "DateTimeField", "required": False}
-            ),
-            "transfer_history": rooms.get(
-                "transfer_history", {"type": "JSONField", "required": False}
-            ),
+            "is_active": {"type": "BooleanField", "required": True},
+            "protocol": {"type": "TextField", "required": False},
+            "tags": {
+                "type": "ManyToManyField",
+                "required": True,
+                "related_model": "sectors.sectortag",
+            },
+            "created_on": {"type": "DateTimeField", "required": True},
+            "ended_at": {"type": "DateTimeField", "required": False},
+            "transfer_history": {"type": "JSONField", "required": False},
             "contact__name": {
                 "type": "CharField",
                 "required": False,
@@ -423,38 +354,67 @@ class ModelFieldsPresenter:
                 "required": False,
                 "related_model": "contacts.contact",
             },
-            "urn": rooms.get("urn", {"type": "TextField", "required": False}),
-            "custom_fields": rooms.get(
-                "custom_fields", {"type": "JSONField", "required": False}
-            ),
+            "urn": {"type": "TextField", "required": False},
+            "custom_fields": {"type": "JSONField", "required": False},
+            "metric__waiting_time": {
+                "type": "IntegerField",
+                "required": False,
+                "related_model": "dashboard.roommetrics",
+            },
+            "metric__first_response_time": {
+                "type": "IntegerField",
+                "required": False,
+                "related_model": "dashboard.roommetrics",
+            },
+            "metric__message_response_time": {
+                "type": "IntegerField",
+                "required": False,
+                "related_model": "dashboard.roommetrics",
+            },
+            "metric__interaction_time": {
+                "type": "IntegerField",
+                "required": False,
+                "related_model": "dashboard.roommetrics",
+            },
         }
-        models_info["rooms"] = ordered_rooms
+
+        # Define all available fields for agent status logs export
+        agent_status_logs_fields = {
+            "uuid": {"type": "UUIDField", "required": True},
+            "agent__email": {
+                "type": "EmailField",
+                "required": False,
+                "related_model": "accounts.user",
+            },
+            "agent__first_name": {
+                "type": "CharField",
+                "required": False,
+                "related_model": "accounts.user",
+            },
+            "agent__last_name": {
+                "type": "CharField",
+                "required": False,
+                "related_model": "accounts.user",
+            },
+            "project__name": {
+                "type": "CharField",
+                "required": False,
+                "related_model": "projects.project",
+            },
+            "project__uuid": {
+                "type": "UUIDField",
+                "required": False,
+                "related_model": "projects.project",
+            },
+            "log_date": {"type": "DateField", "required": True},
+            "status_changes": {"type": "JSONField", "required": True},
+            "created_on": {"type": "DateTimeField", "required": True},
+            "modified_on": {"type": "DateTimeField", "required": True},
+        }
+
+        models_info = {
+            "rooms": rooms_fields,
+            "agent_status_logs": agent_status_logs_fields,
+        }
         cache.set(cache_key, models_info, timeout=86400)
         return models_info
-
-    @staticmethod
-    def _get_model_fields(app_label, model_name):
-        """
-        Return information about the fields of a specific model
-        """
-        try:
-            model = apps.get_model(app_label, model_name)
-            fields = {}
-
-            for field in model._meta.get_fields():
-                if hasattr(field, "get_internal_type"):
-                    field_info = {
-                        "type": field.get_internal_type(),
-                        "required": not field.null if hasattr(field, "null") else True,
-                    }
-
-                    if field.get_internal_type() in ["ForeignKey", "ManyToManyField"]:
-                        field_info[
-                            "related_model"
-                        ] = f"{field.related_model._meta.app_label}.{field.related_model._meta.model_name}"
-
-                    fields[field.name] = field_info
-
-            return fields
-        except LookupError:
-            return {"error": f"Model {model_name} not found in app {app_label}"}
