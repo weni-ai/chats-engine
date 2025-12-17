@@ -1,8 +1,10 @@
+from functools import cached_property
 import logging
 from datetime import datetime
 
 from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from chats.apps.accounts.models import User
@@ -19,6 +21,7 @@ from chats.apps.api.v1.sectors.serializers import DetailSectorTagSerializer
 from chats.apps.history.filters.rooms_filter import (
     get_history_rooms_queryset_by_contact,
 )
+from chats.apps.projects.models.models import ProjectPermission
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room, RoomPin, RoomNote
 from chats.apps.sectors.models import SectorTag
@@ -563,3 +566,75 @@ class RoomNoteSerializer(serializers.ModelSerializer):
             "name": obj.user.full_name,
             "email": obj.user.email,
         }
+
+
+class BulkTransferSerializer(serializers.Serializer):
+    user_email = serializers.EmailField(required=False)
+    queue_uuid = serializers.UUIDField(required=False)
+    rooms_list = serializers.ListField(child=serializers.UUIDField(), required=True)
+
+    @cached_property
+    def user(self) -> User:
+        request = self.context.get("request")
+        return request.user
+
+    def validate_queue_uuid(self, queue_uuid):
+        queue = Queue.objects.filter(uuid=queue_uuid).first()
+
+        if not queue:
+            raise serializers.ValidationError({"queue_uuid": "Queue not found"})
+
+        if not ProjectPermission.objects.filter(
+            project=queue.sector.project, user=self.user
+        ).exists():
+            raise serializers.ValidationError(
+                {"queue_uuid": "User has no permission on the project"}
+            )
+
+        return queue_uuid
+
+    def validate(self, attrs):
+        if not attrs.get("user_email") and not attrs.get("queue_uuid"):
+            raise serializers.ValidationError(
+                {"user_email": "user_email or queue_uuid is required"}
+            )
+
+        projects = set(
+            Room.objects.filter(uuid__in=attrs.get("rooms_list"))
+            .values_list("queue__sector__project__uuid", flat=True)
+            .distinct()
+        )
+
+        if queue_uuid := attrs.get("queue_uuid"):
+            queue_project = (
+                Queue.objects.filter(uuid=queue_uuid)
+                .values_list("sector__project__uuid", flat=True)
+                .first()
+            )
+            for project in projects:
+                if project != queue_project:
+                    raise serializers.ValidationError(
+                        {"error": _("Cannot transfer rooms from a project to another")}
+                    )
+
+        if user_email := attrs.get("user_email"):
+            user_projects = set(
+                ProjectPermission.objects.filter(user_id=user_email).values_list(
+                    "project__uuid", flat=True
+                )
+            )
+            for project in projects:
+                if project not in user_projects:
+                    raise serializers.ValidationError(
+                        {"error": _("User has no permission on the project")}
+                    )
+
+        attrs["queue"] = (
+            Queue.objects.filter(uuid=queue_uuid).first() if queue_uuid else None
+        )
+        attrs["user"] = (
+            User.objects.filter(email=user_email).first() if user_email else None
+        )
+        attrs["rooms"] = Room.objects.filter(uuid__in=attrs.get("rooms_list"))
+
+        return super().validate(attrs)
