@@ -686,8 +686,10 @@ class RoomsBulkTransferTestCase(APITestCase):
 
         self.client.force_authenticate(user=self.agent_1)
 
-    @patch("chats.apps.api.v1.rooms.viewsets.start_queue_priority_routing")
-    @patch("chats.apps.api.v1.rooms.viewsets.logger")
+    @patch(
+        "chats.apps.api.v1.rooms.services.bulk_transfer_service.start_queue_priority_routing"
+    )
+    @patch("chats.apps.api.v1.rooms.services.bulk_transfer_service.logger")
     def test_bulk_transfer_to_user(
         self, mock_logger, mock_start_queue_priority_routing
     ):
@@ -764,7 +766,7 @@ class RoomsBulkTransferTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(
             response.data["error"],
-            f"User {self.agent_2.email} has no permission on the project {p.name} <{p.uuid}>",
+            f"User {self.agent_2.email} has no permission on the project {p.uuid}",
         )
 
 

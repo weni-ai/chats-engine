@@ -173,7 +173,9 @@ class BulkTransferService:
             )
             for project in projects:
                 if project not in user_projects:
-                    raise ValueError("User has no permission on the project")
+                    raise ValueError(
+                        f"User {user.email} has no permission on the project {project}"
+                    )
 
     def transfer(
         self,

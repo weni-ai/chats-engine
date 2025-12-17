@@ -720,7 +720,11 @@ class RoomViewset(
 
         user_request = request.user
         service = BulkTransferService()
-        service.transfer(rooms, user_request, user, queue)
+
+        try:
+            service.transfer(rooms, user_request, user, queue)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(
             {"success": "Mass transfer completed"},
