@@ -185,3 +185,47 @@ class CustomStatusSerializer(serializers.ModelSerializer):
 
 class LastStatusQueryParamsSerializer(serializers.Serializer):
     project_uuid = serializers.UUIDField(required=True)
+
+
+class ContactUUIDQuerySerializer(serializers.Serializer):
+    contact = serializers.UUIDField(required=True, help_text="UUID of the contact")
+
+
+class CursorQuerySerializer(serializers.Serializer):
+    cursor = serializers.CharField(
+        required=False,
+        help_text="Cursor of pagination returned by the previous endpoint",
+    )
+
+
+class FlowUUIDQuerySerializer(serializers.Serializer):
+    flow = serializers.UUIDField(required=True, help_text="UUID of the flow")
+
+
+class ProjectContactWarningQuerySerializer(serializers.Serializer):
+    project = serializers.UUIDField(required=True)
+    contact = serializers.UUIDField(required=True)
+
+
+class FlowStartListQuerySerializer(serializers.Serializer):
+    created_on_after = serializers.DateField(
+        required=False, help_text="Filter flow starts created after this date (YYYY-MM-DD)"
+    )
+    created_on_before = serializers.DateField(
+        required=False, help_text="Filter flow starts created before this date (YYYY-MM-DD)"
+    )
+
+
+class ProjectQuerySerializer(serializers.Serializer):
+    project = serializers.UUIDField(required=True)
+
+
+class ProjectVerifyAccessQuerySerializer(serializers.Serializer):
+    project = serializers.UUIDField(required=True)
+
+
+class ProjectPermissionListQuerySerializer(serializers.Serializer):
+    project = serializers.UUIDField(required=False)
+    sector = serializers.UUIDField(required=False)
+    role = serializers.IntegerField(required=False)
+    status = serializers.CharField(required=False)
