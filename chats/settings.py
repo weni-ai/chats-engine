@@ -72,6 +72,8 @@ INSTALLED_APPS = [
     "chats.apps.ai_features.history_summary",
     "chats.apps.feature_flags",
     "chats.apps.feedbacks",
+    "chats.apps.csat",
+    # third party apps
     "weni.feature_flags",  # weni-commons feature flags
     "channels",
     "drf_yasg",
