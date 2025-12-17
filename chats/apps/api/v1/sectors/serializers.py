@@ -120,7 +120,11 @@ class SectorSerializer(serializers.ModelSerializer):
 
         project = self.instance.project if self.instance else data.get("project")
 
-        validate_is_csat_enabled(project, data.get("is_csat_enabled"), self.context)
+        if (
+            project
+            and (is_csat_enabled := data.get("is_csat_enabled", None)) is not None
+        ):
+            validate_is_csat_enabled(project, is_csat_enabled, self.context)
 
         config = data.get("config", {})
         if "secondary_project" in config:
