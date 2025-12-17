@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import List, Optional
 
 from chats.apps.accounts.models import User
 from chats.apps.queues.utils import start_queue_priority_routing
@@ -18,7 +18,7 @@ class BulkTransferService:
     Service for bulk transferring rooms.
     """
 
-    def transfer_user_and_queue(self, rooms: list[Room], user: User, queue: Queue):
+    def transfer_user_and_queue(self, rooms: List[Room], user: User, queue: Queue):
         for room in rooms:
             old_user = room.user
             old_queue = room.queue
@@ -59,7 +59,7 @@ class BulkTransferService:
         room.mark_notes_as_non_deletable()
         room.update_ticket_async()
 
-    def transfer_user(self, rooms: list[Room], user: User, user_request: User):
+    def transfer_user(self, rooms: List[Room], user: User, user_request: User):
         for room in rooms:
             old_user = room.user
 
@@ -103,7 +103,7 @@ class BulkTransferService:
             ):
                 room.send_automatic_message()
 
-    def transfer_queue(self, rooms: list[Room], queue: Queue, user_request: User):
+    def transfer_queue(self, rooms: List[Room], queue: Queue, user_request: User):
         for room in rooms:
             transfer_user = room.user if room.user else user_request
 
@@ -134,7 +134,7 @@ class BulkTransferService:
 
     def transfer(
         self,
-        rooms: list[Room],
+        rooms: List[Room],
         user_request: User,
         user: Optional[User] = None,
         queue: Optional[Queue] = None,
