@@ -1,7 +1,10 @@
 import logging
-from typing import List, Optional
+from typing import Optional
+
+from django.db.models import QuerySet
 
 from chats.apps.accounts.models import User
+from chats.apps.projects.models.models import ProjectPermission
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
@@ -18,7 +21,7 @@ class BulkTransferService:
     Service for bulk transferring rooms.
     """
 
-    def transfer_user_and_queue(self, rooms: List[Room], user: User, queue: Queue):
+    def transfer_user_and_queue(self, rooms: QuerySet[Room], user: User, queue: Queue):
         for room in rooms:
             old_user = room.user
             old_queue = room.queue
@@ -59,7 +62,7 @@ class BulkTransferService:
         room.mark_notes_as_non_deletable()
         room.update_ticket_async()
 
-    def transfer_user(self, rooms: List[Room], user: User, user_request: User):
+    def transfer_user(self, rooms: QuerySet[Room], user: User, user_request: User):
         for room in rooms:
             old_user = room.user
 
@@ -103,7 +106,7 @@ class BulkTransferService:
             ):
                 room.send_automatic_message()
 
-    def transfer_queue(self, rooms: List[Room], queue: Queue, user_request: User):
+    def transfer_queue(self, rooms: QuerySet[Room], queue: Queue, user_request: User):
         for room in rooms:
             transfer_user = room.user if room.user else user_request
 
@@ -132,9 +135,49 @@ class BulkTransferService:
             # Mark all notes as non-deletable when room is transferred
             room.mark_notes_as_non_deletable()
 
+    def get_rooms_projects(self, rooms: QuerySet[Room]):
+        cache_key = "_rooms_projects"
+
+        if cached_projects := getattr(self, cache_key, None):
+            return cached_projects
+
+        projects = set(
+            rooms.values_list("queue__sector__project__uuid", flat=True).distinct()
+        )
+        setattr(self, cache_key, projects)
+        return projects
+
+    def validate_queue(self, rooms: QuerySet[Room], queue: Optional[Queue]):
+        if not queue:
+            return
+
+        projects = self.get_rooms_projects(rooms)
+
+        if projects:
+            queue_project = queue.sector.project.uuid
+            for project in projects:
+                if project != queue_project:
+                    raise ValueError("Cannot transfer rooms from a project to another")
+
+    def validate_user(self, rooms: QuerySet[Room], user: Optional[User]):
+        if not user:
+            return
+
+        projects = self.get_rooms_projects(rooms)
+
+        if projects:
+            user_projects = set(
+                ProjectPermission.objects.filter(user=user).values_list(
+                    "project__uuid", flat=True
+                )
+            )
+            for project in projects:
+                if project not in user_projects:
+                    raise ValueError("User has no permission on the project")
+
     def transfer(
         self,
-        rooms: List[Room],
+        rooms: QuerySet[Room],
         user_request: User,
         user: Optional[User] = None,
         queue: Optional[Queue] = None,
@@ -142,6 +185,9 @@ class BulkTransferService:
         """
         Transfer the rooms.
         """
+
+        self.validate_queue(rooms, queue)
+        self.validate_user(rooms, user)
 
         if user and queue:
             self.transfer_user_and_queue(rooms, user, queue)

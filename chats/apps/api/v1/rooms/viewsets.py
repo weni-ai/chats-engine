@@ -15,6 +15,7 @@ from django.db.models import (
     Subquery,
     When,
 )
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.timezone import make_aware
 from django.utils.translation import gettext_lazy as _
@@ -69,6 +70,7 @@ from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
 from chats.apps.msgs.models import Message
 from chats.apps.projects.models.models import Project
+from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.exceptions import (
@@ -704,8 +706,17 @@ class RoomViewset(
         serializer.is_valid(raise_exception=True)
 
         rooms = serializer.validated_data["rooms"]
-        user = serializer.validated_data.get("user")
-        queue = serializer.validated_data.get("queue")
+        user_email = request.query_params.get("user_email")
+        queue_uuid = request.query_params.get("queue_uuid")
+
+        user = None
+        queue = None
+
+        if user_email:
+            user = get_object_or_404(User, email=user_email)
+
+        if queue_uuid:
+            queue = get_object_or_404(Queue, pk=queue_uuid)
 
         user_request = request.user
         service = BulkTransferService()
