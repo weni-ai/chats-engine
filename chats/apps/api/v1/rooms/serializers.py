@@ -6,6 +6,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from chats.apps.accounts.models import User
+from chats.apps.ai_features.history_summary.enums import HistorySummaryFeedbackTags
 from chats.apps.ai_features.history_summary.models import (
     HistorySummary,
     HistorySummaryFeedback,
@@ -117,6 +118,8 @@ class RoomSerializer(serializers.ModelSerializer):
         return room.queue.sector.can_edit_custom_fields
 
     def get_has_history(self, room: Room) -> bool:
+        if self.context.get("disable_has_history"):
+            return False
         request = self.context.get("request")
 
         if not request:
@@ -226,9 +229,19 @@ class ListRoomSerializer(serializers.ModelSerializer):
         if not request:
             return False
 
-        return RoomPin.objects.filter(room=room, user=request.user).exists()
+        pins_query = {"room": room}
+
+        user_email = request.query_params.get("email")
+        if user_email:
+            pins_query["user__email"] = user_email
+        else:
+            pins_query["user"] = request.user
+
+        return RoomPin.objects.filter(**pins_query).exists()
 
     def get_has_history(self, room: Room) -> bool:
+        if self.context.get("disable_has_history"):
+            return False
         request = self.context.get("request")
 
         if not request:
@@ -394,10 +407,23 @@ class RoomHistorySummaryFeedbackSerializer(serializers.ModelSerializer):
     text = serializers.CharField(
         required=False, allow_blank=True, allow_null=True, max_length=150
     )
+    tags = serializers.ListField(
+        required=False,
+        child=serializers.CharField(),
+    )
 
     class Meta:
         model = HistorySummaryFeedback
-        fields = ["liked", "text"]
+        fields = ["liked", "text", "tags"]
+
+    def validate_tags(self, tags):
+        for tag in tags:
+            if tag not in HistorySummaryFeedbackTags.values:
+                raise serializers.ValidationError(
+                    [f"Invalid tag: {tag}"],
+                )
+
+        return tags
 
     def validate(self, attrs):
         attrs["user"] = self.context["request"].user
@@ -464,6 +490,7 @@ class RoomTagSerializer(serializers.ModelSerializer):
     class Meta:
         model = SectorTag
         fields = ["uuid", "name"]
+        ref_name = "V1RoomTagSerializer"
 
 
 class AddOrRemoveTagFromRoomSerializer(serializers.Serializer):
