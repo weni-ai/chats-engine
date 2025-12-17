@@ -34,6 +34,7 @@ from chats.apps.sectors.utils import get_country_from_timezone, get_country_holi
 
 
 class SectorViewset(viewsets.ModelViewSet):
+    swagger_tag = "Sectors"
     queryset = Sector.objects.exclude(is_deleted=True)
     serializer_class = sector_serializers.SectorSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
@@ -228,6 +229,7 @@ class SectorViewset(viewsets.ModelViewSet):
 
 
 class SectorTagsViewset(viewsets.ModelViewSet):
+    swagger_tag = "Sectors"
     queryset = SectorTag.objects.all().order_by("name")
     serializer_class = sector_serializers.SectorTagSerializer
     filter_backends = [DjangoFilterBackend]
@@ -265,6 +267,7 @@ class SectorTagsViewset(viewsets.ModelViewSet):
 
 
 class SectorAuthorizationViewset(viewsets.ModelViewSet):
+    swagger_tag = "Sectors"
     queryset = SectorAuthorization.objects.all()
     serializer_class = sector_serializers.SectorAuthorizationSerializer
     filter_backends = [DjangoFilterBackend]
@@ -307,6 +310,7 @@ class SectorAuthorizationViewset(viewsets.ModelViewSet):
 
 
 class SectorHolidayViewSet(viewsets.ModelViewSet):
+    swagger_tag = "Sectors"
     """
     ViewSet to manage holidays and special days by sectors.
     """

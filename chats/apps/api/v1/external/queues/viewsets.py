@@ -15,6 +15,7 @@ from chats.apps.queues.models import Queue
 
 
 class QueueFlowViewset(viewsets.ReadOnlyModelViewSet):
+    swagger_tag = "Integrations"
     model = Queue
     queryset = Queue.objects.exclude(is_deleted=True)
     serializer_class = QueueFlowSerializer

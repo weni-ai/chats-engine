@@ -13,6 +13,7 @@ from chats.utils.websockets import send_channels_group
 
 
 class AgentDisconnectView(APIView):
+    swagger_tag = "Agents"
     permission_classes = [permissions.IsAuthenticated, ProjectBodyIsAdmin]
 
     def post(self, request):
