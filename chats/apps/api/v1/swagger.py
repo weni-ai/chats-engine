@@ -8,7 +8,7 @@ schema_view = get_schema_view(
         default_version="v1",
         description="-",
         terms_of_service="https://weni.ai/termos-de-uso/",
-        contact=openapi.Contact(email="helder.souza@weni.ai"),
+        contact=openapi.Contact(email="kallil.souza@vtex.com, alan.dovale@vtex.com"),
         license=openapi.License(name="GPL-3.0"),
     ),
     public=True,

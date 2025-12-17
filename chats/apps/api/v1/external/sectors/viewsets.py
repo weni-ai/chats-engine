@@ -14,6 +14,7 @@ from chats.apps.sectors.models import Sector
 
 
 class SectorFlowViewset(viewsets.ReadOnlyModelViewSet):
+    swagger_tag = "Integrations"
     model = Sector
     queryset = Sector.objects.exclude(is_deleted=True)
     serializer_class = SectorFlowSerializer

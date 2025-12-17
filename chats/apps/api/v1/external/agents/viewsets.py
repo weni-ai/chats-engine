@@ -10,6 +10,7 @@ from chats.apps.projects.models import ProjectPermission
 
 
 class AgentFlowViewset(viewsets.ReadOnlyModelViewSet):
+    swagger_tag = "Integrations"
     model = ProjectPermission
     queryset = ProjectPermission.objects.all()
     serializer_class = AgentFlowSerializer
