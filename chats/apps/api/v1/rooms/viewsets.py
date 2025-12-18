@@ -165,11 +165,14 @@ class RoomViewset(
                     project_uuid,
                 ):
                     last_24h = timezone.now() - timedelta(days=1)
-                    annotations["last_contact_interaction"] = (
-                        Max(
-                            "messages__created_on",
-                            filter=Q(messages__contact__isnull=False),
-                        ),
+                    annotations["last_contact_interaction"] = Max(
+                        Case(
+                            When(
+                                messages__contact__isnull=False,
+                                then="messages__created_on",
+                            ),
+                            output_field=DateTimeField(),
+                        )
                     )
                     annotations["is_24h_valid_computed"] = Case(
                         When(
