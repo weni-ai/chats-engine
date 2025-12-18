@@ -13,6 +13,7 @@ from django.db.models import (
     Q,
     Subquery,
     When,
+    Count,
 )
 from django.utils import timezone
 from django.utils.timezone import make_aware
