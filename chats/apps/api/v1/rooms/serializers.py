@@ -276,7 +276,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        if data.get("is_24h_valid") is None:
+        if data.get("is_24h_valid", None) is None:
             data.pop("is_24h_valid")
 
         return data
