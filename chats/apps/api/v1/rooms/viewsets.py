@@ -143,14 +143,9 @@ class RoomViewset(
             .filter(queue__sector__project__permissions__user=self.request.user)
         )
 
-        last_24h = timezone.now() - timedelta(days=1)
-
         annotations = {
             "last_interaction": Max("messages__created_on"),
             "unread_msgs": Count("messages", filter=Q(messages__seen=False)),
-            "last_contact_interaction": Max(
-                "messages__created_on", filter=Q(messages__contact__isnull=False)
-            ),
             "last_message_text": Subquery(
                 Message.objects.filter(room=OuterRef("pk"))
                 .exclude(user__isnull=True, contact__isnull=True)
@@ -169,6 +164,13 @@ class RoomViewset(
                     self.request.user.email,
                     project_uuid,
                 ):
+                    last_24h = timezone.now() - timedelta(days=1)
+                    annotations["last_contact_interaction"] = (
+                        Max(
+                            "messages__created_on",
+                            filter=Q(messages__contact__isnull=False),
+                        ),
+                    )
                     annotations["is_24h_valid_computed"] = Case(
                         When(
                             Q(
