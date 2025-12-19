@@ -715,8 +715,10 @@ class RoomsBulkTransferTestCase(APITestCase):
             self.agent_2.email,
         )
 
-    @patch("chats.apps.api.v1.rooms.viewsets.start_queue_priority_routing")
-    @patch("chats.apps.api.v1.rooms.viewsets.logger")
+    @patch(
+        "chats.apps.api.v1.rooms.services.bulk_transfer_service.start_queue_priority_routing"
+    )
+    @patch("chats.apps.api.v1.rooms.services.bulk_transfer_service.logger")
     def test_bulk_transfer_to_queue(
         self, mock_logger, mock_start_queue_priority_routing
     ):
