@@ -196,4 +196,4 @@ class BulkTransferService:
         elif user:
             self.transfer_user(rooms, user, user_request)
         elif queue:
-            self.transfer_queue(rooms, queue)
+            self.transfer_queue(rooms, queue, user_request)
