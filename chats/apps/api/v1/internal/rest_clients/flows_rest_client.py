@@ -294,6 +294,7 @@ class FlowRESTClient(
             json=data,
             headers=self.project_headers(project.flows_authorization),
         )
+        print(f"🔍 DEBUG start_flow(): Response: {response.json()}")
         try:
             return response.json()
         except ValueError as e:

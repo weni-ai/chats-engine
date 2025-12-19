@@ -64,7 +64,13 @@ class CSATFlowService(BaseCSATService):
         return flow_uuid
 
     def start_csat_flow(self, room: Room) -> None:
+        print(
+            f"🔍 DEBUG CSATFlowService.start_csat_flow(): Starting CSAT flow for room {room.uuid}"
+        )
         if room.is_active:
+            print(
+                f"🔍 DEBUG CSATFlowService.start_csat_flow(): Room {room.uuid} is active"
+            )
             raise ValidationError("Room is active")
 
         flow_uuid = self.get_flow_uuid(room.project.uuid)
@@ -83,6 +89,8 @@ class CSATFlowService(BaseCSATService):
                 "webhook_url": webhook_url,
             },
         }
+
+        print(f"🔍 DEBUG CSATFlowService.start_csat_flow(): Data: {data}")
 
         return self.flows_client.start_flow(room.project, data)
 

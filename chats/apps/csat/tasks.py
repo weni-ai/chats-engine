@@ -9,6 +9,7 @@ from chats.apps.api.authentication.token import JWTTokenGenerator
 
 @app.task
 def start_csat_flow(room_uuid: str):
+    print(f"🔍 DEBUG start_csat_flow(): Starting CSAT flow for room {room_uuid}")
     room = Room.objects.get(uuid=room_uuid)
 
     CSATFlowService(
