@@ -39,6 +39,10 @@ class ProjectSerializer(serializers.ModelSerializer):
         if config is not None and "chat_gpt_token" in config.keys():
             config = config.copy()
             config.pop("chat_gpt_token", None)
+
+        has_chats_enabled = project.has_chats_summary
+        config["has_chats_enabled"] = has_chats_enabled
+
         return config
 
 
@@ -209,10 +213,12 @@ class ProjectContactWarningQuerySerializer(serializers.Serializer):
 
 class FlowStartListQuerySerializer(serializers.Serializer):
     created_on_after = serializers.DateField(
-        required=False, help_text="Filter flow starts created after this date (YYYY-MM-DD)"
+        required=False,
+        help_text="Filter flow starts created after this date (YYYY-MM-DD)",
     )
     created_on_before = serializers.DateField(
-        required=False, help_text="Filter flow starts created before this date (YYYY-MM-DD)"
+        required=False,
+        help_text="Filter flow starts created before this date (YYYY-MM-DD)",
     )
 
 
