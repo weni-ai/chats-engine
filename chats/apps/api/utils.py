@@ -76,7 +76,14 @@ def ensure_timezone(dt, tz):
 
 
 def create_reply_index(message: Message):
-    if message.external_id:
+    if not message.external_id:
+        return
+
+    if ChatMessageReplyIndex.objects.filter(external_id=message.external_id).exists():
+        ChatMessageReplyIndex.objects.filter(external_id=message.external_id).update(
+            message=message,
+        )
+    else:
         ChatMessageReplyIndex.objects.update_or_create(
             external_id=message.external_id,
             message=message,
