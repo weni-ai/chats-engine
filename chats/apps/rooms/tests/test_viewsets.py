@@ -28,6 +28,7 @@ from chats.apps.rooms.tests.decorators import with_room_user
 from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 from chats.apps.sectors.tests.decorators import with_sector_authorization
 from chats.core.cache import CacheClient
+from chats.apps.ai_features.history_summary.enums import HistorySummaryFeedbackTags
 
 User = get_user_model()
 
@@ -634,8 +635,10 @@ class RoomsBulkTransferTestCase(APITestCase):
 
         self.client.force_authenticate(user=self.agent_1)
 
-    @patch("chats.apps.api.v1.rooms.viewsets.start_queue_priority_routing")
-    @patch("chats.apps.api.v1.rooms.viewsets.logger")
+    @patch(
+        "chats.apps.api.v1.rooms.services.bulk_transfer_service.start_queue_priority_routing"
+    )
+    @patch("chats.apps.api.v1.rooms.services.bulk_transfer_service.logger")
     def test_bulk_transfer_to_user(
         self, mock_logger, mock_start_queue_priority_routing
     ):
@@ -661,8 +664,10 @@ class RoomsBulkTransferTestCase(APITestCase):
             self.agent_2.email,
         )
 
-    @patch("chats.apps.api.v1.rooms.viewsets.start_queue_priority_routing")
-    @patch("chats.apps.api.v1.rooms.viewsets.logger")
+    @patch(
+        "chats.apps.api.v1.rooms.services.bulk_transfer_service.start_queue_priority_routing"
+    )
+    @patch("chats.apps.api.v1.rooms.services.bulk_transfer_service.logger")
     def test_bulk_transfer_to_queue(
         self, mock_logger, mock_start_queue_priority_routing
     ):
@@ -712,7 +717,7 @@ class RoomsBulkTransferTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(
             response.data["error"],
-            f"User {self.agent_2.email} has no permission on the project {p.name} <{p.uuid}>",
+            f"User {self.agent_2.email} has no permission on the project {p.uuid}",
         )
 
 
@@ -978,6 +983,46 @@ class RoomHistorySummaryTestCase(APITestCase):
 
         self.assertEqual(feedback.liked, False)
         self.assertEqual(feedback.text, None)
+
+    @with_room_user
+    def test_post_room_history_summary_feedback_with_liked_as_false_with_tags(self):
+        history_summary = self.create_history_summary(self.room)
+
+        self.assertFalse(history_summary.feedbacks.filter(user=self.user).exists())
+
+        response = self.post_room_history_summary_feedback(
+            self.room.uuid,
+            {"liked": False, "tags": [HistorySummaryFeedbackTags.INCORRECT_SUMMARY]},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["liked"], False)
+        self.assertEqual(
+            response.data["tags"], [HistorySummaryFeedbackTags.INCORRECT_SUMMARY]
+        )
+
+        self.assertTrue(history_summary.feedbacks.filter(user=self.user).exists())
+        feedback = history_summary.feedbacks.filter(user=self.user).first()
+
+        self.assertEqual(feedback.liked, False)
+        self.assertEqual(feedback.text, None)
+        self.assertEqual(feedback.tags, [HistorySummaryFeedbackTags.INCORRECT_SUMMARY])
+
+    @with_room_user
+    def test_post_room_history_summary_feedback_with_liked_as_false_with_invalid_tag(
+        self,
+    ):
+        history_summary = self.create_history_summary(self.room)
+
+        self.assertFalse(history_summary.feedbacks.filter(user=self.user).exists())
+
+        response = self.post_room_history_summary_feedback(
+            self.room.uuid,
+            {"liked": False, "tags": ["INVALID_TAG"]},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["tags"][0].code, "invalid")
 
     @with_room_user
     def test_post_room_history_summary_feedback_with_text(self):

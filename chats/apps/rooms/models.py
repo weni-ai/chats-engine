@@ -291,7 +291,7 @@ class Room(BaseModel, BaseConfigurableModel):
         return self.is_waiting or check_flowstarts
 
     @property
-    def project(self):
+    def project(self) -> "Project":
         return self.queue.project
 
     @property
@@ -410,6 +410,9 @@ class Room(BaseModel, BaseConfigurableModel):
             if project:
                 InServiceStatusService.room_closed(self.user, project)
 
+        if self.queue.sector.is_csat_enabled and self.user:
+            transaction.on_commit(lambda: self.start_csat_flow())
+
     def request_callback(self, room_data: dict):
         if self.callback_url is None:
             return None
@@ -448,6 +451,10 @@ class Room(BaseModel, BaseConfigurableModel):
     def base_notification(self, content, action):
         if self.user:
             permission = self.get_permission(self.user)
+
+            if not permission:
+                return
+
             group_name = f"permission_{permission.pk}"
         else:
             group_name = f"queue_{self.queue.pk}"
@@ -679,6 +686,14 @@ class Room(BaseModel, BaseConfigurableModel):
         Room.objects.filter(pk=self.pk).update(
             unread_messages_count=0, last_unread_message_at=timezone.now()
         )
+
+    def start_csat_flow(self):
+        """
+        Starts the CSAT flow for a room.
+        """
+        from chats.apps.csat.tasks import start_csat_flow
+
+        start_csat_flow.delay(self.uuid)
 
 
 class RoomPin(BaseModel):

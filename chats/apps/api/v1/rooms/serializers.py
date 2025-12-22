@@ -6,6 +6,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from chats.apps.accounts.models import User
+from chats.apps.ai_features.history_summary.enums import HistorySummaryFeedbackTags
 from chats.apps.ai_features.history_summary.models import (
     HistorySummary,
     HistorySummaryFeedback,
@@ -145,9 +146,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
     )
     last_message = serializers.SerializerMethodField()
     is_waiting = serializers.BooleanField()
-    is_24h_valid = serializers.BooleanField(
-        default=True, source="is_24h_valid_computed"
-    )
+    is_24h_valid = serializers.SerializerMethodField()
     config = serializers.JSONField(required=False, read_only=True)
     last_interaction = serializers.DateTimeField(read_only=True)
     can_edit_custom_fields = serializers.SerializerMethodField()
@@ -258,6 +257,19 @@ class ListRoomSerializer(serializers.ModelSerializer):
         return get_history_rooms_queryset_by_contact(
             room.contact, user, room.queue.sector.project
         ).exists()
+
+    def get_is_24h_valid(self, room: Room) -> bool:
+        if room_24h_valid := getattr(room, "is_24h_valid_computed", None):
+            return room_24h_valid
+
+        return None
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if data.get("is_24h_valid", None) is None:
+            data.pop("is_24h_valid")
+
+        return data
 
 
 class TransferRoomSerializer(serializers.ModelSerializer):
@@ -408,10 +420,23 @@ class RoomHistorySummaryFeedbackSerializer(serializers.ModelSerializer):
     text = serializers.CharField(
         required=False, allow_blank=True, allow_null=True, max_length=150
     )
+    tags = serializers.ListField(
+        required=False,
+        child=serializers.CharField(),
+    )
 
     class Meta:
         model = HistorySummaryFeedback
-        fields = ["liked", "text"]
+        fields = ["liked", "text", "tags"]
+
+    def validate_tags(self, tags):
+        for tag in tags:
+            if tag not in HistorySummaryFeedbackTags.values:
+                raise serializers.ValidationError(
+                    [f"Invalid tag: {tag}"],
+                )
+
+        return tags
 
     def validate(self, attrs):
         attrs["user"] = self.context["request"].user
@@ -551,3 +576,12 @@ class RoomNoteSerializer(serializers.ModelSerializer):
             "name": obj.user.full_name,
             "email": obj.user.email,
         }
+
+
+class BulkTransferSerializer(serializers.Serializer):
+    rooms_list = serializers.ListField(child=serializers.UUIDField(), required=True)
+
+    def validate(self, attrs):
+        attrs["rooms"] = Room.objects.filter(uuid__in=attrs.get("rooms_list"))
+
+        return super().validate(attrs)

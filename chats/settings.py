@@ -72,6 +72,8 @@ INSTALLED_APPS = [
     "chats.apps.ai_features.history_summary",
     "chats.apps.feature_flags",
     "chats.apps.feedbacks",
+    "chats.apps.csat",
+    # third party apps
     "weni.feature_flags",  # weni-commons feature flags
     "channels",
     "drf_yasg",
@@ -184,6 +186,9 @@ USE_I18N = True
 USE_L10N = True
 
 USE_TZ = True
+
+DEFAULT_LANGUAGE = "en-us"
+LOCALE_PATHS = [os.path.join(BASE_DIR, "chats/locale")]
 
 
 # Static files (CSS, JavaScript, Images)
@@ -590,12 +595,20 @@ FEEDBACK_FEATURE_FLAG_KEY = env.str(
 AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY = env.str(
     "AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY", default="weniChatsAutomaticMessage"
 )
+
+# CSAT
+CSAT_FEATURE_FLAG_KEY = env.str("CSAT_FEATURE_FLAG_KEY", default="weniChatsCSAT")
+
+CHATS_BASE_URL = env.str("CHATS_BASE_URL", default="http://localhost:8000")
+
 AUTOMATIC_MESSAGE_FLOWS_GET_TICKET_RETRIES = env.int(
     "AUTOMATIC_MESSAGE_FLOWS_GET_TICKET_RETRIES", default=3
 )
 AUTOMATIC_MESSAGE_CHECK_TICKET_ON_ROOM_CREATE = env.bool(
     "AUTOMATIC_MESSAGE_CHECK_TICKET_ON_ROOM_CREATE", default=False
 )
+
+# Keys
 WENI_CHATS_PIN_ROOMS_OPTIMIZATION_FLAG_KEY = env.str(
     "WENI_CHATS_PIN_ROOMS_OPTIMIZATION_FLAG_KEY",
     default="weniChatsPinRoomsOptimization",
@@ -603,6 +616,10 @@ WENI_CHATS_PIN_ROOMS_OPTIMIZATION_FLAG_KEY = env.str(
 WENI_CHATS_DISABLE_HAS_HISTORY_FLAG_KEY = env.str(
     "WENI_CHATS_DISABLE_HAS_HISTORY_FLAG_KEY",
     default="weniChatsDisableHasHistory",
+)
+WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY = env.str(
+    "WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY",
+    default="weniChatsBackEndReturn24hValidOnRoomsList",
 )
 
 
