@@ -613,3 +613,12 @@ class RoomNoteSerializer(serializers.ModelSerializer):
             "name": obj.user.full_name,
             "email": obj.user.email,
         }
+
+
+class BulkTransferSerializer(serializers.Serializer):
+    rooms_list = serializers.ListField(child=serializers.UUIDField(), required=True)
+
+    def validate(self, attrs):
+        attrs["rooms"] = Room.objects.filter(uuid__in=attrs.get("rooms_list"))
+
+        return super().validate(attrs)

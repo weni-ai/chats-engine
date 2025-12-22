@@ -532,6 +532,10 @@ class Room(BaseModel, BaseConfigurableModel):
     def base_notification(self, content, action):
         if self.user:
             permission = self.get_permission(self.user)
+
+            if not permission:
+                return
+
             group_name = f"permission_{permission.pk}"
         else:
             group_name = f"queue_{self.queue.pk}"
