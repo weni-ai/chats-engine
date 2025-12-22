@@ -25,7 +25,7 @@ def validate_is_csat_enabled(project: Project, value: bool, context: dict) -> bo
     project = project
 
     if value is True and not is_feature_active(
-        settings.CSAT_FEATURE_FLAG_KEY, user, project
+        settings.CSAT_FEATURE_FLAG_KEY, user.email, str(project.uuid)
     ):
         raise serializers.ValidationError(
             {
@@ -132,7 +132,11 @@ class SectorSerializer(serializers.ModelSerializer):
 
         project = self.instance.project if self.instance else data.get("project")
 
-        validate_is_csat_enabled(project, data.get("is_csat_enabled"), self.context)
+        if (
+            project
+            and (is_csat_enabled := data.get("is_csat_enabled", None)) is not None
+        ):
+            validate_is_csat_enabled(project, is_csat_enabled, self.context)
 
         config = data.get("config", {})
         if "secondary_project" in config:

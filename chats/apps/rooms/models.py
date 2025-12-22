@@ -776,6 +776,14 @@ class Room(BaseModel, BaseConfigurableModel):
             unread_messages_count=0, last_unread_message_at=timezone.now()
         )
 
+    def start_csat_flow(self):
+        """
+        Starts the CSAT flow for a room.
+        """
+        from chats.apps.csat.tasks import start_csat_flow
+
+        start_csat_flow.delay(self.uuid)
+
 
 class RoomPin(BaseModel):
     """

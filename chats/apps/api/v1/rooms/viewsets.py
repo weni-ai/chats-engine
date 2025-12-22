@@ -148,7 +148,6 @@ class RoomViewset(
 
         annotations = {
             "last_interaction": Max("messages__created_on"),
-            "unread_msgs": Count("messages", filter=Q(messages__seen=False)),
             "last_message_text": Subquery(
                 Message.objects.filter(room=OuterRef("pk"))
                 .exclude(user__isnull=True, contact__isnull=True)
