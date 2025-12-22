@@ -17,6 +17,11 @@ class TestMessageModel(TestCase):
     def setUp(self):
         self.room = Room.objects.create()
 
+    @patch("chats.apps.rooms.models.Room.clear_24h_valid_cache")
+    def test_create_message(self, mock_clear_24h_valid_cache):
+        Message.objects.create(room=self.room)
+        mock_clear_24h_valid_cache.assert_called_once()
+
     def test_create_message_passing_created_on(self):
         timestamp = timezone.now() - timedelta(days=2)
 
@@ -452,3 +457,173 @@ class TestRetryConfiguration(TestCase):
 
         call_args = mock_get_session.call_args[1]
         self.assertNotIn(404, call_args["status_forcelist"])
+
+
+class TestMessageMediaUploadTo(TestCase):
+    """Test MessageMedia upload_to functionality for unique file names"""
+
+    def setUp(self):
+        self.room = Room.objects.create()
+        self.message = Message.objects.create(room=self.room, text="Test message")
+
+    def test_upload_to_generates_unique_filenames(self):
+        """Test that upload_to generates unique filenames using UUID"""
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        # Create two media objects with the same original filename
+        file1 = SimpleUploadedFile(
+            "test_image.png", b"file_content_1", content_type="image/png"
+        )
+        file2 = SimpleUploadedFile(
+            "test_image.png", b"file_content_2", content_type="image/png"
+        )
+
+        media1 = MessageMedia.objects.create(
+            message=self.message, content_type="image/png", media_file=file1
+        )
+
+        media2 = MessageMedia.objects.create(
+            message=self.message, content_type="image/png", media_file=file2
+        )
+
+        # Get the generated file paths
+        path1 = media1.media_file.name
+        path2 = media2.media_file.name
+
+        # Assert that paths are different despite same original filename
+        self.assertNotEqual(path1, path2)
+
+        # Assert that paths contain the UUID
+        self.assertIn(str(media1.uuid), path1)
+        self.assertIn(str(media2.uuid), path2)
+
+        # Assert that paths have correct format
+        self.assertTrue(path1.startswith("messagemedia/"))
+        self.assertTrue(path2.startswith("messagemedia/"))
+        self.assertTrue(path1.endswith(".png"))
+        self.assertTrue(path2.endswith(".png"))
+
+    def test_upload_to_preserves_file_extension(self):
+        """Test that upload_to preserves the original file extension"""
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        test_cases = [
+            ("image.png", "image/png", ".png"),
+            ("document.pdf", "application/pdf", ".pdf"),
+            ("video.mp4", "video/mp4", ".mp4"),
+            ("audio.ogg", "audio/ogg", ".ogg"),
+            ("file.JPG", "image/jpeg", ".jpg"),  # Test uppercase to lowercase
+        ]
+
+        for filename, content_type, expected_ext in test_cases:
+            with self.subTest(filename=filename):
+                file = SimpleUploadedFile(
+                    filename, b"content", content_type=content_type
+                )
+                media = MessageMedia.objects.create(
+                    message=self.message, content_type=content_type, media_file=file
+                )
+
+                path = media.media_file.name
+                self.assertTrue(path.endswith(expected_ext.lower()))
+
+    def test_upload_to_function_directly(self):
+        """Test the upload_to function directly"""
+        from chats.apps.msgs.models import message_media_upload_to
+
+        media = MessageMedia.objects.create(
+            message=self.message, content_type="image/png"
+        )
+
+        # Test with different filenames
+        result1 = message_media_upload_to(media, "test_image.png")
+        result2 = message_media_upload_to(media, "another_image.PNG")
+
+        # Both should generate the same path (based on same media UUID)
+        self.assertEqual(result1, result2)
+
+        # Path should contain UUID and lowercase extension
+        self.assertEqual(result1, f"messagemedia/{media.uuid}.png")
+
+    def test_same_timestamp_different_files(self):
+        """Test that files uploaded at the same time with same name are unique"""
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from django.utils import timezone
+
+        timestamp = timezone.now()
+
+        # Simulate the bug scenario: same filename at nearly same time
+        filename = "Tue_25_Nov_2025_162211_GMT.png"
+
+        file1 = SimpleUploadedFile(
+            filename, b"content_room_1", content_type="image/png"
+        )
+        file2 = SimpleUploadedFile(
+            filename, b"content_room_2", content_type="image/png"
+        )
+
+        # Create messages in different rooms
+        room1 = Room.objects.create()
+        room2 = Room.objects.create()
+
+        message1 = Message.objects.create(room=room1, created_on=timestamp)
+        message2 = Message.objects.create(room=room2, created_on=timestamp)
+
+        media1 = MessageMedia.objects.create(
+            message=message1,
+            content_type="image/png",
+            media_file=file1,
+            created_on=timestamp,
+        )
+
+        media2 = MessageMedia.objects.create(
+            message=message2,
+            content_type="image/png",
+            media_file=file2,
+            created_on=timestamp,
+        )
+
+        # Assert files have different paths
+        self.assertNotEqual(media1.media_file.name, media2.media_file.name)
+
+        # Assert both are accessible
+        self.assertTrue(media1.media_file.name)
+        self.assertTrue(media2.media_file.name)
+
+        # Assert UUIDs are in paths
+        self.assertIn(str(media1.uuid), media1.media_file.name)
+        self.assertIn(str(media2.uuid), media2.media_file.name)
+
+    def test_upload_to_with_no_extension(self):
+        """Test upload_to handles files without extensions"""
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        file = SimpleUploadedFile(
+            "noextension", b"content", content_type="application/octet-stream"
+        )
+        media = MessageMedia.objects.create(
+            message=self.message,
+            content_type="application/octet-stream",
+            media_file=file,
+        )
+
+        path = media.media_file.name
+        # Should still work, just without extension
+        self.assertIn(str(media.uuid), path)
+        self.assertTrue(path.startswith("messagemedia/"))
+
+    def test_upload_to_with_multiple_dots(self):
+        """Test upload_to correctly extracts extension from filenames with multiple dots"""
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        file = SimpleUploadedFile(
+            "my.file.name.tar.gz", b"content", content_type="application/gzip"
+        )
+        media = MessageMedia.objects.create(
+            message=self.message, content_type="application/gzip", media_file=file
+        )
+
+        path = media.media_file.name
+        # Should use only the last extension
+        self.assertTrue(path.endswith(".gz"))
+        self.assertIn(str(media.uuid), path)

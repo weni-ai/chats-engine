@@ -335,4 +335,22 @@ class FlowRESTClient(
             json=payload,
             headers=self.headers,
         )
+
+        return response
+
+    def get_ticket(self, project, ticket_uuid: str):
+        url = f"{self.base_url}/api/v2/tickets.json"
+        query_params = {
+            "uuid": str(ticket_uuid),
+        }
+        headers = self.project_headers(project.flows_authorization)
+
+        response = retry_request_and_refresh_flows_auth_token(
+            project=project,
+            request_method=requests.get,
+            headers=headers,
+            url=url,
+            params=query_params,
+        )
+
         return response

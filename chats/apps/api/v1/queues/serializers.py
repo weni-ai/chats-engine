@@ -11,6 +11,9 @@ User = get_user_model()
 class QueueSerializer(serializers.ModelSerializer):
 
     sector_name = serializers.CharField(source="sector.name", read_only=True)
+    required_tags = serializers.BooleanField(
+        source="sector.required_tags", read_only=True
+    )
 
     class Meta:
         model = Queue
@@ -58,10 +61,19 @@ class QueueUpdateSerializer(serializers.ModelSerializer):
 class QueueReadOnlyListSerializer(serializers.ModelSerializer):
     agents = serializers.SerializerMethodField()
     sector_name = serializers.CharField(source="sector.name", read_only=True)
+    sector_uuid = serializers.CharField(source="sector.uuid", read_only=True)
 
     class Meta:
         model = Queue
-        fields = ["uuid", "name", "agents", "created_on", "sector_name"]
+        fields = [
+            "uuid",
+            "name",
+            "agents",
+            "created_on",
+            "sector_name",
+            "sector_uuid",
+            "required_tags",
+        ]
 
     def get_agents(self, queue: Queue):
         return queue.agent_count
@@ -133,3 +145,16 @@ class QueueAgentsSerializer(serializers.ModelSerializer):
             if project_permission.status == "ONLINE":
                 return "online"
         return "offline"
+
+
+class QueuePermissionsListQueryParamsSerializer(serializers.Serializer):
+    user_email = serializers.EmailField()
+    project = serializers.UUIDField(required=False, allow_null=True)
+
+    def validate(self, data: dict) -> dict:
+        project = data.get("project")
+
+        if project is None or project == "":
+            data.pop("project")
+
+        return data

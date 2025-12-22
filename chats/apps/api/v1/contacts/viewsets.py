@@ -8,6 +8,8 @@ from chats.apps.contacts.models import Contact
 
 class ContactViewset(viewsets.ReadOnlyModelViewSet):
 
+    swagger_tag = "Contacts"
+
     queryset = Contact.objects.all()
     serializer_class = ContactViewsetSerializer
     filter_backends = [

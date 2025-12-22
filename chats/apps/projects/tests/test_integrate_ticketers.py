@@ -50,7 +50,7 @@ class TestIntegratedTicketers(TestCase):
             rooms_limit=5,
             work_start=timezone.now().time(),
             work_end=timezone.now().time(),
-            config={"secondary_project": str(self.secondary_project.uuid)},
+            secondary_project={"uuid": str(self.secondary_project.uuid)},
         )
 
         self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
@@ -130,7 +130,7 @@ class TestIntegratedTicketers(TestCase):
             self.integration.integrate_ticketer(self.principal_project)
 
         self.sector.refresh_from_db()
-        self.assertFalse(self.sector.config.get("ticketer_integrated", False))
+        self.assertFalse((self.sector.config or {}).get("ticketer_integrated", False))
 
     def test_integrate_topic_success(self):
         mock_response = Mock()
@@ -192,7 +192,7 @@ class TestIntegratedTicketers(TestCase):
             rooms_limit=5,
             work_start=timezone.now().time(),
             work_end=timezone.now().time(),
-            config={"secondary_project": str(self.secondary_project.uuid)},
+            secondary_project={"uuid": str(self.secondary_project.uuid)},
         )
 
         with self.assertRaises(Exception):
@@ -245,7 +245,7 @@ class TestIntegratedTicketers(TestCase):
             rooms_limit=5,
             work_start=timezone.now().time(),
             work_end=timezone.now().time(),
-            config={"secondary_project": str(another_secondary.uuid)},
+            secondary_project={"uuid": str(another_secondary.uuid)},
         )
 
         mock_response = Mock()

@@ -1,15 +1,28 @@
 from django.contrib.postgres.aggregates import JSONBAgg
 from django.contrib.postgres.fields import JSONField
-from django.db.models import Count, F, OuterRef, Q, Subquery
-from django.db.models.functions import JSONObject
+from django.db.models import (
+    Avg,
+    Case,
+    Count,
+    F,
+    IntegerField,
+    OuterRef,
+    Q,
+    Subquery,
+    Sum,
+    Value,
+    When,
+)
+from django.db.models.functions import Coalesce, Extract, JSONObject, Concat
 from django.utils import timezone
+from django.db.models import QuerySet
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.dashboard.dto import get_admin_domains_exclude_filter
 from chats.apps.projects.models import ProjectPermission
-from chats.apps.projects.models.models import CustomStatus
+from chats.apps.projects.models.models import CustomStatus, Project
 
-from .dto import Filters
+from chats.apps.api.v1.internal.dashboard.dto import Filters
 
 
 class AgentRepository:
@@ -30,28 +43,21 @@ class AgentRepository:
         agents_filters = Q(project_permissions__project=project) & Q(is_active=True)
 
         if filters.queue:
-            # If filtering by queue, the agents list will include:
-            # - Agents with authorization to the queue
-            #   (even if they were never assigned to a room from the queue)
-            # - Agents that are linked to rooms related to the queue
-            #   (even if they don't have authorization to the queue anymore)
-
             rooms_filter["rooms__queue"] = filters.queue
             agents_filters &= Q(
                 project_permissions__queue_authorizations__queue=filters.queue
             ) | Q(rooms__queue=filters.queue)
 
         elif filters.sector:
-            # If filtering by sector, the agents list will include:
-            # - Agents with authorization to the sector
-            #   (even if they were never assigned to a room from the sector)
-            # - Agents that are linked to rooms related to the sector
-            #   (even if they don't have authorization to the sector anymore)
-
             rooms_filter["rooms__queue__sector__in"] = filters.sector
-            agents_filters &= Q(
-                project_permissions__sector_authorizations__sector__in=filters.sector
-            ) | Q(rooms__queue__sector__in=filters.sector)
+            # If filtering by sector, we need to include both sector and queue authorizations
+            agents_filters &= (
+                Q(project_permissions__sector_authorizations__sector__in=filters.sector)
+                | Q(rooms__queue__sector__in=filters.sector)
+                | Q(
+                    project_permissions__queue_authorizations__queue__sector__in=filters.sector
+                )
+            )
         else:
             rooms_filter["rooms__queue__sector__project"] = project
         if filters.tag:
@@ -59,13 +65,9 @@ class AgentRepository:
         if filters.start_date and filters.end_date:
             start_time = filters.start_date
             end_time = filters.end_date
-            # We want to count rooms that were created before the end date
-            # and are still active (still in progress)
             opened_rooms["rooms__is_active"] = True
             opened_rooms["rooms__created_on__lte"] = end_time
 
-            # We want to count rooms that were ended between the start and end date
-            # and are not active (they are closed)
             closed_rooms["rooms__ended_at__range"] = [start_time, end_time]
             closed_rooms["rooms__is_active"] = False
         else:
@@ -88,10 +90,14 @@ class AgentRepository:
         if filters.agent:
             agents_query = agents_query.filter(email=filters.agent)
 
+        custom_status_start_date = filters.start_date or initial_datetime
+        custom_status_end_date = filters.end_date or timezone.now()
+
         custom_status_subquery = Subquery(
             CustomStatus.objects.filter(
                 user=OuterRef("email"),
                 status_type__project=project,
+                created_on__range=[custom_status_start_date, custom_status_end_date],
             )
             .values("user")
             .annotate(
@@ -100,11 +106,36 @@ class AgentRepository:
                         status_type=F("status_type__name"),
                         break_time=F("break_time"),
                         is_active=F("is_active"),
+                        created_on=F("created_on"),
                     )
                 )
             )
             .values("aggregated"),
             output_field=JSONField(),
+        )
+
+        in_service_time_subquery = (
+            CustomStatus.objects.filter(
+                user=OuterRef("email"),
+                status_type__project=project,
+                status_type__name="In-Service",
+            )
+            .annotate(
+                time_contribution=Case(
+                    When(
+                        is_active=True,
+                        user__project_permissions__status="ONLINE",
+                        user__project_permissions__project=project,
+                        then=Extract(timezone.now() - F("created_on"), "epoch"),
+                    ),
+                    When(is_active=False, then=F("break_time")),
+                    default=Value(0),
+                    output_field=IntegerField(),
+                )
+            )
+            .values("user")
+            .annotate(total=Sum("time_contribution"))
+            .values("total")
         )
 
         agents_query = (
@@ -121,23 +152,55 @@ class AgentRepository:
                     distinct=True,
                     filter=Q(**opened_rooms, **rooms_filter),
                 ),
+                avg_first_response_time=Avg(
+                    "rooms__metric__first_response_time",
+                    filter=Q(**closed_rooms, **rooms_filter)
+                    & Q(rooms__metric__first_response_time__gt=0),
+                ),
+                avg_message_response_time=Avg(
+                    "rooms__metric__message_response_time",
+                    filter=Q(**closed_rooms, **rooms_filter)
+                    & Q(rooms__metric__message_response_time__gt=0),
+                ),
+                avg_interaction_time=Avg(
+                    "rooms__metric__interaction_time",
+                    filter=Q(**closed_rooms, **rooms_filter)
+                    & Q(rooms__metric__interaction_time__gt=0),
+                ),
                 custom_status=custom_status_subquery,
+                time_in_service_order=Coalesce(
+                    Subquery(in_service_time_subquery, output_field=IntegerField()),
+                    Value(0),
+                ),
             )
             .distinct()
-            .values(
-                "first_name",
-                "last_name",
-                "email",
-                "status",
-                "closed",
-                "opened",
-                "custom_status",
-            )
+        )
+
+        if filters.ordering:
+            if "time_in_service" in filters.ordering:
+                ordering_field = filters.ordering.replace(
+                    "time_in_service", "time_in_service_order"
+                )
+                agents_query = agents_query.order_by(ordering_field)
+            else:
+                agents_query = agents_query.order_by(filters.ordering)
+
+        agents_query = agents_query.values(
+            "first_name",
+            "last_name",
+            "email",
+            "status",
+            "closed",
+            "opened",
+            "avg_first_response_time",
+            "avg_message_response_time",
+            "avg_interaction_time",
+            "custom_status",
         )
 
         return agents_query
 
-    def get_agents_custom_status(self, filters: Filters, project):
+    def get_agents_custom_status_and_rooms(self, filters: Filters, project):
         tz = project.timezone
         initial_datetime = (
             timezone.now()
@@ -240,15 +303,94 @@ class AgentRepository:
                 ),
                 custom_status=custom_status_subquery,
             )
-            .values(
-                "first_name",
-                "last_name",
-                "email",
-                "status",
-                "closed",
-                "opened",
-                "custom_status",
-            )
+            .distinct()
+        )
+
+        if filters.ordering:
+            agents_query = agents_query.order_by(filters.ordering)
+
+        agents_query = agents_query.values(
+            "first_name",
+            "last_name",
+            "email",
+            "status",
+            "closed",
+            "opened",
+            "custom_status",
         )
 
         return agents_query
+
+    def _get_agents_query(self, filters: Filters, project: Project):
+        agents = self.model.filter(project_permissions__project=project)
+
+        if not filters.is_weni_admin:
+            agents = agents.exclude(get_admin_domains_exclude_filter())
+
+        if filters.agent:
+            agents = agents.filter(email=filters.agent)
+
+        if filters.queue:
+            agents = agents.filter(
+                project_permissions__queue_authorizations__queue=filters.queue
+            )
+        elif filters.sector:
+            agents = agents.filter(
+                project_permissions__queue_authorizations__queue__sector__in=filters.sector
+            )
+
+        return agents
+
+    def _get_custom_status_query(self, filters: Filters, project: Project):
+        custom_status = CustomStatus.objects.filter(
+            Q(
+                user=OuterRef("email"),
+            )
+            & Q(
+                status_type__project=project,
+                status_type__is_deleted=False,
+            )
+            & ~Q(status_type__name__iexact="in-service")
+        )
+
+        if filters.start_date:
+            custom_status = custom_status.filter(created_on__gte=filters.start_date)
+        if filters.end_date:
+            custom_status = custom_status.filter(created_on__lte=filters.end_date)
+
+        return custom_status
+
+    def get_agents_custom_status(
+        self, filters: Filters, project: Project
+    ) -> QuerySet[User]:
+        agents = self._get_agents_query(filters, project)
+
+        custom_status_base_query = self._get_custom_status_query(filters, project)
+
+        custom_status_subquery = Subquery(
+            custom_status_base_query.values("user")
+            .annotate(
+                aggregated=JSONBAgg(
+                    JSONObject(
+                        status_type=F("status_type__name"),
+                        break_time=F("break_time"),
+                    )
+                )
+            )
+            .values("aggregated"),
+            output_field=JSONField(),
+        )
+
+        agents = agents.annotate(
+            custom_status=custom_status_subquery,
+            agent=Concat(F("first_name"), Value(" "), F("last_name")),
+        )
+
+        ordering_fields = ["-agent", "agent"]
+
+        if filters.ordering and filters.ordering in ordering_fields:
+            agents = agents.order_by(filters.ordering)
+        else:
+            agents = agents.order_by("agent")
+
+        return agents

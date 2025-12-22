@@ -20,9 +20,13 @@ from chats.apps.api.v1.groups_sectors.viewsets import (
     GroupSectorViewset,
 )
 from chats.apps.api.v1.internal.csat.views import CSATWebhookView
+from chats.apps.api.v1.internal.contacts.views import RoomsContactsInternalViewSet
 from chats.apps.api.v1.internal.dashboard.viewsets import InternalDashboardViewset
 from chats.apps.api.v1.internal.projects import viewsets as project_internal_views
-from chats.apps.api.v1.internal.rooms.viewsets import InternalListRoomsViewSet
+from chats.apps.api.v1.internal.rooms.viewsets import (
+    InternalListRoomsViewSet,
+    InternalProtocolRoomsViewSet,
+)
 from chats.apps.api.v1.internal.users import viewsets as user_internal_views
 from chats.apps.api.v1.msgs.viewsets import MessageMediaViewset, MessageViewset
 from chats.apps.api.v1.orgs.viewsets import OrgProjectViewSet
@@ -48,9 +52,6 @@ from chats.apps.api.v1.users.viewsets import ProfileViewset
 from chats.apps.discussions.views import DiscussionViewSet
 from chats.apps.history.views import HistoryRoomViewset
 from chats.apps.api.v1.feature_flags.views import FeatureFlagsViewSet
-from chats.apps.api.v1.feature_flags.integrations.growthbook.views import (
-    GrowthbookWebhook,
-)
 from chats.apps.api.v1.feedbacks.views import FeedbackViewSet
 
 
@@ -118,7 +119,7 @@ router.register("quick_messages", QuickMessageViewset)
 router.register(
     "sector_quick_messages", SectorQuickMessageViewset, basename="sector_quick_message"
 )
-router.register("media", MessageMediaViewset)
+router.register("media", MessageMediaViewset, basename="media")
 router.register("contact", ContactViewset)
 router.register("history/rooms", HistoryRoomViewset, basename="history_room")
 router.register("discussion", DiscussionViewSet, basename="discussion")
@@ -146,11 +147,6 @@ router.register(
 )
 router.register("authorization/queue", QueueAuthorizationViewset, basename="queue_auth")
 router.register("dashboard", DashboardLiveViewset, basename="dashboard")
-router.register(
-    "feature_flags/growthbook_webhook",
-    GrowthbookWebhook,
-    basename="growthbook_webhook",
-)
 router.register("feature_flags", FeatureFlagsViewSet, basename="feature_flags")
 router.register("feedbacks", FeedbackViewSet, basename="feedbacks")
 
@@ -178,6 +174,11 @@ router.register(
     basename="dash_internal",
 )
 router.register(
+    "internal/rooms/protocols",
+    InternalProtocolRoomsViewSet,
+    basename="protocols_internal",
+)
+router.register(
     "internal/rooms",
     InternalListRoomsViewSet,
     basename="room_internal",
@@ -187,6 +188,12 @@ router.register(
     CSATWebhookView,
     basename="csat_internal",
 )
+router.register(
+    "internal/contacts",
+    RoomsContactsInternalViewSet,
+    basename="contact_internal",
+)
+
 
 # External
 router.register("external/msgs", MessageFlowViewset, basename="external_message")

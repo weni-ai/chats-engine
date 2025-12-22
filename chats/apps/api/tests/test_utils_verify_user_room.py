@@ -19,14 +19,14 @@ class VerifyUserRoomTests(TestCase):
         room = DummyRoom(user=self.user)
         self.assertEqual(verify_user_room(room, "ignored"), self.user)
 
-    @patch("chats.apps.api.utils.get_user_id_by_email_cached")
+    @patch("chats.core.cache_utils.get_user_id_by_email_cached")
     def test_resolves_user_from_email(self, mock_cache):
         mock_cache.return_value = self.user.pk
         room = DummyRoom(user=None)
         resolved = verify_user_room(room, "Agent@Acme.com")
         self.assertEqual(resolved, self.user)
 
-    @patch("chats.apps.api.utils.get_user_id_by_email_cached", return_value=None)
+    @patch("chats.core.cache_utils.get_user_id_by_email_cached", return_value=None)
     def test_raises_when_email_not_found(self, _):
         room = DummyRoom(user=None)
         with self.assertRaises(User.DoesNotExist):
