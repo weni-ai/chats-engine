@@ -9,5 +9,6 @@ exclude =
     old,
     build,
     dist,
-    migrations
+    migrations,
+    chats/apps/csat/flows/definitions/flow.py
 max-line-length=119
