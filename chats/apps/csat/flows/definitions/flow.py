@@ -452,7 +452,7 @@ CSAT_FLOW_DEFINITION_DATA = {
                 },
             },
             "metadata": {"expires": 10080},
-            "name": "CSAT Chats V1",
+            "name": "Weni Chats CSAT Flow",
             "nodes": [
                 {
                     "actions": [
