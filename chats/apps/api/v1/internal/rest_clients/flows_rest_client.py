@@ -331,6 +331,7 @@ class FlowRESTClient(
     def create_or_update_flow(self, project: "Project", definition: dict):
         payload = {
             "project_uuid": str(project.uuid),
+            "is_mutable": False,
             "definition": definition,
         }
 
@@ -341,6 +342,7 @@ class FlowRESTClient(
             json=payload,
             headers=self.headers,
         )
+
         return response
 
     def get_ticket(self, project, ticket_uuid: str):

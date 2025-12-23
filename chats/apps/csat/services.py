@@ -47,8 +47,17 @@ class CSATFlowService(BaseCSATService):
     def get_flow_uuid(self, project_uuid: UUID) -> UUID:
         cache_key = CSAT_FLOW_CACHE_KEY.format(project_uuid=str(project_uuid))
 
-        if cached_flow_uuid := self.cache_client.get(cache_key):
-            return UUID(cached_flow_uuid)
+        try:
+            if cached_flow_uuid := self.cache_client.get(cache_key):
+                if isinstance(cached_flow_uuid, bytes):
+                    cached_flow_uuid = cached_flow_uuid.decode()
+
+                return UUID(cached_flow_uuid)
+        except ValueError:
+            logger.error(
+                "[CSAT FLOW SERVICE] Failed to parse cached flow UUID: %s",
+                cached_flow_uuid,
+            )
 
         flow_uuid = (
             CSATFlowProjectConfig.objects.filter(project__uuid=project_uuid)
