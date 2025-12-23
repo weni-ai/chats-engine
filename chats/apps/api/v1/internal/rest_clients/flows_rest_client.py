@@ -325,6 +325,7 @@ class FlowRESTClient(
     def create_or_update_flow(self, project: "Project", definition: dict):
         payload = {
             "project_uuid": str(project.uuid),
+            "is_mutable": False,
             "definition": definition,
         }
 
