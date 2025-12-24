@@ -20,6 +20,7 @@ env:
   USE_EDA: true
   GROWTHBOOK_CLIENT_KEY: "dummy_key_ci"
   GROWTHBOOK_HOST_BASE_URL: "http://localhost"
+  INTERNAL_API_TOKEN: "dummy-token"
 
 jobs:
   build:

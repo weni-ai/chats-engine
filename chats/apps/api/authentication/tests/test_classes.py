@@ -205,7 +205,7 @@ class InternalAPITokenAuthenticationViewAPITestCase(APITestCase):
     def test_authenticated_request_with_valid_token(self):
         response = self.client.get(
             "/internal-api-token-authentication/",
-            HTTP_AUTHORIZATION=f"Token test-token",
+            HTTP_AUTHORIZATION="Token test-token",
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -221,7 +221,7 @@ class InternalAPITokenAuthenticationViewAPITestCase(APITestCase):
     def test_unauthenticated_request_with_invalid_token(self):
         response = self.client.get(
             "/internal-api-token-authentication/",
-            HTTP_AUTHORIZATION=f"Token invalid-token",
+            HTTP_AUTHORIZATION="Token invalid-token",
         )
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
@@ -230,7 +230,7 @@ class InternalAPITokenAuthenticationViewAPITestCase(APITestCase):
     def test_unauthenticated_request_with_malformed_token(self):
         response = self.client.get(
             "/internal-api-token-authentication/",
-            HTTP_AUTHORIZATION=f"Token Bearer invalid-token",
+            HTTP_AUTHORIZATION="Token Bearer invalid-token",
         )
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
