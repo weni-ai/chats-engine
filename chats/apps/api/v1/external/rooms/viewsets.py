@@ -104,6 +104,9 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
     def permission_classes(self):
         if self.request.auth and hasattr(self.request.auth, "project"):
             return [IsAdminPermission]
+        elif self.request.auth == "INTERNAL":
+            return []
+
         return [ModuleHasPermission]
 
     @action(detail=True, methods=["PUT", "PATCH"], url_name="close")

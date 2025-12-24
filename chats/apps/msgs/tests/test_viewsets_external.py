@@ -1,5 +1,6 @@
 from unittest import mock
 
+from django.test import override_settings
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
@@ -7,6 +8,7 @@ from django.utils import timezone
 from django.utils.timezone import timedelta
 from rest_framework import status
 from rest_framework.test import APITestCase
+
 
 from chats.apps.accounts.models import User
 from chats.apps.api.utils import create_user_and_token
@@ -33,14 +35,18 @@ class MsgsExternalTests(APITestCase):
         return queue
 
     def _request_create_message(
-        self, direction: str = "incoming", created_on=None, token=None
+        self,
+        direction: str = "incoming",
+        created_on=None,
+        token=None,
+        token_type: str = "Bearer",
     ):
         if token is None:
             token = "f3ce543e-d77e-4508-9140-15c95752a380"
 
         url = reverse("external_message-list")
         client = self.client
-        client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+        client.credentials(HTTP_AUTHORIZATION=f"{token_type} {token}")
         data = {
             "room": self.room.uuid,
             "text": "olá.",
@@ -50,22 +56,24 @@ class MsgsExternalTests(APITestCase):
         }
         return client.post(url, data=data, format="json")
 
-    def _request_update_message(self, message, data, token=None):
+    def _request_update_message(
+        self, message, data, token=None, token_type: str = "Bearer"
+    ):
         if token is None:
             token = "f3ce543e-d77e-4508-9140-15c95752a380"
 
         url = reverse("external_message-detail", kwargs={"uuid": message.uuid})
         client = self.client
-        client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+        client.credentials(HTTP_AUTHORIZATION=f"{token_type} {token}")
         return client.patch(url, data=data, format="json")
 
-    def _request_list_messages(self, token=None):
+    def _request_list_messages(self, token=None, token_type: str = "Bearer"):
         if token is None:
             token = "f3ce543e-d77e-4508-9140-15c95752a380"
 
         url = reverse("external_message-list")
         client = self.client
-        client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+        client.credentials(HTTP_AUTHORIZATION=f"{token_type} {token}")
         return client.get(url, {"room": self.room.uuid}, format="json")
 
     def test_create_external_msgs(self):
@@ -205,6 +213,18 @@ class MsgsExternalTests(APITestCase):
         response = self._request_create_message(token=token)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         mock_has_permission.assert_called_once()
+
+    @override_settings(INTERNAL_API_TOKEN="dummy-token")
+    def test_create_external_msgs_with_internal_api_token(self):
+        response = self._request_create_message(token="dummy-token", token_type="Token")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    @override_settings(INTERNAL_API_TOKEN="dummy-token")
+    def test_create_external_msgs_with_internal_api_token_with_invalid_token(self):
+        response = self._request_create_message(
+            token="invalid-token", token_type="Token"
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_update_external_msgs(self):
         message = self.room.messages.create(

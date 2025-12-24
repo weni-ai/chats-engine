@@ -103,4 +103,4 @@ def get_token_auth_classes(request):
         UUID(token)
         return [ProjectAdminAuthentication]
     except ValueError:
-        return [TOKEN_AUTHENTICATION_CLASS, InternalAPITokenAuthentication]
+        return [InternalAPITokenAuthentication, TOKEN_AUTHENTICATION_CLASS]

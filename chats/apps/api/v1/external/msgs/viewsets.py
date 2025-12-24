@@ -45,6 +45,8 @@ class MessageFlowViewset(
     def permission_classes(self):
         if self.request.auth and hasattr(self.request.auth, "project"):
             return [IsAdminPermission]
+        elif self.request.auth == "INTERNAL":
+            return []
         return [ModuleHasPermission]
 
     def perform_create(self, serializer):

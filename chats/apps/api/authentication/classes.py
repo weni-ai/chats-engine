@@ -70,7 +70,7 @@ class InternalAPITokenAuthentication(BaseAuthentication):
         if token == "" or token != settings.INTERNAL_API_TOKEN:
             raise AuthenticationFailed("Invalid authentication token.")
 
-        return (None, None)
+        return (None, "INTERNAL")
 
     def authenticate_header(self, request):
         return "Token"
