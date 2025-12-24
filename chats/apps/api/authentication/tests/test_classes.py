@@ -10,8 +10,12 @@ from rest_framework.views import APIView
 from rest_framework.test import APITestCase, APIClient
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.exceptions import AuthenticationFailed
 
-from chats.apps.api.authentication.classes import JWTAuthentication
+from chats.apps.api.authentication.classes import (
+    InternalAPITokenAuthentication,
+    JWTAuthentication,
+)
 from chats.apps.api.authentication.token import JWTTokenGenerator
 
 
@@ -44,7 +48,7 @@ class JWTAuthenticationTests(TestCase):
         self.assertIsNotNone(result[1])
 
 
-class MockView(APIView):
+class JWTAuthenticationView(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [JWTRequiredPermission]
 
@@ -60,8 +64,8 @@ class MockView(APIView):
 
 
 @override_settings(ROOT_URLCONF="chats.apps.api.authentication.tests.test_urls")
-class MockViewAPITestCase(APITestCase):
-    """Test cases for MockView using JWTAuthentication."""
+class JWTAuthenticationViewAPITestCase(APITestCase):
+    """Test cases for JWTAuthenticationView using JWTAuthentication."""
 
     def setUp(self):
         self.client = APIClient()
@@ -74,7 +78,7 @@ class MockViewAPITestCase(APITestCase):
     def test_authenticated_request_with_valid_token(self):
         """Test that a request with a valid JWT token is authenticated and token data is available."""
         response = self.client.get(
-            "/mock/", HTTP_AUTHORIZATION=f"Token {self.valid_token}"
+            "/jwt-authentication/", HTTP_AUTHORIZATION=f"Token {self.valid_token}"
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -92,7 +96,7 @@ class MockViewAPITestCase(APITestCase):
 
     def test_unauthenticated_request_without_token(self):
         """Test that a request without a token is not authenticated."""
-        response = self.client.get("/mock/")
+        response = self.client.get("/jwt-authentication/")
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
@@ -100,7 +104,7 @@ class MockViewAPITestCase(APITestCase):
         """Test that a request with an invalid token is not authenticated."""
         invalid_token = "invalid.jwt.token"
         response = self.client.get(
-            "/mock/", HTTP_AUTHORIZATION=f"Token {invalid_token}"
+            "/jwt-authentication/", HTTP_AUTHORIZATION=f"Token {invalid_token}"
         )
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
@@ -109,7 +113,7 @@ class MockViewAPITestCase(APITestCase):
         """Test that a request with a malformed token is not authenticated."""
         malformed_token = "Bearer invalid.jwt.token"
         response = self.client.get(
-            "/mock/", HTTP_AUTHORIZATION=f"Token {malformed_token}"
+            "/jwt-authentication/", HTTP_AUTHORIZATION=f"Token {malformed_token}"
         )
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
@@ -130,7 +134,7 @@ class MockViewAPITestCase(APITestCase):
         )
 
         response = self.client.get(
-            "/mock/", HTTP_AUTHORIZATION=f"Token {expired_token}"
+            "/jwt-authentication/", HTTP_AUTHORIZATION=f"Token {expired_token}"
         )
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
@@ -138,7 +142,7 @@ class MockViewAPITestCase(APITestCase):
     def test_token_data_structure(self):
         """Test that the token data structure is correct and complete."""
         response = self.client.get(
-            "/mock/", HTTP_AUTHORIZATION=f"Token {self.valid_token}"
+            "/jwt-authentication/", HTTP_AUTHORIZATION=f"Token {self.valid_token}"
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -153,3 +157,80 @@ class MockViewAPITestCase(APITestCase):
 
         current_time = int(timezone.now().timestamp())
         self.assertGreater(token_data["exp"], current_time)
+
+
+class InternalAPITokenAuthenticationTests(TestCase):
+    def setUp(self):
+        self.authentication = InternalAPITokenAuthentication()
+
+    @override_settings(INTERNAL_API_TOKEN="test-token")
+    def test_authenticate_credentials_with_the_correct_token(self):
+        result = self.authentication.authenticate_credentials("test-token")
+
+        self.assertIsNotNone(result)
+
+    @override_settings(INTERNAL_API_TOKEN="test-token")
+    def test_authenticate_credentials_with_the_incorrect_token(self):
+        with self.assertRaises(AuthenticationFailed):
+            self.authentication.authenticate_credentials("incorrect-token")
+
+    @override_settings(INTERNAL_API_TOKEN="test-token")
+    def test_authenticate_credentials_with_no_token(self):
+        with self.assertRaises(AuthenticationFailed):
+            self.authentication.authenticate_credentials("")
+
+
+class InternalAPITokenAuthenticationView(APIView):
+    authentication_classes = [InternalAPITokenAuthentication]
+
+    def get(self, request):
+        """Test endpoint that returns the authenticated data from the token."""
+
+        return Response(
+            {
+                "status": "ok",
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+@override_settings(ROOT_URLCONF="chats.apps.api.authentication.tests.test_urls")
+class InternalAPITokenAuthenticationViewAPITestCase(APITestCase):
+    """Test cases for InternalAPITokenAuthenticationView using InternalAPITokenAuthentication."""
+
+    def setUp(self):
+        self.client = APIClient()
+
+    @override_settings(INTERNAL_API_TOKEN="test-token")
+    def test_authenticated_request_with_valid_token(self):
+        response = self.client.get(
+            "/internal-api-token-authentication/",
+            HTTP_AUTHORIZATION=f"Token test-token",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "ok")
+
+    @override_settings(INTERNAL_API_TOKEN="test-token")
+    def test_unauthenticated_request_without_token(self):
+        response = self.client.get("/internal-api-token-authentication/")
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    @override_settings(INTERNAL_API_TOKEN="test-token")
+    def test_unauthenticated_request_with_invalid_token(self):
+        response = self.client.get(
+            "/internal-api-token-authentication/",
+            HTTP_AUTHORIZATION=f"Token invalid-token",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    @override_settings(INTERNAL_API_TOKEN="test-token")
+    def test_unauthenticated_request_with_malformed_token(self):
+        response = self.client.get(
+            "/internal-api-token-authentication/",
+            HTTP_AUTHORIZATION=f"Token Bearer invalid-token",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
