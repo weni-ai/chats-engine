@@ -95,7 +95,7 @@ class ProjectAdminAuthentication(TokenAuthentication):
         return (authorization.user_email, authorization)
 
 
-def get_auth_internal_classes(request):
+def get_token_auth_classes(request):
     auth = get_authorization_header(request)
     token = auth.split()[1].decode() if len(auth.split()) > 1 else ""
 

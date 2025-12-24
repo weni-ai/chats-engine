@@ -14,7 +14,7 @@ from rest_framework.response import Response
 
 from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
-    get_auth_internal_classes,
+    get_token_auth_classes,
 )
 from chats.apps.ai_features.history_summary.models import (
     HistorySummary,
@@ -98,7 +98,7 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
 
     @cached_property
     def authentication_classes(self):
-        return get_auth_internal_classes(self.request)
+        return get_token_auth_classes(self.request)
 
     @cached_property
     def permission_classes(self):

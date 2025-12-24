@@ -5,7 +5,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, viewsets
 
 from chats.apps.accounts.authentication.drf.authorization import (
-    get_auth_internal_classes,
+    get_token_auth_classes,
 )
 from chats.apps.api.v1.external.msgs.filters import MessageFilter
 from chats.apps.api.v1.external.msgs.serializers import MsgFlowSerializer
@@ -39,7 +39,7 @@ class MessageFlowViewset(
 
     @cached_property
     def authentication_classes(self):
-        return get_auth_internal_classes(self.request)
+        return get_token_auth_classes(self.request)
 
     @cached_property
     def permission_classes(self):
