@@ -215,12 +215,22 @@ class MsgsExternalTests(APITestCase):
         mock_has_permission.assert_called_once()
 
     @override_settings(INTERNAL_API_TOKEN="dummy-token")
-    def test_create_external_msgs_with_internal_api_token(self):
+    @mock.patch(
+        "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
+    )
+    def test_create_external_msgs_with_internal_api_token(self, mock_get_userinfo):
+        mock_get_userinfo.return_value = {}
         response = self._request_create_message(token="dummy-token", token_type="Token")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     @override_settings(INTERNAL_API_TOKEN="dummy-token")
-    def test_create_external_msgs_with_internal_api_token_with_invalid_token(self):
+    @mock.patch(
+        "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
+    )
+    def test_create_external_msgs_with_internal_api_token_with_invalid_token(
+        self, mock_get_userinfo
+    ):
+        mock_get_userinfo.return_value = {}
         response = self._request_create_message(
             token="invalid-token", token_type="Token"
         )
