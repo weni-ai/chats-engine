@@ -7,6 +7,7 @@ from rest_framework import filters, mixins, viewsets
 from chats.apps.accounts.authentication.drf.authorization import (
     get_token_auth_classes,
 )
+from chats.apps.api.authentication.permissions import InternalAPITokenRequiredPermission
 from chats.apps.api.v1.external.msgs.filters import MessageFilter
 from chats.apps.api.v1.external.msgs.serializers import MsgFlowSerializer
 from chats.apps.api.v1.external.permissions import IsAdminPermission
@@ -46,7 +47,7 @@ class MessageFlowViewset(
         if self.request.auth and hasattr(self.request.auth, "project"):
             return [IsAdminPermission]
         elif self.request.auth == "INTERNAL":
-            return []
+            return [InternalAPITokenRequiredPermission]
         return [ModuleHasPermission]
 
     def perform_create(self, serializer):

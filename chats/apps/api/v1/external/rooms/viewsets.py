@@ -24,6 +24,7 @@ from chats.apps.ai_features.history_summary.tasks import (
     cancel_history_summary_generation,
     generate_history_summary,
 )
+from chats.apps.api.authentication.permissions import InternalAPITokenRequiredPermission
 from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.external.rooms.serializers import (
     RoomFlowSerializer,
@@ -105,7 +106,7 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         if self.request.auth and hasattr(self.request.auth, "project"):
             return [IsAdminPermission]
         elif self.request.auth == "INTERNAL":
-            return []
+            return [InternalAPITokenRequiredPermission]
 
         return [ModuleHasPermission]
 
