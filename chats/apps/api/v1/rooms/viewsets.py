@@ -303,67 +303,63 @@ class RoomViewset(
         return self._get_paginated_response(annotated_qs)
 
     def _list_with_optimized_pin_order(self, qs, request, project):
-        target_pins_queryset = RoomPin.objects.filter(
-            room__queue__sector__project=project,
-        )
-
+        # Determine which user we're filtering pins for
         if user_email := request.query_params.get("email"):
-            target_pins_queryset = target_pins_queryset.filter(user__email=user_email)
+            pins_query = {
+                "room__queue__sector__project": project,
+                "user__email": user_email,
+            }
         else:
-            target_pins_queryset = target_pins_queryset.filter(user=request.user)
+            pins_query = {
+                "room__queue__sector__project": project,
+                "user": request.user,
+            }
 
-        annotation_pins_queryset = RoomPin.objects.filter(
-            room__queue__sector__project=project,
+        # CRITICAL: Filter FIRST, then get pinned rooms
+        # This avoids annotating thousands of unnecessary rooms
+        filtered_qs = self.filter_queryset(qs)
+        
+        # Get pinned room IDs efficiently
+        pinned_room_ids = set(
+            RoomPin.objects.filter(**pins_query).values_list("room_id", flat=True)
         )
-        if user_email:
-            annotation_pins_queryset = annotation_pins_queryset.filter(
-                user__email=user_email
+
+        # Get filtered room IDs
+        filtered_room_ids = set(filtered_qs.values_list("pk", flat=True))
+
+        # Combine both sets: rooms that match filters OR are pinned
+        all_room_ids = filtered_room_ids | pinned_room_ids
+
+        # Get secondary sort from filtered queryset
+        secondary_sort = list(filtered_qs.query.order_by or self.ordering or [])
+
+        # Create pin subquery for annotations
+        pin_subquery = (
+            RoomPin.objects.filter(
+                room=OuterRef("pk"),
+                **pins_query,
             )
-        else:
-            annotation_pins_queryset = annotation_pins_queryset.filter(
-                user=request.user
-            )
-
-        pin_subquery = annotation_pins_queryset.filter(room=OuterRef("pk")).order_by(
-            "-created_on"
-        )
-        target_pin_subquery = target_pins_queryset.filter(room=OuterRef("pk")).order_by(
-            "-created_on"
+            .order_by("-created_on")
         )
 
-        annotated_qs = qs.annotate(
+        # NOW annotate only the rooms we need
+        annotated_qs = qs.filter(pk__in=all_room_ids).annotate(
             is_pinned=Exists(pin_subquery),
             pin_created_on=Subquery(
                 pin_subquery.values("created_on")[:1],
                 output_field=DateTimeField(),
             ),
-            list_is_pinned=Exists(target_pin_subquery),
-            list_pin_created_on=Subquery(
-                target_pin_subquery.values("created_on")[:1],
-                output_field=DateTimeField(),
-            ),
         )
 
-        filtered_qs = self.filter_queryset(annotated_qs)
-        filtered_room_ids = filtered_qs.values("pk").order_by()
-
-        secondary_sort = list(filtered_qs.query.order_by or self.ordering or [])
-
-        pinned_room_subquery = target_pins_queryset.values("room_id")
-
-        combined_qs = annotated_qs.filter(
-            Q(pk__in=Subquery(filtered_room_ids))
-            | Q(pk__in=Subquery(pinned_room_subquery))
-        ).distinct()
-
+        # Apply ordering
         if secondary_sort:
-            combined_qs = combined_qs.order_by(
+            annotated_qs = annotated_qs.order_by(
                 "-is_pinned", "-pin_created_on", *secondary_sort
             )
         else:
-            combined_qs = combined_qs.order_by("-is_pinned", "-pin_created_on")
+            annotated_qs = annotated_qs.order_by("-is_pinned", "-pin_created_on")
 
-        return self._get_paginated_response(combined_qs)
+        return self._get_paginated_response(annotated_qs)
 
     def _get_paginated_response(self, queryset):
         page = self.paginate_queryset(queryset)
