@@ -622,9 +622,6 @@ INSIGHTS_API_RETRY_DELAY = env.int("INSIGHTS_API_RETRY_DELAY", default=5)
 FEEDBACK_FEATURE_FLAG_KEY = env.str(
     "FEEDBACK_FEATURE_FLAG_KEY", default="weniChatsFeedback"
 )
-AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY = env.str(
-    "AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY", default="weniChatsAutomaticMessage"
-)
 
 # CSAT
 CSAT_FEATURE_FLAG_KEY = env.str("CSAT_FEATURE_FLAG_KEY", default="weniChatsCSAT")

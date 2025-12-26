@@ -110,21 +110,6 @@ class SectorSerializer(serializers.ModelSerializer):
         automatic_message = data.get("automatic_message")
 
         if automatic_message:
-            project_obj = data.get("project")
-            if automatic_message.get("is_active", False) and not is_feature_active(
-                settings.AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY,
-                self.context["request"].user.email,
-                str(project_obj.uuid) if project_obj else None,
-            ):
-                raise serializers.ValidationError(
-                    {
-                        "is_automatic_message_active": [
-                            _("This feature is not available for this project.")
-                        ]
-                    },
-                    code="automatic_message_feature_flag_is_not_active",
-                )
-
             data.pop("automatic_message")
 
             data["is_automatic_message_active"] = automatic_message.get("is_active")
@@ -218,28 +203,7 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
         automatic_message = attrs.get("automatic_message", None)
 
         if automatic_message is not None:
-            current_is_automatic_message_active = (
-                self.instance.is_automatic_message_active
-            )
             new_is_automatic_message_active = automatic_message.get("is_active")
-
-            if (
-                current_is_automatic_message_active != new_is_automatic_message_active
-                and not is_feature_active(
-                    settings.AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY,
-                    self.context["request"].user.email,
-                    str(project.uuid) if project else None,
-                )
-            ):
-
-                raise serializers.ValidationError(
-                    {
-                        "is_automatic_message_active": [
-                            _("This feature is not available for this project.")
-                        ]
-                    },
-                    code="automatic_message_feature_flag_is_not_active",
-                )
 
             attrs.pop("automatic_message")
             attrs["is_automatic_message_active"] = new_is_automatic_message_active
