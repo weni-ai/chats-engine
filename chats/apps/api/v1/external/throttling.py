@@ -15,7 +15,7 @@ class ExternalBaseThrottle(SimpleRateThrottle):
             ):
                 return True
 
-        if request.auth == "INTERNAL":
+        if getattr(request, "auth", None) == "INTERNAL":
             return True
 
         return super().allow_request(request, view)
