@@ -632,3 +632,7 @@ USER_OBJECT_CACHE_ENABLED = env.bool("USER_OBJECT_CACHE_ENABLED", default=True)
 ROOM_24H_VALID_CACHE_TTL = env.int(
     "ROOM_24H_VALID_CACHE_TTL", default=0
 )  # 0 means no cache
+
+
+# Internal API Token
+INTERNAL_API_TOKEN = env.str("INTERNAL_API_TOKEN")
