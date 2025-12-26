@@ -2,6 +2,7 @@ from unittest.mock import patch
 
 from django.urls import reverse
 from rest_framework import status
+from django.test import override_settings
 from rest_framework.test import APITestCase
 from unittest import mock
 from chats.apps.accounts.models import User
@@ -23,10 +24,10 @@ class RoomsExternalTests(APITestCase):
     def setUp(self) -> None:
         self.queue_1 = Queue.objects.get(uuid="f341417b-5143-4469-a99d-f141a0676bd4")
 
-    def _create_room(self, token: str, data: dict):
+    def _create_room(self, token: str, data: dict, token_type: str = "Bearer"):
         url = reverse("external_rooms-list")
         client = self.client
-        client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+        client.credentials(HTTP_AUTHORIZATION=f"{token_type} {token}")
 
         return client.post(url, data=data, format="json")
 
@@ -93,6 +94,54 @@ class RoomsExternalTests(APITestCase):
         response = self._create_room(token, data)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         mock_has_permission.assert_called_once()
+
+    @patch(
+        "chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room",
+        return_value=None,
+    )
+    @mock.patch(
+        "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
+    )
+    @override_settings(INTERNAL_API_TOKEN="dummy-token")
+    def test_create_external_room_with_internal_api_token(
+        self, mock_get_userinfo, mock_get_room
+    ):
+        mock_get_userinfo.return_value = {}
+        mock_get_room.return_value = None
+        data = {
+            "queue_uuid": str(self.queue_1.uuid),
+            "contact": {
+                "external_id": "e3955fd5-5705-60cd-b480-b45594b70282",
+                "name": "Foo Bar",
+                "email": "FooBar@weni.ai",
+                "phone": "+250788123123",
+                "custom_fields": {},
+            },
+        }
+        response = self._create_room("dummy-token", data, token_type="Token")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    @mock.patch(
+        "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
+    )
+    @override_settings(INTERNAL_API_TOKEN="dummy-token")
+    def test_create_external_room_with_internal_api_token_with_invalid_token(
+        self, mock_get_userinfo
+    ):
+        mock_get_userinfo.return_value = {}
+        data = {
+            "queue_uuid": str(self.queue_1.uuid),
+            "contact": {
+                "external_id": "e3955fd5-5705-60cd-b480-b45594b70282",
+                "name": "Foo Bar",
+                "email": "FooBar@weni.ai",
+                "phone": "+250788123123",
+                "custom_fields": {},
+            },
+        }
+
+        response = self._create_room("invalid-token", data, token_type="Token")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")

@@ -16,7 +16,7 @@ from rest_framework.response import Response
 
 from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
-    get_auth_class,
+    get_token_auth_classes,
 )
 from chats.apps.ai_features.history_summary.models import (
     HistorySummary,
@@ -101,15 +101,15 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
 
     @cached_property
     def authentication_classes(self):
-        print("request.headers")
-        print(self.request.headers)
-
-        return get_auth_class(self.request)
+        return get_token_auth_classes(self.request)
 
     @cached_property
     def permission_classes(self):
         if self.request.auth and hasattr(self.request.auth, "project"):
             return [IsAdminPermission]
+        elif self.request.auth == "INTERNAL":
+            return []
+
         return [ModuleHasPermission]
 
     @action(detail=True, methods=["PUT", "PATCH"], url_name="close")

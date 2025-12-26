@@ -42,8 +42,8 @@ class ProjectSerializer(serializers.ModelSerializer):
             config = config.copy()
             config.pop("chat_gpt_token", None)
 
-        has_chats_enabled = project.has_chats_summary
-        config["has_chats_enabled"] = has_chats_enabled
+        has_chats_summary = project.has_chats_summary
+        config["has_chats_summary"] = has_chats_summary
 
         return config
 
