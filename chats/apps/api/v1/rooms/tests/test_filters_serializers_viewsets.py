@@ -220,8 +220,10 @@ class RoomViewsetListTests(TestCase):
         # With the optimized pin version, query count should be much lower
         # The key is filtering FIRST, then annotating only necessary rooms
         # This prevents the O(N) annotation problem that caused production issues
-        self.assertLessEqual(len(ctx), 50, 
-            f"Query count too high: {len(ctx)}. The optimized version should stay under 50 queries.")
+        self.assertLessEqual(
+            len(ctx), 50,
+            f"Query count too high: {len(ctx)}. The optimized version should stay under 50 queries."
+        )
 
     def test_list_supports_common_filters(self):
         room_a = self._create_room("PROTO-123")
@@ -254,36 +256,38 @@ class RoomViewsetListTests(TestCase):
         active_pinned = self._create_room("ACTIVE-PINNED", is_active=True)
         active_regular = self._create_room("ACTIVE-REGULAR", is_active=True)
         inactive_pinned = self._create_room("INACTIVE-PINNED", is_active=False)
-        
+
         # Pin both pinned rooms
         RoomPin.objects.create(room=active_pinned, user=self.request_user)
         RoomPin.objects.create(room=inactive_pinned, user=self.request_user)
-        
+
         # Request only active rooms
         params = {
-            "project": str(self.project.pk), 
+            "project": str(self.project.pk),
             "is_active": "true",
             "limit": 50
         }
-        
+
         with CaptureQueriesContext(connection) as ctx:
             response = self._list(params)
-        
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         results = response.data["results"]
-        
+
         # Should include active pinned room first, then active regular
         result_uuids = [r["uuid"] for r in results]
         self.assertIn(str(active_pinned.uuid), result_uuids)
         self.assertIn(str(active_regular.uuid), result_uuids)
-        
+
         # Should NOT include inactive pinned room (filters applied correctly)
         self.assertNotIn(str(inactive_pinned.uuid), result_uuids)
-        
+
         # Pinned room should come first
         if len(results) >= 2:
             self.assertEqual(results[0]["uuid"], str(active_pinned.uuid))
-        
+
         # Query count should be reasonable even with filters
-        self.assertLessEqual(len(ctx), 50,
-            f"Too many queries with filters: {len(ctx)}")
+        self.assertLessEqual(
+            len(ctx), 50,
+            f"Too many queries with filters: {len(ctx)}"
+        )

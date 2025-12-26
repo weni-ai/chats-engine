@@ -318,7 +318,7 @@ class RoomViewset(
         # CRITICAL: Filter FIRST, then get pinned rooms
         # This avoids annotating thousands of unnecessary rooms
         filtered_qs = self.filter_queryset(qs)
-        
+
         # Get pinned room IDs efficiently
         pinned_room_ids = set(
             RoomPin.objects.filter(**pins_query).values_list("room_id", flat=True)
