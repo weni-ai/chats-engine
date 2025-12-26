@@ -251,7 +251,7 @@ class RoomViewsetListTests(TestCase):
         """
         Test that the optimized version filters BEFORE annotating,
         which is critical for performance with large datasets.
-        
+
         Important: Pinned rooms are ALWAYS included regardless of filters
         (union operation). This matches the legacy behavior and is intentional -
         users should see their pinned rooms even if they don't match filters.
@@ -297,7 +297,7 @@ class RoomViewsetListTests(TestCase):
             (i for i, r in enumerate(results) if r["uuid"] == str(inactive_pinned.uuid)),
             None
         )
-        
+
         # Both pinned rooms should appear before the regular active room
         if active_pinned_idx is not None and inactive_pinned_idx is not None:
             for i, r in enumerate(results):
