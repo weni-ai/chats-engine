@@ -94,8 +94,12 @@ class RoomsExternalTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         mock_has_permission.assert_called_once()
 
+    @mock.patch(
+        "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
+    )
     @override_settings(INTERNAL_API_TOKEN="dummy-token")
-    def test_create_external_room_with_internal_api_token(self):
+    def test_create_external_room_with_internal_api_token(self, mock_get_userinfo):
+        mock_get_userinfo.return_value = {}
         data = {
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
@@ -109,8 +113,14 @@ class RoomsExternalTests(APITestCase):
         response = self._create_room("dummy-token", data, token_type="Token")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
+    @mock.patch(
+        "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
+    )
     @override_settings(INTERNAL_API_TOKEN="dummy-token")
-    def test_create_external_room_with_internal_api_token_with_invalid_token(self):
+    def test_create_external_room_with_internal_api_token_with_invalid_token(
+        self, mock_get_userinfo
+    ):
+        mock_get_userinfo.return_value = {}
         data = {
             "queue_uuid": str(self.queue_1.uuid),
             "contact": {
