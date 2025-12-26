@@ -53,7 +53,7 @@ class InternalAPITokenAuthentication(BaseAuthentication):
         token = request.headers.get("Authorization")
 
         if not token or not token.startswith("Token "):
-            raise AuthenticationFailed("No authentication token provided.")
+            return None
 
         try:
             token = token.split(" ")[1]
@@ -70,7 +70,7 @@ class InternalAPITokenAuthentication(BaseAuthentication):
         if token == "" or token != settings.INTERNAL_API_TOKEN:
             raise AuthenticationFailed("Invalid authentication token.")
 
-        return (None, None)
+        return (None, "INTERNAL")
 
     def authenticate_header(self, request):
         return "Token"
