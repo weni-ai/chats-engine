@@ -19,7 +19,10 @@ from chats.apps.api.authentication.classes import (
 from chats.apps.api.authentication.token import JWTTokenGenerator
 
 
-from chats.apps.api.authentication.permissions import JWTRequiredPermission
+from chats.apps.api.authentication.permissions import (
+    InternalAPITokenRequiredPermission,
+    JWTRequiredPermission,
+)
 
 
 class JWTAuthenticationTests(TestCase):
@@ -182,6 +185,7 @@ class InternalAPITokenAuthenticationTests(TestCase):
 
 class InternalAPITokenAuthenticationView(APIView):
     authentication_classes = [InternalAPITokenAuthentication]
+    permission_classes = [InternalAPITokenRequiredPermission]
 
     def get(self, request):
         """Test endpoint that returns the authenticated data from the token."""
