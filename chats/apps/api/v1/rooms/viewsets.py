@@ -692,6 +692,127 @@ class RoomViewset(
             )
             raise
 
+    def _transfer_room_to_user_and_queue(self, room, user, queue):
+        old_queue = room.queue
+        old_user = room.user
+        room.queue = queue
+        room.user = user
+        room.save()
+
+        feedback_queue = create_transfer_json(action="transfer", from_=old_queue, to=queue)
+        feedback_user = create_transfer_json(action="transfer", from_=old_user, to=user)
+        create_room_feedback_message(room, feedback_queue, method=RoomFeedbackMethods.ROOM_TRANSFER)
+        create_room_feedback_message(room, feedback_user, method=RoomFeedbackMethods.ROOM_TRANSFER)
+
+        room.notify_queue("update")
+        room.notify_user("update", user=old_user)
+        room.notify_user("update")
+        start_queue_priority_routing(queue)
+        room.mark_notes_as_non_deletable()
+        room.update_ticket_async()
+
+    def _transfer_room_to_user(self, room, user, user_request):
+        old_user = room.user
+        old_user_assigned_at = room.user_assigned_at
+        transfer_user = verify_user_room(room, user_request)
+
+        feedback = create_transfer_json(action="transfer", from_=transfer_user, to=user)
+        room.user = user
+        room.save()
+
+        logger.info(
+            "Starting queue priority routing for room %s from bulk transfer to user %s",
+            room.uuid, user.email,
+        )
+        start_queue_priority_routing(room.queue)
+        create_room_feedback_message(room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER)
+
+        notify_user = old_user if old_user else transfer_user
+        room.notify_user("update", user=notify_user)
+        room.notify_user("update")
+        room.notify_queue("update")
+        room.update_ticket()
+        room.mark_notes_as_non_deletable()
+
+        if self._should_send_automatic_message(old_user_assigned_at, room):
+            room.send_automatic_message()
+
+    def _should_send_automatic_message(self, old_user_assigned_at, room):
+        return (
+            not old_user_assigned_at
+            and room.queue.sector.is_automatic_message_active
+            and room.queue.sector.automatic_message_text
+        )
+
+    def _transfer_room_to_queue(self, room, queue, user_request):
+        transfer_user = verify_user_room(room, user_request)
+        feedback = create_transfer_json(action="transfer", from_=transfer_user, to=queue)
+
+        room.user = None
+        room.queue = queue
+        room.save()
+
+        create_room_feedback_message(room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER)
+        room.notify_user("update", user=transfer_user)
+        room.notify_queue("update")
+
+        logger.info(
+            "Starting queue priority routing for room %s from bulk transfer to queue %s",
+            room.uuid, queue.uuid,
+        )
+        start_queue_priority_routing(queue)
+        room.mark_notes_as_non_deletable()
+
+    def _bulk_transfer_to_user_and_queue(self, rooms_list, user_email, queue_uuid):
+        user = User.objects.get(email=user_email)
+        queue = Queue.objects.get(uuid=queue_uuid)
+
+        projects = rooms_list.values_list("queue__sector__project__uuid", flat=True).distinct()
+        for project in projects:
+            if project != queue.project.uuid:
+                return Response(
+                    {"error": "Cannot transfer rooms from a project to another"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        for room in rooms_list:
+            self._transfer_room_to_user_and_queue(room, user, queue)
+        return None
+
+    def _bulk_transfer_to_user_only(self, rooms_list, user_email, user_request):
+        email_l = (user_email or "").lower()
+        uid = get_user_id_by_email_cached(email_l)
+
+        if uid is None:
+            return Response(
+                {"error": f"User {user_email} not found"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = User.objects.get(pk=uid)
+
+        for room in rooms_list:
+            project = room.queue.project
+            if not project.permissions.filter(user=user).exists():
+                return Response(
+                    {"error": f"User {user.email} has no permission on the project {project.name} <{project.uuid}>"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            self._transfer_room_to_user(room, user, user_request)
+        return None
+
+    def _bulk_transfer_to_queue_only(self, rooms_list, queue_uuid, user_request):
+        queue = Queue.objects.get(uuid=queue_uuid)
+
+        for room in rooms_list:
+            if queue.project != room.project:
+                return Response(
+                    {"error": "Cannot transfer rooms from a project to another"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            self._transfer_room_to_queue(room, queue, user_request)
+        return None
+
     @action(
         detail=False,
         methods=["PATCH"],
@@ -711,153 +832,16 @@ class RoomViewset(
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        error_response = None
         if user_email and queue_uuid:
-            user = User.objects.get(email=user_email)
-            queue = Queue.objects.get(uuid=queue_uuid)
+            error_response = self._bulk_transfer_to_user_and_queue(rooms_list, user_email, queue_uuid)
+        elif user_email:
+            error_response = self._bulk_transfer_to_user_only(rooms_list, user_email, user_request)
+        elif queue_uuid:
+            error_response = self._bulk_transfer_to_queue_only(rooms_list, queue_uuid, user_request)
 
-            projects = rooms_list.values_list(
-                "queue__sector__project__uuid", flat=True
-            ).distinct()
-
-            for project in projects:
-                if project != queue.project.uuid:
-                    return Response(
-                        {"error": "Cannot transfer rooms from a project to another"},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-
-            for room in rooms_list:
-                old_queue = room.queue
-                old_user = room.user
-
-                room.queue = queue
-                room.user = user
-
-                room.save()
-
-                feedback_queue = create_transfer_json(
-                    action="transfer",
-                    from_=old_queue,
-                    to=queue,
-                )
-                feedback_user = create_transfer_json(
-                    action="transfer",
-                    from_=old_user,
-                    to=user,
-                )
-                create_room_feedback_message(
-                    room, feedback_queue, method=RoomFeedbackMethods.ROOM_TRANSFER
-                )
-                create_room_feedback_message(
-                    room, feedback_user, method=RoomFeedbackMethods.ROOM_TRANSFER
-                )
-                room.notify_queue("update")
-                room.notify_user("update", user=old_user)
-                room.notify_user("update")
-
-                start_queue_priority_routing(queue)
-
-                room.mark_notes_as_non_deletable()
-                room.update_ticket_async()
-
-        elif user_email and not queue_uuid:
-            email_l = (user_email or "").lower()
-            uid = get_user_id_by_email_cached(email_l)
-
-            if uid is None:
-                return Response(
-                    {"error": f"User {user_email} not found"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            user = User.objects.get(pk=uid)
-
-            for room in rooms_list:
-                old_user = room.user
-                project = room.queue.project
-                if not project.permissions.filter(user=user).exists():
-                    return Response(
-                        {
-                            "error": (
-                                f"User {user.email} has no permission on the project "
-                                f"{project.name} <{project.uuid}>"
-                            )
-                        },
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-
-                transfer_user = verify_user_room(room, user_request)
-
-                feedback = create_transfer_json(
-                    action="transfer",
-                    from_=transfer_user,
-                    to=user,
-                )
-
-                old_user_assigned_at = room.user_assigned_at
-
-                room.user = user
-                room.save()
-
-                logger.info(
-                    "Starting queue priority routing for room %s from bulk transfer to user %s",
-                    room.uuid,
-                    user.email,
-                )
-                start_queue_priority_routing(room.queue)
-
-                create_room_feedback_message(
-                    room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
-                )
-                if old_user:
-                    room.notify_user("update", user=old_user)
-                else:
-                    room.notify_user("update", user=transfer_user)
-                room.notify_user("update")
-                room.notify_queue("update")
-
-                room.update_ticket()
-                room.mark_notes_as_non_deletable()
-                if (
-                    not old_user_assigned_at
-                    and room.queue.sector.is_automatic_message_active
-                    and room.queue.sector.automatic_message_text
-                ):
-                    room.send_automatic_message()
-
-        elif queue_uuid and not user_email:
-            queue = Queue.objects.get(uuid=queue_uuid)
-            for room in rooms_list:
-                if queue.project != room.project:
-                    return Response(
-                        {"error": "Cannot transfer rooms from a project to another"},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-                transfer_user = verify_user_room(room, user_request)
-                feedback = create_transfer_json(
-                    action="transfer",
-                    from_=transfer_user,
-                    to=queue,
-                )
-                room.user = None
-                room.queue = queue
-                room.save()
-
-                create_room_feedback_message(
-                    room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
-                )
-                room.notify_user("update", user=transfer_user)
-                room.notify_queue("update")
-
-                logger.info(
-                    "Starting queue priority routing for room %s from bulk transfer to queue %s",
-                    room.uuid,
-                    queue.uuid,
-                )
-                start_queue_priority_routing(queue)
-
-                # Mark all notes as non-deletable when room is transferred
-                room.mark_notes_as_non_deletable()
+        if error_response:
+            return error_response
 
         return Response(
             {"success": "Mass transfer completed"},

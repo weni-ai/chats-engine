@@ -119,6 +119,100 @@ class RoomViewsetBulkTransferTests(TestCase):
         self.assertEqual(self.room.user, other_agent)
         self.assertEqual(self.room.queue, other_queue)
 
+    def test_bulk_transfer_requires_user_or_queue(self):
+        view = RoomViewset.as_view({"patch": "bulk_transfer"})
+        req = self.factory.patch(
+            "/x",
+            data={"rooms_list": [str(self.room.uuid)]},
+            content_type="application/json",
+        )
+        force_authenticate(req, user=self.admin)
+        resp = view(req)
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("error", resp.data)
+
+    @patch("chats.apps.api.v1.rooms.viewsets.create_room_feedback_message")
+    @patch("chats.apps.api.v1.rooms.viewsets.start_queue_priority_routing")
+    def test_bulk_transfer_to_queue_only(self, _routing, _feedback):
+        view = RoomViewset.as_view({"patch": "bulk_transfer"})
+        other_queue = self.sector.queues.create(name="Other Queue")
+
+        self.room.user = self.agent
+        self.room.save()
+
+        req = self.factory.patch(
+            f"/x?queue_uuid={other_queue.uuid}",
+            data={"rooms_list": [str(self.room.uuid)]},
+            content_type="application/json",
+        )
+        force_authenticate(req, user=self.admin)
+        resp = view(req)
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.queue, other_queue)
+        self.assertIsNone(self.room.user)
+
+    def test_bulk_transfer_to_queue_from_different_project_fails(self):
+        view = RoomViewset.as_view({"patch": "bulk_transfer"})
+
+        other_project = Project.objects.create(name="Other", timezone="UTC")
+        other_sector = other_project.sectors.create(
+            name="S2", rooms_limit=5, work_start="08:00", work_end="18:00"
+        )
+        other_queue = other_sector.queues.create(name="Other Queue")
+
+        req = self.factory.patch(
+            f"/x?queue_uuid={other_queue.uuid}",
+            data={"rooms_list": [str(self.room.uuid)]},
+            content_type="application/json",
+        )
+        force_authenticate(req, user=self.admin)
+        resp = view(req)
+
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("error", resp.data)
+
+    @patch("chats.apps.api.v1.rooms.viewsets.create_room_feedback_message")
+    @patch("chats.apps.api.v1.rooms.viewsets.start_queue_priority_routing")
+    @patch("chats.apps.api.v1.rooms.viewsets.get_user_id_by_email_cached")
+    def test_bulk_transfer_user_without_permission_fails(self, mock_cache, _routing, _feedback):
+        view = RoomViewset.as_view({"patch": "bulk_transfer"})
+        no_perm_user = User.objects.create(email="noperm@acme.com")
+        mock_cache.return_value = no_perm_user.pk
+
+        req = self.factory.patch(
+            "/x?user_email=noperm@acme.com",
+            data={"rooms_list": [str(self.room.uuid)]},
+            content_type="application/json",
+        )
+        force_authenticate(req, user=self.admin)
+        resp = view(req)
+
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("error", resp.data)
+
+    def test_bulk_transfer_to_different_project_queue_fails(self):
+        view = RoomViewset.as_view({"patch": "bulk_transfer"})
+
+        other_project = Project.objects.create(name="Other", timezone="UTC")
+        other_sector = other_project.sectors.create(
+            name="S2", rooms_limit=5, work_start="08:00", work_end="18:00"
+        )
+        other_queue = other_sector.queues.create(name="Other Queue")
+        other_agent = User.objects.create(email="other@test.com")
+        ProjectPermission.objects.create(project=other_project, user=other_agent, role=1)
+
+        req = self.factory.patch(
+            f"/x?user_email={other_agent.email}&queue_uuid={other_queue.uuid}",
+            data={"rooms_list": [str(self.room.uuid)]},
+            content_type="application/json",
+        )
+        force_authenticate(req, user=self.admin)
+        resp = view(req)
+
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
 
 class RoomViewsetListTests(TestCase):
     def setUp(self):

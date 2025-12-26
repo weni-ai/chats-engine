@@ -835,6 +835,62 @@ class ReportFieldsValidatorViewSet(APIView):
 
         return report_data
 
+    def _is_true(self, v):
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "y", "on")
+        if isinstance(v, int):
+            return v == 1
+        return False
+
+    def _extract_root_filters(self, fields_config):
+        return {
+            "open_chats": self._is_true(fields_config.pop("open_chats", None)),
+            "closed_chats": self._is_true(fields_config.pop("closed_chats", None)),
+            "file_type": fields_config.pop("type", None),
+            "start_date": fields_config.pop("start_date", None),
+            "end_date": fields_config.pop("end_date", None),
+        }
+
+    def _apply_root_filters_to_rooms(self, fields_config, root_filters, request_data):
+        if "rooms" not in fields_config or not isinstance(fields_config["rooms"], dict):
+            fields_config["rooms"] = {}
+
+        rooms_config = fields_config["rooms"]
+        rooms_config["open_chats"] = root_filters["open_chats"]
+        rooms_config["closed_chats"] = root_filters["closed_chats"]
+
+        if root_filters["start_date"] and "start_date" not in rooms_config:
+            rooms_config["start_date"] = root_filters["start_date"]
+        if root_filters["end_date"] and "end_date" not in rooms_config:
+            rooms_config["end_date"] = root_filters["end_date"]
+
+        root_agents = request_data.get("agents") or request_data.get("agent")
+        root_tags = request_data.get("tags") or request_data.get("tag")
+        if root_agents is not None:
+            rooms_config["agents"] = root_agents
+        if root_tags is not None:
+            rooms_config["tags"] = root_tags
+
+    def _filter_valid_models(self, fields_config):
+        available_fields = ModelFieldsPresenter.get_models_info()
+        filtered_config = {
+            model_name: fields_config[model_name]
+            for model_name in available_fields.keys()
+            if model_name in fields_config
+        }
+        return filtered_config if filtered_config else {"rooms": {}}
+
+    def _calculate_rooms_count(self, fields_config, project):
+        try:
+            available_fields = ModelFieldsPresenter.get_models_info()
+            rooms_config = fields_config.get("rooms", {})
+            query_data = self._process_model_fields("rooms", rooms_config, project, available_fields)
+            return query_data["queryset"].count() if "queryset" in query_data else 0
+        except Exception:
+            return self._get_rooms_queryset(project).count()
+
     def post(self, request):
         project_uuid = request.data.get("project_uuid")
         if not project_uuid:
@@ -860,74 +916,18 @@ class ReportFieldsValidatorViewSet(APIView):
             )
 
         try:
-            fields_config = {
-                k: v for k, v in request.data.items() if k != "project_uuid"
-            }
+            fields_config = {k: v for k, v in request.data.items() if k != "project_uuid"}
+            root_filters = self._extract_root_filters(fields_config)
 
-            def _is_true(v):
-                if isinstance(v, bool):
-                    return v
-                if isinstance(v, str):
-                    return v.strip().lower() in ("true", "1", "yes", "y", "on")
-                if isinstance(v, int):
-                    return v == 1
-                return False
+            self._apply_root_filters_to_rooms(fields_config, root_filters, request.data)
+            fields_config = self._filter_valid_models(fields_config)
 
-            open_chats = _is_true(fields_config.pop("open_chats", None))
-            closed_chats = _is_true(fields_config.pop("closed_chats", None))
-            file_type = fields_config.pop("type", None)
-            root_start_date = fields_config.pop("start_date", None)
-            root_end_date = fields_config.pop("end_date", None)
-
-            # Apply root-level filters to rooms if present
-            if "rooms" in fields_config and isinstance(fields_config["rooms"], dict):
-                fields_config["rooms"]["open_chats"] = open_chats
-                fields_config["rooms"]["closed_chats"] = closed_chats
-                if root_start_date and "start_date" not in fields_config["rooms"]:
-                    fields_config["rooms"]["start_date"] = root_start_date
-                if root_end_date and "end_date" not in fields_config["rooms"]:
-                    fields_config["rooms"]["end_date"] = root_end_date
-
-            root_agents = request.data.get("agents") or request.data.get("agent")
-            root_tags = request.data.get("tags") or request.data.get("tag")
-            if "rooms" in fields_config:
-                if not isinstance(fields_config["rooms"], dict):
-                    fields_config["rooms"] = {}
-                if root_agents is not None:
-                    fields_config["rooms"]["agents"] = root_agents
-                if root_tags is not None:
-                    fields_config["rooms"]["tags"] = root_tags
-
-            # Preserve all valid models, not just rooms
-            available_fields = ModelFieldsPresenter.get_models_info()
-            filtered_config = {}
-            for model_name in available_fields.keys():
-                if model_name in fields_config:
-                    filtered_config[model_name] = fields_config[model_name]
-
-            # If no valid model found, default to empty rooms for backward compatibility
-            if not filtered_config:
-                filtered_config["rooms"] = {}
-
-            fields_config = filtered_config
-
-            # Calculate rooms count for time estimation
-            try:
-                available_fields = ModelFieldsPresenter.get_models_info()
-                rooms_config = fields_config.get("rooms", {})
-                query_data = self._process_model_fields(
-                    "rooms", rooms_config, project, available_fields
-                )
-                rooms_count = (
-                    query_data["queryset"].count() if "queryset" in query_data else 0
-                )
-            except Exception:
-                rooms_count = self._get_rooms_queryset(project).count()
-
+            rooms_count = self._calculate_rooms_count(fields_config, project)
             estimated_time = self._estimate_execution_time(rooms_count)
 
-            if file_type:
-                fields_config["type"] = file_type
+            if root_filters["file_type"]:
+                fields_config["type"] = root_filters["file_type"]
+
             report_status = ReportStatus.objects.create(
                 project=project, user=request.user, fields_config=fields_config
             )
