@@ -62,16 +62,7 @@ def get_active_room_flow_start(contact, flow_uuid, project):
     return None
 
 
-def get_room_user(
-    contact: Contact,
-    queue: Queue,
-    user: User,
-    groups: List[Dict[str, str]],
-    is_created: bool,
-    flow_uuid,
-    project: Project,
-):
-    # User that started the flow, if any
+def _get_user_from_flowstart(contact, groups, flow_uuid, project, is_created):
     reference_filter = [group["uuid"] for group in groups]
     reference_filter.append(contact.external_id)
     query_filters = {"references__external_id__in": reference_filter}
@@ -82,47 +73,71 @@ def get_room_user(
         project.flowstarts.order_by("-created_on").filter(**query_filters).first()
     )
 
-    if last_flow_start:
-        if is_created is True or not contact.rooms.filter(
-            queue__sector__project=project, created_on__gt=last_flow_start.created_on
-        ):
-            if last_flow_start.permission.status == "ONLINE":
-                return last_flow_start.permission.user
+    if not last_flow_start:
+        return None
 
-    # User linked to the contact
-    if not is_created:
-        linked_user = contact.get_linked_user(project)
-        if linked_user is not None and linked_user.is_online:
-            return linked_user.user
+    has_newer_rooms = contact.rooms.filter(
+        queue__sector__project=project, created_on__gt=last_flow_start.created_on
+    ).exists()
+
+    if is_created or not has_newer_rooms:
+        if last_flow_start.permission.status == "ONLINE":
+            return last_flow_start.permission.user
+
+    return None
+
+
+def _get_linked_user(contact, project, is_created):
+    if is_created:
+        return None
+    linked_user = contact.get_linked_user(project)
+    if linked_user is not None and linked_user.is_online:
+        return linked_user.user
+    return None
+
+
+def _handle_priority_routing(queue, project):
+    current_queue_size = queue.rooms.filter(is_active=True, user__isnull=True).count()
+
+    if current_queue_size == 0:
+        return queue.get_available_agent()
+
+    logger.info(
+        "Calling start_queue_priority_routing for queue %s from get_room_user because the queue is not empty",
+        queue.uuid,
+    )
+    start_queue_priority_routing(queue)
+    return None
+
+
+def get_room_user(
+    contact: Contact,
+    queue: Queue,
+    user: User,
+    groups: List[Dict[str, str]],
+    is_created: bool,
+    flow_uuid,
+    project: Project,
+):
+    flowstart_user = _get_user_from_flowstart(
+        contact, groups, flow_uuid, project, is_created
+    )
+    if flowstart_user:
+        return flowstart_user
+
+    linked_user = _get_linked_user(contact, project, is_created)
+    if linked_user:
+        return linked_user
 
     if user and project.permissions.filter(user=user, status="ONLINE").exists():
         return user
 
     if project.use_queue_priority_routing:
-        current_queue_size = queue.rooms.filter(
-            is_active=True, user__isnull=True
-        ).count()
-
-        if current_queue_size == 0:
-            # If the queue is empty, the available user with the least number
-            # of rooms will be selected, if any.
-            return queue.get_available_agent()
-
-        logger.info(
-            "Calling start_queue_priority_routing for queue %s from get_room_user because the queue is not empty",
-            queue.uuid,
-        )
-        start_queue_priority_routing(queue)
-
-        # If the queue is not empty, the room must stay in the queue,
-        # so that, when a agent becomes available, the first room in the queue
-        # will be assigned to the them. This logic is not done here.
-        return None
+        return _handle_priority_routing(queue, project)
 
     if queue.rooms.filter(is_active=True, user__isnull=True).exists():
         return None
 
-    # General room routing type
     return queue.get_available_agent()
 
 
@@ -518,7 +533,42 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             external_id=contact_external_id, defaults=contact_data
         )
 
+    def _validate_message_content(self, text, medias):
+        if text is None and not medias:
+            raise serializers.ValidationError(
+                {"detail": "Cannot create message without text or media"}
+            )
+
+    def _process_incoming_message(self, msg_data, room, is_waiting, was_24h_valid):
+        msg_data["contact"] = room.contact
+        need_update = is_waiting or not was_24h_valid
+        if is_waiting:
+            room.is_waiting = False
+        return need_update
+
+    def _build_message(self, msg_data, room, created_on):
+        msg_data["room"] = room
+        msg_data["created_on"] = created_on
+        return Message(**msg_data)
+
+    def _create_media_objects(self, created_messages, media_data_map):
+        all_media = []
+        for message_index, message in enumerate(created_messages):
+            if message_index in media_data_map:
+                for media_data in media_data_map[message_index]:
+                    all_media.append(
+                        MessageMedia(
+                            content_type=media_data["content_type"],
+                            media_url=media_data["url"],
+                            message=message,
+                        )
+                    )
+        return all_media
+
     def process_message_history(self, room, messages_data):
+        if not messages_data:
+            return
+
         is_waiting = room.get_is_waiting()
         was_24h_valid = room.is_24h_valid
         need_update_room = False
@@ -533,25 +583,16 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             text = msg_data.get("text")
             created_on = msg_data.get("created_on")
 
-            if text is None and not medias:
-                raise serializers.ValidationError(
-                    {"detail": "Cannot create message without text or media"}
-                )
+            self._validate_message_content(text, medias)
 
             if direction == "incoming":
-                msg_data["contact"] = room.contact
+                if self._process_incoming_message(
+                    msg_data, room, is_waiting, was_24h_valid
+                ):
+                    need_update_room = True
                 any_incoming_msgs = True
 
-                if is_waiting:
-                    need_update_room = True
-                    room.is_waiting = False
-                elif not was_24h_valid:
-                    need_update_room = True
-
-            msg_data["room"] = room
-            msg_data["created_on"] = created_on
-            message = Message(**msg_data)
-            messages_to_create.append(message)
+            messages_to_create.append(self._build_message(msg_data, room, created_on))
 
             if medias:
                 media_data_map[message_index] = medias
@@ -560,22 +601,9 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             room.save()
 
         if messages_to_create:
-            created_messages: list[Message] = Message.objects.bulk_create(
-                messages_to_create
-            )
+            created_messages = Message.objects.bulk_create(messages_to_create)
 
-            all_media = []
-            for message_index, message in enumerate(created_messages):
-                if message_index in media_data_map:
-                    for media_data in media_data_map[message_index]:
-                        all_media.append(
-                            MessageMedia(
-                                content_type=media_data["content_type"],
-                                media_url=media_data["url"],
-                                message=message,
-                            )
-                        )
-
+            all_media = self._create_media_objects(created_messages, media_data_map)
             if all_media:
                 MessageMedia.objects.bulk_create(all_media)
 
@@ -584,5 +612,4 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             if room.user is None and room.contact and any_incoming_msgs:
                 room.trigger_default_message()
 
-            created_messages_count = len(created_messages)
-            room.increment_unread_messages_count(created_messages_count, timezone.now())
+            room.increment_unread_messages_count(len(created_messages), timezone.now())

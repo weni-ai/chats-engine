@@ -77,10 +77,7 @@ class SectorSerializer(serializers.ModelSerializer):
             "work_end": {"required": False, "allow_null": True},
         }
 
-    def validate(self, data):
-        """
-        Check if the work_end date its greater than work_start date.
-        """
+    def _validate_work_hours(self, data):
         start = data.get(
             "work_start",
             getattr(self.instance, "work_start", None) if self.instance else None,
@@ -89,43 +86,44 @@ class SectorSerializer(serializers.ModelSerializer):
             "work_end",
             getattr(self.instance, "work_end", None) if self.instance else None,
         )
-        if start is not None and end is not None:
-            if end <= start:
-                raise serializers.ValidationError(
-                    {"detail": _("work_end date must be greater than work_start date.")}
-                )
+        if start is not None and end is not None and end <= start:
+            raise serializers.ValidationError(
+                {"detail": _("work_end date must be greater than work_start date.")}
+            )
 
+    def _validate_automatic_message(self, data):
         automatic_message = data.get("automatic_message")
+        if not automatic_message:
+            return
 
-        if automatic_message:
-            project_obj = data.get("project")
-            if automatic_message.get("is_active", False) and not is_feature_active(
-                settings.AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY,
-                self.context["request"].user.email,
-                str(project_obj.uuid) if project_obj else None,
-            ):
-                raise serializers.ValidationError(
-                    {
-                        "is_automatic_message_active": [
-                            _("This feature is not available for this project.")
-                        ]
-                    },
-                    code="automatic_message_feature_flag_is_not_active",
-                )
+        project_obj = data.get("project")
+        is_active = automatic_message.get("is_active", False)
 
-            data.pop("automatic_message")
-
-            data["is_automatic_message_active"] = automatic_message.get("is_active")
-            data["automatic_message_text"] = automatic_message.get("text")
-
-        project = self.instance.project if self.instance else data.get("project")
-
-        if (
-            project
-            and (is_csat_enabled := data.get("is_csat_enabled", None)) is not None
+        if is_active and not is_feature_active(
+            settings.AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY,
+            self.context["request"].user.email,
+            str(project_obj.uuid) if project_obj else None,
         ):
+            raise serializers.ValidationError(
+                {
+                    "is_automatic_message_active": [
+                        _("This feature is not available for this project.")
+                    ]
+                },
+                code="automatic_message_feature_flag_is_not_active",
+            )
+
+        data.pop("automatic_message")
+        data["is_automatic_message_active"] = automatic_message.get("is_active")
+        data["automatic_message_text"] = automatic_message.get("text")
+
+    def _validate_csat(self, data):
+        project = self.instance.project if self.instance else data.get("project")
+        is_csat_enabled = data.get("is_csat_enabled")
+        if project and is_csat_enabled is not None:
             validate_is_csat_enabled(project, is_csat_enabled, self.context)
 
+    def _process_secondary_project(self, data):
         config = data.get("config", {})
         if "secondary_project" in config:
             secondary_project_value = config.get("secondary_project")
@@ -133,6 +131,15 @@ class SectorSerializer(serializers.ModelSerializer):
                 data["secondary_project"] = {"uuid": secondary_project_value}
             else:
                 data["secondary_project"] = secondary_project_value
+
+    def validate(self, data):
+        """
+        Check if the work_end date its greater than work_start date.
+        """
+        self._validate_work_hours(data)
+        self._validate_automatic_message(data)
+        self._validate_csat(data)
+        self._process_secondary_project(data)
 
         return data
 

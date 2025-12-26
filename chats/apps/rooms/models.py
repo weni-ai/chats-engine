@@ -4,8 +4,6 @@ import time
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
-from django.db.models import Q
-
 import requests
 import sentry_sdk
 from django.conf import settings
@@ -13,7 +11,7 @@ from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models, transaction
-from django.db.models import F
+from django.db.models import F, Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_redis import get_redis_connection
@@ -26,13 +24,13 @@ from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTCl
 from chats.apps.projects.models.models import RoomRoutingType
 from chats.apps.projects.usecases.send_room_info import RoomInfoUseCase
 from chats.apps.projects.usecases.status_service import InServiceStatusService
+from chats.apps.queues.models import Queue
 from chats.apps.rooms.exceptions import (
     MaxPinRoomLimitReachedError,
     RoomIsNotActiveError,
 )
 from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
-from chats.apps.queues.models import Queue
 
 if TYPE_CHECKING:
     from chats.apps.projects.models.models import Project
@@ -161,20 +159,27 @@ class Room(BaseModel, BaseConfigurableModel):
             self.pk,
         )
 
+    def _get_project_from_queue(self):
+        if not self.queue or not hasattr(self.queue, "sector"):
+            return None
+        sector = self.queue.sector
+        if not sector or not hasattr(sector, "project"):
+            return None
+        return sector.project
+
+    def _handle_user_assignment(self, old_user, new_user, project):
+        if old_user is not None:
+            InServiceStatusService.room_closed(old_user, project)
+        if new_user is not None:
+            InServiceStatusService.room_assigned(new_user, project)
+
     def _update_agent_service_status(self, is_new):
         """
         Atualiza o status 'In-Service' dos agentes baseado nas mudanças na sala
-        Args:
-            is_new: Boolean indicando se é uma sala nova
         """
         old_user = self._original_user
         new_user = self.user
-
-        project = None
-        if self.queue and hasattr(self.queue, "sector"):
-            sector = self.queue.sector
-            if sector and hasattr(sector, "project"):
-                project = sector.project
+        project = self._get_project_from_queue()
 
         if not project:
             return
@@ -183,18 +188,10 @@ class Room(BaseModel, BaseConfigurableModel):
             InServiceStatusService.room_assigned(new_user, project)
             return
 
-        if old_user is None and new_user is not None:
-            InServiceStatusService.room_assigned(new_user, project)
+        if old_user == new_user:
             return
 
-        if old_user is not None and new_user is not None and old_user != new_user:
-            InServiceStatusService.room_closed(old_user, project)
-            InServiceStatusService.room_assigned(new_user, project)
-            return
-
-        if old_user is not None and new_user is None:
-            InServiceStatusService.room_closed(old_user, project)
-            return
+        self._handle_user_assignment(old_user, new_user, project)
 
     class Meta:
         verbose_name = _("Room")
@@ -210,43 +207,50 @@ class Room(BaseModel, BaseConfigurableModel):
             models.Index(fields=["project_uuid"]),
         ]
 
-    def save(self, *args, **kwargs) -> None:
+    def _validate_closed_room(self):
         if self._state.adding is False and self.__original_is_active is False:
             raise ValidationError({"detail": _("Closed rooms cannot receive updates")})
 
+    def _set_added_to_queue_at(self):
         if self._state.adding:
             self.added_to_queue_at = timezone.now()
 
-        user_has_changed = self.pk and self.tracker.has_changed("user")
-
-        if self.user and not self.user_assigned_at or user_has_changed:
+    def _update_user_assigned_at(self, user_has_changed):
+        if self.user and (not self.user_assigned_at or user_has_changed):
             self.user_assigned_at = timezone.now()
 
+    def _set_first_user_assigned_at(self):
         if self.is_active and self.user and not self.first_user_assigned_at:
-            if self.user_assigned_at:
-                self.first_user_assigned_at = self.user_assigned_at
-            else:
-                self.first_user_assigned_at = timezone.now()
+            self.first_user_assigned_at = self.user_assigned_at or timezone.now()
 
-        if user_has_changed and not self.user:
-            self.added_to_queue_at = timezone.now()
-
+    def _handle_user_change(self, user_has_changed):
         if user_has_changed:
+            if not self.user:
+                self.added_to_queue_at = timezone.now()
             self.clear_pins()
 
-        is_new = self._state.adding
+    def _clear_tags_on_sector_change(self, queue_has_changed, old_queue):
+        if queue_has_changed and old_queue and self.queue:
+            old_queue_obj = Queue.objects.get(pk=old_queue)
+            if old_queue_obj.sector != self.queue.sector:
+                self.tags.clear()
 
+    def save(self, *args, **kwargs) -> None:
+        self._validate_closed_room()
+        self._set_added_to_queue_at()
+
+        user_has_changed = self.pk and self.tracker.has_changed("user")
+        self._update_user_assigned_at(user_has_changed)
+        self._set_first_user_assigned_at()
+        self._handle_user_change(user_has_changed)
+
+        is_new = self._state.adding
         queue_has_changed = self.tracker.has_changed("queue")
         old_queue = self.tracker.previous("queue")
 
         super().save(*args, **kwargs)
 
-        if queue_has_changed and old_queue and self.queue:
-            old_queue = Queue.objects.get(pk=old_queue)
-
-            if old_queue.sector != self.queue.sector:
-                self.tags.clear()
-
+        self._clear_tags_on_sector_change(queue_has_changed, old_queue)
         self._update_agent_service_status(is_new)
 
     def send_automatic_message(self, delay: int = 0, check_ticket: bool = False):

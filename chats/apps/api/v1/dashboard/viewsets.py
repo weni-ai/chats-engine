@@ -14,7 +14,6 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from chats.apps.core.filters import get_filters_from_query_params
 from chats.apps.api.v1.dashboard.presenter import get_export_data
 from chats.apps.api.v1.dashboard.repository import (
     ORMRoomsDataRepository,
@@ -26,6 +25,7 @@ from chats.apps.api.v1.dashboard.serializers import (
     DashboardRoomSerializer,
     DashboardSectorSerializer,
 )
+from chats.apps.core.filters import get_filters_from_query_params
 from chats.apps.dashboard.models import ReportStatus
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.rooms.models import Room
@@ -745,6 +745,31 @@ class ReportFieldsValidatorViewSet(APIView):
 
         return {"queryset": base_queryset, "related": {}}
 
+    def _get_field_categories(self, sample_row):
+        group_fields = [key for key in sample_row.keys() if "__" not in key]
+        lookup_fields = [key for key in sample_row.keys() if "__" in key]
+        return group_fields, lookup_fields
+
+    def _init_group_entry(self, row, group_fields, lookup_fields):
+        entry = {field: row.get(field) for field in group_fields}
+        for field in lookup_fields:
+            entry[field] = []
+        return entry
+
+    def _add_lookup_values(self, grouped_entry, row, lookup_fields):
+        for field in lookup_fields:
+            value = row.get(field)
+            if value is not None and value not in grouped_entry[field]:
+                grouped_entry[field].append(value)
+
+    def _normalize_lookup_fields(self, result, lookup_fields):
+        for row in result:
+            for field in lookup_fields:
+                if len(row[field]) == 1:
+                    row[field] = row[field][0]
+                elif len(row[field]) == 0:
+                    row[field] = None
+
     def _group_duplicate_records(self, raw_data):
         """
         Group duplicate records caused by Many-to-Many or ForeignKey reverse lookups
@@ -753,37 +778,24 @@ class ReportFieldsValidatorViewSet(APIView):
             return []
 
         sample_row = raw_data[0]
-        group_fields = [key for key in sample_row.keys() if "__" not in key]
-        lookup_fields = [key for key in sample_row.keys() if "__" in key]
+        group_fields, lookup_fields = self._get_field_categories(sample_row)
 
         if not group_fields or not lookup_fields:
             return raw_data
 
         grouped_data = {}
-
         for row in raw_data:
             group_key = tuple(row.get(field) for field in group_fields)
 
             if group_key not in grouped_data:
-                grouped_data[group_key] = {
-                    field: row.get(field) for field in group_fields
-                }
-                for field in lookup_fields:
-                    grouped_data[group_key][field] = []
+                grouped_data[group_key] = self._init_group_entry(
+                    row, group_fields, lookup_fields
+                )
 
-            for field in lookup_fields:
-                value = row.get(field)
-                if value is not None and value not in grouped_data[group_key][field]:
-                    grouped_data[group_key][field].append(value)
+            self._add_lookup_values(grouped_data[group_key], row, lookup_fields)
 
         result = list(grouped_data.values())
-
-        for row in result:
-            for field in lookup_fields:
-                if len(row[field]) == 1:
-                    row[field] = row[field][0]
-                elif len(row[field]) == 0:
-                    row[field] = None
+        self._normalize_lookup_fields(result, lookup_fields)
 
         return result
 
@@ -835,6 +847,74 @@ class ReportFieldsValidatorViewSet(APIView):
 
         return report_data
 
+    def _is_true(self, v):
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            return v.strip().lower() in ("true", "1", "yes", "y", "on")
+        if isinstance(v, int):
+            return v == 1
+        return False
+
+    def _extract_root_level_config(self, request_data, fields_config):
+        open_chats = self._is_true(fields_config.pop("open_chats", None))
+        closed_chats = self._is_true(fields_config.pop("closed_chats", None))
+        file_type = fields_config.pop("type", None)
+        root_start_date = fields_config.pop("start_date", None)
+        root_end_date = fields_config.pop("end_date", None)
+        root_agents = request_data.get("agents") or request_data.get("agent")
+        root_tags = request_data.get("tags") or request_data.get("tag")
+
+        return {
+            "open_chats": open_chats,
+            "closed_chats": closed_chats,
+            "file_type": file_type,
+            "start_date": root_start_date,
+            "end_date": root_end_date,
+            "agents": root_agents,
+            "tags": root_tags,
+        }
+
+    def _apply_root_filters_to_rooms(self, fields_config, root_config):
+        if "rooms" not in fields_config:
+            return
+
+        if not isinstance(fields_config["rooms"], dict):
+            fields_config["rooms"] = {}
+
+        fields_config["rooms"]["open_chats"] = root_config["open_chats"]
+        fields_config["rooms"]["closed_chats"] = root_config["closed_chats"]
+
+        if root_config["start_date"] and "start_date" not in fields_config["rooms"]:
+            fields_config["rooms"]["start_date"] = root_config["start_date"]
+        if root_config["end_date"] and "end_date" not in fields_config["rooms"]:
+            fields_config["rooms"]["end_date"] = root_config["end_date"]
+        if root_config["agents"] is not None:
+            fields_config["rooms"]["agents"] = root_config["agents"]
+        if root_config["tags"] is not None:
+            fields_config["rooms"]["tags"] = root_config["tags"]
+
+    def _filter_valid_models(self, fields_config, available_fields):
+        filtered_config = {}
+        for model_name in available_fields.keys():
+            if model_name in fields_config:
+                filtered_config[model_name] = fields_config[model_name]
+
+        if not filtered_config:
+            filtered_config["rooms"] = {}
+
+        return filtered_config
+
+    def _calculate_rooms_count(self, fields_config, project, available_fields):
+        try:
+            rooms_config = fields_config.get("rooms", {})
+            query_data = self._process_model_fields(
+                "rooms", rooms_config, project, available_fields
+            )
+            return query_data["queryset"].count() if "queryset" in query_data else 0
+        except Exception:
+            return self._get_rooms_queryset(project).count()
+
     def post(self, request):
         project_uuid = request.data.get("project_uuid")
         if not project_uuid:
@@ -864,70 +944,20 @@ class ReportFieldsValidatorViewSet(APIView):
                 k: v for k, v in request.data.items() if k != "project_uuid"
             }
 
-            def _is_true(v):
-                if isinstance(v, bool):
-                    return v
-                if isinstance(v, str):
-                    return v.strip().lower() in ("true", "1", "yes", "y", "on")
-                if isinstance(v, int):
-                    return v == 1
-                return False
+            root_config = self._extract_root_level_config(request.data, fields_config)
+            self._apply_root_filters_to_rooms(fields_config, root_config)
 
-            open_chats = _is_true(fields_config.pop("open_chats", None))
-            closed_chats = _is_true(fields_config.pop("closed_chats", None))
-            file_type = fields_config.pop("type", None)
-            root_start_date = fields_config.pop("start_date", None)
-            root_end_date = fields_config.pop("end_date", None)
-
-            # Apply root-level filters to rooms if present
-            if "rooms" in fields_config and isinstance(fields_config["rooms"], dict):
-                fields_config["rooms"]["open_chats"] = open_chats
-                fields_config["rooms"]["closed_chats"] = closed_chats
-                if root_start_date and "start_date" not in fields_config["rooms"]:
-                    fields_config["rooms"]["start_date"] = root_start_date
-                if root_end_date and "end_date" not in fields_config["rooms"]:
-                    fields_config["rooms"]["end_date"] = root_end_date
-
-            root_agents = request.data.get("agents") or request.data.get("agent")
-            root_tags = request.data.get("tags") or request.data.get("tag")
-            if "rooms" in fields_config:
-                if not isinstance(fields_config["rooms"], dict):
-                    fields_config["rooms"] = {}
-                if root_agents is not None:
-                    fields_config["rooms"]["agents"] = root_agents
-                if root_tags is not None:
-                    fields_config["rooms"]["tags"] = root_tags
-
-            # Preserve all valid models, not just rooms
             available_fields = ModelFieldsPresenter.get_models_info()
-            filtered_config = {}
-            for model_name in available_fields.keys():
-                if model_name in fields_config:
-                    filtered_config[model_name] = fields_config[model_name]
+            fields_config = self._filter_valid_models(fields_config, available_fields)
 
-            # If no valid model found, default to empty rooms for backward compatibility
-            if not filtered_config:
-                filtered_config["rooms"] = {}
-
-            fields_config = filtered_config
-
-            # Calculate rooms count for time estimation
-            try:
-                available_fields = ModelFieldsPresenter.get_models_info()
-                rooms_config = fields_config.get("rooms", {})
-                query_data = self._process_model_fields(
-                    "rooms", rooms_config, project, available_fields
-                )
-                rooms_count = (
-                    query_data["queryset"].count() if "queryset" in query_data else 0
-                )
-            except Exception:
-                rooms_count = self._get_rooms_queryset(project).count()
-
+            rooms_count = self._calculate_rooms_count(
+                fields_config, project, available_fields
+            )
             estimated_time = self._estimate_execution_time(rooms_count)
 
-            if file_type:
-                fields_config["type"] = file_type
+            if root_config["file_type"]:
+                fields_config["type"] = root_config["file_type"]
+
             report_status = ReportStatus.objects.create(
                 project=project, user=request.user, fields_config=fields_config
             )
