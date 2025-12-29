@@ -43,8 +43,12 @@ def persist_keycloak_user_by_email(user_email: str):  # TODO: ERROR HANDLING
     email = user_data.get("email")
     user = User.objects.get_or_create(email=email)[0]
     first_name = user_data.get("firstName", "") or user_data.get("username", "")
-    user.first_name = first_name[:29]  # TODO: Maybe change this limit in the models
-    user.last_name = user_data.get("lastName", "")
+    last_name = user_data.get("lastName", "")
+
+    if first_name:
+        user.first_name = first_name[:29]
+    if last_name:
+        user.last_name = last_name
     user.save()
 
 
