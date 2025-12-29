@@ -50,6 +50,7 @@ class RoomArchivedConversation(models.Model):
         verbose_name=_("File"),
         upload_to=upload_to,
         help_text=_("The file that contains the archived conversation"),
+        max_length=255,
     )
     archive_process_started_at = models.DateTimeField(
         verbose_name=_("Archive process started at"),

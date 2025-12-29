@@ -1,4 +1,5 @@
 from django.test import TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 from django.utils import timezone
 from chats.apps.archive_chats.models import (
@@ -72,3 +73,23 @@ class TestRoomArchivedConversation(TestCase):
         self.assertEqual(conversation.errors[1]["error"], "division by zero")
         self.assertIsNotNone(conversation.errors[1]["traceback"])
         self.assertEqual(conversation.errors[1]["sentry_event_id"], "test-event-id")
+
+    def test_file_upload_to(self):
+        test_file = SimpleUploadedFile(
+            "test.jsonl", b"fake jsonl content", content_type="application/jsonl"
+        )
+
+        conversation = RoomArchivedConversation.objects.create(
+            job=self.job,
+            room=self.room,
+            file=test_file,
+            archive_process_started_at=timezone.now(),
+            archive_process_finished_at=timezone.now(),
+            messages_deleted_at=timezone.now(),
+        )
+
+        project_uuid = self.room.queue.sector.project.uuid
+        room_uuid = self.room.uuid
+
+        expected_path = f"archived_conversations/{project_uuid}/{room_uuid}/test.jsonl"
+        self.assertEqual(conversation.file.name, expected_path)
