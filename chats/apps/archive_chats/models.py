@@ -95,12 +95,13 @@ class RoomArchivedConversation(models.Model):
         verbose_name_plural = _("Room Archived Conversations")
 
     def __str__(self):
-        return f"Room Archived Conversation {self.room.id} - {self.room.name}"
+        return f"Room Archived Conversation {self.room.uuid} - {self.room.queue.sector.project.name}"
 
     def register_error(self, error: Exception, sentry_event_id: Optional[str] = None):
-        self.errors.append(
+        errors = self.errors or []
+        errors.append(
             {
-                "timestamp": timezone.now(),
+                "timestamp": str(timezone.now()),
                 "error": str(error),
                 "traceback": traceback.format_exception(
                     type(error), error, error.__traceback__
@@ -108,4 +109,5 @@ class RoomArchivedConversation(models.Model):
                 "sentry_event_id": sentry_event_id,
             }
         )
+        self.errors = errors
         self.save(update_fields=["errors"])
