@@ -1,18 +1,28 @@
 from abc import ABC, abstractmethod
 
 
+from django.utils import timezone
+
+
+from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
+from chats.apps.archive_chats.models import (
+    ArchiveConversationsJob,
+    RoomArchivedConversation,
+)
 from chats.apps.archive_chats.serializers import ArchiveMessageSerializer
-from chats.apps.msgs.models import MessageMedia
+from chats.apps.msgs.models import Message, MessageMedia
 from chats.apps.rooms.models import Room
 
 
 class BaseArchiveChatsService(ABC):
     @abstractmethod
-    def archive_room_history(self, room: Room) -> None:
+    def archive_room_history(self, room: Room, job: ArchiveConversationsJob) -> None:
         pass
 
     @abstractmethod
-    def process_messages(self, room: Room) -> list[ArchiveMessageSerializer]:
+    def process_messages(
+        self, room_archived_conversation: RoomArchivedConversation
+    ) -> list[ArchiveMessageSerializer]:
         pass
 
     @abstractmethod
@@ -29,11 +39,41 @@ class BaseArchiveChatsService(ABC):
 
 
 class ArchiveChatsService(BaseArchiveChatsService):
-    def archive_room_history(self, room: Room) -> None:
-        pass
+    def start_archive_job(self) -> ArchiveConversationsJob:
+        return ArchiveConversationsJob.objects.create(
+            started_at=timezone.now(),
+        )
 
-    def process_messages(self, room: Room) -> list[ArchiveMessageSerializer]:
-        pass
+    def archive_room_history(self, room: Room, job: ArchiveConversationsJob) -> None:
+        room_archived_conversation = RoomArchivedConversation.objects.create(
+            job=job,
+            room=room,
+            status=ArchiveConversationsJobStatus.PENDING,
+        )
+
+        messages_data = self.process_messages(room_archived_conversation)  # noqa
+
+    def process_messages(
+        self, room_archived_conversation: RoomArchivedConversation
+    ) -> list[ArchiveMessageSerializer]:
+        room = room_archived_conversation.room
+
+        room_archived_conversation.status = (
+            ArchiveConversationsJobStatus.PROCESSING_MESSAGES
+        )
+        room_archived_conversation.save(update_fields=["status"])
+
+        messages_data: list[ArchiveMessageSerializer] = []
+        messages = Message.objects.filter(room=room).order_by("created_on")
+
+        for message in messages:
+            if message.media.exists():
+                for media in message.media.all():
+                    self.process_media_message(media)
+
+            messages_data.append(ArchiveMessageSerializer(message).data)
+
+        return messages_data
 
     def upload_messages_file(self, messages: list[ArchiveMessageSerializer]) -> None:
         pass
