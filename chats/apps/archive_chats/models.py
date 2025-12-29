@@ -39,7 +39,7 @@ class RoomArchivedConversation(models.Model):
         related_name="room_archived_conversations",
         help_text=_("The job that archived the conversation"),
     )
-    room = models.OneToOneField(
+    room = models.ForeignKey(
         Room,
         verbose_name=_("Room"),
         on_delete=models.CASCADE,
