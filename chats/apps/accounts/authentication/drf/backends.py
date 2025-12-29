@@ -107,9 +107,15 @@ class WeniOIDCAuthenticationBackend(OIDCAuthenticationBackend):
             first_name = user_info.get("given_name", "")
             last_name = user_info.get("family_name", "")
 
-            if user.first_name != first_name or user.last_name != last_name:
+            updated = False
+            if first_name and user.first_name != first_name:
                 user.first_name = first_name
+                updated = True
+            if last_name and user.last_name != last_name:
                 user.last_name = last_name
+                updated = True
+
+            if updated:
                 user.save()
                 invalidate_cached_user(email)
 
@@ -118,8 +124,13 @@ class WeniOIDCAuthenticationBackend(OIDCAuthenticationBackend):
 
         user, created = self.UserModel.objects.get_or_create(email=email)
 
-        user.first_name = user_info.get("given_name", "")
-        user.last_name = user_info.get("family_name", "")
+        first_name = user_info.get("given_name", "")
+        last_name = user_info.get("family_name", "")
+
+        if first_name:
+            user.first_name = first_name
+        if last_name:
+            user.last_name = last_name
         user.save()
 
         invalidate_cached_user(email)
@@ -142,8 +153,13 @@ class WeniOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         if not user:
             user = self.UserModel.objects.create(email=email)
 
-        user.first_name = claims.get("given_name", "")
-        user.last_name = claims.get("family_name", "")
+        first_name = claims.get("given_name", "")
+        last_name = claims.get("family_name", "")
+
+        if first_name:
+            user.first_name = first_name
+        if last_name:
+            user.last_name = last_name
         user.save()
 
         invalidate_cached_user(email)
