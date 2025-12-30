@@ -79,12 +79,18 @@ class ArchiveChatsService(BaseArchiveChatsService):
         )
         room_archived_conversation.save(update_fields=["status"])
 
+        logger.info(
+            f"[ArchiveChatsService] Room archived conversation status updated to "
+            f"{room_archived_conversation.status} for room {room.uuid} "
+            f"with archived conversation {room_archived_conversation.uuid}"
+        )
+
         messages_data: list[ArchiveMessageSerializer] = []
         messages = Message.objects.filter(room=room).order_by("created_on")
 
         for message in messages:
-            if message.media.exists():
-                for media in message.media.all():
+            if message.medias.exists():
+                for media in message.medias.all():
                     self.process_media_message(media)
 
             messages_data.append(ArchiveMessageSerializer(message).data)

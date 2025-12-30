@@ -8,10 +8,13 @@ from chats.apps.archive_chats.models import (
     RoomArchivedConversation,
 )
 from chats.apps.archive_chats.services import ArchiveChatsService
+from chats.apps.msgs.models import Message
 from chats.apps.rooms.models import Room
 from chats.apps.queues.models import Queue
 from chats.apps.sectors.models import Sector
 from chats.apps.projects.models import Project
+from chats.apps.contacts.models import Contact
+from chats.apps.accounts.models import User
 
 
 class TestArchiveChatsService(TestCase):
@@ -27,6 +30,10 @@ class TestArchiveChatsService(TestCase):
         )
         self.queue = Queue.objects.create(sector=self.sector)
         self.room = Room.objects.create(queue=self.queue)
+        self.user = User.objects.create(
+            email="test@example.com", first_name="Test", last_name="User"
+        )
+        self.contact = Contact.objects.create(name="Test Contact")
 
     def test_start_archive_job(self):
         self.assertFalse(ArchiveConversationsJob.objects.exists())
@@ -56,3 +63,52 @@ class TestArchiveChatsService(TestCase):
         self.assertEqual(archived_conversation.job, job)
 
         mock_process_messages.assert_called_once_with(archived_conversation)
+
+    def test_process_messages(self):
+        message_a = Message.objects.create(
+            room=self.room,
+            user=self.user,
+            text="Test message",
+            created_on=timezone.now(),
+        )
+        message_b = Message.objects.create(
+            room=self.room,
+            contact=self.contact,
+            text="Test message",
+            created_on=timezone.now(),
+        )
+        messages = [message_a, message_b]
+
+        archived_conversation = RoomArchivedConversation.objects.create(
+            job=self.service.start_archive_job(),
+            room=self.room,
+            file="test.zip",
+            archive_process_started_at=timezone.now(),
+            archive_process_finished_at=timezone.now(),
+            messages_deleted_at=timezone.now(),
+        )
+        messages_data = self.service.process_messages(archived_conversation)
+
+        self.assertIsInstance(messages_data, list)
+        self.assertEqual(len(messages_data), 2)
+
+        for i, message in enumerate(messages):
+            self.assertEqual(messages_data[i].get("uuid"), str(message.uuid))
+            self.assertEqual(messages_data[i].get("text"), message.text)
+            self.assertEqual(
+                messages_data[i].get("created_on"), message.created_on.isoformat()
+            )
+            user_data = messages_data[i].get("user", {}) or {}
+            self.assertEqual(
+                user_data.get("email"),
+                message.user.email if message.user else None,
+            )
+            contact_data = messages_data[i].get("contact", {}) or {}
+            self.assertEqual(
+                contact_data.get("external_id"),
+                message.contact.external_id if message.contact else None,
+            )
+            self.assertEqual(
+                contact_data.get("name"),
+                message.contact.name if message.contact else None,
+            )
