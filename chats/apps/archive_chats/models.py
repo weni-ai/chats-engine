@@ -1,4 +1,6 @@
 import traceback
+import uuid
+
 from typing import Optional
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -10,6 +12,14 @@ from chats.apps.rooms.models import Room
 
 
 class ArchiveConversationsJob(models.Model):
+    uuid = models.UUIDField(
+        _("UUID"),
+        default=uuid.uuid4,
+        help_text=_("The UUID of the job"),
+        unique=True,
+        editable=False,
+        primary_key=True,
+    )
     started_at = models.DateTimeField(
         _("Started at"),
         null=True,
@@ -22,10 +32,18 @@ class ArchiveConversationsJob(models.Model):
         verbose_name_plural = _("Archive Conversations Jobs")
 
     def __str__(self):
-        return f"Archive Conversations Job {self.id} - {self.started_at}"
+        return f"Archive Conversations Job {self.uuid} - {self.started_at}"
 
 
 class RoomArchivedConversation(models.Model):
+    uuid = models.UUIDField(
+        _("UUID"),
+        default=uuid.uuid4,
+        help_text=_("The UUID of the room archived conversation"),
+        unique=True,
+        editable=False,
+        primary_key=True,
+    )
     status = models.CharField(
         verbose_name=_("Status"),
         max_length=25,
