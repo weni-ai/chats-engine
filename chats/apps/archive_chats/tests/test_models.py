@@ -16,7 +16,7 @@ class TestArchiveConversationsJob(TestCase):
     def test_str(self):
         job = ArchiveConversationsJob.objects.create(started_at=timezone.now())
         self.assertEqual(
-            str(job), f"Archive Conversations Job {job.id} - {job.started_at}"
+            str(job), f"Archive Conversations Job {job.uuid} - {job.started_at}"
         )
 
 
