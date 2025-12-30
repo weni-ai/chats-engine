@@ -52,7 +52,7 @@ class ArchiveChatsService(BaseArchiveChatsService):
 
     def archive_room_history(self, room: Room, job: ArchiveConversationsJob) -> None:
         logger.info(
-            f"[ArchiveChatsService] Archiving room history for room {room.uuid} with job {job.id}"
+            f"[ArchiveChatsService] Archiving room history for room {room.uuid} with job {job.uuid}"
         )
 
         room_archived_conversation = RoomArchivedConversation.objects.create(
@@ -62,9 +62,9 @@ class ArchiveChatsService(BaseArchiveChatsService):
         )
         logger.info(
             f"[ArchiveChatsService] Room archived conversation created: "
-            f"{room_archived_conversation.id} with status "
+            f"{room_archived_conversation.uuid} with status "
             f"{room_archived_conversation.status} for room {room.uuid} "
-            f"and job {job.id}"
+            f"and job {job.uuid}"
         )
 
         messages_data = self.process_messages(room_archived_conversation)  # noqa
