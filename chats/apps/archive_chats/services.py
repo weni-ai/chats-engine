@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import logging
 
 
 from django.utils import timezone
@@ -12,6 +13,9 @@ from chats.apps.archive_chats.models import (
 from chats.apps.archive_chats.serializers import ArchiveMessageSerializer
 from chats.apps.msgs.models import Message, MessageMedia
 from chats.apps.rooms.models import Room
+
+
+logger = logging.getLogger(__name__)
 
 
 class BaseArchiveChatsService(ABC):
@@ -40,6 +44,8 @@ class BaseArchiveChatsService(ABC):
 
 class ArchiveChatsService(BaseArchiveChatsService):
     def start_archive_job(self) -> ArchiveConversationsJob:
+        logger.info("[ArchiveChatsService] Starting archive job")
+
         return ArchiveConversationsJob.objects.create(
             started_at=timezone.now(),
         )
