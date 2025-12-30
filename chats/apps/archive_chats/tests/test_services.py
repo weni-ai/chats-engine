@@ -1,3 +1,4 @@
+import json
 from unittest.mock import patch
 
 from django.test import TestCase
@@ -7,6 +8,7 @@ from chats.apps.archive_chats.models import (
     ArchiveConversationsJob,
     RoomArchivedConversation,
 )
+from chats.apps.archive_chats.serializers import ArchiveMessageSerializer
 from chats.apps.archive_chats.services import ArchiveChatsService
 from chats.apps.msgs.models import Message
 from chats.apps.rooms.models import Room
@@ -112,3 +114,47 @@ class TestArchiveChatsService(TestCase):
                 contact_data.get("name"),
                 message.contact.name if message.contact else None,
             )
+
+    def test_upload_messages_file(self):
+        archived_conversation = RoomArchivedConversation.objects.create(
+            job=self.service.start_archive_job(),
+            room=self.room,
+        )
+
+        message_a = Message.objects.create(
+            room=self.room,
+            user=self.user,
+            text="Test message",
+            created_on=timezone.now(),
+        )
+        message_b = Message.objects.create(
+            room=self.room,
+            contact=self.contact,
+            text="Test message",
+            created_on=timezone.now(),
+        )
+
+        messages = [
+            ArchiveMessageSerializer(message_a).data,
+            ArchiveMessageSerializer(message_b).data,
+        ]
+
+        self.service.upload_messages_file(
+            room_archived_conversation=archived_conversation,
+            messages=messages,
+        )
+
+        archived_conversation.refresh_from_db()
+
+        self.assertTrue(archived_conversation.file)
+        self.assertEqual(
+            archived_conversation.file.name,
+            f"archived_conversations/{self.project.uuid}/{self.room.uuid}/messages.jsonl",
+        )
+
+        with archived_conversation.file.open("r") as f:
+            lines = f.read().splitlines()
+
+        self.assertEqual(len(lines), 2)
+        self.assertEqual(json.loads(lines[0]), messages[0])
+        self.assertEqual(json.loads(lines[1]), messages[1])

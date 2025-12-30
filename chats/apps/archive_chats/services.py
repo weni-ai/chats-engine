@@ -1,8 +1,11 @@
 from abc import ABC, abstractmethod
+import io
+import json
 import logging
 
 
 from django.utils import timezone
+from django.core.files.base import ContentFile
 
 
 from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
@@ -11,7 +14,6 @@ from chats.apps.archive_chats.models import (
     RoomArchivedConversation,
 )
 from chats.apps.archive_chats.serializers import ArchiveMessageSerializer
-from chats.apps.msgs.models import Message, MessageMedia
 from chats.apps.rooms.models import Room
 
 
@@ -31,14 +33,6 @@ class BaseArchiveChatsService(ABC):
 
     @abstractmethod
     def upload_messages_file(self, messages: list[ArchiveMessageSerializer]) -> None:
-        pass
-
-    @abstractmethod
-    def process_media_message(self, message_media: MessageMedia) -> None:
-        pass
-
-    @abstractmethod
-    def upload_media_file(self, message_media: MessageMedia) -> str:
         pass
 
 
@@ -90,20 +84,31 @@ class ArchiveChatsService(BaseArchiveChatsService):
 
         for message in messages:
             if message.medias.exists():
-                for media in message.medias.all():
-                    self.process_media_message(media)
+                for media in message.medias.all():  # noqa
+                    # TODO: Implement media processing
+                    pass
 
             messages_data.append(ArchiveMessageSerializer(message).data)
 
         return messages_data
 
-    def upload_messages_file(self, messages: list[ArchiveMessageSerializer]) -> None:
-        pass
+    def upload_messages_file(
+        self,
+        room_archived_conversation: RoomArchivedConversation,
+        messages: list[dict],
+    ) -> None:
+        file_object = io.BytesIO()
 
-    def process_media_message(self, message_media: MessageMedia) -> None:
-        # TODO: Implement this
-        pass
+        for message in messages:
+            file_object.write(json.dumps(message).encode("utf-8"))
+            file_object.write(b"\n")
 
-    def upload_media_file(self, message_media: MessageMedia) -> str:
-        # TODO: Implement this
-        pass
+        file_object.seek(0)
+
+        filename = "messages.jsonl"
+
+        room_archived_conversation.file.save(
+            filename,
+            ContentFile(file_object.read()),
+            save=True,
+        )
