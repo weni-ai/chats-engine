@@ -3,7 +3,7 @@ import io
 import json
 import logging
 
-
+from typing import List
 from django.utils import timezone
 from django.core.files.base import ContentFile
 
@@ -29,11 +29,11 @@ class BaseArchiveChatsService(ABC):
     @abstractmethod
     def process_messages(
         self, room_archived_conversation: RoomArchivedConversation
-    ) -> list[ArchiveMessageSerializer]:
+    ) -> List[ArchiveMessageSerializer]:
         pass
 
     @abstractmethod
-    def upload_messages_file(self, messages: list[ArchiveMessageSerializer]) -> None:
+    def upload_messages_file(self, messages: List[dict]) -> None:
         pass
 
 
@@ -96,7 +96,7 @@ class ArchiveChatsService(BaseArchiveChatsService):
     def upload_messages_file(
         self,
         room_archived_conversation: RoomArchivedConversation,
-        messages: list[dict],
+        messages: List[dict],
     ) -> None:
         file_object = io.BytesIO()
 
