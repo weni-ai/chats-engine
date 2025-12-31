@@ -73,6 +73,7 @@ INSTALLED_APPS = [
     "chats.apps.feature_flags",
     "chats.apps.feedbacks",
     "chats.apps.csat",
+    "chats.apps.archive_chats",
     # third party apps
     "weni.feature_flags",  # weni-commons feature flags
     "channels",
