@@ -1,0 +1,10 @@
+from django.db import models
+
+
+class ArchiveConversationsJobStatus(models.TextChoices):
+    PENDING = "PENDING"
+    PROCESSING_MESSAGES = "PROCESSING_MESSAGES"
+    UPLOADING_MESSAGES_FILE = "UPLOADING_MESSAGES_FILE"
+    DELETING_MESSAGES_FROM_DB = "DELETING_MESSAGES_FROM_DB"
+    FINISHED = "FINISHED"
+    FAILED = "FAILED"
