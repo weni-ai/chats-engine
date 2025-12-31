@@ -128,5 +128,9 @@ class RoomArchivedConversation(models.Model):
                 "sentry_event_id": sentry_event_id,
             }
         )
+
         self.errors = errors
-        self.save(update_fields=["errors"])
+        self.status = ArchiveConversationsJobStatus.FAILED
+        self.failed_at = timezone.now()
+
+        self.save(update_fields=["errors", "status", "failed_at"])
