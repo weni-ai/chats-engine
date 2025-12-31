@@ -65,6 +65,12 @@ class ArchiveChatsService(BaseArchiveChatsService):
         messages_data = self.process_messages(room_archived_conversation)
         self.upload_messages_file(room_archived_conversation, messages_data)
 
+        room_archived_conversation.refresh_from_db()
+        room_archived_conversation.status = ArchiveConversationsJobStatus.FINISHED
+        room_archived_conversation.save(update_fields=["status"])
+
+        return room_archived_conversation
+
     def process_messages(
         self, room_archived_conversation: RoomArchivedConversation
     ) -> List[ArchiveMessageSerializer]:
@@ -99,6 +105,17 @@ class ArchiveChatsService(BaseArchiveChatsService):
         room_archived_conversation: RoomArchivedConversation,
         messages: List[dict],
     ) -> None:
+        room_archived_conversation.status = (
+            ArchiveConversationsJobStatus.UPLOADING_MESSAGES_FILE
+        )
+        room_archived_conversation.save(update_fields=["status"])
+
+        logger.info(
+            f"[ArchiveChatsService] Room archived conversation status updated to "
+            f"{room_archived_conversation.status} for room {room_archived_conversation.room.uuid} "
+            f"with archived conversation {room_archived_conversation.uuid}"
+        )
+
         file_object = io.BytesIO()
 
         for message in messages:
@@ -114,3 +131,5 @@ class ArchiveChatsService(BaseArchiveChatsService):
             ContentFile(file_object.read()),
             save=True,
         )
+
+        return room_archived_conversation
