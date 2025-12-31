@@ -15,6 +15,7 @@ from chats.apps.archive_chats.models import (
 )
 from chats.apps.archive_chats.serializers import ArchiveMessageSerializer
 from chats.apps.rooms.models import Room
+from chats.apps.msgs.models import Message
 
 
 logger = logging.getLogger(__name__)
