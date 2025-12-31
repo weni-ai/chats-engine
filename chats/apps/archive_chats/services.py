@@ -66,7 +66,7 @@ class ArchiveChatsService(BaseArchiveChatsService):
 
     def process_messages(
         self, room_archived_conversation: RoomArchivedConversation
-    ) -> list[ArchiveMessageSerializer]:
+    ) -> List[ArchiveMessageSerializer]:
         room = room_archived_conversation.room
 
         room_archived_conversation.status = (
@@ -80,7 +80,7 @@ class ArchiveChatsService(BaseArchiveChatsService):
             f"with archived conversation {room_archived_conversation.uuid}"
         )
 
-        messages_data: list[ArchiveMessageSerializer] = []
+        messages_data: List[ArchiveMessageSerializer] = []
         messages = Message.objects.filter(room=room).order_by("created_on")
 
         for message in messages:
