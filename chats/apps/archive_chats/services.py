@@ -6,6 +6,7 @@ import logging
 from typing import List
 from django.utils import timezone
 from django.core.files.base import ContentFile
+from sentry_sdk import capture_exception
 
 
 from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
@@ -62,12 +63,25 @@ class ArchiveChatsService(BaseArchiveChatsService):
             f"and job {job.uuid}"
         )
 
-        messages_data = self.process_messages(room_archived_conversation)
-        self.upload_messages_file(room_archived_conversation, messages_data)
+        try:
+            messages_data = self.process_messages(room_archived_conversation)
+            self.upload_messages_file(room_archived_conversation, messages_data)
+
+            room_archived_conversation.refresh_from_db()
+            room_archived_conversation.status = ArchiveConversationsJobStatus.FINISHED
+            room_archived_conversation.archive_process_finished_at = timezone.now()
+            room_archived_conversation.save(
+                update_fields=["status", "archive_process_finished_at"]
+            )
+        except Exception as e:
+            sentry_event_id = capture_exception(e)
+            room_archived_conversation.register_error(e, sentry_event_id)
+            logger.error(
+                f"[ArchiveChatsService] Error archiving room history for room {room.uuid} with job {job.uuid}: {e}",
+                exc_info=True,
+            )
 
         room_archived_conversation.refresh_from_db()
-        room_archived_conversation.status = ArchiveConversationsJobStatus.FINISHED
-        room_archived_conversation.save(update_fields=["status"])
 
         return room_archived_conversation
 
@@ -79,7 +93,10 @@ class ArchiveChatsService(BaseArchiveChatsService):
         room_archived_conversation.status = (
             ArchiveConversationsJobStatus.PROCESSING_MESSAGES
         )
-        room_archived_conversation.save(update_fields=["status"])
+        room_archived_conversation.archive_process_started_at = timezone.now()
+        room_archived_conversation.save(
+            update_fields=["status", "archive_process_started_at"]
+        )
 
         logger.info(
             f"[ArchiveChatsService] Room archived conversation status updated to "

@@ -4,6 +4,7 @@ from unittest.mock import patch
 from django.test import TestCase
 from django.utils import timezone
 
+from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
 from chats.apps.archive_chats.models import (
     ArchiveConversationsJob,
     RoomArchivedConversation,
@@ -66,6 +67,40 @@ class TestArchiveChatsService(TestCase):
 
         mock_process_messages.assert_called_once_with(archived_conversation)
 
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.process_messages")
+    @patch("chats.apps.archive_chats.services.capture_exception")
+    def test_archive_room_history_with_error(
+        self, mock_capture_exception, mock_process_messages
+    ):
+        mock_capture_exception.return_value = "test-event-id"
+        mock_process_messages.side_effect = Exception("Test error")
+        self.assertFalse(RoomArchivedConversation.objects.exists())
+
+        now = timezone.now()
+
+        with patch(
+            "chats.apps.archive_chats.services.timezone.now"
+        ) as mock_service_now, patch(
+            "chats.apps.archive_chats.models.timezone.now"
+        ) as mock_model_now:
+            mock_service_now.return_value = now
+            mock_model_now.return_value = now
+            job = self.service.start_archive_job()
+            self.service.archive_room_history(self.room, job)
+
+        archived_conversation = RoomArchivedConversation.objects.first()
+
+        self.assertEqual(
+            archived_conversation.status, ArchiveConversationsJobStatus.FAILED
+        )
+        self.assertEqual(archived_conversation.failed_at, now)
+        self.assertEqual(len(archived_conversation.errors), 1)
+        self.assertEqual(archived_conversation.errors[0]["error"], "Test error")
+        self.assertIsNotNone(archived_conversation.errors[0]["traceback"])
+        self.assertEqual(
+            archived_conversation.errors[0]["sentry_event_id"], "test-event-id"
+        )
+
     def test_process_messages(self):
         message_a = Message.objects.create(
             room=self.room,
@@ -90,6 +125,13 @@ class TestArchiveChatsService(TestCase):
             messages_deleted_at=timezone.now(),
         )
         messages_data = self.service.process_messages(archived_conversation)
+
+        archived_conversation.refresh_from_db()
+        self.assertEqual(
+            archived_conversation.status,
+            ArchiveConversationsJobStatus.PROCESSING_MESSAGES,
+        )
+        self.assertIsNotNone(archived_conversation.archive_process_started_at)
 
         self.assertIsInstance(messages_data, list)
         self.assertEqual(len(messages_data), 2)
@@ -146,6 +188,10 @@ class TestArchiveChatsService(TestCase):
 
         archived_conversation.refresh_from_db()
 
+        self.assertEqual(
+            archived_conversation.status,
+            ArchiveConversationsJobStatus.UPLOADING_MESSAGES_FILE,
+        )
         self.assertTrue(archived_conversation.file)
         self.assertEqual(
             archived_conversation.file.name,
