@@ -62,7 +62,8 @@ class ArchiveChatsService(BaseArchiveChatsService):
             f"and job {job.uuid}"
         )
 
-        messages_data = self.process_messages(room_archived_conversation)  # noqa
+        messages_data = self.process_messages(room_archived_conversation)
+        self.upload_messages_file(room_archived_conversation, messages_data)
 
     def process_messages(
         self, room_archived_conversation: RoomArchivedConversation
