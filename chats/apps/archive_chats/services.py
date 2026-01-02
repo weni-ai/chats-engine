@@ -5,7 +5,7 @@ import logging
 import boto3
 import requests
 
-from typing import List, Optional
+from typing import List
 from django.conf import settings
 from django.utils import timezone
 from django.core.files.base import ContentFile
