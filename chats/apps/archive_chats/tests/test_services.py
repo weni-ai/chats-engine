@@ -1,6 +1,7 @@
 import json
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.utils import timezone
 
@@ -11,7 +12,8 @@ from chats.apps.archive_chats.models import (
 )
 from chats.apps.archive_chats.serializers import ArchiveMessageSerializer
 from chats.apps.archive_chats.services import ArchiveChatsService
-from chats.apps.msgs.models import Message
+from chats.apps.archive_chats.uploads import get_media_upload_to
+from chats.apps.msgs.models import Message, MessageMedia
 from chats.apps.rooms.models import Room
 from chats.apps.queues.models import Queue
 from chats.apps.sectors.models import Sector
@@ -22,7 +24,9 @@ from chats.apps.accounts.models import User
 
 class TestArchiveChatsService(TestCase):
     def setUp(self):
-        self.service = ArchiveChatsService()
+        self.bucket = MagicMock()
+        self.bucket.name = "test-bucket"
+        self.service = ArchiveChatsService(bucket=self.bucket)
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
             name="Test Sector",
@@ -204,3 +208,133 @@ class TestArchiveChatsService(TestCase):
         self.assertEqual(len(lines), 2)
         self.assertEqual(json.loads(lines[0]), messages[0])
         self.assertEqual(json.loads(lines[1]), messages[1])
+
+    @patch("chats.apps.archive_chats.services.is_file_in_the_same_bucket")
+    @patch(
+        "chats.apps.archive_chats.services.ArchiveChatsService._copy_file_using_server_side_copy"
+    )
+    def test_upload_media_file_when_file_is_in_the_same_bucket(
+        self, mock_copy_file_using_server_side_copy, mock_is_file_in_the_same_bucket
+    ):
+        mock_is_file_in_the_same_bucket.return_value = True
+        mock_copy_file_using_server_side_copy.return_value = None
+
+        message_media = MessageMedia.objects.create(
+            message=Message.objects.create(room=self.room),
+            content_type="image/png",
+            media_file=SimpleUploadedFile(
+                "test.png", b"file_content", content_type="image/png"
+            ),
+        )
+
+        self.service.upload_media_file(message_media, "test.png")
+
+        mock_copy_file_using_server_side_copy.assert_called_once_with(
+            message_media, "test.png"
+        )
+        mock_is_file_in_the_same_bucket.assert_called_once_with(
+            message_media.media_file.url, self.bucket.name
+        )
+
+    @patch("chats.apps.archive_chats.services.is_file_in_the_same_bucket")
+    @patch(
+        "chats.apps.archive_chats.services.ArchiveChatsService._copy_file_using_client_side_copy"
+    )
+    def test_upload_media_file_when_file_is_not_in_the_same_bucket(
+        self, mock_copy_file_using_client_side_copy, mock_is_file_in_the_same_bucket
+    ):
+        mock_is_file_in_the_same_bucket.return_value = False
+        mock_copy_file_using_client_side_copy.return_value = None
+
+        message_media = MessageMedia.objects.create(
+            message=Message.objects.create(room=self.room),
+            content_type="image/png",
+            media_file=SimpleUploadedFile(
+                "test.png", b"file_content", content_type="image/png"
+            ),
+        )
+
+        self.service.upload_media_file(message_media, "test.png")
+
+        mock_copy_file_using_client_side_copy.assert_called_once_with(
+            message_media, "test.png"
+        )
+        mock_is_file_in_the_same_bucket.assert_called_once_with(
+            message_media.media_file.url, self.bucket.name
+        )
+
+    @patch("chats.apps.archive_chats.services.is_file_in_the_same_bucket")
+    @patch(
+        "chats.apps.archive_chats.services.ArchiveChatsService._copy_file_using_client_side_copy"
+    )
+    def test_upload_media_file_when_media_file_field_is_empty(
+        self, mock_copy_file_using_client_side_copy, mock_is_file_in_the_same_bucket
+    ):
+        mock_is_file_in_the_same_bucket.return_value = False
+        mock_copy_file_using_client_side_copy.return_value = None
+
+        message_media = MessageMedia.objects.create(
+            message=Message.objects.create(room=self.room),
+            content_type="image/png",
+            media_url="https://example.com/test.png",
+        )
+
+        self.service.upload_media_file(message_media, "test.png")
+
+        mock_copy_file_using_client_side_copy.assert_called_once_with(
+            message_media, "test.png"
+        )
+        mock_is_file_in_the_same_bucket.assert_not_called()
+
+    def test_copy_file_using_server_side_copy(self):
+        message_media = MessageMedia.objects.create(
+            message=Message.objects.create(room=self.room),
+            content_type="image/png",
+            media_file=SimpleUploadedFile(
+                "test.png", b"file_content", content_type="image/png"
+            ),
+        )
+
+        self.service._copy_file_using_server_side_copy(message_media, "test.png")
+        self.bucket.copy.assert_called_once_with(
+            {
+                "Bucket": self.bucket.name,
+                "Key": message_media.media_file.name,
+            },
+            get_media_upload_to(message_media.message, "test.png"),
+        )
+
+    def test_copy_file_using_client_side_copy(self):
+        message_media = MessageMedia.objects.create(
+            message=Message.objects.create(room=self.room),
+            content_type="image/png",
+            media_url="https://example.com/test.png",
+        )
+
+        new_key = get_media_upload_to(message_media.message, "test.png")
+
+        mock_response = MagicMock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.raw = MagicMock()
+
+        mock_get = MagicMock()
+        mock_get.__enter__.return_value = mock_response
+        mock_get.__exit__.return_value = None
+
+        with patch("requests.get", return_value=mock_get) as mock_requests_get:
+            result = self.service._copy_file_using_client_side_copy(
+                message_media, "test.png"
+            )
+
+        mock_requests_get.assert_called_once_with(
+            message_media.media_url,
+            stream=True,
+            timeout=60,
+        )
+
+        self.bucket.upload_fileobj.assert_called_once_with(
+            mock_response.raw,
+            new_key,
+        )
+
+        self.assertEqual(result, new_key)
