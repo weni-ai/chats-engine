@@ -155,10 +155,9 @@ class ArchiveChatsService(BaseArchiveChatsService):
                         else get_filename_from_url(media.media_url)
                     )
 
-                    if original_filename in used_media_filenames:
-                        unique_filename = generate_unique_filename(
-                            original_filename, used_media_filenames
-                        )
+                    unique_filename = generate_unique_filename(
+                        original_filename, used_media_filenames
+                    )
 
                     key = self.upload_media_file(media, unique_filename)
                     used_media_filenames.add(unique_filename)
