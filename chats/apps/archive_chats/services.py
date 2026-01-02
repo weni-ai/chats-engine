@@ -4,6 +4,8 @@ import json
 import logging
 import boto3
 import requests
+from requests.exceptions import RequestException
+import time
 
 from typing import List
 from django.conf import settings
@@ -247,17 +249,36 @@ class ArchiveChatsService(BaseArchiveChatsService):
         return new_key
 
     def _copy_file_using_client_side_copy(
-        self, message_media: MessageMedia, filename: str
+        self,
+        message_media: MessageMedia,
+        filename: str,
+        max_retries: int = 3,
+        backoff_factor: float = 1.0,
     ) -> str:
         """
-        Copy a file from the original url to the target bucket using client-side copy.
+        Copy a file from the original url to the target bucket using client-side copy
+        with retry logic.
         """
         original_url = message_media.media_url
         new_key = get_media_upload_to(message_media.message, filename)
 
-        with requests.get(original_url, stream=True, timeout=60) as response:
-            response.raise_for_status()
+        last_exception = None
 
-            self.bucket.upload_fileobj(response.raw, new_key)
+        for attempt in range(1, max_retries + 1):
+            try:
+                with requests.get(original_url, stream=True, timeout=60) as response:
+                    response.raise_for_status()
+                    self.bucket.upload_fileobj(response.raw, new_key)
 
-        return new_key
+                return new_key
+
+            except RequestException as exc:
+                last_exception = exc
+
+                if attempt == max_retries:
+                    break
+
+                sleep_time = backoff_factor * (2 ** (attempt - 1))
+                time.sleep(sleep_time)
+
+        raise last_exception
