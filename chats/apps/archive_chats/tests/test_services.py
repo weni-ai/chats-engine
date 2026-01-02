@@ -1,6 +1,7 @@
 import json
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.utils import timezone
 
@@ -11,7 +12,7 @@ from chats.apps.archive_chats.models import (
 )
 from chats.apps.archive_chats.serializers import ArchiveMessageSerializer
 from chats.apps.archive_chats.services import ArchiveChatsService
-from chats.apps.msgs.models import Message
+from chats.apps.msgs.models import Message, MessageMedia
 from chats.apps.rooms.models import Room
 from chats.apps.queues.models import Queue
 from chats.apps.sectors.models import Sector
@@ -22,7 +23,9 @@ from chats.apps.accounts.models import User
 
 class TestArchiveChatsService(TestCase):
     def setUp(self):
-        self.service = ArchiveChatsService()
+        self.bucket = MagicMock()
+        self.bucket.name = "test-bucket"
+        self.service = ArchiveChatsService(bucket=self.bucket)
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
             name="Test Sector",
@@ -204,3 +207,33 @@ class TestArchiveChatsService(TestCase):
         self.assertEqual(len(lines), 2)
         self.assertEqual(json.loads(lines[0]), messages[0])
         self.assertEqual(json.loads(lines[1]), messages[1])
+
+    @patch("chats.apps.archive_chats.services.is_file_in_the_same_bucket")
+    @patch(
+        "chats.apps.archive_chats.services.ArchiveChatsService._copy_file_using_server_side_copy"
+    )
+    def test_upload_media_file(
+        self, mock_copy_file_using_server_side_copy, mock_is_file_in_the_same_bucket
+    ):
+        mock_is_file_in_the_same_bucket.return_value = True
+        mock_copy_file_using_server_side_copy.return_value = None
+
+        message_media = MessageMedia.objects.create(
+            message=Message.objects.create(room=self.room),
+            content_type="image/png",
+            media_file=SimpleUploadedFile(
+                "test.png", b"file_content", content_type="image/png"
+            ),
+        )
+
+        self.service.upload_media_file(message_media, "test.png")
+
+        self.assertTrue(message_media.media_file.name.startswith("messagemedia/"))
+        self.assertTrue(message_media.media_file.name.endswith(".png"))
+
+        mock_copy_file_using_server_side_copy.assert_called_once_with(
+            message_media, "test.png"
+        )
+        mock_is_file_in_the_same_bucket.assert_called_once_with(
+            message_media.media_file.url, self.bucket.name
+        )

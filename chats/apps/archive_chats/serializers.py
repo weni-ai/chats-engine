@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.utils import timezone
 
+from chats.apps.archive_chats.dataclass import ArchiveMessageMedia
 from chats.apps.msgs.models import Message
 from chats.apps.accounts.models import User
 from chats.apps.contacts.models import Contact
@@ -24,10 +25,16 @@ class ArchiveContactSerializer(serializers.ModelSerializer):
         ]
 
 
+class ArchiveMessageMediaSerializer(serializers.Serializer):
+    url = serializers.URLField(read_only=True)
+    content_type = serializers.CharField(read_only=True)
+
+
 class ArchiveMessageSerializer(serializers.ModelSerializer):
     user = ArchiveUserSerializer(read_only=True)
     contact = ArchiveContactSerializer(read_only=True)
     created_on = serializers.SerializerMethodField(read_only=True)
+    media = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Message
@@ -37,6 +44,7 @@ class ArchiveMessageSerializer(serializers.ModelSerializer):
             "created_on",
             "user",
             "contact",
+            "media",
         ]
 
     def get_created_on(self, obj) -> str:
@@ -47,3 +55,8 @@ class ArchiveMessageSerializer(serializers.ModelSerializer):
             dt = obj.created_on.astimezone(timezone.utc)
 
         return dt.isoformat()
+
+    def get_media(self, obj) -> list[dict]:
+        media: list[ArchiveMessageMedia] = self.context.get("media", [])
+
+        return ArchiveMessageMediaSerializer(media, many=True).data
