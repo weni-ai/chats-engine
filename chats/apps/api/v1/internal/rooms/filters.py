@@ -47,6 +47,11 @@ class RoomFilter(filters.FilterSet):
         required=False,
         method="filter_contact",
     )
+    urn = filters.CharFilter(
+        required=False,
+        field_name="urn",
+        lookup_expr="icontains",
+    )
     contact_external_id = filters.CharFilter(
         required=False,
         field_name="contact__external_id",
@@ -74,7 +79,7 @@ class RoomFilter(filters.FilterSet):
 
     def filter_contact(self, queryset, name, value):
         return queryset.filter(
-            Q(Q(contact__name__icontains=value) | Q(urn__icontains=value))
+            Q(contact__name__icontains=value) | Q(urn__icontains=value)
         )
 
     def filter_tags(self, queryset, name, value):
