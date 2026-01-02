@@ -1,3 +1,4 @@
+from typing import Set
 from urllib.parse import urlparse
 
 from django.utils.crypto import get_random_string
@@ -13,7 +14,7 @@ def get_filename_from_url(url: str) -> str:
 
 
 def generate_unique_filename(
-    original_filename: str, used_filenames: set[str], max_attempts: int = 5
+    original_filename: str, used_filenames: Set[str], max_attempts: int = 5
 ) -> str:
     """
     Generate a unique filename based on the original filename.

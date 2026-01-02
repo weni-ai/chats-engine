@@ -1,3 +1,4 @@
+from typing import List
 from rest_framework import serializers
 from django.utils import timezone
 
@@ -56,7 +57,7 @@ class ArchiveMessageSerializer(serializers.ModelSerializer):
 
         return dt.isoformat()
 
-    def get_media(self, obj) -> list[dict]:
+    def get_media(self, obj) -> List[dict]:
         media: list[ArchiveMessageMedia] = self.context.get("media", [])
 
         return ArchiveMessageMediaSerializer(media, many=True).data
