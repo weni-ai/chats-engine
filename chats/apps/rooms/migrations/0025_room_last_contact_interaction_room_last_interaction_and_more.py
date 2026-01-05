@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('rooms', '0022_room_last_unread_message_at_and_more'),
+        ('rooms', '0024_room_last_unread_message_at_and_more'),
     ]
 
     operations = [
