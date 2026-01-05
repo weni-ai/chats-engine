@@ -11,6 +11,7 @@ from django.utils.timezone import timedelta
 from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
+from chats.apps.msgs.models import Message
 from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.exceptions import (
@@ -20,7 +21,6 @@ from chats.apps.rooms.exceptions import (
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.utils import create_transfer_json
 from chats.apps.sectors.models import Sector, SectorTag
-from chats.apps.msgs.models import Message
 
 
 class ConstraintTests(APITestCase):
@@ -550,3 +550,156 @@ class TestRoomUnreadMessagesCount(TransactionTestCase):
         self.room.refresh_from_db()
         self.assertEqual(self.room.unread_messages_count, 0)
         self.assertIsNotNone(self.room.last_unread_message_at)
+
+
+class TestUpdateLastMessage(APITestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(
+            name="Test Queue",
+            sector=self.sector,
+        )
+        self.room = Room.objects.create(queue=self.queue)
+        self.user = User.objects.create(email="agent@test.com")
+
+    def test_update_last_message(self):
+        self.assertIsNone(self.room.last_interaction)
+        self.assertIsNone(self.room.last_message)
+        self.assertEqual(self.room.last_message_text, "")
+
+        message = Message.objects.create(
+            room=self.room, text="Hello world", user=self.user
+        )
+
+        self.room.update_last_message(message=message, user=self.user)
+        self.room.refresh_from_db()
+
+        self.assertEqual(self.room.last_interaction, message.created_on)
+        self.assertEqual(self.room.last_message, message)
+        self.assertEqual(self.room.last_message_text, "Hello world")
+        self.assertEqual(self.room.last_message_user, self.user)
+        self.assertIsNone(self.room.last_message_contact)
+
+    def test_update_last_message_overwrites_previous(self):
+        message_1 = Message.objects.create(
+            room=self.room, text="First message", user=self.user
+        )
+
+        self.room.update_last_message(message=message_1, user=self.user)
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.last_message_text, "First message")
+
+        message_2 = Message.objects.create(
+            room=self.room, text="Second message", user=self.user
+        )
+
+        self.room.update_last_message(message=message_2, user=self.user)
+        self.room.refresh_from_db()
+
+        self.assertEqual(self.room.last_message, message_2)
+        self.assertEqual(self.room.last_message_text, "Second message")
+        self.assertEqual(self.room.last_interaction, message_2.created_on)
+
+
+class TestOnNewMessage(APITestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(
+            name="Test Queue",
+            sector=self.sector,
+        )
+        from chats.apps.contacts.models import Contact
+
+        self.contact = Contact.objects.create(name="Test Contact")
+        self.room = Room.objects.create(queue=self.queue, contact=self.contact)
+
+    def test_on_new_message_updates_all_fields(self):
+        self.assertIsNone(self.room.last_interaction)
+        self.assertIsNone(self.room.last_message)
+
+        message = Message.objects.create(
+            room=self.room, text="Contact message", contact=self.contact
+        )
+
+        self.room.on_new_message(message=message, contact=self.contact)
+        self.room.refresh_from_db()
+
+        self.assertEqual(self.room.last_interaction, message.created_on)
+        self.assertEqual(self.room.last_message, message)
+        self.assertEqual(self.room.last_message_text, "Contact message")
+        self.assertIsNone(self.room.last_message_user)
+        self.assertEqual(self.room.last_message_contact, self.contact)
+
+    def test_on_new_message_increments_unread(self):
+        self.assertEqual(self.room.unread_messages_count, 0)
+
+        message_1 = Message.objects.create(
+            room=self.room, text="Message 1", contact=self.contact
+        )
+
+        self.room.on_new_message(
+            message=message_1, contact=self.contact, increment_unread=1
+        )
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.unread_messages_count, 1)
+
+        message_2 = Message.objects.create(
+            room=self.room, text="Message 2", contact=self.contact
+        )
+
+        self.room.on_new_message(
+            message=message_2, contact=self.contact, increment_unread=3
+        )
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.unread_messages_count, 4)
+
+    def test_on_new_message_only_updates_if_newer(self):
+        message_1 = Message.objects.create(
+            room=self.room, text="Recent message", contact=self.contact
+        )
+
+        self.room.on_new_message(message=message_1, contact=self.contact)
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.last_message_text, "Recent message")
+
+        old_time = timezone.now() - timedelta(hours=1)
+        message_2 = Message.objects.create(
+            room=self.room, text="Old message", contact=self.contact
+        )
+        message_2.created_on = old_time
+        message_2.save()
+
+        self.room.on_new_message(message=message_2, contact=self.contact)
+        self.room.refresh_from_db()
+
+        self.assertEqual(self.room.last_message_text, "Recent message")
+        self.assertEqual(self.room.last_message, message_1)
+
+    def test_on_new_message_without_increment_unread(self):
+        self.assertEqual(self.room.unread_messages_count, 0)
+
+        message = Message.objects.create(
+            room=self.room, text="Message without unread", contact=self.contact
+        )
+
+        self.room.on_new_message(
+            message=message, contact=self.contact, increment_unread=0
+        )
+        self.room.refresh_from_db()
+
+        self.assertEqual(self.room.unread_messages_count, 0)
+        self.assertEqual(self.room.last_message_text, "Message without unread")

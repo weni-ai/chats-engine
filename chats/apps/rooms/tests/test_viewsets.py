@@ -1,6 +1,6 @@
 import uuid
 from datetime import time, timedelta
-from unittest.mock import patch, PropertyMock
+from unittest.mock import PropertyMock, patch
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -11,12 +11,14 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.test import APITestCase
 
+from chats.apps.ai_features.history_summary.enums import HistorySummaryFeedbackTags
 from chats.apps.ai_features.history_summary.models import (
     HistorySummary,
     HistorySummaryStatus,
 )
 from chats.apps.api.utils import create_contact, create_user_and_token
 from chats.apps.contacts.models import Contact
+from chats.apps.msgs.models import Message
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.projects.models.models import RoomRoutingType
 from chats.apps.projects.tests.decorators import with_project_permission
@@ -28,7 +30,6 @@ from chats.apps.rooms.tests.decorators import with_room_user
 from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 from chats.apps.sectors.tests.decorators import with_sector_authorization
 from chats.core.cache import CacheClient
-from chats.apps.ai_features.history_summary.enums import HistorySummaryFeedbackTags
 
 User = get_user_model()
 
@@ -1751,3 +1752,102 @@ class TestCanSendMessageStatusAuthenticatedUser(BaseTestCanSendMessageStatus):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["can_send_message"], False)
+
+
+class TestLastMessageInRoomList(APITestCase):
+    def setUp(self):
+        self.agent, self.agent_token = create_user_and_token("agent")
+        self.contact = create_contact("Contact", "contact@mail.com", "offline", {})
+
+        self.project = Project.objects.create(name="Test Project")
+        self.agent_perm = self.project.permissions.create(
+            user=self.agent,
+            role=ProjectPermission.ROLE_ATTENDANT,
+        )
+
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+        )
+
+        self.queue = Queue.objects.create(
+            name="Test Queue",
+            sector=self.sector,
+        )
+        self.queue.authorizations.create(
+            permission=self.agent_perm,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        self.room = Room.objects.create(
+            queue=self.queue,
+            user=self.agent,
+            contact=self.contact,
+            project_uuid=str(self.project.uuid),
+        )
+
+    def _list_rooms(self, token):
+        url = reverse("room-list")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+        return self.client.get(url, {"project": str(self.project.uuid)})
+
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_list_rooms_returns_last_message_fields_from_contact(self, mock_feature):
+        message = Message.objects.create(
+            room=self.room, text="Test message", contact=self.contact
+        )
+
+        self.room.on_new_message(
+            message=message,
+            contact=self.contact,
+            increment_unread=1,
+        )
+
+        response = self._list_rooms(self.agent_token)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        room_data = response.data["results"][0]
+        last_message = room_data["last_message"]
+
+        self.assertEqual(str(last_message["uuid"]), str(message.uuid))
+        self.assertEqual(last_message["text"], "Test message")
+        self.assertIsNone(last_message["user"])
+        self.assertEqual(str(last_message["contact"]), str(self.contact.uuid))
+
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_list_rooms_without_last_message(self, mock_feature):
+        response = self._list_rooms(self.agent_token)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        room_data = response.data["results"][0]
+        last_message = room_data["last_message"]
+
+        self.assertIsNone(last_message["uuid"])
+        self.assertEqual(last_message["text"], "")
+        self.assertIsNone(last_message["created_on"])
+
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_list_rooms_last_message_updates_with_new_message(self, mock_feature):
+        message_1 = Message.objects.create(
+            room=self.room, text="First message", contact=self.contact
+        )
+
+        self.room.on_new_message(message=message_1, contact=self.contact)
+
+        message_2 = Message.objects.create(
+            room=self.room, text="Second message", contact=self.contact
+        )
+
+        self.room.on_new_message(message=message_2, contact=self.contact)
+
+        response = self._list_rooms(self.agent_token)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        room_data = response.data["results"][0]
+        last_message = room_data["last_message"]
+
+        self.assertEqual(str(last_message["uuid"]), str(message_2.uuid))
+        self.assertEqual(last_message["text"], "Second message")
