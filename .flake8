@@ -12,3 +12,4 @@ exclude =
     migrations,
     chats/apps/csat/flows/definitions/flow.py
 max-line-length=119
+max-complexity=15
