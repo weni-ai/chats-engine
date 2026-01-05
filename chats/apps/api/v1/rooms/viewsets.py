@@ -433,7 +433,7 @@ class RoomViewset(
             )
 
         with transaction.atomic():
-            instance.close(tags, "agent")
+            instance.close(tags, "agent", request.user)
 
         instance.refresh_from_db()
         serialized_data = RoomSerializer(instance=instance)

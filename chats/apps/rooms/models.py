@@ -95,6 +95,14 @@ class Room(BaseModel, BaseConfigurableModel):
     )
 
     ended_by = models.CharField(_("Ended by"), max_length=50, null=True, blank=True)
+    closed_by = models.ForeignKey(
+        "accounts.User",
+        related_name="closed_rooms",
+        verbose_name=_("closed by"),
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
 
     is_active = models.BooleanField(_("is active?"), default=True)
     is_waiting = models.BooleanField(_("is waiting for answer?"), default=False)
@@ -386,12 +394,13 @@ class Room(BaseModel, BaseConfigurableModel):
         self.tags.add(*new_tag_ids)
         self.tags.remove(*tags_to_remove_ids)
 
-    def close(self, tags: list = [], end_by: str = ""):
+    def close(self, tags: list = [], end_by: str = "", closed_by: "User" = None):
         from chats.apps.projects.usecases.status_service import InServiceStatusService
 
         self.is_active = False
         self.ended_at = timezone.now()
         self.ended_by = end_by
+        self.closed_by = closed_by
 
         with transaction.atomic():
             if tags is not None:
