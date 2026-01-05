@@ -8,7 +8,6 @@ from django.db.models import (
     Case,
     DateTimeField,
     Exists,
-    Max,
     OuterRef,
     Q,
     Subquery,
@@ -89,8 +88,6 @@ from chats.apps.rooms.views import (
     update_custom_fields,
     update_flows_custom_fields,
 )
-
-
 from chats.apps.sectors.models import SectorTag
 
 logger = logging.getLogger(__name__)
@@ -146,53 +143,7 @@ class RoomViewset(
             .filter(queue__sector__project__permissions__user=self.request.user)
         )
 
-        annotations = {
-            "last_interaction": Max("messages__created_on"),
-            "last_message_text": Subquery(
-                Message.objects.filter(room=OuterRef("pk"))
-                .exclude(user__isnull=True, contact__isnull=True)
-                .exclude(text="")
-                .order_by("-created_on")
-                .values("text")[:1]
-            ),
-        }
-
-        project_uuid = self.request.query_params.get("project")
-
-        if project_uuid and self.request.user.is_authenticated:
-            try:
-                if is_feature_active(
-                    settings.WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY,
-                    self.request.user.email,
-                    project_uuid,
-                ):
-                    last_24h = timezone.now() - timedelta(days=1)
-                    annotations["last_contact_interaction"] = Max(
-                        Case(
-                            When(
-                                messages__contact__isnull=False,
-                                then="messages__created_on",
-                            ),
-                            output_field=DateTimeField(),
-                        )
-                    )
-                    annotations["is_24h_valid_computed"] = Case(
-                        When(
-                            Q(
-                                urn__startswith="whatsapp",
-                                last_contact_interaction__lt=last_24h,
-                            ),
-                            then=False,
-                        ),
-                        default=True,
-                        output_field=BooleanField(),
-                    )
-            except Exception as e:
-                logger.error(f"Error checking feature flag: {e}")
-
-        qs = qs.annotate(**annotations).select_related(
-            "user", "contact", "queue", "queue__sector"
-        )
+        qs = qs.select_related("user", "contact", "queue", "queue__sector")
 
         return qs
 
