@@ -117,7 +117,7 @@ class RoomsExternalTests(APITestCase):
                 "custom_fields": {},
             },
         }
-        response = self._create_room("dummy-token", data, token_type="Token")
+        response = self._create_room("dummy-token", data, token_type="Bearer")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     @mock.patch(
@@ -139,7 +139,7 @@ class RoomsExternalTests(APITestCase):
             },
         }
 
-        response = self._create_room("invalid-token", data, token_type="Token")
+        response = self._create_room("invalid-token", data, token_type="Bearer")
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)

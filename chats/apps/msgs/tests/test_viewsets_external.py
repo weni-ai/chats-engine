@@ -220,7 +220,9 @@ class MsgsExternalTests(APITestCase):
     )
     def test_create_external_msgs_with_internal_api_token(self, mock_get_userinfo):
         mock_get_userinfo.return_value = {}
-        response = self._request_create_message(token="dummy-token", token_type="Token")
+        response = self._request_create_message(
+            token="dummy-token", token_type="Bearer"
+        )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     @override_settings(INTERNAL_API_TOKEN="dummy-token")
@@ -232,7 +234,7 @@ class MsgsExternalTests(APITestCase):
     ):
         mock_get_userinfo.return_value = {}
         response = self._request_create_message(
-            token="invalid-token", token_type="Token"
+            token="invalid-token", token_type="Bearer"
         )
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
