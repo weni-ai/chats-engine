@@ -106,7 +106,7 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
             start_date=params.get("start_date"),
             end_date=params.get("end_date"),
             agent=params.get("agent"),
-            sector=request.query_params.getlist("sector", []),
+            sector=request.query_params.getlist("sectors", []),
             tag=params.get("tags"),
             tags=request.query_params.getlist("tags", []),
             queue=params.get("queue"),
