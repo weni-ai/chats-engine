@@ -215,3 +215,9 @@ class DashboardCustomStatusSerializer(serializers.Serializer):
             "url": f"chats:dashboard/view-mode/{obj.email}",
             "type": "internal",
         }
+
+
+class DashboardCSATRatingsSerializer(serializers.Serializer):
+    rating = serializers.IntegerField()
+    value = serializers.FloatField(source="percentage")
+    full_value = serializers.IntegerField(source="count")

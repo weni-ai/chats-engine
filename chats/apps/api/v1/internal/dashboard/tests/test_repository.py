@@ -1,4 +1,5 @@
 from datetime import datetime
+import pytz
 import random
 import pytz
 
@@ -14,20 +15,24 @@ from chats.apps.api.v1.internal.dashboard.repository import (
     CSATRepository,
 )
 from chats.apps.projects.models.models import Project
+
+from chats.apps.projects.models.models import (
+    CustomStatus,
+    CustomStatusType,
+    Project,
+    ProjectPermission,
+)
+from chats.apps.accounts.models import User
+from chats.apps.sectors.models import Sector, SectorTag
+from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.csat.models import CSATSurvey
 from chats.apps.sectors.models import Sector
-from chats.apps.queues.models import Queue
 from chats.apps.contacts.models import Contact
-from chats.apps.accounts.models import User
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.sectors.models import SectorAuthorization
 from chats.apps.queues.models import QueueAuthorization
 from chats.apps.sectors.models import SectorTag
-from chats.apps.projects.models.models import (
-    CustomStatus,
-    CustomStatusType,
-)
 
 
 class AgentRepositoryTestCase(TestCase):

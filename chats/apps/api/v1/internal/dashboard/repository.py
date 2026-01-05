@@ -556,7 +556,7 @@ class CSATRepository:
         csat_query = {"room__queue__sector__project": project}
 
         for key, (field_name, filter_value) in filter_mapping.items():
-            if filter_value is not None:
+            if filter_value is not None and filter_value != "":
                 if field_name.endswith("__in") and not isinstance(filter_value, list):
                     filter_value = [filter_value]
 

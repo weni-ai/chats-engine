@@ -3,12 +3,19 @@ import uuid
 
 from django.utils import timezone
 import pytz
+import pytz
+import uuid
+from unittest.mock import patch
+
 from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework.response import Response
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.internal.dashboard.dto import CSATRatingCount, CSATRatings
+from chats.apps.sectors.models import Sector
+from chats.apps.queues.models import Queue
+from chats.apps.accounts.tests.decorators import with_internal_auth
 from chats.apps.projects.models.models import (
     CustomStatus,
     CustomStatusType,
