@@ -4,8 +4,6 @@ import time
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
-from django.db.models import Q
-
 import requests
 import sentry_sdk
 from django.conf import settings
@@ -13,7 +11,7 @@ from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models, transaction
-from django.db.models import F
+from django.db.models import F, Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_redis import get_redis_connection
@@ -26,13 +24,13 @@ from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTCl
 from chats.apps.projects.models.models import RoomRoutingType
 from chats.apps.projects.usecases.send_room_info import RoomInfoUseCase
 from chats.apps.projects.usecases.status_service import InServiceStatusService
+from chats.apps.queues.models import Queue
 from chats.apps.rooms.exceptions import (
     MaxPinRoomLimitReachedError,
     RoomIsNotActiveError,
 )
 from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
-from chats.apps.queues.models import Queue
 
 if TYPE_CHECKING:
     from chats.apps.projects.models.models import Project
@@ -130,6 +128,16 @@ class Room(BaseModel, BaseConfigurableModel):
     unread_messages_count = models.IntegerField(_("Unread messages count"), default=0)
     last_unread_message_at = models.DateTimeField(
         _("Last unread message at"), null=True, blank=True
+    )
+    last_interaction = models.DateTimeField(
+        _("Last interaction"), null=True, blank=True
+    )
+    last_message_uuid = models.UUIDField(_("Last message UUID"), null=True, blank=True)
+    last_message_text = models.TextField(
+        _("Last message text"), null=True, blank=True, default=""
+    )
+    last_contact_interaction = models.DateTimeField(
+        _("Last contact interaction"), null=True, blank=True
     )
 
     tracker = FieldTracker(fields=["user", "queue"])
@@ -686,6 +694,45 @@ class Room(BaseModel, BaseConfigurableModel):
         Room.objects.filter(pk=self.pk).update(
             unread_messages_count=0, last_unread_message_at=timezone.now()
         )
+
+    def update_last_message(self, message_uuid, text: str, created_on: datetime):
+        """
+        Updates last message fields. Used for agent/system messages.
+        """
+        Room.objects.filter(pk=self.pk).update(
+            last_interaction=created_on,
+            last_message_uuid=message_uuid,
+            last_message_text=text,
+        )
+
+    def on_new_message(
+        self,
+        message_uuid,
+        text: str,
+        created_on: datetime,
+        increment_unread: int = 0,
+    ):
+        """
+        Updates room state when a new message arrives from contact.
+        Single UPDATE with all last_message fields.
+        Only updates if message is newer than last_interaction.
+        """
+        update_fields = {
+            "last_interaction": created_on,
+            "last_contact_interaction": created_on,
+            "last_message_uuid": message_uuid,
+            "last_message_text": text,
+        }
+
+        if increment_unread > 0:
+            update_fields["unread_messages_count"] = (
+                F("unread_messages_count") + increment_unread
+            )
+
+        Room.objects.filter(
+            Q(pk=self.pk)
+            & (Q(last_interaction__lt=created_on) | Q(last_interaction__isnull=True)),
+        ).update(**update_fields)
 
     def start_csat_flow(self):
         """

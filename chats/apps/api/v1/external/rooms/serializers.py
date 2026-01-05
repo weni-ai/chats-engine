@@ -584,5 +584,10 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             if room.user is None and room.contact and any_incoming_msgs:
                 room.trigger_default_message()
 
-            created_messages_count = len(created_messages)
-            room.increment_unread_messages_count(created_messages_count, timezone.now())
+            last_msg = created_messages[-1]
+            room.on_new_message(
+                message_uuid=last_msg.uuid,
+                text=last_msg.text,
+                created_on=last_msg.created_on,
+                increment_unread=len(created_messages),
+            )

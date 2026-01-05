@@ -1,15 +1,13 @@
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django_filters.rest_framework import DjangoFilterBackend
-from django.core.exceptions import ObjectDoesNotExist
 from pydub.exceptions import CouldntDecodeError
 from rest_framework import filters, mixins, parsers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from chats.apps.api.pagination import (
-    CustomCursorPagination,
-)
+from chats.apps.api.pagination import CustomCursorPagination
 from chats.apps.api.v1.msgs.filters import MessageFilter, MessageMediaFilter
 from chats.apps.api.v1.msgs.permissions import MessageMediaPermission, MessagePermission
 from chats.apps.api.v1.msgs.serializers import (
@@ -57,6 +55,13 @@ class MessageViewset(
             serializer.instance.notify_room("create", True)
 
             message = serializer.instance
+            if message.text:
+                message.room.update_last_message(
+                    message_uuid=message.uuid,
+                    text=message.text,
+                    created_on=message.created_on,
+                )
+
             if message.user and message.room.first_user_assigned_at:
                 try:
                     metric = message.room.metric
