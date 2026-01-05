@@ -1,0 +1,14 @@
+{% extends 'rooms/emails/base.html' %}
+{% load i18n %}
+
+{% block content %}
+<div
+    style="font-family: 'Lato'; font-size: 14px; line-height: 22px; color: #3B414D; width: 616px; margin: 24px auto auto auto;">
+    <span style="font-size: 16px; font-weight: 700; line-height: 24px;">{% trans 'Hi,' %}</span>
+    <p>
+        {% blocktrans with project_name=project_name file_link=download_url %}The data export for the {{ project_name }}
+        project is ready and you can download it by <a clicktracking=off style="color: #00A49F; text-decoration: none;"
+            href="{{ file_link }}" target="_blank">clicking here</a>.{% endblocktrans %}
+    </p>
+</div>
+{% endblock %}

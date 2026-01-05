@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     "chats.apps.feedbacks",
     "chats.apps.csat",
     # third party apps
+    "weni.feature_flags",  # weni-commons feature flags
     "channels",
     "drf_yasg",
     "django_filters",
@@ -185,6 +186,9 @@ USE_I18N = True
 USE_L10N = True
 
 USE_TZ = True
+
+DEFAULT_LANGUAGE = "en-us"
+LOCALE_PATHS = [os.path.join(BASE_DIR, "chats/locale")]
 
 
 # Static files (CSS, JavaScript, Images)
@@ -361,6 +365,38 @@ SWAGGER_SETTINGS = {
     "SECURITY_DEFINITIONS": {
         "api_key": {"type": "apiKey", "name": "Authorization", "in": "header"}
     },
+    "DEFAULT_AUTO_SCHEMA_CLASS": "chats.apps.api.swagger.TaggedSwaggerAutoSchema",
+    "DOC_EXPANSION": "list",
+    "DEFAULT_MODEL_RENDERING": "model",
+    "DISPLAY_OPERATION_ID": True,
+    "PERSIST_AUTHORIZATION": True,
+    "REFETCH_SCHEMA_WITH_AUTH": True,
+    "OPERATIONS_SORTER": "method",
+    "TAGS_SORTER": "alpha",
+    "SHOW_EXTENSIONS": True,
+    "VALIDATOR_URL": None,
+    "TAGS": [
+        {"name": "Authentication", "description": "Login and token workflow."},
+        {"name": "Users", "description": "User profile and preferences."},
+        {"name": "Projects", "description": "Projects, permissions and metadata."},
+        {"name": "Rooms", "description": "Chat rooms lifecycle and transfers."},
+        {"name": "Queues", "description": "Routing queues and authorizations."},
+        {"name": "Messages", "description": "Messages, history and media."},
+        {"name": "Dashboard", "description": "Real-time dashboards and metrics."},
+        {"name": "Sectors", "description": "Sectors, tags and authorizations."},
+        {"name": "Groups", "description": "Group-to-sector relationships."},
+        {"name": "Contacts", "description": "Contacts sourced from CRM."},
+        {"name": "Quick Messages", "description": "Reusable canned responses."},
+        {"name": "Integrations", "description": "External flows and connectors."},
+        {"name": "Custom Status", "description": "Custom status types and tracking."},
+        {"name": "Feature Flags", "description": "Experiments and Growthbook hooks."},
+        {"name": "Feedback", "description": "End-user satisfaction feedback."},
+        {"name": "Organizations", "description": "Organization level project access."},
+        {"name": "AI Features", "description": "Prompt templates and AI automations."},
+        {"name": "Agents", "description": "Agent administration workflows."},
+        {"name": "Discussions", "description": "Discussion threads and moderation."},
+        {"name": "History", "description": "Closed-room history retrieval."},
+    ],
 }
 
 # CORS CONFIG
@@ -412,7 +448,7 @@ METRICS_CUSTOM_QUEUE = env("METRICS_CUSTOM_QUEUE", default="celery")
 
 USE_CELERY = env.bool("USE_CELERY", default=False)
 CELERY_BROKER_URL = env.str("CELERY_BROKER_URL", default=REDIS_URL)
-CELERY_RESULT_BACKEND = env.str("CELERY_RESULT_BACKEND", default="django-db")
+CELERY_RESULT_BACKEND = None
 CELERY_ACCEPT_CONTENT = ["application/json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
@@ -556,13 +592,11 @@ GROWTHBOOK_WEBHOOK_SECRET = env.str("GROWTHBOOK_WEBHOOK_SECRET", default="")
 FEEDBACK_FEATURE_FLAG_KEY = env.str(
     "FEEDBACK_FEATURE_FLAG_KEY", default="weniChatsFeedback"
 )
-AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY = env.str(
-    "AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY", default="weniChatsAutomaticMessage"
-)
 
 # CSAT
 CSAT_FEATURE_FLAG_KEY = env.str("CSAT_FEATURE_FLAG_KEY", default="weniChatsCSAT")
 
+CHATS_BASE_URL = env.str("CHATS_BASE_URL", default="http://localhost:8000")
 
 AUTOMATIC_MESSAGE_FLOWS_GET_TICKET_RETRIES = env.int(
     "AUTOMATIC_MESSAGE_FLOWS_GET_TICKET_RETRIES", default=3
@@ -571,7 +605,27 @@ AUTOMATIC_MESSAGE_CHECK_TICKET_ON_ROOM_CREATE = env.bool(
     "AUTOMATIC_MESSAGE_CHECK_TICKET_ON_ROOM_CREATE", default=False
 )
 
+# Keys
+WENI_CHATS_PIN_ROOMS_OPTIMIZATION_FLAG_KEY = env.str(
+    "WENI_CHATS_PIN_ROOMS_OPTIMIZATION_FLAG_KEY",
+    default="weniChatsPinRoomsOptimization",
+)
+WENI_CHATS_DISABLE_HAS_HISTORY_FLAG_KEY = env.str(
+    "WENI_CHATS_DISABLE_HAS_HISTORY_FLAG_KEY",
+    default="weniChatsDisableHasHistory",
+)
+WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY = env.str(
+    "WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY",
+    default="weniChatsBackEndReturn24hValidOnRoomsList",
+)
+
 
 # USER CACHE
 USER_OBJECT_CACHE_TTL = env.int("USER_OBJECT_CACHE_TTL", default=300)
 USER_OBJECT_CACHE_ENABLED = env.bool("USER_OBJECT_CACHE_ENABLED", default=True)
+
+
+# ROOM 24H VALID CACHE
+ROOM_24H_VALID_CACHE_TTL = env.int(
+    "ROOM_24H_VALID_CACHE_TTL", default=0
+)  # 0 means no cache

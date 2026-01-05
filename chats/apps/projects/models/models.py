@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING, Optional
+from uuid import UUID
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import (
@@ -22,7 +24,9 @@ from .permission_managers import UserPermissionsManager
 
 User = get_user_model()
 
-# Create your models here.
+
+if TYPE_CHECKING:
+    from chats.apps.csat.models import CSATFlowProjectConfig
 
 
 class TemplateType(BaseSoftDeleteModel, BaseModel):
@@ -269,6 +273,17 @@ class Project(BaseConfigurableModel, BaseModel):
         return self.permissions.filter(
             user=user, role=ProjectPermission.ROLE_ADMIN
         ).exists()
+
+    @property
+    def csat_flow_uuid(self) -> Optional[UUID]:
+        csat_flow_config: Optional["CSATFlowProjectConfig"] = getattr(
+            self, "csat_flow_project_config", None
+        )
+
+        if not csat_flow_config:
+            return None
+
+        return csat_flow_config.flow_uuid
 
     @property
     def is_csat_enabled(self):
@@ -708,3 +723,56 @@ class AgentDisconnectLog(BaseModel):
     class Meta:
         verbose_name = "Agent Disconnect Log"
         verbose_name_plural = "Agent Disconnect Logs"
+
+
+class AgentStatusLog(BaseModel):
+    """
+    Daily log of agent status changes (online/offline/breaks).
+    One record per agent per day, updated throughout the day.
+    """
+
+    agent = models.ForeignKey(
+        "accounts.User",
+        related_name="agent_status_logs",
+        verbose_name=_("agent"),
+        on_delete=models.CASCADE,
+        to_field="email",
+    )
+
+    project = models.ForeignKey(
+        "projects.Project",
+        related_name="agent_status_logs",
+        verbose_name=_("project"),
+        on_delete=models.CASCADE,
+    )
+
+    log_date = models.DateField(
+        _("log date"), help_text=_("Date of the log (agent's local timezone)")
+    )
+
+    status_changes = models.JSONField(
+        _("status changes"),
+        default=list,
+        help_text=_(
+            "List of status change events: "
+            "[{'timestamp': '...', 'status': 'ONLINE|OFFLINE', "
+            "'custom_status': 'status_name or null', 'status_type_uuid': '...'}]"
+        ),
+    )
+
+    class Meta:
+        verbose_name = _("Agent Status Log")
+        verbose_name_plural = _("Agent Status Logs")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["agent", "project", "log_date"],
+                name="unique_agent_project_date_log",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["agent", "project", "log_date"]),
+            models.Index(fields=["project", "log_date"]),
+        ]
+
+    def __str__(self):
+        return f"{self.agent.email} - {self.project.name} - {self.log_date}"

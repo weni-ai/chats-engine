@@ -1,15 +1,19 @@
 import json
 import logging
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
+
+from django.db.models import Q
 
 import requests
 import sentry_sdk
 from django.conf import settings
+from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models, transaction
+from django.db.models import F
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_redis import get_redis_connection
@@ -32,6 +36,9 @@ from chats.apps.queues.models import Queue
 
 if TYPE_CHECKING:
     from chats.apps.projects.models.models import Project
+
+
+ROOM_24H_VALID_CACHE_TTL = settings.ROOM_24H_VALID_CACHE_TTL
 
 
 logger = logging.getLogger(__name__)
@@ -119,6 +126,10 @@ class Room(BaseModel, BaseConfigurableModel):
     )
     added_to_queue_at = models.DateTimeField(
         _("Added to queue at"), null=True, blank=True
+    )
+    unread_messages_count = models.IntegerField(_("Unread messages count"), default=0)
+    last_unread_message_at = models.DateTimeField(
+        _("Last unread message at"), null=True, blank=True
     )
 
     tracker = FieldTracker(fields=["user", "queue"])
@@ -280,7 +291,7 @@ class Room(BaseModel, BaseConfigurableModel):
         return self.is_waiting or check_flowstarts
 
     @property
-    def project(self):
+    def project(self) -> "Project":
         return self.queue.project
 
     @property
@@ -306,18 +317,50 @@ class Room(BaseModel, BaseConfigurableModel):
         sent_message.notify_room("create", True)
 
     @property
+    def room_24h_valid_cache_key(self) -> str:
+        return f"room_24h_valid_cache:{self.pk}"
+
+    def save_24h_valid_to_cache(self, is_24h_valid: bool) -> None:
+        if ROOM_24H_VALID_CACHE_TTL == 0:
+            return
+
+        cache.set(
+            self.room_24h_valid_cache_key,
+            is_24h_valid,
+            ROOM_24H_VALID_CACHE_TTL,
+        )
+
+    def get_24h_valid_from_cache(self) -> bool:
+        if ROOM_24H_VALID_CACHE_TTL == 0:
+            return None
+
+        return cache.get(self.room_24h_valid_cache_key)
+
+    def clear_24h_valid_cache(self) -> None:
+        cache.delete(self.room_24h_valid_cache_key)
+
+    @property
     def is_24h_valid(self) -> bool:
         """Validates is the last contact message was sent more than a day ago"""
+
         if not self.urn.startswith("whatsapp"):
             return True
+
+        if cached_is_24h_valid := self.get_24h_valid_from_cache():
+            return cached_is_24h_valid
+
+        is_24h_valid = True
 
         day_validation = self.messages.filter(
             created_on__gte=timezone.now() - timedelta(days=1),
             contact=self.contact,
         )
         if not day_validation.exists():
-            return self.created_on > timezone.now() - timedelta(days=1)
-        return True
+            is_24h_valid = self.created_on > timezone.now() - timedelta(days=1)
+
+        self.save_24h_valid_to_cache(is_24h_valid)
+
+        return is_24h_valid
 
     @property
     def serialized_ws_data(self):
@@ -367,6 +410,9 @@ class Room(BaseModel, BaseConfigurableModel):
             if project:
                 InServiceStatusService.room_closed(self.user, project)
 
+        if self.queue.sector.is_csat_enabled and self.user:
+            transaction.on_commit(lambda: self.start_csat_flow())
+
     def request_callback(self, room_data: dict):
         if self.callback_url is None:
             return None
@@ -405,6 +451,10 @@ class Room(BaseModel, BaseConfigurableModel):
     def base_notification(self, content, action):
         if self.user:
             permission = self.get_permission(self.user)
+
+            if not permission:
+                return
+
             group_name = f"permission_{permission.pk}"
         else:
             group_name = f"queue_{self.queue.pk}"
@@ -614,6 +664,36 @@ class Room(BaseModel, BaseConfigurableModel):
         self.full_transfer_history.append(transfer)
         self.transfer_history = transfer  # legacy
         self.save(update_fields=["full_transfer_history", "transfer_history"])
+
+    def increment_unread_messages_count(
+        self, count: int, last_unread_message_at: datetime
+    ):
+        """
+        Updates the unread messages count for a room.
+        """
+        Room.objects.filter(
+            Q(pk=self.pk)
+            & (
+                Q(last_unread_message_at__lt=last_unread_message_at)
+                | Q(last_unread_message_at__isnull=True)
+            ),
+        ).update(unread_messages_count=F("unread_messages_count") + count)
+
+    def clear_unread_messages_count(self):
+        """
+        Clears the unread messages count for a room.
+        """
+        Room.objects.filter(pk=self.pk).update(
+            unread_messages_count=0, last_unread_message_at=timezone.now()
+        )
+
+    def start_csat_flow(self):
+        """
+        Starts the CSAT flow for a room.
+        """
+        from chats.apps.csat.tasks import start_csat_flow
+
+        start_csat_flow.delay(self.uuid)
 
 
 class RoomPin(BaseModel):
