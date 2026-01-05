@@ -57,9 +57,8 @@ class MessageViewset(
             message = serializer.instance
             if message.text:
                 message.room.update_last_message(
-                    message_uuid=message.uuid,
-                    text=message.text,
-                    created_on=message.created_on,
+                    message=message,
+                    user=message.user,
                 )
 
             if message.user and message.room.first_user_assigned_at:

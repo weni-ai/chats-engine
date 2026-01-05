@@ -62,9 +62,8 @@ class MessageFlowViewset(
         instance.notify_room("create")
         room = instance.room
         room.on_new_message(
-            message_uuid=instance.uuid,
-            text=instance.text,
-            created_on=instance.created_on,
+            message=instance,
+            contact=instance.contact,
             increment_unread=1,
         )
         if room.user is None and instance.contact:

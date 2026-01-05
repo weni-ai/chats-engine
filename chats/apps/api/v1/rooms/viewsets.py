@@ -141,32 +141,6 @@ class RoomViewset(
             .filter(queue__sector__project__permissions__user=self.request.user)
         )
 
-        project_uuid = self.request.query_params.get("project")
-
-        if project_uuid and self.request.user.is_authenticated:
-            try:
-                if is_feature_active(
-                    settings.WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY,
-                    self.request.user.email,
-                    project_uuid,
-                ):
-                    last_24h = timezone.now() - timedelta(days=1)
-                    qs = qs.annotate(
-                        is_24h_valid_computed=Case(
-                            When(
-                                Q(
-                                    urn__startswith="whatsapp",
-                                    last_contact_interaction__lt=last_24h,
-                                ),
-                                then=False,
-                            ),
-                            default=True,
-                            output_field=BooleanField(),
-                        )
-                    )
-            except Exception as e:
-                logger.error(f"Error checking feature flag: {e}")
-
         qs = qs.select_related("user", "contact", "queue", "queue__sector")
 
         return qs

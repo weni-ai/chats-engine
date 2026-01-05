@@ -26,11 +26,7 @@ def create_message(text, room, user=None, contact=None):
         return None
     message = Message.objects.create(room=room, text=text, user=user, contact=contact)
     if text:
-        room.update_last_message(
-            message_uuid=message.uuid,
-            text=message.text,
-            created_on=message.created_on,
-        )
+        room.update_last_message(message=message, user=user)
     return message
 
 

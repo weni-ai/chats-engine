@@ -132,12 +132,32 @@ class Room(BaseModel, BaseConfigurableModel):
     last_interaction = models.DateTimeField(
         _("Last interaction"), null=True, blank=True
     )
-    last_message_uuid = models.UUIDField(_("Last message UUID"), null=True, blank=True)
+    last_message = models.ForeignKey(
+        "msgs.Message",
+        verbose_name=_("Last message"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
     last_message_text = models.TextField(
         _("Last message text"), null=True, blank=True, default=""
     )
-    last_contact_interaction = models.DateTimeField(
-        _("Last contact interaction"), null=True, blank=True
+    last_message_user = models.ForeignKey(
+        "accounts.User",
+        verbose_name=_("Last message user"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    last_message_contact = models.ForeignKey(
+        "contacts.Contact",
+        verbose_name=_("Last message contact"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
     )
 
     tracker = FieldTracker(fields=["user", "queue"])
@@ -695,33 +715,30 @@ class Room(BaseModel, BaseConfigurableModel):
             unread_messages_count=0, last_unread_message_at=timezone.now()
         )
 
-    def update_last_message(self, message_uuid, text: str, created_on: datetime):
+    def update_last_message(self, message, user=None):
         """
         Updates last message fields. Used for agent/system messages.
         """
         Room.objects.filter(pk=self.pk).update(
-            last_interaction=created_on,
-            last_message_uuid=message_uuid,
-            last_message_text=text,
+            last_interaction=message.created_on,
+            last_message=message,
+            last_message_text=message.text,
+            last_message_user=user,
+            last_message_contact=None,
         )
 
-    def on_new_message(
-        self,
-        message_uuid,
-        text: str,
-        created_on: datetime,
-        increment_unread: int = 0,
-    ):
+    def on_new_message(self, message, contact=None, increment_unread: int = 0):
         """
         Updates room state when a new message arrives from contact.
         Single UPDATE with all last_message fields.
         Only updates if message is newer than last_interaction.
         """
         update_fields = {
-            "last_interaction": created_on,
-            "last_contact_interaction": created_on,
-            "last_message_uuid": message_uuid,
-            "last_message_text": text,
+            "last_interaction": message.created_on,
+            "last_message": message,
+            "last_message_text": message.text,
+            "last_message_user": None,
+            "last_message_contact": contact,
         }
 
         if increment_unread > 0:
@@ -731,7 +748,10 @@ class Room(BaseModel, BaseConfigurableModel):
 
         Room.objects.filter(
             Q(pk=self.pk)
-            & (Q(last_interaction__lt=created_on) | Q(last_interaction__isnull=True)),
+            & (
+                Q(last_interaction__lt=message.created_on)
+                | Q(last_interaction__isnull=True)
+            ),
         ).update(**update_fields)
 
     def start_csat_flow(self):

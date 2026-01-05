@@ -119,11 +119,7 @@ class AutomaticMessagesService:
                 )
 
                 if message_text:
-                    room.update_last_message(
-                        message_uuid=message.uuid,
-                        text=message.text,
-                        created_on=message.created_on,
-                    )
+                    room.update_last_message(message=message, user=user)
 
                 transaction.on_commit(lambda: message.notify_room("create", True))
 

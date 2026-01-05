@@ -18,6 +18,7 @@ from chats.apps.ai_features.history_summary.models import (
 )
 from chats.apps.api.utils import create_contact, create_user_and_token
 from chats.apps.contacts.models import Contact
+from chats.apps.msgs.models import Message
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.projects.models.models import RoomRoutingType
 from chats.apps.projects.tests.decorators import with_project_permission
@@ -1794,14 +1795,14 @@ class TestLastMessageInRoomList(APITestCase):
         return self.client.get(url, {"project": str(self.project.uuid)})
 
     @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
-    def test_list_rooms_returns_last_message_fields(self, mock_feature):
-        msg_uuid = uuid.uuid4()
-        now = timezone.now()
+    def test_list_rooms_returns_last_message_fields_from_contact(self, mock_feature):
+        message = Message.objects.create(
+            room=self.room, text="Test message", contact=self.contact
+        )
 
         self.room.on_new_message(
-            message_uuid=msg_uuid,
-            text="Test message",
-            created_on=now,
+            message=message,
+            contact=self.contact,
             increment_unread=1,
         )
 
@@ -1811,9 +1812,9 @@ class TestLastMessageInRoomList(APITestCase):
         room_data = response.data["results"][0]
         last_message = room_data["last_message"]
 
-        self.assertEqual(str(last_message["uuid"]), str(msg_uuid))
+        self.assertEqual(str(last_message["uuid"]), str(message.uuid))
         self.assertEqual(last_message["text"], "Test message")
-        self.assertEqual(last_message["user"], self.agent.email)
+        self.assertIsNone(last_message["user"])
         self.assertEqual(str(last_message["contact"]), str(self.contact.uuid))
 
     @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
@@ -1830,23 +1831,17 @@ class TestLastMessageInRoomList(APITestCase):
 
     @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
     def test_list_rooms_last_message_updates_with_new_message(self, mock_feature):
-        msg_uuid_1 = uuid.uuid4()
-        now_1 = timezone.now()
-
-        self.room.on_new_message(
-            message_uuid=msg_uuid_1,
-            text="First message",
-            created_on=now_1,
+        message_1 = Message.objects.create(
+            room=self.room, text="First message", contact=self.contact
         )
 
-        msg_uuid_2 = uuid.uuid4()
-        now_2 = timezone.now()
+        self.room.on_new_message(message=message_1, contact=self.contact)
 
-        self.room.on_new_message(
-            message_uuid=msg_uuid_2,
-            text="Second message",
-            created_on=now_2,
+        message_2 = Message.objects.create(
+            room=self.room, text="Second message", contact=self.contact
         )
+
+        self.room.on_new_message(message=message_2, contact=self.contact)
 
         response = self._list_rooms(self.agent_token)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -1854,5 +1849,5 @@ class TestLastMessageInRoomList(APITestCase):
         room_data = response.data["results"][0]
         last_message = room_data["last_message"]
 
-        self.assertEqual(str(last_message["uuid"]), str(msg_uuid_2))
+        self.assertEqual(str(last_message["uuid"]), str(message_2.uuid))
         self.assertEqual(last_message["text"], "Second message")

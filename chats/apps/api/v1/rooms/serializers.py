@@ -101,13 +101,17 @@ class RoomSerializer(serializers.ModelSerializer):
         return room.get_is_waiting()
 
     def get_last_message(self, room: Room):
-        if room.last_message_uuid:
+        if room.last_message_id:
             return {
-                "uuid": room.last_message_uuid,
+                "uuid": room.last_message.uuid,
                 "text": room.last_message_text or "",
                 "created_on": room.last_interaction,
-                "user": room.user.email if room.user else None,
-                "contact": room.contact.uuid if room.contact else None,
+                "user": room.last_message_user.email
+                if room.last_message_user
+                else None,
+                "contact": room.last_message_contact.uuid
+                if room.last_message_contact
+                else None,
             }
         return None
 
@@ -212,13 +216,17 @@ class ListRoomSerializer(serializers.ModelSerializer):
         return room.queue.sector.can_edit_custom_fields
 
     def get_last_message(self, room: Room):
-        if room.last_message_uuid:
+        if room.last_message_id:
             return {
-                "uuid": room.last_message_uuid,
+                "uuid": room.last_message.uuid,
                 "text": room.last_message_text or "",
                 "created_on": room.last_interaction,
-                "user": room.user.email if room.user else None,
-                "contact": room.contact.uuid if room.contact else None,
+                "user": room.last_message_user.email
+                if room.last_message_user
+                else None,
+                "contact": room.last_message_contact.uuid
+                if room.last_message_contact
+                else None,
             }
         return {
             "uuid": None,

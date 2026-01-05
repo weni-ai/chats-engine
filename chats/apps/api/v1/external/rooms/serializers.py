@@ -586,8 +586,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
             last_msg = created_messages[-1]
             room.on_new_message(
-                message_uuid=last_msg.uuid,
-                text=last_msg.text,
-                created_on=last_msg.created_on,
+                message=last_msg,
+                contact=last_msg.contact,
                 increment_unread=len(created_messages),
             )
