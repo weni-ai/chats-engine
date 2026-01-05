@@ -174,13 +174,13 @@ class InternalAPITokenAuthenticationTests(TestCase):
 
     @override_settings(INTERNAL_API_TOKEN="test-token")
     def test_authenticate_credentials_with_the_incorrect_token(self):
-        with self.assertRaises(AuthenticationFailed):
-            self.authentication.authenticate_credentials("incorrect-token")
+        result = self.authentication.authenticate_credentials("incorrect-token")
+        self.assertIsNone(result)
 
     @override_settings(INTERNAL_API_TOKEN="test-token")
     def test_authenticate_credentials_with_no_token(self):
-        with self.assertRaises(AuthenticationFailed):
-            self.authentication.authenticate_credentials("")
+        result = self.authentication.authenticate_credentials("")
+        self.assertIsNone(result)
 
 
 class InternalAPITokenAuthenticationView(APIView):
@@ -209,7 +209,7 @@ class InternalAPITokenAuthenticationViewAPITestCase(APITestCase):
     def test_authenticated_request_with_valid_token(self):
         response = self.client.get(
             "/internal-api-token-authentication/",
-            HTTP_AUTHORIZATION="Token test-token",
+            HTTP_AUTHORIZATION="Bearer test-token",
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -225,7 +225,7 @@ class InternalAPITokenAuthenticationViewAPITestCase(APITestCase):
     def test_unauthenticated_request_with_invalid_token(self):
         response = self.client.get(
             "/internal-api-token-authentication/",
-            HTTP_AUTHORIZATION="Token invalid-token",
+            HTTP_AUTHORIZATION="Bearer invalid-token",
         )
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
@@ -234,7 +234,7 @@ class InternalAPITokenAuthenticationViewAPITestCase(APITestCase):
     def test_unauthenticated_request_with_malformed_token(self):
         response = self.client.get(
             "/internal-api-token-authentication/",
-            HTTP_AUTHORIZATION="Token Bearer invalid-token",
+            HTTP_AUTHORIZATION="Bearer invalid-token",
         )
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

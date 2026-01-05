@@ -52,13 +52,13 @@ class InternalAPITokenAuthentication(BaseAuthentication):
         """
         token = request.headers.get("Authorization")
 
-        if not token or not token.startswith("Token "):
+        if not token or not token.startswith("Bearer "):
             return None
 
         try:
             token = token.split(" ")[1]
         except IndexError:
-            raise AuthenticationFailed("Invalid authentication token.")
+            return None
 
         return self.authenticate_credentials(token)
 
@@ -67,10 +67,13 @@ class InternalAPITokenAuthentication(BaseAuthentication):
         Authenticate the credentials using the internal API token.
         """
 
-        if token == "" or token != settings.INTERNAL_API_TOKEN:
+        if token == "" or len(token) != len(settings.INTERNAL_API_TOKEN):
+            return None
+
+        if token != settings.INTERNAL_API_TOKEN:
             raise AuthenticationFailed("Invalid authentication token.")
 
         return (None, "INTERNAL")
 
     def authenticate_header(self, request):
-        return "Token"
+        return "Bearer"
