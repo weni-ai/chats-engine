@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
         ('contacts', '0009_add_index_to_contact_name'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ('msgs', '0017_alter_messagemedia_media_file'),
-        ('rooms', '0023_room_last_contact_interaction_room_last_interaction_and_more'),
+        ('rooms', '0025_room_last_contact_interaction_room_last_interaction_and_more'),
     ]
 
     operations = [
