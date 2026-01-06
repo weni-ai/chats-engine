@@ -1,15 +1,13 @@
 from rest_framework import status
-from rest_framework.viewsets import GenericViewSet
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
-
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.viewsets import GenericViewSet
+from weni.feature_flags.services import FeatureFlagsService
 
 from chats.apps.api.v1.feedbacks.serializers import FeedbackSerializer
 from chats.apps.api.v1.permissions import ProjectBodyPermission
 from chats.apps.feedbacks.services import UserFeedbackService
-from chats.apps.feature_flags.services import FeatureFlagService
-from chats.apps.feature_flags.integrations.growthbook.instance import GROWTHBOOK_CLIENT
 from chats.core.cache import CacheClient
 
 
@@ -18,9 +16,11 @@ class FeedbackViewSet(GenericViewSet):
     Viewset for feedback creation.
     """
 
+    swagger_tag = "Feedback"
+
     feedback_service = UserFeedbackService(
         cache_client=CacheClient(),
-        feature_flags_service=FeatureFlagService(growthbook_client=GROWTHBOOK_CLIENT),
+        feature_flags_service=FeatureFlagsService(),
     )
     serializer_class = FeedbackSerializer
 

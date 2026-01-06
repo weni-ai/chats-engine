@@ -36,6 +36,11 @@ class Contact(BaseModel):
                 name="contact_external_id_idx",
                 condition=models.Q(external_id__isnull=False),
             ),
+            models.Index(
+                fields=["name"],
+                name="contact_name_idx",
+                condition=models.Q(name__isnull=False),
+            ),
         ]
 
     def __str__(self):

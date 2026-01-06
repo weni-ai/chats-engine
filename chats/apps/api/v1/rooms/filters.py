@@ -54,7 +54,11 @@ class RoomFilter(filters.FilterSet):
         except ObjectDoesNotExist:
             return queryset.none()
 
-        user_param = self.request.query_params.get("email") or self.request.user
+        request_params = getattr(self.request, "query_params", None)
+        if request_params is None:
+            request_params = getattr(self.request, "GET", {})
+
+        user_param = request_params.get("email") or self.request.user
         if isinstance(user_param, User):
             user_email = (user_param.email or "").lower()
         else:
@@ -74,6 +78,7 @@ class RoomFilter(filters.FilterSet):
         user_project = Q(user_id=user_email) & Q(project_uuid=value)
         queue_filter = Q(user__isnull=True) & Q(queue__in=project_permission.queue_ids)
         ff = user_project | queue_filter
+
         queryset = queryset.filter(
             ff,
             is_active=True,

@@ -2,6 +2,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
+from weni.feature_flags.shortcuts import is_feature_active
 
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.projects.models.models import Project
@@ -11,7 +12,6 @@ from chats.apps.sectors.models import (
     SectorHoliday,
     SectorTag,
 )
-from chats.apps.feature_flags.utils import is_feature_active
 
 User = get_user_model()
 
@@ -25,7 +25,7 @@ def validate_is_csat_enabled(project: Project, value: bool, context: dict) -> bo
     project = project
 
     if value is True and not is_feature_active(
-        settings.CSAT_FEATURE_FLAG_KEY, user, project
+        settings.CSAT_FEATURE_FLAG_KEY, user.email, str(project.uuid)
     ):
         raise serializers.ValidationError(
             {
@@ -98,20 +98,6 @@ class SectorSerializer(serializers.ModelSerializer):
         automatic_message = data.get("automatic_message")
 
         if automatic_message:
-            if automatic_message.get("is_active", False) and not is_feature_active(
-                settings.AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY,
-                self.context["request"].user,
-                data.get("project"),
-            ):
-                raise serializers.ValidationError(
-                    {
-                        "is_automatic_message_active": [
-                            _("This feature is not available for this project.")
-                        ]
-                    },
-                    code="automatic_message_feature_flag_is_not_active",
-                )
-
             data.pop("automatic_message")
 
             data["is_automatic_message_active"] = automatic_message.get("is_active")
@@ -119,7 +105,11 @@ class SectorSerializer(serializers.ModelSerializer):
 
         project = self.instance.project if self.instance else data.get("project")
 
-        validate_is_csat_enabled(project, data.get("is_csat_enabled"), self.context)
+        if (
+            project
+            and (is_csat_enabled := data.get("is_csat_enabled", None)) is not None
+        ):
+            validate_is_csat_enabled(project, is_csat_enabled, self.context)
 
         config = data.get("config", {})
         if "secondary_project" in config:
@@ -200,28 +190,7 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
         automatic_message = attrs.get("automatic_message", None)
 
         if automatic_message is not None:
-            current_is_automatic_message_active = (
-                self.instance.is_automatic_message_active
-            )
             new_is_automatic_message_active = automatic_message.get("is_active")
-
-            if (
-                current_is_automatic_message_active != new_is_automatic_message_active
-                and not is_feature_active(
-                    settings.AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY,
-                    self.context["request"].user,
-                    project,
-                )
-            ):
-
-                raise serializers.ValidationError(
-                    {
-                        "is_automatic_message_active": [
-                            _("This feature is not available for this project.")
-                        ]
-                    },
-                    code="automatic_message_feature_flag_is_not_active",
-                )
 
             attrs.pop("automatic_message")
             attrs["is_automatic_message_active"] = new_is_automatic_message_active

@@ -67,6 +67,8 @@ standardwebhooks = "^1.0.0"
 workalendar = "^17.0.0"
 xlsxwriter = "^3.2.5"
 daphne = "^3.0.0"
+pyjwt = "2.9.0"
+weni-commons = "^1.1.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"

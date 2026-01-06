@@ -39,6 +39,7 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
             "waiting_time",
             "queue_time",
             "csat_rating",
+            "protocol",
         ]
 
     def get_agent(self, obj):
@@ -62,18 +63,18 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
 
     def get_duration(self, obj: Room) -> int:
         if not obj.first_user_assigned_at:
-            return None
+            return 0
 
         if obj.is_active and obj.user:
             return int((timezone.now() - obj.first_user_assigned_at).total_seconds())
         elif not obj.is_active and obj.ended_at:
             return int((obj.ended_at - obj.first_user_assigned_at).total_seconds())
 
-        return None
+        return 0
 
     def get_first_response_time(self, obj: Room) -> int:
         try:
-            if hasattr(obj, "metric") and obj.metric.first_response_time > 0:
+            if hasattr(obj, "metric") and obj.metric.first_response_time is not None:
                 return obj.metric.first_response_time
 
             if obj.first_user_assigned_at and obj.is_active and obj.user:
@@ -84,25 +85,25 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
                 )
 
                 if has_any_agent_messages:
-                    return None
+                    return 0
 
                 return int(
                     (timezone.now() - obj.first_user_assigned_at).total_seconds()
                 )
         except Exception:
             pass
-        return None
+        return 0
 
     def get_waiting_time(self, obj: Room) -> int:
         if not obj.added_to_queue_at or not obj.user_assigned_at:
-            return None
+            return 0
         return int((obj.user_assigned_at - obj.added_to_queue_at).total_seconds())
 
     def get_queue_time(self, obj: Room) -> int:
         if obj.is_active and not obj.user:
             queue_start = obj.added_to_queue_at
             return int((timezone.now() - queue_start).total_seconds())
-        return None
+        return 0
 
     def get_csat_rating(self, obj: Room) -> int:
         csat_survey: Optional[CSATSurvey] = getattr(obj, "csat_survey", None)
@@ -111,3 +112,9 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
             return csat_survey.rating
 
         return None
+
+
+class InternalProtocolRoomsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Room
+        fields = ["protocol"]

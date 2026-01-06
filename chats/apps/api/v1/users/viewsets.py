@@ -7,6 +7,7 @@ from chats.apps.api.v1.users import serializers
 
 
 class ProfileViewset(viewsets.GenericViewSet):
+    swagger_tag = "Users"
     queryset = Profile.objects.all()
     serializer_class = serializers.ProfileSerializer
     permission_classes = [IsAuthenticated]

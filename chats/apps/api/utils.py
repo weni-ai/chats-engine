@@ -24,7 +24,10 @@ def create_user_and_token(nickname: str = "fake"):
 def create_message(text, room, user=None, contact=None):
     if user == contact:
         return None
-    return Message.objects.create(room=room, text=text, user=user, contact=contact)
+    message = Message.objects.create(room=room, text=text, user=user, contact=contact)
+    if text:
+        room.update_last_message(message=message, user=user)
+    return message
 
 
 def create_contact(
@@ -76,7 +79,14 @@ def ensure_timezone(dt, tz):
 
 
 def create_reply_index(message: Message):
-    if message.external_id:
+    if not message.external_id:
+        return
+
+    if ChatMessageReplyIndex.objects.filter(external_id=message.external_id).exists():
+        ChatMessageReplyIndex.objects.filter(external_id=message.external_id).update(
+            message=message,
+        )
+    else:
         ChatMessageReplyIndex.objects.update_or_create(
             external_id=message.external_id,
             message=message,

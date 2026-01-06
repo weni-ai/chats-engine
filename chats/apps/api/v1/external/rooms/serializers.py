@@ -155,6 +155,7 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
     first_user_message = serializers.SerializerMethodField()
     tags = TagSimpleSerializer(many=True, required=False)
     interaction_time = serializers.IntegerField(source="metric.interaction_time")
+    urn = serializers.CharField()
     contact_external_id = serializers.CharField(source="contact.external_id")
     protocol = serializers.CharField(read_only=True)
     callid = serializers.SerializerMethodField()
@@ -170,6 +171,7 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
             "created_on",
             "interaction_time",
             "ended_at",
+            "urn",
             "contact_external_id",
             "user",
             "user_name",
@@ -558,7 +560,9 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             room.save()
 
         if messages_to_create:
-            created_messages = Message.objects.bulk_create(messages_to_create)
+            created_messages: list[Message] = Message.objects.bulk_create(
+                messages_to_create
+            )
 
             all_media = []
             for message_index, message in enumerate(created_messages):
@@ -579,3 +583,10 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
             if room.user is None and room.contact and any_incoming_msgs:
                 room.trigger_default_message()
+
+            last_msg = created_messages[-1]
+            room.on_new_message(
+                message=last_msg,
+                contact=last_msg.contact,
+                increment_unread=len(created_messages),
+            )
