@@ -16,7 +16,9 @@ from chats.apps.archive_chats.models import (
 )
 from chats.apps.archive_chats.serializers import ArchiveMessageSerializer
 from chats.apps.rooms.models import Room
-from chats.apps.msgs.models import Message
+from chats.apps.msgs.models import (
+    Message,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -35,6 +37,10 @@ class BaseArchiveChatsService(ABC):
 
     @abstractmethod
     def upload_messages_file(self, messages: List[dict]) -> None:
+        pass
+
+    @abstractmethod
+    def delete_room_messages(self, room: Room) -> None:
         pass
 
 
@@ -150,3 +156,20 @@ class ArchiveChatsService(BaseArchiveChatsService):
         )
 
         return room_archived_conversation
+
+    def delete_room_messages(self, room: Room, batch_size: int = 1000) -> None:
+        logger.info(
+            f"[ArchiveChatsService] Deleting room messages for room {room.uuid}"
+        )
+
+        messages = Message.objects.filter(room=room)
+
+        for i in range(0, len(messages), batch_size):
+            messages_batch = messages[i : i + batch_size]
+
+            if not messages_batch.exists():
+                break
+
+            messages_batch.delete()
+
+        logger.info(f"[ArchiveChatsService] Room messages deleted for room {room.uuid}")
