@@ -76,12 +76,6 @@ class RoomArchivedConversation(models.Model):
         blank=True,
         help_text=_("The date and time when the archive process started"),
     )
-    archive_process_finished_at = models.DateTimeField(
-        verbose_name=_("Archive process finished at"),
-        null=True,
-        blank=True,
-        help_text=_("The date and time when the conversation was archived"),
-    )
     messages_deleted_at = models.DateTimeField(
         verbose_name=_("Messages deleted at"),
         null=True,
