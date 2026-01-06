@@ -1,6 +1,7 @@
 import json
 from unittest.mock import patch
 
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 
@@ -129,7 +130,7 @@ class TestArchiveChatsService(TestCase):
         archived_conversation.refresh_from_db()
         self.assertEqual(
             archived_conversation.status,
-            ArchiveConversationsJobStatus.PROCESSING_MESSAGES,
+            ArchiveConversationsJobStatus.MESSAGES_PROCESSED,
         )
         self.assertIsNotNone(archived_conversation.archive_process_started_at)
 
@@ -181,6 +182,9 @@ class TestArchiveChatsService(TestCase):
             ArchiveMessageSerializer(message_b).data,
         ]
 
+        archived_conversation.status = ArchiveConversationsJobStatus.MESSAGES_PROCESSED
+        archived_conversation.save(update_fields=["status"])
+
         self.service.upload_messages_file(
             room_archived_conversation=archived_conversation,
             messages=messages,
@@ -190,7 +194,7 @@ class TestArchiveChatsService(TestCase):
 
         self.assertEqual(
             archived_conversation.status,
-            ArchiveConversationsJobStatus.UPLOADING_MESSAGES_FILE,
+            ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED,
         )
         self.assertTrue(archived_conversation.file)
         self.assertEqual(
@@ -204,3 +208,28 @@ class TestArchiveChatsService(TestCase):
         self.assertEqual(len(lines), 2)
         self.assertEqual(json.loads(lines[0]), messages[0])
         self.assertEqual(json.loads(lines[1]), messages[1])
+
+    def test_upload_messages_file_when_status_is_not_messages_processed(self):
+        archived_conversation = RoomArchivedConversation.objects.create(
+            job=self.service.start_archive_job(),
+            room=self.room,
+            status=ArchiveConversationsJobStatus.PENDING,
+        )
+
+        with self.assertRaises(ValidationError) as context:
+            self.service.upload_messages_file(
+                room_archived_conversation=archived_conversation,
+                messages=[],
+            )
+
+        self.assertEqual(
+            context.exception.message,
+            f"Room archived conversation {archived_conversation.uuid} is not in messages processed status",
+        )
+
+        archived_conversation.refresh_from_db()
+
+        self.assertEqual(
+            archived_conversation.status,
+            ArchiveConversationsJobStatus.PENDING,
+        )

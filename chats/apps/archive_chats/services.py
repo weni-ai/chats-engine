@@ -4,6 +4,7 @@ import json
 import logging
 
 from typing import List
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.core.files.base import ContentFile
 from sentry_sdk import capture_exception
@@ -115,6 +116,11 @@ class ArchiveChatsService(BaseArchiveChatsService):
 
             messages_data.append(ArchiveMessageSerializer(message).data)
 
+        room_archived_conversation.status = (
+            ArchiveConversationsJobStatus.MESSAGES_PROCESSED
+        )
+        room_archived_conversation.save(update_fields=["status"])
+
         return messages_data
 
     def upload_messages_file(
@@ -122,6 +128,15 @@ class ArchiveChatsService(BaseArchiveChatsService):
         room_archived_conversation: RoomArchivedConversation,
         messages: List[dict],
     ) -> None:
+
+        if (
+            room_archived_conversation.status
+            != ArchiveConversationsJobStatus.MESSAGES_PROCESSED
+        ):
+            raise ValidationError(
+                f"Room archived conversation {room_archived_conversation.uuid} is not in messages processed status"
+            )
+
         room_archived_conversation.status = (
             ArchiveConversationsJobStatus.UPLOADING_MESSAGES_FILE
         )
@@ -148,5 +163,10 @@ class ArchiveChatsService(BaseArchiveChatsService):
             ContentFile(file_object.read()),
             save=True,
         )
+
+        room_archived_conversation.status = (
+            ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED
+        )
+        room_archived_conversation.save(update_fields=["status"])
 
         return room_archived_conversation
