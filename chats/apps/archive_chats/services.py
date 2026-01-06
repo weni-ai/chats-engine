@@ -4,6 +4,7 @@ import json
 import logging
 
 from typing import List
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.core.files.base import ContentFile
 from sentry_sdk import capture_exception
@@ -128,6 +129,16 @@ class ArchiveChatsService(BaseArchiveChatsService):
         room_archived_conversation: RoomArchivedConversation,
         messages: List[dict],
     ) -> None:
+        room_archived_conversation.refresh_from_db()
+
+        if (
+            room_archived_conversation.status
+            != ArchiveConversationsJobStatus.PROCESSING_MESSAGES
+        ):
+            raise ValidationError(
+                f"Room archived conversation {room_archived_conversation.uuid} is not in processing messages status"
+            )
+
         room_archived_conversation.status = (
             ArchiveConversationsJobStatus.UPLOADING_MESSAGES_FILE
         )
@@ -157,7 +168,15 @@ class ArchiveChatsService(BaseArchiveChatsService):
 
         return room_archived_conversation
 
-    def delete_room_messages(self, room: Room, batch_size: int = 1000) -> None:
+    def delete_room_messages(
+        self,
+        room_archived_conversation: RoomArchivedConversation,
+        batch_size: int = 1000,
+    ) -> None:
+        room_archived_conversation.refresh_from_db()
+
+        room = room_archived_conversation.room
+
         logger.info(
             f"[ArchiveChatsService] Deleting room messages for room {room.uuid}"
         )
