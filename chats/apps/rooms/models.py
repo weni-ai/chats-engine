@@ -95,14 +95,7 @@ class Room(BaseModel, BaseConfigurableModel):
     )
 
     ended_by = models.CharField(_("Ended by"), max_length=50, null=True, blank=True)
-    closed_by = models.ForeignKey(
-        "accounts.User",
-        related_name="closed_rooms",
-        verbose_name=_("closed by"),
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-    )
+
 
     is_active = models.BooleanField(_("is active?"), default=True)
     is_waiting = models.BooleanField(_("is waiting for answer?"), default=False)
