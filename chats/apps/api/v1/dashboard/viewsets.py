@@ -8,12 +8,13 @@ from django.contrib.postgres.aggregates import ArrayAgg
 from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
-from rest_framework import permissions, status, viewsets
+from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from chats.apps.core.filters import get_filters_from_query_params
 from chats.apps.api.v1.dashboard.presenter import get_export_data
 from chats.apps.api.v1.dashboard.repository import (
     ORMRoomsDataRepository,
@@ -45,9 +46,15 @@ logger = logging.getLogger(__name__)
 logger = logging.getLogger(__name__)
 
 
+class _DashboardEmptySerializer(serializers.Serializer):
+    """Placeholder serializer to satisfy DRF assertions during schema generation."""
+
+
 class DashboardLiveViewset(viewsets.GenericViewSet):
+    swagger_tag = "Dashboard"
     lookup_field = "uuid"
     queryset = Project.objects.all()
+    serializer_class = _DashboardEmptySerializer
 
     @action(
         detail=True,
@@ -403,7 +410,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
     def time_metrics(self, request, *args, **kwargs):
         """Time metrics for the project - real-time data"""
         project = self.get_object()
-        params = request.query_params.dict()
+        params = get_filters_from_query_params(request.query_params)
 
         filters = Filters(
             start_date=params.get("start_date"),
@@ -421,6 +428,37 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
 
         time_metrics_service = TimeMetricsService()
         metrics_data = time_metrics_service.get_time_metrics(filters, project)
+
+        return Response(metrics_data, status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["GET"],
+        url_name="time_metrics_for_analysis",
+    )
+    def time_metrics_for_analysis(self, request, *args, **kwargs):
+        """Time metrics for the project - analysis data"""
+        project = self.get_object()
+        params = get_filters_from_query_params(request.query_params)
+
+        filters = Filters(
+            start_date=params.get("start_date"),
+            end_date=params.get("end_date"),
+            agent=params.get("agent"),
+            sector=params.get("sector"),
+            queue=params.get("queue"),
+            tag=params.get("tag"),
+            user_request=request.user,
+            project=project,
+            is_weni_admin=should_exclude_admin_domains(
+                request.user.email if request.user else ""
+            ),
+        )
+
+        time_metrics_service = TimeMetricsService()
+        metrics_data = time_metrics_service.get_time_metrics_for_analysis(
+            filters, project
+        )
 
         return Response(metrics_data, status.HTTP_200_OK)
 
@@ -446,6 +484,8 @@ class ModelFieldsViewSet(APIView):
     Endpoint para retornar os campos disponíveis dos principais models do sistema.
     """
 
+    swagger_tag = "Dashboard"
+
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
@@ -456,6 +496,8 @@ class ReportFieldsValidatorViewSet(APIView):
     """
     Endpoint to validate fields and generate rooms report.
     """
+
+    swagger_tag = "Dashboard"
 
     permission_classes = [permissions.IsAuthenticated]
 

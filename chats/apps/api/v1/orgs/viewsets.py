@@ -9,6 +9,7 @@ from .serializers import OrgProjectSerializer
 
 
 class OrgProjectViewSet(mixins.ListModelMixin, GenericViewSet):
+    swagger_tag = "Organizations"
     serializer_class = OrgProjectSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = "org"

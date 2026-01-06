@@ -1,7 +1,9 @@
+import uuid
 from django.db import IntegrityError
 from django.test import override_settings
 from rest_framework.test import APITestCase
 
+from chats.apps.csat.models import CSATFlowProjectConfig
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.sectors.models import Sector
 
@@ -197,3 +199,20 @@ class PropertyTests(APITestCase):
         )
 
         self.assertEqual(project.has_chats_summary, True)
+
+    def test_csat_flow_uuid_when_csat_flow_project_config_is_not_set(self):
+        project = Project.objects.create(
+            name="Test Project",
+        )
+        self.assertIsNone(project.csat_flow_uuid)
+
+    def test_csat_flow_uuid_when_csat_flow_project_config_is_set(self):
+        project = Project.objects.create(
+            name="Test Project",
+        )
+        csat_flow_project_config = CSATFlowProjectConfig.objects.create(
+            project=project,
+            flow_uuid=uuid.uuid4(),
+            version=1,
+        )
+        self.assertEqual(project.csat_flow_uuid, csat_flow_project_config.flow_uuid)

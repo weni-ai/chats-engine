@@ -1,6 +1,7 @@
 import json
-from unittest.mock import call, patch
 import uuid
+from unittest.mock import call, patch
+
 from django.test import TestCase
 
 from chats.apps.feature_flags.integrations.growthbook.clients import GrowthbookClient
@@ -61,12 +62,7 @@ class TestGrowthbookClient(TestCase):
         mock_get.assert_called_once_with(self.client.long_cache_key)
 
     @patch("chats.core.tests.mock.MockCacheClient.get")
-    @patch(
-        "chats.apps.feature_flags.integrations.growthbook.tasks.update_growthbook_feature_flags.delay"
-    )
-    def test_get_feature_flags_from_cache_when_cache_is_empty(
-        self, mock_update_growthbook_feature_flags, mock_get
-    ):
+    def test_get_feature_flags_from_cache_when_cache_is_empty(self, mock_get):
         mock_get.return_value = None
 
         flags = self.client.get_feature_flags_from_cache()
@@ -79,15 +75,9 @@ class TestGrowthbookClient(TestCase):
                 call(self.client.long_cache_key),
             ]
         )
-        mock_update_growthbook_feature_flags.assert_called_once()
 
     @patch("chats.core.tests.mock.MockCacheClient.get")
-    @patch(
-        "chats.apps.feature_flags.integrations.growthbook.tasks.update_growthbook_feature_flags.delay"
-    )
-    def test_get_feature_flags_from_cache_when_short_cache_is_empty(
-        self, mock_update_growthbook_feature_flags, mock_get
-    ):
+    def test_get_feature_flags_from_cache_when_short_cache_is_empty(self, mock_get):
         mock_get.side_effect = [None, json.dumps({"test": True}, ensure_ascii=False)]
 
         flags = self.client.get_feature_flags_from_cache()
@@ -100,15 +90,9 @@ class TestGrowthbookClient(TestCase):
                 call(self.client.long_cache_key),
             ]
         )
-        mock_update_growthbook_feature_flags.assert_called_once()
 
     @patch("chats.core.tests.mock.MockCacheClient.get")
-    @patch(
-        "chats.apps.feature_flags.integrations.growthbook.tasks.update_growthbook_feature_flags.delay"
-    )
-    def test_get_feature_flags_from_cache_when_short_cache_is_valid(
-        self, mock_update_growthbook_feature_flags, mock_get
-    ):
+    def test_get_feature_flags_from_cache_when_short_cache_is_valid(self, mock_get):
         mock_get.side_effect = [{"test": True}, {"test": True}]
 
         flags = self.client.get_feature_flags_from_cache()
@@ -116,7 +100,6 @@ class TestGrowthbookClient(TestCase):
         self.assertEqual(flags, {"test": True})
 
         mock_get.assert_called_once_with(self.client.short_cache_key)
-        mock_update_growthbook_feature_flags.assert_not_called()
 
     @patch("chats.core.tests.mock.MockCacheClient.set")
     def test_set_feature_flags_to_short_cache(self, mock_set):
@@ -205,14 +188,10 @@ class TestGrowthbookClient(TestCase):
 
     @patch("chats.core.tests.mock.MockCacheClient.get")
     @patch("chats.core.tests.mock.MockCacheClient.set")
-    @patch(
-        "chats.apps.feature_flags.integrations.growthbook.tasks.update_growthbook_feature_flags.delay"
-    )
     @patch("requests.get")
     def test_get_feature_flags_when_cache_is_invalid(
         self,
         mock_request_get,
-        mock_update_growthbook_feature_flags,
         mock_cache_set,
         mock_cache_get,
     ):
@@ -240,7 +219,6 @@ class TestGrowthbookClient(TestCase):
                 ),
             ]
         )
-        mock_update_growthbook_feature_flags.assert_called_once()
         mock_request_get.assert_called_once_with(
             f"{self.client.host_base_url}/api/features/{self.client.client_key}",
             timeout=60,

@@ -7,9 +7,11 @@ from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError
 from django.test import TransactionTestCase, override_settings
 from django.utils import timezone
+from django.utils.timezone import timedelta
 from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
+from chats.apps.msgs.models import Message
 from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.exceptions import (
@@ -365,6 +367,86 @@ class TestRoomModel(TransactionTestCase):
 
         self.assertEqual(room.tags.count(), 0)
 
+    @patch("chats.apps.rooms.models.Room.get_24h_valid_from_cache")
+    @patch("chats.apps.rooms.models.Room.save_24h_valid_to_cache")
+    def test_room_24h_valid_when_room_urn_is_not_whatsapp(
+        self, save_24h_valid_to_cache, get_24h_valid_from_cache
+    ):
+        room = Room.objects.create(queue=self.queue, urn="test")
+        self.assertTrue(room.is_24h_valid)
+
+        get_24h_valid_from_cache.assert_not_called()
+        save_24h_valid_to_cache.assert_not_called()
+
+    @patch("chats.apps.rooms.models.Room.get_24h_valid_from_cache")
+    @patch("chats.apps.rooms.models.Room.save_24h_valid_to_cache")
+    def test_room_24h_valid_when_room_response_is_cached(
+        self, save_24h_valid_to_cache, get_24h_valid_from_cache
+    ):
+        get_24h_valid_from_cache.return_value = True
+        room = Room.objects.create(queue=self.queue, urn="whatsapp:1234567890")
+        self.assertTrue(room.is_24h_valid)
+
+        get_24h_valid_from_cache.assert_called_once()
+        save_24h_valid_to_cache.assert_not_called()
+
+    @patch("chats.apps.rooms.models.Room.get_24h_valid_from_cache")
+    @patch("chats.apps.rooms.models.Room.save_24h_valid_to_cache")
+    def test_room_24h_valid_when_room_contact_messages_are_in_24_hour_window(
+        self, save_24h_valid_to_cache, get_24h_valid_from_cache
+    ):
+        get_24h_valid_from_cache.return_value = None
+        room = Room.objects.create(queue=self.queue, urn="whatsapp:1234567890")
+        Message.objects.create(room=room, contact=room.contact, text="Test Message")
+        self.assertTrue(room.is_24h_valid)
+
+        get_24h_valid_from_cache.assert_called()
+        save_24h_valid_to_cache.assert_called()
+
+    @patch("chats.apps.rooms.models.Room.get_24h_valid_from_cache")
+    @patch("chats.apps.rooms.models.Room.save_24h_valid_to_cache")
+    def test_room_24h_valid_when_room_contact_messages_are_not_in_24_hour_window(
+        self, save_24h_valid_to_cache, get_24h_valid_from_cache
+    ):
+        get_24h_valid_from_cache.return_value = None
+
+        now = timezone.now()
+        yesterday = now - timedelta(days=1, hours=1)
+
+        with patch("chats.apps.rooms.models.timezone.now") as mock_now:
+            mock_now.return_value = yesterday
+            room = Room.objects.create(queue=self.queue, urn="whatsapp:1234567890")
+            Message.objects.create(
+                room=room,
+                contact=room.contact,
+                text="Test Message",
+                created_on=yesterday,
+            )
+
+        self.assertFalse(room.is_24h_valid)
+
+        get_24h_valid_from_cache.assert_called()
+        save_24h_valid_to_cache.assert_called()
+
+    @patch("chats.apps.rooms.models.cache")
+    @patch("chats.apps.rooms.models.ROOM_24H_VALID_CACHE_TTL")
+    def test_get_24h_valid_from_cache(self, mock_room_24h_valid_cache_ttl, mock_cache):
+        mock_room_24h_valid_cache_ttl.return_value = 30
+        mock_cache.get.return_value = True
+        room = Room.objects.create(queue=self.queue, urn="whatsapp:1234567890")
+        self.assertTrue(room.get_24h_valid_from_cache())
+
+        mock_cache.get.assert_called_once_with(room.room_24h_valid_cache_key)
+
+    @patch("chats.apps.rooms.models.cache")
+    @patch("chats.apps.rooms.models.ROOM_24H_VALID_CACHE_TTL")
+    def test_save_24h_valid_to_cache(self, mock_room_24h_valid_cache_ttl, mock_cache):
+        mock_room_24h_valid_cache_ttl.return_value = 30
+        mock_cache.set.return_value = True
+        room = Room.objects.create(queue=self.queue, urn="whatsapp:1234567890")
+        room.save_24h_valid_to_cache(True)
+        mock_cache.set.assert_called()
+
 
 class TestHandleRoomCloseTags(TransactionTestCase):
     def setUp(self):
@@ -426,3 +508,198 @@ class TestHandleRoomCloseTags(TransactionTestCase):
         self.assertEqual(
             list(self.room.tags.values_list("uuid", flat=True)), close_tags
         )
+
+
+class TestRoomUnreadMessagesCount(TransactionTestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(
+            name="Test Queue",
+            sector=self.sector,
+        )
+        self.room = Room.objects.create(queue=self.queue)
+
+    def test_increment_unread_messages_count(self):
+        self.assertIsNone(self.room.last_unread_message_at)
+        self.assertEqual(self.room.unread_messages_count, 0)
+
+        self.room.increment_unread_messages_count(1, timezone.now())
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.unread_messages_count, 1)
+        self.assertIsNone(self.room.last_unread_message_at)
+
+        self.room.increment_unread_messages_count(2, timezone.now())
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.unread_messages_count, 3)
+        self.assertIsNone(self.room.last_unread_message_at)
+
+    def test_clear_unread_messages_count(self):
+        self.room.increment_unread_messages_count(1, timezone.now())
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.unread_messages_count, 1)
+        self.assertIsNone(self.room.last_unread_message_at)
+
+        self.room.clear_unread_messages_count()
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.unread_messages_count, 0)
+        self.assertIsNotNone(self.room.last_unread_message_at)
+
+
+class TestUpdateLastMessage(APITestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(
+            name="Test Queue",
+            sector=self.sector,
+        )
+        self.room = Room.objects.create(queue=self.queue)
+        self.user = User.objects.create(email="agent@test.com")
+
+    def test_update_last_message(self):
+        self.assertIsNone(self.room.last_interaction)
+        self.assertIsNone(self.room.last_message)
+        self.assertEqual(self.room.last_message_text, "")
+
+        message = Message.objects.create(
+            room=self.room, text="Hello world", user=self.user
+        )
+
+        self.room.update_last_message(message=message, user=self.user)
+        self.room.refresh_from_db()
+
+        self.assertEqual(self.room.last_interaction, message.created_on)
+        self.assertEqual(self.room.last_message, message)
+        self.assertEqual(self.room.last_message_text, "Hello world")
+        self.assertEqual(self.room.last_message_user, self.user)
+        self.assertIsNone(self.room.last_message_contact)
+
+    def test_update_last_message_overwrites_previous(self):
+        message_1 = Message.objects.create(
+            room=self.room, text="First message", user=self.user
+        )
+
+        self.room.update_last_message(message=message_1, user=self.user)
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.last_message_text, "First message")
+
+        message_2 = Message.objects.create(
+            room=self.room, text="Second message", user=self.user
+        )
+
+        self.room.update_last_message(message=message_2, user=self.user)
+        self.room.refresh_from_db()
+
+        self.assertEqual(self.room.last_message, message_2)
+        self.assertEqual(self.room.last_message_text, "Second message")
+        self.assertEqual(self.room.last_interaction, message_2.created_on)
+
+
+class TestOnNewMessage(APITestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(
+            name="Test Queue",
+            sector=self.sector,
+        )
+        from chats.apps.contacts.models import Contact
+
+        self.contact = Contact.objects.create(name="Test Contact")
+        self.room = Room.objects.create(queue=self.queue, contact=self.contact)
+
+    def test_on_new_message_updates_all_fields(self):
+        self.assertIsNone(self.room.last_interaction)
+        self.assertIsNone(self.room.last_message)
+
+        message = Message.objects.create(
+            room=self.room, text="Contact message", contact=self.contact
+        )
+
+        self.room.on_new_message(message=message, contact=self.contact)
+        self.room.refresh_from_db()
+
+        self.assertEqual(self.room.last_interaction, message.created_on)
+        self.assertEqual(self.room.last_message, message)
+        self.assertEqual(self.room.last_message_text, "Contact message")
+        self.assertIsNone(self.room.last_message_user)
+        self.assertEqual(self.room.last_message_contact, self.contact)
+
+    def test_on_new_message_increments_unread(self):
+        self.assertEqual(self.room.unread_messages_count, 0)
+
+        message_1 = Message.objects.create(
+            room=self.room, text="Message 1", contact=self.contact
+        )
+
+        self.room.on_new_message(
+            message=message_1, contact=self.contact, increment_unread=1
+        )
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.unread_messages_count, 1)
+
+        message_2 = Message.objects.create(
+            room=self.room, text="Message 2", contact=self.contact
+        )
+
+        self.room.on_new_message(
+            message=message_2, contact=self.contact, increment_unread=3
+        )
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.unread_messages_count, 4)
+
+    def test_on_new_message_only_updates_if_newer(self):
+        message_1 = Message.objects.create(
+            room=self.room, text="Recent message", contact=self.contact
+        )
+
+        self.room.on_new_message(message=message_1, contact=self.contact)
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.last_message_text, "Recent message")
+
+        old_time = timezone.now() - timedelta(hours=1)
+        message_2 = Message.objects.create(
+            room=self.room, text="Old message", contact=self.contact
+        )
+        message_2.created_on = old_time
+        message_2.save()
+
+        self.room.on_new_message(message=message_2, contact=self.contact)
+        self.room.refresh_from_db()
+
+        self.assertEqual(self.room.last_message_text, "Recent message")
+        self.assertEqual(self.room.last_message, message_1)
+
+    def test_on_new_message_without_increment_unread(self):
+        self.assertEqual(self.room.unread_messages_count, 0)
+
+        message = Message.objects.create(
+            room=self.room, text="Message without unread", contact=self.contact
+        )
+
+        self.room.on_new_message(
+            message=message, contact=self.contact, increment_unread=0
+        )
+        self.room.refresh_from_db()
+
+        self.assertEqual(self.room.unread_messages_count, 0)
+        self.assertEqual(self.room.last_message_text, "Message without unread")

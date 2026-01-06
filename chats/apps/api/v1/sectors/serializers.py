@@ -2,15 +2,16 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
+from weni.feature_flags.shortcuts import is_feature_active
 
 from chats.apps.api.v1.accounts.serializers import UserSerializer
+from chats.apps.projects.models.models import Project
 from chats.apps.sectors.models import (
     Sector,
     SectorAuthorization,
     SectorHoliday,
     SectorTag,
 )
-from chats.apps.feature_flags.utils import is_feature_active
 
 User = get_user_model()
 
@@ -26,6 +27,26 @@ def _apply_sector_config_defaults(instance: Sector, data: dict) -> dict:
             config.setdefault("can_close_chats_in_queue", False)
     data["config"] = config
     return data
+def validate_is_csat_enabled(project: Project, value: bool, context: dict) -> bool:
+    """
+    Validate if the CSAT feature is enabled for the sector.
+    """
+    request = context.get("request")
+    user = getattr(request, "user", None)
+    project = project
+
+    if value is True and not is_feature_active(
+        settings.CSAT_FEATURE_FLAG_KEY, user.email, str(project.uuid)
+    ):
+        raise serializers.ValidationError(
+            {
+                "is_csat_enabled": [
+                    _("The CSAT feature is not available for this sector")
+                ]
+            },
+            code="csat_feature_flag_is_off",
+        )
+    return value
 
 
 class SectorAutomaticMessageSerializer(serializers.ModelSerializer):
@@ -39,6 +60,7 @@ class SectorAutomaticMessageSerializer(serializers.ModelSerializer):
 
 class SectorSerializer(serializers.ModelSerializer):
     automatic_message = serializers.JSONField(required=False)
+    is_csat_enabled = serializers.BooleanField(required=False, allow_null=False)
 
     class Meta:
         model = Sector
@@ -57,6 +79,7 @@ class SectorSerializer(serializers.ModelSerializer):
             "can_edit_custom_fields",
             "working_day",
             "automatic_message",
+            "is_csat_enabled",
             "required_tags",
             "secondary_project",
         ]
@@ -86,24 +109,18 @@ class SectorSerializer(serializers.ModelSerializer):
         automatic_message = data.get("automatic_message")
 
         if automatic_message:
-            if automatic_message.get("is_active", False) and not is_feature_active(
-                settings.AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY,
-                self.context["request"].user,
-                data.get("project"),
-            ):
-                raise serializers.ValidationError(
-                    {
-                        "is_automatic_message_active": [
-                            _("This feature is not available for this project.")
-                        ]
-                    },
-                    code="automatic_message_feature_flag_is_not_active",
-                )
-
             data.pop("automatic_message")
 
             data["is_automatic_message_active"] = automatic_message.get("is_active")
             data["automatic_message_text"] = automatic_message.get("text")
+
+        project = self.instance.project if self.instance else data.get("project")
+
+        if (
+            project
+            and (is_csat_enabled := data.get("is_csat_enabled", None)) is not None
+        ):
+            validate_is_csat_enabled(project, is_csat_enabled, self.context)
 
         config = data.get("config", {})
         if "secondary_project" in config:
@@ -147,6 +164,7 @@ class SectorSerializer(serializers.ModelSerializer):
 
 class SectorUpdateSerializer(serializers.ModelSerializer):
     automatic_message = serializers.JSONField(required=False)
+    is_csat_enabled = serializers.BooleanField(required=False, allow_null=False)
 
     class Meta:
         model = Sector
@@ -161,6 +179,7 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
             "can_edit_custom_fields",
             "config",
             "automatic_message",
+            "is_csat_enabled",
             "required_tags",
             "secondary_project",
         ]
@@ -183,32 +202,15 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
         automatic_message = attrs.get("automatic_message", None)
 
         if automatic_message is not None:
-            current_is_automatic_message_active = (
-                self.instance.is_automatic_message_active
-            )
             new_is_automatic_message_active = automatic_message.get("is_active")
-
-            if (
-                current_is_automatic_message_active != new_is_automatic_message_active
-                and not is_feature_active(
-                    settings.AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY,
-                    self.context["request"].user,
-                    project,
-                )
-            ):
-
-                raise serializers.ValidationError(
-                    {
-                        "is_automatic_message_active": [
-                            _("This feature is not available for this project.")
-                        ]
-                    },
-                    code="automatic_message_feature_flag_is_not_active",
-                )
 
             attrs.pop("automatic_message")
             attrs["is_automatic_message_active"] = new_is_automatic_message_active
             attrs["automatic_message_text"] = automatic_message.get("text")
+
+        project = self.instance.project
+
+        validate_is_csat_enabled(project, attrs.get("is_csat_enabled"), self.context)
 
         config = attrs.get("config", {})
         if "secondary_project" in config:
@@ -258,6 +260,7 @@ class SectorReadOnlyListSerializer(serializers.ModelSerializer):
             "created_on",
             "has_group_sector",
             "automatic_message",
+            "is_csat_enabled",
             "required_tags",
         ]
 
@@ -290,6 +293,7 @@ class SectorReadOnlyRetrieveSerializer(serializers.ModelSerializer):
             "can_edit_custom_fields",
             "config",
             "automatic_message",
+            "is_csat_enabled",
             "required_tags",
         ]
 

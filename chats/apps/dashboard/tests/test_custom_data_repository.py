@@ -100,7 +100,9 @@ class TestAgentRepository(TestCase):
             is_weni_admin=False,
         )
 
-        result = self.repository.get_agents_custom_status(filters, self.project)
+        result = self.repository.get_agents_custom_status_and_rooms(
+            filters, self.project
+        )
         agents = list(result)
 
         self.assertEqual(len(agents), 2)
@@ -123,7 +125,9 @@ class TestAgentRepository(TestCase):
             is_weni_admin=False,
         )
 
-        result = self.repository.get_agents_custom_status(filters, self.project)
+        result = self.repository.get_agents_custom_status_and_rooms(
+            filters, self.project
+        )
         agents = list(result)
 
         self.assertEqual(len(agents), 1)
@@ -142,7 +146,9 @@ class TestAgentRepository(TestCase):
             is_weni_admin=False,
         )
 
-        result = self.repository.get_agents_custom_status(filters, self.project)
+        result = self.repository.get_agents_custom_status_and_rooms(
+            filters, self.project
+        )
         agents = list(result)
 
         self.assertTrue(len(agents) > 0)
@@ -167,13 +173,17 @@ class TestAgentRepository(TestCase):
             is_weni_admin=False,
         )
 
-        result = self.repository.get_agents_custom_status(filters, self.project)
+        result = self.repository.get_agents_custom_status_and_rooms(
+            filters, self.project
+        )
         agents = list(result)
 
         self.assertFalse(any(a["email"].endswith("weni.ai") for a in agents))
 
         filters.is_weni_admin = True
-        result = self.repository.get_agents_custom_status(filters, self.project)
+        result = self.repository.get_agents_custom_status_and_rooms(
+            filters, self.project
+        )
         agents = list(result)
 
         self.assertTrue(any(a["email"].endswith("weni.ai") for a in agents))
@@ -193,7 +203,9 @@ class TestAgentRepository(TestCase):
             is_weni_admin=False,
         )
 
-        result = self.repository.get_agents_custom_status(filters, self.project)
+        result = self.repository.get_agents_custom_status_and_rooms(
+            filters, self.project
+        )
         agents = list(result)
 
         self.assertFalse(any(a["email"] == self.agent1.email for a in agents))
