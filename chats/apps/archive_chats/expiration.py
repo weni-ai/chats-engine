@@ -14,7 +14,9 @@ def calculate_archive_task_expiration_dt(max_hour: str) -> datetime:
 
     now = datetime.now(timezone.utc)
 
-    expiration_dt = datetime.combine(now.date(), max_hour_dt.time())
+    expiration_dt = datetime.combine(now.date(), max_hour_dt.time()).replace(
+        tzinfo=timezone.utc
+    )
 
     if expiration_dt < now:
         expiration_dt += timedelta(days=1)
