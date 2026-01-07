@@ -633,3 +633,8 @@ USER_OBJECT_CACHE_ENABLED = env.bool("USER_OBJECT_CACHE_ENABLED", default=True)
 ROOM_24H_VALID_CACHE_TTL = env.int(
     "ROOM_24H_VALID_CACHE_TTL", default=0
 )  # 0 means no cache
+
+
+# Archive chats
+ARCHIVE_CHATS_MAX_ROOMS = env.int("ARCHIVE_CHATS_MAX_ROOMS", default=10000)
+ARCHIVE_CHATS_MAX_HOUR = env.str("ARCHIVE_CHATS_MAX_HOUR", default="08:59")  # UTC-0
