@@ -201,7 +201,11 @@ class ArchiveChatsService(BaseArchiveChatsService):
         messages = Message.objects.filter(room=room).values_list("pk", flat=True)
 
         for i in range(0, len(messages), batch_size):
-            messages_batch = Message.objects.filter(pk__in=messages[i : i + batch_size])
+            messages_batch = Message.objects.filter(
+                pk__in=Message.objects.filter(room=room).values_list("pk", flat=True)[
+                    :batch_size
+                ]
+            )
 
             if len(messages_batch) == 0:
                 break
