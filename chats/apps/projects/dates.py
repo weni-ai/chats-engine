@@ -1,6 +1,7 @@
-from datetime import datetime
-import pytz
 import re
+from datetime import datetime
+
+import pytz
 
 
 def parse_date_with_timezone(
@@ -32,18 +33,13 @@ def parse_date_with_timezone(
 
     # Try to parse as ISO datetime format with timezone
     try:
-        # First try to parse as timezone-aware datetime
         if (
             "+" in date_str
             or date_str.endswith("Z")
-            or re.search(
-                r"[+-]\d{2}:\d{2}$", date_str
-            )  # Matches formats like -03:00, +05:30
-            or re.search(r"[+-]\d{4}$", date_str)  # Matches formats like -0300, +0530
+            or re.search(r"[+-]\d{2}:\d{2}$", date_str)
+            or re.search(r"[+-]\d{4}$", date_str)
         ):
-            # Handle timezone-aware formats
             dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-            # Convert to project timezone
             return dt.astimezone(tz)
     except ValueError:
         pass
@@ -51,10 +47,10 @@ def parse_date_with_timezone(
     # Try to parse as naive datetime formats
     try:
         datetime_formats = [
-            "%Y-%m-%dT%H:%M:%S",  # 2025-01-01T00:00:00
-            "%Y-%m-%dT%H:%M:%S.%f",  # 2025-01-01T00:00:00.000000
-            "%Y-%m-%d %H:%M:%S",  # 2025-01-01 00:00:00
-            "%Y-%m-%d %H:%M:%S.%f",  # 2025-01-01 00:00:00.000000
+            "%Y-%m-%dT%H:%M:%S",
+            "%Y-%m-%dT%H:%M:%S.%f",
+            "%Y-%m-%d %H:%M:%S",
+            "%Y-%m-%d %H:%M:%S.%f",
         ]
 
         naive_dt = None
@@ -66,7 +62,6 @@ def parse_date_with_timezone(
                 continue
 
         if naive_dt is not None:
-            # Localize with project timezone
             return tz.localize(naive_dt)
 
     except ValueError:
