@@ -1,3 +1,4 @@
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -65,6 +66,7 @@ class HistorySummaryFeedback(BaseModel):
     )
     liked = models.BooleanField(_("Liked?"))
     text = models.CharField(_("Text"), max_length=150, blank=True, null=True)
+    tags = ArrayField(models.CharField(max_length=100), blank=True, null=True)
 
     class Meta:
         verbose_name = _("History Summary Feedback")

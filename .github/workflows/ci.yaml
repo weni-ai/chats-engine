@@ -18,6 +18,8 @@ env:
   UNPERMITTED_AUDIO_TYPES: "WebM,audio/mpeg3,audio/mpeg,mp3"
   AI_FEATURES_PROMPTS_API_SECRET: "123"
   USE_EDA: true
+  GROWTHBOOK_CLIENT_KEY: "dummy_key_ci"
+  GROWTHBOOK_HOST_BASE_URL: "http://localhost"
 
 jobs:
   build:

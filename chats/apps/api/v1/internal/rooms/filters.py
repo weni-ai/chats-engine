@@ -1,6 +1,7 @@
 from django.db.models import Q
 from django_filters import rest_framework as filters
 
+from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
 
@@ -29,6 +30,11 @@ class RoomFilter(filters.FilterSet):
         field_name="queue__sector",
         queryset=Sector.objects.all(),
     )
+    queue = filters.ModelMultipleChoiceFilter(
+        required=False,
+        field_name="queue",
+        queryset=Queue.objects.all(),
+    )
     agent = filters.CharFilter(
         field_name="user",
         required=False,
@@ -41,11 +47,19 @@ class RoomFilter(filters.FilterSet):
         required=False,
         method="filter_contact",
     )
+    contact_external_id = filters.CharFilter(
+        required=False,
+        field_name="contact__external_id",
+    )
 
     tags = filters.CharFilter(
         required=False,
         method="filter_tags",
         help_text="Room Tags",
+    )
+    protocol = filters.CharFilter(
+        required=False,
+        field_name="protocol",
     )
 
     class Meta:
@@ -69,3 +83,32 @@ class RoomFilter(filters.FilterSet):
 
     def filter_attending(self, queryset, name, value):
         return queryset.filter(user__isnull=not value)
+
+
+class InternalProtocolRoomsFilter(filters.FilterSet):
+    created_on__gte = filters.DateTimeFilter(
+        required=False, field_name="created_on", lookup_expr="gte"
+    )
+    created_on__lte = filters.DateTimeFilter(
+        required=False, field_name="created_on", lookup_expr="lte"
+    )
+
+    ended_at__gte = filters.DateTimeFilter(
+        required=False, field_name="ended_at", lookup_expr="gte"
+    )
+    ended_at__lte = filters.DateTimeFilter(
+        required=False, field_name="ended_at", lookup_expr="lte"
+    )
+    project = filters.CharFilter(
+        required=True,
+        field_name="queue__sector__project",
+    )
+
+    class Meta:
+        model = Room
+        fields = [
+            "created_on__gte",
+            "created_on__lte",
+            "ended_at__gte",
+            "ended_at__lte",
+        ]

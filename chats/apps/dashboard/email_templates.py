@@ -1,3 +1,8 @@
+from django.template.loader import render_to_string
+from django.utils import timezone
+from django.utils.translation import gettext as _
+
+
 def get_report_ready_email(project_name: str, download_url: str):
     """
     Returns (plain_text, html) for report ready email.
@@ -9,24 +14,45 @@ def get_report_ready_email(project_name: str, download_url: str):
     Returns:
         Tuple of (plain_text_body, html_body)
     """
-    plain_text = f"""The custom report for the project {project_name} is ready.
+    context = {
+        "project_name": project_name,
+        "download_url": download_url,
+        "generation_date": timezone.now().strftime("%d/%m/%Y at %H:%M:%S"),
+        "current_year": timezone.now().year,
+    }
 
-Copy and paste the URL below to download the report:
+    html = render_to_string("rooms/emails/report_is_ready.html", context)
 
-{download_url}"""
+    plain_text = _(
+        "The custom report for the project %(project)s is ready.\n\n"
+        "Copy and paste the URL below to download the report:\n\n%(url)s"
+    ) % {"project": project_name, "url": download_url}
 
-    html = f"""<html>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-    <h2>Custom Report Ready</h2>
-    <p>The custom report for the project <strong>{project_name}</strong> is ready.</p>
-    <p style="font-size: 14px; color: #666; margin: 20px 0;">
-        Click the link below to download the report:
-    </p>
-    <p style="background: #f4f4f4; padding: 15px; border-left: 4px solid #4CAF50;
-              word-wrap: break-word; font-family: monospace; font-size: 12px; margin: 20px 0;">
-        {download_url}
-    </p>
-</body>
-</html>"""
+    return plain_text, html
+
+
+def get_report_failed_email(project_name: str, error_message: str = None):
+    """
+    Returns (plain_text, html) for report failed email.
+
+    Args:
+        project_name: Name of the project
+        error_message: Error message to display
+
+    Returns:
+        Tuple of (plain_text_body, html_body)
+    """
+    context = {
+        "project_name": project_name,
+        "error_message": error_message,
+        "current_year": timezone.now().year,
+    }
+
+    html = render_to_string("rooms/emails/report_failed.html", context)
+
+    plain_text = _(
+        "An error occurred while generating the custom report for project %(project)s.\n\n"
+        "Error: %(error)s\n\nPlease try again later or contact support."
+    ) % {"project": project_name, "error": error_message or _("Unknown error")}
 
     return plain_text, html

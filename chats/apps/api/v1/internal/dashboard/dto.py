@@ -8,7 +8,8 @@ class Filters:
     start_date: str = None
     end_date: str = None
     agent: str = None
-    sector: List = None
+    sector: str = None
+    sectors: List = None
     queue: str = None
     queues: List = None
     tag: str = None

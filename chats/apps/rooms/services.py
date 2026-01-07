@@ -4,9 +4,11 @@ import logging
 import time
 
 from django.conf import settings
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMultiAlternatives
 from django.db import models
+from django.template.loader import render_to_string
 from django.utils import timezone
+from django.utils.translation import gettext as _
 from sentry_sdk import capture_message
 
 from chats.apps.projects.models.models import Project
@@ -159,18 +161,32 @@ class RoomsReportService:
                 )
 
                 dt = timezone.now().strftime("%d/%m/%Y_%H-%M-%S")
-                subject = f"Relatório de salas do projeto {self.project.name} - {dt}"
-                message = (
-                    f"O relatório de salas do projeto {self.project.name} "
-                    "está pronto e foi anexado a este email."
-                )
+                subject = _("Rooms report for project %(project)s - %(date)s") % {
+                    "project": self.project.name,
+                    "date": dt,
+                }
 
-                email = EmailMessage(
+                context = {
+                    "project_name": self.project.name,
+                    "generation_date": timezone.now().strftime("%d/%m/%Y at %H:%M:%S"),
+                    "total_rooms": rooms.count(),
+                    "current_year": timezone.now().year,
+                }
+
+                html_content = render_to_string(
+                    "rooms/emails/report_is_ready.html", context
+                )
+                text_content = _(
+                    "The rooms report for project %(project)s is ready and attached to this email."
+                ) % {"project": self.project.name}
+
+                email = EmailMultiAlternatives(
                     subject=subject,
-                    body=message,
+                    body=text_content,
                     from_email=settings.DEFAULT_FROM_EMAIL,
                     to=[recipient_email],
                 )
+                email.attach_alternative(html_content, "text/html")
                 email.attach("rooms_report.csv", csv_content, "text/csv")
                 email.send(fail_silently=False)
 
@@ -185,6 +201,53 @@ class RoomsReportService:
                 "Error generating report for project %s: %s", self.project.uuid, e
             )
             capture_message(e)
+
+            if settings.SEND_EMAILS:
+                logger.info(
+                    "Sending error notification for rooms report of project %s to %s",
+                    self.project.uuid,
+                    recipient_email,
+                )
+
+                dt = timezone.now().strftime("%d/%m/%Y_%H-%M-%S")
+                subject = _(
+                    "Error generating rooms report for project %(project)s - %(date)s"
+                ) % {"project": self.project.name, "date": dt}
+
+                context = {
+                    "project_name": self.project.name,
+                    "error_message": str(e),
+                    "current_year": timezone.now().year,
+                }
+
+                html_content = render_to_string(
+                    "rooms/emails/report_failed.html", context
+                )
+                text_content = _(
+                    "An error occurred while generating the rooms report for project %(project)s.\n\n"
+                    "Error: %(error)s\n\n"
+                    "Please try again later or contact support."
+                ) % {"project": self.project.name, "error": str(e)}
+
+                try:
+                    email = EmailMultiAlternatives(
+                        subject=subject,
+                        body=text_content,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        to=[recipient_email],
+                    )
+                    email.attach_alternative(html_content, "text/html")
+                    email.send(fail_silently=False)
+
+                    logger.info(
+                        "Error notification sent to %s for project %s",
+                        recipient_email,
+                        self.project.uuid,
+                    )
+                except Exception as email_error:
+                    logger.error(
+                        "Failed to send error notification email: %s", email_error
+                    )
 
         finally:
             if output is not None:

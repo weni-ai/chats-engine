@@ -2,8 +2,8 @@ from unittest.mock import patch
 
 from django.urls import reverse
 from rest_framework import status
-from rest_framework.test import APITestCase
 from rest_framework.response import Response
+from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
 from chats.apps.projects.models.models import Project
@@ -47,14 +47,14 @@ class TestFeatureFlagsViewSetAsAuthenticatedUser(BaseTestFeatureFlagsViewSet):
 
     @with_project_permission
     @patch(
-        "chats.apps.feature_flags.services.FeatureFlagService.get_feature_flags_list_for_user_and_project"
+        "weni.feature_flags.services.FeatureFlagsService.get_active_feature_flags_for_attributes"
     )
     def test_get_active_features_with_valid_project_uuid(
         self,
-        mock_get_feature_flags_list_for_user_and_project,
+        mock_get_active_feature_flags_for_attributes,
     ):
         active_features = ["feature_1", "feature_2"]
-        mock_get_feature_flags_list_for_user_and_project.return_value = active_features
+        mock_get_active_feature_flags_for_attributes.return_value = active_features
 
         response = self.get_active_features({"project_uuid": self.project.uuid})
 
