@@ -9,7 +9,6 @@ from django.db.models import (
     IntegerField,
     OuterRef,
     Q,
-    QuerySet,
     Subquery,
     Sum,
     Value,
@@ -21,14 +20,11 @@ from pendulum.parser import parse as pendulum_parse
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.dashboard.dto import get_admin_domains_exclude_filter
-from chats.apps.api.v1.internal.dashboard.dto import Filters
+from chats.apps.api.v1.internal.dashboard.dto import Filters, CSATScoreGeneral
 from chats.apps.projects.dates import parse_date_with_timezone
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.projects.models.models import CustomStatus, Project
 from chats.apps.rooms.models import Room
-
-from chats.apps.api.v1.internal.dashboard.dto import CSATScoreGeneral, Filters
-from chats.apps.projects.dates import parse_date_with_timezone
 
 
 class AgentRepository:
