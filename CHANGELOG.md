@@ -1,3 +1,24 @@
+# 3.39.0
+# Add
+  - Static token authentication for rooms and messages endpoints (used by Mailroom)
+
+# 3.38.0
+# Add
+  - CSAT metrics internal endpoints
+
+# 3.37.0
+# Fix
+  - Prevent users names from being blank
+  - Date range filter on dashboard metrics
+# Refactor
+  - Cyclomatic complexity reduction
+# Add
+  - Prevent users from closing rooms from queue (optional)
+
+# 3.36.7
+# Add
+  - Normalization of last message related fields in rooms list
+
 # 3.36.6
 # Remove
   - Automatic message feature flag
@@ -938,6 +959,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 
