@@ -184,20 +184,40 @@ class ArchiveChatsService(BaseArchiveChatsService):
     ) -> None:
         room_archived_conversation.refresh_from_db()
 
+        if (
+            room_archived_conversation.status
+            != ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED
+        ):
+            raise ValidationError(
+                f"Room archived conversation {room_archived_conversation.uuid} is not in messages file uploaded status"
+            )
+
         room = room_archived_conversation.room
 
         logger.info(
             f"[ArchiveChatsService] Deleting room messages for room {room.uuid}"
         )
 
-        messages = Message.objects.filter(room=room)
+        messages = Message.objects.filter(room=room).values_list("pk", flat=True)
 
         for i in range(0, len(messages), batch_size):
-            messages_batch = messages[i : i + batch_size]
+            messages_batch = Message.objects.filter(pk__in=messages[i : i + batch_size])
 
-            if not messages_batch.exists():
+            if len(messages_batch) == 0:
                 break
 
             messages_batch.delete()
 
-        logger.info(f"[ArchiveChatsService] Room messages deleted for room {room.uuid}")
+        room_archived_conversation.status = (
+            ArchiveConversationsJobStatus.MESSAGES_DELETED_FROM_DB
+        )
+        room_archived_conversation.messages_deleted_at = timezone.now()
+        room_archived_conversation.save(update_fields=["status", "messages_deleted_at"])
+
+        logger.info(
+            f"[ArchiveChatsService] Room archived conversation status updated to "
+            f"{room_archived_conversation.status} for room {room.uuid} "
+            f"with archived conversation {room_archived_conversation.uuid}"
+        )
+
+        return room_archived_conversation
