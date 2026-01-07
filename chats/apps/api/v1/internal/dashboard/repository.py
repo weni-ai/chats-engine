@@ -16,7 +16,6 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce, Extract, JSONObject, Concat
 from django.utils import timezone
-from django.db.models import QuerySet
 from pendulum.parser import parse as pendulum_parse
 
 from chats.apps.accounts.models import User
@@ -27,8 +26,6 @@ from chats.apps.rooms.models import Room
 
 from chats.apps.api.v1.internal.dashboard.dto import CSATScoreGeneral, Filters
 from chats.apps.projects.dates import parse_date_with_timezone
-
-from chats.apps.api.v1.internal.dashboard.dto import Filters
 
 
 class AgentRepository:

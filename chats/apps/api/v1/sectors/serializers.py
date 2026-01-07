@@ -27,6 +27,8 @@ def _apply_sector_config_defaults(instance: Sector, data: dict) -> dict:
             config.setdefault("can_close_chats_in_queue", False)
     data["config"] = config
     return data
+
+
 def validate_is_csat_enabled(project: Project, value: bool, context: dict) -> bool:
     """
     Validate if the CSAT feature is enabled for the sector.
