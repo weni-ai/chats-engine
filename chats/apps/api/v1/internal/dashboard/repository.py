@@ -20,10 +20,16 @@ from pendulum.parser import parse as pendulum_parse
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.dashboard.dto import get_admin_domains_exclude_filter
-from chats.apps.api.v1.internal.dashboard.dto import Filters, CSATScoreGeneral
+from chats.apps.api.v1.internal.dashboard.dto import (
+    Filters,
+    CSATScoreGeneral,
+    CSATRatingCount,
+    CSATRatings,
+)
 from chats.apps.projects.dates import parse_date_with_timezone
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.projects.models.models import CustomStatus, Project
+from chats.apps.csat.models import CSATSurvey
 from chats.apps.rooms.models import Room
 
 
@@ -528,3 +534,48 @@ class AgentRepository:
         )
 
         return self._get_csat_general(filters, project), agents
+
+
+class CSATRepository:
+    def get_csat_ratings(self, filters: Filters, project) -> CSATRatings:
+        filter_mapping = {
+            "start_date": ("room__ended_at__gte", filters.start_date),
+            "end_date": ("room__ended_at__lte", filters.end_date),
+            "queues": ("room__queue__in", filters.queues),
+            "sectors": ("room__queue__sector__in", filters.sectors),
+            "tags": ("room__tags__in", filters.tags),
+            "agent": ("room__user", filters.agent),
+        }
+
+        csat_query = {"room__queue__sector__project": project}
+
+        for key, (field_name, filter_value) in filter_mapping.items():
+            if filter_value is not None and filter_value != "":
+                if field_name.endswith("__in") and not isinstance(filter_value, list):
+                    filter_value = [filter_value]
+
+                csat_query[field_name] = filter_value
+
+        csat_ratings = (
+            CSATSurvey.objects.filter(**csat_query)
+            .values("rating")
+            .annotate(count=Count("uuid"))
+            .order_by("rating")
+        )
+
+        total_count = csat_ratings.aggregate(total=Sum("count"))["total"]
+
+        ratings_counts = [
+            CSATRatingCount(
+                rating=rating["rating"],
+                count=rating["count"],
+                percentage=(
+                    round((rating["count"] / total_count) * 100, 2)
+                    if total_count
+                    else 0.0
+                ),
+            )
+            for rating in csat_ratings
+        ]
+
+        return CSATRatings(ratings=ratings_counts)

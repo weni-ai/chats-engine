@@ -20,6 +20,18 @@ class Filters:
     ordering: str = None
 
 
+@dataclass
+class CSATRatingCount:
+    rating: int
+    count: int
+    percentage: float
+
+
+@dataclass
+class CSATRatings:
+    ratings: List[CSATRatingCount]
+
+
 @dataclass(frozen=True)
 class CSATScoreGeneral:
     rooms: int

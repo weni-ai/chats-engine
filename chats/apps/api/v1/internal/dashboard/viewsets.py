@@ -6,6 +6,7 @@ from chats.apps.api.v1.dashboard.dto import should_exclude_admin_domains
 from chats.apps.api.v1.internal.dashboard.serializers import (
     DashboardAgentsSerializer,
     DashboardCustomAgentStatusSerializer,
+    DashboardCSATRatingsSerializer,
     DashboardCSATScoreByAgentsSerializer,
     DashboardCSATScoreGeneralSerializer,
     DashboardCustomStatusSerializer,
@@ -15,7 +16,8 @@ from chats.apps.projects.models import Project
 from chats.apps.api.pagination import CustomCursorPagination
 
 from chats.apps.api.v1.internal.dashboard.dto import Filters
-from chats.apps.api.v1.internal.dashboard.service import AgentsService
+from chats.apps.api.v1.internal.dashboard.service import AgentsService, CSATService
+from chats.apps.core.filters import get_filters_from_query_params
 
 
 class InternalDashboardViewset(viewsets.GenericViewSet):
@@ -83,6 +85,39 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         )
 
         return Response({"results": agents.data}, status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["GET"],
+        url_name="csat_ratings",
+    )
+    def csat_ratings(self, request, *args, **kwargs):
+        """CSAT ratings for the project"""
+        project = self.get_object()
+        params = get_filters_from_query_params(request.query_params)
+        filters = Filters(
+            start_date=params.get("start_date"),
+            end_date=params.get("end_date"),
+            queue=params.get("queue"),
+            queues=params.get("queues"),
+            sector=params.get("sector"),
+            sectors=params.get("sectors"),
+            tag=params.get("tag"),
+            tags=params.get("tags"),
+            agent=params.get("agent"),
+        )
+
+        csat_service = CSATService()
+        csat_ratings = csat_service.get_csat_ratings(filters, project)
+
+        return Response(
+            {
+                "csat_ratings": DashboardCSATRatingsSerializer(
+                    csat_ratings.ratings, many=True
+                ).data
+            },
+            status.HTTP_200_OK,
+        )
 
     @action(
         detail=True,
