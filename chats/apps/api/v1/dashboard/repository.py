@@ -6,10 +6,10 @@ from django.conf import settings
 from django.db.models import Avg, Count, F, OuterRef, Q, Subquery, Sum
 from django.utils import timezone
 from django_redis import get_redis_connection
-from pendulum.parser import parse as pendulum_parse
 
 from chats.apps.accounts.models import User
 from chats.apps.dashboard.models import RoomMetrics
+from chats.apps.projects.dates import parse_date_with_timezone
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.rooms.models import Room
 
@@ -41,8 +41,9 @@ class AgentRepository:
         closed_rooms = {"rooms__queue__sector__project": project}
         opened_rooms = {"rooms__queue__sector__project": project}
         if filters.start_date and filters.end_date:
-            start_time = pendulum_parse(filters.start_date, tzinfo=tz)
-            end_time = pendulum_parse(filters.end_date + " 23:59:59", tzinfo=tz)
+            tz_str = str(project.timezone)
+            start_time = parse_date_with_timezone(filters.start_date, tz_str)
+            end_time = parse_date_with_timezone(filters.end_date, tz_str, is_end_date=True)
 
             rooms_filter["rooms__created_on__range"] = [start_time, end_time]
             rooms_filter["rooms__is_active"] = False
@@ -129,8 +130,9 @@ class ClosedRoomsRepository:
         self.rooms_filter["is_active"] = False
 
         if filters.start_date and filters.end_date:
-            start_time = pendulum_parse(filters.start_date, tzinfo=tz)
-            end_time = pendulum_parse(filters.end_date + " 23:59:59", tzinfo=tz)
+            tz_str = str(project.timezone)
+            start_time = parse_date_with_timezone(filters.start_date, tz_str)
+            end_time = parse_date_with_timezone(filters.end_date, tz_str, is_end_date=True)
             self.rooms_filter["ended_at__range"] = [start_time, end_time]
 
             return self.rooms_filter
@@ -187,8 +189,9 @@ class TransferCountRepository:
         )
 
         if filters.start_date and filters.end_date:
-            start_time = pendulum_parse(filters.start_date, tzinfo=tz)
-            end_time = pendulum_parse(filters.end_date + " 23:59:59", tzinfo=tz)
+            tz_str = str(project.timezone)
+            start_time = parse_date_with_timezone(filters.start_date, tz_str)
+            end_time = parse_date_with_timezone(filters.end_date, tz_str, is_end_date=True)
             self.rooms_filter["created_on__range"] = [start_time, end_time]
             return self.rooms_filter
 
@@ -241,8 +244,9 @@ class QueueRoomsRepository:
         self.rooms_filter["is_active"] = True
 
         if filters.start_date and filters.end_date:
-            start_time = pendulum_parse(filters.start_date, tzinfo=tz)
-            end_time = pendulum_parse(filters.end_date + " 23:59:59", tzinfo=tz)
+            tz_str = str(project.timezone)
+            start_time = parse_date_with_timezone(filters.start_date, tz_str)
+            end_time = parse_date_with_timezone(filters.end_date, tz_str, is_end_date=True)
             self.rooms_filter["created_on__range"] = [start_time, end_time]
             return self.rooms_filter
 
@@ -284,8 +288,9 @@ class ActiveChatsRepository:
             .replace(hour=0, minute=0, second=0, microsecond=0)
         )
         if filters.start_date and filters.end_date:
-            start_time = pendulum_parse(filters.start_date, tzinfo=tz)
-            end_time = pendulum_parse(filters.end_date + " 23:59:59", tzinfo=tz)
+            tz_str = str(project.timezone)
+            start_time = parse_date_with_timezone(filters.start_date, tz_str)
+            end_time = parse_date_with_timezone(filters.end_date, tz_str, is_end_date=True)
             self.rooms_filter["created_on__range"] = [start_time, end_time]
             self.rooms_filter["is_active"] = False
             self.rooms_filter["user__isnull"] = False
@@ -344,8 +349,9 @@ class SectorRepository:
         )
 
         if filters.start_date and filters.end_date:
-            start_time = pendulum_parse(filters.start_date, tzinfo=tz)
-            end_time = pendulum_parse(filters.end_date + " 23:59:59", tzinfo=tz)
+            tz_str = str(project.timezone)
+            start_time = parse_date_with_timezone(filters.start_date, tz_str)
+            end_time = parse_date_with_timezone(filters.end_date, tz_str, is_end_date=True)
             self.rooms_filter["created_on__range"] = [start_time, end_time]
             return self.rooms_filter
         else:
@@ -417,8 +423,9 @@ class ORMRoomsDataRepository(RoomsDataRepository):
             .replace(hour=0, minute=0, second=0, microsecond=0)
         )
         if filters.start_date and filters.end_date:
-            start_time = pendulum_parse(filters.start_date, tzinfo=tz)
-            end_time = pendulum_parse(filters.end_date + " 23:59:59", tzinfo=tz)
+            tz_str = str(project.timezone)
+            start_time = parse_date_with_timezone(filters.start_date, tz_str)
+            end_time = parse_date_with_timezone(filters.end_date, tz_str, is_end_date=True)
             self.rooms_filter["created_on__range"] = [start_time, end_time]
             self.rooms_filter["user__isnull"] = False
         else:

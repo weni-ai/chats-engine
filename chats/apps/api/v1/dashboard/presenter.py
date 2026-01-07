@@ -8,6 +8,7 @@ from django.apps import apps
 from django.core.cache import cache
 
 from chats.apps.projects.models import ProjectPermission
+from chats.apps.projects.dates import parse_date_with_timezone
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
@@ -23,10 +24,9 @@ def get_export_data(project, filter):
     rooms_filter = {}
 
     if filter.get("start_date") and filter.get("end_date"):
-        start_time = pendulum.parse(filter.get("start_date")).replace(tzinfo=tz)
-        end_time = pendulum.parse(filter.get("end_date") + " 23:59:59").replace(
-            tzinfo=tz
-        )
+        tz_str = str(project.timezone)
+        start_time = parse_date_with_timezone(filter.get("start_date"), tz_str)
+        end_time = parse_date_with_timezone(filter.get("end_date"), tz_str, is_end_date=True)
         rooms_filter["created_on__range"] = [
             start_time,
             end_time,
@@ -73,10 +73,9 @@ def get_general_data(project, filter):
     rooms_filter_closed["is_active"] = False
 
     if filter.get("start_date") and filter.get("end_date"):
-        start_time = pendulum.parse(filter.get("start_date")).replace(tzinfo=tz)
-        end_time = pendulum.parse(filter.get("end_date") + " 23:59:59").replace(
-            tzinfo=tz
-        )
+        tz_str = str(project.timezone)
+        start_time = parse_date_with_timezone(filter.get("start_date"), tz_str)
+        end_time = parse_date_with_timezone(filter.get("end_date"), tz_str, is_end_date=True)
         rooms_filter["created_on__range"] = [
             start_time,
             end_time,
@@ -179,10 +178,9 @@ def get_agents_data(project, filter):
     closed_rooms["user__rooms__is_active"] = False
 
     if filter.get("start_date") and filter.get("end_date"):
-        start_time = pendulum.parse(filter.get("start_date")).replace(tzinfo=tz)
-        end_time = pendulum.parse(filter.get("end_date") + " 23:59:59").replace(
-            tzinfo=tz
-        )
+        tz_str = str(project.timezone)
+        start_time = parse_date_with_timezone(filter.get("start_date"), tz_str)
+        end_time = parse_date_with_timezone(filter.get("end_date"), tz_str, is_end_date=True)
         rooms_filter["user__rooms__created_on__range"] = [
             start_time,
             end_time,
@@ -260,10 +258,9 @@ def get_sector_data(project, filter):
             rooms_filter[f"{rooms_filter_prefix}rooms__user"] = filter.get("agent")
 
     if filter.get("start_date") and filter.get("end_date"):
-        start_time = pendulum.parse(filter.get("start_date")).replace(tzinfo=tz)
-        end_time = pendulum.parse(filter.get("end_date") + " 23:59:59").replace(
-            tzinfo=tz
-        )
+        tz_str = str(project.timezone)
+        start_time = parse_date_with_timezone(filter.get("start_date"), tz_str)
+        end_time = parse_date_with_timezone(filter.get("end_date"), tz_str, is_end_date=True)
         rooms_filter[f"{rooms_filter_prefix}rooms__created_on__range"] = [
             start_time,
             end_time,

@@ -17,8 +17,6 @@ from django.db.models import (
 from django.db.models.functions import Coalesce, Extract, JSONObject, Concat
 from django.utils import timezone
 from django.db.models import QuerySet
-from pendulum.parser import parse as pendulum_parse
-
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.dashboard.dto import get_admin_domains_exclude_filter
 from chats.apps.projects.models import ProjectPermission
@@ -76,8 +74,9 @@ class AgentRepository:
         if filters.tag:
             rooms_filter["rooms__tags__in"] = filters.tag.split(",")
         if filters.start_date and filters.end_date:
-            start_time = pendulum_parse(filters.start_date, tzinfo=tz)
-            end_time = pendulum_parse(filters.end_date + " 23:59:59", tzinfo=tz)
+            tz_str = str(project.timezone)
+            start_time = parse_date_with_timezone(filters.start_date, tz_str)
+            end_time = parse_date_with_timezone(filters.end_date, tz_str, is_end_date=True)
             opened_rooms["rooms__is_active"] = True
             opened_rooms["rooms__created_on__lte"] = end_time
 
@@ -103,13 +102,14 @@ class AgentRepository:
         if filters.agent:
             agents_query = agents_query.filter(email=filters.agent)
 
+        tz_str = str(project.timezone)
         custom_status_start_date = (
-            pendulum_parse(filters.start_date, tzinfo=tz)
+            parse_date_with_timezone(filters.start_date, tz_str)
             if filters.start_date
             else initial_datetime
         )
         custom_status_end_date = (
-            pendulum_parse(filters.end_date + " 23:59:59", tzinfo=tz)
+            parse_date_with_timezone(filters.end_date, tz_str, is_end_date=True)
             if filters.end_date
             else timezone.now()
         )
@@ -260,8 +260,9 @@ class AgentRepository:
             rooms_filter["rooms__tags__in"] = filters.tag.split(",")
 
         if filters.start_date and filters.end_date:
-            start_time = pendulum_parse(filters.start_date, tzinfo=tz)
-            end_time = pendulum_parse(filters.end_date + " 23:59:59", tzinfo=tz)
+            tz_str = str(project.timezone)
+            start_time = parse_date_with_timezone(filters.start_date, tz_str)
+            end_time = parse_date_with_timezone(filters.end_date, tz_str, is_end_date=True)
             rooms_filter["rooms__created_on__range"] = [start_time, end_time]
             rooms_filter["rooms__is_active"] = False
             closed_rooms["rooms__ended_at__range"] = [start_time, end_time]
@@ -508,11 +509,12 @@ class AgentRepository:
             & ~Q(status_type__name__iexact="in-service")
         )
 
+        tz_str = str(project.timezone)
         if filters.start_date:
-            start_time = pendulum_parse(filters.start_date, tzinfo=tz)
+            start_time = parse_date_with_timezone(filters.start_date, tz_str)
             custom_status = custom_status.filter(created_on__gte=start_time)
         if filters.end_date:
-            end_time = pendulum_parse(filters.end_date + " 23:59:59", tzinfo=tz)
+            end_time = parse_date_with_timezone(filters.end_date, tz_str, is_end_date=True)
             custom_status = custom_status.filter(created_on__lte=end_time)
 
         return custom_status

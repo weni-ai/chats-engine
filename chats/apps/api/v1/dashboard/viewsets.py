@@ -20,6 +20,7 @@ from chats.apps.api.v1.dashboard.repository import (
     ORMRoomsDataRepository,
     RoomsCacheRepository,
 )
+from chats.apps.projects.dates import parse_date_with_timezone
 from chats.apps.api.v1.dashboard.serializers import (
     DashboardAgentsSerializer,
     DashboardRawDataSerializer,
@@ -630,9 +631,9 @@ class ReportFieldsValidatorViewSet(APIView):
         if not (start_date and end_date):
             return queryset
 
-        tz = project.timezone
-        start_dt = pendulum.parse(start_date).replace(tzinfo=tz)
-        end_dt = pendulum.parse(end_date + " 23:59:59").replace(tzinfo=tz)
+        tz_str = str(project.timezone)
+        start_dt = parse_date_with_timezone(start_date, tz_str)
+        end_dt = parse_date_with_timezone(end_date, tz_str, is_end_date=True)
 
         open_chats = field_data.get("open_chats")
         closed_chats = field_data.get("closed_chats")
