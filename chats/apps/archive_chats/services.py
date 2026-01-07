@@ -73,6 +73,7 @@ class ArchiveChatsService(BaseArchiveChatsService):
         try:
             messages_data = self.process_messages(room_archived_conversation)
             self.upload_messages_file(room_archived_conversation, messages_data)
+            self.delete_room_messages(room_archived_conversation)
 
             room_archived_conversation.refresh_from_db()
             room_archived_conversation.status = ArchiveConversationsJobStatus.FINISHED
