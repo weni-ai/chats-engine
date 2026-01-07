@@ -11,7 +11,10 @@ from chats.apps.archive_chats.models import (
     RoomArchivedConversation,
 )
 from chats.apps.archive_chats.services import ArchiveChatsService
-from chats.apps.archive_chats.tasks import start_archive_rooms_messages
+from chats.apps.archive_chats.tasks import (
+    archive_room_messages,
+    start_archive_rooms_messages,
+)
 from chats.apps.rooms.models import Room
 
 service = MagicMock(spec=ArchiveChatsService)
@@ -131,3 +134,31 @@ class TestStartArchiveRoomsMessages(TestCase):
         )
 
         assert mock_archive_room_messages_apply_async.call_count == len(rooms)
+
+
+class TestArchiveRoomMessages(TestCase):
+    def setUp(self):
+        service.reset_mock()
+
+    @patch("chats.apps.archive_chats.tasks.ArchiveChatsService", return_value=service)
+    def test_archive_room_messages(self, mock_archive_chats_service):
+        room = Room.objects.create(
+            is_active=False, ended_at=timezone.now() - rdelta(years=1)
+        )
+        job = ArchiveConversationsJob.objects.create(started_at=timezone.now())
+        service.archive_room_history.return_value = None
+
+        archive_room_messages(room.uuid, job.uuid)
+
+        service.archive_room_history.assert_called_once_with(room, job)
+
+    def test_archive_room_messages_with_job_not_found(self):
+        archive_room_messages(uuid.uuid4(), uuid.uuid4())
+
+        service.archive_room_history.assert_not_called()
+
+    def test_archive_room_messages_with_room_not_found(self):
+        job = ArchiveConversationsJob.objects.create(started_at=timezone.now())
+        archive_room_messages(uuid.uuid4(), job.uuid)
+
+        service.archive_room_history.assert_not_called()
