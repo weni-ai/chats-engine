@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.db.models import Q
 
+from chats.apps.accounts.models import User
 from chats.apps.api.utils import calculate_in_service_time
 from chats.apps.projects.models.models import CustomStatusType
 
@@ -130,6 +131,42 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
         return calculate_in_service_time(
             obj.get("custom_status"), user_status=obj.get("status")
         )
+
+
+class DashboardCSATScoreGeneralSerializer(serializers.Serializer):
+    rooms = serializers.IntegerField()
+    reviews = serializers.IntegerField()
+    avg_rating = serializers.SerializerMethodField()
+
+    def get_avg_rating(self, obj):
+        if obj.avg_rating is None:
+            return None
+
+        return round(obj.avg_rating, 2)
+
+
+class DashboardCSATScoreByAgentsSerializer(serializers.Serializer):
+    agent = serializers.SerializerMethodField()
+    rooms = serializers.SerializerMethodField()
+    reviews = serializers.IntegerField()
+    avg_rating = serializers.SerializerMethodField()
+
+    def get_agent(self, obj: User):
+        name = f"{obj.first_name} {obj.last_name}".strip()
+
+        return {
+            "name": name,
+            "email": obj.email,
+        }
+
+    def get_rooms(self, obj: User):
+        return obj.rooms_count
+
+    def get_avg_rating(self, obj):
+        if obj.avg_rating is None:
+            return None
+
+        return round(obj.avg_rating, 2)
 
 
 class DashboardCustomStatusSerializer(serializers.Serializer):
