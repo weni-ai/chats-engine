@@ -3,7 +3,7 @@ from uuid import UUID
 from celery import shared_task
 from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
 from chats.apps.archive_chats.expiration import calculate_archive_task_expiration_dt
-from chats.apps.projects.models.models import Room
+from chats.apps.rooms.models import Room
 from django.conf import settings
 import logging
 from dateutil.relativedelta import relativedelta as rdelta
