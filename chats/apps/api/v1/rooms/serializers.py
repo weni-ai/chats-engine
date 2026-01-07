@@ -13,16 +13,14 @@ from chats.apps.ai_features.history_summary.models import (
 )
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactRelationsSerializer
-from chats.apps.api.v1.msgs.serializers import MessageSerializer
 from chats.apps.api.v1.queues.serializers import QueueSerializer
 from chats.apps.api.v1.sectors.serializers import DetailSectorTagSerializer
 from chats.apps.history.filters.rooms_filter import (
     get_history_rooms_queryset_by_contact,
 )
 from chats.apps.queues.models import Queue
-from chats.apps.rooms.models import Room, RoomPin, RoomNote
+from chats.apps.rooms.models import Room, RoomNote, RoomPin
 from chats.apps.sectors.models import SectorTag
-
 
 logger = logging.getLogger(__name__)
 
@@ -103,16 +101,19 @@ class RoomSerializer(serializers.ModelSerializer):
         return room.get_is_waiting()
 
     def get_last_message(self, room: Room):
-        last_message = (
-            room.messages.order_by("-created_on")
-            .exclude(user__isnull=True, contact__isnull=True)
-            .first()
-        )
-
-        if not last_message:
-            return None
-
-        return MessageSerializer(last_message).data
+        if room.last_message_id:
+            return {
+                "uuid": room.last_message.uuid,
+                "text": room.last_message_text or "",
+                "created_on": room.last_interaction,
+                "user": room.last_message_user.email
+                if room.last_message_user
+                else None,
+                "contact": room.last_message_contact.uuid
+                if room.last_message_contact
+                else None,
+            }
+        return None
 
     def get_can_edit_custom_fields(self, room: Room):
         return room.queue.sector.can_edit_custom_fields
@@ -215,13 +216,25 @@ class ListRoomSerializer(serializers.ModelSerializer):
         return room.queue.sector.can_edit_custom_fields
 
     def get_last_message(self, room: Room):
-        last_message = (
-            room.messages.order_by("-created_on")
-            .exclude(user__isnull=True, contact__isnull=True)
-            .first()
-        )
-
-        return MessageSerializer(last_message).data
+        if room.last_message_id:
+            return {
+                "uuid": room.last_message.uuid,
+                "text": room.last_message_text or "",
+                "created_on": room.last_interaction,
+                "user": room.last_message_user.email
+                if room.last_message_user
+                else None,
+                "contact": room.last_message_contact.uuid
+                if room.last_message_contact
+                else None,
+            }
+        return {
+            "uuid": None,
+            "text": "",
+            "created_on": None,
+            "user": None,
+            "contact": None,
+        }
 
     def get_is_pinned(self, room: Room) -> bool:
         request = self.context.get("request")

@@ -1,5 +1,7 @@
-import pytz
 import uuid
+
+from django.utils import timezone
+import pytz
 from unittest.mock import patch
 
 from rest_framework import status
@@ -11,6 +13,8 @@ from chats.apps.api.v1.internal.dashboard.dto import CSATRatingCount, CSATRating
 from chats.apps.sectors.models import Sector
 from chats.apps.queues.models import Queue
 from chats.apps.accounts.tests.decorators import with_internal_auth
+from chats.apps.rooms.models import Room
+from chats.apps.csat.models import CSATSurvey
 from chats.apps.projects.models.models import (
     CustomStatus,
     CustomStatusType,
@@ -20,6 +24,11 @@ from chats.apps.projects.models.models import (
 
 
 class BaseTestInternalDashboardView(APITestCase):
+    def get_agent_csat_metrics(self, project_uuid: str, filters: dict = {}) -> Response:
+        url = f"/v1/internal/dashboard/{project_uuid}/csat-score-by-agents/"
+
+        return self.client.get(url, filters)
+
     def get_csat_ratings(self, project_uuid: str, filters: dict = {}) -> Response:
         url = f"/v1/internal/dashboard/{project_uuid}/csat_ratings/"
 
@@ -30,6 +39,10 @@ class TestInternalDashboardViewUnauthenticated(BaseTestInternalDashboardView):
     def test_csat_ratings_unauthenticated(self):
         response = self.get_csat_ratings(uuid.uuid4(), {})
 
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_get_agent_csat_metrics_unauthenticated(self):
+        response = self.get_agent_csat_metrics(uuid.uuid4())
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
@@ -72,6 +85,48 @@ class TestInternalDashboardViewAuthenticated(BaseTestInternalDashboardView):
                 }
             ],
         )
+
+    @with_internal_auth
+    def test_get_agent_csat_metrics_authenticated(self):
+        users = [
+            User.objects.create(
+                email="agent1@test.com", first_name="Agent", last_name="One"
+            ),
+            User.objects.create(
+                email="agent2@test.com", first_name="Agent", last_name="Two"
+            ),
+            User.objects.create(
+                email="agent3@test.com", first_name="Agent", last_name="Three"
+            ),
+        ]
+
+        ProjectPermission.objects.create(user=users[0], project=self.project, role=2)
+        room = Room.objects.create(queue=self.queue, user=users[0])
+        room.is_active = False
+        room.save()
+        CSATSurvey.objects.create(room=room, rating=4, answered_on=timezone.now())
+
+        ProjectPermission.objects.create(user=users[1], project=self.project, role=2)
+        room = Room.objects.create(queue=self.queue, user=users[1])
+        room.is_active = False
+        room.save()
+        CSATSurvey.objects.create(room=room, rating=5, answered_on=timezone.now())
+
+        ProjectPermission.objects.create(user=users[2], project=self.project, role=2)
+
+        response = self.get_agent_csat_metrics(self.project.uuid, {"page_size": 1})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNotNone(response.data["next"])
+        self.assertIsNone(response.data["previous"])
+
+        self.assertEqual(response.data["results"][0]["agent"]["name"], "Agent Two")
+        self.assertEqual(
+            response.data["results"][0]["agent"]["email"], "agent2@test.com"
+        )
+        self.assertEqual(response.data["results"][0]["rooms"], 1)
+        self.assertEqual(response.data["results"][0]["reviews"], 1)
+        self.assertEqual(response.data["results"][0]["avg_rating"], 5.0)
 
 
 class BaseTestInternalDashboardViewSet(APITestCase):

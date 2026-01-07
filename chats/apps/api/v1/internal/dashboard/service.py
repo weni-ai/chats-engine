@@ -18,6 +18,10 @@ class AgentsService:
         agents_repository = AgentRepository()
         return agents_repository.get_agents_custom_status(filters, project)
 
+    def get_agents_csat_score(self, filters: Filters, project):
+        agents_repository = AgentRepository()
+        return agents_repository.get_agents_csat_score(filters, project)
+
 
 class CSATService:
     def get_csat_ratings(self, filters: Filters, project):

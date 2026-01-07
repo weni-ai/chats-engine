@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from chats.apps.projects.models import Project, ProjectPermission
-from typing import List
+from typing import List, Optional
 
 
 @dataclass
@@ -30,3 +30,10 @@ class CSATRatingCount:
 @dataclass
 class CSATRatings:
     ratings: List[CSATRatingCount]
+
+
+@dataclass(frozen=True)
+class CSATScoreGeneral:
+    rooms: int
+    reviews: int
+    avg_rating: Optional[float] = None
