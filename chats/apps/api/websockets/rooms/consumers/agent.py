@@ -18,7 +18,6 @@ from chats.apps.api.v1.prometheus.metrics import (
     ws_disconnects_total,
     ws_messages_received_total,
 )
-from chats.apps.feature_flags.utils import is_feature_active
 from chats.apps.history.filters.rooms_filter import (
     get_history_rooms_queryset_by_contact,
 )
@@ -90,11 +89,10 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 await self.load_user()
                 self.last_ping = timezone.now()
 
-                # Start background task to monitor ping timeout if feature is enabled
-                if await self.is_ping_timeout_feature_enabled():
-                    self.ping_timeout_task = asyncio.create_task(
-                        self.ping_timeout_checker()
-                    )
+                # Start background task to monitor ping timeout
+                self.ping_timeout_task = asyncio.create_task(
+                    self.ping_timeout_checker()
+                )
 
     async def disconnect(self, *args, **kwargs):
         # Cancel the ping timeout checker task
@@ -458,16 +456,6 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             status=status,
             custom_status_name=custom_status_name,
             custom_status_type_uuid=custom_status_type_uuid,
-        )
-
-    @database_sync_to_async
-    def is_ping_timeout_feature_enabled(self) -> bool:
-        if not self.permission:
-            return False
-        return is_feature_active(
-            settings.WS_PING_TIMEOUT_FEATURE_FLAG_KEY,
-            self.user,
-            self.permission.project,
         )
 
     async def ping_timeout_checker(self):
