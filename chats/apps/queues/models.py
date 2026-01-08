@@ -1,13 +1,11 @@
 import random
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.db.models import OuterRef, Q, Subquery
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from weni.feature_flags.shortcuts import is_feature_active
 
 from chats.apps.projects.models.models import CustomStatus
 from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
@@ -195,13 +193,6 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
 
         if len(eligible_agents) == 1:
             return eligible_agents[0]
-
-        if is_feature_active(
-            settings.LEAST_ROOMS_CLOSED_TODAY_FEATURE_FLAG_KEY,
-            None,
-            str(self.project.uuid),
-        ):
-            return self._get_agent_with_least_rooms_closed_today(eligible_agents)
 
         return random.choice(eligible_agents)
 
