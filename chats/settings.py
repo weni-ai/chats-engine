@@ -629,6 +629,12 @@ CSAT_FEATURE_FLAG_KEY = env.str("CSAT_FEATURE_FLAG_KEY", default="weniChatsCSAT"
 
 CHATS_BASE_URL = env.str("CHATS_BASE_URL", default="http://localhost:8000")
 
+AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY = env.str(
+    "AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY", default="weniChatsAutomaticMessage"
+)
+WS_PING_TIMEOUT_FEATURE_FLAG_KEY = env.str(
+    "WS_PING_TIMEOUT_FEATURE_FLAG_KEY", default="weniChatsPingTimeout"
+)
 AUTOMATIC_MESSAGE_FLOWS_GET_TICKET_RETRIES = env.int(
     "AUTOMATIC_MESSAGE_FLOWS_GET_TICKET_RETRIES", default=3
 )

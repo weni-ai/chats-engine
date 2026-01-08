@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 import uuid
@@ -74,6 +75,12 @@ class ManagerAgentRoomConsumer(AgentRoomConsumer):
                 await self.load_queues()
                 await self.load_user()
                 self.last_ping = timezone.now()
+
+                # Start background task to monitor ping timeout if feature is enabled
+                if await self.is_ping_timeout_feature_enabled():
+                    self.ping_timeout_task = asyncio.create_task(
+                        self.ping_timeout_checker()
+                    )
 
     async def disconnect(self, *args, **kwargs):
         try:
