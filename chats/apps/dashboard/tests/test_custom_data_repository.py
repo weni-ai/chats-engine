@@ -140,8 +140,8 @@ class TestAgentRepository(TestCase):
             queue=None,
             sector=None,
             tag=None,
-            start_date=now - timedelta(days=1),
-            end_date=now + timedelta(days=1),
+            start_date=(now - timedelta(days=1)).strftime("%Y-%m-%d"),
+            end_date=(now + timedelta(days=1)).strftime("%Y-%m-%d"),
             agent=None,
             is_weni_admin=False,
         )

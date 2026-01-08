@@ -14,7 +14,7 @@ from rest_framework.response import Response
 
 from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
-    get_auth_class,
+    get_token_auth_classes,
 )
 from chats.apps.ai_features.history_summary.models import (
     HistorySummary,
@@ -24,6 +24,7 @@ from chats.apps.ai_features.history_summary.tasks import (
     cancel_history_summary_generation,
     generate_history_summary,
 )
+from chats.apps.api.authentication.permissions import InternalAPITokenRequiredPermission
 from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.external.rooms.serializers import (
     RoomFlowSerializer,
@@ -98,12 +99,15 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
 
     @cached_property
     def authentication_classes(self):
-        return get_auth_class(self.request)
+        return get_token_auth_classes(self.request)
 
     @cached_property
     def permission_classes(self):
         if self.request.auth and hasattr(self.request.auth, "project"):
             return [IsAdminPermission]
+        elif self.request.auth == "INTERNAL":
+            return [InternalAPITokenRequiredPermission]
+
         return [ModuleHasPermission]
 
     @action(detail=True, methods=["PUT", "PATCH"], url_name="close")

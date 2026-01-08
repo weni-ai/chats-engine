@@ -1,10 +1,12 @@
 from functools import cached_property
 
-from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, viewsets
 
-from chats.apps.accounts.authentication.drf.authorization import get_auth_class
+from chats.apps.accounts.authentication.drf.authorization import (
+    get_token_auth_classes,
+)
+from chats.apps.api.authentication.permissions import InternalAPITokenRequiredPermission
 from chats.apps.api.v1.external.msgs.filters import MessageFilter
 from chats.apps.api.v1.external.msgs.serializers import MsgFlowSerializer
 from chats.apps.api.v1.external.permissions import IsAdminPermission
@@ -37,12 +39,14 @@ class MessageFlowViewset(
 
     @cached_property
     def authentication_classes(self):
-        return get_auth_class(self.request)
+        return get_token_auth_classes(self.request)
 
     @cached_property
     def permission_classes(self):
         if self.request.auth and hasattr(self.request.auth, "project"):
             return [IsAdminPermission]
+        elif self.request.auth == "INTERNAL":
+            return [InternalAPITokenRequiredPermission]
         return [ModuleHasPermission]
 
     def perform_create(self, serializer):
@@ -62,7 +66,11 @@ class MessageFlowViewset(
         instance = serializer.save()
         instance.notify_room("create")
         room = instance.room
-        room.increment_unread_messages_count(1, timezone.now())
+        room.on_new_message(
+            message=instance,
+            contact=instance.contact,
+            increment_unread=1,
+        )
         if room.user is None and instance.contact:
             room.trigger_default_message()
 
