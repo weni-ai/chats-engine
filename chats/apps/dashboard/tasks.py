@@ -88,7 +88,9 @@ def _save_report_locally(output: io.BytesIO, project_uuid, dt: str, file_type: s
     return file_path
 
 
-def _send_report_email(project_name, project_uuid, user_email, output, dt, file_type, report_uuid):
+def _send_report_email(
+    project_name, project_uuid, user_email, output, dt, file_type, report_uuid
+):
     from chats.core.storages import ReportsStorage
 
     storage = ReportsStorage()
@@ -158,7 +160,11 @@ def _send_error_email(project_name, user_email, error_message, report_uuid):
 
 def _get_chunk_size(total_records: int) -> int:
     base_chunk_size = getattr(settings, "REPORTS_CHUNK_SIZE", 5000)
-    return base_chunk_size * 2 if total_records > (base_chunk_size * 10) else base_chunk_size
+    return (
+        base_chunk_size * 2
+        if total_records > (base_chunk_size * 10)
+        else base_chunk_size
+    )
 
 
 def generate_metrics(room_uuid: UUID):
@@ -242,8 +248,8 @@ def generate_custom_fields_report(
     """
     Generate a custom report based on the fields configuration.
     """
-    from chats.apps.api.v1.dashboard.viewsets import ReportFieldsValidatorViewSet
     from chats.apps.api.v1.dashboard.presenter import ModelFieldsPresenter
+    from chats.apps.api.v1.dashboard.viewsets import ReportFieldsValidatorViewSet
 
     project = Project.objects.get(uuid=project_uuid)
     report_generator = ReportFieldsValidatorViewSet()
@@ -265,7 +271,9 @@ def generate_custom_fields_report(
         if file_type == "xlsx":
             with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
                 for model_name in ["rooms", "agent_status_logs"]:
-                    _write_model_to_xlsx(writer, model_name, report_data.get(model_name, {}))
+                    _write_model_to_xlsx(
+                        writer, model_name, report_data.get(model_name, {})
+                    )
         else:
             zip_buf = io.BytesIO()
             with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -282,7 +290,13 @@ def generate_custom_fields_report(
         if getattr(settings, "REPORTS_SEND_EMAILS", False):
             try:
                 _send_report_email(
-                    project.name, project.uuid, user_email, output, dt, file_type, report_status.uuid
+                    project.name,
+                    project.uuid,
+                    user_email,
+                    output,
+                    dt,
+                    file_type,
+                    report_status.uuid,
                 )
             except Exception as e:
                 logger.exception("Error sending email report: %s", e)
@@ -299,7 +313,9 @@ def generate_custom_fields_report(
             try:
                 _send_error_email(project.name, user_email, str(e), report_status.uuid)
             except Exception as email_error:
-                logger.exception("Error sending error notification email: %s", email_error)
+                logger.exception(
+                    "Error sending error notification email: %s", email_error
+                )
 
         raise
 
@@ -311,19 +327,33 @@ def _write_xlsx_chunks(writer, sheet_name: str, qs, chunk_size: int, model_cfg: 
 
     if qs.count() == 0:
         requested_fields = model_cfg.get("fields") or []
-        pd.DataFrame(columns=requested_fields).to_excel(writer, sheet_name=sheet_name[:31], index=False)
+        pd.DataFrame(columns=requested_fields).to_excel(
+            writer, sheet_name=sheet_name[:31], index=False
+        )
         return
 
     total = qs.count()
     row_offset = 0
     for start in range(0, total, chunk_size):
         end = min(start + chunk_size, total)
-        logging.info("Writing chunk: sheet=%s start=%s end=%s total=%s", sheet_name, start, end, total)
+        logging.info(
+            "Writing chunk: sheet=%s start=%s end=%s total=%s",
+            sheet_name,
+            start,
+            end,
+            total,
+        )
         chunk = _strip_tz(list(qs[start:end]))
         if not chunk:
             continue
         df = _excel_safe_dataframe(pd.DataFrame(chunk))
-        df.to_excel(writer, sheet_name=sheet_name[:31], index=False, header=(row_offset == 0), startrow=row_offset or 0)
+        df.to_excel(
+            writer,
+            sheet_name=sheet_name[:31],
+            index=False,
+            header=(row_offset == 0),
+            startrow=row_offset or 0,
+        )
         row_offset += len(df)
 
 
@@ -336,7 +366,13 @@ def _write_csv_chunks(csv_buffers: dict, sheet_name: str, qs):
     row_offset = 0
     for start in range(0, total, chunk_size):
         end = min(start + chunk_size, total)
-        logging.info("Writing chunk (csv): sheet=%s start=%s end=%s total=%s", sheet_name, start, end, total)
+        logging.info(
+            "Writing chunk (csv): sheet=%s start=%s end=%s total=%s",
+            sheet_name,
+            start,
+            end,
+            total,
+        )
         chunk = _strip_tz(list(qs[start:end]))
         if not chunk:
             continue
@@ -352,11 +388,18 @@ def _process_xlsx_report(view, fields_config, project, available_fields, output)
             if not model_cfg or model_name not in available_fields:
                 continue
 
-            query_data = view._process_model_fields(model_name, model_cfg, project, available_fields)
+            query_data = view._process_model_fields(
+                model_name, model_cfg, project, available_fields
+            )
             qs = (query_data or {}).get("queryset")
             total_records = qs.count() if qs is not None else 0
             chunk_size = _get_chunk_size(total_records)
-            logging.info("Report size for %s: %s records, chunk_size: %s", model_name, total_records, chunk_size)
+            logging.info(
+                "Report size for %s: %s records, chunk_size: %s",
+                model_name,
+                total_records,
+                chunk_size,
+            )
             _write_xlsx_chunks(writer, model_name, qs, chunk_size, model_cfg)
 
 
@@ -364,7 +407,9 @@ def _process_csv_report(view, fields_config, project, available_fields):
     csv_buffers = {}
     for model_name in ["rooms", "agent_status_logs"]:
         if model_name in fields_config and model_name in available_fields:
-            query_data = view._process_model_fields(model_name, fields_config[model_name], project, available_fields)
+            query_data = view._process_model_fields(
+                model_name, fields_config[model_name], project, available_fields
+            )
             if "queryset" in (query_data or {}):
                 _write_csv_chunks(csv_buffers, model_name, query_data["queryset"])
 
@@ -415,13 +460,25 @@ def process_pending_reports():
 
         if getattr(settings, "REPORTS_SAVE_LOCALLY", True):
             file_path = _save_report_locally(output, project.uuid, dt, file_type)
-            logging.info("Custom report saved at: %s | report_uuid=%s", file_path, report.uuid)
+            logging.info(
+                "Custom report saved at: %s | report_uuid=%s", file_path, report.uuid
+            )
 
-        logging.info("Processing report %s for project %s done.", report.uuid, project.uuid)
+        logging.info(
+            "Processing report %s for project %s done.", report.uuid, project.uuid
+        )
 
         if getattr(settings, "REPORTS_SEND_EMAILS", False):
             try:
-                _send_report_email(project.name, project.uuid, user_email, output, dt, file_type, report.uuid)
+                _send_report_email(
+                    project.name,
+                    project.uuid,
+                    user_email,
+                    output,
+                    dt,
+                    file_type,
+                    report.uuid,
+                )
             except Exception as e:
                 logging.exception("Error sending email report: %s", e)
 
@@ -438,4 +495,6 @@ def process_pending_reports():
             try:
                 _send_error_email(project.name, user_email, str(e), report.uuid)
             except Exception as email_error:
-                logging.exception("Error sending error notification email: %s", email_error)
+                logging.exception(
+                    "Error sending error notification email: %s", email_error
+                )

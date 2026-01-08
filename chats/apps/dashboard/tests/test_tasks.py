@@ -1,18 +1,18 @@
-from datetime import datetime, timezone as dt_timezone
-from unittest.mock import MagicMock, patch, PropertyMock
-import io
+from datetime import datetime
+from datetime import timezone as dt_timezone
+from unittest.mock import MagicMock, patch
 
 from django.test import TestCase, override_settings
 
 from chats.apps.accounts.models import User
 from chats.apps.contacts.models import Contact
-from chats.apps.dashboard.models import ReportStatus, RoomMetrics
+from chats.apps.dashboard.models import ReportStatus
 from chats.apps.dashboard.tasks import (
-    generate_custom_fields_report,
-    process_pending_reports,
+    _norm_file_type,
     _strip_tz,
     _strip_tz_value,
-    _norm_file_type,
+    generate_custom_fields_report,
+    process_pending_reports,
 )
 from chats.apps.projects.models import Project
 from chats.apps.queues.models import Queue
@@ -196,6 +196,7 @@ class GenerateCustomFieldsReportTests(TestCase):
         self.report_status.refresh_from_db()
         self.assertEqual(self.report_status.status, "ready")
 
+
 class ProcessPendingReportsTests(TestCase):
     def setUp(self):
         self.user = User.objects.create(email="test@example.com")
@@ -323,8 +324,12 @@ class ProcessPendingReportsTests(TestCase):
         mock_viewset = MagicMock()
         mock_qs = MagicMock()
         mock_qs.count.return_value = 1
-        mock_qs.__iter__ = lambda self: iter([{"uuid": "123", "log_date": "2024-01-01"}])
-        mock_qs.__getitem__ = lambda self, key: [{"uuid": "123", "log_date": "2024-01-01"}]
+        mock_qs.__iter__ = lambda self: iter(
+            [{"uuid": "123", "log_date": "2024-01-01"}]
+        )
+        mock_qs.__getitem__ = lambda self, key: [
+            {"uuid": "123", "log_date": "2024-01-01"}
+        ]
         mock_viewset._process_model_fields.return_value = {"queryset": mock_qs}
         mock_viewset_class.return_value = mock_viewset
 
@@ -348,7 +353,9 @@ class ProcessPendingReportsTests(TestCase):
             fields_config={},
         )
 
-        with patch("chats.apps.api.v1.dashboard.viewsets.ReportFieldsValidatorViewSet") as mock_viewset_class:
+        with patch(
+            "chats.apps.api.v1.dashboard.viewsets.ReportFieldsValidatorViewSet"
+        ) as mock_viewset_class:
             mock_viewset = MagicMock()
             mock_viewset._process_model_fields.return_value = {"queryset": None}
             mock_viewset_class.return_value = mock_viewset
@@ -361,7 +368,9 @@ class ProcessPendingReportsTests(TestCase):
         self.assertEqual(older_report.status, "ready")
         self.assertEqual(newer_report.status, "pending")
 
-    @override_settings(REPORTS_SAVE_LOCALLY=False, REPORTS_SEND_EMAILS=False, REPORTS_CHUNK_SIZE=100)
+    @override_settings(
+        REPORTS_SAVE_LOCALLY=False, REPORTS_SEND_EMAILS=False, REPORTS_CHUNK_SIZE=100
+    )
     @patch("chats.apps.api.v1.dashboard.viewsets.ReportFieldsValidatorViewSet")
     def test_process_pending_report_large_dataset(self, mock_viewset_class):
         report_status = ReportStatus.objects.create(
@@ -374,8 +383,12 @@ class ProcessPendingReportsTests(TestCase):
         mock_viewset = MagicMock()
         mock_qs = MagicMock()
         mock_qs.count.return_value = 5000
-        mock_qs.__iter__ = lambda self: iter([{"uuid": f"uuid-{i}"} for i in range(100)])
-        mock_qs.__getitem__ = lambda self, key: [{"uuid": f"uuid-{i}"} for i in range(100)]
+        mock_qs.__iter__ = lambda self: iter(
+            [{"uuid": f"uuid-{i}"} for i in range(100)]
+        )
+        mock_qs.__getitem__ = lambda self, key: [
+            {"uuid": f"uuid-{i}"} for i in range(100)
+        ]
         mock_viewset._process_model_fields.return_value = {"queryset": mock_qs}
         mock_viewset_class.return_value = mock_viewset
 
@@ -383,4 +396,3 @@ class ProcessPendingReportsTests(TestCase):
 
         report_status.refresh_from_db()
         self.assertEqual(report_status.status, "ready")
-
