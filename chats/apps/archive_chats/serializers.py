@@ -4,6 +4,7 @@ from django.utils import timezone
 from chats.apps.msgs.models import Message
 from chats.apps.accounts.models import User
 from chats.apps.contacts.models import Contact
+from chats.apps.rooms.models import RoomNote
 
 
 class ArchiveUserSerializer(serializers.ModelSerializer):
@@ -28,6 +29,7 @@ class ArchiveMessageSerializer(serializers.ModelSerializer):
     user = ArchiveUserSerializer(read_only=True)
     contact = ArchiveContactSerializer(read_only=True)
     created_on = serializers.SerializerMethodField(read_only=True)
+    text = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Message
@@ -47,3 +49,14 @@ class ArchiveMessageSerializer(serializers.ModelSerializer):
             dt = obj.created_on.astimezone(timezone.utc)
 
         return dt.isoformat()
+
+    def get_text(self, obj: Message) -> str:
+        internal_note: RoomNote = getattr(obj, "internal_note", None)
+
+        if internal_note:
+            return f"[INTERNAL NOTE] {internal_note.text}"
+
+        if getattr(obj, "automatic_message", None):
+            return f"[AUTOMATIC MESSAGE] {obj.text}"
+
+        return obj.text

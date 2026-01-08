@@ -12,8 +12,8 @@ from chats.apps.archive_chats.models import (
 )
 from chats.apps.archive_chats.serializers import ArchiveMessageSerializer
 from chats.apps.archive_chats.services import ArchiveChatsService
-from chats.apps.msgs.models import Message
-from chats.apps.rooms.models import Room
+from chats.apps.msgs.models import AutomaticMessage, Message
+from chats.apps.rooms.models import Room, RoomNote
 from chats.apps.queues.models import Queue
 from chats.apps.sectors.models import Sector
 from chats.apps.projects.models import Project
@@ -115,7 +115,28 @@ class TestArchiveChatsService(TestCase):
             text="Test message",
             created_on=timezone.now(),
         )
-        messages = [message_a, message_b]
+        message_c = Message.objects.create(
+            room=self.room,
+            user=self.user,
+            text="Test message",
+            created_on=timezone.now(),
+        )
+        AutomaticMessage.objects.create(
+            message=message_c,
+            room=self.room,
+        )
+        message_d = Message.objects.create(
+            room=self.room,
+            user=self.user,
+            text="Test message",
+            created_on=timezone.now(),
+        )
+        RoomNote.objects.create(
+            room=self.room,
+            user=self.user,
+            text="Test note",
+        )
+        messages = [message_a, message_b, message_c, message_d]
 
         archived_conversation = RoomArchivedConversation.objects.create(
             job=self.service.start_archive_job(),
@@ -135,11 +156,18 @@ class TestArchiveChatsService(TestCase):
         self.assertIsNotNone(archived_conversation.archive_process_started_at)
 
         self.assertIsInstance(messages_data, list)
-        self.assertEqual(len(messages_data), 2)
+        self.assertEqual(len(messages_data), 4)
 
         for i, message in enumerate(messages):
+            expected_text = message.text
+
+            if getattr(message, "automatic_message", None):
+                expected_text = f"[AUTOMATIC MESSAGE] {message.text}"
+            elif getattr(message, "internal_note", None):
+                expected_text = f"[INTERNAL NOTE] {message.internal_note.text}"
+
             self.assertEqual(messages_data[i].get("uuid"), str(message.uuid))
-            self.assertEqual(messages_data[i].get("text"), message.text)
+            self.assertEqual(messages_data[i].get("text"), expected_text)
             self.assertEqual(
                 messages_data[i].get("created_on"), message.created_on.isoformat()
             )
