@@ -408,9 +408,9 @@ class TestQueueGetAvailableAgent(TestCase):
         available_agent = self.queue.get_available_agent()
         self.assertEqual(available_agent, self.agent_3)
 
-    @patch("chats.apps.queues.models.is_feature_active", return_value=False)
+    @patch("chats.apps.queues.models.is_feature_active_for_attributes", return_value=False)
     def test_get_available_agent_returns_random_agent_if_rooms_count_is_equal(
-        self, mock_is_feature_active
+        self, mock_is_feature_active_for_attributes
     ):
         for i in range(3):
             # Agent 1 has 3 active rooms
@@ -447,9 +447,9 @@ class TestQueueGetAvailableAgent(TestCase):
             "Agent 3 was never picked, suggesting non-random selection.",
         )
 
-    @patch("chats.apps.queues.models.is_feature_active", return_value=False)
+    @patch("chats.apps.queues.models.is_feature_active_for_attributes", return_value=False)
     def test_get_available_agent_returns_random_agent_if_rooms_count_is_equal_for_general_routing_option(
-        self, mock_is_feature_active
+        self, mock_is_feature_active_for_attributes
     ):
         self.project.config = {"routing_option": "general"}
         self.project.save()
@@ -493,9 +493,9 @@ class TestQueueGetAvailableAgent(TestCase):
             "Agent 3 was never picked, suggesting non-random selection.",
         )
 
-    @patch("chats.apps.queues.models.is_feature_active", return_value=True)
+    @patch("chats.apps.queues.models.is_feature_active_for_attributes", return_value=True)
     def test_get_available_agent_tiebreaker_by_rooms_closed_today(
-        self, mock_is_feature_active
+        self, mock_is_feature_active_for_attributes
     ):
         """
         When agents have the same number of active rooms,
@@ -525,9 +525,9 @@ class TestQueueGetAvailableAgent(TestCase):
         available_agent = self.queue.get_available_agent()
         self.assertEqual(available_agent, self.agent_3)
 
-    @patch("chats.apps.queues.models.is_feature_active", return_value=True)
+    @patch("chats.apps.queues.models.is_feature_active_for_attributes", return_value=True)
     def test_get_available_agent_random_when_all_tiebreakers_equal(
-        self, mock_is_feature_active
+        self, mock_is_feature_active_for_attributes
     ):
         """
         When agents have the same number of active rooms AND the same number
