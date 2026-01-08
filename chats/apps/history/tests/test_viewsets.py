@@ -81,7 +81,7 @@ class TestHistoryRoomViewsets(BaseAPIChatsTestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertFalse(response.data.get("is_archived"))
-        self.assertIsNotNone(response.data.get("archived_conversation_file_url"))
+        self.assertIsNone(response.data.get("archived_conversation_file_url"))
 
     def test_retrieve_room_ok_with_archived_conversation(self):
         """
