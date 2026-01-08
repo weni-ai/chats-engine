@@ -196,13 +196,6 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         if len(eligible_agents) == 1:
             return eligible_agents[0]
 
-        if is_feature_active(
-            settings.LEAST_ROOMS_CLOSED_TODAY_FEATURE_FLAG_KEY,
-            None,
-            str(self.project.uuid),
-        ):
-            return self._get_agent_with_least_rooms_closed_today(eligible_agents)
-
         return random.choice(eligible_agents)
 
     def is_agent(self, user):
