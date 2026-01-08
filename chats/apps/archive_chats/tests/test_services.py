@@ -159,15 +159,8 @@ class TestArchiveChatsService(TestCase):
         self.assertEqual(len(messages_data), 4)
 
         for i, message in enumerate(messages):
-            expected_text = message.text
-
-            if getattr(message, "automatic_message", None):
-                expected_text = f"[AUTOMATIC MESSAGE] {message.text}"
-            elif getattr(message, "internal_note", None):
-                expected_text = f"[INTERNAL NOTE] {message.internal_note.text}"
-
             self.assertEqual(messages_data[i].get("uuid"), str(message.uuid))
-            self.assertEqual(messages_data[i].get("text"), expected_text)
+            self.assertEqual(messages_data[i].get("text"), message.text)
             self.assertEqual(
                 messages_data[i].get("created_on"), message.created_on.isoformat()
             )
@@ -185,6 +178,19 @@ class TestArchiveChatsService(TestCase):
                 contact_data.get("name"),
                 message.contact.name if message.contact else None,
             )
+            self.assertEqual(
+                messages_data[i].get("is_automatic_message"),
+                message.is_automatic_message,
+            )
+
+            if internal_note := getattr(message, "internal_note", None):
+                self.assertEqual(
+                    messages_data[i].get("internal_note"),
+                    {
+                        "uuid": str(internal_note.uuid),
+                        "text": internal_note.text,
+                    },
+                )
 
     def test_upload_messages_file(self):
         archived_conversation = RoomArchivedConversation.objects.create(

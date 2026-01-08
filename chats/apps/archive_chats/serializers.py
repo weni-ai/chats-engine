@@ -1,3 +1,4 @@
+from typing import Optional
 from rest_framework import serializers
 from django.utils import timezone
 
@@ -29,7 +30,7 @@ class ArchiveMessageSerializer(serializers.ModelSerializer):
     user = ArchiveUserSerializer(read_only=True)
     contact = ArchiveContactSerializer(read_only=True)
     created_on = serializers.SerializerMethodField(read_only=True)
-    text = serializers.SerializerMethodField(read_only=True)
+    internal_note = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Message
@@ -39,6 +40,8 @@ class ArchiveMessageSerializer(serializers.ModelSerializer):
             "created_on",
             "user",
             "contact",
+            "is_automatic_message",
+            "internal_note",
         ]
 
     def get_created_on(self, obj) -> str:
@@ -50,13 +53,13 @@ class ArchiveMessageSerializer(serializers.ModelSerializer):
 
         return dt.isoformat()
 
-    def get_text(self, obj: Message) -> str:
+    def get_internal_note(self, obj: Message) -> Optional[dict]:
         internal_note: RoomNote = getattr(obj, "internal_note", None)
 
         if internal_note:
-            return f"[INTERNAL NOTE] {internal_note.text}"
+            return {
+                "uuid": str(internal_note.uuid),
+                "text": internal_note.text,
+            }
 
-        if getattr(obj, "automatic_message", None):
-            return f"[AUTOMATIC MESSAGE] {obj.text}"
-
-        return obj.text
+        return None
