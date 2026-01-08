@@ -2,6 +2,7 @@ import logging
 from typing import Dict, List, Optional
 
 import pendulum
+from django.db import IntegrityError
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
@@ -398,15 +399,23 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             contact, queue, user, groups, created, flow_uuid, project
         )
 
-        room = Room.objects.create(
-            **validated_data,
-            project_uuid=str(queue.project.uuid),
-            contact=contact,
-            queue=queue,
-            protocol=protocol,
-            service_chat=service_chat,
-        )
-        RoomMetrics.objects.create(room=room)
+        try:
+            room = Room.objects.create(
+                **validated_data,
+                project_uuid=str(queue.project.uuid),
+                contact=contact,
+                queue=queue,
+                protocol=protocol,
+                service_chat=service_chat,
+            )
+            RoomMetrics.objects.create(room=room)
+        except IntegrityError:
+            room = Room.objects.filter(
+                is_active=True, contact=contact, queue__sector__project=project
+            ).first()
+            if room is None:
+                raise
+            return room
 
         if history_data:
             self.process_message_history(room, history_data)
@@ -514,9 +523,15 @@ class RoomFlowSerializer(serializers.ModelSerializer):
     def update_or_create_contact(self, validated_data):
         contact_data = validated_data.pop("contact")
         contact_external_id = contact_data.pop("external_id")
-        return Contact.objects.update_or_create(
-            external_id=contact_external_id, defaults=contact_data
-        )
+        try:
+            return Contact.objects.update_or_create(
+                external_id=contact_external_id, defaults=contact_data
+            )
+        except IntegrityError:
+            contact = Contact.objects.filter(external_id=contact_external_id).first()
+            if contact is None:
+                raise
+            return contact, False
 
     def process_message_history(self, room, messages_data):
         is_waiting = room.get_is_waiting()

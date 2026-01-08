@@ -1,7 +1,21 @@
+from django.db import IntegrityError
 from rest_framework.test import APITestCase
 
 from chats.apps.contacts.models import Contact
 from chats.apps.projects.models import Project
+
+
+class ConstraintTests(APITestCase):
+    def test_unique_contact_external_id_constraint(self):
+        Contact.objects.create(external_id="test-external-id", name="Contact 1")
+        with self.assertRaises(IntegrityError) as context:
+            Contact.objects.create(external_id="test-external-id", name="Contact 2")
+        self.assertIn("unique_contact_external_id", str(context.exception))
+
+    def test_allows_multiple_contacts_with_null_external_id(self):
+        Contact.objects.create(external_id=None, name="Contact 1")
+        Contact.objects.create(external_id=None, name="Contact 2")
+        self.assertEqual(Contact.objects.filter(external_id__isnull=True).count(), 2)
 
 
 class PropertyTests(APITestCase):

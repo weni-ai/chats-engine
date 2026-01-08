@@ -232,7 +232,7 @@ class Room(BaseModel, BaseConfigurableModel):
                 fields=["contact", "queue"],
                 condition=models.Q(is_active=True),
                 name="unique_contact_queue_is_activetrue_room",
-            )
+            ),
         ]
         indexes = [
             models.Index(fields=["project_uuid"]),
