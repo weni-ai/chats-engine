@@ -1,3 +1,11 @@
+# 3.39.2
+# Add
+  - Adding the new routing using the correct configuration for growthbook feature flag
+  
+# 3.39.1
+# Hotfix
+  - Removing new routing feature flag configuration
+  
 # 3.39.0
 # Add
   - Static token authentication for rooms and messages endpoints (used by Mailroom)
@@ -959,6 +967,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 
