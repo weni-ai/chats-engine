@@ -2,6 +2,12 @@ from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 
+from django.core.files.uploadedfile import SimpleUploadedFile
+from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
+from chats.apps.archive_chats.models import (
+    ArchiveConversationsJob,
+    RoomArchivedConversation,
+)
 from chats.core.tests.test_base import BaseAPIChatsTestCase
 
 
@@ -74,6 +80,39 @@ class TestHistoryRoomViewsets(BaseAPIChatsTestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(response.data.get("is_archived"))
+        self.assertIsNotNone(response.data.get("archived_conversation_file_url"))
+
+    def test_retrieve_room_ok_with_archived_conversation(self):
+        """
+        Ensure we can retrieve a room with an archived conversation
+        """
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.admin_token.key)
+
+        RoomArchivedConversation.objects.create(
+            job=ArchiveConversationsJob.objects.create(started_at=timezone.now()),
+            room=self.room_1,
+            file=SimpleUploadedFile(
+                "test.zip", b"test", content_type="application/zip"
+            ),
+            status=ArchiveConversationsJobStatus.FINISHED,
+        )
+
+        self.contact.rooms.update(is_active=False, ended_at=timezone.now())
+
+        url = (
+            reverse("history_room-detail", kwargs={"pk": str(self.room_1.pk)})
+            + f"?project={str(self.project.uuid)}"
+        )
+        response = client.get(
+            url,
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data.get("is_archived"))
+        self.assertIsNotNone(response.data.get("archived_conversation_file_url"))
 
     def test_retrieve_contact_no_closed_rooms(self):
         """
