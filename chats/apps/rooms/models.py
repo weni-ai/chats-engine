@@ -816,7 +816,7 @@ class RoomNote(BaseModel):
         "msgs.Message",
         related_name="internal_note",
         verbose_name=_("message"),
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
     )
