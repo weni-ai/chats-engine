@@ -39,8 +39,8 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
             "first_response_time",
             "waiting_time",
             "queue_time",
-            "protocol",
             "csat_rating",
+            "protocol",
         ]
 
     def get_agent(self, obj):

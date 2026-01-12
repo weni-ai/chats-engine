@@ -20,13 +20,6 @@ class Filters:
     ordering: str = None
 
 
-@dataclass(frozen=True)
-class CSATScoreGeneral:
-    rooms: int
-    reviews: int
-    avg_rating: Optional[float] = None
-
-
 @dataclass
 class CSATRatingCount:
     rating: int
@@ -37,3 +30,10 @@ class CSATRatingCount:
 @dataclass
 class CSATRatings:
     ratings: List[CSATRatingCount]
+
+
+@dataclass(frozen=True)
+class CSATScoreGeneral:
+    rooms: int
+    reviews: int
+    avg_rating: Optional[float] = None

@@ -1,11 +1,13 @@
 import random
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.db.models import OuterRef, Q, Subquery
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
 from chats.apps.projects.models.models import CustomStatus
 from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
@@ -151,10 +153,18 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         )
 
         # user_id is the email (to_field="email" in Room.user ForeignKey)
-        rooms_closed_today = {item["user_id"]: item["count"] for item in rooms_closed_counts}
-        min_closed_today = min(rooms_closed_today.get(agent.email, 0) for agent in agents)
+        rooms_closed_today = {
+            item["user_id"]: item["count"] for item in rooms_closed_counts
+        }
+        min_closed_today = min(
+            rooms_closed_today.get(agent.email, 0) for agent in agents
+        )
 
-        eligible_agents = [agent for agent in agents if rooms_closed_today.get(agent.email, 0) == min_closed_today]
+        eligible_agents = [
+            agent
+            for agent in agents
+            if rooms_closed_today.get(agent.email, 0) == min_closed_today
+        ]
 
         return random.choice(eligible_agents)
 
@@ -167,7 +177,7 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         If there is still a tie, a random agent is returned.
         """
         agents = list(self.available_agents)
-        print('agents', agents)
+        print("agents", agents)
         if not agents:
             return None
 
@@ -179,17 +189,24 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         )
 
         min_rooms_count = min(getattr(agent, field_name) for agent in agents)
-        print('min_rooms_count', min_rooms_count)
         eligible_agents = [
             agent for agent in agents if getattr(agent, field_name) == min_rooms_count
         ]
-        print('eligible_agents', eligible_agents)
+        print("eligible_agents", eligible_agents)
         if len(eligible_agents) == 1:
-            print('verificando se tem agente')
+            print("verificando se tem agente")
             return eligible_agents[0]
 
-        print('chamando _get_agent_with_least_rooms_closed_today')
-        return self._get_agent_with_least_rooms_closed_today(eligible_agents)
+        if len(eligible_agents) == 1:
+            return eligible_agents[0]
+
+        if is_feature_active_for_attributes(
+            settings.LEAST_ROOMS_CLOSED_TODAY_FEATURE_FLAG_KEY,
+            {"projectUUID": str(self.project.uuid)},
+        ):
+            return self._get_agent_with_least_rooms_closed_today(eligible_agents)
+
+        return random.choice(eligible_agents)
 
     def is_agent(self, user):
         return self.authorizations.filter(permission__user=user).exists()

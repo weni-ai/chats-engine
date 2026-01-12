@@ -172,12 +172,6 @@ class DashboardCSATScoreByAgentsSerializer(serializers.Serializer):
         return round(obj.avg_rating, 2)
 
 
-class DashboardCSATRatingsSerializer(serializers.Serializer):
-    rating = serializers.IntegerField()
-    value = serializers.FloatField(source="percentage")
-    full_value = serializers.IntegerField(source="count")
-
-
 class DashboardCustomStatusSerializer(serializers.Serializer):
     agent = serializers.CharField(source="full_name")
     agent_email = serializers.EmailField(source="email")

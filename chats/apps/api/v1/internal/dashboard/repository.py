@@ -14,7 +14,7 @@ from django.db.models import (
     Value,
     When,
 )
-from django.db.models.functions import Coalesce, Extract, JSONObject, Concat
+from django.db.models.functions import Coalesce, Concat, Extract, JSONObject
 from django.utils import timezone
 from django.db.models import QuerySet
 from chats.apps.accounts.models import User
@@ -24,16 +24,24 @@ from chats.apps.projects.models.models import CustomStatus, Project
 from chats.apps.rooms.models import Room
 from chats.apps.csat.models import CSATSurvey
 
+
+from chats.apps.api.v1.dashboard.dto import get_admin_domains_exclude_filter
 from chats.apps.api.v1.internal.dashboard.dto import (
+    Filters,
+    CSATScoreGeneral,
     CSATRatingCount,
     CSATRatings,
-    Filters,
 )
 
 from chats.apps.api.v1.internal.dashboard.dto import CSATScoreGeneral, Filters
 from chats.apps.projects.dates import parse_date_with_timezone
 from django.db.models.functions import Coalesce
 from django.db.models import Exists
+from chats.apps.projects.dates import parse_date_with_timezone
+from chats.apps.projects.models import ProjectPermission
+from chats.apps.projects.models.models import CustomStatus, Project
+from chats.apps.csat.models import CSATSurvey
+from chats.apps.rooms.models import Room
 
 
 class AgentRepository:
@@ -76,7 +84,9 @@ class AgentRepository:
         if filters.start_date and filters.end_date:
             tz_str = str(project.timezone)
             start_time = parse_date_with_timezone(filters.start_date, tz_str)
-            end_time = parse_date_with_timezone(filters.end_date, tz_str, is_end_date=True)
+            end_time = parse_date_with_timezone(
+                filters.end_date, tz_str, is_end_date=True
+            )
             opened_rooms["rooms__is_active"] = True
             opened_rooms["rooms__created_on__lte"] = end_time
 
@@ -262,7 +272,9 @@ class AgentRepository:
         if filters.start_date and filters.end_date:
             tz_str = str(project.timezone)
             start_time = parse_date_with_timezone(filters.start_date, tz_str)
-            end_time = parse_date_with_timezone(filters.end_date, tz_str, is_end_date=True)
+            end_time = parse_date_with_timezone(
+                filters.end_date, tz_str, is_end_date=True
+            )
             rooms_filter["rooms__created_on__range"] = [start_time, end_time]
             rooms_filter["rooms__is_active"] = False
             closed_rooms["rooms__ended_at__range"] = [start_time, end_time]
@@ -357,6 +369,85 @@ class AgentRepository:
 
         return agents_query
 
+    def _get_agents_query(self, filters: Filters, project: Project):
+        agents = self.model.filter(project_permissions__project=project)
+
+        if not filters.is_weni_admin:
+            agents = agents.exclude(get_admin_domains_exclude_filter())
+
+        if filters.agent:
+            agents = agents.filter(email=filters.agent)
+
+        if filters.queue:
+            agents = agents.filter(
+                project_permissions__queue_authorizations__queue=filters.queue
+            )
+        elif filters.sector:
+            agents = agents.filter(
+                project_permissions__queue_authorizations__queue__sector__in=filters.sector
+            )
+
+        return agents
+
+    def _get_custom_status_query(self, filters: Filters, project: Project):
+        custom_status = CustomStatus.objects.filter(
+            Q(
+                user=OuterRef("email"),
+            )
+            & Q(
+                status_type__project=project,
+                status_type__is_deleted=False,
+            )
+            & ~Q(status_type__name__iexact="in-service")
+        )
+
+        tz_str = str(project.timezone)
+        if filters.start_date:
+            start_time = parse_date_with_timezone(filters.start_date, tz_str)
+            custom_status = custom_status.filter(created_on__gte=start_time)
+        if filters.end_date:
+            end_time = parse_date_with_timezone(
+                filters.end_date, tz_str, is_end_date=True
+            )
+            custom_status = custom_status.filter(created_on__lte=end_time)
+
+        return custom_status
+
+    def get_agents_custom_status(
+        self, filters: Filters, project: Project
+    ) -> QuerySet[User]:
+        agents = self._get_agents_query(filters, project)
+
+        custom_status_base_query = self._get_custom_status_query(filters, project)
+
+        custom_status_subquery = Subquery(
+            custom_status_base_query.values("user")
+            .annotate(
+                aggregated=JSONBAgg(
+                    JSONObject(
+                        status_type=F("status_type__name"),
+                        break_time=F("break_time"),
+                    )
+                )
+            )
+            .values("aggregated"),
+            output_field=JSONField(),
+        )
+
+        agents = agents.annotate(
+            custom_status=custom_status_subquery,
+            agent=Concat(F("first_name"), Value(" "), F("last_name")),
+        )
+
+        ordering_fields = ["-agent", "agent"]
+
+        if filters.ordering and filters.ordering in ordering_fields:
+            agents = agents.order_by(filters.ordering)
+        else:
+            agents = agents.order_by("agent")
+
+        return agents
+
     def _get_converted_dates(self, filters: Filters, project: Project) -> dict:
         project_timezone = project.timezone if project.timezone else "UTC"
 
@@ -427,6 +518,7 @@ class AgentRepository:
     def _get_csat_rooms_query(self, filters: Filters, project: Project) -> dict:
         rooms_query = {
             "rooms__is_active": False,
+            "queue__sector__project": project,
         }
 
         start_date, end_date = self._get_converted_dates(filters, project)
@@ -477,87 +569,9 @@ class AgentRepository:
 
         return self._get_csat_general(filters, project), agents
 
-    def _get_agents_query(self, filters: Filters, project: Project):
-        agents = self.model.filter(project_permissions__project=project)
-
-        if not filters.is_weni_admin:
-            agents = agents.exclude(get_admin_domains_exclude_filter())
-
-        if filters.agent:
-            agents = agents.filter(email=filters.agent)
-        if filters.queue:
-            agents = agents.filter(
-                project_permissions__queue_authorizations__queue=filters.queue
-            )
-        elif filters.sector:
-            agents = agents.filter(
-                project_permissions__queue_authorizations__queue__sector__in=filters.sector
-            )
-
-        return agents
-
-    def _get_custom_status_query(self, filters: Filters, project: Project):
-        tz = project.timezone
-        custom_status = CustomStatus.objects.filter(
-            Q(
-                user=OuterRef("email"),
-            )
-            & Q(
-                status_type__project=project,
-                status_type__is_deleted=False,
-            )
-            & ~Q(status_type__name__iexact="in-service")
-        )
-
-        tz_str = str(project.timezone)
-        if filters.start_date:
-            start_time = parse_date_with_timezone(filters.start_date, tz_str)
-            custom_status = custom_status.filter(created_on__gte=start_time)
-        if filters.end_date:
-            end_time = parse_date_with_timezone(filters.end_date, tz_str, is_end_date=True)
-            custom_status = custom_status.filter(created_on__lte=end_time)
-
-        return custom_status
-
-    def get_agents_custom_status(
-        self, filters: Filters, project: Project
-    ) -> QuerySet[User]:
-        agents = self._get_agents_query(filters, project)
-
-        custom_status_base_query = self._get_custom_status_query(filters, project)
-
-        custom_status_subquery = Subquery(
-            custom_status_base_query.values("user")
-            .annotate(
-                aggregated=JSONBAgg(
-                    JSONObject(
-                        status_type=F("status_type__name"),
-                        break_time=F("break_time"),
-                    )
-                )
-            )
-            .values("aggregated"),
-            output_field=JSONField(),
-        )
-
-        agents = agents.annotate(
-            custom_status=custom_status_subquery,
-            agent=Concat(F("first_name"), Value(" "), F("last_name")),
-        )
-
-        ordering_fields = ["-agent", "agent"]
-
-        if filters.ordering and filters.ordering in ordering_fields:
-            agents = agents.order_by(filters.ordering)
-        else:
-            agents = agents.order_by("agent")
-
-        return agents
-
 
 class CSATRepository:
     def get_csat_ratings(self, filters: Filters, project) -> CSATRatings:
-        print(f"[csat_ratings repository] filters: {filters}")
         filter_mapping = {
             "start_date": ("room__ended_at__gte", filters.start_date),
             "end_date": ("room__ended_at__lte", filters.end_date),

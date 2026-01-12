@@ -287,13 +287,10 @@ class RoomViewset(
         secondary_sort = list(filtered_qs.query.order_by or self.ordering or [])
 
         # Create pin subquery for annotations
-        pin_subquery = (
-            RoomPin.objects.filter(
-                room=OuterRef("pk"),
-                **pins_query,
-            )
-            .order_by("-created_on")
-        )
+        pin_subquery = RoomPin.objects.filter(
+            room=OuterRef("pk"),
+            **pins_query,
+        ).order_by("-created_on")
 
         # NOW annotate only the rooms we need
         annotated_qs = qs.filter(pk__in=all_room_ids).annotate(
@@ -387,7 +384,7 @@ class RoomViewset(
         if (
             instance.user is None
             and instance.queue
-            and not instance.project.can_close_chats_in_queue
+            and instance.queue.sector.can_close_chats_in_queue
         ):
             permission = instance.project.get_permission(request.user)
             if not permission or not permission.is_admin:

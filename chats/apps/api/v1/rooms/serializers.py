@@ -241,11 +241,6 @@ class ListRoomSerializer(serializers.ModelSerializer):
             "contact": None,
         }
 
-    def get_imported_history_url(self, room: Room):
-        if room.contact and hasattr(room.contact, "imported_history_url"):
-            return room.contact.imported_history_url
-        return None
-
     def get_is_pinned(self, room: Room) -> bool:
         request = self.context.get("request")
 

@@ -1,10 +1,7 @@
-from unittest.mock import patch
 import uuid
 
 from django.utils import timezone
 import pytz
-import pytz
-import uuid
 from unittest.mock import patch
 
 from rest_framework import status
@@ -16,17 +13,14 @@ from chats.apps.api.v1.internal.dashboard.dto import CSATRatingCount, CSATRating
 from chats.apps.sectors.models import Sector
 from chats.apps.queues.models import Queue
 from chats.apps.accounts.tests.decorators import with_internal_auth
+from chats.apps.rooms.models import Room
+from chats.apps.csat.models import CSATSurvey
 from chats.apps.projects.models.models import (
     CustomStatus,
     CustomStatusType,
     Project,
     ProjectPermission,
 )
-from chats.apps.accounts.tests.decorators import with_internal_auth
-from chats.apps.queues.models import Queue
-from chats.apps.sectors.models import Sector
-from chats.apps.rooms.models import Room
-from chats.apps.csat.models import CSATSurvey
 
 
 class BaseTestInternalDashboardView(APITestCase):
@@ -42,13 +36,13 @@ class BaseTestInternalDashboardView(APITestCase):
 
 
 class TestInternalDashboardViewUnauthenticated(BaseTestInternalDashboardView):
-    def test_get_agent_csat_metrics_unauthenticated(self):
-        response = self.get_agent_csat_metrics(uuid.uuid4())
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-
     def test_csat_ratings_unauthenticated(self):
         response = self.get_csat_ratings(uuid.uuid4(), {})
 
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_get_agent_csat_metrics_unauthenticated(self):
+        response = self.get_agent_csat_metrics(uuid.uuid4())
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
@@ -66,6 +60,31 @@ class TestInternalDashboardViewAuthenticated(BaseTestInternalDashboardView):
         self.queue = Queue.objects.create(sector=self.sector, name="Test Queue")
 
         self.client.force_authenticate(user=self.user)
+
+    def test_csat_ratings_without_permission(self):
+        response = self.get_csat_ratings(self.project.uuid, {})
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    @with_internal_auth
+    @patch("chats.apps.api.v1.internal.dashboard.service.CSATService.get_csat_ratings")
+    def test_csat_ratings_authenticated(self, mock_get_csat_ratings):
+        mock_get_csat_ratings.return_value = CSATRatings(
+            ratings=[CSATRatingCount(rating=5, count=1, percentage=100)]
+        )
+        response = self.get_csat_ratings(self.project.uuid, {})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            response.data["csat_ratings"],
+            [
+                {
+                    "rating": 5,
+                    "value": 100.0,
+                    "full_value": 1,
+                }
+            ],
+        )
 
     @with_internal_auth
     def test_get_agent_csat_metrics_authenticated(self):
@@ -108,31 +127,6 @@ class TestInternalDashboardViewAuthenticated(BaseTestInternalDashboardView):
         self.assertEqual(response.data["results"][0]["rooms"], 1)
         self.assertEqual(response.data["results"][0]["reviews"], 1)
         self.assertEqual(response.data["results"][0]["avg_rating"], 5.0)
-
-    def test_csat_ratings_without_permission(self):
-        response = self.get_csat_ratings(self.project.uuid, {})
-
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-    @with_internal_auth
-    @patch("chats.apps.api.v1.internal.dashboard.service.CSATService.get_csat_ratings")
-    def test_csat_ratings_authenticated(self, mock_get_csat_ratings):
-        mock_get_csat_ratings.return_value = CSATRatings(
-            ratings=[CSATRatingCount(rating=5, count=1, percentage=100)]
-        )
-        response = self.get_csat_ratings(self.project.uuid, {})
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(
-            response.data["csat_ratings"],
-            [
-                {
-                    "rating": 5,
-                    "value": 100.0,
-                    "full_value": 1,
-                }
-            ],
-        )
 
 
 class BaseTestInternalDashboardViewSet(APITestCase):
