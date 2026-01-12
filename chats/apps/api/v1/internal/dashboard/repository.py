@@ -554,8 +554,8 @@ class AgentRepository:
                 filter=Q(**rooms_query),
             ),
             reviews=Count(
-                "rooms__csat_survey__rating",
-                distinct=True,
+                "rooms__csat_survey__uuid",
+                distinct=False,
                 filter=Q(**csat_reviews_query),
             ),
             avg_rating=Coalesce(
