@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from rest_framework import status
 from sentry_sdk import capture_exception
-from django.shortcuts import redirect
+from django.http import HttpResponseRedirect
 
 from chats.apps.api.v1.archive_chats.serializers import (
     GetArchivedMediaQueryParamsSerializer,
@@ -33,4 +33,4 @@ class GetArchivedMediaView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        return redirect(url)
+        return HttpResponseRedirect(url)
