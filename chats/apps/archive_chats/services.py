@@ -3,7 +3,9 @@ import io
 import json
 import logging
 
+import re
 from typing import List
+from uuid import UUID
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.core.files.base import ContentFile
@@ -11,11 +13,13 @@ from sentry_sdk import capture_exception
 
 
 from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
+from chats.apps.archive_chats.exceptions import InvalidObjectKey
 from chats.apps.archive_chats.models import (
     ArchiveConversationsJob,
     RoomArchivedConversation,
 )
 from chats.apps.archive_chats.serializers import ArchiveMessageSerializer
+from chats.apps.core.integrations.aws.s3.helpers import get_presigned_url
 from chats.apps.rooms.models import Room
 from chats.apps.msgs.models import Message
 
@@ -36,6 +40,10 @@ class BaseArchiveChatsService(ABC):
 
     @abstractmethod
     def upload_messages_file(self, messages: List[dict]) -> None:
+        pass
+
+    @abstractmethod
+    def get_archived_media_url(self, object_key: str) -> str:
         pass
 
 
@@ -170,3 +178,22 @@ class ArchiveChatsService(BaseArchiveChatsService):
         room_archived_conversation.save(update_fields=["status"])
 
         return room_archived_conversation
+
+    def get_archived_media_url(self, object_key: str) -> str:
+        valid_pattern = r"^archived_conversations/[^/]+/[^/]+/media/[^/]+$"
+
+        if not re.fullmatch(valid_pattern, object_key):
+            raise InvalidObjectKey("Invalid object key")
+
+        parts = object_key.split("/")
+
+        project_uuid = parts[1]
+        room_uuid = parts[2]
+
+        for _uuid in (project_uuid, room_uuid):
+            try:
+                UUID(_uuid)
+            except ValueError:
+                raise InvalidObjectKey("Invalid object key")
+
+        return get_presigned_url(object_key)
