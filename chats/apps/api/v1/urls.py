@@ -13,7 +13,7 @@ from chats.apps.api.v1.dashboard.viewsets import (
     ModelFieldsViewSet,
     ReportFieldsValidatorViewSet,
 )
-from chats.apps.api.v1.routers import routers
+from chats.apps.api.v1.routers import router
 from chats.apps.api.v1.internal.agents.views import AgentDisconnectView
 from chats.apps.api.v1.ai_features.views import HistorySummaryFeedbackTagsView
 
