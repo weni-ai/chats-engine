@@ -22,7 +22,7 @@ from chats.apps.archive_chats.models import (
 )
 from chats.apps.archive_chats.serializers import ArchiveMessageSerializer
 from chats.apps.core.integrations.aws.s3.helpers import get_presigned_url
-from chats.apps.msgs.models import Message, MessageMedia
+from chats.apps.msgs.models import Message
 from chats.apps.rooms.models import Room
 
 
