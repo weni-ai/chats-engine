@@ -1,22 +1,22 @@
 # This is a placeholder and will be changed later to the actual flow definition
 
-CSAT_FLOW_VERSION = 1
+CSAT_FLOW_VERSION = 2
 CSAT_FLOW_NAME = "Weni Chats CSAT Flow"
 CSAT_FLOW_DEFINITION_DATA = {
     "version": "13",
-    "site": "https://flows.weni.ai",
+    "site": "https://flows.stg.cloud.weni.ai",
     "flows": [
         {
             "_ui": {
                 "nodes": {
-                    "2e1f850e-3f6e-4871-9397-bc203150dee5": {
+                    "6c056ac2-b770-46f9-a7c9-d44d92aa2f14": {
                         "position": {
                             "left": "1342.074049511356",
                             "top": "1254.275597947668",
                         },
                         "type": "execute_actions",
                     },
-                    "b9ebab44-c128-481b-8954-f4c85015c817": {
+                    "e715d7fb-28bf-425e-be3b-3b45c1bb0af0": {
                         "config": {"cases": {}},
                         "position": {
                             "left": "1344.7429126871152",
@@ -24,36 +24,36 @@ CSAT_FLOW_DEFINITION_DATA = {
                         },
                         "type": "split_by_scheme",
                     },
-                    "4cd80fe0-94b1-4926-b0f8-4838aa74a75d": {
+                    "2857c7ea-5e79-4b13-a73a-cfbe61ae1f6c": {
                         "position": {
                             "left": "1135.002130439344",
                             "top": "1644.0453112453636",
                         },
                         "type": "execute_actions",
                     },
-                    "b020f657-9f36-481e-9d6d-f8f4f1ea1cec": {
+                    "5dedc9fb-c576-46dc-8154-b9ee4850c9dd": {
                         "position": {
                             "left": "1537.7174976978713",
                             "top": "1645.4129353706592",
                         },
                         "type": "execute_actions",
                     },
-                    "ba69ec44-a454-4040-9ceb-6034a4062471": {
+                    "d5daf3ec-e348-481b-b0e5-2409f90b726d": {
                         "position": {
                             "left": "2102.730635385634",
                             "top": "1864.5697418429131",
                         },
                         "type": "execute_actions",
                     },
-                    "fa05fd8d-b48d-4efa-83be-bf5909e17a5e": {
-                        "type": "wait_for_response",
+                    "4dcffaa1-0674-4363-941b-4f5e3fb0a5b5": {
+                        "config": {"cases": {}},
                         "position": {
                             "left": "1157.2408609900526",
                             "top": "2031.653596440618",
                         },
-                        "config": {"cases": {}},
+                        "type": "wait_for_response",
                     },
-                    "e44d55c1-dc42-4d79-80d2-f6f99a81921e": {
+                    "1400533b-0bd5-4466-90e1-d10828454833": {
                         "config": {
                             "cases": {},
                             "operand": {
@@ -68,57 +68,47 @@ CSAT_FLOW_DEFINITION_DATA = {
                         },
                         "type": "split_by_run_result",
                     },
-                    "0d552af3-2d5e-4d82-a371-ea1630682cd6": {
+                    "c9aa9cda-5e84-4ddf-88d1-4ac4039dd398": {
                         "position": {
-                            "left": "530.5389376101214",
-                            "top": "2304.638408866735",
+                            "left": "516.5389376101214",
+                            "top": "2184.638408866735",
                         },
                         "type": "execute_actions",
                     },
-                    "3c5eb7ee-2ca9-4ef1-a0ce-3d3aeaa4caee": {
+                    "4c7a6ce2-a47c-4a93-843c-65713a3d4ada": {
                         "position": {
                             "left": "1211.8007743109872",
                             "top": "2354.7407051418536",
                         },
                         "type": "execute_actions",
                     },
-                    "b7205ca8-332b-491b-828d-977f926da067": {
-                        "position": {
-                            "left": "532.1525515926652",
-                            "top": "2484.2901920528925",
-                        },
+                    "ba65e658-7022-4862-94e6-e79406d5b578": {
+                        "position": {"left": "531.1525515926652", "top": 2784},
                         "type": "execute_actions",
                     },
-                    "b573a778-ceba-419b-b90c-648c67d01cdd": {
+                    "85d9c83e-ed42-4a1b-aab8-f0f2b2673dc6": {
                         "position": {
                             "left": "1212.9127841724944",
                             "top": "2744.0731410222365",
                         },
                         "type": "execute_actions",
                     },
-                    "8ed3fdc1-52b6-4c94-ac8c-90a81f5de661": {
-                        "position": {
-                            "left": "534.7028958280318",
-                            "top": "2777.623525386226",
-                        },
-                        "type": "execute_actions",
-                    },
-                    "947040c4-66ec-4cb8-9193-72277bf5a817": {
+                    "49277b01-5c08-4cf3-b8d9-c979f5ca3eb3": {
                         "position": {
                             "left": "1216.6290399328577",
                             "top": "2946.571929565236",
                         },
                         "type": "execute_actions",
                     },
-                    "35c6a45b-cacb-4949-8e00-e0227cd49c77": {
+                    "cb4e32e4-541e-4de6-b0f9-8ba3d433c870": {
                         "config": {"cases": {}},
                         "position": {
-                            "left": "531.4199459661597",
-                            "top": "2986.3440877475277",
+                            "left": "525.4199459661597",
+                            "top": "2963.3440877475277",
                         },
                         "type": "wait_for_response",
                     },
-                    "b6e40dc7-c7a3-4c72-b417-e1c8bf8867da": {
+                    "089c1a3f-be4a-46bd-8979-2d20a81e2580": {
                         "config": {"cases": {}},
                         "position": {
                             "left": "1211.3460900709856",
@@ -126,41 +116,50 @@ CSAT_FLOW_DEFINITION_DATA = {
                         },
                         "type": "wait_for_response",
                     },
-                    "a69bba98-4c15-44f3-bd68-f5d8b62093f5": {
+                    "e943d3ed-141f-4bb4-abde-83c19e250a05": {
                         "position": {
-                            "left": "535.4199459661597",
-                            "top": "3219.3440877475277",
+                            "left": "476.41994596615973",
+                            "top": "3216.3440877475277",
                         },
                         "type": "execute_actions",
                     },
-                    "0fc2dae0-49c7-4e09-9b6a-e4be0887088f": {
+                    "fb652fab-817c-42b3-b0f6-19d86d80ee2d": {
                         "position": {
                             "left": "796.927464564468",
                             "top": "3224.6395402223325",
                         },
                         "type": "execute_actions",
                     },
-                    "82fa6589-e918-455d-a6f9-cd0ccda9142f": {
+                    "64cf9379-df72-4bf1-b48d-0f1729c119dc": {
                         "position": {
                             "left": "1215.3460900709856",
                             "top": "3401.4251190743635",
                         },
                         "type": "execute_actions",
                     },
-                    "11a0c6d8-3752-4478-b7e0-79a96c98c244": {
+                    "9c829e36-8fa3-44f5-bafc-c14bddb8f653": {
                         "position": {
                             "left": "1479.7303603839714",
                             "top": "3403.84381983449",
                         },
                         "type": "execute_actions",
                     },
-                    "dd2320a5-4001-41ca-9460-fc80dc96e1ef": {
-                        "type": "split_by_webhook",
+                    "f9066628-7ec1-465e-bdfe-d9dd90838926": {
+                        "config": {},
                         "position": {
                             "left": "908.7015043077097",
                             "top": "3790.3354566551607",
                         },
+                        "type": "split_by_webhook",
+                    },
+                    "1b72166c-2840-4d07-948c-f8978f428f3a": {
+                        "type": "split_by_webhook",
+                        "position": {"left": "530.5389376101214", "top": 2563},
                         "config": {},
+                    },
+                    "e2cfc927-abf9-4181-9c59-e09cf969c1bf": {
+                        "position": {"left": 521, "top": 2346},
+                        "type": "execute_actions",
                     },
                 },
                 "stickies": {},
@@ -170,68 +169,69 @@ CSAT_FLOW_DEFINITION_DATA = {
             "language": "base",
             "localization": {
                 "eng": {
-                    "f4f08916-f4d9-463a-8a5f-fca41b3e1464": {
+                    "07507934-562f-4588-9634-58f7abaa7f31": {
+                        "description": [""],
+                        "title": ["Very dissatisfied \ud83d\ude23"],
+                    },
+                    "0ea27bdb-c90c-434e-ba98-4de165e3fa3b": {
+                        "description": [""],
+                        "title": ["Satisfied \ud83d\ude42"],
+                    },
+                    "1040779e-c097-4b55-9436-d5d8dc22f550": {
+                        "arguments": ["Neutral \ud83d\ude36"]
+                    },
+                    "143ff141-0735-42d2-865d-d9a77cb5c080": {
+                        "arguments": ["terrible horrible"]
+                    },
+                    "364ccca7-a19c-4fff-bcab-34a7f24c1a14": {
+                        "attachments": [],
                         "text": [
-                            "Before we go, tell us about your experience!\n*How would you rate my service?* \ud83d\udc47"
+                            "Before continuing, could you please answer our survey below?"
                         ],
-                        "quick_replies": [],
-                        "header_text": ["Customer Satisfaction Survey"],
+                    },
+                    "370acbd7-7295-4e47-b044-8310f989103d": {
+                        "arguments": ["Very satisfied \ud83d\ude03"]
+                    },
+                    "4b92d027-8fd7-4c1a-b911-a953e6cf6850": {"arguments": ["great"]},
+                    "560eed3b-c2b3-407a-ba70-5ec7b9e76536": {
+                        "arguments": ["Dissatisfied \ud83d\ude41"]
+                    },
+                    "614b6ee5-97f9-4cf2-a92c-4ef12b2d2400": {"arguments": ["good"]},
+                    "6a700f2d-3988-4e5f-8a2f-19149693dc1f": {
+                        "attachments": [],
+                        "text": [
+                            "Leave a comment about your experience with our service \u270d\ufe0f"
+                        ],
+                    },
+                    "781450c5-e6f4-4dde-a03b-51662cbd00ef": {
+                        "button_text": ["Select here"],
                         "footer": [
                             "It\u2019s very quick, it won\u2019t even take a minute."
                         ],
-                        "button_text": ["Select here"],
+                        "header_text": ["Customer Satisfaction Survey"],
+                        "quick_replies": [],
+                        "text": [
+                            "Before we go, tell us about your experience!\n*How would you rate my service?* \ud83d\udc47"
+                        ],
                     },
-                    "d66e53f8-2678-4719-a488-631faea30f04": {
-                        "title": ["Very dissatisfied \ud83d\ude23"],
-                        "description": [""],
-                    },
-                    "53f8bbd9-9bd9-4503-a0b9-cfd347600e79": {
-                        "title": ["Dissatisfied \ud83d\ude41"],
-                        "description": [""],
-                    },
-                    "f4c64614-2912-41af-8ebc-7101186c9e29": {
-                        "title": ["Neutral \ud83d\ude36"],
-                        "description": [""],
-                    },
-                    "ee120af4-7e6a-4eef-bbe8-ca021f9063d2": {
-                        "title": ["Satisfied \ud83d\ude42"],
-                        "description": [""],
-                    },
-                    "029b4fd0-dc7d-4022-9a63-0fa0a5fe0a12": {
-                        "title": ["Very satisfied \ud83d\ude03"],
-                        "description": [""],
-                    },
-                    "5c1cb2ab-e3ef-4a6c-8f2d-8ecbf17f004f": {
-                        "arguments": ["Very satisfied \ud83d\ude03"]
-                    },
-                    "222385f3-ca43-4913-8c62-ec15852d8021": {
-                        "arguments": ["Satisfied \ud83d\ude42"]
-                    },
-                    "d719b03c-4f71-44fb-bcd6-7bea8b80d0f0": {
-                        "arguments": ["Neutral \ud83d\ude36"]
-                    },
-                    "f9ace0f0-faac-4320-9974-5f3b182c5481": {
-                        "arguments": ["Dissatisfied \ud83d\ude41"]
-                    },
-                    "bf9eb137-f853-4154-92ec-f428f8cef32d": {
-                        "arguments": ["Very dissatisfied \ud83d\ude23"]
-                    },
-                    "9f974669-1450-4c4a-b076-a60c37236ee2": {"arguments": ["great"]},
-                    "e2c5ee4f-1b8c-43e3-af1b-96448b4005d9": {"arguments": ["good"]},
-                    "6e0bdb7e-abb8-434c-abee-1e7c036d71f1": {
-                        "arguments": ["neutral normal ok"]
-                    },
-                    "120bd83a-bb64-4fc0-8b55-6e2ae6413529": {"arguments": ["bad poor"]},
-                    "03e04c3a-ee57-4604-b542-7b04227f3afb": {
-                        "arguments": ["terrible horrible"]
-                    },
-                    "43f281be-01ae-4da8-bae6-bb49b07f35fb": {
+                    "79baa84f-db8c-45a3-bab7-faf791fb1bc4": {
                         "arguments": ["satisfied"]
                     },
-                    "f21315b6-4d99-45df-9b38-46ca67d6fb13": {
+                    "7ad88331-4e97-4e1e-b27c-4919210624b3": {
+                        "arguments": ["Very dissatisfied \ud83d\ude23"]
+                    },
+                    "87033018-daf3-45ff-a85e-92f184491528": {
+                        "attachments": [],
                         "text": [
-                            "Before we go, tell us about your experience!\n\n**How would you rate my service?** \ud83d\udc47"
+                            "Your session has ended. We will carefully review your feedback.\n\nThank you for helping us improve our service. See you next time! \ud83d\udc4b"
                         ],
+                    },
+                    "89cd9f22-0e86-4ebc-97e3-3e91f7f7760e": {"arguments": ["bad poor"]},
+                    "a047bf70-707f-4ddb-9009-a1bc1665d980": {
+                        "description": [""],
+                        "title": ["Dissatisfied \ud83d\ude41"],
+                    },
+                    "aa9eb133-f259-41f2-83a2-74c927d7d297": {
                         "attachments": [],
                         "quick_replies": [
                             "Very dissatisfied \ud83d\ude23",
@@ -240,74 +240,176 @@ CSAT_FLOW_DEFINITION_DATA = {
                             "Satisfied \ud83d\ude42",
                             "Very satisfied \ud83d\ude03",
                         ],
-                    },
-                    "e00688d1-7c85-43de-9ae9-4c381bd732dc": {
                         "text": [
-                            "Before continuing, could you please answer our survey below?"
+                            "Before we go, tell us about your experience!\n\n**How would you rate my service?** \ud83d\udc47"
                         ],
-                        "attachments": [],
                     },
-                    "b6eeb06b-5e7f-4df4-b857-2f59f2d39a37": {
-                        "text": [
-                            "Leave a comment about your experience with our service \u270d\ufe0f"
-                        ],
+                    "ba177798-f428-441e-b896-0f5670ad97ee": {
                         "attachments": [],
-                    },
-                    "898136db-4601-4f9f-a133-c323581e9dc2": {
                         "text": [
                             "Leave a comment so we can keep improving our service \u270d\ufe0f"
                         ],
-                        "attachments": [],
                     },
-                    "246fff75-bb2d-469e-8394-2900cdbe6d84": {
+                    "c8960771-af8e-47c4-9542-5df86ca9edcc": {
+                        "description": [""],
+                        "title": ["Very satisfied \ud83d\ude03"],
+                    },
+                    "d3dbf5c4-6404-47b8-a0a8-c739266e82f4": {
+                        "attachments": [],
                         "text": [
                             "Your session has ended.\n\nThank you for your feedback. See you next time! \ud83d\udc4b"
                         ],
-                        "attachments": [],
                     },
-                    "4d2bd028-62d2-454b-a9d4-0b2e3e4c1cc4": {
-                        "text": [
-                            "Your session has ended. We will carefully review your feedback.\n\nThank you for helping us improve our service. See you next time! \ud83d\udc4b"
-                        ],
+                    "d965f29a-55fe-468c-8b9f-7c592d08258d": {
+                        "arguments": ["Satisfied \ud83d\ude42"]
+                    },
+                    "dfb8c7c0-3393-4bc4-b82a-370404af6cdd": {
+                        "arguments": ["neutral normal ok"]
+                    },
+                    "f26e6521-8b6f-43da-a5da-87c1e2529f96": {
+                        "description": [""],
+                        "title": ["Neutral \ud83d\ude36"],
+                    },
+                },
+                "por": {
+                    "07507934-562f-4588-9634-58f7abaa7f31": {
+                        "description": [""],
+                        "title": ["Muito insatisfeito \ud83d\ude23"],
+                    },
+                    "0ea27bdb-c90c-434e-ba98-4de165e3fa3b": {
+                        "description": [""],
+                        "title": ["Satisfeito \ud83d\ude42"],
+                    },
+                    "364ccca7-a19c-4fff-bcab-34a7f24c1a14": {
                         "attachments": [],
+                        "text": [
+                            "Antes de continuar, poderia responder nossa pesquisa abaixo?"
+                        ],
+                    },
+                    "6a700f2d-3988-4e5f-8a2f-19149693dc1f": {
+                        "attachments": [],
+                        "text": [
+                            "Deixe um coment\u00e1rio sobre sua experi\u00eancia com nosso atendimento \u270d\ufe0f"
+                        ],
+                    },
+                    "781450c5-e6f4-4dde-a03b-51662cbd00ef": {
+                        "button_text": ["Selecione aqui"],
+                        "footer": [
+                            "\u00c9 bem r\u00e1pido, n\u00e3o vai demorar nem 1 minuto."
+                        ],
+                        "header_text": ["Pesquisa de Satisfa\u00e7\u00e3o"],
+                        "quick_replies": [],
+                        "text": [
+                            "Antes de encerrar, conte como foi sua experi\u00eancia!\n*Como voc\u00ea avalia o meu atendimento?* \ud83d\udc47"
+                        ],
+                    },
+                    "87033018-daf3-45ff-a85e-92f184491528": {
+                        "attachments": [],
+                        "text": [
+                            "Seu atendimento foi finalizado. Iremos analisar seu coment\u00e1rio com responsabilidade.\n\nAgradecemos a sua colabora\u00e7\u00e3o para melhorar o atendimento. At\u00e9 a pr\u00f3xima \ud83d\udc4b"
+                        ],
+                    },
+                    "a047bf70-707f-4ddb-9009-a1bc1665d980": {
+                        "description": [""],
+                        "title": ["Insatisfeito \ud83d\ude41"],
+                    },
+                    "aa9eb133-f259-41f2-83a2-74c927d7d297": {
+                        "attachments": [],
+                        "text": [
+                            "Antes de encerrar, conte como foi sua experi\u00eancia!\n\n**Como voc\u00ea avalia o meu atendimento?** \ud83d\udc47"
+                        ],
+                    },
+                    "ba177798-f428-441e-b896-0f5670ad97ee": {
+                        "attachments": [],
+                        "text": [
+                            "Deixe um coment\u00e1rio para sempre melhorarmos nosso atendimento \u270d\ufe0f"
+                        ],
+                    },
+                    "c8960771-af8e-47c4-9542-5df86ca9edcc": {
+                        "description": [""],
+                        "title": ["Muito satisfeito \ud83d\ude03"],
+                    },
+                    "d3dbf5c4-6404-47b8-a0a8-c739266e82f4": {
+                        "attachments": [],
+                        "text": [
+                            "Seu atendimento foi finalizado.\n\nAgradecemos a sua colabora\u00e7\u00e3o. At\u00e9 a pr\u00f3xima \ud83d\udc4b"
+                        ],
+                    },
+                    "f26e6521-8b6f-43da-a5da-87c1e2529f96": {
+                        "description": [""],
+                        "title": ["Neutro \ud83d\ude36"],
                     },
                 },
                 "spa": {
-                    "f4f08916-f4d9-463a-8a5f-fca41b3e1464": {
+                    "07507934-562f-4588-9634-58f7abaa7f31": {
+                        "description": [""],
+                        "title": ["Muy insatisfecho \ud83d\ude23"],
+                    },
+                    "0ea27bdb-c90c-434e-ba98-4de165e3fa3b": {
+                        "description": [""],
+                        "title": ["Satisfecho \ud83d\ude42"],
+                    },
+                    "1040779e-c097-4b55-9436-d5d8dc22f550": {
+                        "arguments": ["Neutral \ud83d\ude36"]
+                    },
+                    "143ff141-0735-42d2-865d-d9a77cb5c080": {
+                        "arguments": ["horrible terrible"]
+                    },
+                    "364ccca7-a19c-4fff-bcab-34a7f24c1a14": {
+                        "attachments": [],
                         "text": [
-                            "Antes de terminar, \u00a1cu\u00e9ntanos tu experiencia!\n*\u00bfC\u00f3mo valoras mi atenci\u00f3n?* \ud83d\udc47"
+                            "Antes de continuar, \u00bfpodr\u00edas responder a nuestra encuesta de abajo?"
                         ],
-                        "quick_replies": [],
-                        "header_text": ["Encuesta de Satisfacci\u00f3n"],
+                    },
+                    "370acbd7-7295-4e47-b044-8310f989103d": {
+                        "arguments": ["Muy satisfecho \ud83d\ude03"]
+                    },
+                    "4b92d027-8fd7-4c1a-b911-a953e6cf6850": {
+                        "arguments": ["excelente"]
+                    },
+                    "560eed3b-c2b3-407a-ba70-5ec7b9e76536": {
+                        "arguments": ["Insatisfecho \ud83d\ude41"]
+                    },
+                    "614b6ee5-97f9-4cf2-a92c-4ef12b2d2400": {
+                        "arguments": ["bueno buena"]
+                    },
+                    "6a700f2d-3988-4e5f-8a2f-19149693dc1f": {
+                        "attachments": [],
+                        "text": [
+                            "D\u00e9janos un comentario sobre tu experiencia con nuestra atenci\u00f3n \u270d\ufe0f"
+                        ],
+                    },
+                    "781450c5-e6f4-4dde-a03b-51662cbd00ef": {
+                        "button_text": ["Selecciona aqu\u00ed"],
                         "footer": [
                             "Es muy r\u00e1pido, no te quitar\u00e1 ni un minuto."
                         ],
-                        "button_text": ["Selecciona aqu\u00ed"],
-                    },
-                    "d66e53f8-2678-4719-a488-631faea30f04": {
-                        "title": ["Muy insatisfecho \ud83d\ude23"],
-                        "description": [""],
-                    },
-                    "53f8bbd9-9bd9-4503-a0b9-cfd347600e79": {
-                        "title": ["Insatisfecho \ud83d\ude41"],
-                        "description": [""],
-                    },
-                    "f4c64614-2912-41af-8ebc-7101186c9e29": {
-                        "title": ["Neutral \ud83d\ude36"],
-                        "description": [""],
-                    },
-                    "ee120af4-7e6a-4eef-bbe8-ca021f9063d2": {
-                        "title": ["Satisfecho \ud83d\ude42"],
-                        "description": [""],
-                    },
-                    "029b4fd0-dc7d-4022-9a63-0fa0a5fe0a12": {
-                        "title": ["Muy satisfecho \ud83d\ude03"],
-                        "description": [""],
-                    },
-                    "f21315b6-4d99-45df-9b38-46ca67d6fb13": {
+                        "header_text": ["Encuesta de Satisfacci\u00f3n"],
+                        "quick_replies": [],
                         "text": [
-                            "Antes de terminar, \u00a1cu\u00e9ntanos tu experiencia!\n\n**\u00bfC\u00f3mo valoras mi atenci\u00f3n?** \ud83d\udc47"
+                            "Antes de terminar, \u00a1cu\u00e9ntanos tu experiencia!\n*\u00bfC\u00f3mo valoras mi atenci\u00f3n?* \ud83d\udc47"
                         ],
+                    },
+                    "79baa84f-db8c-45a3-bab7-faf791fb1bc4": {
+                        "arguments": ["satisfecho satisfecha"]
+                    },
+                    "7ad88331-4e97-4e1e-b27c-4919210624b3": {
+                        "arguments": ["Muy insatisfecho \ud83d\ude23"]
+                    },
+                    "87033018-daf3-45ff-a85e-92f184491528": {
+                        "attachments": [],
+                        "text": [
+                            "Tu atenci\u00f3n ha finalizado. Analizaremos tu comentario con responsabilidad.\n\nGracias por ayudarnos a mejorar nuestra atenci\u00f3n. \u00a1Hasta la pr\u00f3xima! \ud83d\udc4b"
+                        ],
+                    },
+                    "89cd9f22-0e86-4ebc-97e3-3e91f7f7760e": {
+                        "arguments": ["malo mala"]
+                    },
+                    "a047bf70-707f-4ddb-9009-a1bc1665d980": {
+                        "description": [""],
+                        "title": ["Insatisfecho \ud83d\ude41"],
+                    },
+                    "aa9eb133-f259-41f2-83a2-74c927d7d297": {
                         "attachments": [],
                         "quick_replies": [
                             "Muy insatisfecho \ud83d\ude23",
@@ -316,138 +418,35 @@ CSAT_FLOW_DEFINITION_DATA = {
                             "Satisfecho \ud83d\ude42",
                             "Muy satisfecho \ud83d\ude03",
                         ],
-                    },
-                    "5c1cb2ab-e3ef-4a6c-8f2d-8ecbf17f004f": {
-                        "arguments": ["Muy satisfecho \ud83d\ude03"]
-                    },
-                    "222385f3-ca43-4913-8c62-ec15852d8021": {
-                        "arguments": ["Satisfecho \ud83d\ude42"]
-                    },
-                    "d719b03c-4f71-44fb-bcd6-7bea8b80d0f0": {
-                        "arguments": ["Neutral \ud83d\ude36"]
-                    },
-                    "f9ace0f0-faac-4320-9974-5f3b182c5481": {
-                        "arguments": ["Insatisfecho \ud83d\ude41"]
-                    },
-                    "bf9eb137-f853-4154-92ec-f428f8cef32d": {
-                        "arguments": ["Muy insatisfecho \ud83d\ude23"]
-                    },
-                    "9f974669-1450-4c4a-b076-a60c37236ee2": {
-                        "arguments": ["excelente"]
-                    },
-                    "e2c5ee4f-1b8c-43e3-af1b-96448b4005d9": {
-                        "arguments": ["bueno buena"]
-                    },
-                    "6e0bdb7e-abb8-434c-abee-1e7c036d71f1": {
-                        "arguments": ["normal neutral"]
-                    },
-                    "120bd83a-bb64-4fc0-8b55-6e2ae6413529": {
-                        "arguments": ["malo mala"]
-                    },
-                    "03e04c3a-ee57-4604-b542-7b04227f3afb": {
-                        "arguments": ["horrible terrible"]
-                    },
-                    "43f281be-01ae-4da8-bae6-bb49b07f35fb": {
-                        "arguments": ["satisfecho satisfecha"]
-                    },
-                    "b6eeb06b-5e7f-4df4-b857-2f59f2d39a37": {
                         "text": [
-                            "D\u00e9janos un comentario sobre tu experiencia con nuestra atenci\u00f3n \u270d\ufe0f"
+                            "Antes de terminar, \u00a1cu\u00e9ntanos tu experiencia!\n\n**\u00bfC\u00f3mo valoras mi atenci\u00f3n?** \ud83d\udc47"
                         ],
-                        "attachments": [],
                     },
-                    "898136db-4601-4f9f-a133-c323581e9dc2": {
+                    "ba177798-f428-441e-b896-0f5670ad97ee": {
+                        "attachments": [],
                         "text": [
                             "D\u00e9janos un comentario para que podamos seguir mejorando nuestra atenci\u00f3n \u270d\ufe0f"
                         ],
-                        "attachments": [],
                     },
-                    "246fff75-bb2d-469e-8394-2900cdbe6d84": {
+                    "c8960771-af8e-47c4-9542-5df86ca9edcc": {
+                        "description": [""],
+                        "title": ["Muy satisfecho \ud83d\ude03"],
+                    },
+                    "d3dbf5c4-6404-47b8-a0a8-c739266e82f4": {
+                        "attachments": [],
                         "text": [
                             "Tu atenci\u00f3n ha finalizado.\n\nAgradecemos tu colaboraci\u00f3n. \u00a1Hasta la pr\u00f3xima! \ud83d\udc4b"
                         ],
-                        "attachments": [],
                     },
-                    "4d2bd028-62d2-454b-a9d4-0b2e3e4c1cc4": {
-                        "text": [
-                            "Tu atenci\u00f3n ha finalizado. Analizaremos tu comentario con responsabilidad.\n\nGracias por ayudarnos a mejorar nuestra atenci\u00f3n. \u00a1Hasta la pr\u00f3xima! \ud83d\udc4b"
-                        ],
-                        "attachments": [],
+                    "d965f29a-55fe-468c-8b9f-7c592d08258d": {
+                        "arguments": ["Satisfecho \ud83d\ude42"]
                     },
-                    "e00688d1-7c85-43de-9ae9-4c381bd732dc": {
-                        "text": [
-                            "Antes de continuar, \u00bfpodr\u00edas responder a nuestra encuesta de abajo?"
-                        ],
-                        "attachments": [],
+                    "dfb8c7c0-3393-4bc4-b82a-370404af6cdd": {
+                        "arguments": ["normal neutral"]
                     },
-                },
-                "por": {
-                    "f4f08916-f4d9-463a-8a5f-fca41b3e1464": {
-                        "text": [
-                            "Antes de encerrar, conte como foi sua experi\u00eancia!\n*Como voc\u00ea avalia o meu atendimento?* \ud83d\udc47"
-                        ],
-                        "quick_replies": [],
-                        "header_text": ["Pesquisa de Satisfa\u00e7\u00e3o"],
-                        "footer": [
-                            "\u00c9 bem r\u00e1pido, n\u00e3o vai demorar nem 1 minuto."
-                        ],
-                        "button_text": ["Selecione aqui"],
-                    },
-                    "d66e53f8-2678-4719-a488-631faea30f04": {
-                        "title": ["Muito insatisfeito \ud83d\ude23"],
+                    "f26e6521-8b6f-43da-a5da-87c1e2529f96": {
                         "description": [""],
-                    },
-                    "53f8bbd9-9bd9-4503-a0b9-cfd347600e79": {
-                        "title": ["Insatisfeito \ud83d\ude41"],
-                        "description": [""],
-                    },
-                    "f4c64614-2912-41af-8ebc-7101186c9e29": {
-                        "title": ["Neutro \ud83d\ude36"],
-                        "description": [""],
-                    },
-                    "ee120af4-7e6a-4eef-bbe8-ca021f9063d2": {
-                        "title": ["Satisfeito \ud83d\ude42"],
-                        "description": [""],
-                    },
-                    "029b4fd0-dc7d-4022-9a63-0fa0a5fe0a12": {
-                        "title": ["Muito satisfeito \ud83d\ude03"],
-                        "description": [""],
-                    },
-                    "f21315b6-4d99-45df-9b38-46ca67d6fb13": {
-                        "text": [
-                            "Antes de encerrar, conte como foi sua experi\u00eancia!\n\n**Como voc\u00ea avalia o meu atendimento?** \ud83d\udc47"
-                        ],
-                        "attachments": [],
-                    },
-                    "e00688d1-7c85-43de-9ae9-4c381bd732dc": {
-                        "text": [
-                            "Antes de continuar, poderia responder nossa pesquisa abaixo?"
-                        ],
-                        "attachments": [],
-                    },
-                    "b6eeb06b-5e7f-4df4-b857-2f59f2d39a37": {
-                        "text": [
-                            "Deixe um coment\u00e1rio sobre sua experi\u00eancia com nosso atendimento \u270d\ufe0f"
-                        ],
-                        "attachments": [],
-                    },
-                    "898136db-4601-4f9f-a133-c323581e9dc2": {
-                        "text": [
-                            "Deixe um coment\u00e1rio para sempre melhorarmos nosso atendimento \u270d\ufe0f"
-                        ],
-                        "attachments": [],
-                    },
-                    "246fff75-bb2d-469e-8394-2900cdbe6d84": {
-                        "text": [
-                            "Seu atendimento foi finalizado.\n\nAgradecemos a sua colabora\u00e7\u00e3o. At\u00e9 a pr\u00f3xima \ud83d\udc4b"
-                        ],
-                        "attachments": [],
-                    },
-                    "4d2bd028-62d2-454b-a9d4-0b2e3e4c1cc4": {
-                        "text": [
-                            "Seu atendimento foi finalizado. Iremos analisar seu coment\u00e1rio com responsabilidade.\n\nAgradecemos a sua colabora\u00e7\u00e3o para melhorar o atendimento. At\u00e9 a pr\u00f3xima \ud83d\udc4b"
-                        ],
-                        "attachments": [],
+                        "title": ["Neutral \ud83d\ude36"],
                     },
                 },
             },
@@ -460,115 +459,113 @@ CSAT_FLOW_DEFINITION_DATA = {
                             "category": "",
                             "name": "tentativa",
                             "type": "set_run_result",
-                            "uuid": "dc71ab5b-cc86-4a1f-863d-0a658b2c0f3c",
+                            "uuid": "32e842e7-d4c1-4a8b-a558-cffc622687a9",
                             "value": "0",
                         }
                     ],
                     "exits": [
                         {
-                            "destination_uuid": "b9ebab44-c128-481b-8954-f4c85015c817",
-                            "uuid": "bcede528-7d80-4178-a8da-d3cbdb299b0e",
+                            "destination_uuid": "e715d7fb-28bf-425e-be3b-3b45c1bb0af0",
+                            "uuid": "3f202d08-d8c8-4481-92ff-7e5b7168e619",
                         }
                     ],
-                    "uuid": "2e1f850e-3f6e-4871-9397-bc203150dee5",
+                    "uuid": "6c056ac2-b770-46f9-a7c9-d44d92aa2f14",
                 },
                 {
                     "actions": [],
                     "exits": [
                         {
-                            "destination_uuid": "4cd80fe0-94b1-4926-b0f8-4838aa74a75d",
-                            "uuid": "0733237c-97cc-490a-a6d2-b78df94de026",
+                            "destination_uuid": "2857c7ea-5e79-4b13-a73a-cfbe61ae1f6c",
+                            "uuid": "4960c299-51c4-4f2a-addb-efa9f01da6d8",
                         },
                         {
-                            "destination_uuid": "b020f657-9f36-481e-9d6d-f8f4f1ea1cec",
-                            "uuid": "7f7cc7b8-901a-4a88-9e16-8ed90abbca38",
+                            "destination_uuid": "5dedc9fb-c576-46dc-8154-b9ee4850c9dd",
+                            "uuid": "206b465c-ab25-4b48-b955-4453c9e02cf3",
                         },
                     ],
                     "router": {
                         "cases": [
                             {
                                 "arguments": ["whatsapp"],
-                                "category_uuid": "60ee929c-cc03-40b8-8742-5fd5c96eab19",
+                                "category_uuid": "c09fe578-b252-4026-8ae0-5ece0762b60a",
                                 "type": "has_only_phrase",
-                                "uuid": "d1d07268-fed3-49ff-98df-608346aa2b6b",
+                                "uuid": "860f3841-b4a8-4010-b99d-ccdd4df3bcac",
                             }
                         ],
                         "categories": [
                             {
-                                "exit_uuid": "0733237c-97cc-490a-a6d2-b78df94de026",
+                                "exit_uuid": "4960c299-51c4-4f2a-addb-efa9f01da6d8",
                                 "name": "WhatsApp",
-                                "uuid": "60ee929c-cc03-40b8-8742-5fd5c96eab19",
+                                "uuid": "c09fe578-b252-4026-8ae0-5ece0762b60a",
                             },
                             {
-                                "exit_uuid": "7f7cc7b8-901a-4a88-9e16-8ed90abbca38",
+                                "exit_uuid": "206b465c-ab25-4b48-b955-4453c9e02cf3",
                                 "name": "Other",
-                                "uuid": "dd68f4fb-452b-4b24-bace-46ba7dbd9e7b",
+                                "uuid": "b8784302-6285-4b86-8b3d-7e0f845992a9",
                             },
                         ],
-                        "default_category_uuid": "dd68f4fb-452b-4b24-bace-46ba7dbd9e7b",
+                        "default_category_uuid": "b8784302-6285-4b86-8b3d-7e0f845992a9",
                         "operand": "@(urn_parts(contact.urn).scheme)",
                         "result_name": "",
                         "type": "switch",
                     },
-                    "uuid": "b9ebab44-c128-481b-8954-f4c85015c817",
+                    "uuid": "e715d7fb-28bf-425e-be3b-3b45c1bb0af0",
                 },
                 {
                     "actions": [
                         {
-                            "type": "send_whatsapp_msg",
-                            "text": "Antes de encerrar, conte como foi sua experi\u00eancia!\n*Como voc\u00ea avalia o meu atendimento?* \ud83d\udc47",
-                            "messageType": "interactive",
-                            "header_type": "text",
-                            "header_text": "Pesquisa de Satisfa\u00e7\u00e3o",
-                            "footer": "\u00c9 bem r\u00e1pido, n\u00e3o vai demorar nem 1 minuto.",
-                            "interaction_type": "list",
                             "button_text": "Selecione aqui",
+                            "flow_data_attachment_name_map": {},
+                            "footer": "\u00c9 bem r\u00e1pido, n\u00e3o vai demorar nem 1 minuto.",
+                            "header_text": "Pesquisa de Satisfa\u00e7\u00e3o",
+                            "header_type": "text",
+                            "interaction_type": "list",
                             "list_items": [
                                 {
                                     "description": "",
                                     "title": "Muito insatisfeito \ud83d\ude23",
-                                    "uuid": "d66e53f8-2678-4719-a488-631faea30f04",
+                                    "uuid": "07507934-562f-4588-9634-58f7abaa7f31",
                                 },
                                 {
                                     "description": "",
                                     "title": "Insatisfeito \ud83d\ude41",
-                                    "uuid": "53f8bbd9-9bd9-4503-a0b9-cfd347600e79",
+                                    "uuid": "a047bf70-707f-4ddb-9009-a1bc1665d980",
                                 },
                                 {
                                     "description": "",
                                     "title": "Neutro \ud83d\ude36",
-                                    "uuid": "f4c64614-2912-41af-8ebc-7101186c9e29",
+                                    "uuid": "f26e6521-8b6f-43da-a5da-87c1e2529f96",
                                 },
                                 {
                                     "description": "",
                                     "title": "Satisfeito \ud83d\ude42",
-                                    "uuid": "ee120af4-7e6a-4eef-bbe8-ca021f9063d2",
+                                    "uuid": "0ea27bdb-c90c-434e-ba98-4de165e3fa3b",
                                 },
                                 {
                                     "description": "",
                                     "title": "Muito satisfeito \ud83d\ude03",
-                                    "uuid": "029b4fd0-dc7d-4022-9a63-0fa0a5fe0a12",
+                                    "uuid": "c8960771-af8e-47c4-9542-5df86ca9edcc",
                                 },
                             ],
-                            "uuid": "f4f08916-f4d9-463a-8a5f-fca41b3e1464",
-                            "flow_data_attachment_name_map": {},
+                            "messageType": "interactive",
                             "quick_replies": [],
+                            "text": "Antes de encerrar, conte como foi sua experi\u00eancia!\n*Como voc\u00ea avalia o meu atendimento?* \ud83d\udc47",
+                            "type": "send_whatsapp_msg",
+                            "uuid": "781450c5-e6f4-4dde-a03b-51662cbd00ef",
                         }
                     ],
                     "exits": [
                         {
-                            "destination_uuid": "fa05fd8d-b48d-4efa-83be-bf5909e17a5e",
-                            "uuid": "8ffc1371-8a5e-4b3b-ae4c-071667b67585",
+                            "destination_uuid": "4dcffaa1-0674-4363-941b-4f5e3fb0a5b5",
+                            "uuid": "d59f3e20-29a1-4f46-9a1f-c364a83fe617",
                         }
                     ],
-                    "uuid": "4cd80fe0-94b1-4926-b0f8-4838aa74a75d",
+                    "uuid": "2857c7ea-5e79-4b13-a73a-cfbe61ae1f6c",
                 },
                 {
                     "actions": [
                         {
                             "attachments": [],
-                            "text": "Antes de encerrar, conte como foi sua experi\u00eancia!\n\n**Como voc\u00ea avalia o meu atendimento?** \ud83d\udc47",
-                            "type": "send_msg",
                             "quick_replies": [
                                 "Muito insatisfeito \ud83d\ude23",
                                 "Insatisfeito \ud83d\ude41",
@@ -576,16 +573,18 @@ CSAT_FLOW_DEFINITION_DATA = {
                                 "Satisfeito \ud83d\ude42",
                                 "Muito satisfeito \ud83d\ude03",
                             ],
-                            "uuid": "f21315b6-4d99-45df-9b38-46ca67d6fb13",
+                            "text": "Antes de encerrar, conte como foi sua experi\u00eancia!\n\n**Como voc\u00ea avalia o meu atendimento?** \ud83d\udc47",
+                            "type": "send_msg",
+                            "uuid": "aa9eb133-f259-41f2-83a2-74c927d7d297",
                         }
                     ],
                     "exits": [
                         {
-                            "destination_uuid": "fa05fd8d-b48d-4efa-83be-bf5909e17a5e",
-                            "uuid": "5264236c-2c78-4a99-9e73-e40955e5f3cb",
+                            "destination_uuid": "4dcffaa1-0674-4363-941b-4f5e3fb0a5b5",
+                            "uuid": "9e4cfcaa-c466-47ce-b9df-b1e59bcb4087",
                         }
                     ],
-                    "uuid": "b020f657-9f36-481e-9d6d-f8f4f1ea1cec",
+                    "uuid": "5dedc9fb-c576-46dc-8154-b9ee4850c9dd",
                 },
                 {
                     "actions": [
@@ -594,211 +593,249 @@ CSAT_FLOW_DEFINITION_DATA = {
                             "quick_replies": [],
                             "text": "Antes de continuar, poderia responder nossa pesquisa abaixo?",
                             "type": "send_msg",
-                            "uuid": "e00688d1-7c85-43de-9ae9-4c381bd732dc",
+                            "uuid": "364ccca7-a19c-4fff-bcab-34a7f24c1a14",
                         },
                         {
                             "category": "",
                             "name": "tentativa",
                             "type": "set_run_result",
-                            "uuid": "6ffb6cf9-0537-4bd2-97f4-d417e2c3c6ed",
+                            "uuid": "30f0527c-6e69-4dc3-a73f-094cdc8200db",
                             "value": "@(results.tentativa +1)",
                         },
                     ],
                     "exits": [
                         {
-                            "destination_uuid": "b9ebab44-c128-481b-8954-f4c85015c817",
-                            "uuid": "563f0361-3cd3-48b1-836e-a63210184c4a",
+                            "destination_uuid": "e715d7fb-28bf-425e-be3b-3b45c1bb0af0",
+                            "uuid": "e69a4e6a-e99a-448b-be56-e43c72425c68",
                         }
                     ],
-                    "uuid": "ba69ec44-a454-4040-9ceb-6034a4062471",
+                    "uuid": "d5daf3ec-e348-481b-b0e5-2409f90b726d",
                 },
                 {
-                    "uuid": "fa05fd8d-b48d-4efa-83be-bf5909e17a5e",
                     "actions": [],
+                    "exits": [
+                        {
+                            "destination_uuid": "c9aa9cda-5e84-4ddf-88d1-4ac4039dd398",
+                            "uuid": "e58afa86-e4fd-4b0a-a690-652ea3055d96",
+                        },
+                        {
+                            "destination_uuid": "c9aa9cda-5e84-4ddf-88d1-4ac4039dd398",
+                            "uuid": "25e16f79-1da4-45e0-bbdd-533d87800e18",
+                        },
+                        {
+                            "destination_uuid": "4c7a6ce2-a47c-4a93-843c-65713a3d4ada",
+                            "uuid": "0e0607a2-aa36-4bd1-99de-2c271d7b611f",
+                        },
+                        {
+                            "destination_uuid": "85d9c83e-ed42-4a1b-aab8-f0f2b2673dc6",
+                            "uuid": "d3cbf020-732f-4a7d-9cd0-4665fed74623",
+                        },
+                        {
+                            "destination_uuid": "85d9c83e-ed42-4a1b-aab8-f0f2b2673dc6",
+                            "uuid": "cfe6a86e-c4ad-4354-87aa-dee48a28b0e0",
+                        },
+                        {
+                            "destination_uuid": "1400533b-0bd5-4466-90e1-d10828454833",
+                            "uuid": "d3dfec87-b652-47f0-9772-0681811b652e",
+                        },
+                        {"uuid": "bdd79156-2302-48f5-9f9f-01e00e9b14a7"},
+                    ],
                     "router": {
-                        "type": "switch",
-                        "default_category_uuid": "cb36c75e-7811-4dad-9f6a-3d13ca387ede",
                         "cases": [
                             {
                                 "arguments": ["Muito satisfeito \ud83d\ude03"],
+                                "category_uuid": "504ecab8-399c-4131-b6c2-1b5ad2551ba6",
                                 "type": "has_only_phrase",
-                                "uuid": "5c1cb2ab-e3ef-4a6c-8f2d-8ecbf17f004f",
-                                "category_uuid": "bf41eee7-71d9-4359-927f-b4d8aedb4cc3",
+                                "uuid": "370acbd7-7295-4e47-b044-8310f989103d",
                             },
                             {
                                 "arguments": ["Satisfeito \ud83d\ude42"],
+                                "category_uuid": "a54c1954-c292-43e8-be21-924700fe8dc1",
                                 "type": "has_only_phrase",
-                                "uuid": "222385f3-ca43-4913-8c62-ec15852d8021",
-                                "category_uuid": "c1c962a9-e13f-4032-99fa-422521be304a",
+                                "uuid": "d965f29a-55fe-468c-8b9f-7c592d08258d",
                             },
                             {
                                 "arguments": ["Neutro \ud83d\ude36"],
+                                "category_uuid": "7fc56dd7-cfda-4de2-90d4-207968077f8c",
                                 "type": "has_only_phrase",
-                                "uuid": "d719b03c-4f71-44fb-bcd6-7bea8b80d0f0",
-                                "category_uuid": "0177d24c-f2de-4187-99f9-b17b76228eb5",
+                                "uuid": "1040779e-c097-4b55-9436-d5d8dc22f550",
                             },
                             {
                                 "arguments": ["Insatisfeito \ud83d\ude41"],
+                                "category_uuid": "b12493b3-dcbc-44a3-937b-377076d61042",
                                 "type": "has_only_phrase",
-                                "uuid": "f9ace0f0-faac-4320-9974-5f3b182c5481",
-                                "category_uuid": "4c292a48-6c1b-4e47-92df-e30e60d3c085",
+                                "uuid": "560eed3b-c2b3-407a-ba70-5ec7b9e76536",
                             },
                             {
                                 "arguments": ["Muito insatisfeito \ud83d\ude23"],
+                                "category_uuid": "4e0e419c-57ff-4c8e-9737-f9c03a1e1f27",
                                 "type": "has_only_phrase",
-                                "uuid": "bf9eb137-f853-4154-92ec-f428f8cef32d",
-                                "category_uuid": "19dcf48a-2dd1-4e91-b1da-4e1a92c49ce0",
+                                "uuid": "7ad88331-4e97-4e1e-b27c-4919210624b3",
                             },
                             {
                                 "arguments": ["\u00f3timo otimo"],
+                                "category_uuid": "504ecab8-399c-4131-b6c2-1b5ad2551ba6",
                                 "type": "has_any_word",
-                                "uuid": "9f974669-1450-4c4a-b076-a60c37236ee2",
-                                "category_uuid": "bf41eee7-71d9-4359-927f-b4d8aedb4cc3",
+                                "uuid": "4b92d027-8fd7-4c1a-b911-a953e6cf6850",
                             },
                             {
                                 "arguments": ["bom boa"],
+                                "category_uuid": "a54c1954-c292-43e8-be21-924700fe8dc1",
                                 "type": "has_any_word",
-                                "uuid": "e2c5ee4f-1b8c-43e3-af1b-96448b4005d9",
-                                "category_uuid": "c1c962a9-e13f-4032-99fa-422521be304a",
+                                "uuid": "614b6ee5-97f9-4cf2-a92c-4ef12b2d2400",
                             },
                             {
                                 "arguments": ["neutro neutra normal"],
+                                "category_uuid": "7fc56dd7-cfda-4de2-90d4-207968077f8c",
                                 "type": "has_any_word",
-                                "uuid": "6e0bdb7e-abb8-434c-abee-1e7c036d71f1",
-                                "category_uuid": "0177d24c-f2de-4187-99f9-b17b76228eb5",
+                                "uuid": "dfb8c7c0-3393-4bc4-b82a-370404af6cdd",
                             },
                             {
                                 "arguments": ["ruim rum"],
+                                "category_uuid": "b12493b3-dcbc-44a3-937b-377076d61042",
                                 "type": "has_any_word",
-                                "uuid": "120bd83a-bb64-4fc0-8b55-6e2ae6413529",
-                                "category_uuid": "4c292a48-6c1b-4e47-92df-e30e60d3c085",
+                                "uuid": "89cd9f22-0e86-4ebc-97e3-3e91f7f7760e",
                             },
                             {
                                 "arguments": ["p\u00e9ssimo pessimo pesimo"],
+                                "category_uuid": "4e0e419c-57ff-4c8e-9737-f9c03a1e1f27",
                                 "type": "has_any_word",
-                                "uuid": "03e04c3a-ee57-4604-b542-7b04227f3afb",
-                                "category_uuid": "19dcf48a-2dd1-4e91-b1da-4e1a92c49ce0",
+                                "uuid": "143ff141-0735-42d2-865d-d9a77cb5c080",
                             },
                             {
                                 "arguments": ["satisfeito satisfeita"],
+                                "category_uuid": "a54c1954-c292-43e8-be21-924700fe8dc1",
                                 "type": "has_any_word",
-                                "uuid": "43f281be-01ae-4da8-bae6-bb49b07f35fb",
-                                "category_uuid": "c1c962a9-e13f-4032-99fa-422521be304a",
+                                "uuid": "79baa84f-db8c-45a3-bab7-faf791fb1bc4",
                             },
                         ],
                         "categories": [
                             {
-                                "exit_uuid": "6af21211-97c5-4952-8413-daff967fc9e4",
+                                "exit_uuid": "e58afa86-e4fd-4b0a-a690-652ea3055d96",
                                 "name": "5",
-                                "uuid": "bf41eee7-71d9-4359-927f-b4d8aedb4cc3",
+                                "uuid": "504ecab8-399c-4131-b6c2-1b5ad2551ba6",
                             },
                             {
-                                "exit_uuid": "67d52193-2707-4ad4-88fb-28cced29aed0",
+                                "exit_uuid": "25e16f79-1da4-45e0-bbdd-533d87800e18",
                                 "name": "4",
-                                "uuid": "c1c962a9-e13f-4032-99fa-422521be304a",
+                                "uuid": "a54c1954-c292-43e8-be21-924700fe8dc1",
                             },
                             {
-                                "exit_uuid": "b8afa9b9-0733-4e2e-983c-2752b795f6df",
+                                "exit_uuid": "0e0607a2-aa36-4bd1-99de-2c271d7b611f",
                                 "name": "3",
-                                "uuid": "0177d24c-f2de-4187-99f9-b17b76228eb5",
+                                "uuid": "7fc56dd7-cfda-4de2-90d4-207968077f8c",
                             },
                             {
-                                "exit_uuid": "17b56bef-c464-4ce6-a55e-7e8dd80a484c",
+                                "exit_uuid": "d3cbf020-732f-4a7d-9cd0-4665fed74623",
                                 "name": "2",
-                                "uuid": "4c292a48-6c1b-4e47-92df-e30e60d3c085",
+                                "uuid": "b12493b3-dcbc-44a3-937b-377076d61042",
                             },
                             {
-                                "exit_uuid": "387f816b-909d-4ca0-8180-b1c6d7812ac9",
+                                "exit_uuid": "cfe6a86e-c4ad-4354-87aa-dee48a28b0e0",
                                 "name": "1",
-                                "uuid": "19dcf48a-2dd1-4e91-b1da-4e1a92c49ce0",
+                                "uuid": "4e0e419c-57ff-4c8e-9737-f9c03a1e1f27",
                             },
                             {
-                                "exit_uuid": "3f8d729d-0718-483a-ab81-da0a0723c9f1",
+                                "exit_uuid": "d3dfec87-b652-47f0-9772-0681811b652e",
                                 "name": "Other",
-                                "uuid": "cb36c75e-7811-4dad-9f6a-3d13ca387ede",
+                                "uuid": "f37cf173-f489-440f-907d-dc9b52ea12e4",
                             },
                             {
-                                "exit_uuid": "9a99e3c0-c235-46fa-bc10-fdf239789fbe",
+                                "exit_uuid": "bdd79156-2302-48f5-9f9f-01e00e9b14a7",
                                 "name": "No Response",
-                                "uuid": "737b3a02-abb2-4f51-82b0-46eaeccbfc10",
+                                "uuid": "2dddf3fd-86f5-4f1b-9416-9622acfa64a9",
                             },
                         ],
+                        "default_category_uuid": "f37cf173-f489-440f-907d-dc9b52ea12e4",
                         "operand": "@input.text",
-                        "wait": {
-                            "type": "msg",
-                            "timeout": {
-                                "seconds": 3600,
-                                "category_uuid": "737b3a02-abb2-4f51-82b0-46eaeccbfc10",
-                            },
-                        },
                         "result_name": "avaliacao",
+                        "type": "switch",
+                        "wait": {
+                            "timeout": {
+                                "category_uuid": "2dddf3fd-86f5-4f1b-9416-9622acfa64a9",
+                                "seconds": 3600,
+                            },
+                            "type": "msg",
+                        },
                     },
+                    "uuid": "4dcffaa1-0674-4363-941b-4f5e3fb0a5b5",
+                },
+                {
+                    "actions": [
+                        {
+                            "field": {
+                                "key": "nota_pesquisa_atendimento_humano",
+                                "name": "Nota Pesquisa Atendimento Humano",
+                            },
+                            "type": "set_contact_field",
+                            "uuid": "41d620b0-300f-4610-8fbb-f5abd8330345",
+                            "value": "@results.avaliacao.category",
+                        }
+                    ],
                     "exits": [
                         {
-                            "destination_uuid": "0d552af3-2d5e-4d82-a371-ea1630682cd6",
-                            "uuid": "6af21211-97c5-4952-8413-daff967fc9e4",
-                        },
-                        {
-                            "destination_uuid": "0d552af3-2d5e-4d82-a371-ea1630682cd6",
-                            "uuid": "67d52193-2707-4ad4-88fb-28cced29aed0",
-                        },
-                        {
-                            "destination_uuid": "3c5eb7ee-2ca9-4ef1-a0ce-3d3aeaa4caee",
-                            "uuid": "b8afa9b9-0733-4e2e-983c-2752b795f6df",
-                        },
-                        {
-                            "destination_uuid": "b573a778-ceba-419b-b90c-648c67d01cdd",
-                            "uuid": "17b56bef-c464-4ce6-a55e-7e8dd80a484c",
-                        },
-                        {
-                            "destination_uuid": "b573a778-ceba-419b-b90c-648c67d01cdd",
-                            "uuid": "387f816b-909d-4ca0-8180-b1c6d7812ac9",
-                        },
-                        {
-                            "destination_uuid": "e44d55c1-dc42-4d79-80d2-f6f99a81921e",
-                            "uuid": "3f8d729d-0718-483a-ab81-da0a0723c9f1",
-                        },
-                        {"uuid": "9a99e3c0-c235-46fa-bc10-fdf239789fbe"},
+                            "destination_uuid": "e2cfc927-abf9-4181-9c59-e09cf969c1bf",
+                            "uuid": "8672429a-8767-4c22-b126-0e8c13f61fcd",
+                        }
                     ],
+                    "uuid": "c9aa9cda-5e84-4ddf-88d1-4ac4039dd398",
                 },
                 {
                     "actions": [],
                     "exits": [
                         {
                             "destination_uuid": None,
-                            "uuid": "643596ae-f40f-4a95-a4c9-66f299c86cf1",
+                            "uuid": "b56ec274-4a16-439c-bd7e-62aa02c3a618",
                         },
                         {
-                            "destination_uuid": "ba69ec44-a454-4040-9ceb-6034a4062471",
-                            "uuid": "eeece6fc-05c0-4c25-8abf-58e22d7bbd7c",
+                            "destination_uuid": "d5daf3ec-e348-481b-b0e5-2409f90b726d",
+                            "uuid": "bb714dce-43e1-48fc-a5b8-b0dbae0502ca",
                         },
                     ],
                     "router": {
                         "cases": [
                             {
                                 "arguments": ["1"],
-                                "category_uuid": "049e60a3-04da-4821-ad42-9dcfbed8a84d",
+                                "category_uuid": "913545b2-73ca-4835-95de-ef6692f27cf2",
                                 "type": "has_any_word",
-                                "uuid": "30452f82-3ce5-48f7-95b6-51357888c558",
+                                "uuid": "bdc87d75-ac28-4aad-96b7-19bbe97b99fa",
                             }
                         ],
                         "categories": [
                             {
-                                "exit_uuid": "643596ae-f40f-4a95-a4c9-66f299c86cf1",
+                                "exit_uuid": "b56ec274-4a16-439c-bd7e-62aa02c3a618",
                                 "name": "J\u00e1 tentou 1x",
-                                "uuid": "049e60a3-04da-4821-ad42-9dcfbed8a84d",
+                                "uuid": "913545b2-73ca-4835-95de-ef6692f27cf2",
                             },
                             {
-                                "exit_uuid": "eeece6fc-05c0-4c25-8abf-58e22d7bbd7c",
+                                "exit_uuid": "bb714dce-43e1-48fc-a5b8-b0dbae0502ca",
                                 "name": "Other",
-                                "uuid": "8076f6bc-44dd-491a-a46d-2508b441e27f",
+                                "uuid": "e7640c78-1374-4c57-a3e5-4378283f9fd8",
                             },
                         ],
-                        "default_category_uuid": "8076f6bc-44dd-491a-a46d-2508b441e27f",
+                        "default_category_uuid": "e7640c78-1374-4c57-a3e5-4378283f9fd8",
                         "operand": "@results.tentativa",
                         "type": "switch",
                     },
-                    "uuid": "e44d55c1-dc42-4d79-80d2-f6f99a81921e",
+                    "uuid": "1400533b-0bd5-4466-90e1-d10828454833",
+                },
+                {
+                    "uuid": "e2cfc927-abf9-4181-9c59-e09cf969c1bf",
+                    "actions": [
+                        {
+                            "type": "set_run_result",
+                            "name": "avaliacao",
+                            "value": "@results.avaliacao.category",
+                            "category": "@results.avaliacao.category",
+                            "uuid": "1ddc320d-ec02-4d31-bed4-254166e9adcc",
+                        }
+                    ],
+                    "exits": [
+                        {
+                            "uuid": "5e7a3f62-4753-485e-bf04-7271dbc55d80",
+                            "destination_uuid": "1b72166c-2840-4d07-948c-f8978f428f3a",
+                        }
+                    ],
                 },
                 {
                     "actions": [
@@ -808,267 +845,23 @@ CSAT_FLOW_DEFINITION_DATA = {
                                 "name": "Nota Pesquisa Atendimento Humano",
                             },
                             "type": "set_contact_field",
-                            "uuid": "d7a5419d-407e-4245-9d75-9a0e4a28d825",
+                            "uuid": "cf88f05b-7575-4d2a-aa9c-266be2e2b099",
                             "value": "@results.avaliacao.category",
                         }
                     ],
                     "exits": [
                         {
-                            "destination_uuid": "b7205ca8-332b-491b-828d-977f926da067",
-                            "uuid": "b553f5fa-0222-4e6f-b145-7c29c1533ecb",
+                            "destination_uuid": "85d9c83e-ed42-4a1b-aab8-f0f2b2673dc6",
+                            "uuid": "7b8d3a2f-0685-4468-9e46-f4cdb22e7aa4",
                         }
                     ],
-                    "uuid": "0d552af3-2d5e-4d82-a371-ea1630682cd6",
+                    "uuid": "4c7a6ce2-a47c-4a93-843c-65713a3d4ada",
                 },
                 {
+                    "uuid": "1b72166c-2840-4d07-948c-f8978f428f3a",
                     "actions": [
                         {
-                            "field": {
-                                "key": "nota_pesquisa_atendimento_humano",
-                                "name": "Nota Pesquisa Atendimento Humano",
-                            },
-                            "type": "set_contact_field",
-                            "uuid": "80a9b3ab-955c-4730-b2b1-1d6841855d1a",
-                            "value": "@results.avaliacao.category",
-                        }
-                    ],
-                    "exits": [
-                        {
-                            "destination_uuid": "b573a778-ceba-419b-b90c-648c67d01cdd",
-                            "uuid": "d8458de9-3b0e-4456-a70a-225b5dcb79f5",
-                        }
-                    ],
-                    "uuid": "3c5eb7ee-2ca9-4ef1-a0ce-3d3aeaa4caee",
-                },
-                {
-                    "actions": [
-                        {
-                            "attachments": [],
-                            "quick_replies": [],
-                            "text": "Deixe um coment\u00e1rio sobre sua experi\u00eancia com nosso atendimento \u270d\ufe0f",
-                            "type": "send_msg",
-                            "uuid": "b6eeb06b-5e7f-4df4-b857-2f59f2d39a37",
-                        }
-                    ],
-                    "exits": [
-                        {
-                            "destination_uuid": "8ed3fdc1-52b6-4c94-ac8c-90a81f5de661",
-                            "uuid": "2af349c0-9019-4d52-9de0-7bdceddeed21",
-                        }
-                    ],
-                    "uuid": "b7205ca8-332b-491b-828d-977f926da067",
-                },
-                {
-                    "actions": [
-                        {
-                            "attachments": [],
-                            "quick_replies": [],
-                            "text": "Deixe um coment\u00e1rio para sempre melhorarmos nosso atendimento \u270d\ufe0f",
-                            "type": "send_msg",
-                            "uuid": "898136db-4601-4f9f-a133-c323581e9dc2",
-                        }
-                    ],
-                    "exits": [
-                        {
-                            "destination_uuid": "947040c4-66ec-4cb8-9193-72277bf5a817",
-                            "uuid": "2f823c77-a3e9-48c6-8924-eb42d5a32814",
-                        }
-                    ],
-                    "uuid": "b573a778-ceba-419b-b90c-648c67d01cdd",
-                },
-                {
-                    "actions": [
-                        {
-                            "category": "@results.avaliacao.category",
-                            "name": "avaliacao",
-                            "type": "set_run_result",
-                            "uuid": "b2eea9f5-0cdb-44e7-b99c-4604ad57c9bf",
-                            "value": "@results.avaliacao.category",
-                        }
-                    ],
-                    "exits": [
-                        {
-                            "destination_uuid": "35c6a45b-cacb-4949-8e00-e0227cd49c77",
-                            "uuid": "9aa159f8-f183-4f71-80e1-72ba60f97bed",
-                        }
-                    ],
-                    "uuid": "8ed3fdc1-52b6-4c94-ac8c-90a81f5de661",
-                },
-                {
-                    "actions": [
-                        {
-                            "category": "@results.avaliacao.category",
-                            "name": "avaliacao",
-                            "type": "set_run_result",
-                            "uuid": "66504dae-ecd9-488b-838f-261398a508e9",
-                            "value": "@results.avaliacao.category",
-                        }
-                    ],
-                    "exits": [
-                        {
-                            "destination_uuid": "b6e40dc7-c7a3-4c72-b417-e1c8bf8867da",
-                            "uuid": "3cf4f828-f1d8-4c25-9c3f-56485a872591",
-                        }
-                    ],
-                    "uuid": "947040c4-66ec-4cb8-9193-72277bf5a817",
-                },
-                {
-                    "actions": [],
-                    "exits": [
-                        {
-                            "destination_uuid": "a69bba98-4c15-44f3-bd68-f5d8b62093f5",
-                            "uuid": "02ac9c15-1cca-4235-a964-66e23f2c6d1c",
-                        },
-                        {
-                            "destination_uuid": "0fc2dae0-49c7-4e09-9b6a-e4be0887088f",
-                            "uuid": "ec6f4128-1169-44ce-85db-9f6f0f6e1253",
-                        },
-                    ],
-                    "router": {
-                        "cases": [],
-                        "categories": [
-                            {
-                                "exit_uuid": "02ac9c15-1cca-4235-a964-66e23f2c6d1c",
-                                "name": "All Responses",
-                                "uuid": "9f65aa01-fd8d-4e3a-bcce-cfb684f16c45",
-                            },
-                            {
-                                "exit_uuid": "ec6f4128-1169-44ce-85db-9f6f0f6e1253",
-                                "name": "No Response",
-                                "uuid": "2434e251-498a-42f4-8c78-dc723979fe73",
-                            },
-                        ],
-                        "default_category_uuid": "9f65aa01-fd8d-4e3a-bcce-cfb684f16c45",
-                        "operand": "@input.text",
-                        "result_name": "comentario",
-                        "type": "switch",
-                        "wait": {
-                            "timeout": {
-                                "category_uuid": "2434e251-498a-42f4-8c78-dc723979fe73",
-                                "seconds": 900,
-                            },
-                            "type": "msg",
-                        },
-                    },
-                    "uuid": "35c6a45b-cacb-4949-8e00-e0227cd49c77",
-                },
-                {
-                    "actions": [],
-                    "exits": [
-                        {
-                            "destination_uuid": "82fa6589-e918-455d-a6f9-cd0ccda9142f",
-                            "uuid": "058ada11-13c7-4e5b-85f4-9de5a74aa655",
-                        },
-                        {
-                            "destination_uuid": "11a0c6d8-3752-4478-b7e0-79a96c98c244",
-                            "uuid": "5e9845ed-7918-48a7-8813-c6b95d99397c",
-                        },
-                    ],
-                    "router": {
-                        "cases": [],
-                        "categories": [
-                            {
-                                "exit_uuid": "058ada11-13c7-4e5b-85f4-9de5a74aa655",
-                                "name": "All Responses",
-                                "uuid": "2c6fc714-b0b8-4000-94a7-1dde8b82dd03",
-                            },
-                            {
-                                "exit_uuid": "5e9845ed-7918-48a7-8813-c6b95d99397c",
-                                "name": "No Response",
-                                "uuid": "bcc4e0c2-1de0-4bd0-9548-929e03947be5",
-                            },
-                        ],
-                        "default_category_uuid": "2c6fc714-b0b8-4000-94a7-1dde8b82dd03",
-                        "operand": "@input.text",
-                        "result_name": "comentario",
-                        "type": "switch",
-                        "wait": {
-                            "timeout": {
-                                "category_uuid": "bcc4e0c2-1de0-4bd0-9548-929e03947be5",
-                                "seconds": 900,
-                            },
-                            "type": "msg",
-                        },
-                    },
-                    "uuid": "b6e40dc7-c7a3-4c72-b417-e1c8bf8867da",
-                },
-                {
-                    "actions": [
-                        {
-                            "attachments": [],
-                            "text": "Seu atendimento foi finalizado.\n\nAgradecemos a sua colabora\u00e7\u00e3o. At\u00e9 a pr\u00f3xima \ud83d\udc4b",
-                            "type": "send_msg",
-                            "quick_replies": [],
-                            "uuid": "246fff75-bb2d-469e-8394-2900cdbe6d84",
-                        }
-                    ],
-                    "exits": [
-                        {
-                            "destination_uuid": "dd2320a5-4001-41ca-9460-fc80dc96e1ef",
-                            "uuid": "744a912d-2c42-43c7-8d94-9378743efe54",
-                        }
-                    ],
-                    "uuid": "a69bba98-4c15-44f3-bd68-f5d8b62093f5",
-                },
-                {
-                    "actions": [
-                        {
-                            "category": "N\u00e3o respondente",
-                            "name": "comentario",
-                            "type": "set_run_result",
-                            "uuid": "accf712c-a3ca-47c8-8853-e4cc834812cc",
-                            "value": "N\u00e3o respondente",
-                        }
-                    ],
-                    "exits": [
-                        {
-                            "destination_uuid": "dd2320a5-4001-41ca-9460-fc80dc96e1ef",
-                            "uuid": "26e39e91-0303-494b-b3b2-50edc63f2750",
-                        }
-                    ],
-                    "uuid": "0fc2dae0-49c7-4e09-9b6a-e4be0887088f",
-                },
-                {
-                    "actions": [
-                        {
-                            "attachments": [],
-                            "quick_replies": [],
-                            "text": "Seu atendimento foi finalizado. Iremos analisar seu coment\u00e1rio com responsabilidade. \n\nAgradecemos a sua colabora\u00e7\u00e3o para melhorar o atendimento. At\u00e9 a pr\u00f3xima \ud83d\udc4b",
-                            "type": "send_msg",
-                            "uuid": "4d2bd028-62d2-454b-a9d4-0b2e3e4c1cc4",
-                        }
-                    ],
-                    "exits": [
-                        {
-                            "destination_uuid": "dd2320a5-4001-41ca-9460-fc80dc96e1ef",
-                            "uuid": "ae8f87d5-a477-4747-bc4f-24da2161b1c7",
-                        }
-                    ],
-                    "uuid": "82fa6589-e918-455d-a6f9-cd0ccda9142f",
-                },
-                {
-                    "actions": [
-                        {
-                            "category": "N\u00e3o respondente",
-                            "name": "comentario",
-                            "type": "set_run_result",
-                            "uuid": "5c9aeefb-d0bc-46bb-a764-5a3b7f304650",
-                            "value": "N\u00e3o respondente",
-                        }
-                    ],
-                    "exits": [
-                        {
-                            "destination_uuid": "dd2320a5-4001-41ca-9460-fc80dc96e1ef",
-                            "uuid": "f700c5d9-d429-4729-bcbc-d708efdfe7a0",
-                        }
-                    ],
-                    "uuid": "11a0c6d8-3752-4478-b7e0-79a96c98c244",
-                },
-                {
-                    "uuid": "dd2320a5-4001-41ca-9460-fc80dc96e1ef",
-                    "actions": [
-                        {
-                            "uuid": "c0b05d49-7bad-48bb-89be-d6774a21f83d",
+                            "uuid": "c2a5b33d-781f-4891-bb48-5a00043476d9",
                             "headers": {
                                 "Accept": "application/json",
                                 "Authorization": "Token @trigger.params.token",
@@ -1076,7 +869,7 @@ CSAT_FLOW_DEFINITION_DATA = {
                             },
                             "type": "call_webhook",
                             "url": "@trigger.params.webhook_url",
-                            "body": '@(json(object(\n  "contact", object(\n    "uuid", contact.uuid, \n    "name", contact.name, \n    "urn", contact.urn\n  ),\n  "flow", object(\n    "uuid", run.flow.uuid, \n    "name", run.flow.name\n  ),\n  "room", trigger.params.room,\n  "rating", results.avaliacao.value,\n  "comment", results.comentario.value\n)))',
+                            "body": '@(json(object(\n  "contact", object(\n    "uuid", contact.uuid, \n    "name", contact.name, \n    "urn", contact.urn\n  ),\n  "flow", object(\n    "uuid", run.flow.uuid, \n    "name", run.flow.name\n  ),\n  "room", trigger.params.room,\n  "rating", results.avaliacao.value\n)))',
                             "method": "POST",
                             "result_name": "Result",
                         }
@@ -1086,42 +879,301 @@ CSAT_FLOW_DEFINITION_DATA = {
                         "operand": "@results.result.category",
                         "cases": [
                             {
-                                "uuid": "e1f11f07-9d81-4087-90d5-a22713d264e3",
+                                "uuid": "86ada5aa-2d58-464c-97aa-0f691c58dfa8",
                                 "type": "has_only_text",
                                 "arguments": ["Success"],
-                                "category_uuid": "1fde0035-1904-4c3e-8049-0b6660ebca9c",
+                                "category_uuid": "9d5f54c2-5284-407b-91df-9b95fdb47a59",
                             }
                         ],
                         "categories": [
                             {
-                                "uuid": "1fde0035-1904-4c3e-8049-0b6660ebca9c",
+                                "uuid": "9d5f54c2-5284-407b-91df-9b95fdb47a59",
                                 "name": "Success",
-                                "exit_uuid": "1a08464c-612a-492d-8c1f-ec90acd1e882",
+                                "exit_uuid": "b77afbc0-d351-4c4e-9fcd-debd42818c69",
                             },
                             {
-                                "uuid": "931baa3c-abd8-4651-bc65-e26015283aac",
+                                "uuid": "20ebdb7d-aca2-497e-956c-1aa6c1025ee3",
                                 "name": "Failure",
-                                "exit_uuid": "5be578e2-0fb6-49b9-b2b7-aa9541a9e61f",
+                                "exit_uuid": "a1114148-ead6-4c6c-9944-5ce78cef266f",
                             },
                         ],
-                        "default_category_uuid": "931baa3c-abd8-4651-bc65-e26015283aac",
+                        "default_category_uuid": "20ebdb7d-aca2-497e-956c-1aa6c1025ee3",
                     },
                     "exits": [
                         {
-                            "uuid": "1a08464c-612a-492d-8c1f-ec90acd1e882",
-                            "destination_uuid": None,
+                            "uuid": "b77afbc0-d351-4c4e-9fcd-debd42818c69",
+                            "destination_uuid": "ba65e658-7022-4862-94e6-e79406d5b578",
                         },
                         {
-                            "uuid": "5be578e2-0fb6-49b9-b2b7-aa9541a9e61f",
-                            "destination_uuid": None,
+                            "uuid": "a1114148-ead6-4c6c-9944-5ce78cef266f",
+                            "destination_uuid": "ba65e658-7022-4862-94e6-e79406d5b578",
                         },
                     ],
+                },
+                {
+                    "actions": [
+                        {
+                            "attachments": [],
+                            "quick_replies": [],
+                            "text": "Deixe um coment\u00e1rio para sempre melhorarmos nosso atendimento \u270d\ufe0f",
+                            "type": "send_msg",
+                            "uuid": "ba177798-f428-441e-b896-0f5670ad97ee",
+                        }
+                    ],
+                    "exits": [
+                        {
+                            "destination_uuid": "49277b01-5c08-4cf3-b8d9-c979f5ca3eb3",
+                            "uuid": "006b3cba-fc20-4564-bd2e-34e9cce21aae",
+                        }
+                    ],
+                    "uuid": "85d9c83e-ed42-4a1b-aab8-f0f2b2673dc6",
+                },
+                {
+                    "actions": [
+                        {
+                            "attachments": [],
+                            "quick_replies": [],
+                            "text": "Deixe um coment\u00e1rio sobre sua experi\u00eancia com nosso atendimento \u270d\ufe0f",
+                            "type": "send_msg",
+                            "uuid": "6a700f2d-3988-4e5f-8a2f-19149693dc1f",
+                        }
+                    ],
+                    "exits": [
+                        {
+                            "destination_uuid": "cb4e32e4-541e-4de6-b0f9-8ba3d433c870",
+                            "uuid": "51634027-d0cb-4a69-ad15-7b54ddefada5",
+                        }
+                    ],
+                    "uuid": "ba65e658-7022-4862-94e6-e79406d5b578",
+                },
+                {
+                    "actions": [
+                        {
+                            "category": "@results.avaliacao.category",
+                            "name": "avaliacao",
+                            "type": "set_run_result",
+                            "uuid": "2a2a5140-8bdc-43d7-9715-87fc97f3cc52",
+                            "value": "@results.avaliacao.category",
+                        }
+                    ],
+                    "exits": [
+                        {
+                            "destination_uuid": "089c1a3f-be4a-46bd-8979-2d20a81e2580",
+                            "uuid": "8798dbf7-f9d8-4277-b271-d89ae194c79e",
+                        }
+                    ],
+                    "uuid": "49277b01-5c08-4cf3-b8d9-c979f5ca3eb3",
+                },
+                {
+                    "actions": [],
+                    "exits": [
+                        {
+                            "destination_uuid": "e943d3ed-141f-4bb4-abde-83c19e250a05",
+                            "uuid": "0d753e70-d9f9-4359-85d0-3fc26f7701aa",
+                        },
+                        {
+                            "destination_uuid": "fb652fab-817c-42b3-b0f6-19d86d80ee2d",
+                            "uuid": "37b972c1-e34f-41e5-821d-1c965350ee07",
+                        },
+                    ],
+                    "router": {
+                        "cases": [],
+                        "categories": [
+                            {
+                                "exit_uuid": "0d753e70-d9f9-4359-85d0-3fc26f7701aa",
+                                "name": "All Responses",
+                                "uuid": "83f9f513-ac86-4dde-8ce9-f8b4b3923388",
+                            },
+                            {
+                                "exit_uuid": "37b972c1-e34f-41e5-821d-1c965350ee07",
+                                "name": "No Response",
+                                "uuid": "95029ae5-0fe5-4084-a1bd-66f8d23e6b1f",
+                            },
+                        ],
+                        "default_category_uuid": "83f9f513-ac86-4dde-8ce9-f8b4b3923388",
+                        "operand": "@input.text",
+                        "result_name": "comentario",
+                        "type": "switch",
+                        "wait": {
+                            "timeout": {
+                                "category_uuid": "95029ae5-0fe5-4084-a1bd-66f8d23e6b1f",
+                                "seconds": 900,
+                            },
+                            "type": "msg",
+                        },
+                    },
+                    "uuid": "cb4e32e4-541e-4de6-b0f9-8ba3d433c870",
+                },
+                {
+                    "actions": [],
+                    "exits": [
+                        {
+                            "destination_uuid": "64cf9379-df72-4bf1-b48d-0f1729c119dc",
+                            "uuid": "0d04eef2-783b-4e84-a7b2-7fe6efc2b4d1",
+                        },
+                        {
+                            "destination_uuid": "9c829e36-8fa3-44f5-bafc-c14bddb8f653",
+                            "uuid": "284e64dc-c0ed-4328-90aa-7908242c6f6b",
+                        },
+                    ],
+                    "router": {
+                        "cases": [],
+                        "categories": [
+                            {
+                                "exit_uuid": "0d04eef2-783b-4e84-a7b2-7fe6efc2b4d1",
+                                "name": "All Responses",
+                                "uuid": "92e016a9-eafc-43b4-9d4d-4db7467dd6a9",
+                            },
+                            {
+                                "exit_uuid": "284e64dc-c0ed-4328-90aa-7908242c6f6b",
+                                "name": "No Response",
+                                "uuid": "4d331dfa-0c06-4a7c-b8d2-2abf698f6ec8",
+                            },
+                        ],
+                        "default_category_uuid": "92e016a9-eafc-43b4-9d4d-4db7467dd6a9",
+                        "operand": "@input.text",
+                        "result_name": "comentario",
+                        "type": "switch",
+                        "wait": {
+                            "timeout": {
+                                "category_uuid": "4d331dfa-0c06-4a7c-b8d2-2abf698f6ec8",
+                                "seconds": 900,
+                            },
+                            "type": "msg",
+                        },
+                    },
+                    "uuid": "089c1a3f-be4a-46bd-8979-2d20a81e2580",
+                },
+                {
+                    "actions": [
+                        {
+                            "attachments": [],
+                            "quick_replies": [],
+                            "text": "Seu atendimento foi finalizado.\n\nAgradecemos a sua colabora\u00e7\u00e3o. At\u00e9 a pr\u00f3xima \ud83d\udc4b",
+                            "type": "send_msg",
+                            "uuid": "d3dbf5c4-6404-47b8-a0a8-c739266e82f4",
+                        }
+                    ],
+                    "exits": [
+                        {
+                            "destination_uuid": "f9066628-7ec1-465e-bdfe-d9dd90838926",
+                            "uuid": "a63e4afd-edfd-4cf7-9221-70b3c9dea944",
+                        }
+                    ],
+                    "uuid": "e943d3ed-141f-4bb4-abde-83c19e250a05",
+                },
+                {
+                    "actions": [
+                        {
+                            "category": "N\u00e3o respondente",
+                            "name": "comentario",
+                            "type": "set_run_result",
+                            "uuid": "aaf24105-4e5b-4f82-8d7c-9509cbcd6e49",
+                            "value": "N\u00e3o respondente",
+                        }
+                    ],
+                    "exits": [
+                        {
+                            "destination_uuid": "f9066628-7ec1-465e-bdfe-d9dd90838926",
+                            "uuid": "27ac1b53-d4be-4618-b435-79532dadb24e",
+                        }
+                    ],
+                    "uuid": "fb652fab-817c-42b3-b0f6-19d86d80ee2d",
+                },
+                {
+                    "actions": [
+                        {
+                            "attachments": [],
+                            "quick_replies": [],
+                            "text": "Seu atendimento foi finalizado. Iremos analisar seu coment\u00e1rio com responsabilidade. \n\nAgradecemos a sua colabora\u00e7\u00e3o para melhorar o atendimento. At\u00e9 a pr\u00f3xima \ud83d\udc4b",
+                            "type": "send_msg",
+                            "uuid": "87033018-daf3-45ff-a85e-92f184491528",
+                        }
+                    ],
+                    "exits": [
+                        {
+                            "destination_uuid": "f9066628-7ec1-465e-bdfe-d9dd90838926",
+                            "uuid": "17ef70f7-0ebe-44b8-a388-e58ead851d59",
+                        }
+                    ],
+                    "uuid": "64cf9379-df72-4bf1-b48d-0f1729c119dc",
+                },
+                {
+                    "actions": [
+                        {
+                            "category": "N\u00e3o respondente",
+                            "name": "comentario",
+                            "type": "set_run_result",
+                            "uuid": "48956fb3-06b9-4506-8906-a5f172d6aaff",
+                            "value": "N\u00e3o respondente",
+                        }
+                    ],
+                    "exits": [
+                        {
+                            "destination_uuid": "f9066628-7ec1-465e-bdfe-d9dd90838926",
+                            "uuid": "7fd590e1-918d-48dc-a893-c4315eafd20a",
+                        }
+                    ],
+                    "uuid": "9c829e36-8fa3-44f5-bafc-c14bddb8f653",
+                },
+                {
+                    "actions": [
+                        {
+                            "body": '@(json(object(\n  "contact", object(\n    "uuid", contact.uuid, \n    "name", contact.name, \n    "urn", contact.urn\n  ),\n  "flow", object(\n    "uuid", run.flow.uuid, \n    "name", run.flow.name\n  ),\n  "room", trigger.params.room,\n  "rating", results.avaliacao.value,\n  "comment", results.comentario.value\n)))',
+                            "headers": {
+                                "Accept": "application/json",
+                                "Authorization": "Token @trigger.params.token",
+                                "Content-Type": "application/json",
+                            },
+                            "method": "POST",
+                            "result_name": "Result",
+                            "type": "call_webhook",
+                            "url": "@trigger.params.webhook_url",
+                            "uuid": "28e30d2d-6bb8-4c1f-8d69-80a4cf74071e",
+                        }
+                    ],
+                    "exits": [
+                        {
+                            "destination_uuid": None,
+                            "uuid": "f34268ea-ce60-41ec-a4b8-b89c11352a0b",
+                        },
+                        {
+                            "destination_uuid": None,
+                            "uuid": "5642ed73-5e06-47ad-8c24-037d56b0c9db",
+                        },
+                    ],
+                    "router": {
+                        "cases": [
+                            {
+                                "arguments": ["Success"],
+                                "category_uuid": "2de26bc7-504b-4d55-8a25-b0d842f3bcf5",
+                                "type": "has_only_text",
+                                "uuid": "883ca4c4-c0ad-400c-97a5-b727f852cfc4",
+                            }
+                        ],
+                        "categories": [
+                            {
+                                "exit_uuid": "f34268ea-ce60-41ec-a4b8-b89c11352a0b",
+                                "name": "Success",
+                                "uuid": "2de26bc7-504b-4d55-8a25-b0d842f3bcf5",
+                            },
+                            {
+                                "exit_uuid": "5642ed73-5e06-47ad-8c24-037d56b0c9db",
+                                "name": "Failure",
+                                "uuid": "02123643-746d-47c3-9ac5-4e2da0bd965f",
+                            },
+                        ],
+                        "default_category_uuid": "02123643-746d-47c3-9ac5-4e2da0bd965f",
+                        "operand": "@results.result.category",
+                        "type": "switch",
+                    },
+                    "uuid": "f9066628-7ec1-465e-bdfe-d9dd90838926",
                 },
             ],
             "spec_version": "13.1.0",
             "type": "messaging",
-            "uuid": "fb488faa-4dba-4faf-8256-be993f851f7c",
-            "revision": 99,
+            "uuid": "4cb6a944-48d2-4b2c-834c-0f9f6f480917",
+            "revision": 34,
         }
     ],
     "campaigns": [],
