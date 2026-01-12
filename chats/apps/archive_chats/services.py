@@ -21,7 +21,6 @@ from chats.apps.archive_chats.models import (
     RoomArchivedConversation,
 )
 from chats.apps.archive_chats.serializers import ArchiveMessageSerializer
-from chats.apps.archive_chats.uploads import get_media_upload_to
 from chats.apps.core.integrations.aws.s3.helpers import get_presigned_url
 from chats.apps.msgs.models import Message, MessageMedia
 from chats.apps.rooms.models import Room
@@ -211,25 +210,6 @@ class ArchiveChatsService(BaseArchiveChatsService):
         room_archived_conversation.save(update_fields=["status"])
 
         return room_archived_conversation
-
-    def _copy_file_using_server_side_copy(
-        self, message_media: MessageMedia, filename: str
-    ) -> str:
-        """
-        Copy a file from the original bucket to the new bucket using server-side copy.
-        """
-        original_key = message_media.media_file.name
-        new_key = get_media_upload_to(message_media.message, filename)
-
-        self.bucket.copy(
-            {
-                "Bucket": self.bucket.name,
-                "Key": original_key,
-            },
-            new_key,
-        )
-
-        return new_key
 
     def get_archived_media_url(self, object_key: str) -> str:
         valid_pattern = r"^archived_conversations/[^/]+/[^/]+/media/[^/]+$"
