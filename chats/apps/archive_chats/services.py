@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.core.files.base import ContentFile
 from sentry_sdk import capture_exception
+from django.conf import settings
 
 
 from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
@@ -16,8 +17,10 @@ from chats.apps.archive_chats.models import (
     RoomArchivedConversation,
 )
 from chats.apps.archive_chats.serializers import ArchiveMessageSerializer
+from chats.apps.archive_chats.uploads import media_upload_to
+from chats.apps.core.integrations.aws.s3.helpers import is_file_in_the_same_bucket
 from chats.apps.rooms.models import Room
-from chats.apps.msgs.models import Message
+from chats.apps.msgs.models import Message, MessageMedia
 
 
 logger = logging.getLogger(__name__)
@@ -170,3 +173,37 @@ class ArchiveChatsService(BaseArchiveChatsService):
         room_archived_conversation.save(update_fields=["status"])
 
         return room_archived_conversation
+
+    def process_media(self, media: MessageMedia) -> None:
+        if not media.media_file:
+            if not media.media_url:
+                return
+
+            return media.media_url
+
+        if is_file_in_the_same_bucket(
+            media.media_url, settings.AWS_STORAGE_BUCKET_NAME
+        ):
+            return self._copy_file_using_server_side_copy(media, media.media_file.name)
+
+    def _get_redirect_url(self, object_key: str) -> str:
+        pass
+
+    def _copy_file_using_server_side_copy(
+        self, message_media: MessageMedia, filename: str
+    ) -> str:
+        """
+        Copy a file from the original bucket to the new bucket using server-side copy.
+        """
+        original_key = message_media.media_file.name
+        new_key = media_upload_to(message_media.message, filename)
+
+        self.bucket.copy(
+            {
+                "Bucket": self.bucket.name,
+                "Key": original_key,
+            },
+            new_key,
+        )
+
+        return new_key
