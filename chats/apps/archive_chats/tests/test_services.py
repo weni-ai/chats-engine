@@ -1,6 +1,9 @@
 import json
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
+import uuid
 
+
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
@@ -12,18 +15,22 @@ from chats.apps.archive_chats.models import (
 )
 from chats.apps.archive_chats.serializers import ArchiveMessageSerializer
 from chats.apps.archive_chats.services import ArchiveChatsService
-from chats.apps.msgs.models import AutomaticMessage, Message
+from chats.apps.archive_chats.uploads import media_upload_to
+from chats.apps.msgs.models import AutomaticMessage, Message, MessageMedia
 from chats.apps.rooms.models import Room, RoomNote
 from chats.apps.queues.models import Queue
 from chats.apps.sectors.models import Sector
 from chats.apps.projects.models import Project
 from chats.apps.contacts.models import Contact
 from chats.apps.accounts.models import User
+from chats.apps.archive_chats.exceptions import InvalidObjectKey
 
 
 class TestArchiveChatsService(TestCase):
     def setUp(self):
-        self.service = ArchiveChatsService()
+        self.bucket = MagicMock()
+        self.bucket.name = "test-bucket"
+        self.service = ArchiveChatsService(bucket=self.bucket)
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
             name="Test Sector",
@@ -266,4 +273,61 @@ class TestArchiveChatsService(TestCase):
         self.assertEqual(
             archived_conversation.status,
             ArchiveConversationsJobStatus.PENDING,
+        )
+
+    @patch("chats.apps.archive_chats.services.get_presigned_url")
+    def test_get_archived_media_url(self, mock_get_presigned_url):
+        object_key = f"archived_conversations/{self.project.uuid}/{self.room.uuid}/media/test.jpg"
+        mock_get_presigned_url.return_value = (
+            f"https://test-bucket.s3.amazonaws.com/{object_key}"
+        )
+
+        url = self.service.get_archived_media_url(object_key)
+
+        self.assertEqual(
+            url,
+            f"https://test-bucket.s3.amazonaws.com/{object_key}",
+        )
+
+    def test_get_archived_media_url_with_invalid_object_key_pattern(self):
+        with self.assertRaises(InvalidObjectKey):
+            self.service.get_archived_media_url("invalid-object-key")
+
+    def test_get_archived_media_url_with_invalid_project_uuid(self):
+        valid_uuid = uuid.uuid4()
+        with self.assertRaises(InvalidObjectKey):
+            self.service.get_archived_media_url(
+                f"archived_conversations/invalid-project-uuid/{valid_uuid}/media/test.jpg"
+            )
+
+    def test_get_archived_media_url_with_invalid_room_uuid(self):
+        valid_uuid = uuid.uuid4()
+        with self.assertRaises(InvalidObjectKey):
+            self.service.get_archived_media_url(
+                f"archived_conversations/{valid_uuid}/invalid-room-uuid/media/test.jpg"
+            )
+
+    def test_get_archived_media_url_without_media_part(self):
+        valid_uuid = uuid.uuid4()
+        with self.assertRaises(InvalidObjectKey):
+            self.service.get_archived_media_url(
+                f"archived_conversations/{valid_uuid}/{valid_uuid}/messages.jsonl"
+            )
+
+    def test_copy_file_using_server_side_copy(self):
+        message_media = MessageMedia.objects.create(
+            message=Message.objects.create(room=self.room),
+            content_type="image/png",
+            media_file=SimpleUploadedFile(
+                "test.png", b"file_content", content_type="image/png"
+            ),
+        )
+
+        self.service._copy_file_using_server_side_copy(message_media, "test.png")
+        self.bucket.copy.assert_called_once_with(
+            {
+                "Bucket": self.bucket.name,
+                "Key": message_media.media_file.name,
+            },
+            media_upload_to(message_media.message, "test.png"),
         )

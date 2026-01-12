@@ -3,8 +3,12 @@ import io
 import json
 import logging
 
+import boto3
+import re
 from typing import List
+from uuid import UUID
 from django.core.exceptions import ValidationError
+from django.urls import reverse
 from django.utils import timezone
 from django.core.files.base import ContentFile
 from sentry_sdk import capture_exception
@@ -12,6 +16,7 @@ from django.conf import settings
 
 
 from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
+from chats.apps.archive_chats.exceptions import InvalidObjectKey
 from chats.apps.archive_chats.models import (
     ArchiveConversationsJob,
     RoomArchivedConversation,
@@ -19,6 +24,7 @@ from chats.apps.archive_chats.models import (
 from chats.apps.archive_chats.serializers import ArchiveMessageSerializer
 from chats.apps.archive_chats.uploads import media_upload_to
 from chats.apps.core.integrations.aws.s3.helpers import is_file_in_the_same_bucket
+from chats.apps.core.integrations.aws.s3.helpers import get_presigned_url
 from chats.apps.rooms.models import Room
 from chats.apps.msgs.models import Message, MessageMedia
 
@@ -41,8 +47,22 @@ class BaseArchiveChatsService(ABC):
     def upload_messages_file(self, messages: List[dict]) -> None:
         pass
 
+    @abstractmethod
+    def get_archived_media_url(self, object_key: str) -> str:
+        pass
+
 
 class ArchiveChatsService(BaseArchiveChatsService):
+    def __init__(self, bucket=None):
+        bucket_name_from_settings = getattr(settings, "AWS_STORAGE_BUCKET_NAME", None)
+
+        if not bucket_name_from_settings and not bucket:
+            raise ValueError(
+                "AWS_STORAGE_BUCKET_NAME is not set and no bucket was provided"
+            )
+
+        self.bucket = bucket or boto3.resource("s3").Bucket(bucket_name_from_settings)
+
     def start_archive_job(self) -> ArchiveConversationsJob:
         logger.info("[ArchiveChatsService] Starting archive job")
 
@@ -112,12 +132,22 @@ class ArchiveChatsService(BaseArchiveChatsService):
         messages = Message.objects.filter(room=room).order_by("created_on")
 
         for message in messages:
+            message_context = {"media": []}
             if message.medias.exists():
                 for media in message.medias.all():  # noqa
-                    # TODO: Implement media processing
-                    pass
+                    url = self.process_media(media)
+                    media_data = {
+                        "url": url,
+                        "content_type": media.content_type,
+                        "created_on": media.created_on,
+                    }
 
-            messages_data.append(ArchiveMessageSerializer(message).data)
+                    if url:
+                        message_context["media"].append(media_data)
+
+            messages_data.append(
+                ArchiveMessageSerializer(message, context=message_context).data
+            )
 
         room_archived_conversation.status = (
             ArchiveConversationsJobStatus.MESSAGES_PROCESSED
@@ -184,10 +214,19 @@ class ArchiveChatsService(BaseArchiveChatsService):
         if is_file_in_the_same_bucket(
             media.media_url, settings.AWS_STORAGE_BUCKET_NAME
         ):
-            return self._copy_file_using_server_side_copy(media, media.media_file.name)
+            object_key = self._copy_file_using_server_side_copy(
+                media, media.media_file.name
+            )
+
+            return self._get_redirect_url(object_key)
+
+        return None
 
     def _get_redirect_url(self, object_key: str) -> str:
-        pass
+        base_url = settings.CHATS_BASE_URL
+        path = reverse("get_archived_media")
+
+        return f"{base_url}{path}?object_key={object_key}"
 
     def _copy_file_using_server_side_copy(
         self, message_media: MessageMedia, filename: str
@@ -207,3 +246,22 @@ class ArchiveChatsService(BaseArchiveChatsService):
         )
 
         return new_key
+
+    def get_archived_media_url(self, object_key: str) -> str:
+        valid_pattern = r"^archived_conversations/[^/]+/[^/]+/media/[^/]+$"
+
+        if not re.fullmatch(valid_pattern, object_key):
+            raise InvalidObjectKey("Invalid object key")
+
+        parts = object_key.split("/")
+
+        project_uuid = parts[1]
+        room_uuid = parts[2]
+
+        for _uuid in (project_uuid, room_uuid):
+            try:
+                UUID(_uuid)
+            except ValueError:
+                raise InvalidObjectKey("Invalid object key")
+
+        return get_presigned_url(object_key)
