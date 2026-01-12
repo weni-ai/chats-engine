@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
@@ -5,17 +6,23 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from chats.apps.accounts.models import User
+from chats.apps.ai_features.history_summary.enums import HistorySummaryFeedbackTags
 from chats.apps.ai_features.history_summary.models import (
     HistorySummary,
     HistorySummaryFeedback,
 )
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactRelationsSerializer
-from chats.apps.api.v1.msgs.serializers import MessageSerializer
 from chats.apps.api.v1.queues.serializers import QueueSerializer
 from chats.apps.api.v1.sectors.serializers import DetailSectorTagSerializer
+from chats.apps.history.filters.rooms_filter import (
+    get_history_rooms_queryset_by_contact,
+)
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room, RoomNote, RoomPin
+from chats.apps.sectors.models import SectorTag
+
+logger = logging.getLogger(__name__)
 
 
 class RoomMessageStatusSerializer(serializers.Serializer):
@@ -33,7 +40,9 @@ class RoomSerializer(serializers.ModelSerializer):
     contact = ContactRelationsSerializer(many=False, read_only=True)
     queue = QueueSerializer(many=False, read_only=True)
     tags = DetailSectorTagSerializer(many=True, read_only=True)
-    unread_msgs = serializers.SerializerMethodField()
+    unread_msgs = serializers.IntegerField(
+        source="unread_messages_count", read_only=True
+    )
     last_message = serializers.SerializerMethodField()
     is_waiting = serializers.SerializerMethodField()
     linked_user = serializers.SerializerMethodField()
@@ -47,6 +56,7 @@ class RoomSerializer(serializers.ModelSerializer):
         required=False, read_only=True, default=list
     )
     added_to_queue_at = serializers.DateTimeField(read_only=True)
+    has_history = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -63,6 +73,8 @@ class RoomSerializer(serializers.ModelSerializer):
             "imported_history_url",
             "full_transfer_history",
             "added_to_queue_at",
+            "has_history",
+            "unread_msgs",
         ]
 
     def get_is_24h_valid(self, room: Room) -> bool:
@@ -88,35 +100,54 @@ class RoomSerializer(serializers.ModelSerializer):
     def get_is_waiting(self, room: Room):
         return room.get_is_waiting()
 
-    def get_unread_msgs(self, room: Room):
-        return room.messages.filter(seen=False).count()
-
     def get_last_message(self, room: Room):
-        last_message = (
-            room.messages.order_by("-created_on")
-            .exclude(user__isnull=True, contact__isnull=True)
-            .first()
-        )
-
-        if not last_message:
-            return None
-
-        return MessageSerializer(last_message).data
+        if room.last_message_id:
+            return {
+                "uuid": room.last_message.uuid,
+                "text": room.last_message_text or "",
+                "created_on": room.last_interaction,
+                "user": room.last_message_user.email
+                if room.last_message_user
+                else None,
+                "contact": room.last_message_contact.uuid
+                if room.last_message_contact
+                else None,
+            }
+        return None
 
     def get_can_edit_custom_fields(self, room: Room):
         return room.queue.sector.can_edit_custom_fields
+
+    def get_has_history(self, room: Room) -> bool:
+        if self.context.get("disable_has_history"):
+            return False
+        request = self.context.get("request")
+
+        if not request:
+            logger.info("[RoomSerializer] No request found for has_history method")
+            return False
+
+        user = getattr(request, "user", None)
+
+        if not user:
+            logger.info("[RoomSerializer] No user found for has_history method")
+            return False
+
+        return get_history_rooms_queryset_by_contact(
+            room.contact, user, room.queue.sector.project
+        ).exists()
 
 
 class ListRoomSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
     contact = serializers.SerializerMethodField()
     queue = serializers.SerializerMethodField()
-    unread_msgs = serializers.IntegerField(required=False, default=0)
+    unread_msgs = serializers.IntegerField(
+        source="unread_messages_count", read_only=True
+    )
     last_message = serializers.SerializerMethodField()
     is_waiting = serializers.BooleanField()
-    is_24h_valid = serializers.BooleanField(
-        default=True, source="is_24h_valid_computed"
-    )
+    is_24h_valid = serializers.SerializerMethodField()
     config = serializers.JSONField(required=False, read_only=True)
     last_interaction = serializers.DateTimeField(read_only=True)
     can_edit_custom_fields = serializers.SerializerMethodField()
@@ -124,6 +155,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
     imported_history_url = serializers.CharField(read_only=True, default="")
     is_pinned = serializers.SerializerMethodField()
     added_to_queue_at = serializers.DateTimeField(read_only=True)
+    has_history = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -148,6 +180,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
             "imported_history_url",
             "is_pinned",
             "added_to_queue_at",
+            "has_history",
         ]
 
     def get_user(self, room: Room):
@@ -167,6 +200,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
                 "name": room.queue.name,
                 "sector": str(room.queue.sector.uuid),
                 "sector_name": room.queue.sector.name,
+                "required_tags": room.queue.required_tags,
             }
         except AttributeError:
             return None
@@ -182,13 +216,25 @@ class ListRoomSerializer(serializers.ModelSerializer):
         return room.queue.sector.can_edit_custom_fields
 
     def get_last_message(self, room: Room):
-        last_message = (
-            room.messages.order_by("-created_on")
-            .exclude(user__isnull=True, contact__isnull=True)
-            .first()
-        )
-
-        return MessageSerializer(last_message).data
+        if room.last_message_id:
+            return {
+                "uuid": room.last_message.uuid,
+                "text": room.last_message_text or "",
+                "created_on": room.last_interaction,
+                "user": room.last_message_user.email
+                if room.last_message_user
+                else None,
+                "contact": room.last_message_contact.uuid
+                if room.last_message_contact
+                else None,
+            }
+        return {
+            "uuid": None,
+            "text": "",
+            "created_on": None,
+            "user": None,
+            "contact": None,
+        }
 
     def get_is_pinned(self, room: Room) -> bool:
         request = self.context.get("request")
@@ -196,7 +242,47 @@ class ListRoomSerializer(serializers.ModelSerializer):
         if not request:
             return False
 
-        return RoomPin.objects.filter(room=room, user=request.user).exists()
+        pins_query = {"room": room}
+
+        user_email = request.query_params.get("email")
+        if user_email:
+            pins_query["user__email"] = user_email
+        else:
+            pins_query["user"] = request.user
+
+        return RoomPin.objects.filter(**pins_query).exists()
+
+    def get_has_history(self, room: Room) -> bool:
+        if self.context.get("disable_has_history"):
+            return False
+        request = self.context.get("request")
+
+        if not request:
+            logger.info("[RoomSerializer] No request found for has_history method")
+            return False
+
+        user = getattr(request, "user", None)
+
+        if not user:
+            logger.info("[RoomSerializer] No user found for has_history method")
+            return False
+
+        return get_history_rooms_queryset_by_contact(
+            room.contact, user, room.queue.sector.project
+        ).exists()
+
+    def get_is_24h_valid(self, room: Room) -> bool:
+        if room_24h_valid := getattr(room, "is_24h_valid_computed", None):
+            return room_24h_valid
+
+        return None
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if data.get("is_24h_valid", None) is None:
+            data.pop("is_24h_valid")
+
+        return data
 
 
 class TransferRoomSerializer(serializers.ModelSerializer):
@@ -347,10 +433,23 @@ class RoomHistorySummaryFeedbackSerializer(serializers.ModelSerializer):
     text = serializers.CharField(
         required=False, allow_blank=True, allow_null=True, max_length=150
     )
+    tags = serializers.ListField(
+        required=False,
+        child=serializers.CharField(),
+    )
 
     class Meta:
         model = HistorySummaryFeedback
-        fields = ["liked", "text"]
+        fields = ["liked", "text", "tags"]
+
+    def validate_tags(self, tags):
+        for tag in tags:
+            if tag not in HistorySummaryFeedbackTags.values:
+                raise serializers.ValidationError(
+                    [f"Invalid tag: {tag}"],
+                )
+
+        return tags
 
     def validate(self, attrs):
         attrs["user"] = self.context["request"].user
@@ -413,6 +512,64 @@ class PinRoomSerializer(serializers.Serializer):
     status = serializers.BooleanField(required=True)
 
 
+class RoomTagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SectorTag
+        fields = ["uuid", "name"]
+        ref_name = "V1RoomTagSerializer"
+
+
+class AddOrRemoveTagFromRoomSerializer(serializers.Serializer):
+    uuid = serializers.UUIDField(required=True, allow_null=False)
+
+    def validate(self, attrs):
+        room = self.context.get("room")
+        tag_uuid = attrs.get("uuid")
+
+        sector_tag = SectorTag.objects.filter(
+            uuid=tag_uuid, sector=room.queue.sector
+        ).first()
+
+        if not sector_tag:
+            raise serializers.ValidationError(
+                {"uuid": ["Tag not found for the room's sector"]}, code="tag_not_found"
+            )
+
+        attrs["sector_tag"] = sector_tag
+
+        return super().validate(attrs)
+
+
+class AddRoomTagSerializer(AddOrRemoveTagFromRoomSerializer):
+    uuid = serializers.UUIDField(required=True, allow_null=False)
+
+    def validate(self, attrs):
+        room = self.context.get("room")
+        attrs = super().validate(attrs)
+
+        if room.tags.filter(uuid=attrs["sector_tag"].uuid).exists():
+            raise serializers.ValidationError(
+                {"uuid": ["Tag already exists for the room"]}, code="tag_already_exists"
+            )
+
+        return attrs
+
+
+class RemoveRoomTagSerializer(AddOrRemoveTagFromRoomSerializer):
+    uuid = serializers.UUIDField(required=True, allow_null=False)
+
+    def validate(self, attrs):
+        room = self.context.get("room")
+        attrs = super().validate(attrs)
+
+        if not room.tags.filter(uuid=attrs["sector_tag"].uuid).exists():
+            raise serializers.ValidationError(
+                {"uuid": ["Tag not found for the room"]}, code="tag_not_found"
+            )
+
+        return attrs
+
+
 class RoomNoteSerializer(serializers.ModelSerializer):
     """
     Serializer for room notes
@@ -432,3 +589,12 @@ class RoomNoteSerializer(serializers.ModelSerializer):
             "name": obj.user.full_name,
             "email": obj.user.email,
         }
+
+
+class BulkTransferSerializer(serializers.Serializer):
+    rooms_list = serializers.ListField(child=serializers.UUIDField(), required=True)
+
+    def validate(self, attrs):
+        attrs["rooms"] = Room.objects.filter(uuid__in=attrs.get("rooms_list"))
+
+        return super().validate(attrs)

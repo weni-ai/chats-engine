@@ -8,6 +8,7 @@ from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.serializers.json import DjangoJSONEncoder
 from django.utils import timezone
 
 from chats.apps.api.v1.prometheus.metrics import (
@@ -17,8 +18,12 @@ from chats.apps.api.v1.prometheus.metrics import (
     ws_disconnects_total,
     ws_messages_received_total,
 )
+from chats.apps.history.filters.rooms_filter import (
+    get_history_rooms_queryset_by_contact,
+)
 from chats.apps.projects.models.models import ProjectPermission
 from chats.apps.projects.usecases.status_service import InServiceStatusService
+from chats.apps.rooms.models import Room
 from chats.core.cache import CacheClient
 
 logger = logging.getLogger(__name__)
@@ -117,6 +122,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                     )
                     await self.set_user_status("OFFLINE")
                     await self.finalize_in_service_if_needed()
+                    await self.log_status_change("OFFLINE")
                 else:
                     logger.info(
                         "User %s has other active connections, not setting status to OFFLINE",
@@ -130,6 +136,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 )
                 await self.set_user_status("OFFLINE")
                 await self.finalize_in_service_if_needed()
+                await self.log_status_change("OFFLINE")
 
     async def set_connection_check_response(self, connection_id: str, response: bool):
         self.cache.set(
@@ -274,6 +281,32 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             await self.set_connection_check_response(
                 connection_id=event["content"].get("connection_id"), response=True
             )
+        elif "rooms." in event.get("action"):
+            content = event.get("content", {})
+
+            try:
+                if isinstance(content, str):
+                    content = json.loads(content)
+
+                room_uuid = content.get("uuid")
+
+                if not room_uuid:
+                    return self.send_json(event)
+
+                has_history = await self.get_has_history_by_room_uuid(room_uuid)
+                content["has_history"] = has_history
+
+                event["content"] = json.dumps(
+                    content,
+                    sort_keys=True,
+                    indent=1,
+                    cls=DjangoJSONEncoder,
+                )
+            except Exception as e:
+                logger.error(f"Error getting history rooms queryset by contact: {e}")
+                return self.send_json(event)
+
+            await self.send_json(event)
         else:
             await self.send_json(event)
 
@@ -295,6 +328,13 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         """ """
         self.queues = self.permission.queue_ids
         return self.queues
+
+    @database_sync_to_async
+    def get_has_history_by_room_uuid(self, room_uuid: str):
+        room = Room.objects.get(uuid=room_uuid)
+        return get_history_rooms_queryset_by_contact(
+            room.contact, self.user, room.queue.sector.project
+        ).exists()
 
     async def has_other_active_connections(self):
         """
@@ -363,3 +403,21 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 InServiceStatusService.room_closed(self.user, permission.project)
         except ProjectPermission.DoesNotExist:
             pass
+
+    @database_sync_to_async
+    def log_status_change(
+        self,
+        status: str,
+        custom_status_name: str = None,
+        custom_status_type_uuid: str = None,
+    ):
+        """Log agent status change via Celery task"""
+        from chats.apps.projects.tasks import log_agent_status_change
+
+        log_agent_status_change.delay(
+            agent_email=self.user.email,
+            project_uuid=str(self.permission.project.uuid),
+            status=status,
+            custom_status_name=custom_status_name,
+            custom_status_type_uuid=custom_status_type_uuid,
+        )

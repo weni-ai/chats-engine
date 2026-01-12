@@ -92,30 +92,44 @@ class OIDCBackendTests(SimpleTestCase):
         # Act & Assert
         self.assertEqual(backend.get_username(claims), "john.doe")
 
-    @mock.patch.object(sut.WeniOIDCAuthenticationBackend, "get_username", autospec=True)
-    def test_create_user_sanitises_username(self, mock_get_username):
-        """Username generated must be alphanumeric and up to 16 chars."""
+    @mock.patch(
+        "chats.apps.accounts.authentication.drf.backends.invalidate_cached_user"
+    )
+    @mock.patch(
+        "chats.apps.accounts.authentication.drf.backends.check_module_permission"
+    )
+    @mock.patch("chats.apps.accounts.authentication.drf.backends.get_cached_user")
+    def test_create_user_sanitises_username(
+        self, mock_get_cached_user, mock_check_perm, mock_invalidate
+    ):
+        """create_user should use email from claims and handle cache properly."""
         # Arrange
-        mock_get_username.return_value = "john.doe@weni.io"
+        mock_get_cached_user.return_value = None
 
         dummy_user_model = mock.Mock()
         dummy_user_instance = SimpleNamespace(
-            first_name="", last_name="", save=lambda: None
+            first_name="", last_name="", save=mock.Mock()
         )
-        dummy_user_model.objects.get_or_create.return_value = (
-            dummy_user_instance,
-            True,
-        )
+        dummy_user_model.objects.create.return_value = dummy_user_instance
 
         # Act
         with mock.patch.object(sut, "User", dummy_user_model):
             backend = DummyBackend()
             backend.UserModel = dummy_user_model
-            claims = {"email": "john@weni.io"}
-            backend.create_user(claims)
+            claims = {
+                "email": "john@weni.io",
+                "given_name": "John",
+                "family_name": "Doe",
+            }
+            result = backend.create_user(claims)
 
-            # get_or_create should be called with sanitised username
-            mock_get_username.assert_called_once()
-            dummy_user_model.objects.get_or_create.assert_called_once_with(
+            # Assert
+            mock_get_cached_user.assert_called_once_with("john@weni.io")
+            dummy_user_model.objects.create.assert_called_once_with(
                 email="john@weni.io"
             )
+            self.assertEqual(result.first_name, "John")
+            self.assertEqual(result.last_name, "Doe")
+            result.save.assert_called_once()
+            mock_invalidate.assert_called_once_with("john@weni.io")
+            mock_check_perm.assert_called_once_with(claims, dummy_user_instance)

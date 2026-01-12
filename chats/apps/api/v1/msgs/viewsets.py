@@ -1,7 +1,8 @@
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django_filters.rest_framework import DjangoFilterBackend
 from pydub.exceptions import CouldntDecodeError
-from rest_framework import filters, mixins, pagination, parsers, status, viewsets
+from rest_framework import filters, mixins, parsers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -24,6 +25,7 @@ class MessageViewset(
     mixins.UpdateModelMixin,
     viewsets.GenericViewSet,
 ):
+    swagger_tag = "Messages"
     queryset = ChatMessage.objects.select_related(
         "room", "user", "contact", "internal_note", "internal_note__user"
     ).prefetch_related("medias")
@@ -51,6 +53,29 @@ class MessageViewset(
         with transaction.atomic():
             serializer.save()
             serializer.instance.notify_room("create", True)
+
+            message = serializer.instance
+            if message.text:
+                message.room.update_last_message(
+                    message=message,
+                    user=message.user,
+                )
+
+            if message.user and message.room.first_user_assigned_at:
+                try:
+                    metric = message.room.metric
+                    if metric.first_response_time is None:
+                        from chats.apps.dashboard.tasks import (
+                            calculate_first_response_time_task,
+                        )
+
+                        calculate_first_response_time_task.delay(str(message.room.uuid))
+                except ObjectDoesNotExist:
+                    from chats.apps.dashboard.tasks import (
+                        calculate_first_response_time_task,
+                    )
+
+                    calculate_first_response_time_task.delay(str(message.room.uuid))
 
     def perform_update(self, serializer):
         serializer.save()
@@ -86,14 +111,17 @@ class MessageViewset(
 class MessageMediaViewset(
     mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
 ):
+    swagger_tag = "Messages"
     queryset = MessageMedia.objects.all()
     serializer_class = MessageMediaSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = MessageMediaFilter
     parser_classes = [parsers.MultiPartParser]
     permission_classes = [IsAuthenticated, MessageMediaPermission]
-    pagination_class = pagination.PageNumberPagination
+    pagination_class = CustomCursorPagination
     lookup_field = "uuid"
+    ordering = "created_on"
+    ordering_fields = ["created_on", "content_type"]
 
     def get_queryset(self):
         if self.request.query_params.get("contact") or self.request.query_params.get(

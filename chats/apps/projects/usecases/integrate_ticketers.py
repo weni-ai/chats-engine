@@ -63,7 +63,7 @@ class IntegratedTicketers:
         for secondary_project in projects:
             sectors = Sector.objects.filter(
                 project=project,
-                config__secondary_project=str(secondary_project.uuid),
+                secondary_project__uuid=str(secondary_project.uuid),
             )
 
             for sector in sectors:
@@ -124,7 +124,7 @@ class IntegratedTicketers:
         for secondary_project in projects:
             queues = Queue.objects.filter(
                 sector__project=project,
-                sector__config__secondary_project=str(secondary_project.uuid),
+                sector__secondary_project__uuid=str(secondary_project.uuid),
             )
 
             for queue in queues:
@@ -171,8 +171,14 @@ class IntegratedTicketers:
     def integrate_individual_ticketer(self, project, integrated_token):
         """Integrate a specific individual ticketer."""
         try:
+            # integrated_token can be a dict or string UUID
+            if isinstance(integrated_token, dict):
+                token_uuid = integrated_token.get("uuid")
+            else:
+                token_uuid = integrated_token
+
             sector = Sector.objects.get(
-                project=project, config__secondary_project=str(integrated_token)
+                project=project, secondary_project__uuid=token_uuid
             )
 
             # Check if already integrated
@@ -182,8 +188,14 @@ class IntegratedTicketers:
                 )
                 return {"status": "skipped", "reason": "already_integrated"}
 
+            # Get UUID from secondary_project dict
+            if isinstance(sector.secondary_project, dict):
+                secondary_project_uuid = sector.secondary_project.get("uuid")
+            else:
+                secondary_project_uuid = sector.secondary_project
+
             content = {
-                "project_uuid": str(sector.config.get("secondary_project")),
+                "project_uuid": str(secondary_project_uuid),
                 "name": sector.name,
                 "config": {
                     "project_auth": str(sector.external_token.pk),
@@ -224,9 +236,15 @@ class IntegratedTicketers:
     def integrate_individual_topic(self, project, sector_integrated_token):
         """Integrate all queues from a specific sector."""
         try:
+            # sector_integrated_token can be a dict or string UUID
+            if isinstance(sector_integrated_token, dict):
+                token_uuid = sector_integrated_token.get("uuid")
+            else:
+                token_uuid = sector_integrated_token
+
             queues = Queue.objects.filter(
                 sector__project=project,
-                sector__config__secondary_project=str(sector_integrated_token),
+                sector__secondary_project__uuid=str(token_uuid),
             )
 
             integrated_count = 0
@@ -239,11 +257,17 @@ class IntegratedTicketers:
                     skipped_count += 1
                     continue
 
+                # Get UUID from secondary_project dict
+                if isinstance(queue.sector.secondary_project, dict):
+                    secondary_project_uuid = queue.sector.secondary_project.get("uuid")
+                else:
+                    secondary_project_uuid = queue.sector.secondary_project
+
                 content = {
                     "uuid": str(queue.uuid),
                     "name": queue.name,
                     "sector_uuid": str(queue.sector.uuid),
-                    "project_uuid": str(queue.sector.config.get("secondary_project")),
+                    "project_uuid": str(secondary_project_uuid),
                 }
 
                 try:

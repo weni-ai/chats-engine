@@ -2,6 +2,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
+from weni.feature_flags.shortcuts import is_feature_active
 
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.projects.models.models import Project
@@ -11,9 +12,21 @@ from chats.apps.sectors.models import (
     SectorHoliday,
     SectorTag,
 )
-from chats.apps.feature_flags.utils import is_feature_active
 
 User = get_user_model()
+
+
+def _apply_sector_config_defaults(instance: Sector, data: dict) -> dict:
+    config = data.get("config") or {}
+    if isinstance(config, dict):
+        if instance:
+            config.setdefault(
+                "can_close_chats_in_queue", instance.can_close_chats_in_queue
+            )
+        else:
+            config.setdefault("can_close_chats_in_queue", False)
+    data["config"] = config
+    return data
 
 
 def validate_is_csat_enabled(project: Project, value: bool, context: dict) -> bool:
@@ -25,7 +38,7 @@ def validate_is_csat_enabled(project: Project, value: bool, context: dict) -> bo
     project = project
 
     if value is True and not is_feature_active(
-        settings.CSAT_FEATURE_FLAG_KEY, user, project
+        settings.CSAT_FEATURE_FLAG_KEY, user.email, str(project.uuid)
     ):
         raise serializers.ValidationError(
             {
@@ -69,6 +82,8 @@ class SectorSerializer(serializers.ModelSerializer):
             "working_day",
             "automatic_message",
             "is_csat_enabled",
+            "required_tags",
+            "secondary_project",
         ]
         extra_kwargs = {
             "work_start": {"required": False, "allow_null": True},
@@ -96,20 +111,6 @@ class SectorSerializer(serializers.ModelSerializer):
         automatic_message = data.get("automatic_message")
 
         if automatic_message:
-            if automatic_message.get("is_active", False) and not is_feature_active(
-                settings.AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY,
-                self.context["request"].user,
-                data.get("project"),
-            ):
-                raise serializers.ValidationError(
-                    {
-                        "is_automatic_message_active": [
-                            _("This feature is not available for this project.")
-                        ]
-                    },
-                    code="automatic_message_feature_flag_is_not_active",
-                )
-
             data.pop("automatic_message")
 
             data["is_automatic_message_active"] = automatic_message.get("is_active")
@@ -117,13 +118,48 @@ class SectorSerializer(serializers.ModelSerializer):
 
         project = self.instance.project if self.instance else data.get("project")
 
-        validate_is_csat_enabled(project, data.get("is_csat_enabled"), self.context)
+        if (
+            project
+            and (is_csat_enabled := data.get("is_csat_enabled", None)) is not None
+        ):
+            validate_is_csat_enabled(project, is_csat_enabled, self.context)
+
+        config = data.get("config", {})
+        if "secondary_project" in config:
+            secondary_project_value = config.get("secondary_project")
+            if isinstance(secondary_project_value, str):
+                data["secondary_project"] = {"uuid": secondary_project_value}
+            else:
+                data["secondary_project"] = secondary_project_value
 
         return data
+
+    def validate_required_tags(self, value) -> bool:
+        """
+        Check if the sector has at least one tag to require tags.
+        """
+
+        if value is True:
+            if not self.instance:
+                # For now, tags are created after the sector is created
+                # This may change in the future
+                raise serializers.ValidationError(
+                    [_("Sector must have at least one tag to require tags.")],
+                    code="sector_must_have_at_least_one_tag_to_require_tags",
+                )
+
+            if not self.instance.tags.exists():
+                raise serializers.ValidationError(
+                    [_("Sector must have at least one tag to require tags.")],
+                    code="sector_must_have_at_least_one_tag_to_require_tags",
+                )
+
+        return value
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
         data["automatic_message"] = SectorAutomaticMessageSerializer(instance).data
+        data = _apply_sector_config_defaults(instance, data)
 
         return data
 
@@ -146,6 +182,8 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
             "config",
             "automatic_message",
             "is_csat_enabled",
+            "required_tags",
+            "secondary_project",
         ]
         extra_kwargs = {field: {"required": False} for field in fields}
 
@@ -166,28 +204,7 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
         automatic_message = attrs.get("automatic_message", None)
 
         if automatic_message is not None:
-            current_is_automatic_message_active = (
-                self.instance.is_automatic_message_active
-            )
             new_is_automatic_message_active = automatic_message.get("is_active")
-
-            if (
-                current_is_automatic_message_active != new_is_automatic_message_active
-                and not is_feature_active(
-                    settings.AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY,
-                    self.context["request"].user,
-                    project,
-                )
-            ):
-
-                raise serializers.ValidationError(
-                    {
-                        "is_automatic_message_active": [
-                            _("This feature is not available for this project.")
-                        ]
-                    },
-                    code="automatic_message_feature_flag_is_not_active",
-                )
 
             attrs.pop("automatic_message")
             attrs["is_automatic_message_active"] = new_is_automatic_message_active
@@ -197,12 +214,33 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
 
         validate_is_csat_enabled(project, attrs.get("is_csat_enabled"), self.context)
 
+        config = attrs.get("config", {})
+        if "secondary_project" in config:
+            secondary_project_value = config.get("secondary_project")
+            if isinstance(secondary_project_value, str):
+                attrs["secondary_project"] = {"uuid": secondary_project_value}
+            else:
+                attrs["secondary_project"] = secondary_project_value
+
         return attrs
+
+    def validate_required_tags(self, value) -> bool:
+        """
+        Check if the sector has at least one tag to require tags.
+        """
+        if value is True and not self.instance.tags.exists():
+            raise serializers.ValidationError(
+                [_("Sector must have at least one tag to require tags.")],
+                code="sector_must_have_at_least_one_tag_to_require_tags",
+            )
+
+        return value
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
 
         data["automatic_message"] = SectorAutomaticMessageSerializer(instance).data
+        data = _apply_sector_config_defaults(instance, data)
 
         return data
 
@@ -224,6 +262,8 @@ class SectorReadOnlyListSerializer(serializers.ModelSerializer):
             "created_on",
             "has_group_sector",
             "automatic_message",
+            "is_csat_enabled",
+            "required_tags",
         ]
 
     def get_agents(self, sector: Sector):
@@ -255,10 +295,16 @@ class SectorReadOnlyRetrieveSerializer(serializers.ModelSerializer):
             "can_edit_custom_fields",
             "config",
             "automatic_message",
+            "is_csat_enabled",
+            "required_tags",
         ]
 
     def get_automatic_message(self, sector: Sector):
         return SectorAutomaticMessageSerializer(sector).data
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        return _apply_sector_config_defaults(instance, data)
 
 
 class SectorWSSerializer(serializers.ModelSerializer):
@@ -344,7 +390,16 @@ class DetailSectorTagSerializer(serializers.ModelSerializer):
 class TagSimpleSerializer(serializers.ModelSerializer):
     class Meta:
         model = SectorTag
-        fields = ["uuid", "name"]
+        fields = ["uuid", "name", "is_deleted"]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+
+        if instance.is_deleted:
+            name = data.get("name").split("_is_deleted_")[0]
+            data["name"] = f"{name}"
+
+        return data
 
 
 class SectorAgentsSerializer(serializers.ModelSerializer):

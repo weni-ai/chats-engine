@@ -26,7 +26,12 @@ class RoomInfoUseCase:
         if not self._is_infracommerce_with_secondary(room):
             return str(room.project.uuid)
 
-        return room.queue.sector.config.get("secondary_project")
+        secondary_project = room.queue.sector.secondary_project
+        if secondary_project:
+            if isinstance(secondary_project, dict):
+                return str(secondary_project.get("uuid"))
+            return str(secondary_project)
+        return str(room.project.uuid)
 
     def _is_infracommerce_with_secondary(self, room: "Room") -> bool:
         """Check if it's an Infracommerce project with a secondary project configured."""
@@ -36,7 +41,7 @@ class RoomInfoUseCase:
         if not room.project.config.get("its_principal", False):
             return False
 
-        if not (room.queue and room.queue.sector and room.queue.sector.config):
+        if not (room.queue and room.queue.sector):
             return False
 
-        return bool(room.queue.sector.config.get("secondary_project"))
+        return bool(room.queue.sector.secondary_project)

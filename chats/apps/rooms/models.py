@@ -1,15 +1,17 @@
 import json
 import logging
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 import requests
 import sentry_sdk
 from django.conf import settings
+from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models, transaction
+from django.db.models import F, Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_redis import get_redis_connection
@@ -22,6 +24,7 @@ from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTCl
 from chats.apps.projects.models.models import RoomRoutingType
 from chats.apps.projects.usecases.send_room_info import RoomInfoUseCase
 from chats.apps.projects.usecases.status_service import InServiceStatusService
+from chats.apps.queues.models import Queue
 from chats.apps.rooms.exceptions import (
     MaxPinRoomLimitReachedError,
     RoomIsNotActiveError,
@@ -31,7 +34,9 @@ from chats.utils.websockets import send_channels_group
 
 if TYPE_CHECKING:
     from chats.apps.projects.models.models import Project
-    from chats.apps.queues.models import Queue
+
+
+ROOM_24H_VALID_CACHE_TTL = settings.ROOM_24H_VALID_CACHE_TTL
 
 
 logger = logging.getLogger(__name__)
@@ -120,8 +125,42 @@ class Room(BaseModel, BaseConfigurableModel):
     added_to_queue_at = models.DateTimeField(
         _("Added to queue at"), null=True, blank=True
     )
+    unread_messages_count = models.IntegerField(_("Unread messages count"), default=0)
+    last_unread_message_at = models.DateTimeField(
+        _("Last unread message at"), null=True, blank=True
+    )
+    last_interaction = models.DateTimeField(
+        _("Last interaction"), null=True, blank=True
+    )
+    last_message = models.ForeignKey(
+        "msgs.Message",
+        verbose_name=_("Last message"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    last_message_text = models.TextField(
+        _("Last message text"), null=True, blank=True, default=""
+    )
+    last_message_user = models.ForeignKey(
+        "accounts.User",
+        verbose_name=_("Last message user"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    last_message_contact = models.ForeignKey(
+        "contacts.Contact",
+        verbose_name=_("Last message contact"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
 
-    tracker = FieldTracker(fields=["user"])
+    tracker = FieldTracker(fields=["user", "queue"])
 
     @property
     def is_billing_notified(self) -> bool:
@@ -200,7 +239,7 @@ class Room(BaseModel, BaseConfigurableModel):
         ]
 
     def save(self, *args, **kwargs) -> None:
-        if self.__original_is_active is False:
+        if self._state.adding is False and self.__original_is_active is False:
             raise ValidationError({"detail": _("Closed rooms cannot receive updates")})
 
         if self._state.adding:
@@ -225,11 +264,20 @@ class Room(BaseModel, BaseConfigurableModel):
 
         is_new = self._state.adding
 
+        queue_has_changed = self.tracker.has_changed("queue")
+        old_queue = self.tracker.previous("queue")
+
         super().save(*args, **kwargs)
+
+        if queue_has_changed and old_queue and self.queue:
+            old_queue = Queue.objects.get(pk=old_queue)
+
+            if old_queue.sector != self.queue.sector:
+                self.tags.clear()
 
         self._update_agent_service_status(is_new)
 
-    def send_automatic_message(self, delay: int = 0):
+    def send_automatic_message(self, delay: int = 0, check_ticket: bool = False):
         from chats.apps.sectors.tasks import send_automatic_message
 
         if (
@@ -243,6 +291,7 @@ class Room(BaseModel, BaseConfigurableModel):
                     self.uuid,
                     self.queue.sector.automatic_message_text,
                     self.user.id,
+                    check_ticket,
                 ],
                 countdown=delay,
             )
@@ -296,18 +345,50 @@ class Room(BaseModel, BaseConfigurableModel):
         sent_message.notify_room("create", True)
 
     @property
+    def room_24h_valid_cache_key(self) -> str:
+        return f"room_24h_valid_cache:{self.pk}"
+
+    def save_24h_valid_to_cache(self, is_24h_valid: bool) -> None:
+        if ROOM_24H_VALID_CACHE_TTL == 0:
+            return
+
+        cache.set(
+            self.room_24h_valid_cache_key,
+            is_24h_valid,
+            ROOM_24H_VALID_CACHE_TTL,
+        )
+
+    def get_24h_valid_from_cache(self) -> bool:
+        if ROOM_24H_VALID_CACHE_TTL == 0:
+            return None
+
+        return cache.get(self.room_24h_valid_cache_key)
+
+    def clear_24h_valid_cache(self) -> None:
+        cache.delete(self.room_24h_valid_cache_key)
+
+    @property
     def is_24h_valid(self) -> bool:
         """Validates is the last contact message was sent more than a day ago"""
+
         if not self.urn.startswith("whatsapp"):
             return True
+
+        if cached_is_24h_valid := self.get_24h_valid_from_cache():
+            return cached_is_24h_valid
+
+        is_24h_valid = True
 
         day_validation = self.messages.filter(
             created_on__gte=timezone.now() - timedelta(days=1),
             contact=self.contact,
         )
         if not day_validation.exists():
-            return self.created_on > timezone.now() - timedelta(days=1)
-        return True
+            is_24h_valid = self.created_on > timezone.now() - timedelta(days=1)
+
+        self.save_24h_valid_to_cache(is_24h_valid)
+
+        return is_24h_valid
 
     @property
     def serialized_ws_data(self):
@@ -323,6 +404,16 @@ class Room(BaseModel, BaseConfigurableModel):
             .order_by("-created_on")[:5]
         )
 
+    def _handle_close_tags(self, tags: list):
+        current_tag_ids = set(
+            [str(tag_uuid) for tag_uuid in self.tags.values_list("uuid", flat=True)]
+        )
+        new_tag_ids = set(tags) - current_tag_ids
+        tags_to_remove_ids = current_tag_ids - set([str(tag_uuid) for tag_uuid in tags])
+
+        self.tags.add(*new_tag_ids)
+        self.tags.remove(*tags_to_remove_ids)
+
     def close(self, tags: list = [], end_by: str = ""):
         from chats.apps.projects.usecases.status_service import InServiceStatusService
 
@@ -330,12 +421,13 @@ class Room(BaseModel, BaseConfigurableModel):
         self.ended_at = timezone.now()
         self.ended_by = end_by
 
-        if tags is not None:
-            self.tags.add(*tags)
+        with transaction.atomic():
+            if tags is not None:
+                self._handle_close_tags(tags)
 
-        self.clear_pins()
+            self.clear_pins()
 
-        self.save()
+            self.save()
 
         if self.user:
             project = None
@@ -387,6 +479,10 @@ class Room(BaseModel, BaseConfigurableModel):
     def base_notification(self, content, action):
         if self.user:
             permission = self.get_permission(self.user)
+
+            if not permission:
+                return
+
             group_name = f"permission_{permission.pk}"
         else:
             group_name = f"queue_{self.queue.pk}"
@@ -596,6 +692,67 @@ class Room(BaseModel, BaseConfigurableModel):
         self.full_transfer_history.append(transfer)
         self.transfer_history = transfer  # legacy
         self.save(update_fields=["full_transfer_history", "transfer_history"])
+
+    def increment_unread_messages_count(
+        self, count: int, last_unread_message_at: datetime
+    ):
+        """
+        Updates the unread messages count for a room.
+        """
+        Room.objects.filter(
+            Q(pk=self.pk)
+            & (
+                Q(last_unread_message_at__lt=last_unread_message_at)
+                | Q(last_unread_message_at__isnull=True)
+            ),
+        ).update(unread_messages_count=F("unread_messages_count") + count)
+
+    def clear_unread_messages_count(self):
+        """
+        Clears the unread messages count for a room.
+        """
+        Room.objects.filter(pk=self.pk).update(
+            unread_messages_count=0, last_unread_message_at=timezone.now()
+        )
+
+    def update_last_message(self, message, user=None):
+        """
+        Updates last message fields. Used for agent/system messages.
+        """
+        Room.objects.filter(pk=self.pk).update(
+            last_interaction=message.created_on,
+            last_message=message,
+            last_message_text=message.text,
+            last_message_user=user,
+            last_message_contact=None,
+        )
+
+    def on_new_message(self, message, contact=None, increment_unread: int = 0):
+        """
+        Updates room state when a new message arrives from contact.
+        Single UPDATE with all last_message fields.
+        Only updates if message is newer than last_interaction.
+        """
+        update_fields = {
+            "last_interaction": message.created_on,
+            "last_message": message,
+            "last_message_text": message.text,
+            "last_message_user": None,
+            "last_message_contact": contact,
+        }
+
+        if increment_unread > 0:
+            update_fields["unread_messages_count"] = (
+                F("unread_messages_count") + increment_unread
+            )
+
+        Room.objects.filter(
+            Q(pk=self.pk)
+            & (
+                Q(last_interaction__lt=message.created_on)
+                | Q(last_interaction__isnull=True)
+            ),
+        ).update(**update_fields)
 
     def start_csat_flow(self):
         """

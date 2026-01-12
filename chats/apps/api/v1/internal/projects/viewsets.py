@@ -26,12 +26,22 @@ User = get_user_model()
 
 
 class ProjectViewset(viewsets.ModelViewSet):
+    swagger_tag = "Projects"
     queryset = Project.objects.all()
     serializer_class = serializers.ProjectInternalSerializer
     permission_classes = [IsAuthenticated, ModuleHasPermission]
     lookup_field = "uuid"
 
+    def list(self, request, *args, **kwargs):
+        """List projects for internal modules."""
+        return super().list(request, *args, **kwargs)
+
+    def retrieve(self, request, *args, **kwargs):
+        """Retrieve the metadata of a project for internal modules."""
+        return super().retrieve(request, *args, **kwargs)
+
     def create(self, request, *args, **kwargs):
+        """Create a project through the internal service (syncing Keycloak when needed)."""
         if settings.OIDC_ENABLED:
             user_email = request.data.get("user_email")
             if user_email is None:
@@ -42,6 +52,7 @@ class ProjectViewset(viewsets.ModelViewSet):
 
 
 class ProjectPermissionViewset(viewsets.ModelViewSet):
+    swagger_tag = "Projects"
     queryset = ProjectPermission.objects.all()
     serializer_class = serializers.ProjectPermissionSerializer
     permission_classes = [IsAuthenticated, ModuleHasPermission]
@@ -61,7 +72,16 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
             return serializers.ProjectPermissionReadSerializer
         return super().get_serializer_class()
 
+    def list(self, request, *args, **kwargs):
+        """List project permissions for administrative modules."""
+        return super().list(request, *args, **kwargs)
+
+    def retrieve(self, request, *args, **kwargs):
+        """Retrieve a specific project permission record."""
+        return super().retrieve(request, *args, **kwargs)
+
     def create(self, request, *args, **kwargs):
+        """Create a project permission (persisting the user in Keycloak when required)."""
         if settings.OIDC_ENABLED:
             user_email = request.data.get("user")
             persist_keycloak_user_by_email(user_email)
@@ -76,6 +96,7 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
     def update(
         self, request, *args, **kwargs
     ):  # TODO: GAMBIARRA ALERT! MOVE THIS LOGIC TO THE SERIALIZER or somewhere else
+        """Update a project permission role/association for a user."""
         qs = self.queryset
         try:
             user_email = request.data["user"]
@@ -110,6 +131,7 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["POST", "GET"], permission_classes=[IsAuthenticated])
     def status(self, request, *args, **kwargs):
+        """Read or update the connection status for the current user's permission."""
         instance: ProjectPermission = None
 
         if request.method == "POST":
@@ -126,6 +148,14 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
             if user_status.lower() == "online":
                 instance.status = ProjectPermission.STATUS_ONLINE
                 instance.save()
+
+                # Log status change
+                from chats.apps.projects.tasks import log_agent_status_change
+                log_agent_status_change.delay(
+                    agent_email=instance.user.email,
+                    project_uuid=str(instance.project.uuid),
+                    status="ONLINE",
+                )
 
                 room_count = Room.objects.filter(
                     user=instance.user,
@@ -162,6 +192,14 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
                 instance.status = ProjectPermission.STATUS_OFFLINE
                 instance.save()
 
+                # Log status change
+                from chats.apps.projects.tasks import log_agent_status_change
+                log_agent_status_change.delay(
+                    agent_email=instance.user.email,
+                    project_uuid=str(instance.project.uuid),
+                    status="OFFLINE",
+                )
+
                 in_service_type = InServiceStatusService.get_or_create_status_type(
                     instance.project
                 )
@@ -196,6 +234,7 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
         )
 
     def delete(self, request):
+        """Remove a project permission for the provided project/user pair."""
         permission = get_object_or_404(
             ProjectPermission,
             project_id=request.data["project"],

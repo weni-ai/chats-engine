@@ -24,6 +24,7 @@ from chats.apps.sectors.usecases import (
 
 
 class GroupSectorViewset(viewsets.ModelViewSet):
+    swagger_tag = "Groups"
     queryset = GroupSector.objects.exclude(is_deleted=True)
     serializer_class = GroupSectorSerializer
     filterset_class = GroupSectorFilter
@@ -188,6 +189,7 @@ class GroupSectorViewset(viewsets.ModelViewSet):
 
 
 class GroupSectorAuthorizationViewset(viewsets.ModelViewSet):
+    swagger_tag = "Groups"
     queryset = GroupSectorAuthorization.objects.all()
     serializer_class = GroupSectorAuthorizationSerializer
     permission_classes = [IsAuthenticated, IsProjectAdmin]
