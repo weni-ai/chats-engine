@@ -3,32 +3,28 @@ import io
 import json
 import logging
 import boto3
-import requests
-from requests.exceptions import RequestException
-import time
 
+import re
 from typing import List
 from django.conf import settings
+from uuid import UUID
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.core.files.base import ContentFile
 from sentry_sdk import capture_exception
 
 
 from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
-from chats.apps.archive_chats.dataclass import ArchiveMessageMedia
-from chats.apps.archive_chats.helpers import (
-    generate_unique_filename,
-    get_filename_from_url,
-)
+from chats.apps.archive_chats.exceptions import InvalidObjectKey
 from chats.apps.archive_chats.models import (
     ArchiveConversationsJob,
     RoomArchivedConversation,
 )
 from chats.apps.archive_chats.serializers import ArchiveMessageSerializer
 from chats.apps.archive_chats.uploads import get_media_upload_to
-from chats.apps.rooms.models import Room
+from chats.apps.core.integrations.aws.s3.helpers import get_presigned_url
 from chats.apps.msgs.models import Message, MessageMedia
-from chats.apps.core.integrations.aws.s3.helpers import is_file_in_the_same_bucket
+from chats.apps.rooms.models import Room
 
 
 logger = logging.getLogger(__name__)
@@ -54,7 +50,7 @@ class BaseArchiveChatsService(ABC):
         pass
 
     @abstractmethod
-    def upload_media_file(self, message_media: MessageMedia) -> None:
+    def get_archived_media_url(self, object_key: str) -> str:
         pass
 
 
@@ -151,26 +147,17 @@ class ArchiveChatsService(BaseArchiveChatsService):
             media_data = []
             if message.medias.exists():
                 for media in message.medias.all():  # noqa
-                    original_filename = (
-                        media.media_file.name
-                        if media.media_file
-                        else get_filename_from_url(media.media_url)
-                    )
-
-                    unique_filename = generate_unique_filename(
-                        original_filename, used_media_filenames
-                    )
-
-                    key = self.upload_media_file(media, unique_filename)
-                    used_media_filenames.add(unique_filename)
-
-                    media_data.append(
-                        ArchiveMessageMedia(url=key, content_type=media.content_type)
-                    )
+                    # TODO
+                    pass
 
             messages_data.append(
                 ArchiveMessageSerializer(message, context={"media": media_data}).data
             )
+
+        room_archived_conversation.status = (
+            ArchiveConversationsJobStatus.MESSAGES_PROCESSED
+        )
+        room_archived_conversation.save(update_fields=["status"])
 
         return messages_data
 
@@ -182,6 +169,15 @@ class ArchiveChatsService(BaseArchiveChatsService):
         """
         Upload a messages file to the archived conversations location.
         """
+
+        if (
+            room_archived_conversation.status
+            != ArchiveConversationsJobStatus.MESSAGES_PROCESSED
+        ):
+            raise ValidationError(
+                f"Room archived conversation {room_archived_conversation.uuid} is not in messages processed status"
+            )
+
         room_archived_conversation.status = (
             ArchiveConversationsJobStatus.UPLOADING_MESSAGES_FILE
         )
@@ -209,25 +205,12 @@ class ArchiveChatsService(BaseArchiveChatsService):
             save=True,
         )
 
+        room_archived_conversation.status = (
+            ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED
+        )
+        room_archived_conversation.save(update_fields=["status"])
+
         return room_archived_conversation
-
-    def upload_media_file(self, message_media: MessageMedia, filename: str) -> str:
-        """
-        Upload a media file to the archived conversations location.
-        """
-        if message_media.media_file:
-            url = message_media.media_file.url
-            same_bucket = is_file_in_the_same_bucket(url, self.bucket.name)
-        else:
-            url = message_media.media_url
-            same_bucket = False
-
-        if same_bucket:
-            key = self._copy_file_using_server_side_copy(message_media, filename)
-        else:
-            key = self._copy_file_using_client_side_copy(message_media, filename)
-
-        return key
 
     def _copy_file_using_server_side_copy(
         self, message_media: MessageMedia, filename: str
@@ -248,37 +231,21 @@ class ArchiveChatsService(BaseArchiveChatsService):
 
         return new_key
 
-    def _copy_file_using_client_side_copy(
-        self,
-        message_media: MessageMedia,
-        filename: str,
-        max_retries: int = 3,
-        backoff_factor: float = 1.0,
-    ) -> str:
-        """
-        Copy a file from the original url to the target bucket using client-side copy
-        with retry logic.
-        """
-        original_url = message_media.media_url
-        new_key = get_media_upload_to(message_media.message, filename)
+    def get_archived_media_url(self, object_key: str) -> str:
+        valid_pattern = r"^archived_conversations/[^/]+/[^/]+/media/[^/]+$"
 
-        last_exception = None
+        if not re.fullmatch(valid_pattern, object_key):
+            raise InvalidObjectKey("Invalid object key")
 
-        for attempt in range(1, max_retries + 1):
+        parts = object_key.split("/")
+
+        project_uuid = parts[1]
+        room_uuid = parts[2]
+
+        for _uuid in (project_uuid, room_uuid):
             try:
-                with requests.get(original_url, stream=True, timeout=60) as response:
-                    response.raise_for_status()
-                    self.bucket.upload_fileobj(response.raw, new_key)
+                UUID(_uuid)
+            except ValueError:
+                raise InvalidObjectKey("Invalid object key")
 
-                return new_key
-
-            except RequestException as exc:
-                last_exception = exc
-
-                if attempt == max_retries:
-                    break
-
-                sleep_time = backoff_factor * (2 ** (attempt - 1))
-                time.sleep(sleep_time)
-
-        raise last_exception
+        return get_presigned_url(object_key)

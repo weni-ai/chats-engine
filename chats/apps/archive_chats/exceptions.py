@@ -1,0 +1,2 @@
+class InvalidObjectKey(Exception):
+    pass

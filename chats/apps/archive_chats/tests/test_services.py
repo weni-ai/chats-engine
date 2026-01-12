@@ -1,7 +1,8 @@
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
+import uuid
 
-from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 
@@ -12,14 +13,14 @@ from chats.apps.archive_chats.models import (
 )
 from chats.apps.archive_chats.serializers import ArchiveMessageSerializer
 from chats.apps.archive_chats.services import ArchiveChatsService
-from chats.apps.archive_chats.uploads import get_media_upload_to
-from chats.apps.msgs.models import Message, MessageMedia
-from chats.apps.rooms.models import Room
+from chats.apps.msgs.models import AutomaticMessage, Message
+from chats.apps.rooms.models import Room, RoomNote
 from chats.apps.queues.models import Queue
 from chats.apps.sectors.models import Sector
 from chats.apps.projects.models import Project
 from chats.apps.contacts.models import Contact
 from chats.apps.accounts.models import User
+from chats.apps.archive_chats.exceptions import InvalidObjectKey
 
 
 class TestArchiveChatsService(TestCase):
@@ -118,7 +119,28 @@ class TestArchiveChatsService(TestCase):
             text="Test message",
             created_on=timezone.now(),
         )
-        messages = [message_a, message_b]
+        message_c = Message.objects.create(
+            room=self.room,
+            user=self.user,
+            text="Test message",
+            created_on=timezone.now(),
+        )
+        AutomaticMessage.objects.create(
+            message=message_c,
+            room=self.room,
+        )
+        message_d = Message.objects.create(
+            room=self.room,
+            user=self.user,
+            text="Test message",
+            created_on=timezone.now(),
+        )
+        RoomNote.objects.create(
+            room=self.room,
+            user=self.user,
+            text="Test note",
+        )
+        messages = [message_a, message_b, message_c, message_d]
 
         archived_conversation = RoomArchivedConversation.objects.create(
             job=self.service.start_archive_job(),
@@ -133,12 +155,12 @@ class TestArchiveChatsService(TestCase):
         archived_conversation.refresh_from_db()
         self.assertEqual(
             archived_conversation.status,
-            ArchiveConversationsJobStatus.PROCESSING_MESSAGES,
+            ArchiveConversationsJobStatus.MESSAGES_PROCESSED,
         )
         self.assertIsNotNone(archived_conversation.archive_process_started_at)
 
         self.assertIsInstance(messages_data, list)
-        self.assertEqual(len(messages_data), 2)
+        self.assertEqual(len(messages_data), 4)
 
         for i, message in enumerate(messages):
             self.assertEqual(messages_data[i].get("uuid"), str(message.uuid))
@@ -160,6 +182,19 @@ class TestArchiveChatsService(TestCase):
                 contact_data.get("name"),
                 message.contact.name if message.contact else None,
             )
+            self.assertEqual(
+                messages_data[i].get("is_automatic_message"),
+                message.is_automatic_message,
+            )
+
+            if internal_note := getattr(message, "internal_note", None):
+                self.assertEqual(
+                    messages_data[i].get("internal_note"),
+                    {
+                        "uuid": str(internal_note.uuid),
+                        "text": internal_note.text,
+                    },
+                )
 
     def test_upload_messages_file(self):
         archived_conversation = RoomArchivedConversation.objects.create(
@@ -185,6 +220,9 @@ class TestArchiveChatsService(TestCase):
             ArchiveMessageSerializer(message_b).data,
         ]
 
+        archived_conversation.status = ArchiveConversationsJobStatus.MESSAGES_PROCESSED
+        archived_conversation.save(update_fields=["status"])
+
         self.service.upload_messages_file(
             room_archived_conversation=archived_conversation,
             messages=messages,
@@ -194,7 +232,7 @@ class TestArchiveChatsService(TestCase):
 
         self.assertEqual(
             archived_conversation.status,
-            ArchiveConversationsJobStatus.UPLOADING_MESSAGES_FILE,
+            ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED,
         )
         self.assertTrue(archived_conversation.file)
         self.assertEqual(
@@ -209,132 +247,66 @@ class TestArchiveChatsService(TestCase):
         self.assertEqual(json.loads(lines[0]), messages[0])
         self.assertEqual(json.loads(lines[1]), messages[1])
 
-    @patch("chats.apps.archive_chats.services.is_file_in_the_same_bucket")
-    @patch(
-        "chats.apps.archive_chats.services.ArchiveChatsService._copy_file_using_server_side_copy"
-    )
-    def test_upload_media_file_when_file_is_in_the_same_bucket(
-        self, mock_copy_file_using_server_side_copy, mock_is_file_in_the_same_bucket
-    ):
-        mock_is_file_in_the_same_bucket.return_value = True
-        mock_copy_file_using_server_side_copy.return_value = None
-
-        message_media = MessageMedia.objects.create(
-            message=Message.objects.create(room=self.room),
-            content_type="image/png",
-            media_file=SimpleUploadedFile(
-                "test.png", b"file_content", content_type="image/png"
-            ),
+    def test_upload_messages_file_when_status_is_not_messages_processed(self):
+        archived_conversation = RoomArchivedConversation.objects.create(
+            job=self.service.start_archive_job(),
+            room=self.room,
+            status=ArchiveConversationsJobStatus.PENDING,
         )
 
-        self.service.upload_media_file(message_media, "test.png")
-
-        mock_copy_file_using_server_side_copy.assert_called_once_with(
-            message_media, "test.png"
-        )
-        mock_is_file_in_the_same_bucket.assert_called_once_with(
-            message_media.media_file.url, self.bucket.name
-        )
-
-    @patch("chats.apps.archive_chats.services.is_file_in_the_same_bucket")
-    @patch(
-        "chats.apps.archive_chats.services.ArchiveChatsService._copy_file_using_client_side_copy"
-    )
-    def test_upload_media_file_when_file_is_not_in_the_same_bucket(
-        self, mock_copy_file_using_client_side_copy, mock_is_file_in_the_same_bucket
-    ):
-        mock_is_file_in_the_same_bucket.return_value = False
-        mock_copy_file_using_client_side_copy.return_value = None
-
-        message_media = MessageMedia.objects.create(
-            message=Message.objects.create(room=self.room),
-            content_type="image/png",
-            media_file=SimpleUploadedFile(
-                "test.png", b"file_content", content_type="image/png"
-            ),
-        )
-
-        self.service.upload_media_file(message_media, "test.png")
-
-        mock_copy_file_using_client_side_copy.assert_called_once_with(
-            message_media, "test.png"
-        )
-        mock_is_file_in_the_same_bucket.assert_called_once_with(
-            message_media.media_file.url, self.bucket.name
-        )
-
-    @patch("chats.apps.archive_chats.services.is_file_in_the_same_bucket")
-    @patch(
-        "chats.apps.archive_chats.services.ArchiveChatsService._copy_file_using_client_side_copy"
-    )
-    def test_upload_media_file_when_media_file_field_is_empty(
-        self, mock_copy_file_using_client_side_copy, mock_is_file_in_the_same_bucket
-    ):
-        mock_is_file_in_the_same_bucket.return_value = False
-        mock_copy_file_using_client_side_copy.return_value = None
-
-        message_media = MessageMedia.objects.create(
-            message=Message.objects.create(room=self.room),
-            content_type="image/png",
-            media_url="https://example.com/test.png",
-        )
-
-        self.service.upload_media_file(message_media, "test.png")
-
-        mock_copy_file_using_client_side_copy.assert_called_once_with(
-            message_media, "test.png"
-        )
-        mock_is_file_in_the_same_bucket.assert_not_called()
-
-    def test_copy_file_using_server_side_copy(self):
-        message_media = MessageMedia.objects.create(
-            message=Message.objects.create(room=self.room),
-            content_type="image/png",
-            media_file=SimpleUploadedFile(
-                "test.png", b"file_content", content_type="image/png"
-            ),
-        )
-
-        self.service._copy_file_using_server_side_copy(message_media, "test.png")
-        self.bucket.copy.assert_called_once_with(
-            {
-                "Bucket": self.bucket.name,
-                "Key": message_media.media_file.name,
-            },
-            get_media_upload_to(message_media.message, "test.png"),
-        )
-
-    def test_copy_file_using_client_side_copy(self):
-        message_media = MessageMedia.objects.create(
-            message=Message.objects.create(room=self.room),
-            content_type="image/png",
-            media_url="https://example.com/test.png",
-        )
-
-        new_key = get_media_upload_to(message_media.message, "test.png")
-
-        mock_response = MagicMock()
-        mock_response.raise_for_status.return_value = None
-        mock_response.raw = MagicMock()
-
-        mock_get = MagicMock()
-        mock_get.__enter__.return_value = mock_response
-        mock_get.__exit__.return_value = None
-
-        with patch("requests.get", return_value=mock_get) as mock_requests_get:
-            result = self.service._copy_file_using_client_side_copy(
-                message_media, "test.png"
+        with self.assertRaises(ValidationError) as context:
+            self.service.upload_messages_file(
+                room_archived_conversation=archived_conversation,
+                messages=[],
             )
 
-        mock_requests_get.assert_called_once_with(
-            message_media.media_url,
-            stream=True,
-            timeout=60,
+        self.assertEqual(
+            context.exception.message,
+            f"Room archived conversation {archived_conversation.uuid} is not in messages processed status",
         )
 
-        self.bucket.upload_fileobj.assert_called_once_with(
-            mock_response.raw,
-            new_key,
+        archived_conversation.refresh_from_db()
+
+        self.assertEqual(
+            archived_conversation.status,
+            ArchiveConversationsJobStatus.PENDING,
         )
 
-        self.assertEqual(result, new_key)
+    @patch("chats.apps.archive_chats.services.get_presigned_url")
+    def test_get_archived_media_url(self, mock_get_presigned_url):
+        object_key = f"archived_conversations/{self.project.uuid}/{self.room.uuid}/media/test.jpg"
+        mock_get_presigned_url.return_value = (
+            f"https://test-bucket.s3.amazonaws.com/{object_key}"
+        )
+
+        url = self.service.get_archived_media_url(object_key)
+
+        self.assertEqual(
+            url,
+            f"https://test-bucket.s3.amazonaws.com/{object_key}",
+        )
+
+    def test_get_archived_media_url_with_invalid_object_key_pattern(self):
+        with self.assertRaises(InvalidObjectKey):
+            self.service.get_archived_media_url("invalid-object-key")
+
+    def test_get_archived_media_url_with_invalid_project_uuid(self):
+        valid_uuid = uuid.uuid4()
+        with self.assertRaises(InvalidObjectKey):
+            self.service.get_archived_media_url(
+                f"archived_conversations/invalid-project-uuid/{valid_uuid}/media/test.jpg"
+            )
+
+    def test_get_archived_media_url_with_invalid_room_uuid(self):
+        valid_uuid = uuid.uuid4()
+        with self.assertRaises(InvalidObjectKey):
+            self.service.get_archived_media_url(
+                f"archived_conversations/{valid_uuid}/invalid-room-uuid/media/test.jpg"
+            )
+
+    def test_get_archived_media_url_without_media_part(self):
+        valid_uuid = uuid.uuid4()
+        with self.assertRaises(InvalidObjectKey):
+            self.service.get_archived_media_url(
+                f"archived_conversations/{valid_uuid}/{valid_uuid}/messages.jsonl"
+            )
