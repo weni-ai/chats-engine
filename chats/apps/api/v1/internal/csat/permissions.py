@@ -16,18 +16,18 @@ class CSATWebhookPermission(BasePermission):
             print("[CSATWebhookPermission] project_uuid not found")
             return False
 
-        room_uuid = request.auth.get("room")
+        room_uuid = request.data.get("room")
+        auth_room_uuid = request.auth.get("room")
+
+        if room_uuid != auth_room_uuid:
+            return False
 
         print("[CSATWebhookPermission] room_uuid", room_uuid)
 
         room = Room.objects.filter(
             uuid=room_uuid, queue__sector__project__uuid=project_uuid
         ).first()
+        csat_survey = CSATSurvey.objects.filter(room=room).first()
+        is_completed = csat_survey.is_completed if csat_survey else False
 
-        print("[CSATWebhookPermission] room", vars(room) if room else "not found")
-
-        return (
-            room
-            and not room.is_active
-            and not CSATSurvey.objects.filter(room=room).exists()
-        )
+        return room and not room.is_active and not is_completed
