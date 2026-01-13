@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/4.0/ref/settings/
 
 import os
 from pathlib import Path
+from celery.schedules import crontab
 
 import environ
 import sentry_sdk
@@ -459,7 +460,11 @@ CELERY_BEAT_SCHEDULE = {
     "process-pending-reports": {
         "task": "process_pending_reports",
         "schedule": 20.0,
-    }
+    },
+    "start-archive-rooms-messages": {
+        "task": "start_archive_rooms_messages",
+        "schedule": crontab(hour=0, minute=0),
+    },
 }
 
 # Disable report emails unless explicitly enabled
