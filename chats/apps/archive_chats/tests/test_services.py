@@ -331,3 +331,17 @@ class TestArchiveChatsService(TestCase):
             },
             media_upload_to(message_media.message, "test.png"),
         )
+        
+    @patch("chats.apps.archive_chats.services.get_presigned_url")
+    def test_get_archived_media_url_with_subfolder(self, mock_get_presigned_url):
+        object_key = f"archived_conversations/{self.project.uuid}/{self.room.uuid}/media/subfolder/test.jpg"
+        mock_get_presigned_url.return_value = (
+            f"https://test-bucket.s3.amazonaws.com/{object_key}"
+        )
+
+        url = self.service.get_archived_media_url(object_key)
+
+        self.assertEqual(
+            url,
+            f"https://test-bucket.s3.amazonaws.com/{object_key}",
+        )

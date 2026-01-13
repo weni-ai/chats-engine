@@ -268,7 +268,7 @@ class ArchiveChatsService(BaseArchiveChatsService):
         return new_key
 
     def get_archived_media_url(self, object_key: str) -> str:
-        valid_pattern = r"^archived_conversations/[^/]+/[^/]+/media/[^/]+$"
+        valid_pattern = r"^archived_conversations/[^/]+/[^/]+/media/.+$"
 
         if not re.fullmatch(valid_pattern, object_key):
             raise InvalidObjectKey("Invalid object key")
