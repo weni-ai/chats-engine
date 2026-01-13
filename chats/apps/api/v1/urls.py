@@ -1,6 +1,7 @@
 from django.urls import include, path
 from weni.feature_flags.views import FeatureFlagsWebhookView
 
+from chats.apps.api.v1.archive_chats.views import GetArchivedMediaView
 from chats.apps.api.v1.rooms.viewsets import RoomsReportViewSet
 from chats.apps.api.v1.dashboard.viewsets import (
     ModelFieldsViewSet,
@@ -35,6 +36,11 @@ urlpatterns = [
         "feature_flags/growthbook_webhook/",
         FeatureFlagsWebhookView.as_view(),
         name="feature_flags_webhook",
+    ),
+    path(
+        "archived_chats/media/",
+        GetArchivedMediaView.as_view(),
+        name="get_archived_media",
     ),
     path("", include(router.urls)),
 ]
