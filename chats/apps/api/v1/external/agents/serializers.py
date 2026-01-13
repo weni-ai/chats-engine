@@ -5,7 +5,17 @@ from chats.apps.projects.models import ProjectPermission
 
 
 class AgentFlowSerializer(serializers.ModelSerializer):
-    user = UserSerializer(many=False, required=False)
+    """
+    Serializer for agent (project permission) data via external API.
+
+    Returns user information including email, first_name, last_name and photo_url.
+    """
+
+    user = UserSerializer(
+        many=False,
+        required=False,
+        help_text="User data: email, first_name, last_name, photo_url",
+    )
 
     class Meta:
         model = ProjectPermission
