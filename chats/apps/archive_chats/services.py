@@ -4,14 +4,17 @@ import json
 import logging
 import boto3
 
+import boto3
 import re
 from typing import List
 from django.conf import settings
 from uuid import UUID
 from django.core.exceptions import ValidationError
+from django.urls import reverse
 from django.utils import timezone
 from django.core.files.base import ContentFile
 from sentry_sdk import capture_exception
+from django.conf import settings
 
 
 from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
@@ -21,9 +24,11 @@ from chats.apps.archive_chats.models import (
     RoomArchivedConversation,
 )
 from chats.apps.archive_chats.serializers import ArchiveMessageSerializer
+from chats.apps.archive_chats.uploads import media_upload_to
+from chats.apps.core.integrations.aws.s3.helpers import is_file_in_the_same_bucket
 from chats.apps.core.integrations.aws.s3.helpers import get_presigned_url
-from chats.apps.msgs.models import Message
 from chats.apps.rooms.models import Room
+from chats.apps.msgs.models import Message, MessageMedia
 
 
 logger = logging.getLogger(__name__)
@@ -54,14 +59,15 @@ class BaseArchiveChatsService(ABC):
 
 
 class ArchiveChatsService(BaseArchiveChatsService):
-    """
-    Service to archive the history of a room.
-    """
-
     def __init__(self, bucket=None):
-        self.bucket = bucket or boto3.resource("s3").Bucket(
-            settings.AWS_STORAGE_BUCKET_NAME
-        )
+        bucket_name_from_settings = getattr(settings, "AWS_STORAGE_BUCKET_NAME", None)
+
+        if not bucket_name_from_settings and not bucket:
+            raise ValueError(
+                "AWS_STORAGE_BUCKET_NAME is not set and no bucket was provided"
+            )
+
+        self.bucket = bucket or boto3.resource("s3").Bucket(bucket_name_from_settings)
 
     def start_archive_job(self) -> ArchiveConversationsJob:
         """
@@ -143,14 +149,21 @@ class ArchiveChatsService(BaseArchiveChatsService):
         used_media_filenames = set()
 
         for message in messages:
-            media_data = []
+            message_context = {"media": []}
             if message.medias.exists():
                 for media in message.medias.all():  # noqa
-                    # TODO
-                    pass
+                    url = self.process_media(media)
+                    media_data = {
+                        "url": url,
+                        "content_type": media.content_type,
+                        "created_on": media.created_on,
+                    }
+
+                    if url:
+                        message_context["media"].append(media_data)
 
             messages_data.append(
-                ArchiveMessageSerializer(message, context={"media": media_data}).data
+                ArchiveMessageSerializer(message, context=message_context).data
             )
 
         room_archived_conversation.status = (
@@ -210,6 +223,49 @@ class ArchiveChatsService(BaseArchiveChatsService):
         room_archived_conversation.save(update_fields=["status"])
 
         return room_archived_conversation
+
+    def process_media(self, media: MessageMedia) -> None:
+        if not media.media_file:
+            if not media.media_url:
+                return
+
+            return media.media_url
+
+        if is_file_in_the_same_bucket(
+            media.media_url, settings.AWS_STORAGE_BUCKET_NAME
+        ):
+            object_key = self._copy_file_using_server_side_copy(
+                media, media.media_file.name
+            )
+
+            return self._get_redirect_url(object_key)
+
+        return None
+
+    def _get_redirect_url(self, object_key: str) -> str:
+        base_url = settings.CHATS_BASE_URL
+        path = reverse("get_archived_media")
+
+        return f"{base_url}{path}?object_key={object_key}"
+
+    def _copy_file_using_server_side_copy(
+        self, message_media: MessageMedia, filename: str
+    ) -> str:
+        """
+        Copy a file from the original bucket to the new bucket using server-side copy.
+        """
+        original_key = message_media.media_file.name
+        new_key = media_upload_to(message_media.message, filename)
+
+        self.bucket.copy(
+            {
+                "Bucket": self.bucket.name,
+                "Key": original_key,
+            },
+            new_key,
+        )
+
+        return new_key
 
     def get_archived_media_url(self, object_key: str) -> str:
         valid_pattern = r"^archived_conversations/[^/]+/[^/]+/media/[^/]+$"

@@ -38,6 +38,7 @@ class ArchiveMessageSerializer(serializers.ModelSerializer):
     created_on = serializers.SerializerMethodField(read_only=True)
     media = serializers.SerializerMethodField(read_only=True)
     internal_note = serializers.SerializerMethodField(read_only=True)
+    media = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Message
@@ -50,6 +51,7 @@ class ArchiveMessageSerializer(serializers.ModelSerializer):
             "media",
             "is_automatic_message",
             "internal_note",
+            "media",
         ]
 
     def get_created_on(self, obj) -> str:
@@ -76,3 +78,6 @@ class ArchiveMessageSerializer(serializers.ModelSerializer):
             }
 
         return None
+
+    def get_media(self, obj: Message) -> Optional[list]:
+        return self.context.get("media", [])
