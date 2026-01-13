@@ -440,6 +440,7 @@ class AgentRepository:
     def _get_csat_general(self, filters: Filters, project: Project) -> CSATScoreGeneral:
         rooms_query = {
             "is_active": False,
+            "queue__sector__project": project,
         }
 
         start_date, end_date = self._get_converted_dates(filters, project)
@@ -485,6 +486,7 @@ class AgentRepository:
     def _get_csat_rooms_query(self, filters: Filters, project: Project) -> dict:
         rooms_query = {
             "rooms__is_active": False,
+            "rooms__queue__sector__project": project,
         }
 
         start_date, end_date = self._get_converted_dates(filters, project)
@@ -520,8 +522,8 @@ class AgentRepository:
                 filter=Q(**rooms_query),
             ),
             reviews=Count(
-                "rooms__csat_survey__rating",
-                distinct=True,
+                "rooms__csat_survey__uuid",
+                distinct=False,
                 filter=Q(**csat_reviews_query),
             ),
             avg_rating=Coalesce(
