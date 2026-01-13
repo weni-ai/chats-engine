@@ -212,7 +212,7 @@ class ArchiveChatsService(BaseArchiveChatsService):
             return media.media_url
 
         if is_file_in_the_same_bucket(
-            media.media_url, settings.AWS_STORAGE_BUCKET_NAME
+            media.media_file.url, settings.AWS_STORAGE_BUCKET_NAME
         ):
             object_key = self._copy_file_using_server_side_copy(
                 media, media.media_file.name
