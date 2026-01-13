@@ -139,7 +139,7 @@ class ArchiveChatsService(BaseArchiveChatsService):
                     media_data = {
                         "url": url,
                         "content_type": media.content_type,
-                        "created_on": media.created_on,
+                        "created_on": media.created_on.isoformat(),
                     }
 
                     if url:
