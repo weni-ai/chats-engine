@@ -1,7 +1,9 @@
 import json
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 import uuid
 
+
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
@@ -13,7 +15,8 @@ from chats.apps.archive_chats.models import (
 )
 from chats.apps.archive_chats.serializers import ArchiveMessageSerializer
 from chats.apps.archive_chats.services import ArchiveChatsService
-from chats.apps.msgs.models import AutomaticMessage, Message
+from chats.apps.archive_chats.uploads import media_upload_to
+from chats.apps.msgs.models import AutomaticMessage, Message, MessageMedia
 from chats.apps.rooms.models import Room, RoomNote
 from chats.apps.queues.models import Queue
 from chats.apps.sectors.models import Sector
@@ -25,7 +28,9 @@ from chats.apps.archive_chats.exceptions import InvalidObjectKey
 
 class TestArchiveChatsService(TestCase):
     def setUp(self):
-        self.service = ArchiveChatsService()
+        self.bucket = MagicMock()
+        self.bucket.name = "test-bucket"
+        self.service = ArchiveChatsService(bucket=self.bucket)
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
             name="Test Sector",
@@ -308,6 +313,24 @@ class TestArchiveChatsService(TestCase):
             self.service.get_archived_media_url(
                 f"archived_conversations/{valid_uuid}/{valid_uuid}/messages.jsonl"
             )
+
+    def test_copy_file_using_server_side_copy(self):
+        message_media = MessageMedia.objects.create(
+            message=Message.objects.create(room=self.room),
+            content_type="image/png",
+            media_file=SimpleUploadedFile(
+                "test.png", b"file_content", content_type="image/png"
+            ),
+        )
+
+        self.service._copy_file_using_server_side_copy(message_media, "test.png")
+        self.bucket.copy.assert_called_once_with(
+            {
+                "Bucket": self.bucket.name,
+                "Key": message_media.media_file.name,
+            },
+            media_upload_to(message_media.message, "test.png"),
+        )
 
     @patch("chats.apps.archive_chats.services.get_presigned_url")
     def test_get_archived_media_url_with_subfolder(self, mock_get_presigned_url):

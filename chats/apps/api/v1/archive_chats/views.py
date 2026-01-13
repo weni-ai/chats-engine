@@ -13,8 +13,11 @@ from chats.apps.archive_chats.services import ArchiveChatsService
 
 
 class GetArchivedMediaView(APIView):
-    service = ArchiveChatsService()
     permission_classes = [AllowAny]
+
+    @property
+    def service(self):
+        return ArchiveChatsService()
 
     def get(self, request):
         query_params = GetArchivedMediaQueryParamsSerializer(data=request.query_params)
