@@ -307,6 +307,31 @@ class RoomsManagerTests(APITestCase):
         self.assertEquals(response.status_code, status.HTTP_200_OK)
         self.assertEquals(room.user, self.agent_2)
 
+    def test_transfer_room_includes_requested_by_in_feedback(self):
+        import json
+        from chats.apps.rooms.choices import RoomFeedbackMethods
+
+        data = {"user_email": self.agent_2.email}
+        response = self._request_transfer_room(self.admin.auth_token.key, data)[0]
+
+        self.assertEquals(response.status_code, status.HTTP_200_OK)
+
+        self.room.refresh_from_db()
+        feedback_message = self.room.messages.filter(
+            text__contains=RoomFeedbackMethods.ROOM_TRANSFER
+        ).order_by("-created_on").first()
+
+        self.assertIsNotNone(feedback_message)
+
+        message_data = json.loads(feedback_message.text)
+        feedback_content = message_data.get("content", {})
+
+        self.assertIn("requested_by", feedback_content)
+        self.assertEqual(
+            feedback_content["requested_by"]["email"], self.admin.email
+        )
+        self.assertEqual(feedback_content["requested_by"]["type"], "user")
+
 
 class TestRoomsViewSet(APITestCase):
     def setUp(self) -> None:
@@ -590,6 +615,33 @@ class RoomPickTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
+    def test_pick_room_includes_requested_by_in_feedback(self):
+        import json
+        from chats.apps.rooms.choices import RoomFeedbackMethods
+
+        self.room.queue = self.queue
+        self.room.save()
+
+        response = self.pick_room_from_queue()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        feedback_message = self.room.messages.filter(
+            text__contains=RoomFeedbackMethods.ROOM_TRANSFER
+        ).first()
+
+        self.assertIsNotNone(feedback_message)
+
+        message_data = json.loads(feedback_message.text)
+        feedback_content = message_data.get("content", {})
+
+        self.assertIn("requested_by", feedback_content)
+        self.assertEqual(
+            feedback_content["requested_by"]["email"], self.user.email
+        )
+        self.assertEqual(feedback_content["requested_by"]["type"], "user")
+
 
 class RoomsBulkTransferTestCase(APITestCase):
     def setUp(self) -> None:
@@ -832,6 +884,30 @@ class CloseRoomTestCase(APITestCase):
 
         self.room.refresh_from_db()
         self.assertEqual(self.room.is_active, False)
+
+    def test_close_room_saves_closed_by_user(self):
+        another_agent = User.objects.create(email="another_agent@example.com")
+        perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=another_agent,
+            role=ProjectPermission.ROLE_ADMIN,
+            status="ONLINE",
+        )
+        QueueAuthorization.objects.create(
+            queue=self.queue,
+            permission=perm,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        self.client.force_authenticate(user=another_agent)
+
+        response = self.close_room(self.room.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.room.refresh_from_db()
+        self.assertEqual(self.room.is_active, False)
+        self.assertEqual(self.room.closed_by, another_agent)
 
 
 class RoomHistorySummaryTestCase(APITestCase):

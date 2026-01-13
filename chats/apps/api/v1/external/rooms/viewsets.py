@@ -66,24 +66,28 @@ def add_user_or_queue_to_room(instance: Room, request):
     if (user or queue) is None:
         return None
 
+    requested_by = getattr(request, "user", None) if hasattr(request, "user") else None
+
     if user and instance.user is not None:
         feedback = create_transfer_json(
             action="forward",
             from_="",
             to=instance.user,
+            requested_by=requested_by,
         )
     if queue:
         feedback = create_transfer_json(
             action="forward",
             from_="",
             to=instance.queue,
+            requested_by=requested_by,
         )
 
     instance.add_transfer_to_history(feedback)
 
     # Create a message with the transfer data and Send to the room group
     create_room_feedback_message(
-        instance, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+        instance, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER, requested_by=requested_by
     )
 
     return instance
@@ -333,10 +337,16 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
         modified_on = room.modified_on
         room.user = agent_permission.user
 
+        requested_by = None
+        if hasattr(request_permission, "user_email") and request_permission.user_email:
+            from chats.apps.accounts.models import User
+            requested_by = User.objects.filter(email=request_permission.user_email).first()
+
         feedback = create_transfer_json(
             action="forward",
             from_="",
             to=room.user,
+            requested_by=requested_by,
         )
         room.save()
         room.add_transfer_to_history(feedback)
@@ -346,7 +356,7 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
         room.update_ticket()
 
         create_room_feedback_message(
-            room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+            room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER, requested_by=requested_by
         )
 
         time = timezone.now() - modified_on
@@ -406,6 +416,11 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
 
         update_custom_fields(room, custom_fields_update)
 
+        requested_by = None
+        if hasattr(request_permission, "user_email") and request_permission.user_email:
+            from chats.apps.accounts.models import User
+            requested_by = User.objects.filter(email=request_permission.user_email).first()
+
         feedback = {
             "user": request_permission.user_first_name,
             "custom_field_name": custom_field_name,
@@ -414,7 +429,7 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
         }
 
         create_room_feedback_message(
-            room, feedback, method=RoomFeedbackMethods.EDIT_CUSTOM_FIELDS
+            room, feedback, method=RoomFeedbackMethods.EDIT_CUSTOM_FIELDS, requested_by=requested_by
         )
 
         return Response(

@@ -21,7 +21,7 @@ class BulkTransferService:
     Service for bulk transferring rooms.
     """
 
-    def transfer_user_and_queue(self, rooms: QuerySet[Room], user: User, queue: Queue):
+    def transfer_user_and_queue(self, rooms: QuerySet[Room], user: User, queue: Queue, user_request: User):
         for room in rooms:
             old_user = room.user
             old_queue = room.queue
@@ -35,18 +35,20 @@ class BulkTransferService:
                 action="transfer",
                 from_=old_queue,
                 to=queue,
+                requested_by=user_request,
             )
             feedback_user = create_transfer_json(
                 action="transfer",
                 from_=old_user,
                 to=user,
+                requested_by=user_request,
             )
 
         create_room_feedback_message(
-            room, feedback_queue, method=RoomFeedbackMethods.ROOM_TRANSFER
+            room, feedback_queue, method=RoomFeedbackMethods.ROOM_TRANSFER, requested_by=user_request
         )
         create_room_feedback_message(
-            room, feedback_user, method=RoomFeedbackMethods.ROOM_TRANSFER
+            room, feedback_user, method=RoomFeedbackMethods.ROOM_TRANSFER, requested_by=user_request
         )
         room.notify_queue("update")
         room.notify_user("update", user=old_user)
@@ -72,6 +74,7 @@ class BulkTransferService:
                 action="transfer",
                 from_=old_user,
                 to=transfer_user,
+                requested_by=user_request,
             )
 
             old_user_assigned_at = room.user_assigned_at
@@ -87,7 +90,7 @@ class BulkTransferService:
             start_queue_priority_routing(room.queue)
 
             create_room_feedback_message(
-                room, feedback_user, method=RoomFeedbackMethods.ROOM_TRANSFER
+                room, feedback_user, method=RoomFeedbackMethods.ROOM_TRANSFER, requested_by=user_request
             )
             if old_user:
                 room.notify_user("update", user=old_user)
@@ -114,13 +117,14 @@ class BulkTransferService:
                 action="transfer",
                 from_=transfer_user,
                 to=queue,
+                requested_by=user_request,
             )
             room.user = None
             room.queue = queue
             room.save()
 
             create_room_feedback_message(
-                room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+                room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER, requested_by=user_request
             )
             room.notify_user("update", user=transfer_user)
             room.notify_queue("update")
@@ -192,7 +196,7 @@ class BulkTransferService:
         self.validate_user(rooms, user)
 
         if user and queue:
-            self.transfer_user_and_queue(rooms, user, queue)
+            self.transfer_user_and_queue(rooms, user, queue, user_request)
         elif user:
             self.transfer_user(rooms, user, user_request)
         elif queue:

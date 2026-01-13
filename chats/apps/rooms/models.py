@@ -95,7 +95,7 @@ class Room(BaseModel, BaseConfigurableModel):
     ended_by = models.CharField(_("Ended by"), max_length=50, null=True, blank=True)
     closed_by = models.ForeignKey(
         "accounts.User",
-        related_name="closed_rooms",
+        related_name="closed_rooms_by_user",
         verbose_name=_("closed by"),
         on_delete=models.SET_NULL,
         null=True,
