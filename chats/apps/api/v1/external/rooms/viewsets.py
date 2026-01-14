@@ -66,7 +66,14 @@ def add_user_or_queue_to_room(instance: Room, request):
     if (user or queue) is None:
         return None
 
-    requested_by = getattr(request, "user", None) if hasattr(request, "user") else None
+    requested_by = None
+    user_email = getattr(request, "user", None)
+    if user_email and isinstance(user_email, str):
+        from chats.apps.accounts.models import User
+
+        requested_by = User.objects.filter(email=user_email).first()
+    elif user_email and hasattr(user_email, "pk"):
+        requested_by = user_email
 
     if user and instance.user is not None:
         feedback = create_transfer_json(
@@ -87,7 +94,10 @@ def add_user_or_queue_to_room(instance: Room, request):
 
     # Create a message with the transfer data and Send to the room group
     create_room_feedback_message(
-        instance, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER, requested_by=requested_by
+        instance,
+        feedback,
+        method=RoomFeedbackMethods.ROOM_TRANSFER,
+        requested_by=requested_by,
     )
 
     return instance
@@ -118,7 +128,15 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         Close a room, setting the ended_at date and turning the is_active flag as false
         """
         instance = self.get_object()
-        instance.close(None, "agent")
+        closed_by = None
+        user_email = getattr(request, "user", None)
+        if user_email and isinstance(user_email, str):
+            from chats.apps.accounts.models import User
+
+            closed_by = User.objects.filter(email=user_email).first()
+        elif user_email and hasattr(user_email, "pk"):
+            closed_by = user_email
+        instance.close(None, "agent", closed_by)
         serialized_data = RoomFlowSerializer(instance=instance)
         instance.notify_queue("close")
         if not settings.ACTIVATE_CALC_METRICS:
@@ -340,7 +358,10 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
         requested_by = None
         if hasattr(request_permission, "user_email") and request_permission.user_email:
             from chats.apps.accounts.models import User
-            requested_by = User.objects.filter(email=request_permission.user_email).first()
+
+            requested_by = User.objects.filter(
+                email=request_permission.user_email
+            ).first()
 
         feedback = create_transfer_json(
             action="forward",
@@ -356,7 +377,10 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
         room.update_ticket()
 
         create_room_feedback_message(
-            room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER, requested_by=requested_by
+            room,
+            feedback,
+            method=RoomFeedbackMethods.ROOM_TRANSFER,
+            requested_by=requested_by,
         )
 
         time = timezone.now() - modified_on
@@ -419,7 +443,10 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
         requested_by = None
         if hasattr(request_permission, "user_email") and request_permission.user_email:
             from chats.apps.accounts.models import User
-            requested_by = User.objects.filter(email=request_permission.user_email).first()
+
+            requested_by = User.objects.filter(
+                email=request_permission.user_email
+            ).first()
 
         feedback = {
             "user": request_permission.user_first_name,
@@ -429,7 +456,10 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
         }
 
         create_room_feedback_message(
-            room, feedback, method=RoomFeedbackMethods.EDIT_CUSTOM_FIELDS, requested_by=requested_by
+            room,
+            feedback,
+            method=RoomFeedbackMethods.EDIT_CUSTOM_FIELDS,
+            requested_by=requested_by,
         )
 
         return Response(
