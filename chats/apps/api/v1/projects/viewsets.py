@@ -358,7 +358,7 @@ class ProjectViewset(
         feedback = {"name": chats_flow_start.name}
         if chats_flow_start.room:
             create_room_feedback_message(
-                room, feedback, method=RoomFeedbackMethods.FLOW_START
+                room, feedback, method=RoomFeedbackMethods.FLOW_START, requested_by=request.user
             )
             room.notify_room("update")
         return Response(flow_start, status.HTTP_200_OK)

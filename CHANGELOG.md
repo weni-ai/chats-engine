@@ -1,3 +1,21 @@
+# 3.41.0
+# Fix
+  - Removing unused verification when creating a sector
+# Add
+  - Adds cyclomatic complexity analysis to flake8
+  - Adding filters to avoid return rooms from sectors/queues that are deleted
+  - Better documentation for external endpoints
+  
+# 3.40.1
+  - Filter rooms in the CSAT score by agents by project
+  
+# 3.40.0
+# Add
+  - Update CSAT flows command
+  - Update CSAT Flow to version 2
+# Fix 
+  - Filter rooms in CSAT by project
+  
 # 3.39.2
 # Add
   - Adding the new routing using the correct configuration for growthbook feature flag
@@ -967,6 +985,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 

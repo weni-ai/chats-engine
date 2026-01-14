@@ -58,7 +58,11 @@ def create_feedback_json(method: str, content: dict):
     return {"method": method, "content": content}
 
 
-def create_room_feedback_message(room: object, feedback: dict, method: str):
+def create_room_feedback_message(room: object, feedback: dict, method: str, requested_by=None):
+    if requested_by and "requested_by" not in feedback:
+        from chats.apps.rooms.utils import get_data_from_object
+        feedback["requested_by"] = get_data_from_object(requested_by)
+
     msg = room.messages.create(
         text=json.dumps(create_feedback_json(method=method, content=feedback)),
         seen=True,

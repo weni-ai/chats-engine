@@ -1,9 +1,12 @@
-from collections import deque
+from collections import defaultdict, deque
 
 from django.conf import settings
 
 from chats.apps.msgs.models import ChatMessageReplyIndex, Message
 from chats.utils.websockets import send_channels_group
+
+STATUS_READ_ALIASES = {"READ", "V"}
+STATUS_DELIVERED_ALIASES = {"DELIVERED", "D"}
 
 
 class MessageStatusNotifier:
@@ -36,15 +39,59 @@ class UpdateStatusMessageUseCase:
     def __init__(self):
         self._msgs = deque()
 
-    def _bulk_create(self):
-        msgs_to_process = []
-        while len(self._msgs) > 0:
-            try:
-                msg = self._msgs.popleft()
-                msgs_to_process.append(msg)
-            except IndexError:
-                break
+    def _drain_queue(self):
+        msgs = list(self._msgs)
+        self._msgs.clear()
+        return msgs
 
+    def _is_valid_msg_data(self, msg_data):
+        return msg_data and isinstance(msg_data, dict) and msg_data.get("message_id")
+
+    def _apply_status_update(self, message, status):
+        update_fields = set()
+        if status in STATUS_READ_ALIASES and not message.is_read:
+            message.is_read = "read"
+            update_fields.add("is_read")
+        if status in STATUS_DELIVERED_ALIASES and not message.is_delivered:
+            message.is_delivered = "delivered"
+            update_fields.add("is_delivered")
+        return update_fields
+
+    def _process_message(self, msg_data):
+        try:
+            reply_index = ChatMessageReplyIndex.objects.get(
+                external_id=msg_data["message_id"]
+            )
+            message = reply_index.message
+            if not message.room or not message.room.project:
+                return None, None
+            status = (msg_data["message_status"] or "").upper()
+            update_fields = self._apply_status_update(message, status)
+            if update_fields:
+                message._pending_status = msg_data["message_status"]
+                return message, update_fields
+        except ChatMessageReplyIndex.DoesNotExist:
+            pass
+        except Exception as error:
+            print(
+                f"[UpdateStatusMessageUseCase] - Error processing message {msg_data.get('message_id')}: {error}"
+            )
+        return None, None
+
+    def _notify_messages(self, messages):
+        for message in messages:
+            if hasattr(message, "_pending_status"):
+                try:
+                    MessageStatusNotifier.notify_for_message(
+                        message, message._pending_status
+                    )
+                except Exception as error:
+                    print(
+                        f"[UpdateStatusMessageUseCase] - Notification failed for message {message.uuid}: {error}"
+                    )
+
+    def _bulk_create(self):
+        msgs_to_process = self._drain_queue()
         if not msgs_to_process:
             return
 
@@ -53,78 +100,21 @@ class UpdateStatusMessageUseCase:
         )
 
         messages_to_update = []
-        message_update_fields = {}
+        fields_to_messages = defaultdict(list)
 
         for msg_data in msgs_to_process:
-            if not msg_data or not isinstance(msg_data, dict):
+            if not self._is_valid_msg_data(msg_data):
                 continue
-            if not msg_data.get("message_id"):
-                continue
-            try:
-                reply_index = ChatMessageReplyIndex.objects.get(
-                    external_id=msg_data["message_id"]
-                )
-                message = reply_index.message
-
-                if not message.room:
-                    continue
-
-                updated = False
-                update_fields_for_this_message = set()
-
-                status = (
-                    msg_data["message_status"].upper()
-                    if msg_data["message_status"]
-                    else ""
-                )
-
-                if status in ["READ", "V"]:
-                    if not message.is_read:
-                        message.is_read = "read"
-                        update_fields_for_this_message.add("is_read")
-                        updated = True
-
-                if status in ["DELIVERED", "D"]:
-                    if not message.is_delivered:
-                        message.is_delivered = "delivered"
-                        update_fields_for_this_message.add("is_delivered")
-                        updated = True
-
-                if updated:
-                    messages_to_update.append(message)
-                    message._pending_status = msg_data["message_status"]
-                    message_update_fields[message.uuid] = update_fields_for_this_message
-
-            except ChatMessageReplyIndex.DoesNotExist:
-                continue
-            except Exception as error:
-                print(
-                    f"[UpdateStatusMessageUseCase] - Error processing message {msg_data.get('message_id')}: {error}"
-                )
-                continue
-
-        if messages_to_update:
-            fields_to_messages = {}
-            for message in messages_to_update:
-                fields_key = tuple(sorted(message_update_fields[message.uuid]))
-                if fields_key not in fields_to_messages:
-                    fields_to_messages[fields_key] = []
+            message, update_fields = self._process_message(msg_data)
+            if message:
+                messages_to_update.append(message)
+                fields_key = tuple(sorted(update_fields))
                 fields_to_messages[fields_key].append(message)
 
-            for fields, messages in fields_to_messages.items():
-                Message.objects.bulk_update(messages, list(fields))
+        for fields, messages in fields_to_messages.items():
+            Message.objects.bulk_update(messages, list(fields))
 
-            for message in messages_to_update:
-                if hasattr(message, "_pending_status"):
-                    try:
-                        MessageStatusNotifier.notify_for_message(
-                            message, message._pending_status
-                        )
-                    except Exception as error:
-                        print(
-                            f"[UpdateStatusMessageUseCase] - Notification failed for message {message.uuid}: {error}"
-                        )
-                        continue
+        self._notify_messages(messages_to_update)
 
         print(
             f"[UpdateStatusMessageUseCase] - Bulk update completed for {len(messages_to_update)} messages"

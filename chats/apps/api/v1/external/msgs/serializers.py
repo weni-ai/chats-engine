@@ -20,6 +20,13 @@ class AttachmentSerializer(serializers.ModelSerializer):
 
 
 class MsgFlowSerializer(serializers.ModelSerializer):
+    """
+    Serializer for creating and retrieving messages via external API.
+
+    Supports both incoming (from contact) and outgoing (to contact) messages,
+    with optional attachments and metadata.
+    """
+
     # Write
     direction = serializers.ChoiceField(
         choices=(
@@ -27,18 +34,40 @@ class MsgFlowSerializer(serializers.ModelSerializer):
             ("outgoing", _("outgoing")),
         ),
         write_only=True,
+        help_text="Message direction: 'incoming' (from contact) or 'outgoing' (to contact)",
     )
-    attachments = AttachmentSerializer(many=True, required=False, write_only=True)
+    attachments = AttachmentSerializer(
+        many=True,
+        required=False,
+        write_only=True,
+        help_text="List of media attachments for the message",
+    )
     text = serializers.CharField(
-        required=False, allow_null=True, allow_blank=True, default=""
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        default="",
+        help_text="Message text content",
     )
-    external_id = serializers.CharField(required=False, allow_null=True)
-    metadata = serializers.JSONField(required=False, allow_null=True)
+    external_id = serializers.CharField(
+        required=False,
+        allow_null=True,
+        help_text="External message ID from the source system",
+    )
+    metadata = serializers.JSONField(
+        required=False,
+        allow_null=True,
+        help_text="Additional metadata as JSON object",
+    )
     # Read
     media = MessageMediaSerializer(required=False, many=True, read_only=True)
     contact = ContactRelationsSerializer(many=False, required=False, read_only=True)
     user = UserSerializer(many=False, required=False, read_only=True)
-    created_on = serializers.DateTimeField(required=False, allow_null=True)
+    created_on = serializers.DateTimeField(
+        required=False,
+        allow_null=True,
+        help_text="Message creation timestamp (ISO 8601 format)",
+    )
 
     class Meta:
         model = Message

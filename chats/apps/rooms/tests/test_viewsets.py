@@ -307,6 +307,31 @@ class RoomsManagerTests(APITestCase):
         self.assertEquals(response.status_code, status.HTTP_200_OK)
         self.assertEquals(room.user, self.agent_2)
 
+    def test_transfer_room_includes_requested_by_in_feedback(self):
+        import json
+        from chats.apps.rooms.choices import RoomFeedbackMethods
+
+        data = {"user_email": self.agent_2.email}
+        response = self._request_transfer_room(self.admin.auth_token.key, data)[0]
+
+        self.assertEquals(response.status_code, status.HTTP_200_OK)
+
+        self.room.refresh_from_db()
+        feedback_message = self.room.messages.filter(
+            text__contains=RoomFeedbackMethods.ROOM_TRANSFER
+        ).order_by("-created_on").first()
+
+        self.assertIsNotNone(feedback_message)
+
+        message_data = json.loads(feedback_message.text)
+        feedback_content = message_data.get("content", {})
+
+        self.assertIn("requested_by", feedback_content)
+        self.assertEqual(
+            feedback_content["requested_by"]["email"], self.admin.email
+        )
+        self.assertEqual(feedback_content["requested_by"]["type"], "user")
+
 
 class TestRoomsViewSet(APITestCase):
     def setUp(self) -> None:
@@ -589,6 +614,33 @@ class RoomPickTests(APITestCase):
         response = self.pick_room_from_queue()
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
+    def test_pick_room_includes_requested_by_in_feedback(self):
+        import json
+        from chats.apps.rooms.choices import RoomFeedbackMethods
+
+        self.room.queue = self.queue
+        self.room.save()
+
+        response = self.pick_room_from_queue()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        feedback_message = self.room.messages.filter(
+            text__contains=RoomFeedbackMethods.ROOM_TRANSFER
+        ).first()
+
+        self.assertIsNotNone(feedback_message)
+
+        message_data = json.loads(feedback_message.text)
+        feedback_content = message_data.get("content", {})
+
+        self.assertIn("requested_by", feedback_content)
+        self.assertEqual(
+            feedback_content["requested_by"]["email"], self.user.email
+        )
+        self.assertEqual(feedback_content["requested_by"]["type"], "user")
 
 
 class RoomsBulkTransferTestCase(APITestCase):

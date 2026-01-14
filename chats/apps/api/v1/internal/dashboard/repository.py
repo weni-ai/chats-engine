@@ -472,6 +472,7 @@ class AgentRepository:
     def _get_csat_general(self, filters: Filters, project: Project) -> CSATScoreGeneral:
         rooms_query = {
             "is_active": False,
+            "queue__sector__project": project,
         }
 
         start_date, end_date = self._get_converted_dates(filters, project)
