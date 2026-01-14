@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ("rooms", "0024_room_last_unread_message_at_and_more"),
+        ("rooms", "0022_roomnote_message"),
     ]
 
     operations = [
