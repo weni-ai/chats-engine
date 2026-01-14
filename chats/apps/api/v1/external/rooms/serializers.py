@@ -127,11 +127,33 @@ def get_room_user(
 
 
 class RoomListSerializer(serializers.ModelSerializer):
-    contact = serializers.CharField(source="contact.name")
-    contact_external_id = serializers.CharField(source="contact.external_id")
-    waiting_time = serializers.IntegerField(source="metric.waiting_time")
-    interaction_time = serializers.IntegerField(source="metric.interaction_time")
-    tags = TagSimpleSerializer(many=True, required=False)
+    """
+    Serializer for listing rooms via external API.
+
+    Returns room details including contact info, agent, metrics and tags.
+    """
+
+    contact = serializers.CharField(
+        source="contact.name",
+        help_text="Contact display name",
+    )
+    contact_external_id = serializers.CharField(
+        source="contact.external_id",
+        help_text="Contact external ID from the source system",
+    )
+    waiting_time = serializers.IntegerField(
+        source="metric.waiting_time",
+        help_text="Time in seconds the room waited in queue",
+    )
+    interaction_time = serializers.IntegerField(
+        source="metric.interaction_time",
+        help_text="Total interaction time in seconds",
+    )
+    tags = TagSimpleSerializer(
+        many=True,
+        required=False,
+        help_text="List of tags associated with the room",
+    )
 
     class Meta:
         model = Room
@@ -151,19 +173,58 @@ class RoomListSerializer(serializers.ModelSerializer):
 
 
 class RoomMetricsSerializer(serializers.ModelSerializer):
-    user_name = serializers.SerializerMethodField()
-    first_user_message = serializers.SerializerMethodField()
-    tags = TagSimpleSerializer(many=True, required=False)
-    interaction_time = serializers.IntegerField(source="metric.interaction_time")
-    urn = serializers.CharField()
-    contact_external_id = serializers.CharField(source="contact.external_id")
-    protocol = serializers.CharField(read_only=True)
-    callid = serializers.SerializerMethodField()
-    automatic_message_sent_at = serializers.SerializerMethodField()
-    first_user_assigned_at = serializers.DateTimeField()
-    time_to_send_automatic_message = serializers.SerializerMethodField()
-    sector = serializers.SerializerMethodField()
-    custom_fields = serializers.JSONField(read_only=True)
+    """
+    Serializer for room metrics via external API.
+
+    Returns detailed metrics including interaction time, tags, protocol,
+    automatic message timing, and custom fields.
+    """
+
+    user_name = serializers.SerializerMethodField(
+        help_text="Full name of the assigned agent",
+    )
+    first_user_message = serializers.SerializerMethodField(
+        help_text="Timestamp of the first agent message (ISO 8601)",
+    )
+    tags = TagSimpleSerializer(
+        many=True,
+        required=False,
+        help_text="List of tags associated with the room",
+    )
+    interaction_time = serializers.IntegerField(
+        source="metric.interaction_time",
+        help_text="Total interaction time in seconds",
+    )
+    urn = serializers.CharField(
+        help_text="Contact URN (e.g., whatsapp:5511999999999)",
+    )
+    contact_external_id = serializers.CharField(
+        source="contact.external_id",
+        help_text="Contact external ID from the source system",
+    )
+    protocol = serializers.CharField(
+        read_only=True,
+        help_text="Room protocol number",
+    )
+    callid = serializers.SerializerMethodField(
+        help_text="Call ID from custom fields (if available)",
+    )
+    automatic_message_sent_at = serializers.SerializerMethodField(
+        help_text="Timestamp when automatic message was sent (ISO 8601)",
+    )
+    first_user_assigned_at = serializers.DateTimeField(
+        help_text="Timestamp when first agent was assigned (ISO 8601)",
+    )
+    time_to_send_automatic_message = serializers.SerializerMethodField(
+        help_text="Time in seconds from assignment to automatic message",
+    )
+    sector = serializers.SerializerMethodField(
+        help_text="Sector info: {uuid, name}",
+    )
+    custom_fields = serializers.JSONField(
+        read_only=True,
+        help_text="Custom fields as JSON object",
+    )
 
     class Meta:
         model = Room
@@ -268,6 +329,13 @@ class ProjectInfoSerializer(serializers.Serializer):
 
 
 class RoomFlowSerializer(serializers.ModelSerializer):
+    """
+    Serializer for creating and managing rooms (tickets) via external API.
+
+    Supports room creation with queue or sector assignment, contact data,
+    optional flow start, and message history.
+    """
+
     user = UserSerializer(many=False, required=False, read_only=True)
     user_email = serializers.SlugRelatedField(
         queryset=User.objects.all(),
@@ -276,22 +344,55 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         slug_field="email",
         write_only=True,
         allow_null=True,
+        help_text="Email of the agent to assign to the room",
     )
     sector_uuid = serializers.CharField(
-        required=False, write_only=True, allow_null=True
+        required=False,
+        write_only=True,
+        allow_null=True,
+        help_text="UUID of the sector (alternative to queue_uuid)",
     )
     queue_uuid = serializers.PrimaryKeyRelatedField(
-        queryset=Queue.objects.all(), required=False, source="queue", write_only=True
+        queryset=Queue.objects.all(),
+        required=False,
+        source="queue",
+        write_only=True,
+        help_text="UUID of the queue to assign the room",
     )
     queue = QueueSerializer(many=False, required=False, read_only=True)
-    contact = ContactRelationsSerializer(many=False, required=False, read_only=False)
-    flow_uuid = serializers.CharField(required=False, write_only=True, allow_null=True)
-    is_anon = serializers.BooleanField(write_only=True, required=False, default=False)
-    ticket_uuid = serializers.UUIDField(required=False)
-    history = serializers.ListField(
-        child=serializers.DictField(), required=False, write_only=True
+    contact = ContactRelationsSerializer(
+        many=False,
+        required=False,
+        read_only=False,
+        help_text="Contact data (external_id, name, email, phone, custom_fields)",
     )
-    project_info = ProjectInfoSerializer(required=False, write_only=True)
+    flow_uuid = serializers.CharField(
+        required=False,
+        write_only=True,
+        allow_null=True,
+        help_text="UUID of the flow that started this room",
+    )
+    is_anon = serializers.BooleanField(
+        write_only=True,
+        required=False,
+        default=False,
+        help_text="If true, the URN will not be saved",
+    )
+    ticket_uuid = serializers.UUIDField(
+        required=False,
+        help_text="External ticket UUID for integration",
+    )
+    history = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        write_only=True,
+        help_text="List of messages to create as history",
+    )
+    project_info = ProjectInfoSerializer(
+        required=False,
+        write_only=True,
+        help_text="Project information for context",
+    )
 
     class Meta:
         model = Room

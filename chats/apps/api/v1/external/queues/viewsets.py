@@ -15,6 +15,13 @@ from chats.apps.queues.models import Queue
 
 
 class QueueFlowViewset(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for listing and retrieving queues via external API.
+
+    Requires project admin authentication via Bearer token.
+    Rate limited: 20/sec, 600/min, 30k/hour.
+    """
+
     swagger_tag = "Integrations"
     model = Queue
     queryset = Queue.objects.exclude(is_deleted=True)
@@ -36,3 +43,11 @@ class QueueFlowViewset(viewsets.ReadOnlyModelViewSet):
         if permission is None or permission.role != 1:
             return qs.none()
         return qs.filter(sector__project=permission.project)
+
+    def list(self, request, *args, **kwargs):
+        """List all active queues in the authenticated project."""
+        return super().list(request, *args, **kwargs)
+
+    def retrieve(self, request, *args, **kwargs):
+        """Retrieve details of a specific queue by UUID."""
+        return super().retrieve(request, *args, **kwargs)

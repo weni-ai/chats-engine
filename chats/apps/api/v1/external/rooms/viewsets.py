@@ -14,7 +14,7 @@ from rest_framework.response import Response
 
 from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
-    get_auth_class,
+    get_token_auth_classes,
 )
 from chats.apps.ai_features.history_summary.models import (
     HistorySummary,
@@ -24,6 +24,7 @@ from chats.apps.ai_features.history_summary.tasks import (
     cancel_history_summary_generation,
     generate_history_summary,
 )
+from chats.apps.api.authentication.permissions import InternalAPITokenRequiredPermission
 from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.external.rooms.serializers import (
     RoomFlowSerializer,
@@ -104,6 +105,13 @@ def add_user_or_queue_to_room(instance: Room, request):
 
 
 class RoomFlowViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing rooms (tickets) via external API.
+
+    Supports room creation, updates, closure and message history.
+    Supports both project admin authentication (Bearer token) and module authentication.
+    """
+
     swagger_tag = "Integrations"
     model = Room
     queryset = Room.objects.all()
@@ -112,21 +120,30 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
 
     @cached_property
     def authentication_classes(self):
-        return get_auth_class(self.request)
+        return get_token_auth_classes(self.request)
 
     @cached_property
     def permission_classes(self):
         if self.request.auth and hasattr(self.request.auth, "project"):
             return [IsAdminPermission]
+        elif self.request.auth == "INTERNAL":
+            return [InternalAPITokenRequiredPermission]
+
         return [ModuleHasPermission]
+
+    def list(self, request, *args, **kwargs):
+        """List all rooms accessible via external API."""
+        return super().list(request, *args, **kwargs)
+
+    def retrieve(self, request, *args, **kwargs):
+        """Retrieve details of a specific room by UUID."""
+        return super().retrieve(request, *args, **kwargs)
 
     @action(detail=True, methods=["PUT", "PATCH"], url_name="close")
     def close(
         self, request, *args, **kwargs
     ):  # TODO: Remove the body options on swagger as it won't use any
-        """
-        Close a room, setting the ended_at date and turning the is_active flag as false
-        """
+        """Close a room, setting ended_at and is_active=False."""
         instance = self.get_object()
         closed_by = None
         user_email = getattr(request, "user", None)
@@ -196,6 +213,7 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         return Response(status=status.HTTP_201_CREATED)
 
     def create(self, request, *args, **kwargs):
+        """Create a new room (ticket) for a contact in a queue or sector."""
         try:
             with transaction.atomic():
                 serializer = self.get_serializer(data=request.data)
@@ -294,6 +312,12 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
 
 
 class RoomUserExternalViewSet(viewsets.ViewSet):
+    """
+    ViewSet for assigning agents to rooms via external API.
+
+    Requires project admin authentication via Bearer token.
+    """
+
     swagger_tag = "Integrations"
     serializer_class = RoomFlowSerializer
     permission_classes = [
@@ -302,6 +326,7 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
     authentication_classes = [ProjectAdminAuthentication]
 
     def partial_update(self, request, pk=None):
+        """Assign an agent to a queued room by ticket ID."""
         if pk is None:
             return Response(
                 {"Detail": "No ticket id on the request"}, status.HTTP_400_BAD_REQUEST
@@ -396,6 +421,13 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
 
 
 class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
+    """
+    ViewSet for updating room custom fields via external API.
+
+    Requires project admin authentication via Bearer token.
+    Rate limited: 20/sec, 600/min, 30k/hour.
+    """
+
     swagger_tag = "Integrations"
     serializer_class = RoomFlowSerializer
     authentication_classes = [ProjectAdminAuthentication]
@@ -406,6 +438,7 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
     ]
 
     def partial_update(self, request, pk=None):
+        """Update custom fields for a room by contact external ID."""
         custom_fields_update = request.data
         data = {"fields": custom_fields_update}
 
@@ -469,6 +502,13 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
 
 
 class ExternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for listing rooms with cursor pagination via external API.
+
+    Requires project admin authentication via Bearer token.
+    Rate limited: 20/sec, 600/min, 30k/hour.
+    """
+
     swagger_tag = "Integrations"
     model = Room
     queryset = Room.objects
@@ -505,8 +545,17 @@ class ExternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
             .filter(queue__sector__project=self.request.auth.project)
         )
 
+    def list(self, request, *args, **kwargs):
+        """List rooms with cursor-based pagination (page_size=5)."""
+        return super().list(request, *args, **kwargs)
+
+    def retrieve(self, request, *args, **kwargs):
+        """Retrieve details of a specific room by UUID."""
+        return super().retrieve(request, *args, **kwargs)
+
     @action(detail=False, methods=["GET"], url_name="count")
     def count(self, request, *args, **kwargs):
+        """Return count of active rooms: waiting (no agent) and in_service (with agent)."""
         queryset = self.filter_queryset(self.get_queryset()).filter(is_active=True)
         waiting = queryset.filter(user__isnull=True).count()
         in_service = queryset.filter(user__isnull=False).count()
@@ -517,6 +566,13 @@ class ExternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class ExternalListWithPaginationRoomsViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for listing rooms with limit/offset pagination via external API.
+
+    Requires project admin authentication via Bearer token.
+    Rate limited: 20/sec, 600/min, 30k/hour.
+    """
+
     swagger_tag = "Integrations"
     model = Room
     queryset = Room.objects
@@ -554,8 +610,17 @@ class ExternalListWithPaginationRoomsViewSet(viewsets.ReadOnlyModelViewSet):
             .filter(queue__sector__project=self.request.auth.project)
         )
 
+    def list(self, request, *args, **kwargs):
+        """List rooms with limit/offset pagination (default=10, max=100)."""
+        return super().list(request, *args, **kwargs)
+
+    def retrieve(self, request, *args, **kwargs):
+        """Retrieve details of a specific room by UUID."""
+        return super().retrieve(request, *args, **kwargs)
+
     @action(detail=False, methods=["GET"], url_name="count")
     def count(self, request, *args, **kwargs):
+        """Return count of active rooms: waiting and in_service."""
         queryset = self.filter_queryset(self.get_queryset()).filter(is_active=True)
         waiting = queryset.filter(user__isnull=True).count()
         in_service = queryset.filter(user__isnull=False).count()
@@ -566,6 +631,14 @@ class ExternalListWithPaginationRoomsViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class RoomMetricsViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    ViewSet for retrieving room metrics via external API.
+
+    Provides detailed metrics including interaction time, tags, protocol, etc.
+    Requires project admin authentication via Bearer token.
+    Rate limited: 20/sec, 600/min, 30k/hour.
+    """
+
     swagger_tag = "Integrations"
     model = Room
     queryset = Room.objects.select_related("user").prefetch_related("messages", "tags")
@@ -599,3 +672,11 @@ class RoomMetricsViewSet(viewsets.ReadOnlyModelViewSet):
             .get_queryset()
             .filter(queue__sector__project=self.request.auth.project)
         )
+
+    def list(self, request, *args, **kwargs):
+        """List rooms with detailed metrics (interaction time, tags, protocol, etc.)."""
+        return super().list(request, *args, **kwargs)
+
+    def retrieve(self, request, *args, **kwargs):
+        """Retrieve detailed metrics for a specific room."""
+        return super().retrieve(request, *args, **kwargs)
