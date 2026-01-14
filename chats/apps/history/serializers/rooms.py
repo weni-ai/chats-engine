@@ -30,6 +30,7 @@ class RoomHistorySerializer(serializers.ModelSerializer):
     user = UserNameSerializer(many=False, read_only=True)
     contact = ContactOptimizedSerializer(read_only=True)
     tags = serializers.SerializerMethodField()
+    closed_by = UserNameSerializer(many=False, read_only=True)
 
     class Meta:
         model = Room
@@ -42,6 +43,7 @@ class RoomHistorySerializer(serializers.ModelSerializer):
             "tags",
             "protocol",
             "service_chat",
+            "closed_by",
         ]
 
     def get_tags(self, obj):
