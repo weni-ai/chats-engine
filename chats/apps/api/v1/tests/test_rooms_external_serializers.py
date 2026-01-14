@@ -20,7 +20,7 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
             rooms_limit=10,
             work_start="09:00",
             work_end="17:00",
-            working_day={
+            config={
                 "working_hours": {
                     "open_in_weekends": True,
                     "schedules": {
@@ -133,7 +133,7 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
             rooms_limit=10,
             work_start="09:00",
             work_end="17:00",
-            working_day={
+            config={
                 "working_hours": {
                     "open_in_weekends": False,
                     "schedules": {
@@ -187,7 +187,7 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
             rooms_limit=10,
             work_start="09:00",
             work_end="17:00",
-            working_day={
+            config={
                 "working_hours": {
                     "open_in_weekends": True,
                     "schedules": {
@@ -265,7 +265,7 @@ class TestRoomFlowSerializerWeekendValidation(TestCase):
             rooms_limit=10,
             work_start="09:00",
             work_end="17:00",
-            working_day={},
+            config={},
         )
 
         Queue.objects.create(name="No Config Queue", sector=sector_no_config)

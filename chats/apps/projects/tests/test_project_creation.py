@@ -119,6 +119,7 @@ class TestProjectCreationUsecase(TestCase):
         This test verifies that when a project with its_principal=True exists in an org,
         any new projects created in that org will have its_principal=False in their config.
         """
+
         principal_project = self._create_principal_project()
 
         self.assertEqual(principal_project.config, {"its_principal": True})

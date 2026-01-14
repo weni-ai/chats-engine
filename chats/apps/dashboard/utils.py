@@ -1,15 +1,17 @@
 import logging
-from typing import TYPE_CHECKING
 from datetime import timedelta
+from typing import TYPE_CHECKING
 
 from django.db.models import Q
 from django.utils import timezone
+from pendulum.parser import parse as pendulum_parse
 
 logger = logging.getLogger(__name__)
 
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
+
     from chats.apps.msgs.models import Message
     from chats.apps.rooms.models import Room
 

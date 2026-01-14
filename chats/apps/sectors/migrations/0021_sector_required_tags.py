@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sectors', '0019_sector_automatic_message_text_and_more'),
+        ("sectors", "0020_sector_is_csat_enabled"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='sector',
-            name='required_tags',
-            field=models.BooleanField(default=False, verbose_name='required tags?'),
+            model_name="sector",
+            name="required_tags",
+            field=models.BooleanField(default=False, verbose_name="required tags?"),
         ),
     ]

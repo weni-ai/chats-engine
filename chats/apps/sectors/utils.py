@@ -107,12 +107,12 @@ class WorkingHoursValidator:
         if holiday:
             holiday_data = {
                 "day_type": holiday.day_type,
-                "start_time": holiday.start_time.strftime("%H:%M")
-                if holiday.start_time
-                else None,
-                "end_time": holiday.end_time.strftime("%H:%M")
-                if holiday.end_time
-                else None,
+                "start_time": (
+                    holiday.start_time.strftime("%H:%M") if holiday.start_time else None
+                ),
+                "end_time": (
+                    holiday.end_time.strftime("%H:%M") if holiday.end_time else None
+                ),
                 "description": holiday.description,
             }
             cache_client.set(cache_key, json.dumps(holiday_data), ex=300)
@@ -199,7 +199,6 @@ class WorkingHoursValidator:
                 )
             start_time = self._parse_time_cached(start_str)
             end_time = self._parse_time_cached(end_str)
-
             if start_time <= current_time <= end_time:
                 return
             raise ValidationError(

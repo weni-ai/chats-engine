@@ -6,7 +6,7 @@ class Migration(migrations.Migration):
     atomic = False
 
     dependencies = [
-        ("contacts", "0008_alter_contact_imported_history_url"),
+        ("contacts", "0009_alter_contact_imported_history_url"),
     ]
 
     operations = [

@@ -34,7 +34,9 @@ CONNECTION_CHECK_WAIT_TIME = 1
 CONNECTION_CHECK_TIMEOUT = 1
 CONNECTION_CHECK_CACHE_TTL = 10
 
-logger = logging.getLogger(__name__)
+# Ping timeout configuration
+PING_TIMEOUT_SECONDS = getattr(settings, "WS_PING_TIMEOUT_SECONDS", 60)
+PING_CHECK_INTERVAL_SECONDS = getattr(settings, "WS_PING_CHECK_INTERVAL_SECONDS", 10)
 
 
 class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
@@ -87,7 +89,22 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 await self.load_user()
                 self.last_ping = timezone.now()
 
+                # Start background task to monitor ping timeout
+                self.ping_timeout_task = asyncio.create_task(
+                    self.ping_timeout_checker()
+                )
+
     async def disconnect(self, *args, **kwargs):
+        # Cancel the ping timeout checker task
+        if hasattr(self, "ping_timeout_task") and not self.ping_timeout_task.done():
+            self.ping_timeout_task.cancel()
+            try:
+                await self.ping_timeout_task
+            except asyncio.CancelledError:
+                logger.debug(
+                    f"ping_timeout_task cancelled for user {self.user.email if self.user else 'unknown'}"
+                )
+
         try:
             ws_active_connections.labels(consumer=self.CONSUMER_TYPE).dec()
             ws_disconnects_total.labels(consumer=self.CONSUMER_TYPE).inc()
@@ -283,6 +300,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             )
         elif "rooms." in event.get("action"):
             content = event.get("content", {})
+            action = event.get("action")
 
             try:
                 if isinstance(content, str):
@@ -302,6 +320,14 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                     indent=1,
                     cls=DjangoJSONEncoder,
                 )
+            except Room.DoesNotExist:
+                # Log detalhado para diagnosticar race condition
+                room_exists_after = await self.check_room_exists_after_delay(room_uuid)
+                logger.error(
+                    f"Room not found on action '{action}' for room_uuid={room_uuid}. "
+                    f"Room exists after 500ms delay: {room_exists_after}"
+                )
+                return self.send_json(event)
             except Exception as e:
                 logger.error(f"Error getting history rooms queryset by contact: {e}")
                 return self.send_json(event)
@@ -336,6 +362,15 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             room.contact, self.user, room.queue.sector.project
         ).exists()
 
+    async def check_room_exists_after_delay(self, room_uuid: str):
+        """Verifica se o room existe após um delay - usado para diagnosticar race condition"""
+        await asyncio.sleep(0.5)  # 500ms delay
+        return await self._check_room_exists(room_uuid)
+
+    @database_sync_to_async
+    def _check_room_exists(self, room_uuid: str):
+        return Room.objects.filter(uuid=room_uuid).exists()
+
     async def has_other_active_connections(self):
         """
         Check if there are other active connections for this user's permission
@@ -365,6 +400,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         await asyncio.sleep(CONNECTION_CHECK_WAIT_TIME)
 
         # Wait a short time for responses
+        check_response = None
         try:
             check_response = await asyncio.wait_for(
                 self.get_connection_check_response(),
@@ -421,3 +457,62 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             custom_status_name=custom_status_name,
             custom_status_type_uuid=custom_status_type_uuid,
         )
+
+    async def ping_timeout_checker(self):
+        """
+        Background task that monitors ping activity.
+        If no ping is received for PING_TIMEOUT_SECONDS, sets user offline and closes connection.
+        """
+        try:
+            while True:
+                # Check every PING_CHECK_INTERVAL_SECONDS
+                await asyncio.sleep(PING_CHECK_INTERVAL_SECONDS)
+
+                # Safety check: stop if permission is gone
+                if not hasattr(self, "permission") or self.permission is None:
+                    logger.info("ping_timeout_checker: permission gone, stopping task")
+                    break
+
+                # Skip if last_ping not set yet
+                if not hasattr(self, "last_ping"):
+                    continue
+
+                # Calculate time since last ping
+                seconds_since_ping = (timezone.now() - self.last_ping).total_seconds()
+
+                # Check if timeout threshold exceeded
+                if seconds_since_ping > PING_TIMEOUT_SECONDS:
+                    logger.warning(
+                        f"Ping timeout detected for user {self.user.email} "
+                        f"(project: {self.project}). "
+                        f"Last ping was {seconds_since_ping:.0f} seconds ago "
+                        f"(threshold: {PING_TIMEOUT_SECONDS}s). "
+                        f"Setting status to OFFLINE and closing connection."
+                    )
+
+                    # Set user status to OFFLINE
+                    await self.set_user_status("OFFLINE")
+
+                    # Finalize any in-service status
+                    await self.finalize_in_service_if_needed()
+
+                    # Close the WebSocket connection
+                    await self.close(code=1000)
+
+                    # Exit the loop
+                    break
+
+        except asyncio.CancelledError:
+            # Task was cancelled (normal during disconnect)
+            logger.debug(
+                f"ping_timeout_checker cancelled for user "
+                f"{self.user.email if hasattr(self, 'user') and self.user else 'unknown'}"
+            )
+            raise
+        except Exception as e:
+            # Unexpected error - log and stop task
+            logger.error(
+                f"Unexpected error in ping_timeout_checker for user "
+                f"{self.user.email if hasattr(self, 'user') and self.user else 'unknown'}: {e}",
+                exc_info=True,
+            )

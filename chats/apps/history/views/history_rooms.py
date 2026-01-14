@@ -1,3 +1,5 @@
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import IsAuthenticated
@@ -17,7 +19,7 @@ from .permissions import CanRetrieveRoomHistory
 class HistoryRoomViewset(ReadOnlyModelViewSet):
     swagger_tag = "History"
     queryset = Room.objects.select_related(
-        "user", "contact", "queue", "queue__sector"
+        "user", "contact", "queue", "queue__sector", "closed_by"
     ).prefetch_related("tags")
 
     serializer_class = RoomHistorySerializer

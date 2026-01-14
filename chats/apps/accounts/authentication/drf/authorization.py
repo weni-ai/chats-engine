@@ -7,6 +7,7 @@ from django_redis import get_redis_connection
 from mozilla_django_oidc.contrib.drf import OIDCAuthentication
 from rest_framework import exceptions
 from rest_framework.authentication import TokenAuthentication, get_authorization_header
+from mozilla_django_oidc.contrib.drf import OIDCAuthentication
 
 from chats.apps.api.authentication.classes import InternalAPITokenAuthentication
 from chats.apps.projects.models import ProjectPermission
@@ -19,7 +20,13 @@ TOKEN_AUTHENTICATION_CLASS = (
 
 class ProjectAdminDTO:
     def __init__(
-        self, pk: str, project: str, user_email: str, user_first_name: str, role: int
+        self,
+        pk: str,
+        project: str,
+        user_email: str,
+        user_first_name: str,
+        role: int,
+        **kwargs
     ) -> None:
         self.pk = pk
         self.project = project
@@ -82,10 +89,12 @@ class ProjectAdminAuthentication(TokenAuthentication):
             return self._authenticate_credentials(key)
         redis_connection = get_redis_connection()
 
+        print("key", key)
         cache_authorization = redis_connection.get(key)
 
         if cache_authorization is not None:
             cache_authorization = json.loads(cache_authorization)
+            print("cache_authorization", cache_authorization)
             authorization = ProjectAdminDTO(**cache_authorization)
             return (authorization.user_email, authorization)
 

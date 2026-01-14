@@ -7,3 +7,4 @@ class ProjectsConfig(AppConfig):
 
     def ready(self):
         from .models import signals  # noqa: F401
+        from .models import permission_signals  # noqa: F401

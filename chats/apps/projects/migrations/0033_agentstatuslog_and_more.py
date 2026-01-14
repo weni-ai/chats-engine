@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('projects', '0030_agentdisconnectlog'),
+        ('projects', '0032_remove_project_is_csat_enabled'),
     ]
 
     operations = [

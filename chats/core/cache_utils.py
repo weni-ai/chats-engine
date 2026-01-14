@@ -376,7 +376,6 @@ def invalidate_cached_user(email: str) -> None:
     """
     Invalidate the cached user object for a specific email.
     Also invalidates the email lookup cache.
-
     Args:
         email: User email address to invalidate
     """

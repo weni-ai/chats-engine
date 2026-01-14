@@ -313,6 +313,11 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
 
 
 class ProjectInfoSerializer(serializers.Serializer):
+    uuid = serializers.UUIDField(required=False, read_only=False)
+    name = serializers.CharField(required=False, read_only=False)
+
+
+class ProjectInfoSerializer(serializers.Serializer):
     """
     Serializer for representing basic project information.
 

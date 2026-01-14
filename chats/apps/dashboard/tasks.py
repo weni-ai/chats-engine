@@ -289,9 +289,48 @@ def generate_custom_fields_report(
 
         if getattr(settings, "REPORTS_SEND_EMAILS", False):
             try:
-                _send_report_email(
-                    project.name,
-                    project.uuid,
+                from chats.core.storages import ReportsStorage
+
+                storage = ReportsStorage()
+                ext = "xlsx" if file_type == "xlsx" else "zip"
+                filename = f"custom_report_{project.uuid}_{dt}.{ext}"
+
+                output.seek(0)
+                file_path = storage.save(filename, output)
+
+                download_url = storage.get_download_url(
+                    file_path, expiration=int(timedelta(days=7).total_seconds())
+                )
+
+                logger.info(
+                    "Report uploaded to S3: %s | report_uuid=%s | url=%s",
+                    file_path,
+                    report_status.uuid,
+                    download_url,
+                )
+
+                subject = f"Custom report for the project {project.name} - {dt}"
+                message_plain, message_html = get_report_ready_email(
+                    project.name, download_url
+                )
+
+                email = EmailMultiAlternatives(
+                    subject=subject,
+                    body=message_plain,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    to=[user_email],
+                )
+                email.attach_alternative(message_html, "text/html")
+                email.extra_headers = {
+                    "X-No-Track": "True",
+                    "X-Track-Click": "no",
+                    "o:tracking-clicks": "no",
+                }
+
+                email.send(fail_silently=False)
+
+                logger.info(
+                    "Report email sent successfully to %s | report_uuid=%s",
                     user_email,
                     output,
                     dt,
@@ -470,9 +509,48 @@ def process_pending_reports():
 
         if getattr(settings, "REPORTS_SEND_EMAILS", False):
             try:
-                _send_report_email(
-                    project.name,
-                    project.uuid,
+                from chats.core.storages import ReportsStorage
+
+                storage = ReportsStorage()
+                ext = "xlsx" if file_type == "xlsx" else "zip"
+                filename = f"custom_report_{project.uuid}_{dt}.{ext}"
+
+                output.seek(0)
+                file_path = storage.save(filename, output)
+
+                download_url = storage.get_download_url(
+                    file_path, expiration=int(timedelta(days=7).total_seconds())
+                )
+
+                logging.info(
+                    "Report uploaded to S3: %s | report_uuid=%s | url=%s",
+                    file_path,
+                    report.uuid,
+                    download_url,
+                )
+
+                subject = f"Custom report for the project {project.name} - {dt}"
+                message_plain, message_html = get_report_ready_email(
+                    project.name, download_url
+                )
+
+                email = EmailMultiAlternatives(
+                    subject=subject,
+                    body=message_plain,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    to=[user_email],
+                )
+                email.attach_alternative(message_html, "text/html")
+                email.extra_headers = {
+                    "X-No-Track": "True",
+                    "X-Track-Click": "no",
+                    "o:tracking-clicks": "no",
+                }
+
+                email.send(fail_silently=False)
+
+                logging.info(
+                    "Report email sent successfully to %s | report_uuid=%s",
                     user_email,
                     output,
                     dt,

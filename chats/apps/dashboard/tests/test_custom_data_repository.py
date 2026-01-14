@@ -1,20 +1,20 @@
-from datetime import timedelta
-
-import pytz
+from datetime import datetime, timedelta
 from django.test import TestCase
 from django.utils import timezone
+import pytz
 
 from chats.apps.accounts.models import User
-from chats.apps.api.v1.internal.dashboard.dto import Filters
-from chats.apps.api.v1.internal.dashboard.repository import AgentRepository
 from chats.apps.projects.models import (
-    CustomStatus,
-    CustomStatusType,
     Project,
     ProjectPermission,
+    CustomStatusType,
+    CustomStatus,
 )
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.sectors.models import Sector
+
+from chats.apps.api.v1.internal.dashboard.repository import AgentRepository
+from chats.apps.api.v1.internal.dashboard.dto import Filters
 
 
 class TestAgentRepository(TestCase):

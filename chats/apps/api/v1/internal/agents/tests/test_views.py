@@ -1,15 +1,26 @@
 import uuid
-from unittest.mock import patch
+from unittest.mock import uuiduuid
+from datetime import timedelta
 
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError
 from django.test import TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, force_authenticate
+from django.utils import timezone
+
+from django.conf import settings
+from django.db import transaction
+
+from django.contrib.auth import get_user_model
+from rest_framework.exceptions import ValidationError
 
 from chats.apps.api.v1.internal.agents.views import AgentDisconnectView
 from chats.apps.api.v1.permissions import ProjectBodyIsAdmin
-from chats.apps.projects.models import AgentDisconnectLog, Project, ProjectPermission
+from chats.apps.projects.models import Project, ProjectPermission, CustomStatus, CustomStatusType
+from chats.apps.projects.models.models import AgentDisconnectLog
+from chats.apps.projects.usecases.status_service import InServiceStatusService
+
 
 
 class ProjectBodyIsAdminPermissionTests(TestCase):
@@ -111,10 +122,15 @@ class AgentDisconnectViewTests(TestCase):
         "chats.apps.api.v1.internal.agents.views.send_channels_group", return_value=None
     )
     def test_success_admin_disconnects_agent(self, _mock_ws):
-        response = self._call_view(
-            {"project_uuid": str(self.project.uuid), "agent": self.agent.email},
-            self.admin,
-        )
+        # garantir que não caia no 'User already disconnected'
+        self.agent_perm.status = ProjectPermission.STATUS_ONLINE
+        self.agent_perm.save(update_fields=["status"])
+
+        with patch("django.db.transaction.on_commit", lambda f: f()):
+            response = self._call_view(
+                {"project_uuid": str(self.project.uuid), "agent": self.agent.email},
+                self.admin,
+            )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         # target set to OFFLINE
         self.agent_perm.refresh_from_db()
@@ -161,3 +177,91 @@ class AgentDisconnectViewTests(TestCase):
             self.admin,
         )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    @patch("chats.apps.api.v1.internal.agents.views.send_channels_group", return_value=None)
+    def test_disconnect_without_custom_status_sets_offline_and_sends_status_close(self, mock_ws):
+        # Ensure agent is ONLINE and has no active CustomStatus
+        self.agent_perm.status = ProjectPermission.STATUS_ONLINE
+        self.agent_perm.save(update_fields=["status"])
+        self.assertFalse(
+            CustomStatus.objects.filter(user=self.agent, project=self.project, is_active=True).exists()
+        )
+
+        with patch("django.db.transaction.on_commit", lambda f: f()):
+            resp = self._call_view(
+                {"project_uuid": str(self.project.uuid), "agent": self.agent.email},
+                self.admin,
+            )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.agent_perm.refresh_from_db()
+        self.assertEqual(self.agent_perm.status, ProjectPermission.STATUS_OFFLINE)
+
+        actions = [c.kwargs.get("action") for c in mock_ws.call_args_list]
+        self.assertIn("status.close", actions)
+        self.assertNotIn("custom_status.close", actions)
+
+    @patch("chats.apps.api.v1.internal.agents.views.send_channels_group", return_value=None)
+    def test_disconnect_with_active_custom_status_closes_status_and_sends_custom_status_close(self, mock_ws):
+        status_type = CustomStatusType.objects.create(name="lunch", project=self.project)
+        CustomStatus.objects.create(
+            user=self.agent, status_type=status_type, is_active=True, project=self.project, break_time=0
+        )
+        self.assertTrue(
+            CustomStatus.objects.filter(user=self.agent, project=self.project, is_active=True).exists()
+        )
+
+        with patch("django.db.transaction.on_commit", lambda f: f()):
+            resp = self._call_view(
+                {"project_uuid": str(self.project.uuid), "agent": self.agent.email},
+                self.admin,
+            )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertFalse(
+            CustomStatus.objects.filter(user=self.agent, project=self.project, is_active=True).exists()
+        )
+        actions = [c.kwargs.get("action") for c in mock_ws.call_args_list]
+        self.assertIn("custom_status.close", actions)
+        self.assertNotIn("status.close", actions)
+
+    @patch("chats.apps.api.v1.internal.agents.views.send_channels_group", return_value=None)
+    def test_accepts_agent_email_alias(self, mock_ws):
+        self.agent_perm.status = ProjectPermission.STATUS_ONLINE
+        self.agent_perm.save(update_fields=["status"])
+
+        with patch("django.db.transaction.on_commit", lambda f: f()):
+            resp = self._call_view(
+                {"project_uuid": str(self.project.uuid), "agent_email": self.agent.email},
+                self.admin,
+            )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.agent_perm.refresh_from_db()
+        self.assertEqual(self.agent_perm.status, ProjectPermission.STATUS_OFFLINE)
+        actions = [c.kwargs.get("action") for c in mock_ws.call_args_list]
+        self.assertIn("status.close", actions)
+
+    @patch("chats.apps.api.v1.internal.agents.views.send_channels_group", return_value=None)
+    def test_disconnect_updates_break_time_for_active_non_system_custom_status(self, _mock_ws):
+        self.agent_perm.status = ProjectPermission.STATUS_ONLINE
+        self.agent_perm.save(update_fields=["status"])
+
+        lunch_type = CustomStatusType.objects.create(name="lunch", project=self.project)
+        cs = CustomStatus.objects.create(
+            user=self.agent,
+            status_type=lunch_type,
+            is_active=True,
+            project=self.project,
+            break_time=0,
+        )
+        one_hour_ago = timezone.now() - timedelta(hours=1)
+        CustomStatus.objects.filter(pk=cs.pk).update(created_on=one_hour_ago)
+
+        with patch("django.db.transaction.on_commit", lambda f: f()):
+            resp = self._call_view(
+                {"project_uuid": str(self.project.uuid), "agent": self.agent.email},
+                self.admin,
+            )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+        cs.refresh_from_db()
+        self.assertFalse(cs.is_active)
+        self.assertGreaterEqual(cs.break_time, 3600)

@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sectors', '0020_sector_required_tags'),
+        ("sectors", "0021_sector_required_tags"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='sectortag',
-            name='is_deleted',
-            field=models.BooleanField(default=False, verbose_name='is deleted?'),
+            model_name="sectortag",
+            name="is_deleted",
+            field=models.BooleanField(default=False, verbose_name="is deleted?"),
         ),
     ]

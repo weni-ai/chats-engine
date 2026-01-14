@@ -4,7 +4,7 @@ CSAT_FLOW_VERSION = 2
 CSAT_FLOW_NAME = "Weni Chats CSAT Flow"
 CSAT_FLOW_DEFINITION_DATA = {
     "version": "13",
-    "site": "https://flows.weni.ai",
+    "site": "https://flows.stg.cloud.weni.ai",
     "flows": [
         {
             "_ui": {

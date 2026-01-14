@@ -30,6 +30,7 @@ class RoomHistorySerializer(serializers.ModelSerializer):
     user = UserNameSerializer(many=False, read_only=True)
     contact = ContactOptimizedSerializer(read_only=True)
     tags = serializers.SerializerMethodField()
+    closed_by = UserNameSerializer(many=False, read_only=True)
 
     class Meta:
         model = Room
@@ -42,6 +43,7 @@ class RoomHistorySerializer(serializers.ModelSerializer):
             "tags",
             "protocol",
             "service_chat",
+            "closed_by",
         ]
 
     def get_tags(self, obj):
@@ -62,14 +64,28 @@ class RoomHistorySerializer(serializers.ModelSerializer):
 
 
 class RoomBasicValuesSerializer(serializers.Serializer):
+    """
+    Serializer otimizado para trabalhar com values() - performance máxima
+    """
+
     uuid = serializers.UUIDField()
     ended_at = serializers.DateTimeField()
+
+
+class RoomBasicSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Room
+        fields = [
+            "uuid",
+            "ended_at",
+        ]
 
 
 class RoomDetailSerializer(serializers.ModelSerializer):
     user = UserNameSerializer(many=False, read_only=True)
     contact = serializers.SerializerMethodField()
     tags = serializers.SerializerMethodField()
+    closed_by = UserNameSerializer(many=False, read_only=True)
 
     class Meta:
         model = Room
@@ -83,6 +99,7 @@ class RoomDetailSerializer(serializers.ModelSerializer):
             "contact",
             "tags",
             "protocol",
+            "closed_by",
         ]
 
     def get_contact(self, obj):
