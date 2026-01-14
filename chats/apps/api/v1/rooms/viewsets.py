@@ -398,7 +398,7 @@ class RoomViewset(
                 )
 
         with transaction.atomic():
-            instance.close(tags, "agent")
+            instance.close(tags, "agent", request.user)
 
         instance.refresh_from_db()
         serialized_data = RoomSerializer(instance=instance)
@@ -467,6 +467,7 @@ class RoomViewset(
                 action=action,
                 from_=old_instance.user or old_instance.queue,
                 to=instance.user,
+                requested_by=self.request.user,
             )
 
         if queue:
@@ -475,6 +476,7 @@ class RoomViewset(
                 action="transfer",
                 from_=old_instance.user or old_instance.queue,
                 to=instance.queue,
+                requested_by=self.request.user,
             )
             if (
                 not user
@@ -493,7 +495,7 @@ class RoomViewset(
         # Create a message with the transfer data and Send to the room group
         # TODO separate create message in a function
         create_room_feedback_message(
-            instance, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+            instance, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER, requested_by=self.request.user
         )
 
         if old_user is None and user:  # queued > agent
@@ -596,7 +598,7 @@ class RoomViewset(
             "new": new_custom_field_value,
         }
         create_room_feedback_message(
-            room, feedback, method=RoomFeedbackMethods.EDIT_CUSTOM_FIELDS
+            room, feedback, method=RoomFeedbackMethods.EDIT_CUSTOM_FIELDS, requested_by=request.user
         )
 
         return Response(
@@ -634,6 +636,7 @@ class RoomViewset(
             action=action,
             from_=room.queue,
             to=user,
+            requested_by=request.user,
         )
 
         try:
@@ -642,7 +645,7 @@ class RoomViewset(
             room.add_transfer_to_history(feedback)
 
             create_room_feedback_message(
-                room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+                room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER, requested_by=request.user
             )
             room.notify_queue("update")
 

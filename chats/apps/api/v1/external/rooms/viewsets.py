@@ -67,24 +67,38 @@ def add_user_or_queue_to_room(instance: Room, request):
     if (user or queue) is None:
         return None
 
+    requested_by = None
+    user_email = getattr(request, "user", None)
+    if user_email and isinstance(user_email, str):
+        from chats.apps.accounts.models import User
+
+        requested_by = User.objects.filter(email=user_email).first()
+    elif user_email and hasattr(user_email, "pk"):
+        requested_by = user_email
+
     if user and instance.user is not None:
         feedback = create_transfer_json(
             action="forward",
             from_="",
             to=instance.user,
+            requested_by=requested_by,
         )
     if queue:
         feedback = create_transfer_json(
             action="forward",
             from_="",
             to=instance.queue,
+            requested_by=requested_by,
         )
 
     instance.add_transfer_to_history(feedback)
 
     # Create a message with the transfer data and Send to the room group
     create_room_feedback_message(
-        instance, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+        instance,
+        feedback,
+        method=RoomFeedbackMethods.ROOM_TRANSFER,
+        requested_by=requested_by,
     )
 
     return instance
@@ -131,7 +145,15 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
     ):  # TODO: Remove the body options on swagger as it won't use any
         """Close a room, setting ended_at and is_active=False."""
         instance = self.get_object()
-        instance.close(None, "agent")
+        closed_by = None
+        user_email = getattr(request, "user", None)
+        if user_email and isinstance(user_email, str):
+            from chats.apps.accounts.models import User
+
+            closed_by = User.objects.filter(email=user_email).first()
+        elif user_email and hasattr(user_email, "pk"):
+            closed_by = user_email
+        instance.close(None, "agent", closed_by)
         serialized_data = RoomFlowSerializer(instance=instance)
         instance.notify_queue("close")
         if not settings.ACTIVATE_CALC_METRICS:
@@ -358,10 +380,19 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
         modified_on = room.modified_on
         room.user = agent_permission.user
 
+        requested_by = None
+        if hasattr(request_permission, "user_email") and request_permission.user_email:
+            from chats.apps.accounts.models import User
+
+            requested_by = User.objects.filter(
+                email=request_permission.user_email
+            ).first()
+
         feedback = create_transfer_json(
             action="forward",
             from_="",
             to=room.user,
+            requested_by=requested_by,
         )
         room.save()
         room.add_transfer_to_history(feedback)
@@ -371,7 +402,10 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
         room.update_ticket()
 
         create_room_feedback_message(
-            room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+            room,
+            feedback,
+            method=RoomFeedbackMethods.ROOM_TRANSFER,
+            requested_by=requested_by,
         )
 
         time = timezone.now() - modified_on
@@ -439,6 +473,14 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
 
         update_custom_fields(room, custom_fields_update)
 
+        requested_by = None
+        if hasattr(request_permission, "user_email") and request_permission.user_email:
+            from chats.apps.accounts.models import User
+
+            requested_by = User.objects.filter(
+                email=request_permission.user_email
+            ).first()
+
         feedback = {
             "user": request_permission.user_first_name,
             "custom_field_name": custom_field_name,
@@ -447,7 +489,10 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
         }
 
         create_room_feedback_message(
-            room, feedback, method=RoomFeedbackMethods.EDIT_CUSTOM_FIELDS
+            room,
+            feedback,
+            method=RoomFeedbackMethods.EDIT_CUSTOM_FIELDS,
+            requested_by=requested_by,
         )
 
         return Response(
