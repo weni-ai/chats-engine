@@ -1,6 +1,5 @@
-from functools import cached_property
 import logging
-import time
+from functools import cached_property
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
@@ -12,7 +11,6 @@ from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import CursorPagination, LimitOffsetPagination
 from rest_framework.response import Response
-
 
 from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
@@ -54,7 +52,6 @@ from chats.apps.rooms.views import (
     update_custom_fields,
     update_flows_custom_fields,
 )
-from chats.core.cache import CacheClient
 
 from .filters import RoomFilter, RoomMetricsFilter
 
@@ -70,7 +67,14 @@ def add_user_or_queue_to_room(instance: Room, request):
     if (user or queue) is None:
         return None
 
-    requested_by = getattr(request, "user", None) if hasattr(request, "user") else None
+    requested_by = None
+    user_email = getattr(request, "user", None)
+    if user_email and isinstance(user_email, str):
+        from chats.apps.accounts.models import User
+
+        requested_by = User.objects.filter(email=user_email).first()
+    elif user_email and hasattr(user_email, "pk"):
+        requested_by = user_email
 
     if user and instance.user is not None:
         feedback = create_transfer_json(
@@ -91,7 +95,10 @@ def add_user_or_queue_to_room(instance: Room, request):
 
     # Create a message with the transfer data and Send to the room group
     create_room_feedback_message(
-        instance, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER, requested_by=requested_by
+        instance,
+        feedback,
+        method=RoomFeedbackMethods.ROOM_TRANSFER,
+        requested_by=requested_by,
     )
 
     return instance
@@ -138,7 +145,15 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
     ):  # TODO: Remove the body options on swagger as it won't use any
         """Close a room, setting ended_at and is_active=False."""
         instance = self.get_object()
-        instance.close(None, "agent")
+        closed_by = None
+        user_email = getattr(request, "user", None)
+        if user_email and isinstance(user_email, str):
+            from chats.apps.accounts.models import User
+
+            closed_by = User.objects.filter(email=user_email).first()
+        elif user_email and hasattr(user_email, "pk"):
+            closed_by = user_email
+        instance.close(None, "agent", closed_by)
         serialized_data = RoomFlowSerializer(instance=instance)
         instance.notify_queue("close")
         if not settings.ACTIVATE_CALC_METRICS:
@@ -220,15 +235,6 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
                         check_ticket=settings.AUTOMATIC_MESSAGE_CHECK_TICKET_ON_ROOM_CREATE,
                     )
                 )
-
-            # [STAGING] Just testing
-            urn_with_delay = CacheClient().get(f"urn_with_delay")
-            if urn_with_delay and instance.urn == (
-                urn_with_delay.decode()
-                if isinstance(urn_with_delay, bytes)
-                else urn_with_delay
-            ):
-                time.sleep(5)
 
             return Response(
                 serializer.data, status=status.HTTP_201_CREATED, headers=headers
@@ -377,7 +383,10 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
         requested_by = None
         if hasattr(request_permission, "user_email") and request_permission.user_email:
             from chats.apps.accounts.models import User
-            requested_by = User.objects.filter(email=request_permission.user_email).first()
+
+            requested_by = User.objects.filter(
+                email=request_permission.user_email
+            ).first()
 
         feedback = create_transfer_json(
             action="forward",
@@ -393,7 +402,10 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
         room.update_ticket()
 
         create_room_feedback_message(
-            room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER, requested_by=requested_by
+            room,
+            feedback,
+            method=RoomFeedbackMethods.ROOM_TRANSFER,
+            requested_by=requested_by,
         )
 
         time = timezone.now() - modified_on
@@ -464,7 +476,10 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
         requested_by = None
         if hasattr(request_permission, "user_email") and request_permission.user_email:
             from chats.apps.accounts.models import User
-            requested_by = User.objects.filter(email=request_permission.user_email).first()
+
+            requested_by = User.objects.filter(
+                email=request_permission.user_email
+            ).first()
 
         feedback = {
             "user": request_permission.user_first_name,
@@ -474,7 +489,10 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
         }
 
         create_room_feedback_message(
-            room, feedback, method=RoomFeedbackMethods.EDIT_CUSTOM_FIELDS, requested_by=requested_by
+            room,
+            feedback,
+            method=RoomFeedbackMethods.EDIT_CUSTOM_FIELDS,
+            requested_by=requested_by,
         )
 
         return Response(
