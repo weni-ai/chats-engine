@@ -78,18 +78,25 @@ class SectorViewset(viewsets.ModelViewSet):
 
         project = Project.objects.get(uuid=instance.project.uuid)
 
-        content = {
-            "project_uuid": str(instance.project.uuid),
-            "name": instance.name,
-            "config": {
-                "project_auth": str(instance.external_token.pk),
-                "sector_uuid": str(instance.uuid),
-                "project_uuid": str(instance.project.uuid),
-                "project_name_origin": instance.name,
-            },
-        }
+        is_principal = project.config and project.config.get("its_principal", False)
 
-        if settings.USE_WENI_FLOWS:
+        if is_principal:
+            integrate_use_case = IntegratedTicketers()
+            integrate_use_case.integrate_individual_ticketer(
+                project, instance.secondary_project
+            )
+        elif settings.USE_WENI_FLOWS:
+            content = {
+                "project_uuid": str(instance.project.uuid),
+                "name": instance.name,
+                "config": {
+                    "project_auth": str(instance.external_token.pk),
+                    "sector_uuid": str(instance.uuid),
+                    "project_uuid": str(instance.project.uuid),
+                    "project_name_origin": instance.name,
+                },
+            }
+
             flows_client = FlowRESTClient()
             response = flows_client.create_ticketer(**content)
             if response.status_code not in [
@@ -104,12 +111,6 @@ class SectorViewset(viewsets.ModelViewSet):
                         f"Exception: {response.content}"
                     )
                 )
-
-        if project.config and project.config.get("its_principal", False):
-            integrate_use_case = IntegratedTicketers()
-            integrate_use_case.integrate_individual_ticketer(
-                project, instance.secondary_project
-            )
 
     def update(self, request, *args, **kwargs):
         sector = self.get_object()
