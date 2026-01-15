@@ -5,10 +5,12 @@ from typing import TYPE_CHECKING
 from django.conf import settings
 from django.db import transaction
 from sentry_sdk import capture_exception
+from weni.feature_flags.shortcuts import is_feature_active
 
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.msgs.models import AutomaticMessage, Message
 from chats.apps.projects.models.models import Project
+from chats.apps.rooms.models import Room
 
 logger = logging.getLogger(__name__)
 
@@ -92,11 +94,28 @@ class AutomaticMessagesService:
                     % (ticket_uuid, room.pk)
                 )
 
+        # Check if denormalization feature flag is enabled for this project
+        project = room.queue.sector.project
+        use_denormalized = is_feature_active(
+            settings.DENORMALIZED_MESSAGE_FIELDS_FLAG_KEY,
+            user.email if user else "",
+            str(project.uuid),
+        )
+
+        if use_denormalized:
+            # Fallback híbrido: usar campo desnormalizado se True, senão fazer query
+            has_agent_messages = room.has_agent_messages or room.messages.filter(
+                user__isnull=False
+            ).exists()
+        else:
+            # Comportamento original: query direto
+            has_agent_messages = room.messages.filter(user__isnull=False).exists()
+
         if (
             room.queue.sector.is_automatic_message_active is False
             or not room.queue.sector.automatic_message_text
             or hasattr(room, "automatic_message")
-            or room.messages.filter(user__isnull=False).exists()
+            or has_agent_messages
         ):
             logger.info(
                 "[AUTOMATIC MESSAGES SERVICE] Automatic message not sent to room %s",
@@ -116,6 +135,11 @@ class AutomaticMessagesService:
                 AutomaticMessage.objects.create(
                     room=room,
                     message=message,
+                )
+
+                # Update denormalized automatic_message_sent_at field
+                Room.objects.filter(pk=room.pk).update(
+                    automatic_message_sent_at=message.created_on
                 )
 
                 if message_text:

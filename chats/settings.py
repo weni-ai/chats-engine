@@ -622,6 +622,10 @@ WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY = env.str(
     "WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY",
     default="weniChatsBackEndReturn24hValidOnRoomsList",
 )
+DENORMALIZED_MESSAGE_FIELDS_FLAG_KEY = env.str(
+    "DENORMALIZED_MESSAGE_FIELDS_FLAG_KEY",
+    default="weniChatsDenormalizedMessageFields",
+)
 
 
 # USER CACHE
