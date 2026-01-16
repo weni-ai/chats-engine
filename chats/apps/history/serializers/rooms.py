@@ -1,6 +1,5 @@
 from rest_framework import serializers
 
-from chats.apps.accounts.models import User
 from chats.apps.api.v1.accounts.serializers import UserNameEmailSerializer
 from chats.apps.api.v1.contacts.serializers import ContactSimpleSerializer
 from chats.apps.api.v1.sectors.serializers import TagSimpleSerializer
@@ -53,19 +52,6 @@ class RoomHistorySerializer(serializers.ModelSerializer):
             SectorTag.all_objects.filter(rooms__in=[obj]),
             many=True,
         ).data
-
-    def get_closed_by(self, obj):
-        if not obj.ended_by:
-            return None
-        try:
-            user = User.objects.get(email=obj.ended_by)
-            return {
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "email": user.email,
-            }
-        except User.DoesNotExist:
-            return None
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
