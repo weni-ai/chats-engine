@@ -64,10 +64,6 @@ class RoomHistorySerializer(serializers.ModelSerializer):
 
 
 class RoomBasicValuesSerializer(serializers.Serializer):
-    """
-    Serializer otimizado para trabalhar com values() - performance máxima
-    """
-
     uuid = serializers.UUIDField()
     ended_at = serializers.DateTimeField()
 
@@ -85,7 +81,7 @@ class RoomDetailSerializer(serializers.ModelSerializer):
     user = UserNameEmailSerializer(many=False, read_only=True)
     contact = serializers.SerializerMethodField()
     tags = serializers.SerializerMethodField()
-    closed_by = UserNameSerializer(many=False, read_only=True)
+    closed_by = UserNameEmailSerializer(many=False, read_only=True)
 
     class Meta:
         model = Room
