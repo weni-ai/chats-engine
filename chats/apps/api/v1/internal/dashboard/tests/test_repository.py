@@ -1478,10 +1478,10 @@ class TestAgentRepository(TestCase):
             if isinstance(position, tuple):
                 actual_emails = {agents[i]["email"] for i in range(position[0], position[1])}
                 self.assertEqual(actual_emails, expected_emails,
-                                f"Position {position}: expected {expected_emails}")
+                                 f"Position {position}: expected {expected_emails}")
             else:
                 self.assertEqual(agents[position]["email"], expected_emails,
-                                f"Position {position}: expected {expected_emails}")
+                                 f"Position {position}: expected {expected_emails}")
 
     def _create_test_agents_with_statuses(self):
         """Helper method to create test agents with different statuses"""
