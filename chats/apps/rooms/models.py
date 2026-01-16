@@ -1,7 +1,7 @@
 import json
 import logging
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 import requests
@@ -11,6 +11,7 @@ from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models, transaction
+from django.db.models import F, Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_redis import get_redis_connection
@@ -23,13 +24,13 @@ from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTCl
 from chats.apps.projects.models.models import RoomRoutingType
 from chats.apps.projects.usecases.send_room_info import RoomInfoUseCase
 from chats.apps.projects.usecases.status_service import InServiceStatusService
+from chats.apps.queues.models import Queue
 from chats.apps.rooms.exceptions import (
     MaxPinRoomLimitReachedError,
     RoomIsNotActiveError,
 )
 from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
-from chats.apps.queues.models import Queue
 
 if TYPE_CHECKING:
     from chats.apps.projects.models.models import Project
@@ -92,6 +93,14 @@ class Room(BaseModel, BaseConfigurableModel):
     )
 
     ended_by = models.CharField(_("Ended by"), max_length=50, null=True, blank=True)
+    closed_by = models.ForeignKey(
+        "accounts.User",
+        related_name="closed_rooms_by_user",
+        verbose_name=_("closed by"),
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
 
     is_active = models.BooleanField(_("is active?"), default=True)
     is_waiting = models.BooleanField(_("is waiting for answer?"), default=False)
@@ -123,6 +132,40 @@ class Room(BaseModel, BaseConfigurableModel):
     )
     added_to_queue_at = models.DateTimeField(
         _("Added to queue at"), null=True, blank=True
+    )
+    unread_messages_count = models.IntegerField(_("Unread messages count"), default=0)
+    last_unread_message_at = models.DateTimeField(
+        _("Last unread message at"), null=True, blank=True
+    )
+    last_interaction = models.DateTimeField(
+        _("Last interaction"), null=True, blank=True
+    )
+    last_message = models.ForeignKey(
+        "msgs.Message",
+        verbose_name=_("Last message"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    last_message_text = models.TextField(
+        _("Last message text"), null=True, blank=True, default=""
+    )
+    last_message_user = models.ForeignKey(
+        "accounts.User",
+        verbose_name=_("Last message user"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    last_message_contact = models.ForeignKey(
+        "contacts.Contact",
+        verbose_name=_("Last message contact"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
     )
 
     tracker = FieldTracker(fields=["user", "queue"])
@@ -284,7 +327,7 @@ class Room(BaseModel, BaseConfigurableModel):
         return self.is_waiting or check_flowstarts
 
     @property
-    def project(self):
+    def project(self) -> "Project":
         return self.queue.project
 
     @property
@@ -379,12 +422,13 @@ class Room(BaseModel, BaseConfigurableModel):
         self.tags.add(*new_tag_ids)
         self.tags.remove(*tags_to_remove_ids)
 
-    def close(self, tags: list = [], end_by: str = ""):
+    def close(self, tags: list = [], end_by: str = "", closed_by: "User" = None):
         from chats.apps.projects.usecases.status_service import InServiceStatusService
 
         self.is_active = False
         self.ended_at = timezone.now()
         self.ended_by = end_by
+        self.closed_by = closed_by
 
         with transaction.atomic():
             if tags is not None:
@@ -402,6 +446,9 @@ class Room(BaseModel, BaseConfigurableModel):
                     project = sector.project
             if project:
                 InServiceStatusService.room_closed(self.user, project)
+
+        if self.queue.sector.is_csat_enabled and self.user:
+            transaction.on_commit(lambda: self.start_csat_flow())
 
     def request_callback(self, room_data: dict):
         if self.callback_url is None:
@@ -654,6 +701,75 @@ class Room(BaseModel, BaseConfigurableModel):
         self.full_transfer_history.append(transfer)
         self.transfer_history = transfer  # legacy
         self.save(update_fields=["full_transfer_history", "transfer_history"])
+
+    def increment_unread_messages_count(
+        self, count: int, last_unread_message_at: datetime
+    ):
+        """
+        Updates the unread messages count for a room.
+        """
+        Room.objects.filter(
+            Q(pk=self.pk)
+            & (
+                Q(last_unread_message_at__lt=last_unread_message_at)
+                | Q(last_unread_message_at__isnull=True)
+            ),
+        ).update(unread_messages_count=F("unread_messages_count") + count)
+
+    def clear_unread_messages_count(self):
+        """
+        Clears the unread messages count for a room.
+        """
+        Room.objects.filter(pk=self.pk).update(
+            unread_messages_count=0, last_unread_message_at=timezone.now()
+        )
+
+    def update_last_message(self, message, user=None):
+        """
+        Updates last message fields. Used for agent/system messages.
+        """
+        Room.objects.filter(pk=self.pk).update(
+            last_interaction=message.created_on,
+            last_message=message,
+            last_message_text=message.text,
+            last_message_user=user,
+            last_message_contact=None,
+        )
+
+    def on_new_message(self, message, contact=None, increment_unread: int = 0):
+        """
+        Updates room state when a new message arrives from contact.
+        Single UPDATE with all last_message fields.
+        Only updates if message is newer than last_interaction.
+        """
+        update_fields = {
+            "last_interaction": message.created_on,
+            "last_message": message,
+            "last_message_text": message.text,
+            "last_message_user": None,
+            "last_message_contact": contact,
+        }
+
+        if increment_unread > 0:
+            update_fields["unread_messages_count"] = (
+                F("unread_messages_count") + increment_unread
+            )
+
+        Room.objects.filter(
+            Q(pk=self.pk)
+            & (
+                Q(last_interaction__lt=message.created_on)
+                | Q(last_interaction__isnull=True)
+            ),
+        ).update(**update_fields)
+
+    def start_csat_flow(self):
+        """
+        Starts the CSAT flow for a room.
+        """
+        from chats.apps.csat.tasks import start_csat_flow
+
+        start_csat_flow.delay(self.uuid)
 
 
 class RoomPin(BaseModel):

@@ -1,21 +1,24 @@
 import uuid
-from datetime import time
-from unittest.mock import patch, PropertyMock
+from datetime import time, timedelta
+from unittest.mock import PropertyMock, patch
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.crypto import get_random_string
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.test import APITestCase
 
+from chats.apps.ai_features.history_summary.enums import HistorySummaryFeedbackTags
 from chats.apps.ai_features.history_summary.models import (
     HistorySummary,
     HistorySummaryStatus,
 )
 from chats.apps.api.utils import create_contact, create_user_and_token
 from chats.apps.contacts.models import Contact
+from chats.apps.msgs.models import Message
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.projects.models.models import RoomRoutingType
 from chats.apps.projects.tests.decorators import with_project_permission
@@ -27,7 +30,6 @@ from chats.apps.rooms.tests.decorators import with_room_user
 from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
 from chats.apps.sectors.tests.decorators import with_sector_authorization
 from chats.core.cache import CacheClient
-from chats.apps.ai_features.history_summary.enums import HistorySummaryFeedbackTags
 
 User = get_user_model()
 
@@ -205,67 +207,15 @@ class RoomMessagesTests(APITestCase):
         return client.patch(url, data=data, format="json")
 
     def test_read_all_messages(self):
-        unread_messages_count_old = self.room.messages.filter(seen=False).count()
-
-        data = {"seen": True}
-        response = self._update_message_status(token=self.agent_token, data=data)
-
-        unread_messages_count_new = self.room.messages.filter(seen=False).count()
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertNotEqual(unread_messages_count_new, unread_messages_count_old)
-        self.assertEqual(unread_messages_count_new, 0)
-
-    def test_read_list_messages(self):
-        first_msg, second_msg = self.room.messages.filter(seen=False)[:2]
-
-        data = {"seen": True, "messages": [str(first_msg.pk), str(second_msg.pk)]}
-        response = self._update_message_status(token=self.agent_token, data=data)
-        first_msg.refresh_from_db()
-        second_msg.refresh_from_db()
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertTrue(first_msg.seen and second_msg.seen)
-
-    def test_read_empty_list_messages(self):
-        data = {"seen": True, "messages": ["", ""]}
-        response = self._update_message_status(token=self.agent_token, data=data)
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_read_all_empty_body_messages(self):
-        unread_messages_count_old = self.room.messages.filter(seen=False).count()
+        last_unread_message_at = timezone.now() - timedelta(minutes=1)
+        self.room.increment_unread_messages_count(2, last_unread_message_at)
 
         response = self._update_message_status(token=self.agent_token, data={})
-
-        unread_messages_count_new = self.room.messages.filter(seen=False).count()
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertNotEqual(unread_messages_count_new, unread_messages_count_old)
-        self.assertEqual(unread_messages_count_new, 0)
-
-    def test_unread_all_messages(self):
-        self.room.messages.update(seen=True)
-        read_messages_count_old = self.room.messages.count()
-
-        data = {"seen": False}
-        response = self._update_message_status(token=self.agent_token, data=data)
-
-        read_messages_count_new = self.room.messages.filter(seen=True).count()
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertNotEqual(read_messages_count_new, read_messages_count_old)
-        self.assertEqual(read_messages_count_new, 0)
-
-    def test_unread_list_messages(self):
-        self.room.messages.update(seen=True)
-        first_msg, second_msg = self.room.messages.all()[:2]
-
-        data = {"seen": False, "messages": [str(first_msg.pk), str(second_msg.pk)]}
-        response = self._update_message_status(token=self.agent_token, data=data)
-        first_msg.refresh_from_db()
-        second_msg.refresh_from_db()
+        self.room.refresh_from_db()
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertFalse(first_msg.seen and second_msg.seen)
+        self.assertEqual(self.room.unread_messages_count, 0)
+        self.assertIsNotNone(self.room.last_unread_message_at)
 
 
 class RoomsManagerTests(APITestCase):
@@ -356,6 +306,31 @@ class RoomsManagerTests(APITestCase):
         room.refresh_from_db()
         self.assertEquals(response.status_code, status.HTTP_200_OK)
         self.assertEquals(room.user, self.agent_2)
+
+    def test_transfer_room_includes_requested_by_in_feedback(self):
+        import json
+        from chats.apps.rooms.choices import RoomFeedbackMethods
+
+        data = {"user_email": self.agent_2.email}
+        response = self._request_transfer_room(self.admin.auth_token.key, data)[0]
+
+        self.assertEquals(response.status_code, status.HTTP_200_OK)
+
+        self.room.refresh_from_db()
+        feedback_message = self.room.messages.filter(
+            text__contains=RoomFeedbackMethods.ROOM_TRANSFER
+        ).order_by("-created_on").first()
+
+        self.assertIsNotNone(feedback_message)
+
+        message_data = json.loads(feedback_message.text)
+        feedback_content = message_data.get("content", {})
+
+        self.assertIn("requested_by", feedback_content)
+        self.assertEqual(
+            feedback_content["requested_by"]["email"], self.admin.email
+        )
+        self.assertEqual(feedback_content["requested_by"]["type"], "user")
 
 
 class TestRoomsViewSet(APITestCase):
@@ -640,6 +615,33 @@ class RoomPickTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    @with_project_permission(role=ProjectPermission.ROLE_ADMIN)
+    def test_pick_room_includes_requested_by_in_feedback(self):
+        import json
+        from chats.apps.rooms.choices import RoomFeedbackMethods
+
+        self.room.queue = self.queue
+        self.room.save()
+
+        response = self.pick_room_from_queue()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        feedback_message = self.room.messages.filter(
+            text__contains=RoomFeedbackMethods.ROOM_TRANSFER
+        ).first()
+
+        self.assertIsNotNone(feedback_message)
+
+        message_data = json.loads(feedback_message.text)
+        feedback_content = message_data.get("content", {})
+
+        self.assertIn("requested_by", feedback_content)
+        self.assertEqual(
+            feedback_content["requested_by"]["email"], self.user.email
+        )
+        self.assertEqual(feedback_content["requested_by"]["type"], "user")
+
 
 class RoomsBulkTransferTestCase(APITestCase):
     def setUp(self) -> None:
@@ -686,8 +688,10 @@ class RoomsBulkTransferTestCase(APITestCase):
 
         self.client.force_authenticate(user=self.agent_1)
 
-    @patch("chats.apps.api.v1.rooms.viewsets.start_queue_priority_routing")
-    @patch("chats.apps.api.v1.rooms.viewsets.logger")
+    @patch(
+        "chats.apps.api.v1.rooms.services.bulk_transfer_service.start_queue_priority_routing"
+    )
+    @patch("chats.apps.api.v1.rooms.services.bulk_transfer_service.logger")
     def test_bulk_transfer_to_user(
         self, mock_logger, mock_start_queue_priority_routing
     ):
@@ -713,8 +717,10 @@ class RoomsBulkTransferTestCase(APITestCase):
             self.agent_2.email,
         )
 
-    @patch("chats.apps.api.v1.rooms.viewsets.start_queue_priority_routing")
-    @patch("chats.apps.api.v1.rooms.viewsets.logger")
+    @patch(
+        "chats.apps.api.v1.rooms.services.bulk_transfer_service.start_queue_priority_routing"
+    )
+    @patch("chats.apps.api.v1.rooms.services.bulk_transfer_service.logger")
     def test_bulk_transfer_to_queue(
         self, mock_logger, mock_start_queue_priority_routing
     ):
@@ -764,7 +770,7 @@ class RoomsBulkTransferTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(
             response.data["error"],
-            f"User {self.agent_2.email} has no permission on the project {p.name} <{p.uuid}>",
+            f"User {self.agent_2.email} has no permission on the project {p.uuid}",
         )
 
 
@@ -878,6 +884,44 @@ class CloseRoomTestCase(APITestCase):
 
         self.room.refresh_from_db()
         self.assertEqual(self.room.is_active, False)
+
+    def test_close_room_queue_restriction_blocks_agents(self):
+        self.sector.config = {"can_close_chats_in_queue": True}
+        self.sector.save(update_fields=["config"])
+        self.room.user = None
+        self.room.save()
+
+        attendant = User.objects.create(email="queue_attendant@example.com")
+        attendant_perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=attendant,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status="ONLINE",
+        )
+        QueueAuthorization.objects.create(
+            queue=self.queue,
+            permission=attendant_perm,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        self.client.force_authenticate(user=attendant)
+
+        response = self.close_room(self.room.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data["detail"].code, "queued_room_close_disabled")
+
+    def test_close_room_queue_restriction_allows_admin(self):
+        self.sector.config = {"can_close_chats_in_queue": True}
+        self.sector.save(update_fields=["config"])
+        self.room.user = None
+        self.room.save()
+
+        self.client.force_authenticate(user=self.agent)
+
+        response = self.close_room(self.room.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
 
 class RoomHistorySummaryTestCase(APITestCase):
@@ -1798,3 +1842,102 @@ class TestCanSendMessageStatusAuthenticatedUser(BaseTestCanSendMessageStatus):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["can_send_message"], False)
+
+
+class TestLastMessageInRoomList(APITestCase):
+    def setUp(self):
+        self.agent, self.agent_token = create_user_and_token("agent")
+        self.contact = create_contact("Contact", "contact@mail.com", "offline", {})
+
+        self.project = Project.objects.create(name="Test Project")
+        self.agent_perm = self.project.permissions.create(
+            user=self.agent,
+            role=ProjectPermission.ROLE_ATTENDANT,
+        )
+
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+        )
+
+        self.queue = Queue.objects.create(
+            name="Test Queue",
+            sector=self.sector,
+        )
+        self.queue.authorizations.create(
+            permission=self.agent_perm,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        self.room = Room.objects.create(
+            queue=self.queue,
+            user=self.agent,
+            contact=self.contact,
+            project_uuid=str(self.project.uuid),
+        )
+
+    def _list_rooms(self, token):
+        url = reverse("room-list")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+        return self.client.get(url, {"project": str(self.project.uuid)})
+
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_list_rooms_returns_last_message_fields_from_contact(self, mock_feature):
+        message = Message.objects.create(
+            room=self.room, text="Test message", contact=self.contact
+        )
+
+        self.room.on_new_message(
+            message=message,
+            contact=self.contact,
+            increment_unread=1,
+        )
+
+        response = self._list_rooms(self.agent_token)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        room_data = response.data["results"][0]
+        last_message = room_data["last_message"]
+
+        self.assertEqual(str(last_message["uuid"]), str(message.uuid))
+        self.assertEqual(last_message["text"], "Test message")
+        self.assertIsNone(last_message["user"])
+        self.assertEqual(str(last_message["contact"]), str(self.contact.uuid))
+
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_list_rooms_without_last_message(self, mock_feature):
+        response = self._list_rooms(self.agent_token)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        room_data = response.data["results"][0]
+        last_message = room_data["last_message"]
+
+        self.assertIsNone(last_message["uuid"])
+        self.assertEqual(last_message["text"], "")
+        self.assertIsNone(last_message["created_on"])
+
+    @patch("chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=False)
+    def test_list_rooms_last_message_updates_with_new_message(self, mock_feature):
+        message_1 = Message.objects.create(
+            room=self.room, text="First message", contact=self.contact
+        )
+
+        self.room.on_new_message(message=message_1, contact=self.contact)
+
+        message_2 = Message.objects.create(
+            room=self.room, text="Second message", contact=self.contact
+        )
+
+        self.room.on_new_message(message=message_2, contact=self.contact)
+
+        response = self._list_rooms(self.agent_token)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        room_data = response.data["results"][0]
+        last_message = room_data["last_message"]
+
+        self.assertEqual(str(last_message["uuid"]), str(message_2.uuid))
+        self.assertEqual(last_message["text"], "Second message")

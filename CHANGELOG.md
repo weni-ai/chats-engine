@@ -1,3 +1,90 @@
+# 3.41.0
+# Fix
+  - Removing unused verification when creating a sector
+# Add
+  - Adds cyclomatic complexity analysis to flake8
+  - Adding filters to avoid return rooms from sectors/queues that are deleted
+  - Better documentation for external endpoints
+  
+# 3.40.1
+  - Filter rooms in the CSAT score by agents by project
+  
+# 3.40.0
+# Add
+  - Update CSAT flows command
+  - Update CSAT Flow to version 2
+# Fix 
+  - Filter rooms in CSAT by project
+  
+# 3.39.2
+# Add
+  - Adding the new routing using the correct configuration for growthbook feature flag
+  
+# 3.39.1
+# Hotfix
+  - Removing new routing feature flag configuration
+  
+# 3.39.0
+# Add
+  - Static token authentication for rooms and messages endpoints (used by Mailroom)
+
+# 3.38.0
+# Add
+  - CSAT metrics internal endpoints
+
+# 3.37.0
+# Fix
+  - Prevent users names from being blank
+  - Date range filter on dashboard metrics
+# Refactor
+  - Cyclomatic complexity reduction
+# Add
+  - Prevent users from closing rooms from queue (optional)
+
+# 3.36.7
+# Add
+  - Normalization of last message related fields in rooms list
+
+# 3.36.6
+# Remove
+  - Automatic message feature flag
+
+# 3.36.5
+# Fix
+  - Chats history summary key name in Project's config
+
+# 3.36.4
+# Add
+  - Return has chats history summary enabled in Project's config
+
+# 3.36.3
+# Add
+  - Rooms unread messages count field (replacing the usage of Message's "seen" count)
+
+# 3.36.2
+# Refactor
+  - Rooms bulk transfer
+
+# 3.36.1
+# Add
+  - Removal of WhatsApp's 24h window validation in rooms list (disabled by default, can be activated again via feature flag, if needed).
+
+# 3.36.0
+# Add
+  - CSAT native feature (partial)
+
+# 3.35.0
+# Add
+  - Tags to history summary feedback
+
+# 3.34.1
+# Fix
+  - Calling the correct method to get features
+
+# 3.34.0
+# Add
+  - Send room notification after transaction to avoid race condition
+
 # 3.33.6
 # Fix
   - Order internal rooms by user full name
@@ -898,6 +985,10 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
+
+
+
 
 
 

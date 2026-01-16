@@ -31,7 +31,7 @@ class RoomHistorySerializer(serializers.ModelSerializer):
     user = UserNameEmailSerializer(many=False, read_only=True)
     contact = ContactOptimizedSerializer(read_only=True)
     tags = serializers.SerializerMethodField()
-    closed_by = serializers.SerializerMethodField()
+    closed_by = UserNameEmailSerializer(many=False, read_only=True)
 
     class Meta:
         model = Room

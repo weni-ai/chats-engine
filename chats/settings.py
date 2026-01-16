@@ -72,6 +72,8 @@ INSTALLED_APPS = [
     "chats.apps.ai_features.history_summary",
     "chats.apps.feature_flags",
     "chats.apps.feedbacks",
+    "chats.apps.csat",
+    # third party apps
     "weni.feature_flags",  # weni-commons feature flags
     "channels",
     "drf_yasg",
@@ -590,15 +592,20 @@ GROWTHBOOK_WEBHOOK_SECRET = env.str("GROWTHBOOK_WEBHOOK_SECRET", default="")
 FEEDBACK_FEATURE_FLAG_KEY = env.str(
     "FEEDBACK_FEATURE_FLAG_KEY", default="weniChatsFeedback"
 )
-AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY = env.str(
-    "AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY", default="weniChatsAutomaticMessage"
-)
+
+# CSAT
+CSAT_FEATURE_FLAG_KEY = env.str("CSAT_FEATURE_FLAG_KEY", default="weniChatsCSAT")
+
+CHATS_BASE_URL = env.str("CHATS_BASE_URL", default="http://localhost:8000")
+
 AUTOMATIC_MESSAGE_FLOWS_GET_TICKET_RETRIES = env.int(
     "AUTOMATIC_MESSAGE_FLOWS_GET_TICKET_RETRIES", default=3
 )
 AUTOMATIC_MESSAGE_CHECK_TICKET_ON_ROOM_CREATE = env.bool(
     "AUTOMATIC_MESSAGE_CHECK_TICKET_ON_ROOM_CREATE", default=False
 )
+
+# Keys
 WENI_CHATS_PIN_ROOMS_OPTIMIZATION_FLAG_KEY = env.str(
     "WENI_CHATS_PIN_ROOMS_OPTIMIZATION_FLAG_KEY",
     default="weniChatsPinRoomsOptimization",
@@ -606,6 +613,14 @@ WENI_CHATS_PIN_ROOMS_OPTIMIZATION_FLAG_KEY = env.str(
 WENI_CHATS_DISABLE_HAS_HISTORY_FLAG_KEY = env.str(
     "WENI_CHATS_DISABLE_HAS_HISTORY_FLAG_KEY",
     default="weniChatsDisableHasHistory",
+)
+LEAST_ROOMS_CLOSED_TODAY_FEATURE_FLAG_KEY = env.str(
+    "LEAST_ROOMS_CLOSED_TODAY_FEATURE_FLAG_KEY",
+    default="weniChatsLeastRoomsClosedToday",
+)
+WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY = env.str(
+    "WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY",
+    default="weniChatsBackEndReturn24hValidOnRoomsList",
 )
 
 
@@ -618,3 +633,7 @@ USER_OBJECT_CACHE_ENABLED = env.bool("USER_OBJECT_CACHE_ENABLED", default=True)
 ROOM_24H_VALID_CACHE_TTL = env.int(
     "ROOM_24H_VALID_CACHE_TTL", default=0
 )  # 0 means no cache
+
+
+# Internal API Token
+INTERNAL_API_TOKEN = env.str("INTERNAL_API_TOKEN")
