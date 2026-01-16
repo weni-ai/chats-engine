@@ -72,6 +72,7 @@ class RoomDetailSerializer(serializers.ModelSerializer):
     user = UserNameEmailSerializer(many=False, read_only=True)
     contact = serializers.SerializerMethodField()
     tags = serializers.SerializerMethodField()
+    closed_by = UserNameEmailSerializer(many=False, read_only=True)
 
     class Meta:
         model = Room
@@ -85,6 +86,7 @@ class RoomDetailSerializer(serializers.ModelSerializer):
             "contact",
             "tags",
             "protocol",
+            "closed_by",
         ]
 
     def get_contact(self, obj):
