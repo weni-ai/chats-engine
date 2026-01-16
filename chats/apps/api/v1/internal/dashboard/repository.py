@@ -5,6 +5,7 @@ from django.db.models import (
     Avg,
     Case,
     Count,
+    Exists,
     F,
     IntegerField,
     OuterRef,
@@ -154,14 +155,28 @@ class AgentRepository:
             .values("total")
         )
 
+        # Subquery para verificar se agente tem custom status ativo
+        has_active_custom_status_subquery = Exists(
+            CustomStatus.objects.filter(
+                user=OuterRef("email"),
+                status_type__project=project,
+                is_active=True,
+            ).exclude(status_type__name__iexact="in-service")
+        )
+
         agents_query = (
             agents_query.filter(agents_filters)
             .annotate(
                 status=Subquery(project_permission_subquery),
+                has_active_custom_status=has_active_custom_status_subquery,
                 status_order=Case(
-                    When(status='OFFLINE', then=Value(1)),
-                    When(status='ONLINE', then=Value(3)),
-                    default=Value(2),
+                    # OFFLINE sem custom status = 1
+                    When(Q(status='OFFLINE') & Q(has_active_custom_status=False), then=Value(1)),
+                    # Com custom status ativo = 2 (independente do status base)
+                    When(has_active_custom_status=True, then=Value(2)),
+                    # ONLINE sem custom status = 3
+                    When(Q(status='ONLINE') & Q(has_active_custom_status=False), then=Value(3)),
+                    default=Value(2),  # Fallback para custom status
                     output_field=IntegerField(),
                 ),
                 closed=Count(
@@ -312,14 +327,28 @@ class AgentRepository:
         if agents_filter:
             agents_query = agents_query.filter(**agents_filter).distinct()
 
+        # Subquery para verificar se agente tem custom status ativo
+        has_active_custom_status_subquery_2 = Exists(
+            CustomStatus.objects.filter(
+                user=OuterRef("email"),
+                status_type__project=project,
+                is_active=True,
+            ).exclude(status_type__name__iexact="in-service")
+        )
+
         agents_query = (
             agents_query.filter(project_permissions__project=project, is_active=True)
             .annotate(
                 status=Subquery(project_permission_queryset),
+                has_active_custom_status=has_active_custom_status_subquery_2,
                 status_order=Case(
-                    When(status='OFFLINE', then=Value(1)),
-                    When(status='ONLINE', then=Value(3)),
-                    default=Value(2),
+                    # OFFLINE sem custom status = 1
+                    When(Q(status='OFFLINE') & Q(has_active_custom_status=False), then=Value(1)),
+                    # Com custom status ativo = 2 (independente do status base)
+                    When(has_active_custom_status=True, then=Value(2)),
+                    # ONLINE sem custom status = 3
+                    When(Q(status='ONLINE') & Q(has_active_custom_status=False), then=Value(3)),
+                    default=Value(2),  # Fallback para custom status
                     output_field=IntegerField(),
                 ),
                 closed=Count(
