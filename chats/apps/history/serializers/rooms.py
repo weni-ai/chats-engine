@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
-from chats.apps.api.v1.accounts.serializers import UserNameSerializer
+from chats.apps.accounts.models import User
+from chats.apps.api.v1.accounts.serializers import UserNameEmailSerializer
 from chats.apps.api.v1.contacts.serializers import ContactSimpleSerializer
 from chats.apps.api.v1.sectors.serializers import TagSimpleSerializer
 from chats.apps.contacts.models import Contact
@@ -27,9 +28,10 @@ class ContactOptimizedSerializer(serializers.ModelSerializer):
 
 
 class RoomHistorySerializer(serializers.ModelSerializer):
-    user = UserNameSerializer(many=False, read_only=True)
+    user = UserNameEmailSerializer(many=False, read_only=True)
     contact = ContactOptimizedSerializer(read_only=True)
     tags = serializers.SerializerMethodField()
+    closed_by = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -42,6 +44,7 @@ class RoomHistorySerializer(serializers.ModelSerializer):
             "tags",
             "protocol",
             "service_chat",
+            "closed_by",
         ]
 
     def get_tags(self, obj):
@@ -50,6 +53,19 @@ class RoomHistorySerializer(serializers.ModelSerializer):
             SectorTag.all_objects.filter(rooms__in=[obj]),
             many=True,
         ).data
+
+    def get_closed_by(self, obj):
+        if not obj.ended_by:
+            return None
+        try:
+            user = User.objects.get(email=obj.ended_by)
+            return {
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "email": user.email,
+            }
+        except User.DoesNotExist:
+            return None
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -67,7 +83,7 @@ class RoomBasicValuesSerializer(serializers.Serializer):
 
 
 class RoomDetailSerializer(serializers.ModelSerializer):
-    user = UserNameSerializer(many=False, read_only=True)
+    user = UserNameEmailSerializer(many=False, read_only=True)
     contact = serializers.SerializerMethodField()
     tags = serializers.SerializerMethodField()
 
