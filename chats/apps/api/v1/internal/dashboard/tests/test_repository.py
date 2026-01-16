@@ -1439,3 +1439,73 @@ class TestAgentRepository(TestCase):
         agents = self.repository.get_agents_custom_status(filters, self.project)
 
         self.assertEqual(agents.count(), 2)
+
+    def _create_test_agents_with_statuses(self):
+        """Helper method to create test agents with different statuses"""
+        # Create sector and queue
+        sector = Sector.objects.create(
+            name="Test Sector", project=self.project, rooms_limit=10,
+            work_start="00:00", work_end="23:59"
+        )
+        Queue.objects.create(name="Test Queue", sector=sector)
+
+        # Create users and permissions with different statuses
+        statuses = [
+            ("offline@test.com", "OFFLINE"),
+            ("online@test.com", "ONLINE"),
+            ("away@test.com", "AWAY"),
+            ("busy@test.com", "BUSY"),
+        ]
+        
+        for email, status in statuses:
+            user = User.objects.create(email=email, first_name="Agent", last_name=status, is_active=True)
+            ProjectPermission.objects.create(
+                project=self.project, user=user,
+                role=ProjectPermission.ROLE_ATTENDANT, status=status
+            )
+
+    def test_agents_ordering_by_status_ascending(self):
+        """Test agents ordered by status ascending: OFFLINE -> Custom -> ONLINE"""
+        self._create_test_agents_with_statuses()
+        
+        agents_list = list(self.repository.get_agents_data(
+            Filters(ordering="status", is_weni_admin=False), self.project
+        ))
+
+        self.assertEqual(len(agents_list), 4)
+        self.assertEqual(agents_list[0]["status"], "OFFLINE")
+        self.assertIn(agents_list[1]["status"], ["AWAY", "BUSY"])
+        self.assertIn(agents_list[2]["status"], ["AWAY", "BUSY"])
+        self.assertEqual(agents_list[3]["status"], "ONLINE")
+
+    def test_agents_ordering_by_status_descending(self):
+        """Test agents ordered by status descending: ONLINE -> Custom -> OFFLINE"""
+        self._create_test_agents_with_statuses()
+        
+        agents_list = list(self.repository.get_agents_data(
+            Filters(ordering="-status", is_weni_admin=False), self.project
+        ))
+
+        self.assertEqual(len(agents_list), 4)
+        self.assertEqual(agents_list[0]["status"], "ONLINE")
+        self.assertIn(agents_list[1]["status"], ["AWAY", "BUSY"])
+        self.assertIn(agents_list[2]["status"], ["AWAY", "BUSY"])
+        self.assertEqual(agents_list[3]["status"], "OFFLINE")
+
+    def test_agents_custom_status_ordering(self):
+        """Test get_agents_custom_status_and_rooms respects status ordering"""
+        self._create_test_agents_with_statuses()
+        
+        # Test ascending
+        agents_asc = list(self.repository.get_agents_custom_status_and_rooms(
+            Filters(ordering="status", is_weni_admin=False), self.project
+        ))
+        self.assertEqual(agents_asc[0]["status"], "OFFLINE")
+        self.assertEqual(agents_asc[-1]["status"], "ONLINE")
+        
+        # Test descending
+        agents_desc = list(self.repository.get_agents_custom_status_and_rooms(
+            Filters(ordering="-status", is_weni_admin=False), self.project
+        ))
+        self.assertEqual(agents_desc[0]["status"], "ONLINE")
+        self.assertEqual(agents_desc[-1]["status"], "OFFLINE")
