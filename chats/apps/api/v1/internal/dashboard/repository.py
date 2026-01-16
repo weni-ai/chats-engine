@@ -155,7 +155,6 @@ class AgentRepository:
             .values("total")
         )
 
-        # Subquery para verificar se agente tem custom status ativo
         has_active_custom_status_subquery = Exists(
             CustomStatus.objects.filter(
                 user=OuterRef("email"),
@@ -170,13 +169,10 @@ class AgentRepository:
                 status=Subquery(project_permission_subquery),
                 has_active_custom_status=has_active_custom_status_subquery,
                 status_order=Case(
-                    # OFFLINE sem custom status = 1
                     When(Q(status='OFFLINE') & Q(has_active_custom_status=False), then=Value(1)),
-                    # Com custom status ativo = 2 (independente do status base)
                     When(has_active_custom_status=True, then=Value(2)),
-                    # ONLINE sem custom status = 3
                     When(Q(status='ONLINE') & Q(has_active_custom_status=False), then=Value(3)),
-                    default=Value(2),  # Fallback para custom status
+                    default=Value(2),
                     output_field=IntegerField(),
                 ),
                 closed=Count(
@@ -327,7 +323,6 @@ class AgentRepository:
         if agents_filter:
             agents_query = agents_query.filter(**agents_filter).distinct()
 
-        # Subquery para verificar se agente tem custom status ativo
         has_active_custom_status_subquery_2 = Exists(
             CustomStatus.objects.filter(
                 user=OuterRef("email"),
@@ -342,13 +337,10 @@ class AgentRepository:
                 status=Subquery(project_permission_queryset),
                 has_active_custom_status=has_active_custom_status_subquery_2,
                 status_order=Case(
-                    # OFFLINE sem custom status = 1
                     When(Q(status='OFFLINE') & Q(has_active_custom_status=False), then=Value(1)),
-                    # Com custom status ativo = 2 (independente do status base)
                     When(has_active_custom_status=True, then=Value(2)),
-                    # ONLINE sem custom status = 3
                     When(Q(status='ONLINE') & Q(has_active_custom_status=False), then=Value(3)),
-                    default=Value(2),  # Fallback para custom status
+                    default=Value(2),
                     output_field=IntegerField(),
                 ),
                 closed=Count(
