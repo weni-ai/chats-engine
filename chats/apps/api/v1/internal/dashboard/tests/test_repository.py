@@ -1449,20 +1449,56 @@ class TestAgentRepository(TestCase):
         )
         Queue.objects.create(name="Test Queue", sector=sector)
 
-        # Create users and permissions with different statuses
-        statuses = [
-            ("offline@test.com", "OFFLINE"),
-            ("online@test.com", "ONLINE"),
-            ("away@test.com", "AWAY"),
-            ("busy@test.com", "BUSY"),
-        ]
+        # Create custom status types
+        away_status_type = CustomStatusType.objects.create(
+            name="Pausa", project=self.project
+        )
+        busy_status_type = CustomStatusType.objects.create(
+            name="Almoço", project=self.project
+        )
 
-        for email, status in statuses:
-            user = User.objects.create(email=email, first_name="Agent", last_name=status, is_active=True)
-            ProjectPermission.objects.create(
-                project=self.project, user=user,
-                role=ProjectPermission.ROLE_ATTENDANT, status=status
-            )
+        # Create users and permissions with base statuses (ONLINE/OFFLINE)
+        # Then create custom statuses for some of them
+        
+        user_offline = User.objects.create(
+            email="offline@test.com", first_name="Agent", last_name="Offline", is_active=True
+        )
+        ProjectPermission.objects.create(
+            project=self.project, user=user_offline,
+            role=ProjectPermission.ROLE_ATTENDANT, status="OFFLINE"
+        )
+
+        user_online = User.objects.create(
+            email="online@test.com", first_name="Agent", last_name="Online", is_active=True
+        )
+        ProjectPermission.objects.create(
+            project=self.project, user=user_online,
+            role=ProjectPermission.ROLE_ATTENDANT, status="ONLINE"
+        )
+
+        user_away = User.objects.create(
+            email="away@test.com", first_name="Agent", last_name="Away", is_active=True
+        )
+        ProjectPermission.objects.create(
+            project=self.project, user=user_away,
+            role=ProjectPermission.ROLE_ATTENDANT, status="ONLINE"
+        )
+        CustomStatus.objects.create(
+            user=user_away, status_type=away_status_type,
+            is_active=True, break_time=0, project=self.project
+        )
+
+        user_busy = User.objects.create(
+            email="busy@test.com", first_name="Agent", last_name="Busy", is_active=True
+        )
+        ProjectPermission.objects.create(
+            project=self.project, user=user_busy,
+            role=ProjectPermission.ROLE_ATTENDANT, status="OFFLINE"
+        )
+        CustomStatus.objects.create(
+            user=user_busy, status_type=busy_status_type,
+            is_active=True, break_time=0, project=self.project
+        )
 
     def test_agents_ordering_by_status_ascending(self):
         """Test agents ordered by status ascending: OFFLINE -> Custom -> ONLINE"""
@@ -1474,9 +1510,11 @@ class TestAgentRepository(TestCase):
 
         self.assertEqual(len(agents_list), 4)
         self.assertEqual(agents_list[0]["status"], "OFFLINE")
-        self.assertIn(agents_list[1]["status"], ["AWAY", "BUSY"])
-        self.assertIn(agents_list[2]["status"], ["AWAY", "BUSY"])
+        self.assertEqual(agents_list[0]["email"], "offline@test.com")
+        middle_emails = {agents_list[1]["email"], agents_list[2]["email"]}
+        self.assertEqual(middle_emails, {"away@test.com", "busy@test.com"})
         self.assertEqual(agents_list[3]["status"], "ONLINE")
+        self.assertEqual(agents_list[3]["email"], "online@test.com")
 
     def test_agents_ordering_by_status_descending(self):
         """Test agents ordered by status descending: ONLINE -> Custom -> OFFLINE"""
@@ -1488,24 +1526,111 @@ class TestAgentRepository(TestCase):
 
         self.assertEqual(len(agents_list), 4)
         self.assertEqual(agents_list[0]["status"], "ONLINE")
-        self.assertIn(agents_list[1]["status"], ["AWAY", "BUSY"])
-        self.assertIn(agents_list[2]["status"], ["AWAY", "BUSY"])
+        self.assertEqual(agents_list[0]["email"], "online@test.com")
+        middle_emails = {agents_list[1]["email"], agents_list[2]["email"]}
+        self.assertEqual(middle_emails, {"away@test.com", "busy@test.com"})
         self.assertEqual(agents_list[3]["status"], "OFFLINE")
+        self.assertEqual(agents_list[3]["email"], "offline@test.com")
 
     def test_agents_custom_status_ordering(self):
         """Test get_agents_custom_status_and_rooms respects status ordering"""
         self._create_test_agents_with_statuses()
 
-        # Test ascending
         agents_asc = list(self.repository.get_agents_custom_status_and_rooms(
             Filters(ordering="status", is_weni_admin=False), self.project
         ))
-        self.assertEqual(agents_asc[0]["status"], "OFFLINE")
-        self.assertEqual(agents_asc[-1]["status"], "ONLINE")
+        self.assertEqual(len(agents_asc), 4)
+        self.assertEqual(agents_asc[0]["email"], "offline@test.com")
+        self.assertEqual(agents_asc[-1]["email"], "online@test.com")
 
-        # Test descending
         agents_desc = list(self.repository.get_agents_custom_status_and_rooms(
             Filters(ordering="-status", is_weni_admin=False), self.project
         ))
-        self.assertEqual(agents_desc[0]["status"], "ONLINE")
-        self.assertEqual(agents_desc[-1]["status"], "OFFLINE")
+        self.assertEqual(len(agents_desc), 4)
+        self.assertEqual(agents_desc[0]["email"], "online@test.com")
+        self.assertEqual(agents_desc[-1]["email"], "offline@test.com")
+
+    def test_multiple_agents_same_status_ordering(self):
+        """Test ordering with multiple agents having same status - custom statuses stay in middle"""
+        sector = Sector.objects.create(
+            name="Test Sector", project=self.project, rooms_limit=10,
+            work_start="00:00", work_end="23:59"
+        )
+        Queue.objects.create(name="Test Queue", sector=sector)
+
+        away_status_type = CustomStatusType.objects.create(
+            name="Pausa", project=self.project
+        )
+        busy_status_type = CustomStatusType.objects.create(
+            name="Almoço", project=self.project
+        )
+
+        for i in range(1, 3):
+            user = User.objects.create(
+                email=f"offline{i}@test.com", first_name="Agent", 
+                last_name=f"Offline{i}", is_active=True
+            )
+            ProjectPermission.objects.create(
+                project=self.project, user=user,
+                role=ProjectPermission.ROLE_ATTENDANT, status="OFFLINE"
+            )
+
+        for i in range(1, 3):
+            user = User.objects.create(
+                email=f"online{i}@test.com", first_name="Agent", 
+                last_name=f"Online{i}", is_active=True
+            )
+            ProjectPermission.objects.create(
+                project=self.project, user=user,
+                role=ProjectPermission.ROLE_ATTENDANT, status="ONLINE"
+            )
+
+        user_away = User.objects.create(
+            email="away@test.com", first_name="Agent", 
+            last_name="Away", is_active=True
+        )
+        ProjectPermission.objects.create(
+            project=self.project, user=user_away,
+            role=ProjectPermission.ROLE_ATTENDANT, status="ONLINE"
+        )
+        CustomStatus.objects.create(
+            user=user_away, status_type=away_status_type,
+            is_active=True, break_time=0, project=self.project
+        )
+
+        user_busy = User.objects.create(
+            email="busy@test.com", first_name="Agent", 
+            last_name="Busy", is_active=True
+        )
+        ProjectPermission.objects.create(
+            project=self.project, user=user_busy,
+            role=ProjectPermission.ROLE_ATTENDANT, status="OFFLINE"
+        )
+        CustomStatus.objects.create(
+            user=user_busy, status_type=busy_status_type,
+            is_active=True, break_time=0, project=self.project
+        )
+
+        agents_asc = list(self.repository.get_agents_data(
+            Filters(ordering="status", is_weni_admin=False), self.project
+        ))
+
+        self.assertEqual(len(agents_asc), 6)
+        offline_emails = {agents_asc[0]["email"], agents_asc[1]["email"]}
+        self.assertEqual(offline_emails, {"offline1@test.com", "offline2@test.com"})
+        middle_emails = {agents_asc[2]["email"], agents_asc[3]["email"]}
+        self.assertEqual(middle_emails, {"away@test.com", "busy@test.com"})
+        online_emails = {agents_asc[4]["email"], agents_asc[5]["email"]}
+        self.assertEqual(online_emails, {"online1@test.com", "online2@test.com"})
+
+        agents_desc = list(self.repository.get_agents_data(
+            Filters(ordering="-status", is_weni_admin=False), self.project
+        ))
+
+        self.assertEqual(len(agents_desc), 6)
+        online_emails_desc = {agents_desc[0]["email"], agents_desc[1]["email"]}
+        self.assertEqual(online_emails_desc, {"online1@test.com", "online2@test.com"})
+        middle_emails_desc = {agents_desc[2]["email"], agents_desc[3]["email"]}
+        self.assertEqual(middle_emails_desc, {"away@test.com", "busy@test.com"})
+        offline_emails_desc = {agents_desc[4]["email"], agents_desc[5]["email"]}
+        self.assertEqual(offline_emails_desc, {"offline1@test.com", "offline2@test.com"})
