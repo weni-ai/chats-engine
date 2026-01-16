@@ -173,6 +173,12 @@ class AgentRepository:
             agents_query.filter(agents_filters)
             .annotate(
                 status=Subquery(project_permission_subquery),
+                status_order=Case(
+                    When(status='OFFLINE', then=Value(1)),
+                    When(status='ONLINE', then=Value(3)),
+                    default=Value(2),
+                    output_field=IntegerField(),
+                ),
                 closed=Count(
                     "rooms__uuid",
                     distinct=True,
@@ -212,6 +218,9 @@ class AgentRepository:
                 ordering_field = filters.ordering.replace(
                     "time_in_service", "time_in_service_order"
                 )
+                agents_query = agents_query.order_by(ordering_field)
+            elif "status" in filters.ordering:
+                ordering_field = filters.ordering.replace("status", "status_order")
                 agents_query = agents_query.order_by(ordering_field)
             else:
                 agents_query = agents_query.order_by(filters.ordering)
@@ -339,6 +348,12 @@ class AgentRepository:
             agents_query.filter(agents_filters_custom)
             .annotate(
                 status=Subquery(project_permission_queryset),
+                status_order=Case(
+                    When(status='OFFLINE', then=Value(1)),
+                    When(status='ONLINE', then=Value(3)),
+                    default=Value(2),
+                    output_field=IntegerField(),
+                ),
                 closed=Count(
                     "rooms__uuid",
                     distinct=True,
@@ -355,7 +370,11 @@ class AgentRepository:
         )
 
         if filters.ordering:
-            agents_query = agents_query.order_by(filters.ordering)
+            if "status" in filters.ordering:
+                ordering_field = filters.ordering.replace("status", "status_order")
+                agents_query = agents_query.order_by(ordering_field)
+            else:
+                agents_query = agents_query.order_by(filters.ordering)
 
         agents_query = agents_query.values(
             "first_name",
