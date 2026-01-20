@@ -18,8 +18,7 @@ def get_data_from_object(obj):
 
 
 def create_transfer_json(action: str, from_, to, requested_by=None):
-    source = requested_by if requested_by else from_
-    from_data = get_data_from_object(source)
+    from_data = get_data_from_object(from_)
     to_data = get_data_from_object(to)
 
     feedback = {

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from chats.apps.api.v1.accounts.serializers import UserNameSerializer
+from chats.apps.api.v1.accounts.serializers import UserNameEmailSerializer
 from chats.apps.api.v1.contacts.serializers import ContactSimpleSerializer
 from chats.apps.api.v1.sectors.serializers import TagSimpleSerializer
 from chats.apps.contacts.models import Contact
@@ -27,10 +27,10 @@ class ContactOptimizedSerializer(serializers.ModelSerializer):
 
 
 class RoomHistorySerializer(serializers.ModelSerializer):
-    user = UserNameSerializer(many=False, read_only=True)
+    user = UserNameEmailSerializer(many=False, read_only=True)
     contact = ContactOptimizedSerializer(read_only=True)
     tags = serializers.SerializerMethodField()
-    closed_by = UserNameSerializer(many=False, read_only=True)
+    closed_by = UserNameEmailSerializer(many=False, read_only=True)
 
     class Meta:
         model = Room
@@ -64,10 +64,6 @@ class RoomHistorySerializer(serializers.ModelSerializer):
 
 
 class RoomBasicValuesSerializer(serializers.Serializer):
-    """
-    Serializer otimizado para trabalhar com values() - performance máxima
-    """
-
     uuid = serializers.UUIDField()
     ended_at = serializers.DateTimeField()
 
@@ -82,10 +78,10 @@ class RoomBasicSerializer(serializers.ModelSerializer):
 
 
 class RoomDetailSerializer(serializers.ModelSerializer):
-    user = UserNameSerializer(many=False, read_only=True)
+    user = UserNameEmailSerializer(many=False, read_only=True)
     contact = serializers.SerializerMethodField()
     tags = serializers.SerializerMethodField()
-    closed_by = UserNameSerializer(many=False, read_only=True)
+    closed_by = UserNameEmailSerializer(many=False, read_only=True)
 
     class Meta:
         model = Room
