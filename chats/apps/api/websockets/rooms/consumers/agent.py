@@ -187,6 +187,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             await command(payload["content"])
         elif command_name == "ping":
             self.last_ping = timezone.now()
+            await self.update_last_seen()
             await self.send_json({"type": "pong"})
 
     # METHODS
@@ -344,6 +345,12 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         self.permission.status = status
         self.permission.save(update_fields=["status"])
         self.permission.notify_user("update", "system")
+
+    @database_sync_to_async
+    def update_last_seen(self):
+        """Update the last_seen timestamp on the permission."""
+        self.permission.last_seen = timezone.now()
+        self.permission.save(update_fields=["last_seen"])
 
     @database_sync_to_async
     def get_permission(self):

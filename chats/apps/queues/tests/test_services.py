@@ -54,6 +54,7 @@ class QueueRouterServiceTestCase(TestCase):
                 user=agent,
                 role=ProjectPermission.ROLE_ATTENDANT,
                 status="ONLINE",
+                last_seen=timezone.now(),
             )
             QueueAuthorization.objects.create(
                 queue=self.queue,

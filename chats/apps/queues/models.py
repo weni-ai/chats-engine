@@ -9,8 +9,12 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
+from chats.apps.feature_flags.utils import is_feature_active
 from chats.apps.projects.models.models import CustomStatus
 from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
+
+# Threshold for considering an agent as "recently seen" (in seconds)
+LAST_SEEN_THRESHOLD_SECONDS = 60
 
 from .queue_managers import QueueManager
 
@@ -70,15 +74,37 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
             project_permissions__queue_authorizations__queue=self,
         )
 
+    def _is_ping_timeout_feature_enabled(self) -> bool:
+        """Check if the ping timeout feature is enabled for this queue's project."""
+        try:
+            return is_feature_active(
+                settings.WS_PING_TIMEOUT_FEATURE_FLAG_KEY,
+                user=None,
+                project=self.sector.project,
+            )
+        except Exception:
+            return False
+
     @property
     def online_agents(self):
-        # Filtra agentes online
-        agents = self.agents.filter(
-            project_permissions__status="ONLINE",
-            project_permissions__project=self.sector.project,
-            project_permissions__queue_authorizations__queue=self,
-            project_permissions__queue_authorizations__role=1,
-        )
+        from datetime import timedelta
+
+        # Base filter: status must be ONLINE
+        base_filter = {
+            "project_permissions__status": "ONLINE",
+            "project_permissions__project": self.sector.project,
+            "project_permissions__queue_authorizations__queue": self,
+            "project_permissions__queue_authorizations__role": 1,
+        }
+
+        # If ping timeout feature is enabled, also filter by last_seen
+        if self._is_ping_timeout_feature_enabled():
+            last_seen_threshold = timezone.now() - timedelta(
+                seconds=LAST_SEEN_THRESHOLD_SECONDS
+            )
+            base_filter["project_permissions__last_seen__gte"] = last_seen_threshold
+
+        agents = self.agents.filter(**base_filter)
 
         custom_status_query = Subquery(
             CustomStatus.objects.filter(
@@ -89,9 +115,7 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
             ).values("user__id")
         )
 
-        return agents.exclude(
-            id__in=custom_status_query
-        )  # TODO: Set this variable to ProjectPermission.STATUS_ONLINE
+        return agents.exclude(id__in=custom_status_query)
 
     @property
     def available_agents(self):
