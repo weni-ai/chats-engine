@@ -9,7 +9,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
-from chats.apps.feature_flags.utils import is_feature_active
+from weni.feature_flags.shortcuts import is_feature_active
 from chats.apps.projects.models.models import CustomStatus
 from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
 
