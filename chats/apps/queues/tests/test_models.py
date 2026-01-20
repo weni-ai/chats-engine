@@ -1,7 +1,4 @@
-<<<<<<< HEAD
-=======
 from datetime import timedelta
->>>>>>> feature/disconnect-using-ping
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
