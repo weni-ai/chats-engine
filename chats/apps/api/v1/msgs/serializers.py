@@ -32,7 +32,7 @@ class MessageMediaSimpleSerializer(serializers.ModelSerializer):
             "url",
             "created_on",
         ]
-
+        ref_name = "V1MessageMediaSimpleSerializer"
         extra_kwargs = {
             "media_file": {"write_only": True},
             "message": {"read_only": True, "required": False},
@@ -269,6 +269,9 @@ class MessageSerializer(BaseMessageSerializer):
                 }
 
             return result
+        except ChatMessageReplyIndex.DoesNotExist:
+            # Replied message not found in index - expected scenario for projects that dont use whatsapp.
+            return None
         except Exception as error:
             LOGGER.error("Error getting replied message: %s", error)
             return None

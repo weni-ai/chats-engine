@@ -35,6 +35,7 @@ class RoomTagSerializer(serializers.ModelSerializer):
     class Meta:
         model = SectorTag
         fields = ["uuid", "name"]
+        ref_name = "V2ExternalRoomTagSerializer"
 
 
 class RoomSectorSerializer(serializers.ModelSerializer):

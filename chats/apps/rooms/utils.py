@@ -17,12 +17,17 @@ def get_data_from_object(obj):
     return data
 
 
-def create_transfer_json(action: str, from_, to):
+def create_transfer_json(action: str, from_, to, requested_by=None):
     from_data = get_data_from_object(from_)
     to_data = get_data_from_object(to)
 
-    return {
+    feedback = {
         "action": action,
         "from": from_data,
         "to": to_data,
     }
+
+    if requested_by:
+        feedback["requested_by"] = get_data_from_object(requested_by)
+
+    return feedback

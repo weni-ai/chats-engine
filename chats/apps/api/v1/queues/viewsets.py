@@ -26,7 +26,10 @@ from chats.apps.sectors.usecases.group_sector_authorization import (
 )
 from chats.core.cache_utils import get_user_id_by_email_cached
 
-from .serializers import QueueAgentsSerializer
+from .serializers import (
+    QueueAgentsSerializer,
+    QueuePermissionsListQueryParamsSerializer,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -34,6 +37,7 @@ User = get_user_model()
 
 
 class QueueViewset(ModelViewSet):
+    swagger_tag = "Queues"
     queryset = Queue.objects.all()
     serializer_class = queue_serializers.QueueSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
@@ -219,18 +223,27 @@ class QueueViewset(ModelViewSet):
 
     @action(detail=False, methods=["GET"])
     def list_queue_permissions(self, request, *args, **kwargs):
-        user_email = request.query_params.get("user_email")
-        project = request.query_params.get("project")
+        query_params = QueuePermissionsListQueryParamsSerializer(
+            data=request.query_params
+        )
+        query_params.is_valid(raise_exception=True)
+
+        user_email = query_params.validated_data["user_email"]
+        project = query_params.validated_data.get("project")
 
         email_l = (user_email or "").lower()
         if get_user_id_by_email_cached(email_l) is None:
             return Response({"user_permissions": []}, status=status.HTTP_200_OK)
 
-        queue_permissions = QueueAuthorization.objects.filter(
-            permission__user_id=email_l,
-            queue__sector__project=project,
-            queue__is_deleted=False,
-        )
+        query_params = {
+            "permission__user_id": email_l,
+            "queue__is_deleted": False,
+        }
+
+        if project:
+            query_params["queue__sector__project"] = project
+
+        queue_permissions = QueueAuthorization.objects.filter(**query_params)
         serializer_data = queue_serializers.QueueAuthorizationSerializer(
             queue_permissions, many=True
         )
@@ -241,6 +254,7 @@ class QueueViewset(ModelViewSet):
 
 
 class QueueAuthorizationViewset(ModelViewSet):
+    swagger_tag = "Queues"
     queryset = QueueAuthorization.objects.all()
     serializer_class = queue_serializers.QueueAuthorizationSerializer
     filter_backends = [DjangoFilterBackend]

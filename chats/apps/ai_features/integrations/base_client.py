@@ -1,4 +1,7 @@
 from abc import ABC, abstractmethod
+from typing import List
+
+from chats.apps.ai_features.integrations.dataclass import PromptMessage
 
 
 class BaseAIPlatformClient(ABC):
@@ -10,7 +13,9 @@ class BaseAIPlatformClient(ABC):
         self.model_id = model_id
 
     @abstractmethod
-    def generate_text(self, prompt_settings: dict, prompt: str) -> str:
+    def generate_text(
+        self, prompt_settings: dict, prompt_msgs: List[PromptMessage]
+    ) -> str:
         """
         Generate text using the AI model platform client.
         """

@@ -80,7 +80,12 @@ class RoomsReportService:
 
         try:
             rooms = (
-                Room.objects.filter(queue__sector__project=self.project, **filters)
+                Room.objects.filter(
+                    queue__sector__project=self.project,
+                    queue__is_deleted=False,
+                    queue__sector__is_deleted=False,
+                    **filters,
+                )
                 .order_by("created_on")
                 .select_related("user", "contact", "queue", "queue__sector", "metric")
             ).prefetch_related("tags")

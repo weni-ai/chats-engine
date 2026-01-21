@@ -145,3 +145,16 @@ class QueueAgentsSerializer(serializers.ModelSerializer):
             if project_permission.status == "ONLINE":
                 return "online"
         return "offline"
+
+
+class QueuePermissionsListQueryParamsSerializer(serializers.Serializer):
+    user_email = serializers.EmailField()
+    project = serializers.UUIDField(required=False, allow_null=True)
+
+    def validate(self, data: dict) -> dict:
+        project = data.get("project")
+
+        if project is None or project == "":
+            data.pop("project")
+
+        return data
