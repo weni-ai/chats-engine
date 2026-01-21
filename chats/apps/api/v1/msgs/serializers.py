@@ -22,6 +22,7 @@ TODO: Refactor these serializers into less classes
 
 class MessageMediaSimpleSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField(read_only=True)
+    transcription = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = MessageMedia
@@ -31,6 +32,7 @@ class MessageMediaSimpleSerializer(serializers.ModelSerializer):
             "media_file",
             "url",
             "created_on",
+            "transcription",
         ]
         ref_name = "V1MessageMediaSimpleSerializer"
         extra_kwargs = {
@@ -46,6 +48,34 @@ class MessageMediaSimpleSerializer(serializers.ModelSerializer):
             return media.message.get_sender().full_name
         except AttributeError:
             return ""
+
+    def get_transcription(self, media: MessageMedia):
+        """
+        Get transcription data for audio media.
+        Returns text and feedback for the current user.
+        """
+        if not hasattr(media, "transcription"):
+            return None
+
+        transcription = media.transcription
+        if not transcription or transcription.status != "DONE":
+            return None
+
+        result = {"text": transcription.text}
+
+        # Get user feedback if available
+        user = self.context.get("request", {})
+        if hasattr(user, "user"):
+            user = user.user
+            feedback = transcription.feedbacks.filter(user=user).first()
+            if feedback:
+                result["feedback"] = {"liked": feedback.liked}
+            else:
+                result["feedback"] = {"liked": None}
+        else:
+            result["feedback"] = {"liked": None}
+
+        return result
 
 
 class MessageMediaSerializer(serializers.ModelSerializer):

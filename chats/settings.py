@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     "chats.core",
     "chats.apps.ai_features",
     "chats.apps.ai_features.history_summary",
+    "chats.apps.ai_features.audio_transcription",
     "chats.apps.feature_flags",
     "chats.apps.feedbacks",
     "chats.apps.csat",
@@ -435,6 +436,11 @@ UNPERMITTED_AUDIO_TYPES = env.list(
     default=[
         "webm",
     ],
+)
+
+# Maximum audio duration in seconds for transcription (default: 5 minutes)
+AUDIO_TRANSCRIPTION_MAX_DURATION_SECONDS = env.int(
+    "AUDIO_TRANSCRIPTION_MAX_DURATION_SECONDS", default=300
 )
 
 CHATS_FLOWS_TAG = env.str("CHATS_FLOWS_TAG", default="chats")
