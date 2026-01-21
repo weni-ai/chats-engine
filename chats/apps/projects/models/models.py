@@ -342,6 +342,13 @@ class ProjectPermission(
         _("Is it the first access of user?"), default=True
     )
 
+    last_seen = models.DateTimeField(
+        _("Last seen"),
+        null=True,
+        blank=True,
+        help_text=_("Last time the agent sent a ping (heartbeat)"),
+    )
+
     objects = UserPermissionsManager()
     auth = models.Manager()
 

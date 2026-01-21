@@ -1,8 +1,10 @@
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from chats.apps.contacts.models import Contact
@@ -96,6 +98,7 @@ class QueueSetUpMixin(TestCase):
 class QueueAvailableAgentsDefaultTestCase(QueueSetUpMixin, TestCase):
     def test_available_agents_returns_online_agents(self):
         self.agent_permission.status = "ONLINE"
+        self.agent_permission.last_seen = timezone.now()
         self.agent_permission.save()
 
         self.assertIn(self.agent, self.queue.available_agents)
@@ -106,6 +109,7 @@ class QueueAvailableAgentsDefaultTestCase(QueueSetUpMixin, TestCase):
         self.room.save()
 
         self.agent_permission.status = "ONLINE"
+        self.agent_permission.last_seen = timezone.now()
         self.agent_permission.save()
 
         self.assertNotIn(self.agent, self.queue.available_agents)
@@ -117,14 +121,17 @@ class QueueAvailableAgentsDefaultTestCase(QueueSetUpMixin, TestCase):
         self.room.save()
 
         self.agent_permission.status = "ONLINE"
+        self.agent_permission.last_seen = timezone.now()
         self.agent_permission.save()
 
         self.assertIn(self.agent, self.queue.available_agents)
 
     def test_if_2_online_agents_are_returned_in_available_agents(self):
         self.agent_permission.status = "ONLINE"
+        self.agent_permission.last_seen = timezone.now()
         self.agent_permission.save()
         self.agent_2_permission.status = "ONLINE"
+        self.agent_2_permission.last_seen = timezone.now()
         self.agent_2_permission.save()
 
         self.assertEqual(self.queue.available_agents.count(), 2)
@@ -140,8 +147,10 @@ class QueueAvailableAgentsDefaultTestCase(QueueSetUpMixin, TestCase):
         self.room.save()
 
         self.agent_permission.status = "ONLINE"
+        self.agent_permission.last_seen = timezone.now()
         self.agent_permission.save()
         self.agent_2_permission.status = "ONLINE"
+        self.agent_2_permission.last_seen = timezone.now()
         self.agent_2_permission.save()
 
         self.assertEqual(self.agent_2, self.queue.available_agents.first())
@@ -163,7 +172,9 @@ class QueueAvailableAgentsGaneralTestCase(TestCase):
         user = User.objects.get(email="amywong@chats.weni.ai")
         Room.objects.update(user=user)
         Room.objects.first().close()
-        self.project.permissions.filter(user=user).update(status="ONLINE")
+        self.project.permissions.filter(user=user).update(
+            status="ONLINE", last_seen=timezone.now()
+        )
 
         available_agents = self.queue.available_agents
 
@@ -172,7 +183,9 @@ class QueueAvailableAgentsGaneralTestCase(TestCase):
     def test_1_online_user_with_2_active_1_closed(self):
         user = User.objects.get(email="amywong@chats.weni.ai")
         user.rooms.first().close()
-        self.project.permissions.filter(user=user).update(status="ONLINE")
+        self.project.permissions.filter(user=user).update(
+            status="ONLINE", last_seen=timezone.now()
+        )
 
         available_agents = self.queue.available_agents
 
@@ -186,9 +199,11 @@ class QueueAvailableAgentsGaneralTestCase(TestCase):
         """
         user = User.objects.get(email="amywong@chats.weni.ai")
         user.rooms.first().close()
-        self.project.permissions.filter(user=user).update(status="ONLINE")
+        self.project.permissions.filter(user=user).update(
+            status="ONLINE", last_seen=timezone.now()
+        )
         self.project.permissions.filter(user__email="linalawson@chats.weni.ai").update(
-            status="ONLINE"
+            status="ONLINE", last_seen=timezone.now()
         )
 
         available_agents = self.queue.available_agents
@@ -299,6 +314,7 @@ class TestQueueOnlineAgents(TestCase):
                 project=self.project,
                 role=ProjectPermission.ROLE_ATTENDANT,
                 status="ONLINE",
+                last_seen=timezone.now(),
             )
             self.queue.authorizations.create(
                 permission=agent.project_permissions.first()
@@ -365,6 +381,82 @@ class TestQueueOnlineAgents(TestCase):
         self.assertEqual(self.queue.online_agents.count(), 3)
         self.assertIn(self.agent_1, self.queue.online_agents)
 
+    @patch(
+        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=True
+    )
+    def test_online_agents_excludes_agents_with_old_last_seen_when_feature_enabled(
+        self, mock_feature_flag
+    ):
+        """
+        Test that agents with last_seen older than the threshold
+        are not returned in online_agents when ping timeout feature is enabled.
+        """
+        self.assertEqual(self.queue.online_agents.count(), 3)
+
+        # Set agent_1's last_seen to 2 minutes ago (beyond the 90s threshold)
+        old_last_seen = timezone.now() - timedelta(seconds=120)
+        self.agent_1.project_permissions.update(last_seen=old_last_seen)
+
+        self.assertEqual(self.queue.online_agents.count(), 2)
+        self.assertNotIn(self.agent_1, self.queue.online_agents)
+
+    @patch(
+        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=True
+    )
+    def test_online_agents_excludes_agents_with_null_last_seen_when_feature_enabled(
+        self, mock_feature_flag
+    ):
+        """
+        Test that agents with null last_seen are not returned in online_agents
+        when ping timeout feature is enabled.
+        """
+        self.assertEqual(self.queue.online_agents.count(), 3)
+
+        # Set agent_1's last_seen to None
+        self.agent_1.project_permissions.update(last_seen=None)
+
+        self.assertEqual(self.queue.online_agents.count(), 2)
+        self.assertNotIn(self.agent_1, self.queue.online_agents)
+
+    @patch(
+        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=False
+    )
+    def test_online_agents_includes_agents_with_old_last_seen_when_feature_disabled(
+        self, mock_feature_flag
+    ):
+        """
+        Test that agents with old last_seen ARE returned in online_agents
+        when ping timeout feature is disabled (legacy behavior).
+        """
+        self.assertEqual(self.queue.online_agents.count(), 3)
+
+        # Set agent_1's last_seen to 2 minutes ago
+        old_last_seen = timezone.now() - timedelta(seconds=120)
+        self.agent_1.project_permissions.update(last_seen=old_last_seen)
+
+        # Agent should still be returned because feature is disabled
+        self.assertEqual(self.queue.online_agents.count(), 3)
+        self.assertIn(self.agent_1, self.queue.online_agents)
+
+    @patch(
+        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=False
+    )
+    def test_online_agents_includes_agents_with_null_last_seen_when_feature_disabled(
+        self, mock_feature_flag
+    ):
+        """
+        Test that agents with null last_seen ARE returned in online_agents
+        when ping timeout feature is disabled (legacy behavior).
+        """
+        self.assertEqual(self.queue.online_agents.count(), 3)
+
+        # Set agent_1's last_seen to None
+        self.agent_1.project_permissions.update(last_seen=None)
+
+        # Agent should still be returned because feature is disabled
+        self.assertEqual(self.queue.online_agents.count(), 3)
+        self.assertIn(self.agent_1, self.queue.online_agents)
+
 
 class TestQueueGetAvailableAgent(TestCase):
     def setUp(self):
@@ -387,6 +479,7 @@ class TestQueueGetAvailableAgent(TestCase):
                 project=self.project,
                 role=ProjectPermission.ROLE_ATTENDANT,
                 status="ONLINE",
+                last_seen=timezone.now(),
             )
             self.queue.authorizations.create(
                 permission=agent.project_permissions.first()
@@ -408,7 +501,9 @@ class TestQueueGetAvailableAgent(TestCase):
         available_agent = self.queue.get_available_agent()
         self.assertEqual(available_agent, self.agent_3)
 
-    @patch("chats.apps.queues.models.is_feature_active_for_attributes", return_value=False)
+    @patch(
+        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=False
+    )
     def test_get_available_agent_returns_random_agent_if_rooms_count_is_equal(
         self, mock_is_feature_active_for_attributes
     ):
@@ -447,7 +542,9 @@ class TestQueueGetAvailableAgent(TestCase):
             "Agent 3 was never picked, suggesting non-random selection.",
         )
 
-    @patch("chats.apps.queues.models.is_feature_active_for_attributes", return_value=False)
+    @patch(
+        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=False
+    )
     def test_get_available_agent_returns_random_agent_if_rooms_count_is_equal_for_general_routing_option(
         self, mock_is_feature_active_for_attributes
     ):
@@ -493,7 +590,9 @@ class TestQueueGetAvailableAgent(TestCase):
             "Agent 3 was never picked, suggesting non-random selection.",
         )
 
-    @patch("chats.apps.queues.models.is_feature_active_for_attributes", return_value=True)
+    @patch(
+        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=True
+    )
     def test_get_available_agent_tiebreaker_by_rooms_closed_today(
         self, mock_is_feature_active_for_attributes
     ):
@@ -525,7 +624,9 @@ class TestQueueGetAvailableAgent(TestCase):
         available_agent = self.queue.get_available_agent()
         self.assertEqual(available_agent, self.agent_3)
 
-    @patch("chats.apps.queues.models.is_feature_active_for_attributes", return_value=True)
+    @patch(
+        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=True
+    )
     def test_get_available_agent_random_when_all_tiebreakers_equal(
         self, mock_is_feature_active_for_attributes
     ):
