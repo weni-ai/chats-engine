@@ -1,4 +1,5 @@
 import random
+from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -86,8 +87,6 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
 
     @property
     def online_agents(self):
-        from datetime import timedelta
-
         # Base filter: status must be ONLINE
         base_filter = {
             "project_permissions__status": "ONLINE",

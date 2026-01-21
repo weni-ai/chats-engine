@@ -196,7 +196,8 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             await command(payload["content"])
         elif command_name == "ping":
             self.last_ping = timezone.now()
-            await self.maybe_update_last_seen()
+            if await self.is_ping_timeout_feature_enabled():
+                await self.maybe_update_last_seen()
             await self.send_json({"type": "pong"})
 
     # METHODS
@@ -497,10 +498,13 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                     )
 
                     # Set user status to OFFLINE
-                    await self.set_user_status("OFFLINE")
+                    await self.set_user_status(ProjectPermission.STATUS_OFFLINE)
 
                     # Finalize any in-service status
                     await self.finalize_in_service_if_needed()
+
+                    # Log the status change
+                    await self.log_status_change(ProjectPermission.STATUS_OFFLINE)
 
                     # Close the WebSocket connection
                     await self.close(code=1000)
