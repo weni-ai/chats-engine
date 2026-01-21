@@ -12,10 +12,11 @@ from chats.apps.feature_flags.utils import is_feature_active
 from chats.apps.projects.models.models import CustomStatus
 from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
 
-# Threshold for considering an agent as "recently seen" (in seconds)
-LAST_SEEN_THRESHOLD_SECONDS = 60
-
 from .queue_managers import QueueManager
+
+# Threshold for considering an agent as "recently seen" (in seconds)
+# Should be greater than WS_LAST_SEEN_UPDATE_INTERVAL_SECONDS to avoid false negatives
+LAST_SEEN_THRESHOLD_SECONDS = getattr(settings, "WS_LAST_SEEN_THRESHOLD_SECONDS", 90)
 
 User = get_user_model()
 

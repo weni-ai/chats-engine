@@ -1,10 +1,12 @@
-from datetime import time
 import json
+from datetime import time
 from unittest.mock import patch
+
 from django.test import TestCase
 from django.utils import timezone
 from django.utils.timezone import timedelta
 
+from chats.apps.accounts.models import User
 from chats.apps.projects.models.models import (
     Project,
     ProjectPermission,
@@ -15,7 +17,6 @@ from chats.apps.queues.services import QueueRouterService
 from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
-from chats.apps.accounts.models import User
 
 
 class QueueRouterServiceTestCase(TestCase):
@@ -245,3 +246,164 @@ class QueueRouterServiceTestCase(TestCase):
 
         room_1.user = self.agent_2
         room_1.save()
+
+
+class RaceConditionTestCase(TestCase):
+    """
+    Tests for race condition protection in route_rooms.
+
+    These tests validate that when an agent goes OFFLINE between
+    get_available_agent() and room.save(), the room is NOT assigned
+    to the offline agent.
+    """
+
+    def setUp(self):
+        self.project = Project.objects.create(
+            name="Test Project Race Condition",
+            room_routing_type=RoomRoutingType.QUEUE_PRIORITY,
+        )
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=5,
+            work_start=time(hour=5, minute=0),
+            work_end=time(hour=23, minute=59),
+        )
+        self.queue = Queue.objects.create(
+            name="Test Queue",
+            sector=self.sector,
+        )
+
+        self.agent = User.objects.create(
+            email="agent_race@example.com",
+            first_name="Agent",
+            last_name="Race",
+        )
+        self.agent_permission = ProjectPermission.objects.create(
+            project=self.project,
+            user=self.agent,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status="ONLINE",
+            last_seen=timezone.now(),
+        )
+        QueueAuthorization.objects.create(
+            queue=self.queue,
+            permission=self.agent_permission,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+    @patch("chats.apps.queues.services.logger")
+    def test_room_not_assigned_when_agent_goes_offline_during_routing(
+        self, mock_logger
+    ):
+        """
+        Test that simulates race condition:
+        1. Agent is ONLINE when get_available_agent() is called
+        2. Agent goes OFFLINE before room.save()
+        3. Room should NOT be assigned to the offline agent
+
+        This test validates the fix works correctly.
+        """
+        # Create a room to be routed
+        room = Room.objects.create(queue=self.queue, user=None)
+
+        service = QueueRouterService(self.queue)
+
+        # Store original get_available_agent
+        original_get_available_agent = self.queue.get_available_agent
+
+        def get_available_agent_and_go_offline():
+            """
+            Simulates race condition:
+            Returns the agent, then immediately sets them OFFLINE
+            """
+            agent = original_get_available_agent()
+            if agent:
+                # Simulate agent going offline RIGHT AFTER being selected
+                ProjectPermission.objects.filter(
+                    user=agent, project=self.project
+                ).update(status="OFFLINE")
+            return agent
+
+        # Patch get_available_agent to simulate race condition
+        with patch.object(
+            self.queue,
+            "get_available_agent",
+            side_effect=get_available_agent_and_go_offline,
+        ):
+            service.route_rooms()
+
+        # Verify the room was NOT assigned to the offline agent
+        room.refresh_from_db()
+        self.assertIsNone(room.user)
+
+        # Verify the log message was generated
+        mock_logger.info.assert_any_call(
+            "Agent %s is no longer online for room %s, skipping",
+            self.agent.email,
+            room.uuid,
+        )
+
+    @patch("chats.apps.queues.services.logger")
+    def test_room_assigned_when_agent_stays_online(self, mock_logger):
+        """
+        Test that when agent stays ONLINE, room is assigned normally.
+        This is the happy path - no race condition.
+        """
+        # Create a room to be routed
+        room = Room.objects.create(queue=self.queue, user=None)
+
+        service = QueueRouterService(self.queue)
+        service.route_rooms()
+
+        # Verify the room WAS assigned to the online agent
+        room.refresh_from_db()
+        self.assertEqual(room.user, self.agent)
+
+        # Verify success log
+        mock_logger.info.assert_any_call(
+            "%s rooms routed for queue %s, ending routing", 1, self.queue.uuid
+        )
+
+    @patch("chats.apps.queues.services.logger")
+    def test_room_stays_unassigned_when_only_agent_goes_offline(self, mock_logger):
+        """
+        Test that when the only available agent goes offline during routing,
+        the room stays unassigned (not assigned to offline agent).
+
+        Note: Current implementation moves to next ROOM, not next agent.
+        This test validates that at least the offline agent doesn't get the room.
+        """
+        # Create a room to be routed
+        room = Room.objects.create(queue=self.queue, user=None)
+
+        service = QueueRouterService(self.queue)
+
+        original_get_available_agent = self.queue.get_available_agent
+
+        def get_available_agent_then_go_offline():
+            """Returns the agent, then sets them offline"""
+            agent = original_get_available_agent()
+            if agent:
+                ProjectPermission.objects.filter(
+                    user=agent, project=self.project
+                ).update(status="OFFLINE")
+            return agent
+
+        with patch.object(
+            self.queue,
+            "get_available_agent",
+            side_effect=get_available_agent_then_go_offline,
+        ):
+            service.route_rooms()
+
+        # Verify the room was NOT assigned to the offline agent
+        room.refresh_from_db()
+        self.assertIsNone(room.user)
+
+        # Verify log shows agent was skipped
+        mock_logger.info.assert_any_call(
+            "Agent %s is no longer online for room %s, skipping",
+            self.agent.email,
+            room.uuid,
+        )

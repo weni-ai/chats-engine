@@ -1,10 +1,10 @@
 import logging
 from typing import TYPE_CHECKING
+
 from django.db.models.functions import Coalesce
 
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
-
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +41,7 @@ class QueueRouterService:
         """
         Route rooms to available agents.
         """
+        from chats.apps.projects.models import ProjectPermission
         from chats.apps.queues.utils import create_room_assigned_from_queue_feedback
         from chats.apps.rooms.tasks import update_ticket_assignee_async
 
@@ -81,6 +82,23 @@ class QueueRouterService:
 
             if not agent:
                 break
+
+            # Double-check agent is still online before assigning
+            # This prevents race condition where agent goes offline between
+            # get_available_agent() and save()
+            is_still_online = ProjectPermission.objects.filter(
+                user=agent,
+                project=self.queue.sector.project,
+                status=ProjectPermission.STATUS_ONLINE,
+            ).exists()
+
+            if not is_still_online:
+                logger.info(
+                    "Agent %s is no longer online for room %s, skipping",
+                    agent.email,
+                    room.uuid,
+                )
+                continue
 
             old_user_assigned_at = room.user_assigned_at
 

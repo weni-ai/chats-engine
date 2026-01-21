@@ -391,7 +391,7 @@ class TestQueueOnlineAgents(TestCase):
         """
         self.assertEqual(self.queue.online_agents.count(), 3)
 
-        # Set agent_1's last_seen to 2 minutes ago (beyond the 60s threshold)
+        # Set agent_1's last_seen to 2 minutes ago (beyond the 90s threshold)
         old_last_seen = timezone.now() - timedelta(seconds=120)
         self.agent_1.project_permissions.update(last_seen=old_last_seen)
 

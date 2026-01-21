@@ -76,9 +76,12 @@ class ManagerAgentRoomConsumer(AgentRoomConsumer):
                 await self.load_queues()
                 await self.load_user()
                 self.last_ping = timezone.now()
+                self._last_seen_updated_at = None  # Force first update
 
                 # Start background task to monitor ping timeout if feature is enabled
                 if await self.is_ping_timeout_feature_enabled():
+                    # Update last_seen immediately on connect
+                    await self.maybe_update_last_seen()
                     self.ping_timeout_task = asyncio.create_task(
                         self.ping_timeout_checker()
                     )

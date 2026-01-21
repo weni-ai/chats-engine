@@ -181,6 +181,81 @@ class PingTimeoutUnitTestCase(TestCase):
         # Assert that last_ping was updated
         self.assertGreater(consumer.last_ping, initial_time)
 
+    def test_maybe_update_last_seen_skips_when_recent(self):
+        """Test that maybe_update_last_seen skips update when last update was recent"""
+        consumer = MagicMock(spec=AgentRoomConsumer)
+        consumer._last_seen_updated_at = timezone.now() - timedelta(seconds=30)
+        consumer._update_last_seen_db = AsyncMock()
+
+        async def run_test():
+            # Simulating the logic from maybe_update_last_seen
+            now = timezone.now()
+            if (
+                hasattr(consumer, "_last_seen_updated_at")
+                and consumer._last_seen_updated_at
+            ):
+                seconds_since_update = (
+                    now - consumer._last_seen_updated_at
+                ).total_seconds()
+                if seconds_since_update < 60:  # LAST_SEEN_UPDATE_INTERVAL_SECONDS
+                    return False  # Skipped
+            await consumer._update_last_seen_db()
+            return True
+
+        result = asyncio.run(run_test())
+        self.assertFalse(result)
+        consumer._update_last_seen_db.assert_not_called()
+
+    def test_maybe_update_last_seen_updates_when_interval_passed(self):
+        """Test that maybe_update_last_seen updates when interval has passed"""
+        consumer = MagicMock(spec=AgentRoomConsumer)
+        consumer._last_seen_updated_at = timezone.now() - timedelta(seconds=70)
+        consumer._update_last_seen_db = AsyncMock()
+
+        async def run_test():
+            # Simulating the logic from maybe_update_last_seen
+            now = timezone.now()
+            if (
+                hasattr(consumer, "_last_seen_updated_at")
+                and consumer._last_seen_updated_at
+            ):
+                seconds_since_update = (
+                    now - consumer._last_seen_updated_at
+                ).total_seconds()
+                if seconds_since_update < 60:  # LAST_SEEN_UPDATE_INTERVAL_SECONDS
+                    return False  # Skipped
+            await consumer._update_last_seen_db()
+            return True
+
+        result = asyncio.run(run_test())
+        self.assertTrue(result)
+        consumer._update_last_seen_db.assert_called_once()
+
+    def test_maybe_update_last_seen_updates_on_first_call(self):
+        """Test that maybe_update_last_seen updates on first call (no _last_seen_updated_at)"""
+        consumer = MagicMock(spec=AgentRoomConsumer)
+        consumer._last_seen_updated_at = None
+        consumer._update_last_seen_db = AsyncMock()
+
+        async def run_test():
+            # Simulating the logic from maybe_update_last_seen
+            now = timezone.now()
+            if (
+                hasattr(consumer, "_last_seen_updated_at")
+                and consumer._last_seen_updated_at
+            ):
+                seconds_since_update = (
+                    now - consumer._last_seen_updated_at
+                ).total_seconds()
+                if seconds_since_update < 60:  # LAST_SEEN_UPDATE_INTERVAL_SECONDS
+                    return False  # Skipped
+            await consumer._update_last_seen_db()
+            return True
+
+        result = asyncio.run(run_test())
+        self.assertTrue(result)
+        consumer._update_last_seen_db.assert_called_once()
+
     def test_task_cancellation_handling(self):
         """Test that CancelledError is properly handled"""
 

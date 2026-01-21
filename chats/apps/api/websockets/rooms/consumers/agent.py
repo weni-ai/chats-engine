@@ -38,6 +38,10 @@ CONNECTION_CHECK_CACHE_TTL = 10
 # Ping timeout configuration
 PING_TIMEOUT_SECONDS = getattr(settings, "WS_PING_TIMEOUT_SECONDS", 60)
 PING_CHECK_INTERVAL_SECONDS = getattr(settings, "WS_PING_CHECK_INTERVAL_SECONDS", 10)
+# Interval to update last_seen in database (reduces write overhead)
+LAST_SEEN_UPDATE_INTERVAL_SECONDS = getattr(
+    settings, "WS_LAST_SEEN_UPDATE_INTERVAL_SECONDS", 60
+)
 
 
 class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
@@ -89,9 +93,12 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 await self.load_queues()
                 await self.load_user()
                 self.last_ping = timezone.now()
+                self._last_seen_updated_at = None  # Force first update
 
                 # Start background task to monitor ping timeout if feature is enabled
                 if await self.is_ping_timeout_feature_enabled():
+                    # Update last_seen immediately on connect
+                    await self.maybe_update_last_seen()
                     self.ping_timeout_task = asyncio.create_task(
                         self.ping_timeout_checker()
                     )
@@ -189,7 +196,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             await command(payload["content"])
         elif command_name == "ping":
             self.last_ping = timezone.now()
-            await self.update_last_seen()
+            await self.maybe_update_last_seen()
             await self.send_json({"type": "pong"})
 
     # METHODS
@@ -339,9 +346,26 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         self.permission.save(update_fields=["status"])
         self.permission.notify_user("update", "system")
 
+    async def maybe_update_last_seen(self):
+        """
+        Update last_seen only if enough time has passed since last update.
+        This reduces database write overhead when pings are frequent.
+        """
+        now = timezone.now()
+
+        # Check if we need to update (first time or interval passed)
+        if hasattr(self, "_last_seen_updated_at") and self._last_seen_updated_at:
+            seconds_since_update = (now - self._last_seen_updated_at).total_seconds()
+            if seconds_since_update < LAST_SEEN_UPDATE_INTERVAL_SECONDS:
+                return  # Skip update, not enough time passed
+
+        # Perform the database update
+        await self._update_last_seen_db()
+        self._last_seen_updated_at = now
+
     @database_sync_to_async
-    def update_last_seen(self):
-        """Update the last_seen timestamp on the permission."""
+    def _update_last_seen_db(self):
+        """Update the last_seen timestamp on the permission in database."""
         self.permission.last_seen = timezone.now()
         self.permission.save(update_fields=["last_seen"])
 
