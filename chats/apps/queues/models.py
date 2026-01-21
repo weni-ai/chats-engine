@@ -1,4 +1,5 @@
 import random
+from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -17,6 +18,10 @@ from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteMo
 LAST_SEEN_THRESHOLD_SECONDS = 60
 
 from .queue_managers import QueueManager
+
+# Threshold for considering an agent as "recently seen" (in seconds)
+# Should be greater than WS_LAST_SEEN_UPDATE_INTERVAL_SECONDS to avoid false negatives
+LAST_SEEN_THRESHOLD_SECONDS = getattr(settings, "WS_LAST_SEEN_THRESHOLD_SECONDS", 90)
 
 User = get_user_model()
 
@@ -77,18 +82,15 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
     def _is_ping_timeout_feature_enabled(self) -> bool:
         """Check if the ping timeout feature is enabled for this queue's project."""
         try:
-            return is_feature_active(
+            return is_feature_active_for_attributes(
                 settings.WS_PING_TIMEOUT_FEATURE_FLAG_KEY,
-                user=None,
-                project=self.sector.project,
+                {"projectUUID": str(self.sector.project.uuid)},
             )
         except Exception:
             return False
 
     @property
     def online_agents(self):
-        from datetime import timedelta
-
         # Base filter: status must be ONLINE
         base_filter = {
             "project_permissions__status": "ONLINE",

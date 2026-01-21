@@ -381,7 +381,9 @@ class TestQueueOnlineAgents(TestCase):
         self.assertEqual(self.queue.online_agents.count(), 3)
         self.assertIn(self.agent_1, self.queue.online_agents)
 
-    @patch("chats.apps.queues.models.is_feature_active", return_value=True)
+    @patch(
+        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=True
+    )
     def test_online_agents_excludes_agents_with_old_last_seen_when_feature_enabled(
         self, mock_feature_flag
     ):
@@ -391,14 +393,16 @@ class TestQueueOnlineAgents(TestCase):
         """
         self.assertEqual(self.queue.online_agents.count(), 3)
 
-        # Set agent_1's last_seen to 2 minutes ago (beyond the 60s threshold)
+        # Set agent_1's last_seen to 2 minutes ago (beyond the 90s threshold)
         old_last_seen = timezone.now() - timedelta(seconds=120)
         self.agent_1.project_permissions.update(last_seen=old_last_seen)
 
         self.assertEqual(self.queue.online_agents.count(), 2)
         self.assertNotIn(self.agent_1, self.queue.online_agents)
 
-    @patch("chats.apps.queues.models.is_feature_active", return_value=True)
+    @patch(
+        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=True
+    )
     def test_online_agents_excludes_agents_with_null_last_seen_when_feature_enabled(
         self, mock_feature_flag
     ):
@@ -414,7 +418,9 @@ class TestQueueOnlineAgents(TestCase):
         self.assertEqual(self.queue.online_agents.count(), 2)
         self.assertNotIn(self.agent_1, self.queue.online_agents)
 
-    @patch("chats.apps.queues.models.is_feature_active", return_value=False)
+    @patch(
+        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=False
+    )
     def test_online_agents_includes_agents_with_old_last_seen_when_feature_disabled(
         self, mock_feature_flag
     ):
@@ -432,7 +438,9 @@ class TestQueueOnlineAgents(TestCase):
         self.assertEqual(self.queue.online_agents.count(), 3)
         self.assertIn(self.agent_1, self.queue.online_agents)
 
-    @patch("chats.apps.queues.models.is_feature_active", return_value=False)
+    @patch(
+        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=False
+    )
     def test_online_agents_includes_agents_with_null_last_seen_when_feature_disabled(
         self, mock_feature_flag
     ):

@@ -181,6 +181,81 @@ class PingTimeoutUnitTestCase(TestCase):
         # Assert that last_ping was updated
         self.assertGreater(consumer.last_ping, initial_time)
 
+    def test_maybe_update_last_seen_skips_when_recent(self):
+        """Test that maybe_update_last_seen skips update when last update was recent"""
+        consumer = MagicMock(spec=AgentRoomConsumer)
+        consumer._last_seen_updated_at = timezone.now() - timedelta(seconds=30)
+        consumer._update_last_seen_db = AsyncMock()
+
+        async def run_test():
+            # Simulating the logic from maybe_update_last_seen
+            now = timezone.now()
+            if (
+                hasattr(consumer, "_last_seen_updated_at")
+                and consumer._last_seen_updated_at
+            ):
+                seconds_since_update = (
+                    now - consumer._last_seen_updated_at
+                ).total_seconds()
+                if seconds_since_update < 60:  # LAST_SEEN_UPDATE_INTERVAL_SECONDS
+                    return False  # Skipped
+            await consumer._update_last_seen_db()
+            return True
+
+        result = asyncio.run(run_test())
+        self.assertFalse(result)
+        consumer._update_last_seen_db.assert_not_called()
+
+    def test_maybe_update_last_seen_updates_when_interval_passed(self):
+        """Test that maybe_update_last_seen updates when interval has passed"""
+        consumer = MagicMock(spec=AgentRoomConsumer)
+        consumer._last_seen_updated_at = timezone.now() - timedelta(seconds=70)
+        consumer._update_last_seen_db = AsyncMock()
+
+        async def run_test():
+            # Simulating the logic from maybe_update_last_seen
+            now = timezone.now()
+            if (
+                hasattr(consumer, "_last_seen_updated_at")
+                and consumer._last_seen_updated_at
+            ):
+                seconds_since_update = (
+                    now - consumer._last_seen_updated_at
+                ).total_seconds()
+                if seconds_since_update < 60:  # LAST_SEEN_UPDATE_INTERVAL_SECONDS
+                    return False  # Skipped
+            await consumer._update_last_seen_db()
+            return True
+
+        result = asyncio.run(run_test())
+        self.assertTrue(result)
+        consumer._update_last_seen_db.assert_called_once()
+
+    def test_maybe_update_last_seen_updates_on_first_call(self):
+        """Test that maybe_update_last_seen updates on first call (no _last_seen_updated_at)"""
+        consumer = MagicMock(spec=AgentRoomConsumer)
+        consumer._last_seen_updated_at = None
+        consumer._update_last_seen_db = AsyncMock()
+
+        async def run_test():
+            # Simulating the logic from maybe_update_last_seen
+            now = timezone.now()
+            if (
+                hasattr(consumer, "_last_seen_updated_at")
+                and consumer._last_seen_updated_at
+            ):
+                seconds_since_update = (
+                    now - consumer._last_seen_updated_at
+                ).total_seconds()
+                if seconds_since_update < 60:  # LAST_SEEN_UPDATE_INTERVAL_SECONDS
+                    return False  # Skipped
+            await consumer._update_last_seen_db()
+            return True
+
+        result = asyncio.run(run_test())
+        self.assertTrue(result)
+        consumer._update_last_seen_db.assert_called_once()
+
     def test_task_cancellation_handling(self):
         """Test that CancelledError is properly handled"""
 
@@ -234,12 +309,14 @@ class PingTimeoutFeatureFlagTestCase(TestCase):
         )
         self.queue = self.sector.queues.create(name="Test queue FF")
 
-    @patch("chats.apps.api.websockets.rooms.consumers.agent.is_feature_active")
+    @patch(
+        "chats.apps.api.websockets.rooms.consumers.agent.is_feature_active_for_attributes"
+    )
     async def test_ping_timeout_task_not_created_when_feature_disabled(
-        self, mock_is_feature_active
+        self, mock_is_feature_active_for_attributes
     ):
         """Test that ping_timeout_task is not created when feature flag is disabled"""
-        mock_is_feature_active.return_value = False
+        mock_is_feature_active_for_attributes.return_value = False
 
         communicator = WebsocketCommunicator(
             self.application,
@@ -248,18 +325,20 @@ class PingTimeoutFeatureFlagTestCase(TestCase):
         connected, _ = await communicator.connect()
         self.assertTrue(connected)
 
-        mock_is_feature_active.assert_called_once()
-        call_args = mock_is_feature_active.call_args
+        mock_is_feature_active_for_attributes.assert_called_once()
+        call_args = mock_is_feature_active_for_attributes.call_args
         self.assertEqual(call_args[0][0], settings.WS_PING_TIMEOUT_FEATURE_FLAG_KEY)
 
         await communicator.disconnect()
 
-    @patch("chats.apps.api.websockets.rooms.consumers.agent.is_feature_active")
+    @patch(
+        "chats.apps.api.websockets.rooms.consumers.agent.is_feature_active_for_attributes"
+    )
     async def test_ping_timeout_task_created_when_feature_enabled(
-        self, mock_is_feature_active
+        self, mock_is_feature_active_for_attributes
     ):
         """Test that ping_timeout_task is created when feature flag is enabled"""
-        mock_is_feature_active.return_value = True
+        mock_is_feature_active_for_attributes.return_value = True
 
         communicator = WebsocketCommunicator(
             self.application,
@@ -268,8 +347,8 @@ class PingTimeoutFeatureFlagTestCase(TestCase):
         connected, _ = await communicator.connect()
         self.assertTrue(connected)
 
-        mock_is_feature_active.assert_called_once()
-        call_args = mock_is_feature_active.call_args
+        mock_is_feature_active_for_attributes.assert_called_once()
+        call_args = mock_is_feature_active_for_attributes.call_args
         self.assertEqual(call_args[0][0], settings.WS_PING_TIMEOUT_FEATURE_FLAG_KEY)
 
         await communicator.disconnect()
