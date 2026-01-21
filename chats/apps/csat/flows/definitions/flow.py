@@ -461,6 +461,13 @@ CSAT_FLOW_DEFINITION_DATA = {
                             "type": "set_run_result",
                             "uuid": "32e842e7-d4c1-4a8b-a558-cffc622687a9",
                             "value": "0",
+                        },
+                        {
+                            "attachments": [],
+                            "text": "Antes de encerrar, conte como foi sua experiência!",
+                            "type": "send_msg",
+                            "quick_replies": [],
+                            "uuid": "d47105ad-6376-4aa1-894b-8209de614756",
                         }
                     ],
                     "exits": [
@@ -590,9 +597,9 @@ CSAT_FLOW_DEFINITION_DATA = {
                     "actions": [
                         {
                             "attachments": [],
-                            "quick_replies": [],
-                            "text": "Antes de continuar, poderia responder nossa pesquisa abaixo?",
+                            "text": "Sua opinião é muito importante para nós e leva menos de 1 minuto. Agradecemos se puder responder.",
                             "type": "send_msg",
+                            "quick_replies": [],
                             "uuid": "364ccca7-a19c-4fff-bcab-34a7f24c1a14",
                         },
                         {
@@ -638,7 +645,10 @@ CSAT_FLOW_DEFINITION_DATA = {
                             "destination_uuid": "1400533b-0bd5-4466-90e1-d10828454833",
                             "uuid": "d3dfec87-b652-47f0-9772-0681811b652e",
                         },
-                        {"uuid": "bdd79156-2302-48f5-9f9f-01e00e9b14a7"},
+                        {
+                            "uuid": "bdd79156-2302-48f5-9f9f-01e00e9b14a7",
+                            "destination_uuid": "1400533b-0bd5-4466-90e1-d10828454833",
+                        },
                     ],
                     "router": {
                         "cases": [
@@ -753,7 +763,7 @@ CSAT_FLOW_DEFINITION_DATA = {
                         "wait": {
                             "timeout": {
                                 "category_uuid": "2dddf3fd-86f5-4f1b-9416-9622acfa64a9",
-                                "seconds": 3600,
+                                "seconds": 600,
                             },
                             "type": "msg",
                         },
@@ -997,7 +1007,7 @@ CSAT_FLOW_DEFINITION_DATA = {
                         "wait": {
                             "timeout": {
                                 "category_uuid": "95029ae5-0fe5-4084-a1bd-66f8d23e6b1f",
-                                "seconds": 900,
+                                "seconds": 600,
                             },
                             "type": "msg",
                         },
@@ -1037,7 +1047,7 @@ CSAT_FLOW_DEFINITION_DATA = {
                         "wait": {
                             "timeout": {
                                 "category_uuid": "4d331dfa-0c06-4a7c-b8d2-2abf698f6ec8",
-                                "seconds": 900,
+                                "seconds": 600,
                             },
                             "type": "msg",
                         },
