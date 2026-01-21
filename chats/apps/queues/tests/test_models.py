@@ -381,7 +381,9 @@ class TestQueueOnlineAgents(TestCase):
         self.assertEqual(self.queue.online_agents.count(), 3)
         self.assertIn(self.agent_1, self.queue.online_agents)
 
-    @patch("chats.apps.queues.models.is_feature_active", return_value=True)
+    @patch(
+        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=True
+    )
     def test_online_agents_excludes_agents_with_old_last_seen_when_feature_enabled(
         self, mock_feature_flag
     ):
@@ -398,7 +400,9 @@ class TestQueueOnlineAgents(TestCase):
         self.assertEqual(self.queue.online_agents.count(), 2)
         self.assertNotIn(self.agent_1, self.queue.online_agents)
 
-    @patch("chats.apps.queues.models.is_feature_active", return_value=True)
+    @patch(
+        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=True
+    )
     def test_online_agents_excludes_agents_with_null_last_seen_when_feature_enabled(
         self, mock_feature_flag
     ):
@@ -414,7 +418,9 @@ class TestQueueOnlineAgents(TestCase):
         self.assertEqual(self.queue.online_agents.count(), 2)
         self.assertNotIn(self.agent_1, self.queue.online_agents)
 
-    @patch("chats.apps.queues.models.is_feature_active", return_value=False)
+    @patch(
+        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=False
+    )
     def test_online_agents_includes_agents_with_old_last_seen_when_feature_disabled(
         self, mock_feature_flag
     ):
@@ -432,7 +438,9 @@ class TestQueueOnlineAgents(TestCase):
         self.assertEqual(self.queue.online_agents.count(), 3)
         self.assertIn(self.agent_1, self.queue.online_agents)
 
-    @patch("chats.apps.queues.models.is_feature_active", return_value=False)
+    @patch(
+        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=False
+    )
     def test_online_agents_includes_agents_with_null_last_seen_when_feature_disabled(
         self, mock_feature_flag
     ):
@@ -493,7 +501,9 @@ class TestQueueGetAvailableAgent(TestCase):
         available_agent = self.queue.get_available_agent()
         self.assertEqual(available_agent, self.agent_3)
 
-    @patch("chats.apps.queues.models.is_feature_active_for_attributes", return_value=False)
+    @patch(
+        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=False
+    )
     def test_get_available_agent_returns_random_agent_if_rooms_count_is_equal(
         self, mock_is_feature_active_for_attributes
     ):
@@ -532,7 +542,9 @@ class TestQueueGetAvailableAgent(TestCase):
             "Agent 3 was never picked, suggesting non-random selection.",
         )
 
-    @patch("chats.apps.queues.models.is_feature_active_for_attributes", return_value=False)
+    @patch(
+        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=False
+    )
     def test_get_available_agent_returns_random_agent_if_rooms_count_is_equal_for_general_routing_option(
         self, mock_is_feature_active_for_attributes
     ):
@@ -578,7 +590,9 @@ class TestQueueGetAvailableAgent(TestCase):
             "Agent 3 was never picked, suggesting non-random selection.",
         )
 
-    @patch("chats.apps.queues.models.is_feature_active_for_attributes", return_value=True)
+    @patch(
+        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=True
+    )
     def test_get_available_agent_tiebreaker_by_rooms_closed_today(
         self, mock_is_feature_active_for_attributes
     ):
@@ -610,7 +624,9 @@ class TestQueueGetAvailableAgent(TestCase):
         available_agent = self.queue.get_available_agent()
         self.assertEqual(available_agent, self.agent_3)
 
-    @patch("chats.apps.queues.models.is_feature_active_for_attributes", return_value=True)
+    @patch(
+        "chats.apps.queues.models.is_feature_active_for_attributes", return_value=True
+    )
     def test_get_available_agent_random_when_all_tiebreakers_equal(
         self, mock_is_feature_active_for_attributes
     ):

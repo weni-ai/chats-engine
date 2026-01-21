@@ -309,12 +309,14 @@ class PingTimeoutFeatureFlagTestCase(TestCase):
         )
         self.queue = self.sector.queues.create(name="Test queue FF")
 
-    @patch("chats.apps.api.websockets.rooms.consumers.agent.is_feature_active")
+    @patch(
+        "chats.apps.api.websockets.rooms.consumers.agent.is_feature_active_for_attributes"
+    )
     async def test_ping_timeout_task_not_created_when_feature_disabled(
-        self, mock_is_feature_active
+        self, mock_is_feature_active_for_attributes
     ):
         """Test that ping_timeout_task is not created when feature flag is disabled"""
-        mock_is_feature_active.return_value = False
+        mock_is_feature_active_for_attributes.return_value = False
 
         communicator = WebsocketCommunicator(
             self.application,
@@ -323,18 +325,20 @@ class PingTimeoutFeatureFlagTestCase(TestCase):
         connected, _ = await communicator.connect()
         self.assertTrue(connected)
 
-        mock_is_feature_active.assert_called_once()
-        call_args = mock_is_feature_active.call_args
+        mock_is_feature_active_for_attributes.assert_called_once()
+        call_args = mock_is_feature_active_for_attributes.call_args
         self.assertEqual(call_args[0][0], settings.WS_PING_TIMEOUT_FEATURE_FLAG_KEY)
 
         await communicator.disconnect()
 
-    @patch("chats.apps.api.websockets.rooms.consumers.agent.is_feature_active")
+    @patch(
+        "chats.apps.api.websockets.rooms.consumers.agent.is_feature_active_for_attributes"
+    )
     async def test_ping_timeout_task_created_when_feature_enabled(
-        self, mock_is_feature_active
+        self, mock_is_feature_active_for_attributes
     ):
         """Test that ping_timeout_task is created when feature flag is enabled"""
-        mock_is_feature_active.return_value = True
+        mock_is_feature_active_for_attributes.return_value = True
 
         communicator = WebsocketCommunicator(
             self.application,
@@ -343,8 +347,8 @@ class PingTimeoutFeatureFlagTestCase(TestCase):
         connected, _ = await communicator.connect()
         self.assertTrue(connected)
 
-        mock_is_feature_active.assert_called_once()
-        call_args = mock_is_feature_active.call_args
+        mock_is_feature_active_for_attributes.assert_called_once()
+        call_args = mock_is_feature_active_for_attributes.call_args
         self.assertEqual(call_args[0][0], settings.WS_PING_TIMEOUT_FEATURE_FLAG_KEY)
 
         await communicator.disconnect()

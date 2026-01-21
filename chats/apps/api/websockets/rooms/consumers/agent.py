@@ -10,6 +10,7 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder
 from django.utils import timezone
+from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
 from chats.apps.api.v1.prometheus.metrics import (
     ws_active_connections,
@@ -18,7 +19,6 @@ from chats.apps.api.v1.prometheus.metrics import (
     ws_disconnects_total,
     ws_messages_received_total,
 )
-from chats.apps.feature_flags.utils import is_feature_active
 from chats.apps.history.filters.rooms_filter import (
     get_history_rooms_queryset_by_contact,
 )
@@ -459,10 +459,9 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
     def is_ping_timeout_feature_enabled(self) -> bool:
         if not self.permission:
             return False
-        return is_feature_active(
+        return is_feature_active_for_attributes(
             settings.WS_PING_TIMEOUT_FEATURE_FLAG_KEY,
-            self.user,
-            self.permission.project,
+            {"projectUUID": str(self.permission.project.uuid)},
         )
 
     async def ping_timeout_checker(self):

@@ -9,7 +9,6 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
-from chats.apps.feature_flags.utils import is_feature_active
 from chats.apps.projects.models.models import CustomStatus
 from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
 
@@ -78,10 +77,9 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
     def _is_ping_timeout_feature_enabled(self) -> bool:
         """Check if the ping timeout feature is enabled for this queue's project."""
         try:
-            return is_feature_active(
+            return is_feature_active_for_attributes(
                 settings.WS_PING_TIMEOUT_FEATURE_FLAG_KEY,
-                user=None,
-                project=self.sector.project,
+                {"projectUUID": str(self.sector.project.uuid)},
             )
         except Exception:
             return False
