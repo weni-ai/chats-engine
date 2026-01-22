@@ -218,7 +218,7 @@ CSAT_FLOW_DEFINITION_DATA = {
                         "header_text": ["Customer Satisfaction Survey"],
                         "quick_replies": [],
                         "text": [
-                            "Before we go, tell us about your experience!\n*How would you rate my service?* \ud83d\udc47"
+                            "*How would you rate my service?* \ud83d\udc47"
                         ],
                     },
                     "79baa84f-db8c-45a3-bab7-faf791fb1bc4": {
@@ -248,7 +248,7 @@ CSAT_FLOW_DEFINITION_DATA = {
                             "Very satisfied \ud83d\ude03",
                         ],
                         "text": [
-                            "Before we go, tell us about your experience!\n\n**How would you rate my service?** \ud83d\udc47"
+                            "**How would you rate my service?** \ud83d\udc47"
                         ],
                     },
                     "ba177798-f428-441e-b896-0f5670ad97ee": {
@@ -314,7 +314,7 @@ CSAT_FLOW_DEFINITION_DATA = {
                         "header_text": ["Pesquisa de Satisfa\u00e7\u00e3o"],
                         "quick_replies": [],
                         "text": [
-                            "Antes de encerrar, conte como foi sua experi\u00eancia!\n*Como voc\u00ea avalia o meu atendimento?* \ud83d\udc47"
+                            "*Como voc\u00ea avalia o meu atendimento?* \ud83d\udc47"
                         ],
                     },
                     "87033018-daf3-45ff-a85e-92f184491528": {
@@ -330,7 +330,7 @@ CSAT_FLOW_DEFINITION_DATA = {
                     "aa9eb133-f259-41f2-83a2-74c927d7d297": {
                         "attachments": [],
                         "text": [
-                            "Antes de encerrar, conte como foi sua experi\u00eancia!\n\n**Como voc\u00ea avalia o meu atendimento?** \ud83d\udc47"
+                            "**Como voc\u00ea avalia o meu atendimento?** \ud83d\udc47"
                         ],
                     },
                     "ba177798-f428-441e-b896-0f5670ad97ee": {
@@ -408,7 +408,7 @@ CSAT_FLOW_DEFINITION_DATA = {
                         "header_text": ["Encuesta de Satisfacci\u00f3n"],
                         "quick_replies": [],
                         "text": [
-                            "Antes de terminar, \u00a1cu\u00e9ntanos tu experiencia!\n*\u00bfC\u00f3mo valoras mi atenci\u00f3n?* \ud83d\udc47"
+                            "*\u00bfC\u00f3mo valoras mi atenci\u00f3n?* \ud83d\udc47"
                         ],
                     },
                     "79baa84f-db8c-45a3-bab7-faf791fb1bc4": {
@@ -440,7 +440,7 @@ CSAT_FLOW_DEFINITION_DATA = {
                             "Muy satisfecho \ud83d\ude03",
                         ],
                         "text": [
-                            "Antes de terminar, \u00a1cu\u00e9ntanos tu experiencia!\n\n**\u00bfC\u00f3mo valoras mi atenci\u00f3n?** \ud83d\udc47"
+                            "**\u00bfC\u00f3mo valoras mi atenci\u00f3n?** \ud83d\udc47"
                         ],
                     },
                     "ba177798-f428-441e-b896-0f5670ad97ee": {
@@ -577,7 +577,7 @@ CSAT_FLOW_DEFINITION_DATA = {
                             ],
                             "messageType": "interactive",
                             "quick_replies": [],
-                            "text": "Antes de encerrar, conte como foi sua experi\u00eancia!\n*Como voc\u00ea avalia o meu atendimento?* \ud83d\udc47",
+                            "text": "*Como voc\u00ea avalia o meu atendimento?* \ud83d\udc47",
                             "type": "send_whatsapp_msg",
                             "uuid": "781450c5-e6f4-4dde-a03b-51662cbd00ef",
                         }
@@ -601,7 +601,7 @@ CSAT_FLOW_DEFINITION_DATA = {
                                 "Satisfeito \ud83d\ude42",
                                 "Muito satisfeito \ud83d\ude03",
                             ],
-                            "text": "Antes de encerrar, conte como foi sua experi\u00eancia!\n\n**Como voc\u00ea avalia o meu atendimento?** \ud83d\udc47",
+                            "text": "**Como voc\u00ea avalia o meu atendimento?** \ud83d\udc47",
                             "type": "send_msg",
                             "uuid": "aa9eb133-f259-41f2-83a2-74c927d7d297",
                         }
