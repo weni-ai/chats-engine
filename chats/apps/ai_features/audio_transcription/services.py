@@ -34,22 +34,18 @@ class AudioTranscriptionService:
         Build the payload for the Lambda function.
         """
         return {
-            "parameters": {
-                "media_url": media.url,
-                "media_uuid": str(media.uuid),
-            },
-            "sessionAttributes": {},
-            "promptSessionAttributes": {
-                "alwaysFormat": "<example>{'msg': {'text': 'Hello, how can I help you today?'}}</example>"
-            },
-            "agent": {
-                "name": "INLINE_AGENT",
-                "version": "INLINE_AGENT",
-                "id": "INLINE_AGENT",
-            },
-            "actionGroup": "voice_transcription_function",
-            "function": self.function_arn,
             "messageVersion": "1.0",
+            "agent": "audio-transcription-agent",
+            "actionGroup": "audio-actions",
+            "function": "transcribe_audio",
+            "parameters": [
+                {
+                    "name": "audio_url",
+                    "value": media.url,
+                }
+            ],
+            "sessionAttributes": {},
+            "promptSessionAttributes": {},
         }
 
     def _invoke_lambda(self, payload: dict) -> dict:
@@ -77,6 +73,7 @@ class AudioTranscriptionService:
             payload = self._build_payload(media)
             response = self._invoke_lambda(payload)
 
+            # Check for Lambda execution error
             if response.get("errorMessage") or response.get("error"):
                 error_msg = response.get("errorMessage") or response.get("error")
                 logger.error(
@@ -92,7 +89,34 @@ class AudioTranscriptionService:
                 transcription.notify_transcription()
                 return transcription
 
-            transcription_text = response.get("text", "")
+            # Extract text from Lambda response
+            # Response format: response.response.functionResponse.responseBody.TEXT.body
+            try:
+                response_body = (
+                    response.get("response", {})
+                    .get("functionResponse", {})
+                    .get("responseBody", {})
+                    .get("TEXT", {})
+                    .get("body", "")
+                )
+                transcription_text = response_body
+            except (KeyError, AttributeError):
+                transcription_text = ""
+
+            # Check if response contains an error message
+            if transcription_text.startswith("Error"):
+                logger.error(
+                    "Lambda returned error for media %s: %s",
+                    media.uuid,
+                    transcription_text,
+                )
+                capture_message(
+                    f"Lambda returned error for media {media.uuid}: {transcription_text}",
+                    level="error",
+                )
+                transcription.update_status(AudioTranscriptionStatus.FAILED)
+                transcription.notify_transcription()
+                return transcription
 
             if not transcription_text:
                 logger.warning(

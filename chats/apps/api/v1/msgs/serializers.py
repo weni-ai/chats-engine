@@ -54,20 +54,20 @@ class MessageMediaSimpleSerializer(serializers.ModelSerializer):
         Get transcription data for audio media.
         Returns text and feedback for the current user.
         """
-        if not hasattr(media, "transcription"):
+        try:
+            transcription = media.transcription
+        except Exception:
             return None
 
-        transcription = media.transcription
         if not transcription or transcription.status != "DONE":
             return None
 
         result = {"text": transcription.text}
 
         # Get user feedback if available
-        user = self.context.get("request", {})
-        if hasattr(user, "user"):
-            user = user.user
-            feedback = transcription.feedbacks.filter(user=user).first()
+        request = self.context.get("request")
+        if request and hasattr(request, "user") and request.user.is_authenticated:
+            feedback = transcription.feedbacks.filter(user=request.user).first()
             if feedback:
                 result["feedback"] = {"liked": feedback.liked}
             else:

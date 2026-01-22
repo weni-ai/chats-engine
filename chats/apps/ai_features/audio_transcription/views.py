@@ -1,12 +1,16 @@
 import logging
 
 from django.conf import settings
-from django.utils.translation import gettext_lazy as _
+from django.utils import translation
+from django.utils.translation import gettext as _
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from chats.apps.ai_features.audio_transcription.enums import (
+    AudioTranscriptionFeedbackTags,
+)
 from chats.apps.ai_features.audio_transcription.models import (
     AudioTranscription,
     AudioTranscriptionStatus,
@@ -18,6 +22,7 @@ from chats.apps.ai_features.audio_transcription.serializers import (
 from chats.apps.ai_features.audio_transcription.tasks import transcribe_audio
 from chats.apps.ai_features.audio_transcription.utils import get_audio_duration_seconds
 from chats.apps.msgs.models import MessageMedia
+from chats.core.mixins import LanguageViewMixin
 
 logger = logging.getLogger(__name__)
 
@@ -160,3 +165,25 @@ class AudioTranscriptionFeedbackView(APIView):
             {"liked": feedback.liked},
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
+
+
+class AudioTranscriptionFeedbackTagsView(LanguageViewMixin, APIView):
+    """
+    API view to get the possible tags for the audio transcription feedback.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        """
+        Get the possible tags for the audio transcription feedback.
+        """
+        language = self.get_language()
+
+        translation.activate(language)
+        results = {}
+
+        for choice in AudioTranscriptionFeedbackTags:
+            results[choice.value] = _(choice.label)
+
+        return Response({"results": results}, status=status.HTTP_200_OK)
