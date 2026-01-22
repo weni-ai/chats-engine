@@ -186,7 +186,14 @@ CSAT_FLOW_DEFINITION_DATA = {
                     "364ccca7-a19c-4fff-bcab-34a7f24c1a14": {
                         "attachments": [],
                         "text": [
-                            "Before continuing, could you please answer our survey below?"
+                            "Your opinion is very important to us and takes less than 1 minute. We would appreciate it if you could respond."
+                        ],
+                    },
+                    "d47105ad-6376-4aa1-894b-8209de614756": {
+                        "attachments": [],
+                        "quick_replies": [],
+                        "text": [
+                            "Before we go, tell us about your experience!"
                         ],
                     },
                     "370acbd7-7295-4e47-b044-8310f989103d": {
@@ -283,7 +290,14 @@ CSAT_FLOW_DEFINITION_DATA = {
                     "364ccca7-a19c-4fff-bcab-34a7f24c1a14": {
                         "attachments": [],
                         "text": [
-                            "Antes de continuar, poderia responder nossa pesquisa abaixo?"
+                            "Sua opinião é muito importante para nós e leva menos de 1 minuto. Agradecemos se puder responder."
+                        ],
+                    },
+                    "d47105ad-6376-4aa1-894b-8209de614756": {
+                        "attachments": [],
+                        "quick_replies": [],
+                        "text": [
+                            "Antes de encerrar, conte como foi sua experiência!"
                         ],
                     },
                     "6a700f2d-3988-4e5f-8a2f-19149693dc1f": {
@@ -358,7 +372,14 @@ CSAT_FLOW_DEFINITION_DATA = {
                     "364ccca7-a19c-4fff-bcab-34a7f24c1a14": {
                         "attachments": [],
                         "text": [
-                            "Antes de continuar, \u00bfpodr\u00edas responder a nuestra encuesta de abajo?"
+                            "Tu opinión es muy importante para nosotros y toma menos de 1 minuto. Te agradeceríamos si pudieras responder."
+                        ],
+                    },
+                    "d47105ad-6376-4aa1-894b-8209de614756": {
+                        "attachments": [],
+                        "quick_replies": [],
+                        "text": [
+                            "Antes de terminar, ¡cuéntanos tu experiencia!"
                         ],
                     },
                     "370acbd7-7295-4e47-b044-8310f989103d": {
