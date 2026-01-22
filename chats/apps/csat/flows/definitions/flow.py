@@ -1,6 +1,6 @@
 # This is a placeholder and will be changed later to the actual flow definition
 
-CSAT_FLOW_VERSION = 2
+CSAT_FLOW_VERSION = 3
 CSAT_FLOW_NAME = "Weni Chats CSAT Flow"
 CSAT_FLOW_DEFINITION_DATA = {
     "version": "13",
