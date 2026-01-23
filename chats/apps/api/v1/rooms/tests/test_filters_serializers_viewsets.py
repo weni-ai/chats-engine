@@ -217,8 +217,13 @@ class RoomViewsetListTests(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertGreaterEqual(len(response.data["results"]), 3)
-        # Ensure query count stays bounded even with thousands of rooms
-        self.assertLessEqual(len(ctx), 400)
+        # With the optimized pin version, query count should be much lower
+        # The key is filtering FIRST, then annotating only necessary rooms
+        # This prevents the O(N) annotation problem that caused production issues
+        self.assertLessEqual(
+            len(ctx), 50,
+            f"Query count too high: {len(ctx)}. The optimized version should stay under 50 queries."
+        )
 
     def test_list_supports_common_filters(self):
         room_a = self._create_room("PROTO-123")
@@ -240,4 +245,68 @@ class RoomViewsetListTests(TestCase):
         )
         self.assertTrue(
             any(item["uuid"] == str(room_a.uuid) for item in search_response.data["results"])
+        )
+
+    def test_optimized_pin_order_filters_before_annotating(self):
+        """
+        Test that the optimized version filters BEFORE annotating,
+        which is critical for performance with large datasets.
+
+        Important: Pinned rooms are ALWAYS included regardless of filters
+        (union operation). This matches the legacy behavior and is intentional -
+        users should see their pinned rooms even if they don't match filters.
+        """
+        # Create rooms with different statuses
+        active_pinned = self._create_room("ACTIVE-PINNED", is_active=True)
+        active_regular = self._create_room("ACTIVE-REGULAR", is_active=True)
+        inactive_pinned = self._create_room("INACTIVE-PINNED", is_active=False)
+
+        # Pin both pinned rooms
+        RoomPin.objects.create(room=active_pinned, user=self.request_user)
+        RoomPin.objects.create(room=inactive_pinned, user=self.request_user)
+
+        # Request only active rooms
+        params = {
+            "project": str(self.project.pk),
+            "is_active": "true",
+            "limit": 50
+        }
+
+        with CaptureQueriesContext(connection) as ctx:
+            response = self._list(params)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data["results"]
+        result_uuids = [r["uuid"] for r in results]
+
+        # Should include both active rooms
+        self.assertIn(str(active_pinned.uuid), result_uuids)
+        self.assertIn(str(active_regular.uuid), result_uuids)
+
+        # Pinned rooms bypass filters - inactive pinned room SHOULD be included
+        # This matches the legacy behavior (both use union of filtered + pinned)
+        self.assertIn(str(inactive_pinned.uuid), result_uuids)
+
+        # Pinned rooms should come first (sorted by pin date)
+        # Find indices of pinned rooms in results
+        active_pinned_idx = next(
+            (i for i, r in enumerate(results) if r["uuid"] == str(active_pinned.uuid)),
+            None
+        )
+        inactive_pinned_idx = next(
+            (i for i, r in enumerate(results) if r["uuid"] == str(inactive_pinned.uuid)),
+            None
+        )
+
+        # Both pinned rooms should appear before the regular active room
+        if active_pinned_idx is not None and inactive_pinned_idx is not None:
+            for i, r in enumerate(results):
+                if r["uuid"] == str(active_regular.uuid):
+                    self.assertLess(active_pinned_idx, i, "Active pinned room should come before regular room")
+                    self.assertLess(inactive_pinned_idx, i, "Inactive pinned room should come before regular room")
+
+        # Query count should be reasonable even with filters
+        self.assertLessEqual(
+            len(ctx), 50,
+            f"Too many queries with filters: {len(ctx)}"
         )
