@@ -451,18 +451,20 @@ class SectorTicketerCreationTests(APITestCase):
             role=ProjectPermission.ROLE_ADMIN,
         )
 
+    @patch("chats.apps.api.v1.sectors.viewsets.settings")
     @patch(
         "chats.apps.api.v1.sectors.viewsets.IntegratedTicketers.integrate_individual_ticketer"
     )
     @patch("chats.apps.api.v1.sectors.viewsets.FlowRESTClient.create_ticketer")
     def test_principal_project_creates_ticketer_only_in_secondary(
-        self, mock_create_ticketer, mock_integrate_individual
+        self, mock_create_ticketer, mock_integrate_individual, mock_settings
     ):
         """
         When creating a sector in a principal project, should create ticketer
         ONLY in secondary project (via integrate_individual_ticketer),
         NOT in principal project.
         """
+        mock_settings.USE_WENI_FLOWS = True
         mock_integrate_individual.return_value = {"status": "success"}
 
         url = reverse("sector-list")
@@ -530,18 +532,20 @@ class SectorTicketerCreationTests(APITestCase):
         call_kwargs = mock_create_ticketer.call_args[1]
         self.assertEqual(call_kwargs["project_uuid"], str(self.normal_project.uuid))
 
+    @patch("chats.apps.api.v1.sectors.viewsets.settings")
     @patch(
         "chats.apps.api.v1.sectors.viewsets.IntegratedTicketers.integrate_individual_ticketer"
     )
     @patch("chats.apps.api.v1.sectors.viewsets.FlowRESTClient.create_ticketer")
     def test_principal_project_does_not_create_duplicate_ticketers(
-        self, mock_create_ticketer, mock_integrate_individual
+        self, mock_create_ticketer, mock_integrate_individual, mock_settings
     ):
         """
         Regression test: ensure that principal projects don't create
         ticketers in both principal AND secondary projects (the bug that was fixed).
         Only secondary project should have the ticketer created.
         """
+        mock_settings.USE_WENI_FLOWS = True
         mock_integrate_individual.return_value = {"status": "success"}
 
         url = reverse("sector-list")
