@@ -409,15 +409,29 @@ class AgentRepository:
             & ~Q(status_type__name__iexact="in-service")
         )
 
-        tz_str = str(project.timezone)
+        tz = project.timezone
+        tz_str = str(tz)
+
         if filters.start_date:
             start_time = parse_date_with_timezone(filters.start_date, tz_str)
-            custom_status = custom_status.filter(created_on__gte=start_time)
+        else:
+            start_time = (
+                timezone.now()
+                .astimezone(tz)
+                .replace(hour=0, minute=0, second=0, microsecond=0)
+            )
+
         if filters.end_date:
             end_time = parse_date_with_timezone(
                 filters.end_date, tz_str, is_end_date=True
             )
-            custom_status = custom_status.filter(created_on__lte=end_time)
+        else:
+            end_time = timezone.now()
+
+        custom_status = custom_status.filter(
+            created_on__gte=start_time,
+            created_on__lte=end_time,
+        )
 
         return custom_status
 
