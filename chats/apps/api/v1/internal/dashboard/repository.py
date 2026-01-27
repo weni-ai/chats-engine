@@ -169,10 +169,10 @@ class AgentRepository:
                 status=Subquery(project_permission_subquery),
                 has_active_custom_status=has_active_custom_status_subquery,
                 status_order=Case(
-                    When(Q(status='OFFLINE') & Q(has_active_custom_status=False), then=Value(1)),
-                    When(has_active_custom_status=True, then=Value(2)),
-                    When(Q(status='ONLINE') & Q(has_active_custom_status=False), then=Value(3)),
-                    default=Value(2),
+                    When(status='ONLINE', then=Value(1)),
+                    When(Q(status='OFFLINE') & Q(has_active_custom_status=True), then=Value(2)),
+                    When(status='OFFLINE', then=Value(3)),
+                    default=Value(3),
                     output_field=IntegerField(),
                 ),
                 closed=Count(
@@ -209,23 +209,13 @@ class AgentRepository:
             .distinct()
         )
 
-        if filters.ordering:
-            if "time_in_service" in filters.ordering:
-                ordering_field = filters.ordering.replace(
-                    "time_in_service", "time_in_service_order"
-                )
-                agents_query = agents_query.order_by(ordering_field)
-            elif "status" in filters.ordering:
-                ordering_field = filters.ordering.replace("status", "status_order")
-                agents_query = agents_query.order_by(ordering_field)
-            else:
-                agents_query = agents_query.order_by(filters.ordering)
-
         agents_query = agents_query.values(
             "first_name",
             "last_name",
             "email",
             "status",
+            "status_order",
+            "has_active_custom_status",
             "closed",
             "opened",
             "avg_first_response_time",
@@ -233,6 +223,18 @@ class AgentRepository:
             "avg_interaction_time",
             "custom_status",
         )
+
+        if filters.ordering:
+            if "time_in_service" in filters.ordering:
+                ordering_field = filters.ordering.replace(
+                    "time_in_service", "time_in_service_order"
+                )
+                agents_query = agents_query.order_by(ordering_field, "email")
+            elif "status" in filters.ordering:
+                ordering_field = filters.ordering.replace("status", "status_order")
+                agents_query = agents_query.order_by(ordering_field, "email")
+            else:
+                agents_query = agents_query.order_by(filters.ordering)
 
         return agents_query
 
@@ -337,10 +339,10 @@ class AgentRepository:
                 status=Subquery(project_permission_queryset),
                 has_active_custom_status=has_active_custom_status_subquery_2,
                 status_order=Case(
-                    When(Q(status='OFFLINE') & Q(has_active_custom_status=False), then=Value(1)),
-                    When(has_active_custom_status=True, then=Value(2)),
-                    When(Q(status='ONLINE') & Q(has_active_custom_status=False), then=Value(3)),
-                    default=Value(2),
+                    When(status='ONLINE', then=Value(1)),
+                    When(Q(status='OFFLINE') & Q(has_active_custom_status=True), then=Value(2)),
+                    When(status='OFFLINE', then=Value(3)),
+                    default=Value(3),
                     output_field=IntegerField(),
                 ),
                 closed=Count(
@@ -358,22 +360,24 @@ class AgentRepository:
             .distinct()
         )
 
-        if filters.ordering:
-            if "status" in filters.ordering:
-                ordering_field = filters.ordering.replace("status", "status_order")
-                agents_query = agents_query.order_by(ordering_field)
-            else:
-                agents_query = agents_query.order_by(filters.ordering)
-
         agents_query = agents_query.values(
             "first_name",
             "last_name",
             "email",
             "status",
+            "status_order",
+            "has_active_custom_status",
             "closed",
             "opened",
             "custom_status",
         )
+
+        if filters.ordering:
+            if "status" in filters.ordering:
+                ordering_field = filters.ordering.replace("status", "status_order")
+                agents_query = agents_query.order_by(ordering_field, "email")
+            else:
+                agents_query = agents_query.order_by(filters.ordering)
 
         return agents_query
 
