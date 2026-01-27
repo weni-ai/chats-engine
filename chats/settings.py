@@ -72,11 +72,8 @@ INSTALLED_APPS = [
     "chats.core",
     "chats.apps.ai_features",
     "chats.apps.ai_features.history_summary",
-<<<<<<< HEAD
     "chats.apps.ai_features.response_suggestions",
-=======
     "chats.apps.ai_features.audio_transcription",
->>>>>>> feature/audio-description
     "chats.apps.feature_flags",
     "chats.apps.feedbacks",
     "chats.apps.csat",
