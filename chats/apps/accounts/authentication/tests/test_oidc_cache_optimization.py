@@ -17,14 +17,12 @@ class CacheFunctionUnitTest(TestCase):
     def setUp(self):
         """Setup test data"""
         self.test_email = "test.user@example.com"
-
         self.user = User.objects.create(
             email=self.test_email,
             first_name="Test",
             last_name="User",
             is_active=True,
         )
-
         invalidate_cached_user(self.test_email)
 
     def tearDown(self):
@@ -119,14 +117,12 @@ class IntegrationTest(TestCase):
         """Setup user and authentication"""
         self.client = APIClient()
         self.test_email = "integration.test@example.com"
-
         self.user = User.objects.create(
             email=self.test_email,
             first_name="Integration",
             last_name="Test",
             is_active=True,
         )
-
         self.token = Token.objects.create(user=self.user)
         invalidate_cached_user(self.test_email)
 
@@ -185,14 +181,12 @@ class ComparisonTest(TestCase):
     def setUp(self):
         """Setup test data"""
         self.test_email = "comparison.test@example.com"
-
         self.user = User.objects.create(
             email=self.test_email,
             first_name="Comparison",
             last_name="Test",
             is_active=True,
         )
-
         invalidate_cached_user(self.test_email)
 
     def tearDown(self):

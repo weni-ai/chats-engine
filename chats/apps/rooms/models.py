@@ -168,7 +168,7 @@ class Room(BaseModel, BaseConfigurableModel):
         related_name="+",
     )
 
-    tracker = FieldTracker(fields=["user", "queue"])
+    tracker = FieldTracker(fields=["user", "is_active", "queue"])
 
     @property
     def is_billing_notified(self) -> bool:
@@ -245,6 +245,61 @@ class Room(BaseModel, BaseConfigurableModel):
         indexes = [
             models.Index(fields=["project_uuid"]),
         ]
+
+    def _update_agent_service_status(self, is_new):
+        """
+        Atualiza o status 'In-Service' dos agentes baseado nas mudanças na sala
+
+        Args:
+            is_new: Boolean indicando se é uma sala nova
+        """
+
+        # Obter valores relevantes
+        old_user = self._original_user
+        new_user = self.user
+
+        # Obter o projeto da sala
+        project = None
+        if self.queue and hasattr(self.queue, "sector"):
+            sector = self.queue.sector
+            if sector and hasattr(sector, "project"):
+                project = sector.project
+
+        if not project:
+            return  # Se não encontrar projeto, não faz nada
+
+        # Caso prioritário: Sala fechada
+        if (
+            hasattr(self, "__original_is_active")
+            and self.__original_is_active is True
+            and self.is_active is False
+        ):
+            if old_user:
+                InServiceStatusService.room_closed(old_user, project)
+            return
+
+        # Casos de atribuição de sala
+
+        # Caso 1: Sala nova com usuário atribuído
+        if is_new and new_user:
+            InServiceStatusService.room_assigned(new_user, project)
+            return
+
+        # Caso 2: Usuário adicionado a uma sala existente
+        if old_user is None and new_user is not None:
+            InServiceStatusService.room_assigned(new_user, project)
+            return
+
+        # Caso 3: Transferência entre agentes
+        if old_user is not None and new_user is not None and old_user != new_user:
+            InServiceStatusService.room_closed(old_user, project)
+            InServiceStatusService.room_assigned(new_user, project)
+            return
+
+        # Caso 4: Usuário removido da sala
+        if old_user is not None and new_user is None:
+            InServiceStatusService.room_closed(old_user, project)
+            return
 
     def save(self, *args, **kwargs) -> None:
         if self._state.adding is False and self.__original_is_active is False:
@@ -399,6 +454,12 @@ class Room(BaseModel, BaseConfigurableModel):
         return is_24h_valid
 
     @property
+    def imported_history_url(self):
+        if self.contact and self.contact.imported_history_url:
+            return self.contact.imported_history_url
+        return None
+
+    @property
     def serialized_ws_data(self):
         from chats.apps.api.v1.rooms.serializers import RoomSerializer  # noqa
 
@@ -437,6 +498,24 @@ class Room(BaseModel, BaseConfigurableModel):
             self.clear_pins()
 
             self.save()
+
+        # AGORA chamar room_closed, quando a sala já está inativa no banco
+        if self.user:
+            project = None
+            if self.queue and hasattr(self.queue, "sector"):
+                sector = self.queue.sector
+                if sector and hasattr(sector, "project"):
+                    project = sector.project
+
+            print(f"🔍 DEBUG close(): project={project}")
+
+            if project:
+                print(f"🔍 DEBUG close(): Chamando InServiceStatusService.room_closed")
+                InServiceStatusService.room_closed(self.user, project)
+            else:
+                print(f"🔍 DEBUG close(): project é None, não chama room_closed")
+        else:
+            print(f"🔍 DEBUG close(): user é None, não chama room_closed")
 
         if self.user:
             project = None
@@ -701,6 +780,14 @@ class Room(BaseModel, BaseConfigurableModel):
         self.full_transfer_history.append(transfer)
         self.transfer_history = transfer  # legacy
         self.save(update_fields=["full_transfer_history", "transfer_history"])
+
+    def start_csat_flow(self):
+        """
+        Starts the CSAT flow for a room.
+        """
+        from chats.apps.csat.tasks import start_csat_flow
+
+        start_csat_flow.delay(self.uuid)
 
     def increment_unread_messages_count(
         self, count: int, last_unread_message_at: datetime

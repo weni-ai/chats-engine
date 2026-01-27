@@ -118,6 +118,11 @@ class RoomSerializer(serializers.ModelSerializer):
     def get_can_edit_custom_fields(self, room: Room):
         return room.queue.sector.can_edit_custom_fields
 
+    def get_imported_history_url(self, room: Room):
+        if room.contact and hasattr(room.contact, "imported_history_url"):
+            return room.contact.imported_history_url
+        return None
+
     def get_has_history(self, room: Room) -> bool:
         if self.context.get("disable_has_history"):
             return False
@@ -341,6 +346,12 @@ class TransferRoomSerializer(serializers.ModelSerializer):
         except AttributeError:
             return ""
 
+    def get_imported_history_url(self, room: Room):
+        """Retorna a URL do histórico importado do contato"""
+        if room.contact and hasattr(room.contact, "imported_history_url"):
+            return room.contact.imported_history_url
+        return None
+
 
 class RoomContactSerializer(serializers.ModelSerializer):
     user = UserSerializer(many=False, read_only=True)
@@ -510,6 +521,27 @@ class PinRoomSerializer(serializers.Serializer):
 
     # True to pin, False to unpin
     status = serializers.BooleanField(required=True)
+
+
+class RoomNoteSerializer(serializers.ModelSerializer):
+    """
+    Serializer for room notes
+    """
+
+    user = serializers.SerializerMethodField()
+    is_deletable = serializers.ReadOnlyField()
+
+    class Meta:
+        model = RoomNote
+        fields = ["uuid", "created_on", "user", "text", "is_deletable"]
+        read_only_fields = ["uuid", "created_on", "user", "is_deletable"]
+
+    def get_user(self, obj):
+        return {
+            "uuid": str(obj.user.pk),
+            "name": obj.user.full_name,
+            "email": obj.user.email,
+        }
 
 
 class RoomTagSerializer(serializers.ModelSerializer):

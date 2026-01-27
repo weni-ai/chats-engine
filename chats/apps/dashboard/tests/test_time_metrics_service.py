@@ -39,7 +39,6 @@ class TimeMetricsServiceTest(TestCase):
     def test_avg_waiting_time_with_active_rooms_in_queue(self):
         """Test average waiting time calculation for active rooms in queue"""
         now = timezone.now()
-
         room1 = Room.objects.create(
             queue=self.queue,
             contact=self.contact,
@@ -49,7 +48,6 @@ class TimeMetricsServiceTest(TestCase):
         Room.objects.filter(uuid=room1.uuid).update(
             added_to_queue_at=now - timedelta(hours=1)
         )
-
         room2 = Room.objects.create(
             queue=self.queue,
             contact=Contact.objects.create(name="Contact 2", email="contact2@test.com"),
@@ -59,7 +57,6 @@ class TimeMetricsServiceTest(TestCase):
         Room.objects.filter(uuid=room2.uuid).update(
             added_to_queue_at=now - timedelta(hours=2)
         )
-
         filters = Filters(
             start_date=None,
             end_date=None,
@@ -119,7 +116,6 @@ class TimeMetricsServiceTest(TestCase):
         """Test metrics respect date filters"""
         now = timezone.now()
         today = now.strftime("%Y-%m-%d")
-
         room1 = Room.objects.create(
             queue=self.queue,
             contact=self.contact,
@@ -129,7 +125,6 @@ class TimeMetricsServiceTest(TestCase):
         Room.objects.filter(uuid=room1.uuid).update(
             added_to_queue_at=now - timedelta(minutes=10)
         )
-
         filters = Filters(
             start_date=today,
             end_date=today,
@@ -166,7 +161,6 @@ class TimeMetricsServiceTest(TestCase):
         Room.objects.filter(uuid=room1.uuid).update(
             added_to_queue_at=now - timedelta(minutes=10)
         )
-
         room2 = Room.objects.create(
             queue=another_queue,
             contact=Contact.objects.create(name="Contact 2", email="contact2@test.com"),
@@ -176,7 +170,6 @@ class TimeMetricsServiceTest(TestCase):
         Room.objects.filter(uuid=room2.uuid).update(
             added_to_queue_at=now - timedelta(minutes=20)
         )
-
         filters = Filters(
             start_date=None,
             end_date=None,
@@ -208,7 +201,6 @@ class TimeMetricsServiceTest(TestCase):
         Room.objects.filter(uuid=room1.uuid).update(
             added_to_queue_at=now - timedelta(minutes=10)
         )
-
         room2 = Room.objects.create(
             queue=another_queue,
             contact=Contact.objects.create(name="Contact 2", email="contact2@test.com"),
@@ -218,7 +210,6 @@ class TimeMetricsServiceTest(TestCase):
         Room.objects.filter(uuid=room2.uuid).update(
             added_to_queue_at=now - timedelta(minutes=20)
         )
-
         filters = Filters(
             start_date=None,
             end_date=None,

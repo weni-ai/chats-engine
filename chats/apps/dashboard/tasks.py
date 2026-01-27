@@ -25,11 +25,16 @@ from chats.celery import app
 logger = logging.getLogger(__name__)
 
 
-def _strip_tz_value(v):
+def _strip_tz_value(v, project_tz=None):
+    """
+    Convert datetime values to project timezone (or UTC if not provided) and remove tzinfo.
+    This is needed for Excel compatibility.
+    """
+    target_tz = project_tz if project_tz else timezone.utc
     if isinstance(v, pd.Timestamp):
         try:
             if v.tz is not None:
-                return v.tz_convert("UTC").tz_localize(None)
+                return v.tz_convert(target_tz).tz_localize(None)
         except Exception:
             try:
                 return v.tz_localize(None)
@@ -38,25 +43,25 @@ def _strip_tz_value(v):
         return v
     if isinstance(v, datetime):
         if v.tzinfo is not None:
-            return v.astimezone(timezone.utc).replace(tzinfo=None)
+            return v.astimezone(target_tz).replace(tzinfo=None)
         return v
     return v
 
 
-def _strip_tz(obj):
+def _strip_tz(obj, project_tz=None):
     if isinstance(obj, dict):
-        return {k: _strip_tz(v) for k, v in obj.items()}
+        return {k: _strip_tz(v, project_tz) for k, v in obj.items()}
     if isinstance(obj, list):
-        return [_strip_tz(v) for v in obj]
-    return _strip_tz_value(obj)
+        return [_strip_tz(v, project_tz) for v in obj]
+    return _strip_tz_value(obj, project_tz)
 
 
-def _excel_safe_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+def _excel_safe_dataframe(df: pd.DataFrame, project_tz=None) -> pd.DataFrame:
     try:
         for col in df.columns:
-            df[col] = df[col].map(_strip_tz_value)
+            df[col] = df[col].map(lambda v: _strip_tz_value(v, project_tz))
     except Exception:
-        df = df.applymap(_strip_tz_value)
+        df = df.applymap(lambda v: _strip_tz_value(v, project_tz))
     return df
 
 
@@ -221,22 +226,22 @@ def calculate_first_response_time_task(room_uuid: UUID):
         )
 
 
-def _write_model_to_xlsx(writer, model_name: str, model_data: dict):
+def _write_model_to_xlsx(writer, model_name: str, model_data: dict, project_tz=None):
     if not model_data:
         return
-    df_data = _strip_tz(model_data.get("data", []))
+    df_data = _strip_tz(model_data.get("data", []), project_tz)
     df = pd.DataFrame(df_data)
-    df = _excel_safe_dataframe(df)
+    df = _excel_safe_dataframe(df, project_tz)
     if not df.empty:
         df.to_excel(writer, sheet_name=model_name[:31], index=False)
 
 
-def _write_model_to_csv(zf, model_name: str, model_data: dict):
+def _write_model_to_csv(zf, model_name: str, model_data: dict, project_tz=None):
     if not model_data:
         return
-    df_data = _strip_tz(model_data.get("data", []))
+    df_data = _strip_tz(model_data.get("data", []), project_tz)
     df = pd.DataFrame(df_data)
-    df = _excel_safe_dataframe(df)
+    df = _excel_safe_dataframe(df, project_tz)
     if not df.empty:
         zf.writestr(f"{model_name[:31]}.csv", df.to_csv(index=False).encode("utf-8"))
 
@@ -252,6 +257,7 @@ def generate_custom_fields_report(
     from chats.apps.api.v1.dashboard.viewsets import ReportFieldsValidatorViewSet
 
     project = Project.objects.get(uuid=project_uuid)
+    project_tz = project.timezone
     report_generator = ReportFieldsValidatorViewSet()
     report_status = ReportStatus.objects.get(uuid=report_status_id)
 
@@ -272,13 +278,15 @@ def generate_custom_fields_report(
             with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
                 for model_name in ["rooms", "agent_status_logs"]:
                     _write_model_to_xlsx(
-                        writer, model_name, report_data.get(model_name, {})
+                        writer, model_name, report_data.get(model_name, {}), project_tz
                     )
         else:
             zip_buf = io.BytesIO()
             with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
                 for model_name in ["rooms", "agent_status_logs"]:
-                    _write_model_to_csv(zf, model_name, report_data.get(model_name, {}))
+                    _write_model_to_csv(
+                        zf, model_name, report_data.get(model_name, {}), project_tz
+                    )
             output = zip_buf
 
         dt = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
@@ -289,9 +297,48 @@ def generate_custom_fields_report(
 
         if getattr(settings, "REPORTS_SEND_EMAILS", False):
             try:
-                _send_report_email(
-                    project.name,
-                    project.uuid,
+                from chats.core.storages import ReportsStorage
+
+                storage = ReportsStorage()
+                ext = "xlsx" if file_type == "xlsx" else "zip"
+                filename = f"custom_report_{project.uuid}_{dt}.{ext}"
+
+                output.seek(0)
+                file_path = storage.save(filename, output)
+
+                download_url = storage.get_download_url(
+                    file_path, expiration=int(timedelta(days=7).total_seconds())
+                )
+
+                logger.info(
+                    "Report uploaded to S3: %s | report_uuid=%s | url=%s",
+                    file_path,
+                    report_status.uuid,
+                    download_url,
+                )
+
+                subject = f"Custom report for the project {project.name} - {dt}"
+                message_plain, message_html = get_report_ready_email(
+                    project.name, download_url
+                )
+
+                email = EmailMultiAlternatives(
+                    subject=subject,
+                    body=message_plain,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    to=[user_email],
+                )
+                email.attach_alternative(message_html, "text/html")
+                email.extra_headers = {
+                    "X-No-Track": "True",
+                    "X-Track-Click": "no",
+                    "o:tracking-clicks": "no",
+                }
+
+                email.send(fail_silently=False)
+
+                logger.info(
+                    "Report email sent successfully to %s | report_uuid=%s",
                     user_email,
                     output,
                     dt,
@@ -320,7 +367,9 @@ def generate_custom_fields_report(
         raise
 
 
-def _write_xlsx_chunks(writer, sheet_name: str, qs, chunk_size: int, model_cfg: dict):
+def _write_xlsx_chunks(
+    writer, sheet_name: str, qs, chunk_size: int, model_cfg: dict, project_tz=None
+):
     if qs is None:
         pd.DataFrame().to_excel(writer, sheet_name=sheet_name[:31], index=False)
         return
@@ -343,10 +392,10 @@ def _write_xlsx_chunks(writer, sheet_name: str, qs, chunk_size: int, model_cfg: 
             end,
             total,
         )
-        chunk = _strip_tz(list(qs[start:end]))
+        chunk = _strip_tz(list(qs[start:end]), project_tz)
         if not chunk:
             continue
-        df = _excel_safe_dataframe(pd.DataFrame(chunk))
+        df = _excel_safe_dataframe(pd.DataFrame(chunk), project_tz)
         df.to_excel(
             writer,
             sheet_name=sheet_name[:31],
@@ -357,7 +406,7 @@ def _write_xlsx_chunks(writer, sheet_name: str, qs, chunk_size: int, model_cfg: 
         row_offset += len(df)
 
 
-def _write_csv_chunks(csv_buffers: dict, sheet_name: str, qs):
+def _write_csv_chunks(csv_buffers: dict, sheet_name: str, qs, project_tz=None):
     total = qs.count()
     chunk_size = _get_chunk_size(total)
     buf = csv_buffers.get(sheet_name) or io.StringIO()
@@ -373,15 +422,17 @@ def _write_csv_chunks(csv_buffers: dict, sheet_name: str, qs):
             end,
             total,
         )
-        chunk = _strip_tz(list(qs[start:end]))
+        chunk = _strip_tz(list(qs[start:end]), project_tz)
         if not chunk:
             continue
-        df = _excel_safe_dataframe(pd.DataFrame(chunk))
+        df = _excel_safe_dataframe(pd.DataFrame(chunk), project_tz)
         df.to_csv(buf, index=False, header=(row_offset == 0))
         row_offset += len(df)
 
 
-def _process_xlsx_report(view, fields_config, project, available_fields, output):
+def _process_xlsx_report(
+    view, fields_config, project, available_fields, output, project_tz=None
+):
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
         for model_name in ["rooms", "agent_status_logs"]:
             model_cfg = fields_config.get(model_name) or {}
@@ -400,10 +451,14 @@ def _process_xlsx_report(view, fields_config, project, available_fields, output)
                 total_records,
                 chunk_size,
             )
-            _write_xlsx_chunks(writer, model_name, qs, chunk_size, model_cfg)
+            _write_xlsx_chunks(
+                writer, model_name, qs, chunk_size, model_cfg, project_tz
+            )
 
 
-def _process_csv_report(view, fields_config, project, available_fields):
+def _process_csv_report(
+    view, fields_config, project, available_fields, project_tz=None
+):
     csv_buffers = {}
     for model_name in ["rooms", "agent_status_logs"]:
         if model_name in fields_config and model_name in available_fields:
@@ -411,7 +466,9 @@ def _process_csv_report(view, fields_config, project, available_fields):
                 model_name, fields_config[model_name], project, available_fields
             )
             if "queryset" in (query_data or {}):
-                _write_csv_chunks(csv_buffers, model_name, query_data["queryset"])
+                _write_csv_chunks(
+                    csv_buffers, model_name, query_data["queryset"], project_tz
+                )
 
     zip_buf = io.BytesIO()
     with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -442,6 +499,7 @@ def process_pending_reports():
         report.save()
 
     project = report.project
+    project_tz = project.timezone
     fields_config = report.fields_config or {}
     user_email = report.user.email
 
@@ -452,9 +510,13 @@ def process_pending_reports():
 
         if file_type == "xlsx":
             output = io.BytesIO()
-            _process_xlsx_report(view, fields_config, project, available_fields, output)
+            _process_xlsx_report(
+                view, fields_config, project, available_fields, output, project_tz
+            )
         else:
-            output = _process_csv_report(view, fields_config, project, available_fields)
+            output = _process_csv_report(
+                view, fields_config, project, available_fields, project_tz
+            )
 
         dt = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
 
@@ -470,9 +532,48 @@ def process_pending_reports():
 
         if getattr(settings, "REPORTS_SEND_EMAILS", False):
             try:
-                _send_report_email(
-                    project.name,
-                    project.uuid,
+                from chats.core.storages import ReportsStorage
+
+                storage = ReportsStorage()
+                ext = "xlsx" if file_type == "xlsx" else "zip"
+                filename = f"custom_report_{project.uuid}_{dt}.{ext}"
+
+                output.seek(0)
+                file_path = storage.save(filename, output)
+
+                download_url = storage.get_download_url(
+                    file_path, expiration=int(timedelta(days=7).total_seconds())
+                )
+
+                logging.info(
+                    "Report uploaded to S3: %s | report_uuid=%s | url=%s",
+                    file_path,
+                    report.uuid,
+                    download_url,
+                )
+
+                subject = f"Custom report for the project {project.name} - {dt}"
+                message_plain, message_html = get_report_ready_email(
+                    project.name, download_url
+                )
+
+                email = EmailMultiAlternatives(
+                    subject=subject,
+                    body=message_plain,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    to=[user_email],
+                )
+                email.attach_alternative(message_html, "text/html")
+                email.extra_headers = {
+                    "X-No-Track": "True",
+                    "X-Track-Click": "no",
+                    "o:tracking-clicks": "no",
+                }
+
+                email.send(fail_silently=False)
+
+                logging.info(
+                    "Report email sent successfully to %s | report_uuid=%s",
                     user_email,
                     output,
                     dt,

@@ -63,6 +63,7 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
         "waiting_time",
         "duration",
         "first_response_time",
+        "protocol",
     ]
     search_fields = [
         "contact__external_id",

@@ -21,6 +21,9 @@ from chats.core.cache_utils import get_user_id_by_email_cached
 
 from chats.apps.rooms.models import Room
 from chats.core.views import persist_keycloak_user_by_email
+from chats.apps.projects.usecases.status_service import InServiceStatusService
+from chats.apps.rooms.models import Room
+from chats.apps.projects.models import CustomStatus
 
 User = get_user_model()
 
@@ -148,6 +151,50 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
             if user_status.lower() == "online":
                 instance.status = ProjectPermission.STATUS_ONLINE
                 instance.save()
+                
+                # Verificar se deve recriar In-Service
+                # Verificar se tem salas ativas
+                room_count = Room.objects.filter(
+                    user=instance.user,
+                    queue__sector__project=instance.project,
+                    is_active=True,
+                ).count()
+                
+                # Verificar se tem status de prioridade
+                has_other_priority = InServiceStatusService.has_priority_status(
+                    instance.user, instance.project
+                )
+                
+                # Se tem salas e não tem outros status prioritários, criar In-Service
+                if room_count > 0 and not has_other_priority:
+                    in_service_type = InServiceStatusService.get_or_create_status_type(
+                        instance.project
+                    )
+                    
+                    # Verificar se já não existe um In-Service ativo
+                    existing_in_service = CustomStatus.objects.filter(
+                        user=instance.user,
+                        status_type=in_service_type,
+                        is_active=True,
+                        project=instance.project
+                    ).exists()
+                    
+                    if not existing_in_service:
+                        CustomStatus.objects.create(
+                            user=instance.user,
+                            status_type=in_service_type,
+                            is_active=True,
+                            project=instance.project,
+                            break_time=0,
+                        )
+
+                # Log status change
+                from chats.apps.projects.tasks import log_agent_status_change
+                log_agent_status_change.delay(
+                    agent_email=instance.user.email,
+                    project_uuid=str(instance.project.uuid),
+                    status="ONLINE",
+                )
 
                 # Log status change
                 from chats.apps.projects.tasks import log_agent_status_change

@@ -161,7 +161,6 @@ class WeniOIDCAuthenticationBackend(OIDCAuthenticationBackend):
         if last_name:
             user.last_name = last_name
         user.save()
-
         invalidate_cached_user(email)
         check_module_permission(claims, user)
 

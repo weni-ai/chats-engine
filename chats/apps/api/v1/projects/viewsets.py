@@ -60,6 +60,8 @@ from chats.apps.sectors.models import Sector
 
 logger = logging.getLogger(__name__)
 
+logger = logging.getLogger(__name__)
+
 
 class ProjectViewset(
     mixins.ListModelMixin,
@@ -703,6 +705,16 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                 in_service_status.save(update_fields=["is_active", "break_time"])
 
             serializer.save(user=user)
+            
+            # Log status change
+            from chats.apps.projects.tasks import log_agent_status_change
+            log_agent_status_change.delay(
+                agent_email=user.email,
+                project_uuid=str(project.uuid),
+                status="OFFLINE",
+                custom_status_name=status_type.name,
+                custom_status_type_uuid=str(status_type.uuid),
+            )
 
             # Log status change
             from chats.apps.projects.tasks import log_agent_status_change
@@ -738,8 +750,16 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def close_status(self, request, pk=None):
+        print("🔍 DEBUG: close_status foi chamado!")
+
         try:
             instance = CustomStatus.objects.get(pk=pk)
+            print(f"🔍 DEBUG: close_status chamado para {instance.user}")
+
+            print(f"🔍 DEBUG: request.data = {request.data}")
+            print(
+                f"🔍 DEBUG: is_active do request = {request.data.get('is_active', 'NÃO ENVIADO')}"
+            )
 
             last_active_status = (
                 CustomStatus.objects.filter(
@@ -776,6 +796,14 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                         raise serializers.ValidationError(
                             {"status": "Can't update user status in project."}
                         )
+                    
+                    # Log status change
+                    from chats.apps.projects.tasks import log_agent_status_change
+                    log_agent_status_change.delay(
+                        agent_email=instance.user.email,
+                        project_uuid=str(instance.status_type.project.uuid),
+                        status="ONLINE",
+                    )
 
                     # Log status change
                     from chats.apps.projects.tasks import log_agent_status_change

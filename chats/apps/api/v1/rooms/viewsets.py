@@ -12,6 +12,7 @@ from django.db.models import (
     Q,
     Subquery,
     When,
+    Count,
 )
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -39,6 +40,7 @@ from chats.apps.ai_features.history_summary.models import (
 )
 from chats.apps.api.utils import verify_user_room
 from chats.apps.api.v1 import permissions as api_permissions
+from chats.apps.api.v1.rooms.permissions import RoomNotePermission
 from chats.apps.api.v1.internal.rest_clients.openai_rest_client import OpenAIClient
 from chats.apps.api.v1.msgs.serializers import ChatCompletionSerializer
 from chats.apps.api.v1.rooms import filters as room_filters
@@ -254,67 +256,60 @@ class RoomViewset(
         return self._get_paginated_response(annotated_qs)
 
     def _list_with_optimized_pin_order(self, qs, request, project):
-        target_pins_queryset = RoomPin.objects.filter(
-            room__queue__sector__project=project,
-        )
-
+        # Determine which user we're filtering pins for
         if user_email := request.query_params.get("email"):
-            target_pins_queryset = target_pins_queryset.filter(user__email=user_email)
+            pins_query = {
+                "room__queue__sector__project": project,
+                "user__email": user_email,
+            }
         else:
-            target_pins_queryset = target_pins_queryset.filter(user=request.user)
+            pins_query = {
+                "room__queue__sector__project": project,
+                "user": request.user,
+            }
 
-        annotation_pins_queryset = RoomPin.objects.filter(
-            room__queue__sector__project=project,
-        )
-        if user_email:
-            annotation_pins_queryset = annotation_pins_queryset.filter(
-                user__email=user_email
-            )
-        else:
-            annotation_pins_queryset = annotation_pins_queryset.filter(
-                user=request.user
-            )
+        # CRITICAL: Filter FIRST, then get pinned rooms
+        # This avoids annotating thousands of unnecessary rooms
+        filtered_qs = self.filter_queryset(qs)
 
-        pin_subquery = annotation_pins_queryset.filter(room=OuterRef("pk")).order_by(
-            "-created_on"
-        )
-        target_pin_subquery = target_pins_queryset.filter(room=OuterRef("pk")).order_by(
-            "-created_on"
+        # Get pinned room IDs efficiently
+        pinned_room_ids = set(
+            RoomPin.objects.filter(**pins_query).values_list("room_id", flat=True)
         )
 
-        annotated_qs = qs.annotate(
+        # Get filtered room IDs
+        filtered_room_ids = set(filtered_qs.values_list("pk", flat=True))
+
+        # Combine both sets: rooms that match filters OR are pinned
+        all_room_ids = filtered_room_ids | pinned_room_ids
+
+        # Get secondary sort from filtered queryset
+        secondary_sort = list(filtered_qs.query.order_by or self.ordering or [])
+
+        # Create pin subquery for annotations
+        pin_subquery = RoomPin.objects.filter(
+            room=OuterRef("pk"),
+            **pins_query,
+        ).order_by("-created_on")
+
+        # NOW annotate only the rooms we need
+        annotated_qs = qs.filter(pk__in=all_room_ids).annotate(
             is_pinned=Exists(pin_subquery),
             pin_created_on=Subquery(
                 pin_subquery.values("created_on")[:1],
                 output_field=DateTimeField(),
             ),
-            list_is_pinned=Exists(target_pin_subquery),
-            list_pin_created_on=Subquery(
-                target_pin_subquery.values("created_on")[:1],
-                output_field=DateTimeField(),
-            ),
         )
 
-        filtered_qs = self.filter_queryset(annotated_qs)
-        filtered_room_ids = filtered_qs.values("pk").order_by()
-
-        secondary_sort = list(filtered_qs.query.order_by or self.ordering or [])
-
-        pinned_room_subquery = target_pins_queryset.values("room_id")
-
-        combined_qs = annotated_qs.filter(
-            Q(pk__in=Subquery(filtered_room_ids))
-            | Q(pk__in=Subquery(pinned_room_subquery))
-        ).distinct()
-
+        # Apply ordering
         if secondary_sort:
-            combined_qs = combined_qs.order_by(
+            annotated_qs = annotated_qs.order_by(
                 "-is_pinned", "-pin_created_on", *secondary_sort
             )
         else:
-            combined_qs = combined_qs.order_by("-is_pinned", "-pin_created_on")
+            annotated_qs = annotated_qs.order_by("-is_pinned", "-pin_created_on")
 
-        return self._get_paginated_response(combined_qs)
+        return self._get_paginated_response(annotated_qs)
 
     def _get_paginated_response(self, queryset):
         page = self.paginate_queryset(queryset)
@@ -371,6 +366,9 @@ class RoomViewset(
                 ).values_list("uuid", flat=True)
             ]
 
+            print(f"DEBUG tags: {tags}")
+            print(f"DEBUG sector_tags: {sector_tags}")
+
             if set(tags) - set(sector_tags):
                 raise ValidationError(
                     {"tags": ["Tag not found for the room's sector"]},
@@ -391,9 +389,7 @@ class RoomViewset(
             permission = instance.project.get_permission(request.user)
             if not permission or not permission.is_admin:
                 raise PermissionDenied(
-                    detail=_(
-                        "Agents cannot close queued rooms in this sector."
-                    ),
+                    detail=_("Agents cannot close queued rooms in this sector."),
                     code="queued_room_close_disabled",
                 )
 
@@ -885,6 +881,53 @@ class RoomViewset(
             return Response({"detail": str(e)}, status=status.HTTP_403_FORBIDDEN)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="room_note",
+        serializer_class=RoomNoteSerializer,
+    )
+    def create_note(self, request, pk=None):
+        """
+        Create a note for the room
+        """
+        room = self.get_object()
+
+        # Verify user has access to the room
+        if not verify_user_room(room, request.user):
+            raise PermissionDenied(
+                "You don't have permission to add notes to this room"
+            )
+
+        # Room must be active
+        if not room.is_active:
+            raise ValidationError({"detail": "Cannot add notes to closed rooms"})
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # Create a blank message to attach the internal note
+        msg = Message.objects.create(
+            room=room,
+            user=request.user,
+            contact=None,
+            text="",
+        )
+
+        # Create the note attached to the message
+        note = RoomNote.objects.create(
+            room=room,
+            user=request.user,
+            text=serializer.validated_data["text"],
+            message=msg,
+        )
+
+        # Notify message creation for clients listening to messages
+        msg.notify_room("create", True)
+
+        # Return serialized note
+        return Response(RoomNoteSerializer(note).data, status=status.HTTP_201_CREATED)
 
     @action(
         detail=True,

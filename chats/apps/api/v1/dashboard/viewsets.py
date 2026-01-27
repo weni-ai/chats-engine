@@ -20,6 +20,7 @@ from chats.apps.api.v1.dashboard.repository import (
     ORMRoomsDataRepository,
     RoomsCacheRepository,
 )
+from chats.apps.projects.dates import parse_date_with_timezone
 from chats.apps.api.v1.dashboard.serializers import (
     DashboardAgentsSerializer,
     DashboardRawDataSerializer,
@@ -441,6 +442,11 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         project = self.get_object()
         params = get_filters_from_query_params(request.query_params)
 
+        print(
+            "[time_metrics_for_analysis] request.query_params: ", request.query_params
+        )
+        print("[time_metrics_for_analysis] params: ", params)
+
         filters = Filters(
             start_date=params.get("start_date"),
             end_date=params.get("end_date"),
@@ -630,9 +636,9 @@ class ReportFieldsValidatorViewSet(APIView):
         if not (start_date and end_date):
             return queryset
 
-        tz = project.timezone
-        start_dt = pendulum.parse(start_date).replace(tzinfo=tz)
-        end_dt = pendulum.parse(end_date + " 23:59:59").replace(tzinfo=tz)
+        tz_str = str(project.timezone)
+        start_dt = parse_date_with_timezone(start_date, tz_str)
+        end_dt = parse_date_with_timezone(end_date, tz_str, is_end_date=True)
 
         open_chats = field_data.get("open_chats")
         closed_chats = field_data.get("closed_chats")
@@ -684,7 +690,6 @@ class ReportFieldsValidatorViewSet(APIView):
                 tags_list=ArrayAgg("tags__name", distinct=True)
             )
             query_fields = ["tags_list" if f == "tags" else f for f in query_fields]
-
         return queryset.values(*query_fields)
 
     def _apply_agent_status_logs_filters(self, queryset, field_data, project):

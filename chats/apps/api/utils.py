@@ -4,6 +4,7 @@ from typing import List
 
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+
 from rest_framework.authtoken.models import Token
 
 from chats.apps.accounts.models import User
@@ -11,6 +12,9 @@ from chats.apps.api.v1.dashboard.dto import RoomData
 from chats.apps.api.v1.dashboard.serializers import DashboardRoomSerializer
 from chats.apps.contacts.models import Contact
 from chats.apps.msgs.models import ChatMessageReplyIndex, Message
+
+logger = logging.getLogger(__name__)
+
 
 logger = logging.getLogger(__name__)
 

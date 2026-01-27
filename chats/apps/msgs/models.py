@@ -77,6 +77,12 @@ class Message(BaseModelWithManualCreatedOn):
         _("message is delivered"), max_length=50, blank=True, null=True
     )
 
+    status = models.JSONField(
+        _("message status"),
+        blank=True,
+        null=True,
+    )
+
     class Meta:
         verbose_name = "Message"
         verbose_name_plural = "Messages"

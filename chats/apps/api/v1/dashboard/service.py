@@ -271,6 +271,8 @@ class TimeMetricsService:
             & Q(ended_at__lte=filters.end_date)
         )
 
+        print("[get_time_metrics_for_analysis] filters: ", filters)
+
         if filters.agent:
             rooms_filter &= Q(user=filters.agent)
 
@@ -288,6 +290,8 @@ class TimeMetricsService:
             if not isinstance(filters.tag, list):
                 filters.tag = [filters.tag]
             rooms_filter &= Q(tags__uuid__in=filters.tag)
+
+        print("[get_time_metrics_for_analysis] rooms_filter: ", rooms_filter)
 
         max_waiting_time = Room.objects.filter(rooms_filter).aggregate(
             Max("metric__waiting_time")

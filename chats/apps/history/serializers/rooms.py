@@ -68,6 +68,15 @@ class RoomBasicValuesSerializer(serializers.Serializer):
     ended_at = serializers.DateTimeField()
 
 
+class RoomBasicSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Room
+        fields = [
+            "uuid",
+            "ended_at",
+        ]
+
+
 class RoomDetailSerializer(serializers.ModelSerializer):
     user = UserNameEmailSerializer(many=False, read_only=True)
     contact = serializers.SerializerMethodField()

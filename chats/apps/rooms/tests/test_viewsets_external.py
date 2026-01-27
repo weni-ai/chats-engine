@@ -4,17 +4,18 @@ from django.urls import reverse
 from rest_framework import status
 from django.test import override_settings
 from rest_framework.test import APITestCase
-from rest_framework.response import Response
-from chats.apps.contacts.models import Contact
-from chats.apps.projects.models.models import Project, RoomRoutingType
-from chats.apps.queues.models import Queue, User
-from chats.apps.rooms.models import Room
-from chats.apps.sectors.models import Sector
 from unittest import mock
+from chats.apps.accounts.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.models import Permission
 
 from chats.apps.api.utils import create_user_and_token
+from chats.apps.queues.models import Queue
+from chats.apps.rooms.models import Room
+from rest_framework.response import Response
+from chats.apps.contacts.models import Contact
+from chats.apps.projects.models.models import Project, RoomRoutingType
+from chats.apps.sectors.models import Sector
 
 
 class RoomsExternalTests(APITestCase):

@@ -98,6 +98,10 @@ class FlowsQueueMixin:
             headers=self.headers,
         )
 
+        if response.status_code == status.HTTP_404_NOT_FOUND:
+            url = f"{self.base_url}/api/v2/internals/ticketers/{sector_uuid}/queues/{uuid}/"
+            LOGGER.error("Queue %s not found on Flows. URL: %s", uuid, url)
+
         if response.status_code not in [
             status.HTTP_200_OK,
             status.HTTP_201_CREATED,
@@ -282,6 +286,7 @@ class FlowRESTClient(
         return flows
 
     def start_flow(self, project, data):
+        print("data", data)
         response = retry_request_and_refresh_flows_auth_token(
             project=project,
             request_method=requests.post,
@@ -289,6 +294,7 @@ class FlowRESTClient(
             json=data,
             headers=self.project_headers(project.flows_authorization),
         )
+        print(f"🔍 DEBUG start_flow(): Response: {response.json()}")
         try:
             return response.json()
         except ValueError as e:

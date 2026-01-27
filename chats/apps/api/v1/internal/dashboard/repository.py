@@ -17,9 +17,15 @@ from django.db.models import (
 )
 from django.db.models.functions import Coalesce, Concat, Extract, JSONObject
 from django.utils import timezone
-from pendulum.parser import parse as pendulum_parse
-
+from django.db.models import QuerySet
 from chats.apps.accounts.models import User
+from chats.apps.api.v1.dashboard.dto import get_admin_domains_exclude_filter
+from chats.apps.projects.models import ProjectPermission
+from chats.apps.projects.models.models import CustomStatus, Project
+from chats.apps.rooms.models import Room
+from chats.apps.csat.models import CSATSurvey
+
+
 from chats.apps.api.v1.dashboard.dto import get_admin_domains_exclude_filter
 from chats.apps.api.v1.internal.dashboard.dto import (
     Filters,
@@ -27,6 +33,11 @@ from chats.apps.api.v1.internal.dashboard.dto import (
     CSATRatingCount,
     CSATRatings,
 )
+
+from chats.apps.api.v1.internal.dashboard.dto import CSATScoreGeneral, Filters
+from chats.apps.projects.dates import parse_date_with_timezone
+from django.db.models.functions import Coalesce
+from django.db.models import Exists
 from chats.apps.projects.dates import parse_date_with_timezone
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.projects.models.models import CustomStatus, Project
@@ -72,8 +83,11 @@ class AgentRepository:
         if filters.tag:
             rooms_filter["rooms__tags__in"] = filters.tag.split(",")
         if filters.start_date and filters.end_date:
-            start_time = pendulum_parse(filters.start_date, tzinfo=tz)
-            end_time = pendulum_parse(filters.end_date + " 23:59:59", tzinfo=tz)
+            tz_str = str(project.timezone)
+            start_time = parse_date_with_timezone(filters.start_date, tz_str)
+            end_time = parse_date_with_timezone(
+                filters.end_date, tz_str, is_end_date=True
+            )
             opened_rooms["rooms__is_active"] = True
             opened_rooms["rooms__created_on__lte"] = end_time
 
@@ -99,13 +113,14 @@ class AgentRepository:
         if filters.agent:
             agents_query = agents_query.filter(email=filters.agent)
 
+        tz_str = str(project.timezone)
         custom_status_start_date = (
-            pendulum_parse(filters.start_date, tzinfo=tz)
+            parse_date_with_timezone(filters.start_date, tz_str)
             if filters.start_date
             else initial_datetime
         )
         custom_status_end_date = (
-            pendulum_parse(filters.end_date + " 23:59:59", tzinfo=tz)
+            parse_date_with_timezone(filters.end_date, tz_str, is_end_date=True)
             if filters.end_date
             else timezone.now()
         )
@@ -277,15 +292,26 @@ class AgentRepository:
             rooms_filter["rooms__tags__in"] = filters.tag.split(",")
 
         if filters.start_date and filters.end_date:
-            start_time = pendulum_parse(filters.start_date, tzinfo=tz)
-            end_time = pendulum_parse(filters.end_date + " 23:59:59", tzinfo=tz)
+            tz_str = str(project.timezone)
+            start_time = parse_date_with_timezone(filters.start_date, tz_str)
+            end_time = parse_date_with_timezone(
+                filters.end_date, tz_str, is_end_date=True
+            )
             rooms_filter["rooms__created_on__range"] = [start_time, end_time]
             rooms_filter["rooms__is_active"] = False
             closed_rooms["rooms__ended_at__range"] = [start_time, end_time]
+
+            # Filter for CustomStatus
+            custom_status_start = start_time
+            custom_status_end = end_time
         else:
             closed_rooms["rooms__ended_at__gte"] = initial_datetime
             opened_rooms["rooms__is_active"] = True
             closed_rooms["rooms__is_active"] = False
+
+            # Default: from start of day until now
+            custom_status_start = initial_datetime
+            custom_status_end = timezone.now()
 
         if filters.agent:
             rooms_filter["rooms__user"] = filters.agent
@@ -299,6 +325,8 @@ class AgentRepository:
             CustomStatus.objects.filter(
                 user=OuterRef("email"),
                 status_type__project=project,
+                created_on__gte=custom_status_start,
+                created_on__lte=custom_status_end,
             )
             .values("user")
             .annotate(
@@ -319,11 +347,15 @@ class AgentRepository:
 
         if not filters.is_weni_admin:
             agents_query = agents_query.exclude(get_admin_domains_exclude_filter())
-        if filters.agent:
-            agents_query = agents_query.filter(email=filters.agent)
 
         if agents_filter:
             agents_query = agents_query.filter(**agents_filter).distinct()
+
+        agents_filters_custom = Q(project_permissions__project=project) & Q(
+            is_active=True
+        )
+        if filters.agent:
+            agents_filters_custom &= Q(email=filters.agent)
 
         has_active_custom_status_subquery_2 = Exists(
             CustomStatus.objects.filter(
@@ -334,7 +366,7 @@ class AgentRepository:
         )
 
         agents_query = (
-            agents_query.filter(project_permissions__project=project, is_active=True)
+            agents_query.filter(agents_filters_custom)
             .annotate(
                 status=Subquery(project_permission_queryset),
                 has_active_custom_status=has_active_custom_status_subquery_2,
@@ -525,6 +557,7 @@ class AgentRepository:
 
         if filters.agent:
             agents = agents.filter(email=filters.agent)
+
         return agents
 
     def _get_csat_rooms_query(self, filters: Filters, project: Project) -> dict:
@@ -601,6 +634,8 @@ class CSATRepository:
                     filter_value = [filter_value]
 
                 csat_query[field_name] = filter_value
+
+        print(f"[csat_ratings repository] csat_query: {csat_query}")
 
         csat_ratings = (
             CSATSurvey.objects.filter(**csat_query)

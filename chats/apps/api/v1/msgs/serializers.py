@@ -22,6 +22,7 @@ TODO: Refactor these serializers into less classes
 
 class MessageMediaSimpleSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField(read_only=True)
+    transcription = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = MessageMedia
@@ -31,6 +32,7 @@ class MessageMediaSimpleSerializer(serializers.ModelSerializer):
             "media_file",
             "url",
             "created_on",
+            "transcription",
         ]
         ref_name = "V1MessageMediaSimpleSerializer"
         extra_kwargs = {
@@ -46,6 +48,34 @@ class MessageMediaSimpleSerializer(serializers.ModelSerializer):
             return media.message.get_sender().full_name
         except AttributeError:
             return ""
+
+    def get_transcription(self, media: MessageMedia):
+        """
+        Get transcription data for audio media.
+        Returns text and feedback for the current user.
+        """
+        try:
+            transcription = media.transcription
+        except Exception:
+            return None
+
+        if not transcription or transcription.status != "DONE":
+            return None
+
+        result = {"text": transcription.text}
+
+        # Get user feedback if available
+        request = self.context.get("request")
+        if request and hasattr(request, "user") and request.user.is_authenticated:
+            feedback = transcription.feedbacks.filter(user=request.user).first()
+            if feedback:
+                result["feedback"] = {"liked": feedback.liked}
+            else:
+                result["feedback"] = {"liked": None}
+        else:
+            result["feedback"] = {"liked": None}
+
+        return result
 
 
 class MessageMediaSerializer(serializers.ModelSerializer):
@@ -218,6 +248,7 @@ class MessageSerializer(BaseMessageSerializer):
             "is_delivered",
             "internal_note",
             "is_automatic_message",
+            "internal_note",
         ]
         read_only_fields = [
             "uuid",
@@ -236,7 +267,12 @@ class MessageSerializer(BaseMessageSerializer):
 
         try:
             replied_id = context.get("id")
-            replied_msg = ChatMessageReplyIndex.objects.get(external_id=replied_id)
+            try:
+                replied_msg = ChatMessageReplyIndex.objects.get(external_id=replied_id)
+                print("replied_msg", replied_msg.message.uuid)
+                print("replied_msg", replied_msg.message.text)
+            except ChatMessageReplyIndex.DoesNotExist:
+                return None
 
             result = {
                 "uuid": str(replied_msg.message.uuid),
@@ -269,14 +305,11 @@ class MessageSerializer(BaseMessageSerializer):
                 }
 
             return result
-        except ChatMessageReplyIndex.DoesNotExist:
-            # Replied message not found in index - expected scenario for projects that dont use whatsapp.
-            return None
-        except Exception as error:
-            LOGGER.error("Error getting replied message: %s", error)
+        except ChatMessage.DoesNotExist:
             return None
 
     def get_internal_note(self, obj):
+        # Returns the internal note attached to this message (if any)
         try:
             note = obj.internal_note
         except RoomNote.DoesNotExist:

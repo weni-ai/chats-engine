@@ -6,9 +6,9 @@ from chats.apps.api.v1.dashboard.dto import should_exclude_admin_domains
 from chats.apps.api.v1.internal.dashboard.serializers import (
     DashboardAgentsSerializer,
     DashboardCustomAgentStatusSerializer,
-    DashboardCSATRatingsSerializer,
     DashboardCSATScoreByAgentsSerializer,
     DashboardCSATScoreGeneralSerializer,
+    DashboardCSATRatingsSerializer,
     DashboardCustomStatusSerializer,
 )
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
@@ -37,6 +37,10 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         project = self.get_object()
         params = request.query_params.dict()
 
+        print(f"🔥 DEBUG VIEWSET: params completos = {params}")
+        print(f"🔥 DEBUG VIEWSET: agent param = '{params.get('agent')}'")
+        print(f"🔥 DEBUG VIEWSET: request.query_params = {dict(request.query_params)}")
+
         filters = Filters(
             start_date=params.get("start_date"),
             end_date=params.get("end_date"),
@@ -48,6 +52,8 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
             is_weni_admin=should_exclude_admin_domains(params.get("user_request", "")),
             ordering=params.get("ordering"),
         )
+
+        print(f"🔥 DEBUG VIEWSET: filters.agent = '{filters.agent}'")
 
         agents_service = AgentsService()
         agents_data = agents_service.get_agents_data(filters, project)
@@ -85,6 +91,75 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         )
 
         return Response({"results": agents.data}, status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["GET"],
+        url_name="csat_score_by_agents",
+        url_path="csat-score-by-agents",
+    )
+    def csat_score_by_agents(self, request, *args, **kwargs):
+        """CSAT score by agents for the project"""
+        project = self.get_object()
+        params = request.query_params.dict()
+        filters = Filters(
+            start_date=params.get("start_date"),
+            end_date=params.get("end_date"),
+            agent=params.get("agent"),
+            sector=request.query_params.getlist("sectors", []),
+            tag=params.get("tags"),
+            tags=request.query_params.getlist("tags", []),
+            queue=params.get("queue"),
+            queues=request.query_params.getlist("queues", []),
+            user_request=params.get("user_request", ""),
+            is_weni_admin=should_exclude_admin_domains(params.get("user_request", "")),
+            ordering=params.get("ordering"),
+        )
+
+        agents_service = AgentsService()
+        general_csat_metrics, agents_csat_metrics = (
+            agents_service.get_agents_csat_score(filters, project)
+        )
+
+        agents_csat_metrics = agents_csat_metrics.order_by("-avg_rating")
+        paginator = CustomCursorPagination()
+        paginator.ordering = "-avg_rating"
+
+        # Apply pagination
+        paginated_agents = paginator.paginate_queryset(
+            agents_csat_metrics, request, view=self
+        )
+
+        if paginated_agents is not None:
+            # If pagination is applied, return paginated response
+            serializer = DashboardCSATScoreByAgentsSerializer(
+                paginated_agents, many=True
+            )
+            paginated_response = paginator.get_paginated_response(serializer.data)
+
+            return Response(
+                {
+                    "general": DashboardCSATScoreGeneralSerializer(
+                        general_csat_metrics
+                    ).data,
+                    **paginated_response.data,
+                },
+                status.HTTP_200_OK,
+            )
+        else:
+            # If no pagination, return simple response
+            serializer = DashboardCSATScoreByAgentsSerializer(
+                agents_csat_metrics, many=True
+            )
+            return Response(
+                {
+                    "general": DashboardCSATScoreGeneralSerializer(
+                        general_csat_metrics
+                    ).data,
+                    "results": serializer.data,
+                },
+                status.HTTP_200_OK,
+            )
 
     @action(
         detail=True,
@@ -156,72 +231,3 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         )
 
         return Response({"results": serializer.data}, status.HTTP_200_OK)
-
-    @action(
-        detail=True,
-        methods=["GET"],
-        url_name="csat_score_by_agents",
-        url_path="csat-score-by-agents",
-    )
-    def csat_score_by_agents(self, request, *args, **kwargs):
-        """CSAT score by agents for the project"""
-        project = self.get_object()
-        params = request.query_params.dict()
-        filters = Filters(
-            start_date=params.get("start_date"),
-            end_date=params.get("end_date"),
-            agent=params.get("agent"),
-            sector=request.query_params.getlist("sectors", []),
-            tag=params.get("tags"),
-            tags=request.query_params.getlist("tags", []),
-            queue=params.get("queue"),
-            queues=request.query_params.getlist("queues", []),
-            user_request=params.get("user_request", ""),
-            is_weni_admin=should_exclude_admin_domains(params.get("user_request", "")),
-            ordering=params.get("ordering"),
-        )
-
-        agents_service = AgentsService()
-        general_csat_metrics, agents_csat_metrics = (
-            agents_service.get_agents_csat_score(filters, project)
-        )
-
-        agents_csat_metrics = agents_csat_metrics.order_by("-avg_rating")
-        paginator = CustomCursorPagination()
-        paginator.ordering = "-avg_rating"
-
-        # Apply pagination
-        paginated_agents = paginator.paginate_queryset(
-            agents_csat_metrics, request, view=self
-        )
-
-        if paginated_agents is not None:
-            # If pagination is applied, return paginated response
-            serializer = DashboardCSATScoreByAgentsSerializer(
-                paginated_agents, many=True
-            )
-            paginated_response = paginator.get_paginated_response(serializer.data)
-
-            return Response(
-                {
-                    "general": DashboardCSATScoreGeneralSerializer(
-                        general_csat_metrics
-                    ).data,
-                    **paginated_response.data,
-                },
-                status.HTTP_200_OK,
-            )
-        else:
-            # If no pagination, return simple response
-            serializer = DashboardCSATScoreByAgentsSerializer(
-                agents_csat_metrics, many=True
-            )
-            return Response(
-                {
-                    "general": DashboardCSATScoreGeneralSerializer(
-                        general_csat_metrics
-                    ).data,
-                    "results": serializer.data,
-                },
-                status.HTTP_200_OK,
-            )

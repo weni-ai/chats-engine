@@ -1,4 +1,5 @@
 import json
+import traceback
 import logging
 from typing import TYPE_CHECKING
 
@@ -77,11 +78,9 @@ class HistorySummaryService:
             ).select_related("contact", "user")
 
             conversation = []
-
             for message in messages:
                 is_contact = message.contact is not None
                 sender = "user" if is_contact else "agent"
-
                 conversation.append(
                     {
                         "sender": sender,
@@ -127,7 +126,10 @@ class HistorySummaryService:
         except Exception as e:
             history_summary.update_status(HistorySummaryStatus.UNAVAILABLE)
             logger.error(
-                "Error generating history summary for room %s: %s", room.uuid, e
+                "Error generating history summary for room %s: %s\n%s",
+                room.uuid,
+                e,
+                traceback.format_exc(),
             )
             capture_message(
                 "Error generating history summary for room %s: %s" % (room.uuid, e),

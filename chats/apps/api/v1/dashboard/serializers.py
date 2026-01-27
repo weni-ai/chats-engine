@@ -9,6 +9,7 @@ from django_redis import get_redis_connection
 from rest_framework import serializers
 
 from chats.apps.projects.models import ProjectPermission
+from chats.apps.projects.dates import parse_date_with_timezone
 from chats.apps.rooms.models import Room
 
 
@@ -30,14 +31,13 @@ def dashboard_general_data(context: dict, project):
     rooms_query = Room.objects
 
     if context.get("start_date") and context.get("end_date"):
-        start_time = pendulum.parse(context.get("start_date")).replace(tzinfo=tz)
-        end_time = pendulum.parse(context.get("end_date") + " 23:59:59").replace(
-            tzinfo=tz
-        )
+        tz_str = str(project.timezone)
+        start_time = parse_date_with_timezone(context.get("start_date"), tz_str)
+        end_time = parse_date_with_timezone(context.get("end_date"), tz_str, is_end_date=True)
 
         rooms_filter["created_on__range"] = [
             start_time,
-            end_time,  # TODO: USE DATETIME IN END DATE
+            end_time,
         ]
         active_chat_filter["is_active"] = False
         active_chat_filter["user__isnull"] = False

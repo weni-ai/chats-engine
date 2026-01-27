@@ -3,6 +3,9 @@ from django.contrib.auth import get_user_model
 from rest_framework import exceptions, serializers, status
 from timezone_field.rest_framework import TimeZoneSerializerField
 
+from chats.apps.api.v1.internal.rest_clients.connect_rest_client import (
+    ConnectRESTClient,
+)
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.api.v1.internal.users.serializers import UserSerializer
 from chats.apps.projects.models import Project, ProjectPermission
@@ -94,11 +97,9 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
             }
             self._queue_data = {"uuid": str(queue.pk), "name": queue.name}
 
-            response_queue = flows_client.create_queue(
-                uuid=str(queue.uuid),
-                project_uuid=str(instance.uuid),
-                name=queue.name,
-                sector_uuid=str(queue.sector.uuid),
+            flow_client = FlowRESTClient()
+            response_flows = flow_client.create_queue(
+                str(queue.uuid), queue.name, str(queue.sector.uuid)
             )
             status_list = [
                 status.HTTP_200_OK,
@@ -106,13 +107,10 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
             ]
 
             if (response_sector.status_code not in status_list) or (
-                response_queue.status_code not in status_list
+                response_flows.status_code not in status_list
             ):
                 instance.delete()
-                error_message = (
-                    f"[{response_sector.status_code}] Sector response: {response_sector.content}. "
-                    f"[{response_queue.status_code}] Queue response: {response_queue.content}."
-                )
+                error_message = f"[{response_sector.status_code}] Sector response: {response_sector.content}. [{response_flows.status_code}] Queue response: {response_flows.content}."  # NOQA
                 raise exceptions.APIException(detail=error_message)
 
         return instance

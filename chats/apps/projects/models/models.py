@@ -12,6 +12,9 @@ from django.db.models import Q, UniqueConstraint
 from django.utils.translation import gettext_lazy as _
 from requests.exceptions import JSONDecodeError
 from timezone_field import TimeZoneField
+from django.utils import timezone
+
+import logging
 
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.api.v1.internal.rest_clients.integrations_rest_client import (
@@ -23,6 +26,7 @@ from chats.utils.websockets import send_channels_group
 from .permission_managers import UserPermissionsManager
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 if TYPE_CHECKING:
@@ -99,6 +103,11 @@ class Project(BaseConfigurableModel, BaseModel):
             "Whether to route rooms using the queue priority or general routing"
         ),
     )
+    internal_flags = models.JSONField(
+        _("Internal flags"),
+        default=dict,
+        help_text=_("Internal flags for the project"),
+    )
 
     class Meta:
         verbose_name = _("Project")
@@ -127,6 +136,14 @@ class Project(BaseConfigurableModel, BaseModel):
             return config.get("agents_can_see_queue_history", True)
         except AttributeError:
             return True
+
+    @property
+    def can_close_chats_in_queue(self) -> bool:
+        try:
+            config = self.get_cached_config()
+            return config.get("can_close_chats_in_queue", False)
+        except AttributeError:
+            return False
 
     @property
     def routing_option(self):
@@ -213,6 +230,18 @@ class Project(BaseConfigurableModel, BaseModel):
             return token
         return self.set_chat_gpt_auth_token(user_login_token)
 
+    def get_internal_flag(self, flag_name: str) -> bool:
+        internal_flags = self.internal_flags or {}
+        return internal_flags.get(flag_name, False)
+
+    def set_internal_flag(self, flag_name: str, value: bool):
+        internal_flags = self.internal_flags or {}
+        internal_flags[flag_name] = value
+
+        self.internal_flags = internal_flags
+
+        self.save(update_fields=["internal_flags"])
+
     @property
     def admin_permissions(self):
         return self.permissions.filter(role=ProjectPermission.ROLE_ADMIN)
@@ -238,6 +267,10 @@ class Project(BaseConfigurableModel, BaseModel):
     @property
     def use_queue_priority_routing(self):
         return self.room_routing_type == RoomRoutingType.QUEUE_PRIORITY
+
+    @property
+    def is_copilot_active(self):
+        return self.get_internal_flag("is_copilot_active")
 
     def get_sectors(self, user, custom_filters: dict = {}):
         user_permission = self.get_permission(user)
@@ -745,7 +778,6 @@ class AgentStatusLog(BaseModel):
         on_delete=models.CASCADE,
         to_field="email",
     )
-
     project = models.ForeignKey(
         "projects.Project",
         related_name="agent_status_logs",

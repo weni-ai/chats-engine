@@ -215,6 +215,28 @@ class TestRoomModel(TransactionTestCase):
         room.close()
         self.assertEqual(room.pins.count(), 0)
 
+    def test_add_transfer_to_history(self):
+        user = User.objects.create(email="a@user.com")
+        room = Room.objects.create(queue=self.queue)
+        self.assertEqual(room.full_transfer_history, [])
+        feedback = create_transfer_json(
+            action="transfer",
+            from_=room.queue,
+            to=user,
+        )
+        room.add_transfer_to_history(feedback)
+        self.assertEqual(room.full_transfer_history, [feedback])
+        self.assertEqual(room.transfer_history, feedback)
+
+        other_feedback = create_transfer_json(
+            action="transfer",
+            from_=room.queue,
+            to=user,
+        )
+        room.add_transfer_to_history(other_feedback)
+        self.assertEqual(room.full_transfer_history, [feedback, other_feedback])
+        self.assertEqual(room.transfer_history, other_feedback)
+
     def test_add_to_queue_at_field(self):
         user = User.objects.create(email="a@user.com")
         room = Room.objects.create(queue=self.queue)

@@ -10,6 +10,7 @@ from chats.apps.api.v1.permissions import ProjectBodyIsAdmin
 from chats.apps.projects.models import CustomStatus, ProjectPermission
 from chats.apps.projects.tasks import create_agent_disconnect_log
 from chats.utils.websockets import send_channels_group
+from chats.apps.api.v1.internal.agents.utils import validate_agent_disconnect
 
 
 class AgentDisconnectView(APIView):
