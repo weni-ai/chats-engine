@@ -1504,9 +1504,9 @@ class TestAgentRepository(TestCase):
             Filters(ordering="status", is_weni_admin=False), self.project
         ))
         self.assertEqual(len(agents_asc), 4)
-        self.assertEqual(agents_asc[0]["email"], "online@test.com")
-        middle_emails = {agents_asc[1]["email"], agents_asc[2]["email"]}
-        self.assertEqual(middle_emails, {"away@test.com", "busy@test.com"})
+        self.assertEqual(agents_asc[0]["email"], "away@test.com")
+        self.assertEqual(agents_asc[1]["email"], "online@test.com")
+        self.assertEqual(agents_asc[2]["email"], "busy@test.com")
         self.assertEqual(agents_asc[3]["email"], "offline@test.com")
 
         agents_desc = list(self.repository.get_agents_data(
@@ -1514,8 +1514,8 @@ class TestAgentRepository(TestCase):
         ))
         self.assertEqual(len(agents_desc), 4)
         self.assertEqual(agents_desc[0]["email"], "offline@test.com")
-        middle_emails_desc = {agents_desc[1]["email"], agents_desc[2]["email"]}
-        self.assertEqual(middle_emails_desc, {"away@test.com", "busy@test.com"})
+        self.assertEqual(agents_desc[1]["email"], "busy@test.com")
+        self.assertEqual(agents_desc[2]["email"], "away@test.com")
         self.assertEqual(agents_desc[3]["email"], "online@test.com")
 
     def test_agents_custom_status_ordering(self):
@@ -1526,7 +1526,7 @@ class TestAgentRepository(TestCase):
             Filters(ordering="status", is_weni_admin=False), self.project
         ))
         self.assertEqual(len(agents_asc), 4)
-        self.assertEqual(agents_asc[0]["email"], "online@test.com")
+        self.assertEqual(agents_asc[0]["email"], "away@test.com")
         self.assertEqual(agents_asc[-1]["email"], "offline@test.com")
 
         agents_desc = list(self.repository.get_agents_custom_status_and_rooms(
