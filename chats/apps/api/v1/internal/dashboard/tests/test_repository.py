@@ -1510,46 +1510,47 @@ class TestAgentRepository(TestCase):
         self._create_agent_with_permission("online@test.com", "ONLINE")
 
     def test_agents_ordering_by_status(self):
-        """Test agents ordered by status: ascending and descending"""
+        """Test agents ordered by status: ONLINE → OFFLINE+custom → OFFLINE (ASC)"""
         self._create_test_agents_with_statuses()
 
         agents_asc = list(self.repository.get_agents_data(
             Filters(ordering="status", is_weni_admin=False), self.project
         ))
         self.assertEqual(len(agents_asc), 4)
-        self._assert_ordering(agents_asc, {
-            0: "offline@test.com",
-            (1, 3): {"away@test.com", "busy@test.com"},
-            3: "online@test.com"
-        })
+        self.assertEqual(agents_asc[0]["email"], "away@test.com")
+        self.assertEqual(agents_asc[1]["email"], "online@test.com")
+        self.assertEqual(agents_asc[2]["email"], "busy@test.com")
+        self.assertEqual(agents_asc[3]["email"], "offline@test.com")
 
         agents_desc = list(self.repository.get_agents_data(
             Filters(ordering="-status", is_weni_admin=False), self.project
         ))
         self.assertEqual(len(agents_desc), 4)
-        self._assert_ordering(agents_desc, {
-            0: "online@test.com",
-            (1, 3): {"away@test.com", "busy@test.com"},
-            3: "offline@test.com"
-        })
+        self.assertEqual(agents_desc[0]["email"], "offline@test.com")
+        self.assertEqual(agents_desc[1]["email"], "busy@test.com")
+        self.assertEqual(agents_desc[2]["email"], "away@test.com")
+        self.assertEqual(agents_desc[3]["email"], "online@test.com")
 
     def test_agents_custom_status_ordering(self):
         """Test get_agents_custom_status_and_rooms respects status ordering"""
         self._create_test_agents_with_statuses()
 
-        for ordering, first_email, last_email in [
-            ("status", "offline@test.com", "online@test.com"),
-            ("-status", "online@test.com", "offline@test.com")
-        ]:
-            agents = list(self.repository.get_agents_custom_status_and_rooms(
-                Filters(ordering=ordering, is_weni_admin=False), self.project
-            ))
-            self.assertEqual(len(agents), 4)
-            self.assertEqual(agents[0]["email"], first_email)
-            self.assertEqual(agents[-1]["email"], last_email)
+        agents_asc = list(self.repository.get_agents_custom_status_and_rooms(
+            Filters(ordering="status", is_weni_admin=False), self.project
+        ))
+        self.assertEqual(len(agents_asc), 4)
+        self.assertEqual(agents_asc[0]["email"], "away@test.com")
+        self.assertEqual(agents_asc[-1]["email"], "offline@test.com")
+
+        agents_desc = list(self.repository.get_agents_custom_status_and_rooms(
+            Filters(ordering="-status", is_weni_admin=False), self.project
+        ))
+        self.assertEqual(len(agents_desc), 4)
+        self.assertEqual(agents_desc[0]["email"], "offline@test.com")
+        self.assertEqual(agents_desc[-1]["email"], "online@test.com")
 
     def test_multiple_agents_same_status_ordering(self):
-        """Test ordering with multiple agents having same status - custom statuses stay in middle"""
+        """Test ordering: ONLINE (ignore custom) → OFFLINE+custom → OFFLINE"""
         self._setup_sector_and_queue()
 
         for i in range(1, 3):
@@ -1566,18 +1567,17 @@ class TestAgentRepository(TestCase):
         user_busy = self._create_agent_with_permission("busy@test.com", "OFFLINE", last_name="Busy")
         self._create_custom_status(user_busy, "Almoço")
 
-        offline_emails = {"offline1@test.com", "offline2@test.com"}
-        online_emails = {"online1@test.com", "online2@test.com"}
-        custom_emails = {"away@test.com", "busy@test.com"}
+        offline_no_custom_emails = {"offline1@test.com", "offline2@test.com"}
+        online_all_emails = {"online1@test.com", "online2@test.com", "away@test.com"}
 
         agents_asc = list(self.repository.get_agents_data(
             Filters(ordering="status", is_weni_admin=False), self.project
         ))
         self.assertEqual(len(agents_asc), 6)
         self._assert_ordering(agents_asc, {
-            (0, 2): offline_emails,
-            (2, 4): custom_emails,
-            (4, 6): online_emails
+            (0, 3): online_all_emails,
+            3: "busy@test.com",
+            (4, 6): offline_no_custom_emails,
         })
 
         agents_desc = list(self.repository.get_agents_data(
@@ -1585,7 +1585,172 @@ class TestAgentRepository(TestCase):
         ))
         self.assertEqual(len(agents_desc), 6)
         self._assert_ordering(agents_desc, {
-            (0, 2): online_emails,
-            (2, 4): custom_emails,
-            (4, 6): offline_emails
+            (0, 2): offline_no_custom_emails,
+            2: "busy@test.com",
+            (3, 6): online_all_emails,
         })
+
+    def test_get_agents_data_custom_status_without_date_filter(self):
+        """
+        Test that custom_status is returned regardless of when it was created.
+        This validates the fix for the bug where active custom status created
+        more than 24h ago were not being returned when using date filters.
+        """
+        self._setup_sector_and_queue()
+
+        user_with_old_pause = self._create_agent_with_permission(
+            "old_pause@test.com", "OFFLINE", last_name="OldPause"
+        )
+
+        old_date = timezone.now() - timedelta(days=5)
+        status_type = CustomStatusType.objects.create(
+            name="Almoço Antigo", project=self.project
+        )
+        old_custom_status = CustomStatus.objects.create(
+            user=user_with_old_pause,
+            status_type=status_type,
+            is_active=True,
+            break_time=100,
+            project=self.project,
+        )
+        CustomStatus.objects.filter(pk=old_custom_status.pk).update(created_on=old_date)
+
+        user_with_recent_pause = self._create_agent_with_permission(
+            "recent_pause@test.com", "OFFLINE", last_name="RecentPause"
+        )
+        recent_status_type = CustomStatusType.objects.create(
+            name="Pausa Recente", project=self.project
+        )
+        CustomStatus.objects.create(
+            user=user_with_recent_pause,
+            status_type=recent_status_type,
+            is_active=True,
+            break_time=50,
+            project=self.project,
+        )
+
+        self._create_agent_with_permission(
+            "no_pause@test.com", "OFFLINE", last_name="NoPause"
+        )
+
+        filters = Filters(
+            start_date=(timezone.now() - timedelta(hours=24)).strftime("%Y-%m-%d"),
+            end_date=timezone.now().strftime("%Y-%m-%d"),
+            is_weni_admin=False,
+        )
+
+        agents = list(self.repository.get_agents_data(filters, self.project))
+
+        agent_with_old_pause = next(
+            (a for a in agents if a["email"] == "old_pause@test.com"), None
+        )
+        self.assertIsNotNone(agent_with_old_pause, "Agent with old pause should be returned")
+
+        self.assertTrue(
+            agent_with_old_pause["has_active_custom_status"],
+            "Agent should have active custom status flag set to True"
+        )
+
+        custom_status_list = agent_with_old_pause.get("custom_status") or []
+        self.assertGreater(
+            len(custom_status_list), 0,
+            "Custom status should be returned even if created more than 24h ago"
+        )
+
+        old_custom_in_list = any(
+            cs.get("status_type") == "Almoço Antigo" and cs.get("is_active") is True
+            for cs in custom_status_list
+        )
+        self.assertTrue(
+            old_custom_in_list,
+            "Old active custom status should be included in the results"
+        )
+
+        agent_with_recent_pause = next(
+            (a for a in agents if a["email"] == "recent_pause@test.com"), None
+        )
+        self.assertIsNotNone(agent_with_recent_pause, "Agent with recent pause should be returned")
+        self.assertTrue(agent_with_recent_pause["has_active_custom_status"])
+
+        recent_custom_status_list = agent_with_recent_pause.get("custom_status") or []
+        self.assertGreater(len(recent_custom_status_list), 0)
+
+        agent_without_pause = next(
+            (a for a in agents if a["email"] == "no_pause@test.com"), None
+        )
+        self.assertIsNotNone(agent_without_pause, "Agent without pause should be returned")
+        self.assertFalse(
+            agent_without_pause["has_active_custom_status"],
+            "Agent should not have active custom status flag"
+        )
+
+    def test_get_agents_data_date_filter_only_affects_rooms(self):
+        """
+        Test that date filters only affect room data (opened/closed counts)
+        and not custom_status data.
+        """
+        sector = self._setup_sector_and_queue()
+        queue = Queue.objects.get(sector=sector)
+        contact = Contact.objects.create(name="Test Contact")
+
+        user = self._create_agent_with_permission(
+            "agent@test.com", "OFFLINE", last_name="Agent"
+        )
+
+        old_date = timezone.now() - timedelta(days=5)
+        status_type = CustomStatusType.objects.create(
+            name="Pausa Antiga", project=self.project
+        )
+        old_custom_status = CustomStatus.objects.create(
+            user=user,
+            status_type=status_type,
+            is_active=True,
+            break_time=200,
+            project=self.project,
+        )
+        CustomStatus.objects.filter(pk=old_custom_status.pk).update(created_on=old_date)
+
+        old_room_date = timezone.now() - timedelta(days=3)
+        Room.objects.create(
+            queue=queue,
+            contact=contact,
+            project_uuid=self.project.uuid,
+            user=user,
+            is_active=False,
+            ended_at=old_room_date,
+        )
+
+        recent_room_date = timezone.now() - timedelta(hours=12)
+        Room.objects.create(
+            queue=queue,
+            contact=contact,
+            project_uuid=self.project.uuid,
+            user=user,
+            is_active=False,
+            ended_at=recent_room_date,
+        )
+
+        filters = Filters(
+            start_date=(timezone.now() - timedelta(hours=24)).strftime("%Y-%m-%d"),
+            end_date=timezone.now().strftime("%Y-%m-%d"),
+            is_weni_admin=False,
+        )
+
+        agents = list(self.repository.get_agents_data(filters, self.project))
+        agent = next((a for a in agents if a["email"] == "agent@test.com"), None)
+
+        self.assertIsNotNone(agent)
+
+        self.assertTrue(agent["has_active_custom_status"])
+        custom_status_list = agent.get("custom_status") or []
+        self.assertGreater(len(custom_status_list), 0)
+
+        has_old_custom_status = any(
+            cs.get("status_type") == "Pausa Antiga" for cs in custom_status_list
+        )
+        self.assertTrue(has_old_custom_status, "Old custom status should be present")
+
+        self.assertEqual(
+            agent["closed"], 1,
+            "Only the recent room should be counted (within 24h)"
+        )
