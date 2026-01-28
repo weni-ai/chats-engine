@@ -1698,7 +1698,7 @@ class TestAgentRepository(TestCase):
         CustomStatus.objects.filter(pk=old_custom_status.pk).update(created_on=old_date)
 
         old_room_date = timezone.now() - timedelta(days=3)
-        old_room = Room.objects.create(
+        Room.objects.create(
             queue=queue,
             contact=contact,
             project_uuid=self.project.uuid,
@@ -1708,7 +1708,7 @@ class TestAgentRepository(TestCase):
         )
 
         recent_room_date = timezone.now() - timedelta(hours=12)
-        recent_room = Room.objects.create(
+        Room.objects.create(
             queue=queue,
             contact=contact,
             project_uuid=self.project.uuid,
