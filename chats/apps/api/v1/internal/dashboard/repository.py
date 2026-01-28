@@ -49,6 +49,37 @@ class AgentRepository:
     def __init__(self):
         self.model = User.objects
 
+    @staticmethod
+    def _get_has_active_custom_status_subquery(project):
+        """
+        Returns an Exists subquery to check if a user has an active custom status
+        (excluding 'in-service' status) for the given project.
+        """
+        return Exists(
+            CustomStatus.objects.filter(
+                user=OuterRef("email"),
+                status_type__project=project,
+                is_active=True,
+            ).exclude(status_type__name__iexact="in-service")
+        )
+
+    @staticmethod
+    def _get_status_order_case():
+        """
+        Returns a Case expression for ordering agents by status.
+        Order priority:
+        1. ONLINE agents (order=1)
+        2. OFFLINE agents with active custom status (order=2)
+        3. OFFLINE agents without custom status (order=3)
+        """
+        return Case(
+            When(status='ONLINE', then=Value(1)),
+            When(Q(status='OFFLINE') & Q(has_active_custom_status=True), then=Value(2)),
+            When(status='OFFLINE', has_active_custom_status=False, then=Value(3)),
+            default=Value(3),
+            output_field=IntegerField(),
+        )
+
     def get_agents_data(self, filters: Filters, project):
         tz = project.timezone
         initial_datetime = (
@@ -113,23 +144,10 @@ class AgentRepository:
         if filters.agent:
             agents_query = agents_query.filter(email=filters.agent)
 
-        tz_str = str(project.timezone)
-        custom_status_start_date = (
-            parse_date_with_timezone(filters.start_date, tz_str)
-            if filters.start_date
-            else initial_datetime
-        )
-        custom_status_end_date = (
-            parse_date_with_timezone(filters.end_date, tz_str, is_end_date=True)
-            if filters.end_date
-            else timezone.now()
-        )
-
         custom_status_subquery = Subquery(
             CustomStatus.objects.filter(
                 user=OuterRef("email"),
                 status_type__project=project,
-                created_on__range=[custom_status_start_date, custom_status_end_date],
             )
             .values("user")
             .annotate(
@@ -170,26 +188,12 @@ class AgentRepository:
             .values("total")
         )
 
-        has_active_custom_status_subquery = Exists(
-            CustomStatus.objects.filter(
-                user=OuterRef("email"),
-                status_type__project=project,
-                is_active=True,
-            ).exclude(status_type__name__iexact="in-service")
-        )
-
         agents_query = (
             agents_query.filter(agents_filters)
             .annotate(
                 status=Subquery(project_permission_subquery),
-                has_active_custom_status=has_active_custom_status_subquery,
-                status_order=Case(
-                    When(status='ONLINE', then=Value(1)),
-                    When(Q(status='OFFLINE') & Q(has_active_custom_status=True), then=Value(2)),
-                    When(status='OFFLINE', then=Value(3)),
-                    default=Value(3),
-                    output_field=IntegerField(),
-                ),
+                has_active_custom_status=self._get_has_active_custom_status_subquery(project),
+                status_order=self._get_status_order_case(),
                 closed=Count(
                     "rooms__uuid",
                     distinct=True,
@@ -351,32 +355,12 @@ class AgentRepository:
         if agents_filter:
             agents_query = agents_query.filter(**agents_filter).distinct()
 
-        agents_filters_custom = Q(project_permissions__project=project) & Q(
-            is_active=True
-        )
-        if filters.agent:
-            agents_filters_custom &= Q(email=filters.agent)
-
-        has_active_custom_status_subquery_2 = Exists(
-            CustomStatus.objects.filter(
-                user=OuterRef("email"),
-                status_type__project=project,
-                is_active=True,
-            ).exclude(status_type__name__iexact="in-service")
-        )
-
         agents_query = (
             agents_query.filter(agents_filters_custom)
             .annotate(
                 status=Subquery(project_permission_queryset),
-                has_active_custom_status=has_active_custom_status_subquery_2,
-                status_order=Case(
-                    When(status='ONLINE', then=Value(1)),
-                    When(Q(status='OFFLINE') & Q(has_active_custom_status=True), then=Value(2)),
-                    When(status='OFFLINE', then=Value(3)),
-                    default=Value(3),
-                    output_field=IntegerField(),
-                ),
+                has_active_custom_status=self._get_has_active_custom_status_subquery(project),
+                status_order=self._get_status_order_case(),
                 closed=Count(
                     "rooms__uuid",
                     distinct=True,
@@ -445,15 +429,29 @@ class AgentRepository:
             & ~Q(status_type__name__iexact="in-service")
         )
 
-        tz_str = str(project.timezone)
+        tz = project.timezone
+        tz_str = str(tz)
+
         if filters.start_date:
             start_time = parse_date_with_timezone(filters.start_date, tz_str)
-            custom_status = custom_status.filter(created_on__gte=start_time)
+        else:
+            start_time = (
+                timezone.now()
+                .astimezone(tz)
+                .replace(hour=0, minute=0, second=0, microsecond=0)
+            )
+
         if filters.end_date:
             end_time = parse_date_with_timezone(
                 filters.end_date, tz_str, is_end_date=True
             )
-            custom_status = custom_status.filter(created_on__lte=end_time)
+        else:
+            end_time = timezone.now()
+
+        custom_status = custom_status.filter(
+            created_on__gte=start_time,
+            created_on__lte=end_time,
+        )
 
         return custom_status
 
