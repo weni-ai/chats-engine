@@ -149,6 +149,22 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
                 )
 
             if user_status.lower() == "online":
+                active_custom_statuses = CustomStatus.objects.filter(
+                    user=instance.user,
+                    project=instance.project,
+                    is_active=True,
+                ).exclude(status_type__name__iexact="in-service")
+
+                project_tz = instance.project.timezone
+                end_time = timezone.now().astimezone(project_tz)
+
+                for custom_status in active_custom_statuses:
+                    created_on = custom_status.created_on.astimezone(project_tz)
+                    duration = end_time - created_on
+                    custom_status.is_active = False
+                    custom_status.break_time = int(duration.total_seconds())
+                    custom_status.save(update_fields=["is_active", "break_time"])
+
                 instance.status = ProjectPermission.STATUS_ONLINE
                 instance.save()
                 
@@ -196,7 +212,6 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
                     status="ONLINE",
                 )
 
-                # Log status change
                 from chats.apps.projects.tasks import log_agent_status_change
                 log_agent_status_change.delay(
                     agent_email=instance.user.email,
