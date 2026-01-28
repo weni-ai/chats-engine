@@ -146,8 +146,17 @@ class AgentRepository:
 
         custom_status_subquery = Subquery(
             CustomStatus.objects.filter(
-                user=OuterRef("email"),
-                status_type__project=project,
+                Q(user=OuterRef("email"))
+                & Q(status_type__project=project)
+                & (
+                    Q(
+                        created_on__range=[
+                            custom_status_start_date,
+                            custom_status_end_date,
+                        ]
+                    )
+                    | Q(is_active=True)
+                )
             )
             .values("user")
             .annotate(
@@ -192,8 +201,17 @@ class AgentRepository:
             agents_query.filter(agents_filters)
             .annotate(
                 status=Subquery(project_permission_subquery),
-                has_active_custom_status=self._get_has_active_custom_status_subquery(project),
-                status_order=self._get_status_order_case(),
+                has_active_custom_status=has_active_custom_status_subquery,
+                status_order=Case(
+                    When(status="ONLINE", then=Value(1)),
+                    When(
+                        Q(status="OFFLINE") & Q(has_active_custom_status=True),
+                        then=Value(2),
+                    ),
+                    When(status="OFFLINE", then=Value(3)),
+                    default=Value(3),
+                    output_field=IntegerField(),
+                ),
                 closed=Count(
                     "rooms__uuid",
                     distinct=True,
@@ -273,17 +291,17 @@ class AgentRepository:
         if filters.queue and filters.sector:
             rooms_filter["rooms__queue"] = filters.queue
             rooms_filter["rooms__queue__sector__in"] = filters.sector
-            agents_filter["project_permissions__queue_authorizations__queue"] = (
-                filters.queue
-            )
+            agents_filter[
+                "project_permissions__queue_authorizations__queue"
+            ] = filters.queue
             agents_filter[
                 "project_permissions__queue_authorizations__queue__sector__in"
             ] = filters.sector
         elif filters.queue:
             rooms_filter["rooms__queue"] = filters.queue
-            agents_filter["project_permissions__queue_authorizations__queue"] = (
-                filters.queue
-            )
+            agents_filter[
+                "project_permissions__queue_authorizations__queue"
+            ] = filters.queue
         elif filters.sector:
             rooms_filter["rooms__queue__sector__in"] = filters.sector
             agents_filter[
@@ -359,8 +377,17 @@ class AgentRepository:
             agents_query.filter(agents_filters_custom)
             .annotate(
                 status=Subquery(project_permission_queryset),
-                has_active_custom_status=self._get_has_active_custom_status_subquery(project),
-                status_order=self._get_status_order_case(),
+                has_active_custom_status=has_active_custom_status_subquery_2,
+                status_order=Case(
+                    When(status="ONLINE", then=Value(1)),
+                    When(
+                        Q(status="OFFLINE") & Q(has_active_custom_status=True),
+                        then=Value(2),
+                    ),
+                    When(status="OFFLINE", then=Value(3)),
+                    default=Value(3),
+                    output_field=IntegerField(),
+                ),
                 closed=Count(
                     "rooms__uuid",
                     distinct=True,
