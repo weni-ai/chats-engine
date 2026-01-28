@@ -56,10 +56,6 @@ class AudioTranscription(BaseModel):
         return self.media.message.room
 
     @property
-    def ws_group_name(self) -> str:
-        return f"room_{self.room.pk}"
-
-    @property
     def serialized_ws_data(self) -> dict:
         return {
             "message_uuid": str(self.media.message.uuid),
@@ -70,14 +66,29 @@ class AudioTranscription(BaseModel):
     def notify_transcription(self):
         """
         Notify the room about the transcription status via WebSocket.
+        Uses the same pattern as Room.base_notification - sends to permission or queue group.
         """
+        room = self.room
+        
+        if room.user:
+            permission = room.get_permission(room.user)
+            if not permission:
+                logger.warning(
+                    f"[AudioTranscription] No permission found for user {room.user.email}, "
+                    f"cannot send WS notification for message {self.media.message.uuid}"
+                )
+                return
+            group_name = f"permission_{permission.pk}"
+        else:
+            group_name = f"queue_{room.queue.pk}"
+
         logger.info(
             f"[AudioTranscription] Sending WS notification - "
-            f"group: {self.ws_group_name}, status: {self.status}, "
+            f"group: {group_name}, status: {self.status}, "
             f"message_uuid: {self.media.message.uuid}"
         )
         send_channels_group(
-            group_name=self.ws_group_name,
+            group_name=group_name,
             call_type="notify",
             content=self.serialized_ws_data,
             action="media.transcribe",
