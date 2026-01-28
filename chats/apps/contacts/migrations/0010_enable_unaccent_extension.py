@@ -5,7 +5,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('contacts', '0010_add_index_to_contact_name'),
+        ('contacts', '0009_add_index_to_contact_name'),
     ]
 
     operations = [
