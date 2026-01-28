@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -6,6 +8,8 @@ from chats.apps.accounts.models import User
 from chats.apps.msgs.models import MessageMedia
 from chats.core.models import BaseModel
 from chats.utils.websockets import send_channels_group
+
+logger = logging.getLogger(__name__)
 
 
 class AudioTranscriptionStatus(models.TextChoices):
@@ -67,6 +71,11 @@ class AudioTranscription(BaseModel):
         """
         Notify the room about the transcription status via WebSocket.
         """
+        logger.info(
+            f"[AudioTranscription] Sending WS notification - "
+            f"group: {self.ws_group_name}, status: {self.status}, "
+            f"message_uuid: {self.media.message.uuid}"
+        )
         send_channels_group(
             group_name=self.ws_group_name,
             call_type="notify",
