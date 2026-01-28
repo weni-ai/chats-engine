@@ -38,6 +38,37 @@ class AgentRepository:
     def __init__(self):
         self.model = User.objects
 
+    @staticmethod
+    def _get_has_active_custom_status_subquery(project):
+        """
+        Returns an Exists subquery to check if a user has an active custom status
+        (excluding 'in-service' status) for the given project.
+        """
+        return Exists(
+            CustomStatus.objects.filter(
+                user=OuterRef("email"),
+                status_type__project=project,
+                is_active=True,
+            ).exclude(status_type__name__iexact="in-service")
+        )
+
+    @staticmethod
+    def _get_status_order_case():
+        """
+        Returns a Case expression for ordering agents by status.
+        Order priority:
+        1. ONLINE agents (order=1)
+        2. OFFLINE agents with active custom status (order=2)
+        3. OFFLINE agents without custom status (order=3)
+        """
+        return Case(
+            When(status='ONLINE', then=Value(1)),
+            When(Q(status='OFFLINE') & Q(has_active_custom_status=True), then=Value(2)),
+            When(status='OFFLINE', has_active_custom_status=False, then=Value(3)),
+            default=Value(3),
+            output_field=IntegerField(),
+        )
+
     def get_agents_data(self, filters: Filters, project):
         tz = project.timezone
         initial_datetime = (
@@ -155,26 +186,12 @@ class AgentRepository:
             .values("total")
         )
 
-        has_active_custom_status_subquery = Exists(
-            CustomStatus.objects.filter(
-                user=OuterRef("email"),
-                status_type__project=project,
-                is_active=True,
-            ).exclude(status_type__name__iexact="in-service")
-        )
-
         agents_query = (
             agents_query.filter(agents_filters)
             .annotate(
                 status=Subquery(project_permission_subquery),
-                has_active_custom_status=has_active_custom_status_subquery,
-                status_order=Case(
-                    When(status='ONLINE', then=Value(1)),
-                    When(Q(status='OFFLINE') & Q(has_active_custom_status=True), then=Value(2)),
-                    When(status='OFFLINE', then=Value(3)),
-                    default=Value(3),
-                    output_field=IntegerField(),
-                ),
+                has_active_custom_status=self._get_has_active_custom_status_subquery(project),
+                status_order=self._get_status_order_case(),
                 closed=Count(
                     "rooms__uuid",
                     distinct=True,
@@ -325,26 +342,12 @@ class AgentRepository:
         if agents_filter:
             agents_query = agents_query.filter(**agents_filter).distinct()
 
-        has_active_custom_status_subquery_2 = Exists(
-            CustomStatus.objects.filter(
-                user=OuterRef("email"),
-                status_type__project=project,
-                is_active=True,
-            ).exclude(status_type__name__iexact="in-service")
-        )
-
         agents_query = (
             agents_query.filter(project_permissions__project=project, is_active=True)
             .annotate(
                 status=Subquery(project_permission_queryset),
-                has_active_custom_status=has_active_custom_status_subquery_2,
-                status_order=Case(
-                    When(status='ONLINE', then=Value(1)),
-                    When(Q(status='OFFLINE') & Q(has_active_custom_status=True), then=Value(2)),
-                    When(status='OFFLINE', then=Value(3)),
-                    default=Value(3),
-                    output_field=IntegerField(),
-                ),
+                has_active_custom_status=self._get_has_active_custom_status_subquery(project),
+                status_order=self._get_status_order_case(),
                 closed=Count(
                     "rooms__uuid",
                     distinct=True,
