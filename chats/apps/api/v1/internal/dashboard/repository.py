@@ -27,6 +27,7 @@ from chats.apps.api.v1.internal.dashboard.dto import (
     CSATRatingCount,
     CSATRatings,
 )
+from chats.apps.api.utils import calculate_in_service_time
 from chats.apps.projects.dates import parse_date_with_timezone
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.projects.models.models import CustomStatus, Project
@@ -139,30 +140,6 @@ class AgentRepository:
             output_field=JSONField(),
         )
 
-        in_service_time_subquery = (
-            CustomStatus.objects.filter(
-                user=OuterRef("email"),
-                status_type__project=project,
-                status_type__name="In-Service",
-            )
-            .annotate(
-                time_contribution=Case(
-                    When(
-                        is_active=True,
-                        user__project_permissions__status="ONLINE",
-                        user__project_permissions__project=project,
-                        then=Extract(timezone.now() - F("created_on"), "epoch"),
-                    ),
-                    When(is_active=False, then=F("break_time")),
-                    default=Value(0),
-                    output_field=IntegerField(),
-                )
-            )
-            .values("user")
-            .annotate(total=Sum("time_contribution"))
-            .values("total")
-        )
-
         has_active_custom_status_subquery = Exists(
             CustomStatus.objects.filter(
                 user=OuterRef("email"),
@@ -212,10 +189,6 @@ class AgentRepository:
                     & Q(rooms__metric__interaction_time__gt=0),
                 ),
                 custom_status=custom_status_subquery,
-                time_in_service_order=Coalesce(
-                    Subquery(in_service_time_subquery, output_field=IntegerField()),
-                    Value(0),
-                ),
             )
             .distinct()
         )
@@ -237,10 +210,17 @@ class AgentRepository:
 
         if filters.ordering:
             if "time_in_service" in filters.ordering:
-                ordering_field = filters.ordering.replace(
-                    "time_in_service", "time_in_service_order"
+                reverse = filters.ordering.startswith("-")
+                agents_list = list(agents_query)
+                agents_list.sort(key=lambda x: x.get("email") or "")
+                agents_list.sort(
+                    key=lambda x: calculate_in_service_time(
+                        x.get("custom_status"), user_status=x.get("status")
+                    )
+                    or 0,
+                    reverse=reverse,
                 )
-                agents_query = agents_query.order_by(ordering_field, "email")
+                return agents_list
             elif "status" in filters.ordering:
                 ordering_field = filters.ordering.replace("status", "status_order")
                 agents_query = agents_query.order_by(ordering_field, "email")
