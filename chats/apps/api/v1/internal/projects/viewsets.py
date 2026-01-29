@@ -204,7 +204,6 @@ class ProjectPermissionViewset(viewsets.ModelViewSet):
                             break_time=0,
                         )
 
-                # Log status change
                 from chats.apps.projects.tasks import log_agent_status_change
                 log_agent_status_change.delay(
                     agent_email=instance.user.email,
