@@ -194,9 +194,7 @@ class InternalRoomsViewSetFilterTestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 1)
-        self.assertEqual(
-            response.data["results"][0]["contact"]["name"], "Ângela Silva"
-        )
+        self.assertEqual(response.data["results"][0]["contact"], "Ângela Silva")
 
     @with_internal_auth
     def test_list_rooms_filter_contact_case_insensitive(self):
