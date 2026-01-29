@@ -79,7 +79,7 @@ class RoomFilter(filters.FilterSet):
 
     def filter_contact(self, queryset, name, value):
         return queryset.filter(
-            Q(contact__name__icontains=value) | Q(urn__icontains=value)
+            Q(contact__name__unaccent__icontains=value) | Q(urn__unaccent__icontains=value)
         )
 
     def filter_tags(self, queryset, name, value):
