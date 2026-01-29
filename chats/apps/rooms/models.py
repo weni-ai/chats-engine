@@ -169,6 +169,18 @@ class Room(BaseModel, BaseConfigurableModel):
     )
 
     tracker = FieldTracker(fields=["user", "is_active", "queue"])
+    # Denormalized fields to avoid joins with messages table
+    first_agent_message_at = models.DateTimeField(
+        _("First agent message at"), null=True, blank=True
+    )
+    has_agent_messages = models.BooleanField(
+        _("Has agent messages"), default=False
+    )
+    automatic_message_sent_at = models.DateTimeField(
+        _("Automatic message sent at"), null=True, blank=True
+    )
+
+    tracker = FieldTracker(fields=["user", "queue"])
 
     @property
     def is_billing_notified(self) -> bool:
@@ -814,14 +826,25 @@ class Room(BaseModel, BaseConfigurableModel):
     def update_last_message(self, message, user=None):
         """
         Updates last message fields. Used for agent/system messages.
+        Also updates denormalized agent message fields when user is provided.
         """
-        Room.objects.filter(pk=self.pk).update(
-            last_interaction=message.created_on,
-            last_message=message,
-            last_message_text=message.text,
-            last_message_user=user,
-            last_message_contact=None,
-        )
+        update_fields = {
+            "last_interaction": message.created_on,
+            "last_message": message,
+            "last_message_text": message.text,
+            "last_message_user": user,
+            "last_message_contact": None,
+        }
+
+        # Update denormalized agent message fields
+        if user is not None:
+            update_fields["has_agent_messages"] = True
+            # Only update first_agent_message_at if not already set
+            Room.objects.filter(
+                pk=self.pk, first_agent_message_at__isnull=True
+            ).update(first_agent_message_at=message.created_on)
+
+        Room.objects.filter(pk=self.pk).update(**update_fields)
 
     def on_new_message(self, message, contact=None, increment_unread: int = 0):
         """
