@@ -4,10 +4,13 @@ import json
 import logging
 
 from typing import List
+from uuid import UUID
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.core.files.base import ContentFile
 from sentry_sdk import capture_exception
+from weni.feature_flags.services import FeatureFlagsService
+from django.conf import settings
 
 
 from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
@@ -226,3 +229,30 @@ class ArchiveChatsService(BaseArchiveChatsService):
         )
 
         return room_archived_conversation
+
+    def get_projects(self) -> List[UUID]:
+        feature_flags_service = FeatureFlagsService()
+        feature_flag_key = settings.ARCHIVE_CHATS_PROJECTS_LIST_FEATURE_FLAG_KEY
+        features = feature_flags_service.get_features()
+
+        projects_list_feature_flag = features.get(feature_flag_key)
+
+        if not projects_list_feature_flag:
+            return []
+
+        try:
+            projects_list = projects_list_feature_flag["rules"][0]["condition"][
+                "projectUUID"
+            ]["$in"]
+        except Exception as e:
+            event_id = capture_exception(e)
+
+            logger.error(
+                "[ArchiveChatsService] Error getting projects list from feature flag "
+                f"{feature_flag_key}: {e} with event id {event_id}",
+                exc_info=True,
+            )
+
+            return []
+
+        return projects_list

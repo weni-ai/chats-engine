@@ -28,11 +28,19 @@ def start_archive_rooms_messages():
     now = datetime.now(timezone.utc)
     limit_date = now - rdelta(years=1)
 
-    rooms = (
-        Room.objects.filter(is_active=False, ended_at__lt=limit_date)
-        .exclude(archived_conversations__status=ArchiveConversationsJobStatus.FINISHED)
-        .order_by("ended_at")[: settings.ARCHIVE_CHATS_MAX_ROOMS]
+    rooms_query = Room.objects.filter(is_active=False, ended_at__lt=limit_date).exclude(
+        archived_conversations__status=ArchiveConversationsJobStatus.FINISHED
     )
+
+    if not settings.ARCHIVE_CHATS_IS_ACTIVE_FOR_ALL_PROJECTS:
+        logger.info(
+            "[start_archive_rooms_messages] Not active for all projects, getting projects list from feature flag"
+        )
+        projects = service.get_projects()
+
+        rooms_query = rooms_query.filter(queue__sector__project__in=projects)
+
+    rooms = rooms_query.order_by("ended_at")[: settings.ARCHIVE_CHATS_MAX_ROOMS]
 
     expiration_dt = calculate_archive_task_expiration_dt(
         settings.ARCHIVE_CHATS_MAX_HOUR
