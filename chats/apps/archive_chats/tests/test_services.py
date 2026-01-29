@@ -18,6 +18,8 @@ from chats.apps.archive_chats.services import ArchiveChatsService
 from chats.apps.archive_chats.uploads import media_upload_to
 from chats.apps.msgs.models import AutomaticMessage, Message, MessageMedia
 from chats.apps.rooms.models import Room, RoomNote
+from chats.apps.msgs.models import AutomaticMessage, Message, MessageMedia
+from chats.apps.rooms.models import Room
 from chats.apps.queues.models import Queue
 from chats.apps.sectors.models import Sector
 from chats.apps.projects.models import Project
@@ -331,7 +333,7 @@ class TestArchiveChatsService(TestCase):
             },
             media_upload_to(message_media.message, "test.png"),
         )
-        
+
     @patch("chats.apps.archive_chats.services.get_presigned_url")
     def test_get_archived_media_url_with_subfolder(self, mock_get_presigned_url):
         object_key = f"archived_conversations/{self.project.uuid}/{self.room.uuid}/media/subfolder/test.jpg"
@@ -344,4 +346,58 @@ class TestArchiveChatsService(TestCase):
         self.assertEqual(
             url,
             f"https://test-bucket.s3.amazonaws.com/{object_key}",
+        )
+
+    def test_delete_room_messages(self):
+        archived_conversation = RoomArchivedConversation.objects.create(
+            job=self.service.start_archive_job(),
+            room=self.room,
+            status=ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED,
+        )
+
+        messages = [
+            Message.objects.create(
+                room=self.room,
+                user=self.user,
+                text="Test message",
+                created_on=timezone.now(),
+            ),
+            Message.objects.create(
+                room=self.room,
+                contact=self.contact,
+                text="Test message",
+                created_on=timezone.now(),
+            ),
+            Message.objects.create(
+                room=self.room,
+                contact=self.contact,
+                text="Test message",
+                created_on=timezone.now(),
+            ),
+        ]
+
+        MessageMedia.objects.create(
+            message=messages[0],
+            content_type="image/png",
+            media_file="test.png",
+        )
+        AutomaticMessage.objects.create(
+            message=messages[0],
+            room=self.room,
+        )
+
+        self.service.delete_room_messages(archived_conversation, batch_size=2)
+
+        archived_conversation.refresh_from_db()
+        self.assertEqual(
+            archived_conversation.status,
+            ArchiveConversationsJobStatus.MESSAGES_DELETED_FROM_DB,
+        )
+
+        self.assertEqual(Message.objects.filter(room=self.room).count(), 0)
+        self.assertEqual(
+            MessageMedia.objects.filter(message__room=self.room).count(), 0
+        )
+        self.assertEqual(
+            AutomaticMessage.objects.filter(message__room=self.room).count(), 0
         )

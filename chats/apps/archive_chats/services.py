@@ -14,6 +14,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.core.files.base import ContentFile
 from sentry_sdk import capture_exception
+from weni.feature_flags.services import FeatureFlagsService
 from django.conf import settings
 
 
@@ -29,6 +30,9 @@ from chats.apps.core.integrations.aws.s3.helpers import is_file_in_the_same_buck
 from chats.apps.core.integrations.aws.s3.helpers import get_presigned_url
 from chats.apps.rooms.models import Room
 from chats.apps.msgs.models import Message, MessageMedia
+from chats.apps.msgs.models import (
+    Message,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -55,6 +59,10 @@ class BaseArchiveChatsService(ABC):
 
     @abstractmethod
     def get_archived_media_url(self, object_key: str) -> str:
+        pass
+
+    @abstractmethod
+    def delete_room_messages(self, room: Room) -> None:
         pass
 
 
@@ -102,6 +110,7 @@ class ArchiveChatsService(BaseArchiveChatsService):
         try:
             messages_data = self.process_messages(room_archived_conversation)
             self.upload_messages_file(room_archived_conversation, messages_data)
+            self.delete_room_messages(room_archived_conversation)
 
             room_archived_conversation.refresh_from_db()
             room_archived_conversation.status = ArchiveConversationsJobStatus.FINISHED
@@ -285,3 +294,79 @@ class ArchiveChatsService(BaseArchiveChatsService):
                 raise InvalidObjectKey("Invalid object key")
 
         return get_presigned_url(object_key)
+
+    def delete_room_messages(
+        self,
+        room_archived_conversation: RoomArchivedConversation,
+        batch_size: int = 1000,
+    ) -> None:
+        room_archived_conversation.refresh_from_db()
+
+        if (
+            room_archived_conversation.status
+            != ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED
+        ):
+            raise ValidationError(
+                f"Room archived conversation {room_archived_conversation.uuid} is not in messages file uploaded status"
+            )
+
+        room = room_archived_conversation.room
+
+        logger.info(
+            f"[ArchiveChatsService] Deleting room messages for room {room.uuid}"
+        )
+
+        messages = Message.objects.filter(room=room).values_list("pk", flat=True)
+
+        for i in range(0, len(messages), batch_size):
+            messages_batch = Message.objects.filter(
+                pk__in=Message.objects.filter(room=room).values_list("pk", flat=True)[
+                    :batch_size
+                ]
+            )
+
+            if len(messages_batch) == 0:
+                break
+
+            messages_batch.delete()
+
+        room_archived_conversation.status = (
+            ArchiveConversationsJobStatus.MESSAGES_DELETED_FROM_DB
+        )
+        room_archived_conversation.messages_deleted_at = timezone.now()
+        room_archived_conversation.save(update_fields=["status", "messages_deleted_at"])
+
+        logger.info(
+            f"[ArchiveChatsService] Room archived conversation status updated to "
+            f"{room_archived_conversation.status} for room {room.uuid} "
+            f"with archived conversation {room_archived_conversation.uuid}"
+        )
+
+        return room_archived_conversation
+
+    def get_projects(self) -> List[UUID]:
+        feature_flags_service = FeatureFlagsService()
+        feature_flag_key = settings.ARCHIVE_CHATS_PROJECTS_LIST_FEATURE_FLAG_KEY
+        features = feature_flags_service.get_features()
+
+        projects_list_feature_flag = features.get(feature_flag_key)
+
+        if not projects_list_feature_flag:
+            return []
+
+        try:
+            projects_list = projects_list_feature_flag["rules"][0]["condition"][
+                "projectUUID"
+            ]["$in"]
+        except Exception as e:
+            event_id = capture_exception(e)
+
+            logger.error(
+                "[ArchiveChatsService] Error getting projects list from feature flag "
+                f"{feature_flag_key}: {e} with event id {event_id}",
+                exc_info=True,
+            )
+
+            return []
+
+        return projects_list
