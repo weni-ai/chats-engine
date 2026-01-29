@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from chats.apps.accounts.models import User
-    from chats.apps.rooms.models import Room
 
 
 FLOWS_GET_TICKET_RETRIES = settings.AUTOMATIC_MESSAGE_FLOWS_GET_TICKET_RETRIES
