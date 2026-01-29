@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('contacts', '0010_enable_unaccent_extension'),
+        ('contacts', '0010_add_index_to_contact_name'),
         ('msgs', '0017_alter_messagemedia_media_file'),
         ('rooms', '0022_roomnote_message'),
     ]

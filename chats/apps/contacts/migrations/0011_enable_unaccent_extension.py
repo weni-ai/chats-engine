@@ -5,10 +5,9 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('contacts', '0009_alter_contact_imported_history_url'),
+        ('contacts', '0010_add_index_to_contact_name'),
     ]
 
     operations = [
         UnaccentExtension(),
     ]
-
