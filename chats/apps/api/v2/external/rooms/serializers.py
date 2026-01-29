@@ -7,11 +7,10 @@ from rest_framework import serializers
 from weni.feature_flags.shortcuts import is_feature_active
 
 from chats.apps.accounts.models import User
+from chats.apps.contacts.models import Contact
 from chats.apps.msgs.models import AutomaticMessage
 from chats.apps.rooms.models import Room
-from chats.apps.contacts.models import Contact
 from chats.apps.sectors.models import Sector, SectorTag
-
 
 SERVER_TZ = timezone.get_current_timezone()
 
@@ -120,18 +119,15 @@ class ExternalRoomMetricsSerializer(serializers.ModelSerializer):
                 return max(
                     int(
                         (
-                            room.automatic_message_sent_at
-                            - room.first_user_assigned_at
+                            room.automatic_message_sent_at - room.first_user_assigned_at
                         ).total_seconds()
                     ),
                     0,
                 )
             return None
         # Fallback: query original
-        if not room.first_user_assigned_at:
-            return 0
         automatic_message = AutomaticMessage.objects.filter(room=room).first()
-        if automatic_message:
+        if automatic_message and room.first_user_assigned_at:
             return max(
                 int(
                     (

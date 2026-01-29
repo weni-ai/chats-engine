@@ -280,7 +280,9 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
             obj.messages.filter(user__isnull=False).order_by("created_on").first()
         )
         if first_msg:
-            msg_date = pendulum.instance(first_msg.created_on).in_tz("America/Sao_Paulo")
+            msg_date = pendulum.instance(first_msg.created_on).in_tz(
+                "America/Sao_Paulo"
+            )
             return msg_date.isoformat()
         return None
 
@@ -312,18 +314,15 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
                 return max(
                     int(
                         (
-                            obj.automatic_message_sent_at
-                            - obj.first_user_assigned_at
+                            obj.automatic_message_sent_at - obj.first_user_assigned_at
                         ).total_seconds()
                     ),
                     0,
                 )
             return None
         # Fallback: query original
-        if not obj.first_user_assigned_at:
-            return 0
         automatic_message = AutomaticMessage.objects.filter(room=obj).first()
-        if automatic_message:
+        if automatic_message and obj.first_user_assigned_at:
             return max(
                 int(
                     (

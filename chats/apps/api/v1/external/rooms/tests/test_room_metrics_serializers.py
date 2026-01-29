@@ -1,7 +1,7 @@
-import pendulum
 from datetime import timedelta
 from unittest.mock import patch
 
+import pendulum
 from django.test import TestCase
 from django.utils import timezone
 
@@ -80,12 +80,8 @@ class TestRoomMetricsSerializerFirstUserMessage(TestCase):
         first_msg_time = timezone.now() - timedelta(hours=2)
         second_msg_time = timezone.now() - timedelta(hours=1)
 
-        create_agent_message(
-            self.room, self.user, "First", created_on=first_msg_time
-        )
-        create_agent_message(
-            self.room, self.user, "Second", created_on=second_msg_time
-        )
+        create_agent_message(self.room, self.user, "First", created_on=first_msg_time)
+        create_agent_message(self.room, self.user, "Second", created_on=second_msg_time)
 
         serializer = RoomMetricsSerializer(self.room)
         result = serializer.data["first_user_message"]
@@ -169,9 +165,7 @@ class TestRoomMetricsSerializerAutomaticMessage(TestCase):
     def test_time_to_send_automatic_message_calculates_correctly(self, mock_ff):
         """Should calculate time between first_user_assigned_at and automatic message"""
         msg_time = self.room.first_user_assigned_at + timedelta(minutes=5)
-        create_automatic_message(
-            self.room, self.user, "Auto msg", created_on=msg_time
-        )
+        create_automatic_message(self.room, self.user, "Auto msg", created_on=msg_time)
 
         serializer = RoomMetricsSerializer(self.room)
         result = serializer.data["time_to_send_automatic_message"]
@@ -179,19 +173,18 @@ class TestRoomMetricsSerializerAutomaticMessage(TestCase):
         self.assertIsNotNone(result)
         self.assertAlmostEqual(result, 300, delta=5)
 
-    def test_time_to_send_automatic_message_returns_zero_without_first_user_assigned_at(
+    def test_time_to_send_automatic_message_returns_none_without_first_user_assigned_at(
         self, mock_ff
     ):
-        """Should return 0 when room has no first_user_assigned_at (fallback behavior)"""
-        self.room.first_user_assigned_at = None
-        self.room.save()
+        """Should return None when room has no first_user_assigned_at"""
+        # Use update() to bypass save() which auto-sets first_user_assigned_at
+        Room.objects.filter(pk=self.room.pk).update(first_user_assigned_at=None)
         self.room.refresh_from_db()
 
         create_automatic_message(self.room, self.user, "Auto msg")
 
         serializer = RoomMetricsSerializer(self.room)
-        # In fallback mode (no request context), returns 0 when first_user_assigned_at is None
-        self.assertEqual(serializer.data["time_to_send_automatic_message"], 0)
+        self.assertIsNone(serializer.data["time_to_send_automatic_message"])
 
 
 @patch(
