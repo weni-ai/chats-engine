@@ -31,7 +31,6 @@ class RoomFilterTestCase(TestCase):
         self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
         self.user = User.objects.create_user(email="test@test.com")
 
-        # Criar contatos com diferentes variações de acentos
         self.contact_angela = Contact.objects.create(
             name="Ângela Silva", email="angela@test.com"
         )
@@ -45,7 +44,6 @@ class RoomFilterTestCase(TestCase):
             name="Paulo Oliveira", email="paulo@test.com"
         )
 
-        # Criar salas para cada contato
         self.room_angela = Room.objects.create(
             contact=self.contact_angela,
             queue=self.queue,
@@ -84,8 +82,7 @@ class RoomFilterTestCase(TestCase):
             queryset=Room.objects.all(),
         )
         filtered_queryset = room_filter.qs
-        
-        # Deve encontrar a sala da Ângela
+
         self.assertIn(self.room_angela, filtered_queryset)
         self.assertEqual(filtered_queryset.count(), 1)
 
@@ -98,8 +95,7 @@ class RoomFilterTestCase(TestCase):
             queryset=Room.objects.all(),
         )
         filtered_queryset = room_filter.qs
-        
-        # Deve encontrar a sala do José
+
         self.assertIn(self.room_jose, filtered_queryset)
         self.assertEqual(filtered_queryset.count(), 1)
 
@@ -112,8 +108,7 @@ class RoomFilterTestCase(TestCase):
             queryset=Room.objects.all(),
         )
         filtered_queryset = room_filter.qs
-        
-        # Deve encontrar a sala da Ângela mesmo com busca em maiúsculas
+
         self.assertIn(self.room_angela, filtered_queryset)
 
     def test_filter_contact_partial_match(self):
@@ -125,8 +120,7 @@ class RoomFilterTestCase(TestCase):
             queryset=Room.objects.all(),
         )
         filtered_queryset = room_filter.qs
-        
-        # Deve encontrar a sala da Ângela Silva
+
         self.assertIn(self.room_angela, filtered_queryset)
 
     def test_filter_contact_by_urn(self):
@@ -138,8 +132,7 @@ class RoomFilterTestCase(TestCase):
             queryset=Room.objects.all(),
         )
         filtered_queryset = room_filter.qs
-        
-        # Deve encontrar a sala pelo urn
+
         self.assertIn(self.room_angela, filtered_queryset)
 
     def test_filter_contact_no_matches(self):
@@ -151,8 +144,7 @@ class RoomFilterTestCase(TestCase):
             queryset=Room.objects.all(),
         )
         filtered_queryset = room_filter.qs
-        
-        # Não deve encontrar nenhuma sala
+
         self.assertEqual(filtered_queryset.count(), 0)
 
 
@@ -175,7 +167,6 @@ class InternalRoomsViewSetFilterTestCase(APITestCase):
         )
         self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
 
-        # Criar contato com acento
         self.contact = Contact.objects.create(
             name="Ângela Silva", email="angela@test.com"
         )
@@ -196,7 +187,7 @@ class InternalRoomsViewSetFilterTestCase(APITestCase):
         response = self.client.get(
             "/v1/internal/rooms/",
             {
-                "contact": "angela",  # Busca sem acento
+                "contact": "angela",
                 "project": str(self.project.uuid),
             },
         )
@@ -222,4 +213,3 @@ class InternalRoomsViewSetFilterTestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 1)
-
