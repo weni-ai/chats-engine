@@ -248,7 +248,8 @@ class ArchiveChatsService(BaseArchiveChatsService):
             event_id = capture_exception(e)
 
             logger.error(
-                f"[ArchiveChatsService] Error getting projects list from feature flag {feature_flag_key}: {e} with event id {event_id}",
+                "[ArchiveChatsService] Error getting projects list from feature flag "
+                f"{feature_flag_key}: {e} with event id {event_id}",
                 exc_info=True,
             )
 

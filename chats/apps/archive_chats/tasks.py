@@ -34,7 +34,7 @@ def start_archive_rooms_messages():
 
     if not settings.ARCHIVE_CHATS_IS_ACTIVE_FOR_ALL_PROJECTS:
         logger.info(
-            f"[start_archive_rooms_messages] Not active for all projects, getting projects list from feature flag"
+            "[start_archive_rooms_messages] Not active for all projects, getting projects list from feature flag"
         )
         projects = service.get_projects()
 

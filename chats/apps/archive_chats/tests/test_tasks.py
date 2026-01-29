@@ -110,13 +110,11 @@ class TestStartArchiveRoomsMessages(TestCase):
         service.start_archive_job.return_value = job
 
         # Should be included
-        rooms = [
+        for _ in range(2):
             Room.objects.create(
                 is_active=False,
                 ended_at=timezone.now() - rdelta(years=1),
             )
-            for _ in range(2)
-        ]
 
         # Should not be included because is active
         Room.objects.create(is_active=True)
