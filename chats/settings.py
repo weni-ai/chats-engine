@@ -146,7 +146,18 @@ CACHES = {
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
-DATABASES = dict(default=env.db(var="DATABASE_URL"))
+# Connection pooling configuration
+# CONN_MAX_AGE: Keeps connections open for reuse (in seconds)
+# CONN_HEALTH_CHECKS: Validates connection before use (Django 4.1+)
+CONN_MAX_AGE = env.int("CONN_MAX_AGE", default=600)  # 10 minutes default
+
+DATABASES = {
+    "default": {
+        **env.db(var="DATABASE_URL"),
+        "CONN_MAX_AGE": CONN_MAX_AGE,
+        "CONN_HEALTH_CHECKS": True,
+    }
+}
 
 # User
 
