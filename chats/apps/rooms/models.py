@@ -163,7 +163,6 @@ class Room(BaseModel, BaseConfigurableModel):
         related_name="+",
     )
 
-    tracker = FieldTracker(fields=["user", "is_active", "queue"])
     # Denormalized fields to avoid joins with messages table
     first_agent_message_at = models.DateTimeField(
         _("First agent message at"), null=True, blank=True
@@ -173,7 +172,7 @@ class Room(BaseModel, BaseConfigurableModel):
         _("Automatic message sent at"), null=True, blank=True
     )
 
-    tracker = FieldTracker(fields=["user_id", "queue_id"])
+    tracker = FieldTracker(fields=["user_id", "queue_id", "is_active"])
 
     @property
     def is_billing_notified(self) -> bool:
