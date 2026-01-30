@@ -43,11 +43,6 @@ logger = logging.getLogger(__name__)
 
 
 class Room(BaseModel, BaseConfigurableModel):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.__original_is_active = self.is_active
-        self._original_user = self.user
-
     user = models.ForeignKey(
         "accounts.User",
         related_name="rooms",
@@ -203,7 +198,12 @@ class Room(BaseModel, BaseConfigurableModel):
         room_client = RoomInfoUseCase()
         room_client.get_room(self)
 
-        self.set_config("is_billing_notified", True)
+        current_config = self.config or {}
+        new_config = current_config.copy()
+        new_config["is_billing_notified"] = True
+
+        Room.objects.filter(pk=self.pk).update(config=new_config)
+
         logger.info(
             "Billing notified for room %s. Setting is_billing_notified to True",
             self.pk,
@@ -215,7 +215,10 @@ class Room(BaseModel, BaseConfigurableModel):
         Args:
             is_new: Boolean indicando se é uma sala nova
         """
-        old_user = self._original_user
+        old_user_pk = (
+            Room.objects.filter(pk=self.pk).values_list("user", flat=True).first()
+        )
+        old_user = User.objects.get(email=old_user_pk) if old_user_pk else None
         new_user = self.user
 
         project = None
@@ -314,7 +317,11 @@ class Room(BaseModel, BaseConfigurableModel):
             return
 
     def save(self, *args, **kwargs) -> None:
-        if self._state.adding is False and self.__original_is_active is False:
+        current_is_active = (
+            Room.objects.filter(pk=self.pk).values_list("is_active", flat=True).first()
+        )
+
+        if self._state.adding is False and current_is_active is False:
             raise ValidationError({"detail": _("Closed rooms cannot receive updates")})
 
         if self._state.adding:
