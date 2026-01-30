@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.core.files.base import ContentFile
 from sentry_sdk import capture_exception
+from django.db import transaction
 
 
 from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
@@ -199,19 +200,24 @@ class ArchiveChatsService(BaseArchiveChatsService):
             f"[ArchiveChatsService] Deleting room messages for room {room.uuid}"
         )
 
-        messages = Message.objects.filter(room=room).values_list("pk", flat=True)
+        messages_count = Message.objects.filter(room=room).count()
+        batches_count = messages_count // batch_size + 1
 
-        for i in range(0, len(messages), batch_size):
-            messages_batch = Message.objects.filter(
-                pk__in=Message.objects.filter(room=room).values_list("pk", flat=True)[
-                    :batch_size
-                ]
-            )
+        logger.info(
+            f"[ArchiveChatsService] Deleting {messages_count} messages "
+            f"for room {room.uuid} in {batches_count} batches"
+        )
 
-            if len(messages_batch) == 0:
-                break
+        with transaction.atomic():
+            for _ in range(batches_count):
+                messages_pks = Message.objects.filter(room=room).values_list(
+                    "pk", flat=True
+                )[:batch_size]
 
-            messages_batch.delete()
+                if len(messages_pks) == 0:
+                    break
+
+                Message.objects.filter(pk__in=messages_pks).delete()
 
         room_archived_conversation.status = (
             ArchiveConversationsJobStatus.MESSAGES_DELETED_FROM_DB
