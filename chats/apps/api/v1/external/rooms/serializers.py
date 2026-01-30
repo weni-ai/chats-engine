@@ -2,10 +2,12 @@ import logging
 from typing import Dict, List, Optional
 
 import pendulum
+from django.conf import settings
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+from weni.feature_flags.shortcuts import is_feature_active
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.accounts.serializers import UserSerializer
@@ -253,7 +255,27 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
             return f"{obj.user.first_name} {obj.user.last_name}".strip()
         return None
 
+    def _is_denormalized_enabled(self, obj) -> bool:
+        project = obj.queue.sector.project if obj.queue else None
+        if not project:
+            return False
+        request = self.context.get("request")
+        user_email = request.user.email if request and hasattr(request, "user") else ""
+        return is_feature_active(
+            settings.DENORMALIZED_MESSAGE_FIELDS_FLAG_KEY,
+            user_email,
+            str(project.uuid),
+        )
+
     def get_first_user_message(self, obj):
+        if self._is_denormalized_enabled(obj):
+            if obj.first_agent_message_at:
+                msg_date = pendulum.instance(obj.first_agent_message_at).in_tz(
+                    "America/Sao_Paulo"
+                )
+                return msg_date.isoformat()
+            return None
+        # Fallback: query original
         first_msg = (
             obj.messages.filter(user__isnull=False).order_by("created_on").first()
         )
@@ -270,23 +292,36 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
         return custom_fields.get("callid", None)
 
     def get_automatic_message_sent_at(self, obj: Room) -> Optional[str]:
-        automatic_message: AutomaticMessage = AutomaticMessage.objects.filter(
-            room=obj
-        ).first()
-
+        if self._is_denormalized_enabled(obj):
+            if obj.automatic_message_sent_at:
+                msg_date = pendulum.instance(obj.automatic_message_sent_at).in_tz(
+                    "America/Sao_Paulo"
+                )
+                return msg_date.isoformat()
+            return None
+        # Fallback: query original
+        automatic_message = AutomaticMessage.objects.filter(room=obj).first()
         if automatic_message:
             msg_date = pendulum.instance(automatic_message.message.created_on).in_tz(
                 "America/Sao_Paulo"
             )
             return msg_date.isoformat()
-
         return None
 
-    def get_time_to_send_automatic_message(self, obj: Room) -> Optional[str]:
-        automatic_message: AutomaticMessage = AutomaticMessage.objects.filter(
-            room=obj
-        ).first()
-
+    def get_time_to_send_automatic_message(self, obj: Room) -> Optional[int]:
+        if self._is_denormalized_enabled(obj):
+            if obj.automatic_message_sent_at and obj.first_user_assigned_at:
+                return max(
+                    int(
+                        (
+                            obj.automatic_message_sent_at - obj.first_user_assigned_at
+                        ).total_seconds()
+                    ),
+                    0,
+                )
+            return None
+        # Fallback: query original
+        automatic_message = AutomaticMessage.objects.filter(room=obj).first()
         if automatic_message and obj.first_user_assigned_at:
             return max(
                 int(
@@ -297,7 +332,6 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
                 ),
                 0,
             )
-
         return None
 
     def get_sector(self, obj: Room) -> Optional[dict]:
