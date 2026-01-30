@@ -168,9 +168,7 @@ class Room(BaseModel, BaseConfigurableModel):
     first_agent_message_at = models.DateTimeField(
         _("First agent message at"), null=True, blank=True
     )
-    has_agent_messages = models.BooleanField(
-        _("Has agent messages"), default=False
-    )
+    has_agent_messages = models.BooleanField(_("Has agent messages"), default=False)
     automatic_message_sent_at = models.DateTimeField(
         _("Automatic message sent at"), null=True, blank=True
     )
@@ -260,61 +258,6 @@ class Room(BaseModel, BaseConfigurableModel):
         indexes = [
             models.Index(fields=["project_uuid"]),
         ]
-
-    def _update_agent_service_status(self, is_new):
-        """
-        Atualiza o status 'In-Service' dos agentes baseado nas mudanças na sala
-
-        Args:
-            is_new: Boolean indicando se é uma sala nova
-        """
-
-        # Obter valores relevantes
-        old_user = self._original_user
-        new_user = self.user
-
-        # Obter o projeto da sala
-        project = None
-        if self.queue and hasattr(self.queue, "sector"):
-            sector = self.queue.sector
-            if sector and hasattr(sector, "project"):
-                project = sector.project
-
-        if not project:
-            return  # Se não encontrar projeto, não faz nada
-
-        # Caso prioritário: Sala fechada
-        if (
-            hasattr(self, "__original_is_active")
-            and self.__original_is_active is True
-            and self.is_active is False
-        ):
-            if old_user:
-                InServiceStatusService.room_closed(old_user, project)
-            return
-
-        # Casos de atribuição de sala
-
-        # Caso 1: Sala nova com usuário atribuído
-        if is_new and new_user:
-            InServiceStatusService.room_assigned(new_user, project)
-            return
-
-        # Caso 2: Usuário adicionado a uma sala existente
-        if old_user is None and new_user is not None:
-            InServiceStatusService.room_assigned(new_user, project)
-            return
-
-        # Caso 3: Transferência entre agentes
-        if old_user is not None and new_user is not None and old_user != new_user:
-            InServiceStatusService.room_closed(old_user, project)
-            InServiceStatusService.room_assigned(new_user, project)
-            return
-
-        # Caso 4: Usuário removido da sala
-        if old_user is not None and new_user is None:
-            InServiceStatusService.room_closed(old_user, project)
-            return
 
     def save(self, *args, **kwargs) -> None:
         current_is_active = (
@@ -847,9 +790,9 @@ class Room(BaseModel, BaseConfigurableModel):
         if user is not None:
             update_fields["has_agent_messages"] = True
             # Only update first_agent_message_at if not already set
-            Room.objects.filter(
-                pk=self.pk, first_agent_message_at__isnull=True
-            ).update(first_agent_message_at=message.created_on)
+            Room.objects.filter(pk=self.pk, first_agent_message_at__isnull=True).update(
+                first_agent_message_at=message.created_on
+            )
 
         Room.objects.filter(pk=self.pk).update(**update_fields)
 
