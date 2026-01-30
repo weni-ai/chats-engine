@@ -1,9 +1,11 @@
+from typing import List
+
 from django.conf import settings
 
 from django.db.models import QuerySet
 
 
-def get_vtex_internal_domains_with_at_symbol() -> list[str]:
+def get_vtex_internal_domains_with_at_symbol() -> List[str]:
     return ["@" + domain for domain in settings.VTEX_INTERNAL_DOMAINS]
 
 
