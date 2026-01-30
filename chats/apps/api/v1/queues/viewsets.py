@@ -9,6 +9,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
+from chats.apps.core.internal_domains import (
+    is_vtex_internal_domain,
+    exclude_vtex_internal_domains,
+)
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.api.v1.permissions import (
     IsQueueAgent,
@@ -223,9 +227,18 @@ class QueueViewset(ModelViewSet):
                 online_sector_managers, online_admins
             )
 
+        agents_pks = set(combined_permissions.values_list("id", flat=True))
+        agents = User.objects.filter(id__in=agents_pks)
+
+        user_email = self.request.user.email
+
+        if not is_vtex_internal_domain(user_email):
+            agents = exclude_vtex_internal_domains(agents)
+
         serializer = QueueAgentsSerializer(
-            combined_permissions, many=True, context={"project": project}
+            agents, many=True, context={"project": project}
         )
+
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["GET"])

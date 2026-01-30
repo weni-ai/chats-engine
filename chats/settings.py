@@ -726,3 +726,12 @@ ARCHIVE_CHATS_PROJECTS_LIST_FEATURE_FLAG_KEY = env.str(
 ARCHIVE_CHATS_IS_ACTIVE_FOR_ALL_PROJECTS = env.bool(
     "ARCHIVE_CHATS_IS_ACTIVE_FOR_ALL_PROJECTS", default=False
 )
+
+# Excluded email domains
+# These are domains used by internal users (such as VTEX employees)
+# and should be excluded from some users lists,
+# because, even if they are included in projects (for testing or deployment purposes, for example),
+# they are not part of the organizations operational team.
+VTEX_INTERNAL_DOMAINS = env.list(
+    "VTEX_INTERNAL_DOMAINS", default=["weni.ai", "vtex.com"]
+)
