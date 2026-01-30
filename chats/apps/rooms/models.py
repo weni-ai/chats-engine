@@ -173,7 +173,7 @@ class Room(BaseModel, BaseConfigurableModel):
         _("Automatic message sent at"), null=True, blank=True
     )
 
-    tracker = FieldTracker(fields=["user", "queue"])
+    tracker = FieldTracker(fields=["user_id", "queue_id"])
 
     @property
     def is_billing_notified(self) -> bool:
@@ -270,7 +270,7 @@ class Room(BaseModel, BaseConfigurableModel):
         if self._state.adding:
             self.added_to_queue_at = timezone.now()
 
-        user_has_changed = self.pk and self.tracker.has_changed("user")
+        user_has_changed = self.pk and self.tracker.has_changed("user_id")
 
         if self.user and not self.user_assigned_at or user_has_changed:
             self.user_assigned_at = timezone.now()
@@ -289,13 +289,13 @@ class Room(BaseModel, BaseConfigurableModel):
 
         is_new = self._state.adding
 
-        queue_has_changed = self.tracker.has_changed("queue")
-        old_queue = self.tracker.previous("queue")
+        queue_has_changed = self.tracker.has_changed("queue_id")
+        old_queue_id = self.tracker.previous("queue_id")
 
         super().save(*args, **kwargs)
 
-        if queue_has_changed and old_queue and self.queue:
-            old_queue = Queue.objects.get(pk=old_queue)
+        if queue_has_changed and old_queue_id and self.queue:
+            old_queue = Queue.objects.get(pk=old_queue_id)
 
             if old_queue.sector != self.queue.sector:
                 self.tags.clear()
