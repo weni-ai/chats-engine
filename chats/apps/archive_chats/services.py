@@ -4,7 +4,6 @@ import json
 import logging
 
 import boto3
-import re
 from typing import List
 from uuid import UUID
 from django.core.exceptions import ValidationError
@@ -22,7 +21,6 @@ from chats.apps.archive_chats.models import (
     RoomArchivedConversation,
 )
 from chats.apps.archive_chats.serializers import ArchiveMessageSerializer
-from chats.apps.archive_chats.uploads import media_upload_to
 from chats.apps.core.integrations.aws.s3.helpers import is_file_in_the_same_bucket
 from chats.apps.core.integrations.aws.s3.helpers import get_presigned_url
 from chats.apps.rooms.models import Room

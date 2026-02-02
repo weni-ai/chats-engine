@@ -3,7 +3,6 @@ from unittest.mock import patch, MagicMock
 import uuid
 
 
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
@@ -15,8 +14,7 @@ from chats.apps.archive_chats.models import (
 )
 from chats.apps.archive_chats.serializers import ArchiveMessageSerializer
 from chats.apps.archive_chats.services import ArchiveChatsService
-from chats.apps.archive_chats.uploads import media_upload_to
-from chats.apps.msgs.models import AutomaticMessage, Message, MessageMedia
+from chats.apps.msgs.models import AutomaticMessage, Message
 from chats.apps.rooms.models import Room, RoomNote
 from chats.apps.queues.models import Queue
 from chats.apps.sectors.models import Sector
