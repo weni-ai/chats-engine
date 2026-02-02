@@ -104,6 +104,13 @@ class RoomSerializer(serializers.ModelSerializer):
 
     def get_last_message(self, room: Room):
         if room.last_message_id:
+            media_data = []
+            for media in room.last_message.medias.all():
+                media_data.append({
+                    "content_type": media.content_type,
+                    "url": media.url,
+                    "created_on": media.created_on,
+                })
             return {
                 "uuid": room.last_message.uuid,
                 "text": room.last_message_text or "",
@@ -114,6 +121,7 @@ class RoomSerializer(serializers.ModelSerializer):
                 "contact": room.last_message_contact.uuid
                 if room.last_message_contact
                 else None,
+                "media": media_data,
             }
         return None
 
@@ -224,6 +232,13 @@ class ListRoomSerializer(serializers.ModelSerializer):
 
     def get_last_message(self, room: Room):
         if room.last_message_id:
+            media_data = []
+            for media in room.last_message.medias.all():
+                media_data.append({
+                    "content_type": media.content_type,
+                    "url": media.url,
+                    "created_on": media.created_on,
+                })
             return {
                 "uuid": room.last_message.uuid,
                 "text": room.last_message_text or "",
@@ -234,6 +249,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
                 "contact": room.last_message_contact.uuid
                 if room.last_message_contact
                 else None,
+                "media": media_data,
             }
         return {
             "uuid": None,
@@ -241,6 +257,7 @@ class ListRoomSerializer(serializers.ModelSerializer):
             "created_on": None,
             "user": None,
             "contact": None,
+            "media": [],
         }
 
     def get_is_pinned(self, room: Room) -> bool:
