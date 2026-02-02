@@ -167,6 +167,11 @@ class Room(BaseModel, BaseConfigurableModel):
         on_delete=models.SET_NULL,
         related_name="+",
     )
+    last_message_media = models.JSONField(
+        _("Last message media"),
+        default=list,
+        blank=True,
+    )
 
     tracker = FieldTracker(fields=["user", "queue"])
 
@@ -728,12 +733,17 @@ class Room(BaseModel, BaseConfigurableModel):
         """
         Updates last message fields. Used for agent/system messages.
         """
+        media_data = [
+            {"content_type": media.content_type, "url": media.url}
+            for media in message.medias.all()
+        ]
         Room.objects.filter(pk=self.pk).update(
             last_interaction=message.created_on,
             last_message=message,
             last_message_text=message.text,
             last_message_user=user,
             last_message_contact=None,
+            last_message_media=media_data,
         )
 
     def on_new_message(self, message, contact=None, increment_unread: int = 0):
@@ -742,12 +752,17 @@ class Room(BaseModel, BaseConfigurableModel):
         Single UPDATE with all last_message fields.
         Only updates if message is newer than last_interaction.
         """
+        media_data = [
+            {"content_type": media.content_type, "url": media.url}
+            for media in message.medias.all()
+        ]
         update_fields = {
             "last_interaction": message.created_on,
             "last_message": message,
             "last_message_text": message.text,
             "last_message_user": None,
             "last_message_contact": contact,
+            "last_message_media": media_data,
         }
 
         if increment_unread > 0:
