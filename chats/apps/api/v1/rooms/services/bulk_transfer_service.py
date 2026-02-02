@@ -4,6 +4,8 @@ from typing import Optional
 from django.db.models import QuerySet
 
 from chats.apps.accounts.models import User
+from chats.apps.dashboard.models import RoomMetrics
+from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
 from chats.apps.projects.models.models import ProjectPermission
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.choices import RoomFeedbackMethods
@@ -21,7 +23,9 @@ class BulkTransferService:
     Service for bulk transferring rooms.
     """
 
-    def transfer_user_and_queue(self, rooms: QuerySet[Room], user: User, queue: Queue, user_request: User):
+    def transfer_user_and_queue(
+        self, rooms: QuerySet[Room], user: User, queue: Queue, user_request: User
+    ):
         for room in rooms:
             old_user = room.user
             old_queue = room.queue
@@ -30,6 +34,12 @@ class BulkTransferService:
             room.queue = queue
 
             room.save()
+
+            metrics = RoomMetrics.objects.get_or_create(room=room)[0]
+
+            metrics.waiting_time += calculate_last_queue_waiting_time(room)
+            metrics.queued_count += 1
+            metrics.save()
 
             feedback_queue = create_transfer_json(
                 action="transfer",
@@ -45,10 +55,16 @@ class BulkTransferService:
             )
 
         create_room_feedback_message(
-            room, feedback_queue, method=RoomFeedbackMethods.ROOM_TRANSFER, requested_by=user_request
+            room,
+            feedback_queue,
+            method=RoomFeedbackMethods.ROOM_TRANSFER,
+            requested_by=user_request,
         )
         create_room_feedback_message(
-            room, feedback_user, method=RoomFeedbackMethods.ROOM_TRANSFER, requested_by=user_request
+            room,
+            feedback_user,
+            method=RoomFeedbackMethods.ROOM_TRANSFER,
+            requested_by=user_request,
         )
         room.notify_queue("update")
         room.notify_user("update", user=old_user)
@@ -82,6 +98,12 @@ class BulkTransferService:
             room.user = user
             room.save()
 
+            metrics = RoomMetrics.objects.get_or_create(room=room)[0]
+
+            metrics.waiting_time += calculate_last_queue_waiting_time(room)
+            metrics.queued_count += 1
+            metrics.save()
+
             logger.info(
                 "Starting queue priority routing for room %s from bulk transfer to user %s",
                 room.uuid,
@@ -90,7 +112,10 @@ class BulkTransferService:
             start_queue_priority_routing(room.queue)
 
             create_room_feedback_message(
-                room, feedback_user, method=RoomFeedbackMethods.ROOM_TRANSFER, requested_by=user_request
+                room,
+                feedback_user,
+                method=RoomFeedbackMethods.ROOM_TRANSFER,
+                requested_by=user_request,
             )
             if old_user:
                 room.notify_user("update", user=old_user)
@@ -124,7 +149,10 @@ class BulkTransferService:
             room.save()
 
             create_room_feedback_message(
-                room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER, requested_by=user_request
+                room,
+                feedback,
+                method=RoomFeedbackMethods.ROOM_TRANSFER,
+                requested_by=user_request,
             )
             room.notify_user("update", user=transfer_user)
             room.notify_queue("update")
