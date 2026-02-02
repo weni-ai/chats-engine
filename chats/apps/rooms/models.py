@@ -162,6 +162,11 @@ class Room(BaseModel, BaseConfigurableModel):
         on_delete=models.SET_NULL,
         related_name="+",
     )
+    last_message_media = models.JSONField(
+        _("Last message media"),
+        default=list,
+        blank=True,
+    )
 
     # Denormalized fields to avoid joins with messages table
     first_agent_message_at = models.DateTimeField(
@@ -777,18 +782,21 @@ class Room(BaseModel, BaseConfigurableModel):
         Updates last message fields. Used for agent/system messages.
         Also updates denormalized agent message fields when user is provided.
         """
+        media_data = [
+            {"content_type": media.content_type, "url": media.url}
+            for media in message.medias.all()
+        ]
         update_fields = {
             "last_interaction": message.created_on,
             "last_message": message,
             "last_message_text": message.text,
             "last_message_user": user,
             "last_message_contact": None,
+            "last_message_media": media_data,
         }
 
-        # Update denormalized agent message fields
         if user is not None:
             update_fields["has_agent_messages"] = True
-            # Only update first_agent_message_at if not already set
             Room.objects.filter(pk=self.pk, first_agent_message_at__isnull=True).update(
                 first_agent_message_at=message.created_on
             )
@@ -801,12 +809,17 @@ class Room(BaseModel, BaseConfigurableModel):
         Single UPDATE with all last_message fields.
         Only updates if message is newer than last_interaction.
         """
+        media_data = [
+            {"content_type": media.content_type, "url": media.url}
+            for media in message.medias.all()
+        ]
         update_fields = {
             "last_interaction": message.created_on,
             "last_message": message,
             "last_message_text": message.text,
             "last_message_user": None,
             "last_message_contact": contact,
+            "last_message_media": media_data,
         }
 
         if increment_unread > 0:

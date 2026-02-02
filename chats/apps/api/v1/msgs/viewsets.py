@@ -68,8 +68,14 @@ class MessageViewset(
                     from chats.apps.dashboard.tasks import calculate_first_response_time_task
                     calculate_first_response_time_task.delay(str(message.room.uuid))
 
-            message = serializer.instance
-            if message.text:
+            instance = serializer.instance
+            if isinstance(instance, MessageMedia):
+                message = instance.message
+            else:
+                message = instance
+
+            has_content = message.text or message.medias.exists()
+            if has_content:
                 message.room.update_last_message(
                     message=message,
                     user=message.user,
