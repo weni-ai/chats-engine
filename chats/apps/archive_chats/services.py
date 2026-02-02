@@ -214,9 +214,7 @@ class ArchiveChatsService(BaseArchiveChatsService):
         if is_file_in_the_same_bucket(
             media.media_file.url, settings.AWS_STORAGE_BUCKET_NAME
         ):
-            object_key = self._copy_file_using_server_side_copy(
-                media, media.media_file.name
-            )
+            object_key = media.media_file.name
 
             return self._get_redirect_url(object_key)
 
@@ -228,31 +226,7 @@ class ArchiveChatsService(BaseArchiveChatsService):
 
         return f"{base_url}{path}?object_key={object_key}"
 
-    def _copy_file_using_server_side_copy(
-        self, message_media: MessageMedia, filename: str
-    ) -> str:
-        """
-        Copy a file from the original bucket to the new bucket using server-side copy.
-        """
-        original_key = message_media.media_file.name
-        new_key = media_upload_to(message_media.message, filename)
-
-        self.bucket.copy(
-            {
-                "Bucket": self.bucket.name,
-                "Key": original_key,
-            },
-            new_key,
-        )
-
-        return new_key
-
     def get_archived_media_url(self, object_key: str) -> str:
-        valid_pattern = r"^archived_conversations/[^/]+/[^/]+/media/.+$"
-
-        if not re.fullmatch(valid_pattern, object_key):
-            raise InvalidObjectKey("Invalid object key")
-
         parts = object_key.split("/")
 
         project_uuid = parts[1]
@@ -263,5 +237,17 @@ class ArchiveChatsService(BaseArchiveChatsService):
                 UUID(_uuid)
             except ValueError:
                 raise InvalidObjectKey("Invalid object key")
+
+        try:
+            room = Room.objects.get(uuid=room_uuid)
+        except Room.DoesNotExist:
+            raise InvalidObjectKey("Room not found")
+
+        is_archived = RoomArchivedConversation.objects.filter(
+            room=room, status=ArchiveConversationsJobStatus.FINISHED
+        ).exists()
+
+        if not is_archived:
+            raise InvalidObjectKey("Room is not archived")
 
         return get_presigned_url(object_key)

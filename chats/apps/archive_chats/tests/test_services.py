@@ -282,16 +282,18 @@ class TestArchiveChatsService(TestCase):
             f"https://test-bucket.s3.amazonaws.com/{object_key}"
         )
 
+        RoomArchivedConversation.objects.create(
+            job=self.service.start_archive_job(),
+            room=self.room,
+            status=ArchiveConversationsJobStatus.FINISHED,
+        )
+
         url = self.service.get_archived_media_url(object_key)
 
         self.assertEqual(
             url,
             f"https://test-bucket.s3.amazonaws.com/{object_key}",
         )
-
-    def test_get_archived_media_url_with_invalid_object_key_pattern(self):
-        with self.assertRaises(InvalidObjectKey):
-            self.service.get_archived_media_url("invalid-object-key")
 
     def test_get_archived_media_url_with_invalid_project_uuid(self):
         valid_uuid = uuid.uuid4()
@@ -314,34 +316,14 @@ class TestArchiveChatsService(TestCase):
                 f"archived_conversations/{valid_uuid}/{valid_uuid}/messages.jsonl"
             )
 
-    def test_copy_file_using_server_side_copy(self):
-        message_media = MessageMedia.objects.create(
-            message=Message.objects.create(room=self.room),
-            content_type="image/png",
-            media_file=SimpleUploadedFile(
-                "test.png", b"file_content", content_type="image/png"
-            ),
-        )
+    def test_get_archived_media_url_with_room_not_archived(self):
+        with self.assertRaises(InvalidObjectKey):
+            self.service.get_archived_media_url(
+                f"archived_conversations/{self.project.uuid}/{self.room.uuid}/media/test.jpg"
+            )
 
-        self.service._copy_file_using_server_side_copy(message_media, "test.png")
-        self.bucket.copy.assert_called_once_with(
-            {
-                "Bucket": self.bucket.name,
-                "Key": message_media.media_file.name,
-            },
-            media_upload_to(message_media.message, "test.png"),
-        )
-
-    @patch("chats.apps.archive_chats.services.get_presigned_url")
-    def test_get_archived_media_url_with_subfolder(self, mock_get_presigned_url):
-        object_key = f"archived_conversations/{self.project.uuid}/{self.room.uuid}/media/subfolder/test.jpg"
-        mock_get_presigned_url.return_value = (
-            f"https://test-bucket.s3.amazonaws.com/{object_key}"
-        )
-
-        url = self.service.get_archived_media_url(object_key)
-
-        self.assertEqual(
-            url,
-            f"https://test-bucket.s3.amazonaws.com/{object_key}",
-        )
+    def test_get_archived_media_url_with_non_existent_room(self):
+        with self.assertRaises(InvalidObjectKey):
+            self.service.get_archived_media_url(
+                f"archived_conversations/{self.project.uuid}/{uuid.uuid4()}/media/test.jpg"
+            )
