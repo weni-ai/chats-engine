@@ -3,7 +3,6 @@ import io
 import json
 import logging
 
-import re
 from typing import List
 from uuid import UUID
 from django.core.exceptions import ValidationError
@@ -180,11 +179,6 @@ class ArchiveChatsService(BaseArchiveChatsService):
         return room_archived_conversation
 
     def get_archived_media_url(self, object_key: str) -> str:
-        valid_pattern = r"^archived_conversations/[^/]+/[^/]+/media/.+$"
-
-        if not re.fullmatch(valid_pattern, object_key):
-            raise InvalidObjectKey("Invalid object key")
-
         parts = object_key.split("/")
 
         project_uuid = parts[1]
@@ -195,5 +189,17 @@ class ArchiveChatsService(BaseArchiveChatsService):
                 UUID(_uuid)
             except ValueError:
                 raise InvalidObjectKey("Invalid object key")
+
+        try:
+            room = Room.objects.get(uuid=room_uuid)
+        except Room.DoesNotExist:
+            raise InvalidObjectKey("Room not found")
+
+        is_archived = RoomArchivedConversation.objects.filter(
+            room=room, status=ArchiveConversationsJobStatus.FINISHED
+        ).exists()
+
+        if not is_archived:
+            raise InvalidObjectKey("Room is not archived")
 
         return get_presigned_url(object_key)
