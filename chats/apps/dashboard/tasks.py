@@ -3,16 +3,18 @@ import logging
 import os
 import zipfile
 from datetime import datetime, timedelta, timezone
-from typing import Optional
+from typing import Optional, List
 from uuid import UUID
 
 import pandas as pd
 from django.conf import settings
+from django.core.files.base import ContentFile
 from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
 
 from chats.apps.dashboard.email_templates import get_report_ready_email
 from chats.apps.dashboard.models import ReportStatus, RoomMetrics
+from chats.core.storages import ExcelStorage
 from chats.apps.dashboard.utils import (
     calculate_first_response_time,
     calculate_last_queue_waiting_time,
@@ -170,6 +172,155 @@ def _get_chunk_size(total_records: int) -> int:
         if total_records > (base_chunk_size * 10)
         else base_chunk_size
     )
+
+
+def _get_parts_dir(project_uuid: UUID, report_uuid: UUID) -> str:
+    """Returns the directory path for report parts."""
+    return f"reports/{project_uuid}/{report_uuid}/tmp"
+
+
+def _list_existing_parts(storage: ExcelStorage, parts_dir: str) -> List[str]:
+    """Lists existing CSV parts sorted by name."""
+    try:
+        _, files = storage.listdir(parts_dir)
+    except Exception:
+        return []
+
+    parts = sorted(f for f in files if f.startswith("rooms.part") and f.endswith(".csv"))
+    return [f"{parts_dir}/{name}" for name in parts]
+
+
+def _write_chunk_to_part(
+    storage: ExcelStorage,
+    parts_dir: str,
+    part_idx: int,
+    df: pd.DataFrame,
+    include_header: bool,
+) -> None:
+    """Writes a single chunk as a CSV part file."""
+    csv_content = df.to_csv(index=False, header=include_header)
+    part_name = f"{parts_dir}/rooms.part{part_idx:06d}.csv"
+    storage.save(part_name, ContentFile(csv_content.encode("utf-8")))
+
+
+def _write_parts_from_queryset(
+    storage: ExcelStorage,
+    parts_dir: str,
+    qs,
+    chunk_size: int,
+    existing_count: int,
+    project_tz=None,
+) -> None:
+    """Writes queryset data as CSV parts, resuming from existing_count."""
+    total = qs.count()
+    if total == 0:
+        return
+
+    next_start = existing_count * chunk_size
+    part_idx = existing_count
+    header_written = existing_count > 0
+
+    for start in range(next_start, total, chunk_size):
+        end = min(start + chunk_size, total)
+        logging.info(
+            "Writing part: start=%s end=%s total=%s part_idx=%s",
+            start,
+            end,
+            total,
+            part_idx,
+        )
+        chunk = _strip_tz(list(qs[start:end]), project_tz)
+        if not chunk:
+            continue
+
+        df = _excel_safe_dataframe(pd.DataFrame(chunk), project_tz)
+        _write_chunk_to_part(storage, parts_dir, part_idx, df, not header_written)
+        header_written = True
+        part_idx += 1
+
+
+def _read_part_content(storage: ExcelStorage, part_path: str) -> str:
+    """Reads content from a part file."""
+    with storage.open(part_path, "rb") as f:
+        return f.read().decode("utf-8")
+
+
+def _finalize_xlsx_from_parts(
+    storage: ExcelStorage, parts: List[str], rooms_cfg: dict
+) -> bytes:
+    """Combines CSV parts into a final XLSX file."""
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+        if not parts:
+            requested_fields = rooms_cfg.get("fields") or []
+            pd.DataFrame(columns=requested_fields).to_excel(
+                writer, sheet_name="rooms", index=False
+            )
+            return output.getvalue()
+
+        current_row = 0
+        for idx, part_path in enumerate(parts):
+            content = _read_part_content(storage, part_path)
+            if not content or not content.strip():
+                continue
+
+            # Skip header for non-first parts
+            if idx > 0 and "\n" in content:
+                content = content.split("\n", 1)[1]
+            if not content.strip():
+                continue
+
+            df = pd.read_csv(io.StringIO(content))
+            if df.empty:
+                continue
+
+            df.to_excel(
+                writer,
+                sheet_name="rooms",
+                index=False,
+                header=(current_row == 0),
+                startrow=current_row if current_row > 0 else 0,
+            )
+            current_row += len(df)
+
+    output.seek(0)
+    return output.getvalue()
+
+
+def _finalize_csv_from_parts(
+    storage: ExcelStorage, parts: List[str], rooms_cfg: dict
+) -> bytes:
+    """Combines CSV parts into a final CSV file."""
+    combined = io.StringIO()
+
+    if not parts:
+        requested_fields = rooms_cfg.get("fields") or []
+        if requested_fields:
+            combined.write(",".join(requested_fields) + "\n")
+        return combined.getvalue().encode("utf-8")
+
+    for idx, part_path in enumerate(parts):
+        content = _read_part_content(storage, part_path)
+        if not content:
+            continue
+
+        if idx == 0:
+            combined.write(content)
+        else:
+            # Skip header for non-first parts
+            content = content.split("\n", 1)[1] if "\n" in content else ""
+            combined.write(content)
+
+    return combined.getvalue().encode("utf-8")
+
+
+def _finalize_from_parts(
+    storage: ExcelStorage, parts: List[str], file_type: str, rooms_cfg: dict
+) -> bytes:
+    """Finalizes report from parts based on file type."""
+    if file_type == "xlsx":
+        return _finalize_xlsx_from_parts(storage, parts, rooms_cfg)
+    return _finalize_csv_from_parts(storage, parts, rooms_cfg)
 
 
 def generate_metrics(room_uuid: UUID):
@@ -438,86 +589,137 @@ def _process_csv_report(
     return zip_buf
 
 
+def _select_report_to_process():
+    """Selects a pending or failed report for processing."""
+    with transaction.atomic():
+        report = (
+            ReportStatus.objects.select_for_update(skip_locked=True)
+            .filter(status__in=["pending", "failed"])
+            .order_by("created_on")
+            .first()
+        )
+        if report:
+            report.status = "in_progress"
+            report.save()
+        return report
+
+
+def _process_report_with_resume(report, view, available_fields, project_tz):
+    """Processes report with resume capability using parts."""
+    fields_config = report.fields_config or {}
+    file_type = _norm_file_type(fields_config.get("type"))
+    chunk_size = getattr(settings, "REPORTS_CHUNK_SIZE", 5000)
+
+    storage = ExcelStorage()
+    parts_dir = _get_parts_dir(report.project.uuid, report.uuid)
+
+    # Get rooms queryset
+    rooms_cfg = fields_config.get("rooms") or {}
+    qs = None
+    if rooms_cfg:
+        query_data = view._process_model_fields(
+            "rooms", rooms_cfg, report.project, available_fields
+        )
+        qs = (query_data or {}).get("queryset")
+
+    # Check existing parts for resume
+    existing_parts = _list_existing_parts(storage, parts_dir)
+    existing_count = len(existing_parts)
+
+    if existing_count > 0:
+        logging.info(
+            "Resuming report %s from part %s", report.uuid, existing_count
+        )
+
+    # Write remaining parts
+    if qs is not None:
+        _write_parts_from_queryset(
+            storage, parts_dir, qs, chunk_size, existing_count, project_tz
+        )
+
+    # Finalize from all parts
+    all_parts = _list_existing_parts(storage, parts_dir)
+    final_bytes = _finalize_from_parts(storage, all_parts, file_type, rooms_cfg)
+
+    return io.BytesIO(final_bytes), file_type
+
+
+def _save_and_send_report(report, output, file_type, user_email):
+    """Saves report locally and sends email if configured."""
+    project = report.project
+    dt = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
+
+    if getattr(settings, "REPORTS_SAVE_LOCALLY", True):
+        file_path = _save_report_locally(output, project.uuid, dt, file_type)
+        logging.info(
+            "Custom report saved at: %s | report_uuid=%s", file_path, report.uuid
+        )
+
+    logging.info(
+        "Processing report %s for project %s done.", report.uuid, project.uuid
+    )
+
+    if getattr(settings, "REPORTS_SEND_EMAILS", False):
+        try:
+            _send_report_email(
+                project.name,
+                project.uuid,
+                user_email,
+                output,
+                dt,
+                file_type,
+                report.uuid,
+            )
+        except Exception as e:
+            logging.exception("Error sending email report: %s", e)
+
+
+def _handle_report_error(report, error, user_email):
+    """Handles report processing error."""
+    logging.exception("Error processing pending report: %s", error)
+    report.status = "failed"
+    report.error_message = str(error)
+    report.save()
+
+    if getattr(settings, "REPORTS_SEND_EMAILS", False):
+        try:
+            _send_error_email(
+                report.project.name, user_email, str(error), report.uuid
+            )
+        except Exception as email_error:
+            logging.exception(
+                "Error sending error notification email: %s", email_error
+            )
+
+
 @app.task(name="process_pending_reports")
 def process_pending_reports():
     """
-    Periodic task to process pending reports, in chunks.
+    Periodic task to process pending/failed reports with resume capability.
     """
     from chats.apps.api.v1.dashboard.presenter import ModelFieldsPresenter
     from chats.apps.api.v1.dashboard.viewsets import ReportFieldsValidatorViewSet
 
-    with transaction.atomic():
-        report = (
-            ReportStatus.objects.select_for_update(skip_locked=True)
-            .filter(status="pending")
-            .order_by("created_on")
-            .first()
-        )
-        if not report:
-            logging.info("No pending reports to process.")
-            return
-        report.status = "in_progress"
-        report.save()
+    report = _select_report_to_process()
+    if not report:
+        logging.info("No pending reports to process.")
+        return
 
-    project = report.project
-    project_tz = project.timezone
-    fields_config = report.fields_config or {}
+    project_tz = report.project.timezone
     user_email = report.user.email
 
     try:
         view = ReportFieldsValidatorViewSet()
         available_fields = ModelFieldsPresenter.get_models_info()
-        file_type = _norm_file_type(fields_config.get("type"))
 
-        if file_type == "xlsx":
-            output = io.BytesIO()
-            _process_xlsx_report(
-                view, fields_config, project, available_fields, output, project_tz
-            )
-        else:
-            output = _process_csv_report(
-                view, fields_config, project, available_fields, project_tz
-            )
-
-        dt = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
-
-        if getattr(settings, "REPORTS_SAVE_LOCALLY", True):
-            file_path = _save_report_locally(output, project.uuid, dt, file_type)
-            logging.info(
-                "Custom report saved at: %s | report_uuid=%s", file_path, report.uuid
-            )
-
-        logging.info(
-            "Processing report %s for project %s done.", report.uuid, project.uuid
+        output, file_type = _process_report_with_resume(
+            report, view, available_fields, project_tz
         )
 
-        if getattr(settings, "REPORTS_SEND_EMAILS", False):
-            try:
-                _send_report_email(
-                    project.name,
-                    project.uuid,
-                    user_email,
-                    output,
-                    dt,
-                    file_type,
-                    report.uuid,
-                )
-            except Exception as e:
-                logging.exception("Error sending email report: %s", e)
+        _save_and_send_report(report, output, file_type, user_email)
 
         report.status = "ready"
         report.save()
 
     except Exception as e:
-        logging.exception("Error processing pending report: %s", e)
-        report.status = "failed"
-        report.error_message = str(e)
-        report.save()
-
-        if getattr(settings, "REPORTS_SEND_EMAILS", False):
-            try:
-                _send_error_email(project.name, user_email, str(e), report.uuid)
-            except Exception as email_error:
-                logging.exception(
-                    "Error sending error notification email: %s", email_error
-                )
+        _handle_report_error(report, e, user_email)
