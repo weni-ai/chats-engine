@@ -445,11 +445,10 @@ class RoomViewset(
         # Create transfer object based on whether it's a user or a queue transfer and add it to the history
         if user:
             if old_instance.user is None:
-                time = timezone.now() - old_instance.modified_on
                 room_metric = RoomMetrics.objects.select_related("room").get_or_create(
                     room=instance
                 )[0]
-                room_metric.waiting_time += time.total_seconds()
+                room_metric.waiting_time += calculate_last_queue_waiting_time(instance)
                 room_metric.queued_count += 1
                 room_metric.save()
             else:
@@ -493,7 +492,10 @@ class RoomViewset(
         # Create a message with the transfer data and Send to the room group
         # TODO separate create message in a function
         create_room_feedback_message(
-            instance, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER, requested_by=self.request.user
+            instance,
+            feedback,
+            method=RoomFeedbackMethods.ROOM_TRANSFER,
+            requested_by=self.request.user,
         )
 
         if old_user is None and user:  # queued > agent
@@ -596,7 +598,10 @@ class RoomViewset(
             "new": new_custom_field_value,
         }
         create_room_feedback_message(
-            room, feedback, method=RoomFeedbackMethods.EDIT_CUSTOM_FIELDS, requested_by=request.user
+            room,
+            feedback,
+            method=RoomFeedbackMethods.EDIT_CUSTOM_FIELDS,
+            requested_by=request.user,
         )
 
         return Response(
@@ -643,7 +648,10 @@ class RoomViewset(
             room.add_transfer_to_history(feedback)
 
             create_room_feedback_message(
-                room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER, requested_by=request.user
+                room,
+                feedback,
+                method=RoomFeedbackMethods.ROOM_TRANSFER,
+                requested_by=request.user,
             )
             room.notify_queue("update")
 
