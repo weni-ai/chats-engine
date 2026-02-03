@@ -290,7 +290,7 @@ class BulkCloseService:
         """
         Clear all pins for the rooms in a single DELETE query.
         """
-        room_ids = [room.id for room in rooms_list]
+        room_ids = [room.pk for room in rooms_list]
         deleted_count, _ = RoomPin.objects.filter(room_id__in=room_ids).delete()
 
         logger.debug(f"Bulk deleted {deleted_count} pins for {len(rooms_list)} rooms")
