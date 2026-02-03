@@ -600,19 +600,24 @@ class BulkTransferSerializer(serializers.Serializer):
         return super().validate(attrs)
 
 
-class BulkCloseSerializer(serializers.Serializer):
-    rooms = serializers.ListField(
-        child=serializers.UUIDField(),
-        min_length=1,
-        max_length=5000,
-        required=True,
-        help_text="List of room UUIDs to close (max 5000)"
-    )
+class RoomToCloseSerializer(serializers.Serializer):
+    """Serializer for individual room to close with its specific tags"""
+    uuid = serializers.UUIDField(required=True, help_text="Room UUID to close")
     tags = serializers.ListField(
         child=serializers.UUIDField(),
         required=False,
         default=list,
-        help_text="List of tag UUIDs to apply to closed rooms"
+        help_text="List of tag UUIDs to apply to this specific room"
+    )
+
+
+class BulkCloseSerializer(serializers.Serializer):
+    rooms = serializers.ListField(
+        child=RoomToCloseSerializer(),
+        min_length=1,
+        max_length=5000,
+        required=True,
+        help_text="List of rooms to close with their specific tags (max 5000)"
     )
     end_by = serializers.CharField(
         max_length=50,
@@ -629,44 +634,59 @@ class BulkCloseSerializer(serializers.Serializer):
 
     def validate_rooms(self, value):
         """
-        Validate that room UUIDs exist and are active.
+        Validate rooms and their tags.
         """
         if not value:
-            raise serializers.ValidationError("At least one room UUID is required")
+            raise serializers.ValidationError("At least one room is required")
         
         if len(value) > 5000:
             raise serializers.ValidationError("Cannot close more than 5000 rooms at once")
         
-        # Check that rooms exist
-        existing_rooms = Room.objects.filter(uuid__in=value, is_active=True)
-        existing_count = existing_rooms.count()
+        # Extract UUIDs and validate unique
+        room_uuids = [room_data["uuid"] for room_data in value]
+        if len(room_uuids) != len(set(room_uuids)):
+            raise serializers.ValidationError("Duplicate room UUIDs found")
         
-        if existing_count == 0:
+        # Check that rooms exist and are active
+        existing_rooms = Room.objects.filter(uuid__in=room_uuids, is_active=True).select_related(
+            "queue__sector"
+        )
+        existing_room_uuids = {str(room.uuid) for room in existing_rooms}
+        
+        if not existing_room_uuids:
             raise serializers.ValidationError("No active rooms found with the provided UUIDs")
         
-        if existing_count < len(value):
+        if len(existing_room_uuids) < len(room_uuids):
             logger.warning(
-                f"BulkCloseSerializer: {len(value) - existing_count} rooms not found or already closed"
+                f"BulkCloseSerializer: {len(room_uuids) - len(existing_room_uuids)} rooms not found or already closed"
             )
         
-        return value
-
-    def validate_tags(self, value):
-        """
-        Validate that tag UUIDs exist.
-        """
-        if not value:
-            return []
+        # Validate tags for each room
+        room_uuid_to_sector = {str(room.uuid): room.queue.sector for room in existing_rooms}
         
-        # Check that tags exist
-        existing_tags = SectorTag.objects.filter(uuid__in=value)
-        existing_count = existing_tags.count()
-        
-        if existing_count != len(value):
-            missing_count = len(value) - existing_count
-            raise serializers.ValidationError(
-                f"{missing_count} tag(s) not found with the provided UUIDs"
-            )
+        for room_data in value:
+            room_uuid = str(room_data["uuid"])
+            tags = room_data.get("tags", [])
+            
+            if room_uuid not in existing_room_uuids:
+                continue  # Will be handled as "not found" later
+            
+            sector = room_uuid_to_sector[room_uuid]
+            
+            if tags:
+                # Validate that tags exist and belong to the room's sector
+                tag_uuids = [str(tag_uuid) for tag_uuid in tags]
+                existing_tags = SectorTag.objects.filter(
+                    uuid__in=tag_uuids,
+                    sector=sector
+                )
+                existing_tag_uuids = {str(tag.uuid) for tag in existing_tags}
+                
+                invalid_tags = set(tag_uuids) - existing_tag_uuids
+                if invalid_tags:
+                    raise serializers.ValidationError(
+                        f"Room {room_uuid}: {len(invalid_tags)} tag(s) not found or don't belong to room's sector"
+                    )
         
         return value
 
@@ -687,7 +707,8 @@ class BulkCloseSerializer(serializers.Serializer):
         """
         Additional cross-field validations.
         """
-        rooms_uuids = attrs.get("rooms", [])
+        rooms_data = attrs.get("rooms", [])
+        room_uuids = [room_data["uuid"] for room_data in rooms_data]
         closed_by = attrs.get("closed_by_email")
         request = self.context.get("request")
         
@@ -697,7 +718,7 @@ class BulkCloseSerializer(serializers.Serializer):
             
             # Get all unique projects from the rooms
             rooms_qs = Room.objects.filter(
-                uuid__in=rooms_uuids,
+                uuid__in=room_uuids,
                 is_active=True
             ).select_related("queue__sector__project")
             
