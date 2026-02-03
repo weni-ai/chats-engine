@@ -786,22 +786,14 @@ class Room(BaseModel, BaseConfigurableModel):
             {"content_type": media.content_type, "url": media.url}
             for media in message.medias.all()
         ]
-        update_fields = {
-            "last_interaction": message.created_on,
-            "last_message": message,
-            "last_message_text": message.text,
-            "last_message_user": user,
-            "last_message_contact": None,
-            "last_message_media": media_data,
-        }
-
-        if user is not None:
-            update_fields["has_agent_messages"] = True
-            Room.objects.filter(pk=self.pk, first_agent_message_at__isnull=True).update(
-                first_agent_message_at=message.created_on
-            )
-
-        Room.objects.filter(pk=self.pk).update(**update_fields)
+        Room.objects.filter(pk=self.pk).update(
+            last_interaction=message.created_on,
+            last_message=message,
+            last_message_text=message.text,
+            last_message_user=user,
+            last_message_contact=None,
+            last_message_media=media_data,
+        )
 
     def on_new_message(self, message, contact=None, increment_unread: int = 0):
         """

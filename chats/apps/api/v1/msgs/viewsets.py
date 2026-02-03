@@ -54,18 +54,26 @@ class MessageViewset(
         with transaction.atomic():
             serializer.save()
             serializer.instance.notify_room("create", True)
-            
+
             message = serializer.instance
-            print(f"DEBUG - User: {message.user}, first_user_assigned_at: {message.room.first_user_assigned_at}")
-            
+            print(
+                f"DEBUG - User: {message.user}, first_user_assigned_at: {message.room.first_user_assigned_at}"
+            )
+
             if message.user and message.room.first_user_assigned_at:
                 try:
                     metric = message.room.metric
                     if metric.first_response_time is None:
-                        from chats.apps.dashboard.tasks import calculate_first_response_time_task
+                        from chats.apps.dashboard.tasks import (
+                            calculate_first_response_time_task,
+                        )
+
                         calculate_first_response_time_task.delay(str(message.room.uuid))
                 except ObjectDoesNotExist:
-                    from chats.apps.dashboard.tasks import calculate_first_response_time_task
+                    from chats.apps.dashboard.tasks import (
+                        calculate_first_response_time_task,
+                    )
+
                     calculate_first_response_time_task.delay(str(message.room.uuid))
 
             instance = serializer.instance

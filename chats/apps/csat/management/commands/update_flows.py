@@ -1,5 +1,6 @@
 from django.core.management.base import BaseCommand
 from rest_framework import status
+from sentry_sdk import capture_message
 
 
 from chats.apps.csat.models import CSATFlowProjectConfig
@@ -74,36 +75,69 @@ class Command(BaseCommand):
 
         flows_client = FlowRESTClient()
 
+        retries = 5
+
         for project_config in projects_configs:
+
             self.stdout.write(
                 f"Updating project config {project_config.project.name} ({project_config.project.uuid})"
             )
 
-            response = flows_client.create_or_update_flow(
-                project_config.project,
-                CSAT_FLOW_DEFINITION_DATA,
-            )
+            is_updated = False
 
-            if not status.is_success(response.status_code):
-                self.stdout.write(
-                    self.style.ERROR(
-                        (
-                            "Failed to update flow for project "
-                            f"{project_config.project.name} "
+            for _ in range(0, retries):
+                response = flows_client.create_or_update_flow(
+                    project_config.project,
+                    CSAT_FLOW_DEFINITION_DATA,
+                )
+
+                if not status.is_success(response.status_code):
+                    try:
+                        content = response.json()
+                    except Exception:
+                        content = response.text
+                    self.stdout.write(
+                        self.style.ERROR(
+                            (
+                                f"Failed to update flow for project: [{response.status_code}] \n{content}\n"
+                                f"{project_config.project.name} "
+                                f"({project_config.project.uuid})"
+                            )
+                        )
+                    )
+                    capture_message(
+                        f"Failed to update flow for project: [{response.status_code}] \n{content}\n"
+                    )
+                    continue
+
+                results = response.json().get("results", [])
+
+                if not results:
+                    self.stdout.write(
+                        self.style.ERROR(
+                            f"No results found for project {project_config.project.name} "
                             f"({project_config.project.uuid})"
                         )
                     )
-                )
-                continue
+                    break
 
-            results = response.json().get("results", [])
-            if not results:
+                if status.is_success(response.status_code):
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"Updated flow for project {project_config.project.name} ({project_config.project.uuid})"
+                        )
+                    )
+                    is_updated = True
+                    break
+
+            if not is_updated:
                 self.stdout.write(
                     self.style.ERROR(
-                        f"No results found for project {project_config.project.name} ({project_config.project.uuid})"
+                        f"Failed to update flow for project {project_config.project.name} "
+                        f"({project_config.project.uuid})"
                     )
                 )
-                continue
+                break
 
             flow_uuid = results[0].get("uuid")
 
