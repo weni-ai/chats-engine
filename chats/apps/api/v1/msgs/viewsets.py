@@ -157,3 +157,10 @@ class MessageMediaViewset(
             instance = serializer.instance
             instance.message.notify_room("update")
             instance.callback()
+
+            # Update last_message when media is added
+            message = instance.message
+            message.room.update_last_message(
+                message=message,
+                user=message.user,
+            )
