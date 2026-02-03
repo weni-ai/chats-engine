@@ -8,7 +8,6 @@ from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
 from chats.apps.contacts.models import Contact
-from chats.apps.msgs.models import Message, MessageMedia
 from chats.apps.projects.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
@@ -28,7 +27,9 @@ class TestMessageViewsetCreateMedia(APITestCase):
             work_end="18:00",
         )
         self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
-        self.contact = Contact.objects.create(name="Test Contact", email="contact@test.com")
+        self.contact = Contact.objects.create(
+            name="Test Contact", email="contact@test.com"
+        )
         self.room = Room.objects.create(
             queue=self.queue,
             contact=self.contact,
@@ -47,24 +48,20 @@ class TestMessageViewsetCreateMedia(APITestCase):
         file_content = BytesIO()
         # Simple 1x1 pixel PNG
         file_content.write(
-            b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01'
-            b'\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00'
-            b'\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00'
-            b'\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82'
+            b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
+            b"\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00"
+            b"\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00\x00\x01\x01\x00"
+            b"\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82"
         )
         file_content.seek(0)
         return SimpleUploadedFile(
-            "test_image.png",
-            file_content.read(),
-            content_type="image/png"
+            "test_image.png", file_content.read(), content_type="image/png"
         )
 
     def _create_test_audio(self):
         """Create a simple test audio file."""
         return SimpleUploadedFile(
-            "test_audio.mp3",
-            b"fake audio content",
-            content_type="audio/mpeg"
+            "test_audio.mp3", b"fake audio content", content_type="audio/mpeg"
         )
 
     @patch("chats.apps.msgs.models.MessageMedia.callback")
@@ -178,7 +175,9 @@ class TestMessageViewsetCreate(APITestCase):
             work_end="18:00",
         )
         self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
-        self.contact = Contact.objects.create(name="Test Contact", email="contact@test.com")
+        self.contact = Contact.objects.create(
+            name="Test Contact", email="contact@test.com"
+        )
         self.room = Room.objects.create(
             queue=self.queue,
             contact=self.contact,
