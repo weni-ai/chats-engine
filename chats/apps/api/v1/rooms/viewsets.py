@@ -722,7 +722,7 @@ class RoomViewset(
     )
     def bulk_close(self, request, pk=None):
         """
-        Endpoint to close multiple rooms in bulk.
+        Endpoint to close multiple rooms in bulk with specific tags per room.
         
         Supports closing rooms that are:
         - In progress (assigned to agents: user__isnull=False)
@@ -730,8 +730,19 @@ class RoomViewset(
         
         Request body:
         {
-            "rooms": ["uuid1", "uuid2", ...],  // Required: List of room UUIDs (max 5000)
-            "tags": ["tag_uuid1", "tag_uuid2"],  // Optional: Tags to apply
+            "rooms": [
+                {
+                    "uuid": "uuid1",
+                    "tags": ["tag_uuid1", "tag_uuid2"]  // Optional: specific tags for this room
+                },
+                {
+                    "uuid": "uuid2",
+                    "tags": ["tag_uuid3"]
+                },
+                {
+                    "uuid": "uuid3"  // No tags
+                }
+            ],
             "end_by": "system",  // Optional: Who/what closed the rooms
             "closed_by_email": "user@example.com"  // Optional: Email of user who closed
         }
@@ -750,10 +761,16 @@ class RoomViewset(
         serializer.is_valid(raise_exception=True)
         
         # Get validated data
-        room_uuids = serializer.validated_data["rooms"]
-        tags = serializer.validated_data.get("tags", [])
+        rooms_data = serializer.validated_data["rooms"]
         end_by = serializer.validated_data.get("end_by", "")
         closed_by = serializer.validated_data.get("closed_by_email")
+        
+        # Extract room UUIDs and build tags map
+        room_uuids = [room_data["uuid"] for room_data in rooms_data]
+        room_tags_map = {
+            str(room_data["uuid"]): [str(tag) for tag in room_data.get("tags", [])]
+            for room_data in rooms_data
+        }
         
         # Fetch active rooms with optimized query
         rooms = Room.objects.filter(
@@ -777,7 +794,7 @@ class RoomViewset(
         try:
             result = service.close(
                 rooms=rooms,
-                tags=tags,
+                room_tags_map=room_tags_map,
                 end_by=end_by,
                 closed_by=closed_by
             )
