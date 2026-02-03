@@ -292,6 +292,7 @@ class RoomViewsetListTests(TestCase):
             f"Too many queries with filters: {len(ctx)}"
         )
 
+
 class RoomViewsetBulkCloseTests(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
@@ -755,7 +756,6 @@ class RoomViewsetBulkCloseTests(TestCase):
 
     def test_bulk_close_with_required_tags_fails_if_no_tags(self):
         """Test that rooms requiring tags fail validation if no tags provided"""
-        from chats.apps.sectors.models import SectorTag
         from chats.apps.queues.models import Queue
 
         # Create a queue that requires tags
