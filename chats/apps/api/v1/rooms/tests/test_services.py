@@ -135,14 +135,14 @@ class BulkCloseServiceTest(TestCase):
             Room.objects.create(queue=self.queue, user=self.user, is_active=True)
             for _ in range(10)
         ]
-        room_ids = [room.id for room in rooms_list]
-        rooms = Room.objects.filter(id__in=room_ids)
+        room_ids = [room.pk for room in rooms_list]
+        rooms = Room.objects.filter(pk__in=room_ids)
 
         result = self.service.close(rooms)
 
         self.assertEqual(result.success_count, 10)
         self.assertEqual(result.failed_count, 0)
-        for room in Room.objects.filter(id__in=room_ids):
+        for room in Room.objects.filter(pk__in=room_ids):
             self.assertFalse(room.is_active)
             self.assertIsNotNone(room.ended_at)
 
@@ -197,7 +197,7 @@ class BulkCloseServiceTest(TestCase):
         RoomPin.objects.create(room=room1, user=self.user)
         RoomPin.objects.create(room=room2, user=self.user)
 
-        rooms = Room.objects.filter(id__in=[room1.id, room2.id])
+        rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk])
 
         self.assertEqual(RoomPin.objects.filter(room__in=rooms).count(), 2)
 
@@ -212,7 +212,7 @@ class BulkCloseServiceTest(TestCase):
         room1 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
         room2 = Room.objects.create(queue=self.queue, user=self.user, is_active=False)
 
-        rooms = Room.objects.filter(id__in=[room1.id, room2.id])
+        rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk])
 
         result = self.service.close(rooms)
 
@@ -236,7 +236,7 @@ class BulkCloseServiceTest(TestCase):
         room1 = Room.objects.create(queue=self.queue, user=None, is_active=True)
         room2 = Room.objects.create(queue=self.queue, user=None, is_active=True)
 
-        rooms = Room.objects.filter(id__in=[room1.id, room2.id])
+        rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk])
 
         result = self.service.close(rooms)
 
@@ -253,7 +253,7 @@ class BulkCloseServiceTest(TestCase):
         room1 = Room.objects.create(queue=self.queue, user=user1, is_active=True)
         room2 = Room.objects.create(queue=self.queue, user=user2, is_active=True)
 
-        rooms = Room.objects.filter(id__in=[room1.id, room2.id])
+        rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk])
 
         result = self.service.close(rooms)
 
@@ -297,15 +297,15 @@ class BulkCloseServiceTest(TestCase):
             Room.objects.create(queue=self.queue, user=self.user, is_active=True)
             for _ in range(100)
         ]
-        room_ids = [room.id for room in rooms_list]
-        rooms = Room.objects.filter(id__in=room_ids)
+        room_ids = [room.pk for room in rooms_list]
+        rooms = Room.objects.filter(pk__in=room_ids)
 
         result = self.service.close(rooms)
 
         self.assertEqual(result.success_count, 100)
         self.assertEqual(result.failed_count, 0)
         # Verify all rooms are closed
-        active_count = Room.objects.filter(id__in=room_ids, is_active=True).count()
+        active_count = Room.objects.filter(pk__in=room_ids, is_active=True).count()
         self.assertEqual(active_count, 0)
 
     def test_close_updates_ended_at_timestamp(self):
@@ -341,7 +341,7 @@ class BulkCloseServiceTest(TestCase):
         room2 = Room.objects.create(queue=self.queue, user=self.user, is_active=False)
         room3 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
 
-        rooms = Room.objects.filter(id__in=[room1.id, room2.id, room3.id])
+        rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk, room3.pk])
 
         result = self.service.close(rooms)
 
@@ -378,7 +378,7 @@ class BulkCloseServiceTest(TestCase):
         tag2 = SectorTag.objects.create(name="Tag2", sector=self.sector)
         tag3 = SectorTag.objects.create(name="Tag3", sector=self.sector)
 
-        rooms = Room.objects.filter(id__in=[room1.id, room2.id, room3.id])
+        rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk, room3.pk])
 
         # Each room gets different tags
         room_tags_map = {
@@ -478,7 +478,7 @@ class BulkCloseServiceTest(TestCase):
         tag1 = SectorTag.objects.create(name="Sector1Tag", sector=self.sector)
         tag2 = SectorTag.objects.create(name="Sector2Tag", sector=sector2)
 
-        rooms = Room.objects.filter(id__in=[room1.id, room2.id])
+        rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk])
 
         # Apply sector-specific tags to each room
         room_tags_map = {
