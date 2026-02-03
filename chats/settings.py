@@ -149,7 +149,7 @@ CACHES = {
 # Connection pooling configuration
 # CONN_MAX_AGE: Keeps connections open for reuse (in seconds)
 # CONN_HEALTH_CHECKS: Validates connection before use (Django 4.1+)
-CONN_MAX_AGE = env.int("CONN_MAX_AGE", default=600)  # 10 minutes default
+CONN_MAX_AGE = env.int("CONN_MAX_AGE", default=60)
 
 DATABASES = {
     "default": {
