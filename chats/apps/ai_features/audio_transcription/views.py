@@ -184,6 +184,6 @@ class AudioTranscriptionFeedbackTagsView(LanguageViewMixin, APIView):
         results = {}
 
         for choice in AudioTranscriptionFeedbackTags:
-            results[choice.value] = _(choice.label)
+            results[choice.value] = str(choice.label)
 
         return Response({"results": results}, status=status.HTTP_200_OK)
