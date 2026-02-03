@@ -1,3 +1,10 @@
+# 3.42.0
+# Fix
+  - Correct interaction time
+# Add
+  - Adding conn max age in chats
+  - Adding media field to serializers
+  
 # 3.41.9
 # Fix
   - close custom status before setting user online
@@ -1021,6 +1028,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 
