@@ -55,12 +55,15 @@ class MessageViewset(
             serializer.instance.notify_room("create", True)
 
             instance = serializer.instance
-            if isinstance(instance, MessageMedia):
+            is_media_instance = isinstance(instance, MessageMedia)
+            if is_media_instance:
                 message = instance.message
             else:
                 message = instance
 
-            has_content = message.text or message.medias.exists()
+            # Se é MessageMedia, já sabemos que tem mídia (não precisamos consultar medias.exists()
+            # que pode ter cache desatualizado da instância criada antes da mídia)
+            has_content = message.text or is_media_instance or message.medias.exists()
             if has_content:
                 message.room.update_last_message(
                     message=message,
