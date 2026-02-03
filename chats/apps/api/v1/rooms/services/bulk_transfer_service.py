@@ -35,11 +35,11 @@ class BulkTransferService:
 
             room.save()
 
-            metrics = RoomMetrics.objects.get_or_create(room=room)[0]
-
-            metrics.waiting_time += calculate_last_queue_waiting_time(room)
-            metrics.queued_count += 1
-            metrics.save()
+            if not old_user:
+                metrics = RoomMetrics.objects.get_or_create(room=room)[0]
+                metrics.waiting_time += calculate_last_queue_waiting_time(room)
+                metrics.queued_count += 1
+                metrics.save()
 
             feedback_queue = create_transfer_json(
                 action="transfer",
@@ -98,11 +98,11 @@ class BulkTransferService:
             room.user = user
             room.save()
 
-            metrics = RoomMetrics.objects.get_or_create(room=room)[0]
-
-            metrics.waiting_time += calculate_last_queue_waiting_time(room)
-            metrics.queued_count += 1
-            metrics.save()
+            if not old_user:
+                metrics = RoomMetrics.objects.get_or_create(room=room)[0]
+                metrics.waiting_time += calculate_last_queue_waiting_time(room)
+                metrics.queued_count += 1
+                metrics.save()
 
             logger.info(
                 "Starting queue priority routing for room %s from bulk transfer to user %s",
