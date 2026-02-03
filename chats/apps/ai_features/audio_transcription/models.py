@@ -69,7 +69,7 @@ class AudioTranscription(BaseModel):
         Uses the same pattern as Room.base_notification - sends to permission or queue group.
         """
         room = self.room
-        
+
         if room.user:
             permission = room.get_permission(room.user)
             if not permission:
