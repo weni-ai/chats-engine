@@ -1,13 +1,14 @@
 import io
 import logging
-import requests
+from typing import Optional
 
+import requests
 from pydub import AudioSegment
 
 logger = logging.getLogger(__name__)
 
 
-def get_audio_duration_seconds(media) -> float | None:
+def get_audio_duration_seconds(media) -> Optional[float]:
     """
     Get the duration of an audio file in seconds.
 
