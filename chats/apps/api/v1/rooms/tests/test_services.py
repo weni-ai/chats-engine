@@ -165,15 +165,19 @@ class BulkCloseServiceTest(TestCase):
         self.assertEqual(room.closed_by, closer_user)
 
     def test_close_with_tags(self):
-        """Test closing rooms and applying tags"""
+        """Test closing rooms and applying specific tags per room"""
         room = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
         tag1 = SectorTag.objects.create(name="Tag1", sector=self.sector)
         tag2 = SectorTag.objects.create(name="Tag2", sector=self.sector)
         rooms = Room.objects.filter(pk=room.pk)
         
+        room_tags_map = {
+            str(room.uuid): [str(tag1.uuid), str(tag2.uuid)]
+        }
+        
         result = self.service.close(
             rooms,
-            tags=[str(tag1.uuid), str(tag2.uuid)]
+            room_tags_map=room_tags_map
         )
         
         self.assertEqual(result.success_count, 1)
@@ -363,3 +367,136 @@ class BulkCloseServiceTest(TestCase):
         self.assertIn("failed_rooms", result_dict)
         self.assertIn("has_more_errors", result_dict)
         self.assertEqual(result_dict["total_processed"], 1)
+    
+    def test_close_with_different_tags_per_room(self):
+        """Test closing multiple rooms with different tags for each"""
+        room1 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+        room2 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+        room3 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+        
+        tag1 = SectorTag.objects.create(name="Tag1", sector=self.sector)
+        tag2 = SectorTag.objects.create(name="Tag2", sector=self.sector)
+        tag3 = SectorTag.objects.create(name="Tag3", sector=self.sector)
+        
+        rooms = Room.objects.filter(id__in=[room1.id, room2.id, room3.id])
+        
+        # Each room gets different tags
+        room_tags_map = {
+            str(room1.uuid): [str(tag1.uuid)],
+            str(room2.uuid): [str(tag2.uuid), str(tag3.uuid)],
+            str(room3.uuid): []  # No tags
+        }
+        
+        result = self.service.close(rooms, room_tags_map=room_tags_map)
+        
+        self.assertEqual(result.success_count, 3)
+        self.assertEqual(result.failed_count, 0)
+        
+        room1.refresh_from_db()
+        room2.refresh_from_db()
+        room3.refresh_from_db()
+        
+        # Verify each room has the correct tags
+        self.assertEqual(room1.tags.count(), 1)
+        self.assertIn(tag1, room1.tags.all())
+        
+        self.assertEqual(room2.tags.count(), 2)
+        self.assertIn(tag2, room2.tags.all())
+        self.assertIn(tag3, room2.tags.all())
+        
+        self.assertEqual(room3.tags.count(), 0)
+    
+    def test_close_with_required_tags_validation(self):
+        """Test that rooms requiring tags fail if no tags provided"""
+        # Create a queue that requires tags
+        queue_with_required_tags = Queue.objects.create(
+            name="Required Tags Queue",
+            sector=self.sector,
+            required_tags=True
+        )
+        
+        room = Room.objects.create(
+            queue=queue_with_required_tags,
+            user=self.user,
+            is_active=True
+        )
+        
+        rooms = Room.objects.filter(pk=room.pk)
+        
+        # Try to close without tags (should fail)
+        result = self.service.close(rooms, room_tags_map={})
+        
+        self.assertEqual(result.success_count, 0)
+        self.assertEqual(result.failed_count, 1)
+        self.assertIn(str(room.uuid), result.failed_rooms)
+        self.assertIn("required", result.errors[0].lower())
+    
+    def test_close_with_required_tags_validation_with_existing_tags(self):
+        """Test that rooms with required_tags pass if they already have tags"""
+        # Create a queue that requires tags
+        queue_with_required_tags = Queue.objects.create(
+            name="Required Tags Queue",
+            sector=self.sector,
+            required_tags=True
+        )
+        
+        tag = SectorTag.objects.create(name="ExistingTag", sector=self.sector)
+        
+        room = Room.objects.create(
+            queue=queue_with_required_tags,
+            user=self.user,
+            is_active=True
+        )
+        room.tags.add(tag)
+        
+        rooms = Room.objects.filter(pk=room.pk)
+        
+        # Close without providing new tags (should succeed because room has existing tags)
+        result = self.service.close(rooms, room_tags_map={})
+        
+        self.assertEqual(result.success_count, 1)
+        self.assertEqual(result.failed_count, 0)
+    
+    def test_close_multiple_sectors_with_different_tags(self):
+        """Test closing rooms from different sectors with sector-specific tags"""
+        # Create another sector and queue
+        sector2 = Sector.objects.create(
+            name="Test Sector 2",
+            project=self.project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+            is_csat_enabled=False,
+        )
+        queue2 = Queue.objects.create(name="Test Queue 2", sector=sector2)
+        
+        # Create rooms in different sectors
+        room1 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+        room2 = Room.objects.create(queue=queue2, user=self.user, is_active=True)
+        
+        # Create sector-specific tags
+        tag1 = SectorTag.objects.create(name="Sector1Tag", sector=self.sector)
+        tag2 = SectorTag.objects.create(name="Sector2Tag", sector=sector2)
+        
+        rooms = Room.objects.filter(id__in=[room1.id, room2.id])
+        
+        # Apply sector-specific tags to each room
+        room_tags_map = {
+            str(room1.uuid): [str(tag1.uuid)],
+            str(room2.uuid): [str(tag2.uuid)]
+        }
+        
+        result = self.service.close(rooms, room_tags_map=room_tags_map)
+        
+        self.assertEqual(result.success_count, 2)
+        self.assertEqual(result.failed_count, 0)
+        
+        room1.refresh_from_db()
+        room2.refresh_from_db()
+        
+        # Verify each room has only its sector's tags
+        self.assertEqual(room1.tags.count(), 1)
+        self.assertIn(tag1, room1.tags.all())
+        
+        self.assertEqual(room2.tags.count(), 1)
+        self.assertIn(tag2, room2.tags.all())

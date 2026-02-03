@@ -275,7 +275,7 @@ class RoomViewsetBulkCloseTests(TestCase):
         view = RoomViewset.as_view({"post": "bulk_close"})
         req = self.factory.post(
             "/x",
-            data={"rooms": [str(room.uuid)]},
+            data={"rooms": [{"uuid": str(room.uuid)}]},
             content_type="application/json",
         )
         force_authenticate(req, user=self.admin)
@@ -300,12 +300,12 @@ class RoomViewsetBulkCloseTests(TestCase):
             )
             for _ in range(5)
         ]
-        room_uuids = [str(room.uuid) for room in rooms]
+        rooms_data = [{"uuid": str(room.uuid)} for room in rooms]
         
         view = RoomViewset.as_view({"post": "bulk_close"})
         req = self.factory.post(
             "/x",
-            data={"rooms": room_uuids},
+            data={"rooms": rooms_data},
             content_type="application/json",
         )
         force_authenticate(req, user=self.admin)
@@ -321,7 +321,7 @@ class RoomViewsetBulkCloseTests(TestCase):
             self.assertFalse(room.is_active)
 
     def test_bulk_close_with_tags(self):
-        """Test closing rooms with tags"""
+        """Test closing rooms with specific tags per room"""
         from chats.apps.sectors.models import SectorTag
         
         room = Room.objects.create(
@@ -335,8 +335,12 @@ class RoomViewsetBulkCloseTests(TestCase):
         req = self.factory.post(
             "/x",
             data={
-                "rooms": [str(room.uuid)],
-                "tags": [str(tag.uuid)]
+                "rooms": [
+                    {
+                        "uuid": str(room.uuid),
+                        "tags": [str(tag.uuid)]
+                    }
+                ]
             },
             content_type="application/json",
         )
@@ -359,7 +363,7 @@ class RoomViewsetBulkCloseTests(TestCase):
         req = self.factory.post(
             "/x",
             data={
-                "rooms": [str(room.uuid)],
+                "rooms": [{"uuid": str(room.uuid)}],
                 "end_by": "system"
             },
             content_type="application/json",
@@ -383,7 +387,7 @@ class RoomViewsetBulkCloseTests(TestCase):
         req = self.factory.post(
             "/x",
             data={
-                "rooms": [str(room.uuid)],
+                "rooms": [{"uuid": str(room.uuid)}],
                 "closed_by_email": self.agent.email
             },
             content_type="application/json",
@@ -406,7 +410,7 @@ class RoomViewsetBulkCloseTests(TestCase):
         view = RoomViewset.as_view({"post": "bulk_close"})
         req = self.factory.post(
             "/x",
-            data={"rooms": [str(room.uuid)]},
+            data={"rooms": [{"uuid": str(room.uuid)}]},
             content_type="application/json",
         )
         force_authenticate(req, user=self.admin)
@@ -433,7 +437,7 @@ class RoomViewsetBulkCloseTests(TestCase):
         view = RoomViewset.as_view({"post": "bulk_close"})
         req = self.factory.post(
             "/x",
-            data={"rooms": [str(other_room.uuid)]},
+            data={"rooms": [{"uuid": str(other_room.uuid)}]},
             content_type="application/json",
         )
         force_authenticate(req, user=self.admin)  # Admin doesn't have permission on other_project
@@ -458,7 +462,10 @@ class RoomViewsetBulkCloseTests(TestCase):
         view = RoomViewset.as_view({"post": "bulk_close"})
         req = self.factory.post(
             "/x",
-            data={"rooms": [str(room1.uuid), str(room2.uuid)]},
+            data={"rooms": [
+                {"uuid": str(room1.uuid)},
+                {"uuid": str(room2.uuid)}
+            ]},
             content_type="application/json",
         )
         force_authenticate(req, user=self.admin)
@@ -487,7 +494,10 @@ class RoomViewsetBulkCloseTests(TestCase):
         view = RoomViewset.as_view({"post": "bulk_close"})
         req = self.factory.post(
             "/x",
-            data={"rooms": [str(room1.uuid), str(room2.uuid)]},
+            data={"rooms": [
+                {"uuid": str(room1.uuid)},
+                {"uuid": str(room2.uuid)}
+            ]},
             content_type="application/json",
         )
         force_authenticate(req, user=self.admin)
@@ -515,7 +525,10 @@ class RoomViewsetBulkCloseTests(TestCase):
         view = RoomViewset.as_view({"post": "bulk_close"})
         req = self.factory.post(
             "/x",
-            data={"rooms": [str(room1.uuid), str(room2.uuid)]},
+            data={"rooms": [
+                {"uuid": str(room1.uuid)},
+                {"uuid": str(room2.uuid)}
+            ]},
             content_type="application/json",
         )
         force_authenticate(req, user=self.admin)
@@ -529,12 +542,12 @@ class RoomViewsetBulkCloseTests(TestCase):
         """Test that serializer validates max rooms limit"""
         # Create more than 5000 room UUIDs
         import uuid
-        room_uuids = [str(uuid.uuid4()) for _ in range(5001)]
+        rooms_data = [{"uuid": str(uuid.uuid4())} for _ in range(5001)]
         
         view = RoomViewset.as_view({"post": "bulk_close"})
         req = self.factory.post(
             "/x",
-            data={"rooms": room_uuids},
+            data={"rooms": rooms_data},
             content_type="application/json",
         )
         force_authenticate(req, user=self.admin)
@@ -559,7 +572,10 @@ class RoomViewsetBulkCloseTests(TestCase):
         view = RoomViewset.as_view({"post": "bulk_close"})
         req = self.factory.post(
             "/x",
-            data={"rooms": [str(room1.uuid), str(room2.uuid)]},
+            data={"rooms": [
+                {"uuid": str(room1.uuid)},
+                {"uuid": str(room2.uuid)}
+            ]},
             content_type="application/json",
         )
         force_authenticate(req, user=self.admin)
@@ -592,7 +608,11 @@ class RoomViewsetBulkCloseTests(TestCase):
         view = RoomViewset.as_view({"post": "bulk_close"})
         req = self.factory.post(
             "/x",
-            data={"rooms": [str(room1.uuid), str(room2.uuid), str(room3.uuid)]},
+            data={"rooms": [
+                {"uuid": str(room1.uuid)},
+                {"uuid": str(room2.uuid)},
+                {"uuid": str(room3.uuid)}
+            ]},
             content_type="application/json",
         )
         force_authenticate(req, user=self.admin)
@@ -617,7 +637,7 @@ class RoomViewsetBulkCloseTests(TestCase):
         view = RoomViewset.as_view({"post": "bulk_close"})
         req = self.factory.post(
             "/x",
-            data={"rooms": [str(room.uuid)]},
+            data={"rooms": [{"uuid": str(room.uuid)}]},
             content_type="application/json",
         )
         force_authenticate(req, user=self.admin)
@@ -627,3 +647,92 @@ class RoomViewsetBulkCloseTests(TestCase):
         self.assertGreater(len(resp.data["errors"]), 0)
         self.assertIn("already closed", resp.data["errors"][0].lower())
         self.assertIn(str(room.uuid), resp.data["failed_rooms"])
+    
+    def test_bulk_close_with_different_tags_per_room(self):
+        """Test closing multiple rooms with different tags for each"""
+        from chats.apps.sectors.models import SectorTag
+        
+        room1 = Room.objects.create(
+            queue=self.queue,
+            project_uuid=str(self.project.pk),
+            is_active=True
+        )
+        room2 = Room.objects.create(
+            queue=self.queue,
+            project_uuid=str(self.project.pk),
+            is_active=True
+        )
+        room3 = Room.objects.create(
+            queue=self.queue,
+            project_uuid=str(self.project.pk),
+            is_active=True
+        )
+        
+        tag1 = SectorTag.objects.create(name="Tag1", sector=self.sector)
+        tag2 = SectorTag.objects.create(name="Tag2", sector=self.sector)
+        tag3 = SectorTag.objects.create(name="Tag3", sector=self.sector)
+        
+        view = RoomViewset.as_view({"post": "bulk_close"})
+        req = self.factory.post(
+            "/x",
+            data={
+                "rooms": [
+                    {"uuid": str(room1.uuid), "tags": [str(tag1.uuid)]},
+                    {"uuid": str(room2.uuid), "tags": [str(tag2.uuid), str(tag3.uuid)]},
+                    {"uuid": str(room3.uuid)}  # No tags
+                ]
+            },
+            content_type="application/json",
+        )
+        force_authenticate(req, user=self.admin)
+        resp = view(req)
+        
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data["success_count"], 3)
+        
+        room1.refresh_from_db()
+        room2.refresh_from_db()
+        room3.refresh_from_db()
+        
+        # Verify each room has correct tags
+        self.assertEqual(room1.tags.count(), 1)
+        self.assertIn(tag1, room1.tags.all())
+        
+        self.assertEqual(room2.tags.count(), 2)
+        self.assertIn(tag2, room2.tags.all())
+        self.assertIn(tag3, room2.tags.all())
+        
+        self.assertEqual(room3.tags.count(), 0)
+    
+    def test_bulk_close_with_required_tags_fails_if_no_tags(self):
+        """Test that rooms requiring tags fail validation if no tags provided"""
+        from chats.apps.sectors.models import SectorTag
+        from chats.apps.queues.models import Queue
+        
+        # Create a queue that requires tags
+        queue_with_required_tags = Queue.objects.create(
+            name="Required Tags Queue",
+            sector=self.sector,
+            required_tags=True
+        )
+        
+        room = Room.objects.create(
+            queue=queue_with_required_tags,
+            project_uuid=str(self.project.pk),
+            is_active=True
+        )
+        
+        view = RoomViewset.as_view({"post": "bulk_close"})
+        req = self.factory.post(
+            "/x",
+            data={"rooms": [{"uuid": str(room.uuid)}]},
+            content_type="application/json",
+        )
+        force_authenticate(req, user=self.admin)
+        resp = view(req)
+        
+        # Should fail because tags are required
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(resp.data["success_count"], 0)
+        self.assertEqual(resp.data["failed_count"], 1)
+        self.assertIn("required", resp.data["errors"][0].lower())
