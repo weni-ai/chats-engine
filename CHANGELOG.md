@@ -1,3 +1,12 @@
+# 3.42.0
+# Fix
+  - Correct interaction time
+  - Calculate waiting time when transferring users from queue
+# Add
+  - Adding conn max age in chats
+  - Adding media field to serializers
+  - Hide users with VTEX and Weni email domains from transfer list
+  
 # 3.41.9
 # Fix
   - close custom status before setting user online
@@ -1021,6 +1030,8 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
+
 
 
 
