@@ -94,7 +94,7 @@ class Command(BaseCommand):
                 if not status.is_success(response.status_code):
                     try:
                         content = response.json()
-                    except Exception as e:
+                    except Exception:
                         content = response.text
                     self.stdout.write(
                         self.style.ERROR(
@@ -115,7 +115,8 @@ class Command(BaseCommand):
                 if not results:
                     self.stdout.write(
                         self.style.ERROR(
-                            f"No results found for project {project_config.project.name} ({project_config.project.uuid})"
+                            f"No results found for project {project_config.project.name} "
+                            f"({project_config.project.uuid})"
                         )
                     )
                     break
@@ -132,7 +133,8 @@ class Command(BaseCommand):
             if not is_updated:
                 self.stdout.write(
                     self.style.ERROR(
-                        f"Failed to update flow for project {project_config.project.name} ({project_config.project.uuid})"
+                        f"Failed to update flow for project {project_config.project.name} "
+                        f"({project_config.project.uuid})"
                     )
                 )
                 break
