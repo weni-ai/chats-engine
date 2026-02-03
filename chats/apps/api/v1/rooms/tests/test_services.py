@@ -109,7 +109,7 @@ class BulkCloseServiceTest(TestCase):
         )
         self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
         self.user = User.objects.create(email="test@test.com")
-        
+
         ProjectPermission.objects.create(
             project=self.project,
             user=self.user,
@@ -120,9 +120,9 @@ class BulkCloseServiceTest(TestCase):
         """Test closing a single room"""
         room = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
         rooms = Room.objects.filter(pk=room.pk)
-        
+
         result = self.service.close(rooms)
-        
+
         self.assertEqual(result.success_count, 1)
         self.assertEqual(result.failed_count, 0)
         room.refresh_from_db()
@@ -137,9 +137,9 @@ class BulkCloseServiceTest(TestCase):
         ]
         room_ids = [room.id for room in rooms_list]
         rooms = Room.objects.filter(id__in=room_ids)
-        
+
         result = self.service.close(rooms)
-        
+
         self.assertEqual(result.success_count, 10)
         self.assertEqual(result.failed_count, 0)
         for room in Room.objects.filter(id__in=room_ids):
@@ -151,13 +151,13 @@ class BulkCloseServiceTest(TestCase):
         room = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
         closer_user = User.objects.create(email="closer@test.com")
         rooms = Room.objects.filter(pk=room.pk)
-        
+
         result = self.service.close(
             rooms,
             end_by="agent",
             closed_by=closer_user
         )
-        
+
         self.assertEqual(result.success_count, 1)
         self.assertEqual(result.failed_count, 0)
         room.refresh_from_db()
@@ -170,16 +170,16 @@ class BulkCloseServiceTest(TestCase):
         tag1 = SectorTag.objects.create(name="Tag1", sector=self.sector)
         tag2 = SectorTag.objects.create(name="Tag2", sector=self.sector)
         rooms = Room.objects.filter(pk=room.pk)
-        
+
         room_tags_map = {
             str(room.uuid): [str(tag1.uuid), str(tag2.uuid)]
         }
-        
+
         result = self.service.close(
             rooms,
             room_tags_map=room_tags_map
         )
-        
+
         self.assertEqual(result.success_count, 1)
         self.assertEqual(result.failed_count, 0)
         room.refresh_from_db()
@@ -192,17 +192,17 @@ class BulkCloseServiceTest(TestCase):
         """Test that closing rooms clears all pins"""
         room1 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
         room2 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
-        
+
         # Create pins for rooms
         RoomPin.objects.create(room=room1, user=self.user)
         RoomPin.objects.create(room=room2, user=self.user)
-        
+
         rooms = Room.objects.filter(id__in=[room1.id, room2.id])
-        
+
         self.assertEqual(RoomPin.objects.filter(room__in=rooms).count(), 2)
-        
+
         result = self.service.close(rooms)
-        
+
         self.assertEqual(result.success_count, 2)
         self.assertEqual(result.failed_count, 0)
         self.assertEqual(RoomPin.objects.filter(room__in=rooms).count(), 0)
@@ -211,11 +211,11 @@ class BulkCloseServiceTest(TestCase):
         """Test that already closed rooms are tracked as failures"""
         room1 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
         room2 = Room.objects.create(queue=self.queue, user=self.user, is_active=False)
-        
+
         rooms = Room.objects.filter(id__in=[room1.id, room2.id])
-        
+
         result = self.service.close(rooms)
-        
+
         # Should close the active room, fail the closed one
         self.assertEqual(result.success_count, 1)
         self.assertEqual(result.failed_count, 1)
@@ -225,9 +225,9 @@ class BulkCloseServiceTest(TestCase):
         """Test that closing no active rooms returns proper result"""
         room = Room.objects.create(queue=self.queue, user=self.user, is_active=False)
         rooms = Room.objects.filter(pk=room.pk)
-        
+
         result = self.service.close(rooms)
-        
+
         self.assertEqual(result.success_count, 0)
         self.assertEqual(result.failed_count, 1)
 
@@ -235,11 +235,11 @@ class BulkCloseServiceTest(TestCase):
         """Test closing rooms that are in queue (no user assigned)"""
         room1 = Room.objects.create(queue=self.queue, user=None, is_active=True)
         room2 = Room.objects.create(queue=self.queue, user=None, is_active=True)
-        
+
         rooms = Room.objects.filter(id__in=[room1.id, room2.id])
-        
+
         result = self.service.close(rooms)
-        
+
         self.assertEqual(result.success_count, 2)
         self.assertEqual(result.failed_count, 0)
         for room in rooms:
@@ -252,11 +252,11 @@ class BulkCloseServiceTest(TestCase):
         user2 = User.objects.create(email="agent2@test.com")
         room1 = Room.objects.create(queue=self.queue, user=user1, is_active=True)
         room2 = Room.objects.create(queue=self.queue, user=user2, is_active=True)
-        
+
         rooms = Room.objects.filter(id__in=[room1.id, room2.id])
-        
+
         result = self.service.close(rooms)
-        
+
         self.assertEqual(result.success_count, 2)
         self.assertEqual(result.failed_count, 0)
         for room in rooms:
@@ -268,12 +268,12 @@ class BulkCloseServiceTest(TestCase):
         """Test that CSAT tasks are scheduled for eligible rooms"""
         self.sector.is_csat_enabled = True
         self.sector.save()
-        
+
         room = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
         rooms = Room.objects.filter(pk=room.pk)
-        
+
         result = self.service.close(rooms)
-        
+
         self.assertEqual(result.success_count, 1)
         # Verify that transaction.on_commit was called (CSAT scheduling)
         self.assertTrue(mock_on_commit.called)
@@ -283,9 +283,9 @@ class BulkCloseServiceTest(TestCase):
         """Test that metrics tasks are scheduled"""
         room = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
         rooms = Room.objects.filter(pk=room.pk)
-        
+
         result = self.service.close(rooms)
-        
+
         self.assertEqual(result.success_count, 1)
         # Verify that transaction.on_commit was called (metrics scheduling)
         self.assertTrue(mock_on_commit.called)
@@ -299,9 +299,9 @@ class BulkCloseServiceTest(TestCase):
         ]
         room_ids = [room.id for room in rooms_list]
         rooms = Room.objects.filter(id__in=room_ids)
-        
+
         result = self.service.close(rooms)
-        
+
         self.assertEqual(result.success_count, 100)
         self.assertEqual(result.failed_count, 0)
         # Verify all rooms are closed
@@ -312,11 +312,11 @@ class BulkCloseServiceTest(TestCase):
         """Test that ended_at is set correctly"""
         room = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
         rooms = Room.objects.filter(pk=room.pk)
-        
+
         before_close = timezone.now()
         result = self.service.close(rooms)
         after_close = timezone.now()
-        
+
         self.assertEqual(result.success_count, 1)
         room.refresh_from_db()
         self.assertIsNotNone(room.ended_at)
@@ -328,38 +328,38 @@ class BulkCloseServiceTest(TestCase):
         """Test that InService status is updated for agents"""
         room = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
         rooms = Room.objects.filter(pk=room.pk)
-        
+
         result = self.service.close(rooms)
-        
+
         self.assertEqual(result.success_count, 1)
         # Verify InServiceStatusService.room_closed was called
         mock_room_closed.assert_called_once_with(self.user, self.project)
-    
+
     def test_close_tracks_individual_failures(self):
         """Test that individual room failures are tracked"""
         room1 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
         room2 = Room.objects.create(queue=self.queue, user=self.user, is_active=False)
         room3 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
-        
+
         rooms = Room.objects.filter(id__in=[room1.id, room2.id, room3.id])
-        
+
         result = self.service.close(rooms)
-        
+
         self.assertEqual(result.success_count, 2)
         self.assertEqual(result.failed_count, 1)
         self.assertEqual(len(result.failed_rooms), 1)
         self.assertIn(str(room2.uuid), result.failed_rooms)
         self.assertEqual(len(result.errors), 1)
         self.assertIn("already closed", result.errors[0].lower())
-    
+
     def test_close_result_to_dict(self):
         """Test that BulkCloseResult.to_dict() returns correct structure"""
         room = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
         rooms = Room.objects.filter(pk=room.pk)
-        
+
         result = self.service.close(rooms)
         result_dict = result.to_dict()
-        
+
         self.assertIn("success_count", result_dict)
         self.assertIn("failed_count", result_dict)
         self.assertIn("total_processed", result_dict)
@@ -367,45 +367,45 @@ class BulkCloseServiceTest(TestCase):
         self.assertIn("failed_rooms", result_dict)
         self.assertIn("has_more_errors", result_dict)
         self.assertEqual(result_dict["total_processed"], 1)
-    
+
     def test_close_with_different_tags_per_room(self):
         """Test closing multiple rooms with different tags for each"""
         room1 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
         room2 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
         room3 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
-        
+
         tag1 = SectorTag.objects.create(name="Tag1", sector=self.sector)
         tag2 = SectorTag.objects.create(name="Tag2", sector=self.sector)
         tag3 = SectorTag.objects.create(name="Tag3", sector=self.sector)
-        
+
         rooms = Room.objects.filter(id__in=[room1.id, room2.id, room3.id])
-        
+
         # Each room gets different tags
         room_tags_map = {
             str(room1.uuid): [str(tag1.uuid)],
             str(room2.uuid): [str(tag2.uuid), str(tag3.uuid)],
             str(room3.uuid): []  # No tags
         }
-        
+
         result = self.service.close(rooms, room_tags_map=room_tags_map)
-        
+
         self.assertEqual(result.success_count, 3)
         self.assertEqual(result.failed_count, 0)
-        
+
         room1.refresh_from_db()
         room2.refresh_from_db()
         room3.refresh_from_db()
-        
+
         # Verify each room has the correct tags
         self.assertEqual(room1.tags.count(), 1)
         self.assertIn(tag1, room1.tags.all())
-        
+
         self.assertEqual(room2.tags.count(), 2)
         self.assertIn(tag2, room2.tags.all())
         self.assertIn(tag3, room2.tags.all())
-        
+
         self.assertEqual(room3.tags.count(), 0)
-    
+
     def test_close_with_required_tags_validation(self):
         """Test that rooms requiring tags fail if no tags provided"""
         # Create a queue that requires tags
@@ -414,23 +414,23 @@ class BulkCloseServiceTest(TestCase):
             sector=self.sector,
             required_tags=True
         )
-        
+
         room = Room.objects.create(
             queue=queue_with_required_tags,
             user=self.user,
             is_active=True
         )
-        
+
         rooms = Room.objects.filter(pk=room.pk)
-        
+
         # Try to close without tags (should fail)
         result = self.service.close(rooms, room_tags_map={})
-        
+
         self.assertEqual(result.success_count, 0)
         self.assertEqual(result.failed_count, 1)
         self.assertIn(str(room.uuid), result.failed_rooms)
         self.assertIn("required", result.errors[0].lower())
-    
+
     def test_close_with_required_tags_validation_with_existing_tags(self):
         """Test that rooms with required_tags pass if they already have tags"""
         # Create a queue that requires tags
@@ -439,24 +439,24 @@ class BulkCloseServiceTest(TestCase):
             sector=self.sector,
             required_tags=True
         )
-        
+
         tag = SectorTag.objects.create(name="ExistingTag", sector=self.sector)
-        
+
         room = Room.objects.create(
             queue=queue_with_required_tags,
             user=self.user,
             is_active=True
         )
         room.tags.add(tag)
-        
+
         rooms = Room.objects.filter(pk=room.pk)
-        
+
         # Close without providing new tags (should succeed because room has existing tags)
         result = self.service.close(rooms, room_tags_map={})
-        
+
         self.assertEqual(result.success_count, 1)
         self.assertEqual(result.failed_count, 0)
-    
+
     def test_close_multiple_sectors_with_different_tags(self):
         """Test closing rooms from different sectors with sector-specific tags"""
         # Create another sector and queue
@@ -469,34 +469,34 @@ class BulkCloseServiceTest(TestCase):
             is_csat_enabled=False,
         )
         queue2 = Queue.objects.create(name="Test Queue 2", sector=sector2)
-        
+
         # Create rooms in different sectors
         room1 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
         room2 = Room.objects.create(queue=queue2, user=self.user, is_active=True)
-        
+
         # Create sector-specific tags
         tag1 = SectorTag.objects.create(name="Sector1Tag", sector=self.sector)
         tag2 = SectorTag.objects.create(name="Sector2Tag", sector=sector2)
-        
+
         rooms = Room.objects.filter(id__in=[room1.id, room2.id])
-        
+
         # Apply sector-specific tags to each room
         room_tags_map = {
             str(room1.uuid): [str(tag1.uuid)],
             str(room2.uuid): [str(tag2.uuid)]
         }
-        
+
         result = self.service.close(rooms, room_tags_map=room_tags_map)
-        
+
         self.assertEqual(result.success_count, 2)
         self.assertEqual(result.failed_count, 0)
-        
+
         room1.refresh_from_db()
         room2.refresh_from_db()
-        
+
         # Verify each room has only its sector's tags
         self.assertEqual(room1.tags.count(), 1)
         self.assertIn(tag1, room1.tags.all())
-        
+
         self.assertEqual(room2.tags.count(), 1)
         self.assertIn(tag2, room2.tags.all())
