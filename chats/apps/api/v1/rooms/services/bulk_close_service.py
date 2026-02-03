@@ -56,7 +56,7 @@ class BulkCloseService:
     def close(
         self,
         rooms: QuerySet[Room],
-        tags: List[str] = None,
+        room_tags_map: Dict[str, List[str]] = None,
         end_by: str = "",
         closed_by: Optional[User] = None,
     ) -> BulkCloseResult:
@@ -65,7 +65,7 @@ class BulkCloseService:
         
         Args:
             rooms: QuerySet of Room objects to close (should be prefetched)
-            tags: List of tag UUIDs to apply to all rooms
+            room_tags_map: Dict mapping room UUID to list of tag UUIDs (e.g., {"room-uuid": ["tag1", "tag2"]})
             end_by: String indicating who/what closed the rooms
             closed_by: User who closed the rooms
             
@@ -77,8 +77,8 @@ class BulkCloseService:
         """
         result = BulkCloseResult()
         
-        if tags is None:
-            tags = []
+        if room_tags_map is None:
+            room_tags_map = {}
         
         # Convert to list to track individual rooms
         rooms_list = list(
@@ -113,11 +113,16 @@ class BulkCloseService:
         now = timezone.now()
         successfully_closed = []
         
-        # Process each room individually to track errors
+        # Process each room individually to track errors and validate required tags
         for room in active_rooms:
             try:
                 # Validate room can be closed
                 self._validate_room_can_close(room)
+                
+                # Validate required tags
+                room_tags = room_tags_map.get(str(room.uuid), [])
+                self._validate_required_tags(room, room_tags)
+                
                 successfully_closed.append(room)
                 result.add_success()
             except Exception as e:
@@ -134,9 +139,8 @@ class BulkCloseService:
             with transaction.atomic():
                 self._bulk_update_rooms(successfully_closed, now, end_by, closed_by)
                 
-                # Handle tags in batch
-                if tags:
-                    self._batch_handle_tags(successfully_closed, tags)
+                # Handle tags per room
+                self._batch_handle_tags_per_room(successfully_closed, room_tags_map)
                 
                 # Bulk delete pins
                 self._bulk_clear_pins(successfully_closed)
@@ -181,6 +185,20 @@ class BulkCloseService:
         if not hasattr(room.queue, 'sector'):
             raise ValueError("Queue has no sector assigned")
     
+    def _validate_required_tags(self, room: Room, tags: List[str]):
+        """
+        Validate that required tags are provided for rooms that require them.
+        Raises exception if validation fails.
+        """
+        # Check if queue requires tags
+        if room.queue.required_tags:
+            # Check if room already has tags or if new tags are being provided
+            has_existing_tags = room.tags.exists()
+            has_new_tags = len(tags) > 0
+            
+            if not has_existing_tags and not has_new_tags:
+                raise ValueError("Tags are required for this queue but none were provided")
+    
     def _bulk_update_rooms(
         self,
         rooms_list: List[Room],
@@ -206,38 +224,67 @@ class BulkCloseService:
         
         logger.debug(f"Bulk updated {len(rooms_list)} rooms")
     
-    def _batch_handle_tags(self, rooms_list: List[Room], tags: List[str]):
+    def _batch_handle_tags_per_room(self, rooms_list: List[Room], room_tags_map: Dict[str, List[str]]):
         """
-        Handle tags in batch by grouping rooms with similar tag operations.
-        Optimizes M2M operations by reducing the number of queries.
+        Handle tags per room, applying specific tags to each room.
+        Each room can have different tags or no tags at all.
+        
+        Args:
+            rooms_list: List of Room objects to update
+            room_tags_map: Dict mapping room UUID to list of tag UUIDs
         """
         from chats.apps.sectors.models import SectorTag
         
-        # Validate tags exist
-        tag_uuids = set(tags)
-        existing_tags = set(
-            SectorTag.objects.filter(uuid__in=tag_uuids).values_list("uuid", flat=True)
-        )
+        if not room_tags_map:
+            logger.debug("No tags to apply to any rooms")
+            return
         
-        if len(existing_tags) != len(tag_uuids):
-            logger.warning(
-                f"Some tags not found. Expected: {tag_uuids}, Found: {existing_tags}"
+        # Collect all unique tag UUIDs to validate in a single query
+        all_tag_uuids = set()
+        for tags in room_tags_map.values():
+            all_tag_uuids.update(tags)
+        
+        if all_tag_uuids:
+            # Validate all tags exist in a single query
+            existing_tags = set(
+                str(tag_uuid) for tag_uuid in SectorTag.objects.filter(
+                    uuid__in=all_tag_uuids
+                ).values_list("uuid", flat=True)
             )
+            
+            if len(existing_tags) != len(all_tag_uuids):
+                missing = all_tag_uuids - existing_tags
+                logger.warning(f"Some tags not found: {missing}")
         
-        # Process each room's tags
+        # Process each room's tags individually
+        rooms_with_tags = 0
         for room in rooms_list:
+            room_uuid_str = str(room.uuid)
+            new_tags = room_tags_map.get(room_uuid_str, [])
+            
+            if not new_tags:
+                continue  # Skip rooms with no tags specified
+            
+            # Get current tags for this room
             current_tag_ids = set(
                 str(tag_uuid) for tag_uuid in room.tags.values_list("uuid", flat=True)
             )
-            new_tag_ids = tag_uuids - current_tag_ids
-            tags_to_remove_ids = current_tag_ids - tag_uuids
             
-            if new_tag_ids:
-                room.tags.add(*new_tag_ids)
-            if tags_to_remove_ids:
-                room.tags.remove(*tags_to_remove_ids)
+            # Convert new tags to set of strings
+            new_tag_ids = set(str(tag) for tag in new_tags)
+            
+            # Determine which tags to add and which to remove
+            tags_to_add = new_tag_ids - current_tag_ids
+            tags_to_remove = current_tag_ids - new_tag_ids
+            
+            if tags_to_add:
+                room.tags.add(*tags_to_add)
+            if tags_to_remove:
+                room.tags.remove(*tags_to_remove)
+            
+            rooms_with_tags += 1
         
-        logger.debug(f"Batch updated tags for {len(rooms_list)} rooms")
+        logger.debug(f"Applied tags to {rooms_with_tags} rooms out of {len(rooms_list)}")
     
     def _bulk_clear_pins(self, rooms_list: List[Room]):
         """
