@@ -25,6 +25,13 @@ class MessageFlowViewset(
     mixins.UpdateModelMixin,
     viewsets.GenericViewSet,
 ):
+    """
+    ViewSet for creating, listing and updating messages via external API.
+
+    Supports both project admin authentication (Bearer token) and module authentication.
+    Rate limited: 20/sec, 600/min, 30k/hour.
+    """
+
     swagger_tag = "Integrations"
     queryset = ChatMessage.objects.all()
     serializer_class = MsgFlowSerializer
@@ -48,6 +55,18 @@ class MessageFlowViewset(
         elif self.request.auth == "INTERNAL":
             return [InternalAPITokenRequiredPermission]
         return [ModuleHasPermission]
+
+    def list(self, request, *args, **kwargs):
+        """List messages filtered by room or other criteria."""
+        return super().list(request, *args, **kwargs)
+
+    def create(self, request, *args, **kwargs):
+        """Create a new message in a room (incoming or outgoing direction)."""
+        return super().create(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        """Update message fields (e.g., mark as seen)."""
+        return super().partial_update(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         validated_data = serializer.validated_data

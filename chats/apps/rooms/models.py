@@ -93,6 +93,14 @@ class Room(BaseModel, BaseConfigurableModel):
     )
 
     ended_by = models.CharField(_("Ended by"), max_length=50, null=True, blank=True)
+    closed_by = models.ForeignKey(
+        "accounts.User",
+        related_name="closed_rooms_by_user",
+        verbose_name=_("closed by"),
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
 
     is_active = models.BooleanField(_("is active?"), default=True)
     is_waiting = models.BooleanField(_("is waiting for answer?"), default=False)
@@ -158,6 +166,11 @@ class Room(BaseModel, BaseConfigurableModel):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="+",
+    )
+    last_message_media = models.JSONField(
+        _("Last message media"),
+        default=list,
+        blank=True,
     )
 
     tracker = FieldTracker(fields=["user", "queue"])
@@ -414,12 +427,13 @@ class Room(BaseModel, BaseConfigurableModel):
         self.tags.add(*new_tag_ids)
         self.tags.remove(*tags_to_remove_ids)
 
-    def close(self, tags: list = [], end_by: str = ""):
+    def close(self, tags: list = [], end_by: str = "", closed_by: "User" = None):
         from chats.apps.projects.usecases.status_service import InServiceStatusService
 
         self.is_active = False
         self.ended_at = timezone.now()
         self.ended_by = end_by
+        self.closed_by = closed_by
 
         with transaction.atomic():
             if tags is not None:
@@ -719,12 +733,17 @@ class Room(BaseModel, BaseConfigurableModel):
         """
         Updates last message fields. Used for agent/system messages.
         """
+        media_data = [
+            {"content_type": media.content_type, "url": media.url}
+            for media in message.medias.all()
+        ]
         Room.objects.filter(pk=self.pk).update(
             last_interaction=message.created_on,
             last_message=message,
             last_message_text=message.text,
             last_message_user=user,
             last_message_contact=None,
+            last_message_media=media_data,
         )
 
     def on_new_message(self, message, contact=None, increment_unread: int = 0):
@@ -733,12 +752,17 @@ class Room(BaseModel, BaseConfigurableModel):
         Single UPDATE with all last_message fields.
         Only updates if message is newer than last_interaction.
         """
+        media_data = [
+            {"content_type": media.content_type, "url": media.url}
+            for media in message.medias.all()
+        ]
         update_fields = {
             "last_interaction": message.created_on,
             "last_message": message,
             "last_message_text": message.text,
             "last_message_user": None,
             "last_message_contact": contact,
+            "last_message_media": media_data,
         }
 
         if increment_unread > 0:

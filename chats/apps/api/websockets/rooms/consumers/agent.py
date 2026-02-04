@@ -10,6 +10,7 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.serializers.json import DjangoJSONEncoder
 from django.utils import timezone
+from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
 from chats.apps.api.v1.prometheus.metrics import (
     ws_active_connections,
@@ -34,7 +35,13 @@ CONNECTION_CHECK_WAIT_TIME = 1
 CONNECTION_CHECK_TIMEOUT = 1
 CONNECTION_CHECK_CACHE_TTL = 10
 
-logger = logging.getLogger(__name__)
+# Ping timeout configuration
+PING_TIMEOUT_SECONDS = getattr(settings, "WS_PING_TIMEOUT_SECONDS", 60)
+PING_CHECK_INTERVAL_SECONDS = getattr(settings, "WS_PING_CHECK_INTERVAL_SECONDS", 10)
+# Interval to update last_seen in database (reduces write overhead)
+LAST_SEEN_UPDATE_INTERVAL_SECONDS = getattr(
+    settings, "WS_LAST_SEEN_UPDATE_INTERVAL_SECONDS", 60
+)
 
 
 class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
@@ -86,8 +93,27 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 await self.load_queues()
                 await self.load_user()
                 self.last_ping = timezone.now()
+                self._last_seen_updated_at = None  # Force first update
+
+                # Start background task to monitor ping timeout if feature is enabled
+                if await self.is_ping_timeout_feature_enabled():
+                    # Update last_seen immediately on connect
+                    await self.maybe_update_last_seen()
+                    self.ping_timeout_task = asyncio.create_task(
+                        self.ping_timeout_checker()
+                    )
 
     async def disconnect(self, *args, **kwargs):
+        # Cancel the ping timeout checker task
+        if hasattr(self, "ping_timeout_task") and not self.ping_timeout_task.done():
+            self.ping_timeout_task.cancel()
+            try:
+                await self.ping_timeout_task
+            except asyncio.CancelledError:
+                logger.debug(
+                    f"ping_timeout_task cancelled for user {self.user.email if self.user else 'unknown'}"
+                )
+
         try:
             ws_active_connections.labels(consumer=self.CONSUMER_TYPE).dec()
             ws_disconnects_total.labels(consumer=self.CONSUMER_TYPE).inc()
@@ -170,6 +196,8 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             await command(payload["content"])
         elif command_name == "ping":
             self.last_ping = timezone.now()
+            if await self.is_ping_timeout_feature_enabled():
+                await self.maybe_update_last_seen()
             await self.send_json({"type": "pong"})
 
     # METHODS
@@ -319,6 +347,29 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         self.permission.save(update_fields=["status"])
         self.permission.notify_user("update", "system")
 
+    async def maybe_update_last_seen(self):
+        """
+        Update last_seen only if enough time has passed since last update.
+        This reduces database write overhead when pings are frequent.
+        """
+        now = timezone.now()
+
+        # Check if we need to update (first time or interval passed)
+        if hasattr(self, "_last_seen_updated_at") and self._last_seen_updated_at:
+            seconds_since_update = (now - self._last_seen_updated_at).total_seconds()
+            if seconds_since_update < LAST_SEEN_UPDATE_INTERVAL_SECONDS:
+                return  # Skip update, not enough time passed
+
+        # Perform the database update
+        await self._update_last_seen_db()
+        self._last_seen_updated_at = now
+
+    @database_sync_to_async
+    def _update_last_seen_db(self):
+        """Update the last_seen timestamp on the permission in database."""
+        self.permission.last_seen = timezone.now()
+        self.permission.save(update_fields=["last_seen"])
+
     @database_sync_to_async
     def get_permission(self):
         return self.user.project_permissions.get(project__uuid=self.project)
@@ -365,6 +416,7 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
         await asyncio.sleep(CONNECTION_CHECK_WAIT_TIME)
 
         # Wait a short time for responses
+        check_response = None
         try:
             check_response = await asyncio.wait_for(
                 self.get_connection_check_response(),
@@ -403,6 +455,77 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
                 InServiceStatusService.room_closed(self.user, permission.project)
         except ProjectPermission.DoesNotExist:
             pass
+
+    @database_sync_to_async
+    def is_ping_timeout_feature_enabled(self) -> bool:
+        if not self.permission:
+            return False
+        return is_feature_active_for_attributes(
+            settings.WS_PING_TIMEOUT_FEATURE_FLAG_KEY,
+            {"projectUUID": str(self.permission.project.uuid)},
+        )
+
+    async def ping_timeout_checker(self):
+        """
+        Background task that monitors ping activity.
+        If no ping is received for PING_TIMEOUT_SECONDS, sets user offline and closes connection.
+        """
+        try:
+            while True:
+                # Check every PING_CHECK_INTERVAL_SECONDS
+                await asyncio.sleep(PING_CHECK_INTERVAL_SECONDS)
+
+                # Safety check: stop if permission is gone
+                if not hasattr(self, "permission") or self.permission is None:
+                    logger.info("ping_timeout_checker: permission gone, stopping task")
+                    break
+
+                # Skip if last_ping not set yet
+                if not hasattr(self, "last_ping"):
+                    continue
+
+                # Calculate time since last ping
+                seconds_since_ping = (timezone.now() - self.last_ping).total_seconds()
+
+                # Check if timeout threshold exceeded
+                if seconds_since_ping > PING_TIMEOUT_SECONDS:
+                    logger.warning(
+                        f"Ping timeout detected for user {self.user.email} "
+                        f"(project: {self.project}). "
+                        f"Last ping was {seconds_since_ping:.0f} seconds ago "
+                        f"(threshold: {PING_TIMEOUT_SECONDS}s). "
+                        f"Setting status to OFFLINE and closing connection."
+                    )
+
+                    # Set user status to OFFLINE
+                    await self.set_user_status(ProjectPermission.STATUS_OFFLINE)
+
+                    # Finalize any in-service status
+                    await self.finalize_in_service_if_needed()
+
+                    # Log the status change
+                    await self.log_status_change(ProjectPermission.STATUS_OFFLINE)
+
+                    # Close the WebSocket connection
+                    await self.close(code=1000)
+
+                    # Exit the loop
+                    break
+
+        except asyncio.CancelledError:
+            # Task was cancelled (normal during disconnect)
+            logger.debug(
+                f"ping_timeout_checker cancelled for user "
+                f"{self.user.email if hasattr(self, 'user') and self.user else 'unknown'}"
+            )
+            raise
+        except Exception as e:
+            # Unexpected error - log and stop task
+            logger.error(
+                f"Unexpected error in ping_timeout_checker for user "
+                f"{self.user.email if hasattr(self, 'user') and self.user else 'unknown'}: {e}",
+                exc_info=True,
+            )
 
     @database_sync_to_async
     def log_status_change(

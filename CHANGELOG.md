@@ -1,3 +1,95 @@
+# 3.42.0
+# Fix
+  - Correct interaction time
+  - Calculate waiting time when transferring users from queue
+# Add
+  - Adding conn max age in chats
+  - Adding media field to serializers
+  - Hide users with VTEX and Weni email domains from transfer list
+  
+# 3.41.9
+# Fix
+  - close custom status before setting user online
+  
+# 3.41.8
+# Fix
+  - ordering in agents table for new dashboard
+  
+# 3.41.7
+# Fix
+  - using project timezone when export data
+  
+# 3.41.6
+# Add
+  - feature to disconnect using ping
+  
+# 3.41.5
+# Fix
+  - formating link to redirect do closed rooms
+  
+# 3.41.4
+# Add
+  - link do redirect to closed rooms
+  
+# 3.41.3
+# Add
+  - filter for urn and agents in internal rooms 
+  
+# 3.41.2
+# Add
+  - Adding closed by field in history viewset
+  
+# 3.41.1
+# Add
+  - Adding closed by field when closing a room
+    
+# 3.41.0
+# Fix
+  - Removing unused verification when creating a sector
+# Add
+  - Adds cyclomatic complexity analysis to flake8
+  - Adding filters to avoid return rooms from sectors/queues that are deleted
+  - Better documentation for external endpoints
+  
+# 3.40.1
+  - Filter rooms in the CSAT score by agents by project
+  
+# 3.40.0
+# Add
+  - Update CSAT flows command
+  - Update CSAT Flow to version 2
+# Fix 
+  - Filter rooms in CSAT by project
+  
+# 3.39.2
+# Add
+  - Adding the new routing using the correct configuration for growthbook feature flag
+  
+# 3.39.1
+# Hotfix
+  - Removing new routing feature flag configuration
+  
+# 3.39.0
+# Add
+  - Static token authentication for rooms and messages endpoints (used by Mailroom)
+
+# 3.38.0
+# Add
+  - CSAT metrics internal endpoints
+
+# 3.37.0
+# Fix
+  - Prevent users names from being blank
+  - Date range filter on dashboard metrics
+# Refactor
+  - Cyclomatic complexity reduction
+# Add
+  - Prevent users from closing rooms from queue (optional)
+
+# 3.36.7
+# Add
+  - Normalization of last message related fields in rooms list
+
 # 3.36.6
 # Remove
   - Automatic message feature flag
@@ -938,6 +1030,12 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
+
+
+
+
+
 
 
 

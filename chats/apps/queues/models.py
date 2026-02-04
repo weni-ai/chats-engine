@@ -1,4 +1,5 @@
 import random
+from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -7,12 +8,16 @@ from django.db import models
 from django.db.models import OuterRef, Q, Subquery
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from weni.feature_flags.shortcuts import is_feature_active
+from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
 from chats.apps.projects.models.models import CustomStatus
 from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
 
 from .queue_managers import QueueManager
+
+# Threshold for considering an agent as "recently seen" (in seconds)
+# Should be greater than WS_LAST_SEEN_UPDATE_INTERVAL_SECONDS to avoid false negatives
+LAST_SEEN_THRESHOLD_SECONDS = getattr(settings, "WS_LAST_SEEN_THRESHOLD_SECONDS", 90)
 
 User = get_user_model()
 
@@ -70,15 +75,34 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
             project_permissions__queue_authorizations__queue=self,
         )
 
+    def _is_ping_timeout_feature_enabled(self) -> bool:
+        """Check if the ping timeout feature is enabled for this queue's project."""
+        try:
+            return is_feature_active_for_attributes(
+                settings.WS_PING_TIMEOUT_FEATURE_FLAG_KEY,
+                {"projectUUID": str(self.sector.project.uuid)},
+            )
+        except Exception:
+            return False
+
     @property
     def online_agents(self):
-        # Filtra agentes online
-        agents = self.agents.filter(
-            project_permissions__status="ONLINE",
-            project_permissions__project=self.sector.project,
-            project_permissions__queue_authorizations__queue=self,
-            project_permissions__queue_authorizations__role=1,
-        )
+        # Base filter: status must be ONLINE
+        base_filter = {
+            "project_permissions__status": "ONLINE",
+            "project_permissions__project": self.sector.project,
+            "project_permissions__queue_authorizations__queue": self,
+            "project_permissions__queue_authorizations__role": 1,
+        }
+
+        # If ping timeout feature is enabled, also filter by last_seen
+        if self._is_ping_timeout_feature_enabled():
+            last_seen_threshold = timezone.now() - timedelta(
+                seconds=LAST_SEEN_THRESHOLD_SECONDS
+            )
+            base_filter["project_permissions__last_seen__gte"] = last_seen_threshold
+
+        agents = self.agents.filter(**base_filter)
 
         custom_status_query = Subquery(
             CustomStatus.objects.filter(
@@ -89,9 +113,7 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
             ).values("user__id")
         )
 
-        return agents.exclude(
-            id__in=custom_status_query
-        )  # TODO: Set this variable to ProjectPermission.STATUS_ONLINE
+        return agents.exclude(id__in=custom_status_query)
 
     @property
     def available_agents(self):
@@ -196,10 +218,9 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         if len(eligible_agents) == 1:
             return eligible_agents[0]
 
-        if is_feature_active(
+        if is_feature_active_for_attributes(
             settings.LEAST_ROOMS_CLOSED_TODAY_FEATURE_FLAG_KEY,
-            None,
-            str(self.project.uuid),
+            {"projectUUID": str(self.project.uuid)},
         ):
             return self._get_agent_with_least_rooms_closed_today(eligible_agents)
 

@@ -5,6 +5,7 @@ from django.db.models import (
     Avg,
     Case,
     Count,
+    Exists,
     F,
     IntegerField,
     OuterRef,
@@ -111,9 +112,17 @@ class AgentRepository:
 
         custom_status_subquery = Subquery(
             CustomStatus.objects.filter(
-                user=OuterRef("email"),
-                status_type__project=project,
-                created_on__range=[custom_status_start_date, custom_status_end_date],
+                Q(user=OuterRef("email"))
+                & Q(status_type__project=project)
+                & (
+                    Q(
+                        created_on__range=[
+                            custom_status_start_date,
+                            custom_status_end_date,
+                        ]
+                    )
+                    | Q(is_active=True)
+                )
             )
             .values("user")
             .annotate(
@@ -154,10 +163,29 @@ class AgentRepository:
             .values("total")
         )
 
+        has_active_custom_status_subquery = Exists(
+            CustomStatus.objects.filter(
+                user=OuterRef("email"),
+                status_type__project=project,
+                is_active=True,
+            ).exclude(status_type__name__iexact="in-service")
+        )
+
         agents_query = (
             agents_query.filter(agents_filters)
             .annotate(
                 status=Subquery(project_permission_subquery),
+                has_active_custom_status=has_active_custom_status_subquery,
+                status_order=Case(
+                    When(status="ONLINE", then=Value(1)),
+                    When(
+                        Q(status="OFFLINE") & Q(has_active_custom_status=True),
+                        then=Value(2),
+                    ),
+                    When(status="OFFLINE", then=Value(3)),
+                    default=Value(3),
+                    output_field=IntegerField(),
+                ),
                 closed=Count(
                     "rooms__uuid",
                     distinct=True,
@@ -192,20 +220,13 @@ class AgentRepository:
             .distinct()
         )
 
-        if filters.ordering:
-            if "time_in_service" in filters.ordering:
-                ordering_field = filters.ordering.replace(
-                    "time_in_service", "time_in_service_order"
-                )
-                agents_query = agents_query.order_by(ordering_field)
-            else:
-                agents_query = agents_query.order_by(filters.ordering)
-
         agents_query = agents_query.values(
             "first_name",
             "last_name",
             "email",
             "status",
+            "status_order",
+            "has_active_custom_status",
             "closed",
             "opened",
             "avg_first_response_time",
@@ -213,6 +234,18 @@ class AgentRepository:
             "avg_interaction_time",
             "custom_status",
         )
+
+        if filters.ordering:
+            if "time_in_service" in filters.ordering:
+                ordering_field = filters.ordering.replace(
+                    "time_in_service", "time_in_service_order"
+                )
+                agents_query = agents_query.order_by(ordering_field, "email")
+            elif "status" in filters.ordering:
+                ordering_field = filters.ordering.replace("status", "status_order")
+                agents_query = agents_query.order_by(ordering_field, "email")
+            else:
+                agents_query = agents_query.order_by(filters.ordering)
 
         return agents_query
 
@@ -232,17 +265,17 @@ class AgentRepository:
         if filters.queue and filters.sector:
             rooms_filter["rooms__queue"] = filters.queue
             rooms_filter["rooms__queue__sector__in"] = filters.sector
-            agents_filter["project_permissions__queue_authorizations__queue"] = (
-                filters.queue
-            )
+            agents_filter[
+                "project_permissions__queue_authorizations__queue"
+            ] = filters.queue
             agents_filter[
                 "project_permissions__queue_authorizations__queue__sector__in"
             ] = filters.sector
         elif filters.queue:
             rooms_filter["rooms__queue"] = filters.queue
-            agents_filter["project_permissions__queue_authorizations__queue"] = (
-                filters.queue
-            )
+            agents_filter[
+                "project_permissions__queue_authorizations__queue"
+            ] = filters.queue
         elif filters.sector:
             rooms_filter["rooms__queue__sector__in"] = filters.sector
             agents_filter[
@@ -303,10 +336,29 @@ class AgentRepository:
         if agents_filter:
             agents_query = agents_query.filter(**agents_filter).distinct()
 
+        has_active_custom_status_subquery_2 = Exists(
+            CustomStatus.objects.filter(
+                user=OuterRef("email"),
+                status_type__project=project,
+                is_active=True,
+            ).exclude(status_type__name__iexact="in-service")
+        )
+
         agents_query = (
             agents_query.filter(project_permissions__project=project, is_active=True)
             .annotate(
                 status=Subquery(project_permission_queryset),
+                has_active_custom_status=has_active_custom_status_subquery_2,
+                status_order=Case(
+                    When(status="ONLINE", then=Value(1)),
+                    When(
+                        Q(status="OFFLINE") & Q(has_active_custom_status=True),
+                        then=Value(2),
+                    ),
+                    When(status="OFFLINE", then=Value(3)),
+                    default=Value(3),
+                    output_field=IntegerField(),
+                ),
                 closed=Count(
                     "rooms__uuid",
                     distinct=True,
@@ -322,18 +374,24 @@ class AgentRepository:
             .distinct()
         )
 
-        if filters.ordering:
-            agents_query = agents_query.order_by(filters.ordering)
-
         agents_query = agents_query.values(
             "first_name",
             "last_name",
             "email",
             "status",
+            "status_order",
+            "has_active_custom_status",
             "closed",
             "opened",
             "custom_status",
         )
+
+        if filters.ordering:
+            if "status" in filters.ordering:
+                ordering_field = filters.ordering.replace("status", "status_order")
+                agents_query = agents_query.order_by(ordering_field, "email")
+            else:
+                agents_query = agents_query.order_by(filters.ordering)
 
         return agents_query
 
@@ -369,15 +427,29 @@ class AgentRepository:
             & ~Q(status_type__name__iexact="in-service")
         )
 
-        tz_str = str(project.timezone)
+        tz = project.timezone
+        tz_str = str(tz)
+
         if filters.start_date:
             start_time = parse_date_with_timezone(filters.start_date, tz_str)
-            custom_status = custom_status.filter(created_on__gte=start_time)
+        else:
+            start_time = (
+                timezone.now()
+                .astimezone(tz)
+                .replace(hour=0, minute=0, second=0, microsecond=0)
+            )
+
         if filters.end_date:
             end_time = parse_date_with_timezone(
                 filters.end_date, tz_str, is_end_date=True
             )
-            custom_status = custom_status.filter(created_on__lte=end_time)
+        else:
+            end_time = timezone.now()
+
+        custom_status = custom_status.filter(
+            created_on__gte=start_time,
+            created_on__lte=end_time,
+        )
 
         return custom_status
 
@@ -440,6 +512,7 @@ class AgentRepository:
     def _get_csat_general(self, filters: Filters, project: Project) -> CSATScoreGeneral:
         rooms_query = {
             "is_active": False,
+            "queue__sector__project": project,
         }
 
         start_date, end_date = self._get_converted_dates(filters, project)
@@ -485,6 +558,7 @@ class AgentRepository:
     def _get_csat_rooms_query(self, filters: Filters, project: Project) -> dict:
         rooms_query = {
             "rooms__is_active": False,
+            "rooms__queue__sector__project": project,
         }
 
         start_date, end_date = self._get_converted_dates(filters, project)
@@ -520,8 +594,8 @@ class AgentRepository:
                 filter=Q(**rooms_query),
             ),
             reviews=Count(
-                "rooms__csat_survey__rating",
-                distinct=True,
+                "rooms__csat_survey__uuid",
+                distinct=False,
                 filter=Q(**csat_reviews_query),
             ),
             avg_rating=Coalesce(
