@@ -500,59 +500,59 @@ class BulkCloseServiceTest(TestCase):
 
         self.assertEqual(room2.tags.count(), 1)
         self.assertIn(tag2, room2.tags.all())
-    
+
     @patch('chats.apps.rooms.models.Room.notify_queue')
     @patch('chats.apps.rooms.models.Room.notify_user')
     def test_close_sends_websocket_notifications(self, mock_notify_user, mock_notify_queue):
         """Test that websocket notifications are sent for closed rooms"""
         room1 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
         room2 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
-        
+
         rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk])
-        
+
         result = self.service.close(rooms)
-        
+
         self.assertEqual(result.success_count, 2)
-        
+
         # Verify notify_queue was called for each room
         self.assertEqual(mock_notify_queue.call_count, 2)
         mock_notify_queue.assert_any_call("close", callback=True)
-        
+
         # Verify notify_user was called for each room
         self.assertEqual(mock_notify_user.call_count, 2)
         mock_notify_user.assert_any_call("close")
-    
+
     @patch('chats.apps.queues.utils.start_queue_priority_routing')
     def test_close_starts_queue_priority_routing(self, mock_start_routing):
         """Test that queue priority routing is started for affected queues"""
         room1 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
         room2 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
-        
+
         rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk])
-        
+
         result = self.service.close(rooms)
-        
+
         self.assertEqual(result.success_count, 2)
-        
+
         # Should be called only once for the unique queue
         mock_start_routing.assert_called_once_with(self.queue)
-    
+
     @patch('chats.apps.queues.utils.start_queue_priority_routing')
     def test_close_starts_routing_for_multiple_queues(self, mock_start_routing):
         """Test that routing is started once per unique queue"""
         # Create second queue
         queue2 = Queue.objects.create(name="Queue 2", sector=self.sector)
-        
+
         room1 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
         room2 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
         room3 = Room.objects.create(queue=queue2, user=self.user, is_active=True)
-        
+
         rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk, room3.pk])
-        
+
         result = self.service.close(rooms)
-        
+
         self.assertEqual(result.success_count, 3)
-        
+
         # Should be called twice (once per unique queue)
         self.assertEqual(mock_start_routing.call_count, 2)
         mock_start_routing.assert_any_call(self.queue)
