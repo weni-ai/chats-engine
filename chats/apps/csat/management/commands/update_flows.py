@@ -2,7 +2,7 @@ from django.core.management.base import BaseCommand
 from rest_framework import status
 from sentry_sdk import capture_message
 import time
-
+from django.conf import settings
 
 from chats.apps.csat.models import CSATFlowProjectConfig
 from chats.apps.csat.flows.definitions.flow import (
@@ -76,7 +76,7 @@ class Command(BaseCommand):
 
         flows_client = FlowRESTClient()
 
-        retries = 5
+        retries = settings.CSAT_FLOW_UPDATE_RETRIES
 
         for project_config in projects_configs:
 
