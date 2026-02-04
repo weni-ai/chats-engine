@@ -94,14 +94,40 @@ class AgentRepository:
             user_id=OuterRef("email"),
         ).values("status")[:1]
 
+        agents_query = self.model
+        if not filters.is_weni_admin:
+            agents_query = agents_query.exclude(get_admin_domains_exclude_filter())
+
+        if filters.agent:
+            agents_query = agents_query.filter(email=filters.agent)
+
+        custom_status_start_date = (
+            pendulum_parse(filters.start_date, tzinfo=tz)
+            if filters.start_date
+            else initial_datetime
+        )
+        custom_status_end_date = (
+            pendulum_parse(filters.end_date + " 23:59:59", tzinfo=tz)
+            if filters.end_date
+            else timezone.now()
+        )
+
         request_time = timezone.now()
 
         break_time_subquery = Subquery(
             CustomStatus.objects.filter(
-                user=OuterRef("email"),
-                status_type__project=project,
-                status_type__name="In-Service",
-                is_active=False,
+                Q(user=OuterRef("email"))
+                & Q(status_type__project=project)
+                & Q(status_type__name="In-Service")
+                & Q(is_active=False)
+                & (
+                    Q(
+                        created_on__range=[
+                            custom_status_start_date,
+                            custom_status_end_date,
+                        ]
+                    )
+                )
             )
             .values("user")
             .annotate(total=Sum(Coalesce(F("break_time"), Value(0))))
@@ -127,24 +153,6 @@ class AgentRepository:
             )
             .values("total")[:1],
             output_field=FloatField(),
-        )
-
-        agents_query = self.model
-        if not filters.is_weni_admin:
-            agents_query = agents_query.exclude(get_admin_domains_exclude_filter())
-
-        if filters.agent:
-            agents_query = agents_query.filter(email=filters.agent)
-
-        custom_status_start_date = (
-            pendulum_parse(filters.start_date, tzinfo=tz)
-            if filters.start_date
-            else initial_datetime
-        )
-        custom_status_end_date = (
-            pendulum_parse(filters.end_date + " 23:59:59", tzinfo=tz)
-            if filters.end_date
-            else timezone.now()
         )
 
         custom_status_subquery = Subquery(
