@@ -30,7 +30,8 @@ class DiscussionFilter(filters.FilterSet):
 
     def filter_search(self, queryset, name, value):
         return queryset.filter(
-            Q(subject__icontains=value) | Q(room__contact__name__icontains=value)
+            Q(subject__unaccent__icontains=value)
+            | Q(room__contact__name__unaccent__icontains=value)
         )
 
     def filter_project(self, queryset, name, value):

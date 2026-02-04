@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     "chats.apps.feature_flags",
     "chats.apps.feedbacks",
     "chats.apps.csat",
+    "chats.apps.archive_chats",
     # third party apps
     "weni.feature_flags",  # weni-commons feature flags
     "channels",
@@ -147,7 +148,18 @@ CACHES = {
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
-DATABASES = dict(default=env.db(var="DATABASE_URL"))
+# Connection pooling configuration
+# CONN_MAX_AGE: Keeps connections open for reuse (in seconds)
+# CONN_HEALTH_CHECKS: Validates connection before use (Django 4.1+)
+CONN_MAX_AGE = env.int("CONN_MAX_AGE", default=60)
+
+DATABASES = {
+    "default": {
+        **env.db(var="DATABASE_URL"),
+        "CONN_MAX_AGE": CONN_MAX_AGE,
+        "CONN_HEALTH_CHECKS": True,
+    }
+}
 
 # User
 
@@ -602,6 +614,18 @@ GROWTHBOOK_WEBHOOK_SECRET = env.str("GROWTHBOOK_WEBHOOK_SECRET", default="")
 FEEDBACK_FEATURE_FLAG_KEY = env.str(
     "FEEDBACK_FEATURE_FLAG_KEY", default="weniChatsFeedback"
 )
+AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY = env.str(
+    "AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY", default="weniChatsAutomaticMessage"
+)
+WS_PING_TIMEOUT_FEATURE_FLAG_KEY = env.str(
+    "WS_PING_TIMEOUT_FEATURE_FLAG_KEY", default="weniChatsPingTimeout"
+)
+WS_PING_TIMEOUT_SECONDS = env.int("WS_PING_TIMEOUT_SECONDS", default=60)
+WS_PING_CHECK_INTERVAL_SECONDS = env.int("WS_PING_CHECK_INTERVAL_SECONDS", default=10)
+WS_LAST_SEEN_UPDATE_INTERVAL_SECONDS = env.int(
+    "WS_LAST_SEEN_UPDATE_INTERVAL_SECONDS", default=60
+)
+WS_LAST_SEEN_THRESHOLD_SECONDS = env.int("WS_LAST_SEEN_THRESHOLD_SECONDS", default=90)
 
 # CSAT
 CSAT_FEATURE_FLAG_KEY = env.str("CSAT_FEATURE_FLAG_KEY", default="weniChatsCSAT")
@@ -647,3 +671,12 @@ ROOM_24H_VALID_CACHE_TTL = env.int(
 
 # Internal API Token
 INTERNAL_API_TOKEN = env.str("INTERNAL_API_TOKEN")
+
+# Excluded email domains
+# These are domains used by internal users (such as VTEX employees)
+# and should be excluded from some users lists,
+# because, even if they are included in projects (for testing or deployment purposes, for example),
+# they are not part of the organizations operational team.
+VTEX_INTERNAL_DOMAINS = env.list(
+    "VTEX_INTERNAL_DOMAINS", default=["weni.ai", "vtex.com"]
+)
