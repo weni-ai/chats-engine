@@ -145,11 +145,15 @@ class BulkCloseService:
                 # Bulk delete pins
                 self._bulk_clear_pins(successfully_closed)
 
-            # Handle InService status updates (grouped by agent)
-            self._batch_update_inservice_status(successfully_closed)
+            # Refresh rooms from DB to ensure notifications have latest data
+            for room in successfully_closed:
+                room.refresh_from_db()
 
             # Notify rooms via websocket (queue and users)
             self._batch_notify_rooms(successfully_closed)
+
+            # Handle InService status updates (grouped by agent)
+            self._batch_update_inservice_status(successfully_closed)
 
             # Start queue priority routing for affected queues
             self._batch_start_queue_priority_routing(successfully_closed)
@@ -340,7 +344,7 @@ class BulkCloseService:
 
     def _batch_notify_rooms(self, rooms_list: List[Room]):
         """
-        Send websocket notifications for closed rooms.
+        Send SYNCHRONOUS websocket notifications for closed rooms.
         Notifies both queue and user channels so agents can see rooms were closed.
         Similar to individual close: notify_queue("close") and notify_user("close")
         """
@@ -360,7 +364,7 @@ class BulkCloseService:
                     f"Failed to notify room {room.uuid}: {str(e)}"
                 )
 
-        logger.debug(f"Notified {notified_count} rooms via websocket")
+        logger.debug(f"Notified {notified_count} rooms via websocket (synchronously)")
 
     def _batch_start_queue_priority_routing(self, rooms_list: List[Room]):
         """
