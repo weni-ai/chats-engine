@@ -147,13 +147,19 @@ class BulkCloseService:
 
             # Handle InService status updates (grouped by agent)
             self._batch_update_inservice_status(successfully_closed)
-
+            
+            # Notify rooms via websocket (queue and users)
+            self._batch_notify_rooms(successfully_closed)
+            
+            # Start queue priority routing for affected queues
+            self._batch_start_queue_priority_routing(successfully_closed)
+            
             # Schedule CSAT flow tasks in batch
             self._batch_schedule_csat_tasks(successfully_closed)
-
+            
             # Schedule metrics tasks in batch
             self._batch_schedule_metrics_tasks(successfully_closed)
-
+            
             logger.info(
                 f"BulkCloseService: Successfully closed {result.success_count} rooms, "
                 f"{result.failed_count} failed"
@@ -331,7 +337,66 @@ class BulkCloseService:
         logger.debug(
             f"Updated InService status for {len(user_project_map)} unique user-project pairs"
         )
-
+    
+    def _batch_notify_rooms(self, rooms_list: List[Room]):
+        """
+        Send websocket notifications for closed rooms.
+        Notifies both queue and user channels so agents can see rooms were closed.
+        Similar to individual close: notify_queue("close") and notify_user("close")
+        """
+        notified_count = 0
+        
+        for room in rooms_list:
+            try:
+                # Notify queue channel (for agents monitoring the queue)
+                room.notify_queue("close", callback=True)
+                
+                # Notify user channel (for the assigned agent if any)
+                room.notify_user("close")
+                
+                notified_count += 1
+            except Exception as e:
+                logger.warning(
+                    f"Failed to notify room {room.uuid}: {str(e)}"
+                )
+        
+        logger.debug(f"Notified {notified_count} rooms via websocket")
+    
+    def _batch_start_queue_priority_routing(self, rooms_list: List[Room]):
+        """
+        Start queue priority routing for unique queues.
+        Groups rooms by queue and calls start_queue_priority_routing once per queue.
+        This optimizes routing by processing each queue only once instead of N times.
+        """
+        from chats.apps.queues.utils import start_queue_priority_routing
+        
+        # Get unique queues from closed rooms
+        unique_queues = set()
+        for room in rooms_list:
+            if room.queue:
+                unique_queues.add(room.queue)
+        
+        if not unique_queues:
+            return
+        
+        # Start priority routing for each unique queue
+        for queue in unique_queues:
+            try:
+                logger.info(
+                    f"Calling start_queue_priority_routing for queue {queue.uuid} "
+                    f"from bulk close"
+                )
+                start_queue_priority_routing(queue)
+            except Exception as e:
+                logger.error(
+                    f"Failed to start priority routing for queue {queue.uuid}: {str(e)}"
+                )
+        
+        logger.debug(
+            f"Started priority routing for {len(unique_queues)} unique queues "
+            f"(from {len(rooms_list)} closed rooms)"
+        )
+    
     def _batch_schedule_csat_tasks(self, rooms_list: List[Room]):
         """
         Schedule CSAT flow tasks in batches using Celery groups.
