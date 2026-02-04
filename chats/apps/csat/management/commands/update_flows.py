@@ -122,11 +122,6 @@ class Command(BaseCommand):
                     break
 
                 if status.is_success(response.status_code):
-                    self.stdout.write(
-                        self.style.SUCCESS(
-                            f"Updated flow for project {project_config.project.name} ({project_config.project.uuid})"
-                        )
-                    )
                     is_updated = True
                     break
 
