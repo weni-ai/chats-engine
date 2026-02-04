@@ -4,6 +4,7 @@ import json
 import logging
 
 from typing import List
+from uuid import UUID
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.core.files.base import ContentFile
@@ -12,11 +13,13 @@ from django.db import transaction
 
 
 from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
+from chats.apps.archive_chats.exceptions import InvalidObjectKey
 from chats.apps.archive_chats.models import (
     ArchiveConversationsJob,
     RoomArchivedConversation,
 )
 from chats.apps.archive_chats.serializers import ArchiveMessageSerializer
+from chats.apps.core.integrations.aws.s3.helpers import get_presigned_url
 from chats.apps.rooms.models import Room
 from chats.apps.msgs.models import (
     Message,
@@ -39,6 +42,10 @@ class BaseArchiveChatsService(ABC):
 
     @abstractmethod
     def upload_messages_file(self, messages: List[dict]) -> None:
+        pass
+
+    @abstractmethod
+    def get_archived_media_url(self, object_key: str) -> str:
         pass
 
     @abstractmethod
@@ -178,6 +185,32 @@ class ArchiveChatsService(BaseArchiveChatsService):
         room_archived_conversation.save(update_fields=["status"])
 
         return room_archived_conversation
+
+    def get_archived_media_url(self, object_key: str) -> str:
+        parts = object_key.split("/")
+
+        project_uuid = parts[1]
+        room_uuid = parts[2]
+
+        for _uuid in (project_uuid, room_uuid):
+            try:
+                UUID(_uuid)
+            except ValueError:
+                raise InvalidObjectKey("Invalid object key")
+
+        try:
+            room = Room.objects.get(uuid=room_uuid)
+        except Room.DoesNotExist:
+            raise InvalidObjectKey("Room not found")
+
+        is_archived = RoomArchivedConversation.objects.filter(
+            room=room, status=ArchiveConversationsJobStatus.FINISHED
+        ).exists()
+
+        if not is_archived:
+            raise InvalidObjectKey("Room is not archived")
+
+        return get_presigned_url(object_key)
 
     def delete_room_messages(
         self,

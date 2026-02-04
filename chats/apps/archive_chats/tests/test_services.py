@@ -1,5 +1,6 @@
 import json
 from unittest.mock import patch
+import uuid
 
 from django.core.exceptions import ValidationError
 from django.test import TestCase
@@ -19,6 +20,7 @@ from chats.apps.sectors.models import Sector
 from chats.apps.projects.models import Project
 from chats.apps.contacts.models import Contact
 from chats.apps.accounts.models import User
+from chats.apps.archive_chats.exceptions import InvalidObjectKey
 
 
 class TestArchiveChatsService(TestCase):
@@ -267,6 +269,59 @@ class TestArchiveChatsService(TestCase):
             archived_conversation.status,
             ArchiveConversationsJobStatus.PENDING,
         )
+
+    @patch("chats.apps.archive_chats.services.get_presigned_url")
+    def test_get_archived_media_url(self, mock_get_presigned_url):
+        object_key = f"archived_conversations/{self.project.uuid}/{self.room.uuid}/media/test.jpg"
+        mock_get_presigned_url.return_value = (
+            f"https://test-bucket.s3.amazonaws.com/{object_key}"
+        )
+
+        RoomArchivedConversation.objects.create(
+            job=self.service.start_archive_job(),
+            room=self.room,
+            status=ArchiveConversationsJobStatus.FINISHED,
+        )
+
+        url = self.service.get_archived_media_url(object_key)
+
+        self.assertEqual(
+            url,
+            f"https://test-bucket.s3.amazonaws.com/{object_key}",
+        )
+
+    def test_get_archived_media_url_with_invalid_project_uuid(self):
+        valid_uuid = uuid.uuid4()
+        with self.assertRaises(InvalidObjectKey):
+            self.service.get_archived_media_url(
+                f"archived_conversations/invalid-project-uuid/{valid_uuid}/media/test.jpg"
+            )
+
+    def test_get_archived_media_url_with_invalid_room_uuid(self):
+        valid_uuid = uuid.uuid4()
+        with self.assertRaises(InvalidObjectKey):
+            self.service.get_archived_media_url(
+                f"archived_conversations/{valid_uuid}/invalid-room-uuid/media/test.jpg"
+            )
+
+    def test_get_archived_media_url_without_media_part(self):
+        valid_uuid = uuid.uuid4()
+        with self.assertRaises(InvalidObjectKey):
+            self.service.get_archived_media_url(
+                f"archived_conversations/{valid_uuid}/{valid_uuid}/messages.jsonl"
+            )
+
+    def test_get_archived_media_url_with_room_not_archived(self):
+        with self.assertRaises(InvalidObjectKey):
+            self.service.get_archived_media_url(
+                f"archived_conversations/{self.project.uuid}/{self.room.uuid}/media/test.jpg"
+            )
+
+    def test_get_archived_media_url_with_non_existent_room(self):
+        with self.assertRaises(InvalidObjectKey):
+            self.service.get_archived_media_url(
+                f"archived_conversations/{self.project.uuid}/{uuid.uuid4()}/media/test.jpg"
+            )
 
     def test_delete_room_messages(self):
         archived_conversation = RoomArchivedConversation.objects.create(
