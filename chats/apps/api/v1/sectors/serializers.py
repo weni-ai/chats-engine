@@ -16,6 +16,19 @@ from chats.apps.sectors.models import (
 User = get_user_model()
 
 
+def _apply_sector_config_defaults(instance: Sector, data: dict) -> dict:
+    config = data.get("config") or {}
+    if isinstance(config, dict):
+        if instance:
+            config.setdefault(
+                "can_close_chats_in_queue", instance.can_close_chats_in_queue
+            )
+        else:
+            config.setdefault("can_close_chats_in_queue", False)
+    data["config"] = config
+    return data
+
+
 def validate_is_csat_enabled(project: Project, value: bool, context: dict) -> bool:
     """
     Validate if the CSAT feature is enabled for the sector.
@@ -98,21 +111,6 @@ class SectorSerializer(serializers.ModelSerializer):
         automatic_message = data.get("automatic_message")
 
         if automatic_message:
-            project_obj = data.get("project")
-            if automatic_message.get("is_active", False) and not is_feature_active(
-                settings.AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY,
-                self.context["request"].user.email,
-                str(project_obj.uuid) if project_obj else None,
-            ):
-                raise serializers.ValidationError(
-                    {
-                        "is_automatic_message_active": [
-                            _("This feature is not available for this project.")
-                        ]
-                    },
-                    code="automatic_message_feature_flag_is_not_active",
-                )
-
             data.pop("automatic_message")
 
             data["is_automatic_message_active"] = automatic_message.get("is_active")
@@ -161,6 +159,7 @@ class SectorSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
         data["automatic_message"] = SectorAutomaticMessageSerializer(instance).data
+        data = _apply_sector_config_defaults(instance, data)
 
         return data
 
@@ -205,28 +204,7 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
         automatic_message = attrs.get("automatic_message", None)
 
         if automatic_message is not None:
-            current_is_automatic_message_active = (
-                self.instance.is_automatic_message_active
-            )
             new_is_automatic_message_active = automatic_message.get("is_active")
-
-            if (
-                current_is_automatic_message_active != new_is_automatic_message_active
-                and not is_feature_active(
-                    settings.AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY,
-                    self.context["request"].user.email,
-                    str(project.uuid) if project else None,
-                )
-            ):
-
-                raise serializers.ValidationError(
-                    {
-                        "is_automatic_message_active": [
-                            _("This feature is not available for this project.")
-                        ]
-                    },
-                    code="automatic_message_feature_flag_is_not_active",
-                )
 
             attrs.pop("automatic_message")
             attrs["is_automatic_message_active"] = new_is_automatic_message_active
@@ -262,6 +240,7 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
         data = super().to_representation(instance)
 
         data["automatic_message"] = SectorAutomaticMessageSerializer(instance).data
+        data = _apply_sector_config_defaults(instance, data)
 
         return data
 
@@ -322,6 +301,10 @@ class SectorReadOnlyRetrieveSerializer(serializers.ModelSerializer):
 
     def get_automatic_message(self, sector: Sector):
         return SectorAutomaticMessageSerializer(sector).data
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        return _apply_sector_config_defaults(instance, data)
 
 
 class SectorWSSerializer(serializers.ModelSerializer):

@@ -1,7 +1,7 @@
 from typing import Optional
 from rest_framework import serializers
 
-from chats.apps.api.v1.accounts.serializers import UserNameSerializer
+from chats.apps.api.v1.accounts.serializers import UserNameEmailSerializer
 from chats.apps.api.v1.contacts.serializers import ContactSimpleSerializer
 from chats.apps.api.v1.sectors.serializers import TagSimpleSerializer
 from chats.apps.contacts.models import Contact
@@ -28,9 +28,10 @@ class ContactOptimizedSerializer(serializers.ModelSerializer):
 
 
 class RoomHistorySerializer(serializers.ModelSerializer):
-    user = UserNameSerializer(many=False, read_only=True)
+    user = UserNameEmailSerializer(many=False, read_only=True)
     contact = ContactOptimizedSerializer(read_only=True)
     tags = serializers.SerializerMethodField()
+    closed_by = UserNameEmailSerializer(many=False, read_only=True)
 
     class Meta:
         model = Room
@@ -43,6 +44,7 @@ class RoomHistorySerializer(serializers.ModelSerializer):
             "tags",
             "protocol",
             "service_chat",
+            "closed_by",
         ]
 
     def get_tags(self, obj):
@@ -68,10 +70,11 @@ class RoomBasicValuesSerializer(serializers.Serializer):
 
 
 class RoomDetailSerializer(serializers.ModelSerializer):
-    user = UserNameSerializer(many=False, read_only=True)
+    user = UserNameEmailSerializer(many=False, read_only=True)
     contact = serializers.SerializerMethodField()
     tags = serializers.SerializerMethodField()
     archived_conversation_file_url = serializers.SerializerMethodField()
+    closed_by = UserNameEmailSerializer(many=False, read_only=True)
 
     class Meta:
         model = Room
@@ -87,6 +90,7 @@ class RoomDetailSerializer(serializers.ModelSerializer):
             "protocol",
             "is_archived",
             "archived_conversation_file_url",
+            "closed_by",
         ]
 
     def get_contact(self, obj):

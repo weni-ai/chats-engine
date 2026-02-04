@@ -1,6 +1,7 @@
 #!/bin/bash
 
-export GUNICORN_APP=${GUNICORN_APP:-"chats.asgi"}
+export GUNICORN_APP=${GUNICORN_APP:-"chats.wsgi"}
+export ASGI_APP=${ASGI_APP:-"chats.asgi"}
 export CELERY_APP=${CELERY_APP:-"chats"}
 export GUNICORN_CONF=${GUNICORN_CONF:-"${PROJECT_PATH}/gunicorn.conf.py"}
 export LOG_LEVEL=${LOG_LEVEL:-"INFO"}
@@ -46,7 +47,7 @@ if [[ "start" == "$1" ]]; then
 elif [[ "start-websocket" == "$1" ]]; then
     do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" bash -lc "cd '${PROJECT_PATH}' && exec daphne \
       -b 0.0.0.0 -p 8000 \
-      '${GUNICORN_APP}:application'"
+      '${ASGI_APP}:application'"
 elif [[ "celery-worker" == "$1" ]]; then
     celery_queue="celery"
     if [ "${2}" ] ; then

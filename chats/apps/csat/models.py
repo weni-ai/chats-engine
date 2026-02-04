@@ -35,6 +35,10 @@ class CSATSurvey(BaseModel):
         self.full_clean()
         super().save(*args, **kwargs)
 
+    @property
+    def is_completed(self):
+        return self.rating is not None and self.comment is not None
+
 
 class CSATFlowProjectConfig(BaseModel):
     project = models.OneToOneField(
