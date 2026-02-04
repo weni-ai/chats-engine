@@ -5,8 +5,10 @@ from django.db.models import (
     Avg,
     Case,
     Count,
+    ExpressionWrapper,
     Exists,
     F,
+    FloatField,
     IntegerField,
     OuterRef,
     Q,
@@ -110,6 +112,49 @@ class AgentRepository:
             else timezone.now()
         )
 
+        request_time = timezone.now()
+
+        break_time_subquery = Subquery(
+            CustomStatus.objects.filter(
+                Q(user=OuterRef("email"))
+                & Q(status_type__project=project)
+                & Q(status_type__name="In-Service")
+                & Q(is_active=False)
+                & (
+                    Q(
+                        created_on__range=[
+                            custom_status_start_date,
+                            custom_status_end_date,
+                        ]
+                    )
+                )
+            )
+            .values("user")
+            .annotate(total=Sum(Coalesce(F("break_time"), Value(0))))
+            .values("total")[:1],
+            output_field=FloatField(),
+        )
+
+        active_time_subquery = Subquery(
+            CustomStatus.objects.filter(
+                user=OuterRef("email"),
+                status_type__project=project,
+                status_type__name="In-Service",
+                is_active=True,
+            )
+            .values("user")
+            .annotate(
+                total=Sum(
+                    ExpressionWrapper(
+                        Extract(request_time - F("created_on"), "epoch"),
+                        output_field=FloatField(),
+                    )
+                )
+            )
+            .values("total")[:1],
+            output_field=FloatField(),
+        )
+
         custom_status_subquery = Subquery(
             CustomStatus.objects.filter(
                 Q(user=OuterRef("email"))
@@ -137,30 +182,6 @@ class AgentRepository:
             )
             .values("aggregated"),
             output_field=JSONField(),
-        )
-
-        in_service_time_subquery = (
-            CustomStatus.objects.filter(
-                user=OuterRef("email"),
-                status_type__project=project,
-                status_type__name="In-Service",
-            )
-            .annotate(
-                time_contribution=Case(
-                    When(
-                        is_active=True,
-                        user__project_permissions__status="ONLINE",
-                        user__project_permissions__project=project,
-                        then=Extract(timezone.now() - F("created_on"), "epoch"),
-                    ),
-                    When(is_active=False, then=F("break_time")),
-                    default=Value(0),
-                    output_field=IntegerField(),
-                )
-            )
-            .values("user")
-            .annotate(total=Sum("time_contribution"))
-            .values("total")
         )
 
         has_active_custom_status_subquery = Exists(
@@ -212,9 +233,16 @@ class AgentRepository:
                     & Q(rooms__metric__interaction_time__gt=0),
                 ),
                 custom_status=custom_status_subquery,
-                time_in_service_order=Coalesce(
-                    Subquery(in_service_time_subquery, output_field=IntegerField()),
-                    Value(0),
+                time_in_service_order=(
+                    Coalesce(break_time_subquery, Value(0.0))
+                    + Case(
+                        When(
+                            status="ONLINE",
+                            then=Coalesce(active_time_subquery, Value(0.0)),
+                        ),
+                        default=Value(0.0),
+                        output_field=FloatField(),
+                    )
                 ),
             )
             .distinct()
@@ -233,10 +261,12 @@ class AgentRepository:
             "avg_message_response_time",
             "avg_interaction_time",
             "custom_status",
+            "time_in_service_order",
         )
 
         if filters.ordering:
             if "time_in_service" in filters.ordering:
+                # Ordenação pelo banco usando o campo calculado
                 ordering_field = filters.ordering.replace(
                     "time_in_service", "time_in_service_order"
                 )
