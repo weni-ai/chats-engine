@@ -160,7 +160,6 @@ class BulkCloseService:
             # Schedule metrics tasks in batch
             self._batch_schedule_metrics_tasks(successfully_closed)
 
-
             logger.info(
                 f"BulkCloseService: Successfully closed {result.success_count} rooms, "
                 f"{result.failed_count} failed"
@@ -397,7 +396,6 @@ class BulkCloseService:
             f"Started priority routing for {len(unique_queues)} unique queues "
             f"(from {len(rooms_list)} closed rooms)"
         )
-
 
     def _batch_schedule_csat_tasks(self, rooms_list: List[Room]):
         """
