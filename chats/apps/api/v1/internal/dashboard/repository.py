@@ -5,8 +5,10 @@ from django.db.models import (
     Avg,
     Case,
     Count,
+    ExpressionWrapper,
     Exists,
     F,
+    FloatField,
     IntegerField,
     OuterRef,
     Q,
@@ -27,7 +29,6 @@ from chats.apps.api.v1.internal.dashboard.dto import (
     CSATRatingCount,
     CSATRatings,
 )
-from chats.apps.api.utils import calculate_in_service_time
 from chats.apps.projects.dates import parse_date_with_timezone
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.projects.models.models import CustomStatus, Project
@@ -92,6 +93,41 @@ class AgentRepository:
             project_id=project,
             user_id=OuterRef("email"),
         ).values("status")[:1]
+
+        request_time = timezone.now()
+
+        break_time_subquery = Subquery(
+            CustomStatus.objects.filter(
+                user=OuterRef("email"),
+                status_type__project=project,
+                status_type__name="In-Service",
+                is_active=False,
+            )
+            .values("user")
+            .annotate(total=Sum(Coalesce(F("break_time"), Value(0))))
+            .values("total")[:1],
+            output_field=FloatField(),
+        )
+
+        active_time_subquery = Subquery(
+            CustomStatus.objects.filter(
+                user=OuterRef("email"),
+                status_type__project=project,
+                status_type__name="In-Service",
+                is_active=True,
+            )
+            .values("user")
+            .annotate(
+                total=Sum(
+                    ExpressionWrapper(
+                        Extract(request_time - F("created_on"), "epoch"),
+                        output_field=FloatField(),
+                    )
+                )
+            )
+            .values("total")[:1],
+            output_field=FloatField(),
+        )
 
         agents_query = self.model
         if not filters.is_weni_admin:
@@ -189,6 +225,17 @@ class AgentRepository:
                     & Q(rooms__metric__interaction_time__gt=0),
                 ),
                 custom_status=custom_status_subquery,
+                time_in_service_order=(
+                    Coalesce(break_time_subquery, Value(0.0))
+                    + Case(
+                        When(
+                            status="ONLINE",
+                            then=Coalesce(active_time_subquery, Value(0.0)),
+                        ),
+                        default=Value(0.0),
+                        output_field=FloatField(),
+                    )
+                ),
             )
             .distinct()
         )
@@ -206,21 +253,16 @@ class AgentRepository:
             "avg_message_response_time",
             "avg_interaction_time",
             "custom_status",
+            "time_in_service_order",
         )
 
         if filters.ordering:
             if "time_in_service" in filters.ordering:
-                reverse = filters.ordering.startswith("-")
-                agents_list = list(agents_query)
-                agents_list.sort(key=lambda x: x.get("email") or "")
-                agents_list.sort(
-                    key=lambda x: calculate_in_service_time(
-                        x.get("custom_status"), user_status=x.get("status")
-                    )
-                    or 0,
-                    reverse=reverse,
+                # Ordenação pelo banco usando o campo calculado
+                ordering_field = filters.ordering.replace(
+                    "time_in_service", "time_in_service_order"
                 )
-                return agents_list
+                agents_query = agents_query.order_by(ordering_field, "email")
             elif "status" in filters.ordering:
                 ordering_field = filters.ordering.replace("status", "status_order")
                 agents_query = agents_query.order_by(ordering_field, "email")
