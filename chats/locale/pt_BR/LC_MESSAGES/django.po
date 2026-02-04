@@ -110,6 +110,18 @@ msgstr "Perfil"
 msgid "Profiles"
 msgstr "Perfis"
 
+#: chats/apps/ai_features/audio_transcription/enums.py:10
+msgid "Incorrect transcription"
+msgstr "Transcrição incorreta"
+
+#: chats/apps/ai_features/audio_transcription/enums.py:11
+msgid "Incomplete transcription"
+msgstr "Transcrição incompleta"
+
+#: chats/apps/ai_features/audio_transcription/enums.py:12
+msgid "Hard to understand"
+msgstr "Difícil de entender"
+
 #: chats/apps/ai_features/history_summary/enums.py:10
 msgid "Incorrect summary"
 msgstr "Resumo incorreto"

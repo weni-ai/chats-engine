@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     "chats.core",
     "chats.apps.ai_features",
     "chats.apps.ai_features.history_summary",
+    "chats.apps.ai_features.audio_transcription",
     "chats.apps.feature_flags",
     "chats.apps.feedbacks",
     "chats.apps.csat",
@@ -448,6 +449,15 @@ UNPERMITTED_AUDIO_TYPES = env.list(
         "webm",
     ],
 )
+
+# Maximum audio duration in seconds for transcription (default: 5 minutes)
+AUDIO_TRANSCRIPTION_MAX_DURATION_SECONDS = env.int(
+    "AUDIO_TRANSCRIPTION_MAX_DURATION_SECONDS", default=300
+)
+
+# AWS Lambda for audio transcription
+AWS_TRANSCRIPTION_LAMBDA_ARN = env.str("AWS_TRANSCRIPTION_LAMBDA_ARN", default="")
+AWS_TRANSCRIPTION_REGION = env.str("AWS_TRANSCRIPTION_REGION", default="us-east-1")
 
 CHATS_FLOWS_TAG = env.str("CHATS_FLOWS_TAG", default="chats")
 CHATS_CACHE_TIME = env.int("CHATS_CACHE_TIME", default=1 * 60 * 60)

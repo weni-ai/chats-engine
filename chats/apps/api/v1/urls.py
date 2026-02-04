@@ -11,6 +11,11 @@ from chats.apps.api.v1.routers import router
 from chats.apps.api.v1.internal.ai_features.views import FeaturePromptsView
 from chats.apps.api.v1.internal.agents.views import AgentDisconnectView
 from chats.apps.api.v1.ai_features.views import HistorySummaryFeedbackTagsView
+from chats.apps.ai_features.audio_transcription.views import (
+    AudioTranscriptionView,
+    AudioTranscriptionFeedbackView,
+    AudioTranscriptionFeedbackTagsView,
+)
 
 
 urlpatterns = [
@@ -18,6 +23,21 @@ urlpatterns = [
         "ai_features/history_summary/feedback/tags/",
         HistorySummaryFeedbackTagsView.as_view(),
         name="history_summary_feedback_tags",
+    ),
+    path(
+        "ai_features/transcription/feedback/tags/",
+        AudioTranscriptionFeedbackTagsView.as_view(),
+        name="audio_transcription_feedback_tags",
+    ),
+    path(
+        "ai_features/transcription/<str:msg_uuid>/",
+        AudioTranscriptionView.as_view(),
+        name="audio_transcription",
+    ),
+    path(
+        "msg/<str:msg_uuid>/transcription/feedback/",
+        AudioTranscriptionFeedbackView.as_view(),
+        name="audio_transcription_feedback",
     ),
     path("rooms/report/", RoomsReportViewSet.as_view(), name="rooms_report"),
     path("model-fields/", ModelFieldsViewSet.as_view(), name="model-fields"),
