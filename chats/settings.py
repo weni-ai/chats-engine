@@ -147,7 +147,18 @@ CACHES = {
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
-DATABASES = dict(default=env.db(var="DATABASE_URL"))
+# Connection pooling configuration
+# CONN_MAX_AGE: Keeps connections open for reuse (in seconds)
+# CONN_HEALTH_CHECKS: Validates connection before use (Django 4.1+)
+CONN_MAX_AGE = env.int("CONN_MAX_AGE", default=60)
+
+DATABASES = {
+    "default": {
+        **env.db(var="DATABASE_URL"),
+        "CONN_MAX_AGE": CONN_MAX_AGE,
+        "CONN_HEALTH_CHECKS": True,
+    }
+}
 
 # User
 
@@ -596,6 +607,15 @@ FEEDBACK_FEATURE_FLAG_KEY = env.str(
 AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY = env.str(
     "AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY", default="weniChatsAutomaticMessage"
 )
+WS_PING_TIMEOUT_FEATURE_FLAG_KEY = env.str(
+    "WS_PING_TIMEOUT_FEATURE_FLAG_KEY", default="weniChatsPingTimeout"
+)
+WS_PING_TIMEOUT_SECONDS = env.int("WS_PING_TIMEOUT_SECONDS", default=60)
+WS_PING_CHECK_INTERVAL_SECONDS = env.int("WS_PING_CHECK_INTERVAL_SECONDS", default=10)
+WS_LAST_SEEN_UPDATE_INTERVAL_SECONDS = env.int(
+    "WS_LAST_SEEN_UPDATE_INTERVAL_SECONDS", default=60
+)
+WS_LAST_SEEN_THRESHOLD_SECONDS = env.int("WS_LAST_SEEN_THRESHOLD_SECONDS", default=90)
 
 # CSAT
 CSAT_FEATURE_FLAG_KEY = env.str("CSAT_FEATURE_FLAG_KEY", default="weniChatsCSAT")
@@ -618,6 +638,10 @@ WENI_CHATS_DISABLE_HAS_HISTORY_FLAG_KEY = env.str(
     "WENI_CHATS_DISABLE_HAS_HISTORY_FLAG_KEY",
     default="weniChatsDisableHasHistory",
 )
+LEAST_ROOMS_CLOSED_TODAY_FEATURE_FLAG_KEY = env.str(
+    "LEAST_ROOMS_CLOSED_TODAY_FEATURE_FLAG_KEY",
+    default="weniChatsLeastRoomsClosedToday",
+)
 WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY = env.str(
     "WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY",
     default="weniChatsBackEndReturn24hValidOnRoomsList",
@@ -633,3 +657,16 @@ USER_OBJECT_CACHE_ENABLED = env.bool("USER_OBJECT_CACHE_ENABLED", default=True)
 ROOM_24H_VALID_CACHE_TTL = env.int(
     "ROOM_24H_VALID_CACHE_TTL", default=0
 )  # 0 means no cache
+
+
+# Internal API Token
+INTERNAL_API_TOKEN = env.str("INTERNAL_API_TOKEN")
+
+# Excluded email domains
+# These are domains used by internal users (such as VTEX employees)
+# and should be excluded from some users lists,
+# because, even if they are included in projects (for testing or deployment purposes, for example),
+# they are not part of the organizations operational team.
+VTEX_INTERNAL_DOMAINS = env.list(
+    "VTEX_INTERNAL_DOMAINS", default=["weni.ai", "vtex.com"]
+)

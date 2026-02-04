@@ -1,4 +1,5 @@
-from unittest.mock import patch
+import uuid
+from unittest.mock import Mock, patch
 
 from django.urls import reverse
 from rest_framework import status
@@ -7,7 +8,7 @@ from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
 from chats.apps.contacts.models import Contact
-from chats.apps.projects.models import Project
+from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorTag
@@ -115,38 +116,7 @@ class SectorTests(APITestCase):
         self.assertIsNone(response.data["automatic_message"]["text"])
 
     @patch("chats.apps.api.v1.sectors.serializers.is_feature_active")
-    def test_create_sector_with_right_project_token_and_automatic_message_active_and_feature_flag_is_off(
-        self,
-        mock_is_feature_active,
-    ):
-        """
-        Verify if the endpoint for create in sector is working with correctly.
-        """
-        mock_is_feature_active.return_value = False
-        url = reverse("sector-list")
-        client = self.client
-        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
-        data = {
-            "name": "Finances",
-            "rooms_limit": 3,
-            "work_start": "11:00",
-            "work_end": "19:30",
-            "project": str(self.project.pk),
-            "automatic_message": {
-                "is_active": True,
-                "text": "Hello, how can I help you?",
-            },
-        }
-        response = client.post(url, data=data, format="json")
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
-            response.data["is_automatic_message_active"][0].code,
-            "automatic_message_feature_flag_is_not_active",
-        )
-
-    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active")
-    def test_create_sector_with_right_project_token_and_automatic_message_active_and_feature_flag_is_on(
+    def test_create_sector_with_right_project_token_and_automatic_message_active(
         self,
         mock_is_feature_active,
     ):
@@ -190,42 +160,7 @@ class SectorTests(APITestCase):
         self.assertEqual("sector 2 updated", sector.name)
 
     @patch("chats.apps.api.v1.sectors.serializers.is_feature_active")
-    def test_update_sector_automatic_message_when_feature_flag_is_off(
-        self, mock_is_feature_active
-    ):
-        """
-        Verify if the endpoint for update in sector is working with correctly.
-        """
-        mock_is_feature_active.return_value = False
-        self.sector.is_automatic_message_active = False
-        self.sector.save(update_fields=["is_automatic_message_active"])
-        url = reverse("sector-detail", args=[self.sector.pk])
-        client = self.client
-        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
-        response = client.patch(
-            url,
-            data={
-                "automatic_message": {
-                    "is_active": True,
-                    "text": "Hello, how can I help you?",
-                },
-            },
-            format="json",
-        )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
-            response.data["is_automatic_message_active"][0].code,
-            "automatic_message_feature_flag_is_not_active",
-        )
-
-        self.sector.refresh_from_db()
-        self.assertFalse(self.sector.is_automatic_message_active)
-        self.assertIsNone(self.sector.automatic_message_text)
-
-    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active")
-    def test_update_sector_automatic_message_when_feature_flag_is_on(
-        self, mock_is_feature_active
-    ):
+    def test_update_sector_automatic_message(self, mock_is_feature_active):
         """
         Verify if the endpoint for update in sector is working with correctly.
         """
@@ -460,3 +395,174 @@ class MsgsExternalTests(APITestCase):
         }
         response = client.post(url, data=data, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+
+class SectorTicketerCreationTests(APITestCase):
+    """
+    Tests to validate that ticketers are created correctly based on project type:
+    - Principal project: ticketer created ONLY in secondary project
+    - Normal project: ticketer created in own project
+    """
+
+    def setUp(self):
+        self.user = User.objects.create(
+            email="admin@test.com", first_name="Admin", last_name="User"
+        )
+        self.token = Token.objects.create(user=self.user)
+
+        self.org_uuid = str(uuid.uuid4())
+
+        self.principal_project = Project.objects.create(
+            uuid=str(uuid.uuid4()),
+            name="Principal Project",
+            org=self.org_uuid,
+            config={"its_principal": True},
+            timezone="America/Sao_Paulo",
+            date_format="D",
+        )
+
+        self.secondary_project = Project.objects.create(
+            uuid=str(uuid.uuid4()),
+            name="Secondary Project",
+            org=self.org_uuid,
+            config={"its_principal": False},
+            timezone="America/Sao_Paulo",
+            date_format="D",
+        )
+
+        self.normal_project = Project.objects.create(
+            uuid=str(uuid.uuid4()),
+            name="Normal Project",
+            org=str(uuid.uuid4()),
+            config={},
+            timezone="America/Sao_Paulo",
+            date_format="D",
+        )
+
+        ProjectPermission.objects.create(
+            user=self.user,
+            project=self.principal_project,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+
+        ProjectPermission.objects.create(
+            user=self.user,
+            project=self.normal_project,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+
+    @patch("chats.apps.api.v1.sectors.viewsets.settings")
+    @patch(
+        "chats.apps.api.v1.sectors.viewsets.IntegratedTicketers.integrate_individual_ticketer"
+    )
+    @patch("chats.apps.api.v1.sectors.viewsets.FlowRESTClient.create_ticketer")
+    def test_principal_project_creates_ticketer_only_in_secondary(
+        self, mock_create_ticketer, mock_integrate_individual, mock_settings
+    ):
+        """
+        When creating a sector in a principal project, should create ticketer
+        ONLY in secondary project (via integrate_individual_ticketer),
+        NOT in principal project.
+        """
+        mock_settings.USE_WENI_FLOWS = True
+        mock_integrate_individual.return_value = {"status": "success"}
+
+        url = reverse("sector-list")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+        data = {
+            "name": "Test Sector Principal",
+            "rooms_limit": 5,
+            "work_start": "08:00",
+            "work_end": "18:00",
+            "project": str(self.principal_project.uuid),
+            "secondary_project": {"uuid": str(self.secondary_project.uuid)},
+        }
+
+        response = self.client.post(url, data=data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        mock_create_ticketer.assert_not_called()
+
+        mock_integrate_individual.assert_called_once()
+        call_args = mock_integrate_individual.call_args
+        self.assertEqual(str(call_args[0][0].uuid), str(self.principal_project.uuid))
+        self.assertEqual(
+            call_args[0][1], {"uuid": str(self.secondary_project.uuid)}
+        )
+
+    @patch(
+        "chats.apps.api.v1.sectors.viewsets.IntegratedTicketers.integrate_individual_ticketer"
+    )
+    @patch("chats.apps.api.v1.sectors.viewsets.FlowRESTClient.create_ticketer")
+    @patch("chats.apps.api.v1.sectors.viewsets.settings")
+    def test_normal_project_creates_ticketer_in_own_project(
+        self, mock_settings, mock_create_ticketer, mock_integrate_individual
+    ):
+        """
+        When creating a sector in a normal project (not principal),
+        should create ticketer in own project via FlowRESTClient,
+        NOT call integrate_individual_ticketer.
+        """
+        mock_settings.USE_WENI_FLOWS = True
+
+        mock_response = Mock()
+        mock_response.status_code = status.HTTP_201_CREATED
+        mock_create_ticketer.return_value = mock_response
+
+        url = reverse("sector-list")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+        data = {
+            "name": "Test Sector Normal",
+            "rooms_limit": 5,
+            "work_start": "08:00",
+            "work_end": "18:00",
+            "project": str(self.normal_project.uuid),
+        }
+
+        response = self.client.post(url, data=data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        mock_integrate_individual.assert_not_called()
+
+        mock_create_ticketer.assert_called_once()
+        call_kwargs = mock_create_ticketer.call_args[1]
+        self.assertEqual(call_kwargs["project_uuid"], str(self.normal_project.uuid))
+
+    @patch("chats.apps.api.v1.sectors.viewsets.settings")
+    @patch(
+        "chats.apps.api.v1.sectors.viewsets.IntegratedTicketers.integrate_individual_ticketer"
+    )
+    @patch("chats.apps.api.v1.sectors.viewsets.FlowRESTClient.create_ticketer")
+    def test_principal_project_does_not_create_duplicate_ticketers(
+        self, mock_create_ticketer, mock_integrate_individual, mock_settings
+    ):
+        """
+        Regression test: ensure that principal projects don't create
+        ticketers in both principal AND secondary projects (the bug that was fixed).
+        Only secondary project should have the ticketer created.
+        """
+        mock_settings.USE_WENI_FLOWS = True
+        mock_integrate_individual.return_value = {"status": "success"}
+
+        url = reverse("sector-list")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+        data = {
+            "name": "Test Sector No Duplicate",
+            "rooms_limit": 5,
+            "work_start": "08:00",
+            "work_end": "18:00",
+            "project": str(self.principal_project.uuid),
+            "secondary_project": {"uuid": str(self.secondary_project.uuid)},
+        }
+
+        response = self.client.post(url, data=data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        self.assertEqual(mock_create_ticketer.call_count, 0)
+        self.assertEqual(mock_integrate_individual.call_count, 1)

@@ -4,8 +4,6 @@ import time
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
-from django.db.models import Q
-
 import requests
 import sentry_sdk
 from django.conf import settings
@@ -13,7 +11,7 @@ from django.core.cache import cache
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models, transaction
-from django.db.models import F
+from django.db.models import F, Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django_redis import get_redis_connection
@@ -26,13 +24,13 @@ from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTCl
 from chats.apps.projects.models.models import RoomRoutingType
 from chats.apps.projects.usecases.send_room_info import RoomInfoUseCase
 from chats.apps.projects.usecases.status_service import InServiceStatusService
+from chats.apps.queues.models import Queue
 from chats.apps.rooms.exceptions import (
     MaxPinRoomLimitReachedError,
     RoomIsNotActiveError,
 )
 from chats.core.models import BaseConfigurableModel, BaseModel
 from chats.utils.websockets import send_channels_group
-from chats.apps.queues.models import Queue
 
 if TYPE_CHECKING:
     from chats.apps.projects.models.models import Project
@@ -45,11 +43,6 @@ logger = logging.getLogger(__name__)
 
 
 class Room(BaseModel, BaseConfigurableModel):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.__original_is_active = self.is_active
-        self._original_user = self.user
-
     user = models.ForeignKey(
         "accounts.User",
         related_name="rooms",
@@ -95,6 +88,14 @@ class Room(BaseModel, BaseConfigurableModel):
     )
 
     ended_by = models.CharField(_("Ended by"), max_length=50, null=True, blank=True)
+    closed_by = models.ForeignKey(
+        "accounts.User",
+        related_name="closed_rooms_by_user",
+        verbose_name=_("closed by"),
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
 
     is_active = models.BooleanField(_("is active?"), default=True)
     is_waiting = models.BooleanField(_("is waiting for answer?"), default=False)
@@ -131,8 +132,43 @@ class Room(BaseModel, BaseConfigurableModel):
     last_unread_message_at = models.DateTimeField(
         _("Last unread message at"), null=True, blank=True
     )
+    last_interaction = models.DateTimeField(
+        _("Last interaction"), null=True, blank=True
+    )
+    last_message = models.ForeignKey(
+        "msgs.Message",
+        verbose_name=_("Last message"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    last_message_text = models.TextField(
+        _("Last message text"), null=True, blank=True, default=""
+    )
+    last_message_user = models.ForeignKey(
+        "accounts.User",
+        verbose_name=_("Last message user"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    last_message_contact = models.ForeignKey(
+        "contacts.Contact",
+        verbose_name=_("Last message contact"),
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    last_message_media = models.JSONField(
+        _("Last message media"),
+        default=list,
+        blank=True,
+    )
 
-    tracker = FieldTracker(fields=["user", "queue"])
+    tracker = FieldTracker(fields=["user_id", "queue_id"])
 
     @property
     def is_billing_notified(self) -> bool:
@@ -155,7 +191,12 @@ class Room(BaseModel, BaseConfigurableModel):
         room_client = RoomInfoUseCase()
         room_client.get_room(self)
 
-        self.set_config("is_billing_notified", True)
+        current_config = self.config or {}
+        new_config = current_config.copy()
+        new_config["is_billing_notified"] = True
+
+        Room.objects.filter(pk=self.pk).update(config=new_config)
+
         logger.info(
             "Billing notified for room %s. Setting is_billing_notified to True",
             self.pk,
@@ -167,7 +208,10 @@ class Room(BaseModel, BaseConfigurableModel):
         Args:
             is_new: Boolean indicando se é uma sala nova
         """
-        old_user = self._original_user
+        old_user_pk = (
+            Room.objects.filter(pk=self.pk).values_list("user", flat=True).first()
+        )
+        old_user = User.objects.get(email=old_user_pk) if old_user_pk else None
         new_user = self.user
 
         project = None
@@ -211,13 +255,17 @@ class Room(BaseModel, BaseConfigurableModel):
         ]
 
     def save(self, *args, **kwargs) -> None:
-        if self._state.adding is False and self.__original_is_active is False:
+        current_is_active = (
+            Room.objects.filter(pk=self.pk).values_list("is_active", flat=True).first()
+        )
+
+        if self._state.adding is False and current_is_active is False:
             raise ValidationError({"detail": _("Closed rooms cannot receive updates")})
 
         if self._state.adding:
             self.added_to_queue_at = timezone.now()
 
-        user_has_changed = self.pk and self.tracker.has_changed("user")
+        user_has_changed = self.pk and self.tracker.has_changed("user_id")
 
         if self.user and not self.user_assigned_at or user_has_changed:
             self.user_assigned_at = timezone.now()
@@ -236,13 +284,13 @@ class Room(BaseModel, BaseConfigurableModel):
 
         is_new = self._state.adding
 
-        queue_has_changed = self.tracker.has_changed("queue")
-        old_queue = self.tracker.previous("queue")
+        queue_has_changed = self.tracker.has_changed("queue_id")
+        old_queue_id = self.tracker.previous("queue_id")
 
         super().save(*args, **kwargs)
 
-        if queue_has_changed and old_queue and self.queue:
-            old_queue = Queue.objects.get(pk=old_queue)
+        if queue_has_changed and old_queue_id and self.queue:
+            old_queue = Queue.objects.get(pk=old_queue_id)
 
             if old_queue.sector != self.queue.sector:
                 self.tags.clear()
@@ -386,12 +434,13 @@ class Room(BaseModel, BaseConfigurableModel):
         self.tags.add(*new_tag_ids)
         self.tags.remove(*tags_to_remove_ids)
 
-    def close(self, tags: list = [], end_by: str = ""):
+    def close(self, tags: list = [], end_by: str = "", closed_by: "User" = None):
         from chats.apps.projects.usecases.status_service import InServiceStatusService
 
         self.is_active = False
         self.ended_at = timezone.now()
         self.ended_by = end_by
+        self.closed_by = closed_by
 
         with transaction.atomic():
             if tags is not None:
@@ -687,6 +736,55 @@ class Room(BaseModel, BaseConfigurableModel):
             unread_messages_count=0, last_unread_message_at=timezone.now()
         )
 
+    def update_last_message(self, message, user=None):
+        """
+        Updates last message fields. Used for agent/system messages.
+        """
+        media_data = [
+            {"content_type": media.content_type, "url": media.url}
+            for media in message.medias.all()
+        ]
+        Room.objects.filter(pk=self.pk).update(
+            last_interaction=message.created_on,
+            last_message=message,
+            last_message_text=message.text,
+            last_message_user=user,
+            last_message_contact=None,
+            last_message_media=media_data,
+        )
+
+    def on_new_message(self, message, contact=None, increment_unread: int = 0):
+        """
+        Updates room state when a new message arrives from contact.
+        Single UPDATE with all last_message fields.
+        Only updates if message is newer than last_interaction.
+        """
+        media_data = [
+            {"content_type": media.content_type, "url": media.url}
+            for media in message.medias.all()
+        ]
+        update_fields = {
+            "last_interaction": message.created_on,
+            "last_message": message,
+            "last_message_text": message.text,
+            "last_message_user": None,
+            "last_message_contact": contact,
+            "last_message_media": media_data,
+        }
+
+        if increment_unread > 0:
+            update_fields["unread_messages_count"] = (
+                F("unread_messages_count") + increment_unread
+            )
+
+        Room.objects.filter(
+            Q(pk=self.pk)
+            & (
+                Q(last_interaction__lt=message.created_on)
+                | Q(last_interaction__isnull=True)
+            ),
+        ).update(**update_fields)
+
     def start_csat_flow(self):
         """
         Starts the CSAT flow for a room.
@@ -749,7 +847,7 @@ class RoomNote(BaseModel):
         "msgs.Message",
         related_name="internal_note",
         verbose_name=_("message"),
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
     )

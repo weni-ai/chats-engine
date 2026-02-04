@@ -14,7 +14,7 @@ from chats.apps.archive_chats.models import (
 )
 from chats.apps.archive_chats.serializers import ArchiveMessageSerializer
 from chats.apps.archive_chats.services import ArchiveChatsService
-from chats.apps.msgs.models import AutomaticMessage, Message
+from chats.apps.msgs.models import AutomaticMessage, Message, MessageMedia
 from chats.apps.rooms.models import Room, RoomNote
 from chats.apps.queues.models import Queue
 from chats.apps.sectors.models import Sector
@@ -325,3 +325,57 @@ class TestArchiveChatsService(TestCase):
             self.service.get_archived_media_url(
                 f"archived_conversations/{self.project.uuid}/{uuid.uuid4()}/media/test.jpg"
             )
+
+    def test_delete_room_messages(self):
+        archived_conversation = RoomArchivedConversation.objects.create(
+            job=self.service.start_archive_job(),
+            room=self.room,
+            status=ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED,
+        )
+
+        messages = [
+            Message.objects.create(
+                room=self.room,
+                user=self.user,
+                text="Test message",
+                created_on=timezone.now(),
+            ),
+            Message.objects.create(
+                room=self.room,
+                contact=self.contact,
+                text="Test message",
+                created_on=timezone.now(),
+            ),
+            Message.objects.create(
+                room=self.room,
+                contact=self.contact,
+                text="Test message",
+                created_on=timezone.now(),
+            ),
+        ]
+
+        MessageMedia.objects.create(
+            message=messages[0],
+            content_type="image/png",
+            media_file="test.png",
+        )
+        AutomaticMessage.objects.create(
+            message=messages[0],
+            room=self.room,
+        )
+
+        self.service.delete_room_messages(archived_conversation, batch_size=2)
+
+        archived_conversation.refresh_from_db()
+        self.assertEqual(
+            archived_conversation.status,
+            ArchiveConversationsJobStatus.MESSAGES_DELETED_FROM_DB,
+        )
+
+        self.assertEqual(Message.objects.filter(room=self.room).count(), 0)
+        self.assertEqual(
+            MessageMedia.objects.filter(message__room=self.room).count(), 0
+        )
+        self.assertEqual(
+            AutomaticMessage.objects.filter(message__room=self.room).count(), 0
+        )
