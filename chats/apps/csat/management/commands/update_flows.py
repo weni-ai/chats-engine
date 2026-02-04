@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand
 from rest_framework import status
 from sentry_sdk import capture_message
+import time
 
 
 from chats.apps.csat.models import CSATFlowProjectConfig
@@ -84,6 +85,7 @@ class Command(BaseCommand):
             )
 
             is_updated = False
+            sleep_time = 1
 
             for _ in range(0, retries):
                 response = flows_client.create_or_update_flow(
@@ -108,6 +110,8 @@ class Command(BaseCommand):
                     capture_message(
                         f"Failed to update flow for project: [{response.status_code}] \n{content}\n"
                     )
+                    time.sleep(sleep_time)
+                    sleep_time *= 2
                     continue
 
                 results = response.json().get("results", [])
