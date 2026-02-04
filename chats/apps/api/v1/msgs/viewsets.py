@@ -1,15 +1,13 @@
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django_filters.rest_framework import DjangoFilterBackend
-from django.core.exceptions import ObjectDoesNotExist
 from pydub.exceptions import CouldntDecodeError
 from rest_framework import filters, mixins, parsers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from chats.apps.api.pagination import (
-    CustomCursorPagination,
-)
+from chats.apps.api.pagination import CustomCursorPagination
 from chats.apps.api.v1.msgs.filters import MessageFilter, MessageMediaFilter
 from chats.apps.api.v1.msgs.permissions import MessageMediaPermission, MessagePermission
 from chats.apps.api.v1.msgs.serializers import (
@@ -56,7 +54,22 @@ class MessageViewset(
             serializer.save()
             serializer.instance.notify_room("create", True)
 
-            message = serializer.instance
+            instance = serializer.instance
+            is_media_instance = isinstance(instance, MessageMedia)
+            if is_media_instance:
+                message = instance.message
+            else:
+                message = instance
+
+            # Se é MessageMedia, já sabemos que tem mídia (não precisamos consultar medias.exists()
+            # que pode ter cache desatualizado da instância criada antes da mídia)
+            has_content = message.text or is_media_instance or message.medias.exists()
+            if has_content:
+                message.room.update_last_message(
+                    message=message,
+                    user=message.user,
+                )
+
             if message.user and message.room.first_user_assigned_at:
                 try:
                     metric = message.room.metric
@@ -144,3 +157,10 @@ class MessageMediaViewset(
             instance = serializer.instance
             instance.message.notify_room("update")
             instance.callback()
+
+            # Update last_message when media is added
+            message = instance.message
+            message.room.update_last_message(
+                message=message,
+                user=message.user,
+            )

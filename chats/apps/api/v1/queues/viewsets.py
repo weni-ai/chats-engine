@@ -9,6 +9,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
+from chats.apps.core.internal_domains import (
+    is_vtex_internal_domain,
+    exclude_vtex_internal_domains,
+)
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.api.v1.permissions import (
     IsQueueAgent,
@@ -82,12 +86,6 @@ class QueueViewset(ModelViewSet):
 
         project = Project.objects.get(uuid=instance.sector.project.uuid)
 
-        content = {
-            "uuid": str(instance.uuid),
-            "name": instance.name,
-            "sector_uuid": str(instance.sector.uuid),
-            "project_uuid": str(instance.sector.project.uuid),
-        }
         use_group_sectors = SectorGroupSector.objects.filter(
             sector=instance.sector
         ).exists()
@@ -96,14 +94,30 @@ class QueueViewset(ModelViewSet):
 
         if not settings.USE_WENI_FLOWS:
             return super().perform_create(serializer)
-        response = FlowRESTClient().create_queue(**content)
-        if response.status_code not in [status.HTTP_200_OK, status.HTTP_201_CREATED]:
-            instance.delete()
-            raise exceptions.APIException(
-                detail=f"[{response.status_code}] Error posting the queue on flows. Exception: {response.content}"
-            )
 
-        if project.config and project.config.get("its_principal", False):
+        should_use_integration = (
+            project.config
+            and project.config.get("its_principal", False)
+            and instance.sector.secondary_project
+        )
+
+        if not should_use_integration:
+            content = {
+                "uuid": str(instance.uuid),
+                "name": instance.name,
+                "sector_uuid": str(instance.sector.uuid),
+                "project_uuid": str(instance.sector.project.uuid),
+            }
+            response = FlowRESTClient().create_queue(**content)
+            if response.status_code not in [
+                status.HTTP_200_OK,
+                status.HTTP_201_CREATED,
+            ]:
+                instance.delete()
+                raise exceptions.APIException(
+                    detail=f"[{response.status_code}] Error posting the queue on flows. Exception: {response.content}"
+                )
+        else:
             integrate_use_case = IntegratedTicketers()
             integrate_use_case.integrate_individual_topic(
                 project, instance.sector.secondary_project
@@ -216,9 +230,18 @@ class QueueViewset(ModelViewSet):
                 online_sector_managers, online_admins
             )
 
+        agents_pks = set(combined_permissions.values_list("id", flat=True))
+        agents = User.objects.filter(id__in=agents_pks)
+
+        user_email = self.request.user.email
+
+        if not is_vtex_internal_domain(user_email):
+            agents = exclude_vtex_internal_domains(agents)
+
         serializer = QueueAgentsSerializer(
-            combined_permissions, many=True, context={"project": project}
+            agents, many=True, context={"project": project}
         )
+
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=False, methods=["GET"])

@@ -8,7 +8,6 @@ from django.db.models import (
     Case,
     DateTimeField,
     Exists,
-    Max,
     OuterRef,
     Q,
     Subquery,
@@ -87,8 +86,6 @@ from chats.apps.rooms.views import (
     update_custom_fields,
     update_flows_custom_fields,
 )
-
-
 from chats.apps.sectors.models import SectorTag
 
 logger = logging.getLogger(__name__)
@@ -144,53 +141,7 @@ class RoomViewset(
             .filter(queue__sector__project__permissions__user=self.request.user)
         )
 
-        annotations = {
-            "last_interaction": Max("messages__created_on"),
-            "last_message_text": Subquery(
-                Message.objects.filter(room=OuterRef("pk"))
-                .exclude(user__isnull=True, contact__isnull=True)
-                .exclude(text="")
-                .order_by("-created_on")
-                .values("text")[:1]
-            ),
-        }
-
-        project_uuid = self.request.query_params.get("project")
-
-        if project_uuid and self.request.user.is_authenticated:
-            try:
-                if is_feature_active(
-                    settings.WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY,
-                    self.request.user.email,
-                    project_uuid,
-                ):
-                    last_24h = timezone.now() - timedelta(days=1)
-                    annotations["last_contact_interaction"] = Max(
-                        Case(
-                            When(
-                                messages__contact__isnull=False,
-                                then="messages__created_on",
-                            ),
-                            output_field=DateTimeField(),
-                        )
-                    )
-                    annotations["is_24h_valid_computed"] = Case(
-                        When(
-                            Q(
-                                urn__startswith="whatsapp",
-                                last_contact_interaction__lt=last_24h,
-                            ),
-                            then=False,
-                        ),
-                        default=True,
-                        output_field=BooleanField(),
-                    )
-            except Exception as e:
-                logger.error(f"Error checking feature flag: {e}")
-
-        qs = qs.annotate(**annotations).select_related(
-            "user", "contact", "queue", "queue__sector"
-        )
+        qs = qs.select_related("user", "contact", "queue", "queue__sector")
 
         return qs
 
@@ -432,8 +383,20 @@ class RoomViewset(
                 code="tags_required",
             )
 
+        if (
+            instance.user is None
+            and instance.queue
+            and instance.queue.sector.can_close_chats_in_queue
+        ):
+            permission = instance.project.get_permission(request.user)
+            if not permission or not permission.is_admin:
+                raise PermissionDenied(
+                    detail=_("Agents cannot close queued rooms in this sector."),
+                    code="queued_room_close_disabled",
+                )
+
         with transaction.atomic():
-            instance.close(tags, "agent")
+            instance.close(tags, "agent", request.user)
 
         instance.refresh_from_db()
         serialized_data = RoomSerializer(instance=instance)
@@ -482,11 +445,10 @@ class RoomViewset(
         # Create transfer object based on whether it's a user or a queue transfer and add it to the history
         if user:
             if old_instance.user is None:
-                time = timezone.now() - old_instance.modified_on
                 room_metric = RoomMetrics.objects.select_related("room").get_or_create(
                     room=instance
                 )[0]
-                room_metric.waiting_time += time.total_seconds()
+                room_metric.waiting_time += calculate_last_queue_waiting_time(instance)
                 room_metric.queued_count += 1
                 room_metric.save()
             else:
@@ -502,6 +464,7 @@ class RoomViewset(
                 action=action,
                 from_=old_instance.user or old_instance.queue,
                 to=instance.user,
+                requested_by=self.request.user,
             )
 
         if queue:
@@ -510,6 +473,7 @@ class RoomViewset(
                 action="transfer",
                 from_=old_instance.user or old_instance.queue,
                 to=instance.queue,
+                requested_by=self.request.user,
             )
             if (
                 not user
@@ -528,7 +492,10 @@ class RoomViewset(
         # Create a message with the transfer data and Send to the room group
         # TODO separate create message in a function
         create_room_feedback_message(
-            instance, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+            instance,
+            feedback,
+            method=RoomFeedbackMethods.ROOM_TRANSFER,
+            requested_by=self.request.user,
         )
 
         if old_user is None and user:  # queued > agent
@@ -631,7 +598,10 @@ class RoomViewset(
             "new": new_custom_field_value,
         }
         create_room_feedback_message(
-            room, feedback, method=RoomFeedbackMethods.EDIT_CUSTOM_FIELDS
+            room,
+            feedback,
+            method=RoomFeedbackMethods.EDIT_CUSTOM_FIELDS,
+            requested_by=request.user,
         )
 
         return Response(
@@ -669,6 +639,7 @@ class RoomViewset(
             action=action,
             from_=room.queue,
             to=user,
+            requested_by=request.user,
         )
 
         try:
@@ -677,7 +648,10 @@ class RoomViewset(
             room.add_transfer_to_history(feedback)
 
             create_room_feedback_message(
-                room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+                room,
+                feedback,
+                method=RoomFeedbackMethods.ROOM_TRANSFER,
+                requested_by=request.user,
             )
             room.notify_queue("update")
 

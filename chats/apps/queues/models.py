@@ -1,16 +1,23 @@
 import random
+from datetime import timedelta
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.db.models import OuterRef, Q, Subquery
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
 from chats.apps.projects.models.models import CustomStatus
 from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
 
 from .queue_managers import QueueManager
+
+# Threshold for considering an agent as "recently seen" (in seconds)
+# Should be greater than WS_LAST_SEEN_UPDATE_INTERVAL_SECONDS to avoid false negatives
+LAST_SEEN_THRESHOLD_SECONDS = getattr(settings, "WS_LAST_SEEN_THRESHOLD_SECONDS", 90)
 
 User = get_user_model()
 
@@ -68,15 +75,34 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
             project_permissions__queue_authorizations__queue=self,
         )
 
+    def _is_ping_timeout_feature_enabled(self) -> bool:
+        """Check if the ping timeout feature is enabled for this queue's project."""
+        try:
+            return is_feature_active_for_attributes(
+                settings.WS_PING_TIMEOUT_FEATURE_FLAG_KEY,
+                {"projectUUID": str(self.sector.project.uuid)},
+            )
+        except Exception:
+            return False
+
     @property
     def online_agents(self):
-        # Filtra agentes online
-        agents = self.agents.filter(
-            project_permissions__status="ONLINE",
-            project_permissions__project=self.sector.project,
-            project_permissions__queue_authorizations__queue=self,
-            project_permissions__queue_authorizations__role=1,
-        )
+        # Base filter: status must be ONLINE
+        base_filter = {
+            "project_permissions__status": "ONLINE",
+            "project_permissions__project": self.sector.project,
+            "project_permissions__queue_authorizations__queue": self,
+            "project_permissions__queue_authorizations__role": 1,
+        }
+
+        # If ping timeout feature is enabled, also filter by last_seen
+        if self._is_ping_timeout_feature_enabled():
+            last_seen_threshold = timezone.now() - timedelta(
+                seconds=LAST_SEEN_THRESHOLD_SECONDS
+            )
+            base_filter["project_permissions__last_seen__gte"] = last_seen_threshold
+
+        agents = self.agents.filter(**base_filter)
 
         custom_status_query = Subquery(
             CustomStatus.objects.filter(
@@ -87,9 +113,7 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
             ).values("user__id")
         )
 
-        return agents.exclude(
-            id__in=custom_status_query
-        )  # TODO: Set this variable to ProjectPermission.STATUS_ONLINE
+        return agents.exclude(id__in=custom_status_query)
 
     @property
     def available_agents(self):
@@ -126,12 +150,53 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
 
         return online_agents.order_by("active_rooms_count")
 
+    def _get_agent_with_least_rooms_closed_today(self, agents):
+        """
+        Returns the agent that closed the fewest rooms today.
+        If there is a tie, returns a random agent.
+        """
+        from datetime import timedelta
+
+        from chats.apps.rooms.models import Room
+
+        today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        tomorrow_start = today_start + timedelta(days=1)
+
+        rooms_closed_counts = (
+            Room.objects.filter(
+                user__in=agents,
+                queue__sector=self.sector,
+                ended_at__gte=today_start,
+                ended_at__lt=tomorrow_start,
+                is_active=False,
+            )
+            .values("user_id")
+            .annotate(count=models.Count("uuid"))
+        )
+
+        # user_id is the email (to_field="email" in Room.user ForeignKey)
+        rooms_closed_today = {
+            item["user_id"]: item["count"] for item in rooms_closed_counts
+        }
+        min_closed_today = min(
+            rooms_closed_today.get(agent.email, 0) for agent in agents
+        )
+
+        eligible_agents = [
+            agent
+            for agent in agents
+            if rooms_closed_today.get(agent.email, 0) == min_closed_today
+        ]
+
+        return random.choice(eligible_agents)
+
     def get_available_agent(self):
         """
         Get an available agent for a queue, based on the number of active rooms.
 
         If the active rooms count is the same for different agents,
-        a random agent, among the ones with the rooms count, is returned.
+        the agent with the least rooms closed today is selected.
+        If there is still a tie, a random agent is returned.
         """
         agents = list(self.available_agents)
 
@@ -146,10 +211,18 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         )
 
         min_rooms_count = min(getattr(agent, field_name) for agent in agents)
-
         eligible_agents = [
             agent for agent in agents if getattr(agent, field_name) == min_rooms_count
         ]
+
+        if len(eligible_agents) == 1:
+            return eligible_agents[0]
+
+        if is_feature_active_for_attributes(
+            settings.LEAST_ROOMS_CLOSED_TODAY_FEATURE_FLAG_KEY,
+            {"projectUUID": str(self.project.uuid)},
+        ):
+            return self._get_agent_with_least_rooms_closed_today(eligible_agents)
 
         return random.choice(eligible_agents)
 

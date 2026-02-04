@@ -78,38 +78,45 @@ class SectorViewset(viewsets.ModelViewSet):
 
         project = Project.objects.get(uuid=instance.project.uuid)
 
-        content = {
-            "project_uuid": str(instance.project.uuid),
-            "name": instance.name,
-            "config": {
-                "project_auth": str(instance.external_token.pk),
-                "sector_uuid": str(instance.uuid),
-                "project_uuid": str(instance.project.uuid),
-                "project_name_origin": instance.name,
-            },
-        }
+        should_use_integration = (
+            project.config
+            and project.config.get("its_principal", False)
+            and instance.secondary_project
+        )
 
         if settings.USE_WENI_FLOWS:
-            flows_client = FlowRESTClient()
-            response = flows_client.create_ticketer(**content)
-            if response.status_code not in [
-                status.HTTP_200_OK,
-                status.HTTP_201_CREATED,
-            ]:
-                instance.delete()
+            if not should_use_integration:
+                content = {
+                    "project_uuid": str(instance.project.uuid),
+                    "name": instance.name,
+                    "config": {
+                        "project_auth": str(instance.external_token.pk),
+                        "sector_uuid": str(instance.uuid),
+                        "project_uuid": str(instance.project.uuid),
+                        "project_name_origin": instance.name,
+                    },
+                }
 
-                raise exceptions.APIException(
-                    detail=(
-                        f"[{response.status_code}] Error posting the sector/ticketer on flows. "
-                        f"Exception: {response.content}"
+                flows_client = FlowRESTClient()
+                response = flows_client.create_ticketer(**content)
+                if response.status_code not in [
+                    status.HTTP_200_OK,
+                    status.HTTP_201_CREATED,
+                ]:
+                    instance.delete()
+
+                    raise exceptions.APIException(
+                        detail=(
+                            f"[{response.status_code}] Error posting the sector/ticketer on flows. "
+                            f"Exception: {response.content}"
+                        )
                     )
-                )
 
-        if project.config and project.config.get("its_principal", False):
-            integrate_use_case = IntegratedTicketers()
-            integrate_use_case.integrate_individual_ticketer(
-                project, instance.secondary_project
-            )
+            else:
+                integrate_use_case = IntegratedTicketers()
+                integrate_use_case.integrate_individual_ticketer(
+                    project, instance.secondary_project
+                )
 
     def update(self, request, *args, **kwargs):
         sector = self.get_object()
@@ -426,119 +433,108 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
         instance.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=False, methods=["get", "patch"])
-    def official_holidays(self, request):
-        """
-        GET /api/v1/sector_holiday/official_holidays/?project=<uuid>&year=2025
-        PATCH /api/v1/sector_holiday/official_holidays/?sector=<uuid>
+    def _parse_date_str(self, ds):
+        if not isinstance(ds, str) or not ds:
+            return None
+        try:
+            return datetime.strptime(ds.strip(), "%Y-%m-%d").date()
+        except ValueError:
+            return None
 
-        GET: retorna feriados oficiais inferidos pelo timezone do projeto.
-        PATCH: habilita/desabilita feriados oficiais por data (YYYY-MM-DD) para o setor.
-        """
-        if request.method.upper() == "PATCH":
-            sector_uuid = request.query_params.get("sector")
-            if not sector_uuid:
-                return Response(
-                    {"detail": "Parameter 'sector' is required"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            enabled_dates = request.data.get("enabled_holidays", [])
-            disabled_dates = request.data.get("disabled_holidays", [])
-
-            if not isinstance(enabled_dates, list) or not isinstance(
-                disabled_dates, list
-            ):
-                return Response(
-                    {"detail": "enabled_holidays and disabled_holidays must be lists"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-
-            try:
-                sector = Sector.objects.get(uuid=sector_uuid)
-            except Sector.DoesNotExist:
-                return Response(
-                    {"detail": "Sector not found"}, status=status.HTTP_404_NOT_FOUND
-                )
-
-            def parse_date_str(ds):
-                if not isinstance(ds, str) or not ds:
-                    return None
-                try:
-                    return datetime.strptime(ds.strip(), "%Y-%m-%d").date()
-                except ValueError:
-                    return None
-
-            dates_to_touch = [
-                *(parse_date_str(d) for d in enabled_dates),
-                *(parse_date_str(d) for d in disabled_dates),
-            ]
-            years = {d.year for d in dates_to_touch if d}
-            official_by_year = {}
-            country_code = get_country_from_timezone(str(sector.project.timezone))
-            for y in years:
-                official_by_year[y] = get_country_holidays(country_code, y) or {}
-
-            enabled_count = 0
-            disabled_count = 0
-            errors = []
-
-            for ds in enabled_dates:
-                d = parse_date_str(ds)
-                if not d:
-                    errors.append(f"Invalid date format: {ds}")
-                    continue
-
-                obj = SectorHoliday.objects.filter(sector=sector, date=d).first()
-                name = official_by_year.get(d.year, {}).get(d, "")
-
-                if obj:
-                    updates = {}
-                    if obj.is_deleted:
-                        obj.is_deleted = False
-                        updates["is_deleted"] = False
-                    if obj.day_type != SectorHoliday.CLOSED:
-                        obj.day_type = SectorHoliday.CLOSED
-                        updates["day_type"] = SectorHoliday.CLOSED
-                    if obj.its_custom:
-                        obj.its_custom = False
-                        updates["its_custom"] = False
-                    if name and obj.description != name:
-                        obj.description = name
-                        updates["description"] = name
-                    if updates:
-                        obj.save()
-                    enabled_count += 1
-                else:
-                    SectorHoliday.objects.create(
-                        sector=sector,
-                        date=d,
-                        day_type=SectorHoliday.CLOSED,
-                        description=name,
-                        its_custom=False,
-                    )
-                    enabled_count += 1
-
-            for ds in disabled_dates:
-                d = parse_date_str(ds)
-                if not d:
-                    errors.append(f"Invalid date format: {ds}")
-                    continue
-                obj = SectorHoliday.objects.filter(sector=sector, date=d).first()
-                if obj and not obj.is_deleted:
-                    obj.is_deleted = True
-                    obj.save(update_fields=["is_deleted"])
-                    disabled_count += 1
-
-            return Response(
-                {
-                    "enabled": enabled_count,
-                    "disabled": disabled_count,
-                    "errors": errors,
-                },
-                status=status.HTTP_200_OK,
+    def _enable_holiday(self, sector, d, name):
+        obj = SectorHoliday.objects.filter(sector=sector, date=d).first()
+        if obj:
+            self._update_existing_holiday(obj, name)
+        else:
+            SectorHoliday.objects.create(
+                sector=sector,
+                date=d,
+                day_type=SectorHoliday.CLOSED,
+                description=name,
+                its_custom=False,
             )
 
+    def _update_existing_holiday(self, obj, name):
+        changed = False
+        if obj.is_deleted:
+            obj.is_deleted = False
+            changed = True
+        if obj.day_type != SectorHoliday.CLOSED:
+            obj.day_type = SectorHoliday.CLOSED
+            changed = True
+        if obj.its_custom:
+            obj.its_custom = False
+            changed = True
+        if name and obj.description != name:
+            obj.description = name
+            changed = True
+        if changed:
+            obj.save()
+
+    def _disable_holiday(self, sector, d):
+        obj = SectorHoliday.objects.filter(sector=sector, date=d).first()
+        if obj and not obj.is_deleted:
+            obj.is_deleted = True
+            obj.save(update_fields=["is_deleted"])
+            return True
+        return False
+
+    def _handle_patch_official_holidays(self, request):
+        sector_uuid = request.query_params.get("sector")
+        if not sector_uuid:
+            return Response(
+                {"detail": "Parameter 'sector' is required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        enabled_dates = request.data.get("enabled_holidays", [])
+        disabled_dates = request.data.get("disabled_holidays", [])
+
+        if not isinstance(enabled_dates, list) or not isinstance(disabled_dates, list):
+            return Response(
+                {"detail": "enabled_holidays and disabled_holidays must be lists"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            sector = Sector.objects.get(uuid=sector_uuid)
+        except Sector.DoesNotExist:
+            return Response(
+                {"detail": "Sector not found"}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        country_code = get_country_from_timezone(str(sector.project.timezone))
+        all_dates = [self._parse_date_str(d) for d in enabled_dates + disabled_dates]
+        years = {d.year for d in all_dates if d}
+        official_by_year = {
+            y: get_country_holidays(country_code, y) or {} for y in years
+        }
+
+        enabled_count, disabled_count, errors = 0, 0, []
+
+        for ds in enabled_dates:
+            d = self._parse_date_str(ds)
+            if not d:
+                errors.append(f"Invalid date format: {ds}")
+                continue
+            name = official_by_year.get(d.year, {}).get(d, "")
+            self._enable_holiday(sector, d, name)
+            enabled_count += 1
+
+        for ds in disabled_dates:
+            d = self._parse_date_str(ds)
+            if not d:
+                errors.append(f"Invalid date format: {ds}")
+                continue
+            if self._disable_holiday(sector, d):
+                disabled_count += 1
+
+        return Response(
+            {"enabled": enabled_count, "disabled": disabled_count, "errors": errors},
+            status=status.HTTP_200_OK,
+        )
+
+    def _handle_get_official_holidays(self, request):
         project_uuid = request.query_params.get("project")
         year_param = request.query_params.get("year")
 
@@ -564,27 +560,16 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        if not year_param:
-            year = timezone.now().astimezone(project.timezone).year
-        else:
-            try:
-                year = int(year_param)
-            except (TypeError, ValueError):
-                return Response(
-                    {"detail": "Invalid 'year'. Use an integer like 2025."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+        year = self._parse_year_param(year_param, project)
+        if isinstance(year, Response):
+            return year
 
         country_code = get_country_from_timezone(str(project.timezone))
         official_holidays = get_country_holidays(country_code, year)
 
         holidays_list = [
-            {
-                "date": holiday_date.strftime("%Y-%m-%d"),
-                "name": holiday_name,
-                "country_code": country_code,
-            }
-            for holiday_date, holiday_name in official_holidays.items()
+            {"date": hd.strftime("%Y-%m-%d"), "name": hn, "country_code": country_code}
+            for hd, hn in official_holidays.items()
         ]
 
         return Response(
@@ -594,6 +579,30 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
                 "holidays": sorted(holidays_list, key=lambda x: x["date"]),
             }
         )
+
+    def _parse_year_param(self, year_param, project):
+        if not year_param:
+            return timezone.now().astimezone(project.timezone).year
+        try:
+            return int(year_param)
+        except (TypeError, ValueError):
+            return Response(
+                {"detail": "Invalid 'year'. Use an integer like 2025."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    @action(detail=False, methods=["get", "patch"])
+    def official_holidays(self, request):
+        """
+        GET /api/v1/sector_holiday/official_holidays/?project=<uuid>&year=2025
+        PATCH /api/v1/sector_holiday/official_holidays/?sector=<uuid>
+
+        GET: retorna feriados oficiais inferidos pelo timezone do projeto.
+        PATCH: habilita/desabilita feriados oficiais por data (YYYY-MM-DD) para o setor.
+        """
+        if request.method.upper() == "PATCH":
+            return self._handle_patch_official_holidays(request)
+        return self._handle_get_official_holidays(request)
 
     @action(detail=False, methods=["post"])
     def import_official_holidays(self, request):
