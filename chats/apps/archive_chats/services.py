@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.core.files.base import ContentFile
 from sentry_sdk import capture_exception
+from django.db import transaction
 
 
 from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
@@ -17,7 +18,9 @@ from chats.apps.archive_chats.models import (
 )
 from chats.apps.archive_chats.serializers import ArchiveMessageSerializer
 from chats.apps.rooms.models import Room
-from chats.apps.msgs.models import Message
+from chats.apps.msgs.models import (
+    Message,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -36,6 +39,10 @@ class BaseArchiveChatsService(ABC):
 
     @abstractmethod
     def upload_messages_file(self, messages: List[dict]) -> None:
+        pass
+
+    @abstractmethod
+    def delete_room_messages(self, room: Room) -> None:
         pass
 
 
@@ -67,6 +74,7 @@ class ArchiveChatsService(BaseArchiveChatsService):
         try:
             messages_data = self.process_messages(room_archived_conversation)
             self.upload_messages_file(room_archived_conversation, messages_data)
+            self.delete_room_messages(room_archived_conversation)
 
             room_archived_conversation.refresh_from_db()
             room_archived_conversation.status = ArchiveConversationsJobStatus.FINISHED
@@ -168,5 +176,59 @@ class ArchiveChatsService(BaseArchiveChatsService):
             ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED
         )
         room_archived_conversation.save(update_fields=["status"])
+
+        return room_archived_conversation
+
+    def delete_room_messages(
+        self,
+        room_archived_conversation: RoomArchivedConversation,
+        batch_size: int = 1000,
+    ) -> None:
+        room_archived_conversation.refresh_from_db()
+
+        if (
+            room_archived_conversation.status
+            != ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED
+        ):
+            raise ValidationError(
+                f"Room archived conversation {room_archived_conversation.uuid} is not in messages file uploaded status"
+            )
+
+        room = room_archived_conversation.room
+
+        logger.info(
+            f"[ArchiveChatsService] Deleting room messages for room {room.uuid}"
+        )
+
+        messages_count = Message.objects.filter(room=room).count()
+        batches_count = messages_count // batch_size + 1
+
+        logger.info(
+            f"[ArchiveChatsService] Deleting {messages_count} messages "
+            f"for room {room.uuid} in {batches_count} batches"
+        )
+
+        with transaction.atomic():
+            for _ in range(batches_count):
+                messages_pks = Message.objects.filter(room=room).values_list(
+                    "pk", flat=True
+                )[:batch_size]
+
+                if len(messages_pks) == 0:
+                    break
+
+                Message.objects.filter(pk__in=messages_pks).delete()
+
+        room_archived_conversation.status = (
+            ArchiveConversationsJobStatus.MESSAGES_DELETED_FROM_DB
+        )
+        room_archived_conversation.messages_deleted_at = timezone.now()
+        room_archived_conversation.save(update_fields=["status", "messages_deleted_at"])
+
+        logger.info(
+            f"[ArchiveChatsService] Room archived conversation status updated to "
+            f"{room_archived_conversation.status} for room {room.uuid} "
+            f"with archived conversation {room_archived_conversation.uuid}"
+        )
 
         return room_archived_conversation
