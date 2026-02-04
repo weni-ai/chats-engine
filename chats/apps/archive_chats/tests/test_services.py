@@ -1,6 +1,7 @@
 import json
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 import uuid
+
 
 from django.core.exceptions import ValidationError
 from django.test import TestCase
@@ -25,7 +26,9 @@ from chats.apps.archive_chats.exceptions import InvalidObjectKey
 
 class TestArchiveChatsService(TestCase):
     def setUp(self):
-        self.service = ArchiveChatsService()
+        self.bucket = MagicMock()
+        self.bucket.name = "test-bucket"
+        self.service = ArchiveChatsService(bucket=self.bucket)
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
             name="Test Sector",
