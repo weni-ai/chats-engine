@@ -5,10 +5,8 @@ from django.db.models import (
     Avg,
     Case,
     Count,
-    ExpressionWrapper,
     Exists,
     F,
-    FloatField,
     IntegerField,
     OuterRef,
     Q,
@@ -17,7 +15,7 @@ from django.db.models import (
     Value,
     When,
 )
-from django.db.models.functions import Coalesce, Concat, Extract, JSONObject
+from django.db.models.functions import Coalesce, Concat, JSONObject
 from django.utils import timezone
 from pendulum.parser import parse as pendulum_parse
 
@@ -112,48 +110,40 @@ class AgentRepository:
             else timezone.now()
         )
 
-        request_time = timezone.now()
-
-        break_time_subquery = Subquery(
-            CustomStatus.objects.filter(
-                Q(user=OuterRef("email"))
-                & Q(status_type__project=project)
-                & Q(status_type__name="In-Service")
-                & Q(is_active=False)
-                & (
-                    Q(
-                        created_on__range=[
-                            custom_status_start_date,
-                            custom_status_end_date,
-                        ]
-                    )
-                )
-            )
-            .values("user")
-            .annotate(total=Sum(Coalesce(F("break_time"), Value(0))))
-            .values("total")[:1],
-            output_field=FloatField(),
-        )
-
-        active_time_subquery = Subquery(
-            CustomStatus.objects.filter(
-                user=OuterRef("email"),
-                status_type__project=project,
-                status_type__name="In-Service",
-                is_active=True,
-            )
-            .values("user")
-            .annotate(
-                total=Sum(
-                    ExpressionWrapper(
-                        Extract(request_time - F("created_on"), "epoch"),
-                        output_field=FloatField(),
-                    )
-                )
-            )
-            .values("total")[:1],
-            output_field=FloatField(),
-        )
+        # not used when loading (time_in_service_order disabled); code kept for reference:
+        # request_time = timezone.now()
+        # break_time_subquery = Subquery(
+        #     CustomStatus.objects.filter(
+        #         Q(user=OuterRef("email"))
+        #         & Q(status_type__project=project)
+        #         & Q(status_type__name="In-Service")
+        #         & Q(is_active=False)
+        #         & (Q(created_on__range=[custom_status_start_date, custom_status_end_date]))
+        #     )
+        #     .values("user")
+        #     .annotate(total=Sum(Coalesce(F("break_time"), Value(0))))
+        #     .values("total")[:1],
+        #     output_field=FloatField(),
+        # )
+        # active_time_subquery = Subquery(
+        #     CustomStatus.objects.filter(
+        #         user=OuterRef("email"),
+        #         status_type__project=project,
+        #         status_type__name="In-Service",
+        #         is_active=True,
+        #     )
+        #     .values("user")
+        #     .annotate(
+        #         total=Sum(
+        #             ExpressionWrapper(
+        #                 Extract(request_time - F("created_on"), "epoch"),
+        #                 output_field=FloatField(),
+        #             )
+        #         )
+        #     )
+        #     .values("total")[:1],
+        #     output_field=FloatField(),
+        # )
 
         custom_status_subquery = Subquery(
             CustomStatus.objects.filter(
@@ -233,17 +223,7 @@ class AgentRepository:
                     & Q(rooms__metric__interaction_time__gt=0),
                 ),
                 custom_status=custom_status_subquery,
-                time_in_service_order=(
-                    Coalesce(break_time_subquery, Value(0.0))
-                    + Case(
-                        When(
-                            status="ONLINE",
-                            then=Coalesce(active_time_subquery, Value(0.0)),
-                        ),
-                        default=Value(0.0),
-                        output_field=FloatField(),
-                    )
-                ),
+                # time_in_service_order: cálculo desativado (código comentado acima)
             )
             .distinct()
         )
@@ -261,16 +241,12 @@ class AgentRepository:
             "avg_message_response_time",
             "avg_interaction_time",
             "custom_status",
-            "time_in_service_order",
         )
 
         if filters.ordering:
             if "time_in_service" in filters.ordering:
-                # Ordenação pelo banco usando o campo calculado
-                ordering_field = filters.ordering.replace(
-                    "time_in_service", "time_in_service_order"
-                )
-                agents_query = agents_query.order_by(ordering_field, "email")
+                # time_in_service_order desativado: ordena só por email
+                agents_query = agents_query.order_by("email")
             elif "status" in filters.ordering:
                 ordering_field = filters.ordering.replace("status", "status_order")
                 agents_query = agents_query.order_by(ordering_field, "email")
