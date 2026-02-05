@@ -257,3 +257,5 @@ class CSATFlowService(BaseCSATService):
             project.name,
             project.uuid,
         )
+
+        return is_updated

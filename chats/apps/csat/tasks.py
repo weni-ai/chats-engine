@@ -1,3 +1,9 @@
+from chats.apps.csat.flows.definitions.flow import (
+    CSAT_FLOW_DEFINITION_DATA,
+    CSAT_FLOW_VERSION,
+)
+from datetime import datetime, timedelta
+from chats.apps.csat.models import CSATFlowProjectConfig
 from chats.apps.projects.models.models import Project
 from chats.celery import app
 from chats.apps.rooms.models import Room
@@ -27,3 +33,26 @@ def create_csat_flow(project_uuid: str):
         cache_client=CacheClient(),
         token_generator=JWTTokenGenerator(),
     ).create_csat_flow(project)
+
+
+@app.task
+def update_all_projects_csat_flow_definition():
+    configs = CSATFlowProjectConfig.objects.filter(version__lt=CSAT_FLOW_VERSION)
+
+    expiration_time = datetime.now() + timedelta(seconds=10)
+
+    for config in configs:
+        update_project_csat_flow_definition.apply_async(
+            args=[config.project.uuid], expires=expiration_time
+        )
+
+
+@app.task
+def update_project_csat_flow_definition(project_uuid: str):
+    project = Project.objects.get(uuid=project_uuid)
+
+    CSATFlowService(
+        flows_client=FlowRESTClient(),
+        cache_client=CacheClient(),
+        token_generator=JWTTokenGenerator(),
+    ).update_csat_flow_definition(project, CSAT_FLOW_DEFINITION_DATA, CSAT_FLOW_VERSION)
