@@ -429,6 +429,7 @@ class RoomViewset(
         # TODO Separate this into smaller methods
         old_instance = serializer.instance
         old_user = old_instance.user
+        old_user = old_instance.user
 
         user = self.request.data.get("user_email")
         queue = self.request.data.get("queue_uuid")
@@ -444,7 +445,7 @@ class RoomViewset(
 
         # Create transfer object based on whether it's a user or a queue transfer and add it to the history
         if user:
-            if old_instance.user is None:
+            if old_user is None:
                 room_metric = RoomMetrics.objects.select_related("room").get_or_create(
                     room=instance
                 )[0]
