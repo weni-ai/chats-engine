@@ -12,45 +12,118 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('msgs', '0017_alter_messagemedia_media_file'),
+        ("msgs", "0017_alter_messagemedia_media_file"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='AudioTranscription',
+            name="AudioTranscription",
             fields=[
-                ('uuid', models.UUIDField(default=uuid.uuid4, primary_key=True, serialize=False)),
-                ('created_on', models.DateTimeField(auto_now_add=True, verbose_name='Created on')),
-                ('modified_on', models.DateTimeField(auto_now=True, verbose_name='Modified on')),
-                ('status', models.CharField(choices=[('QUEUED', 'Queued'), ('PROCESSING', 'Processing'), ('DONE', 'Done'), ('FAILED', 'Failed')], default='QUEUED', max_length=12)),
-                ('text', models.TextField(blank=True, null=True)),
-                ('media', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='transcription', to='msgs.messagemedia')),
+                (
+                    "uuid",
+                    models.UUIDField(
+                        default=uuid.uuid4, primary_key=True, serialize=False
+                    ),
+                ),
+                (
+                    "created_on",
+                    models.DateTimeField(auto_now_add=True, verbose_name="Created on"),
+                ),
+                (
+                    "modified_on",
+                    models.DateTimeField(auto_now=True, verbose_name="Modified on"),
+                ),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[
+                            ("QUEUED", "Queued"),
+                            ("PROCESSING", "Processing"),
+                            ("DONE", "Done"),
+                            ("FAILED", "Failed"),
+                        ],
+                        default="QUEUED",
+                        max_length=12,
+                    ),
+                ),
+                ("text", models.TextField(blank=True, null=True)),
+                (
+                    "media",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="transcription",
+                        to="msgs.messagemedia",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Audio Transcription',
-                'verbose_name_plural': 'Audio Transcriptions',
+                "verbose_name": "Audio Transcription",
+                "verbose_name_plural": "Audio Transcriptions",
             },
         ),
         migrations.CreateModel(
-            name='AudioTranscriptionFeedback',
+            name="AudioTranscriptionFeedback",
             fields=[
-                ('uuid', models.UUIDField(default=uuid.uuid4, primary_key=True, serialize=False)),
-                ('created_on', models.DateTimeField(auto_now_add=True, verbose_name='Created on')),
-                ('modified_on', models.DateTimeField(auto_now=True, verbose_name='Modified on')),
-                ('liked', models.BooleanField(verbose_name='Liked?')),
-                ('text', models.CharField(blank=True, max_length=150, null=True, verbose_name='Text')),
-                ('tags', django.contrib.postgres.fields.ArrayField(base_field=models.CharField(max_length=100), blank=True, null=True, size=None)),
-                ('transcription', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='feedbacks', to='audio_transcription.audiotranscription', verbose_name='Audio Transcription')),
-                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='audio_transcription_feedbacks', to=settings.AUTH_USER_MODEL, verbose_name='User')),
+                (
+                    "uuid",
+                    models.UUIDField(
+                        default=uuid.uuid4, primary_key=True, serialize=False
+                    ),
+                ),
+                (
+                    "created_on",
+                    models.DateTimeField(auto_now_add=True, verbose_name="Created on"),
+                ),
+                (
+                    "modified_on",
+                    models.DateTimeField(auto_now=True, verbose_name="Modified on"),
+                ),
+                ("liked", models.BooleanField(verbose_name="Liked?")),
+                (
+                    "text",
+                    models.CharField(
+                        blank=True, max_length=150, null=True, verbose_name="Text"
+                    ),
+                ),
+                (
+                    "tags",
+                    django.contrib.postgres.fields.ArrayField(
+                        base_field=models.CharField(max_length=100),
+                        blank=True,
+                        null=True,
+                        size=None,
+                    ),
+                ),
+                (
+                    "transcription",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="feedbacks",
+                        to="audio_transcription.audiotranscription",
+                        verbose_name="Audio Transcription",
+                    ),
+                ),
+                (
+                    "user",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="audio_transcription_feedbacks",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="User",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Audio Transcription Feedback',
-                'verbose_name_plural': 'Audio Transcription Feedbacks',
+                "verbose_name": "Audio Transcription Feedback",
+                "verbose_name_plural": "Audio Transcription Feedbacks",
             },
         ),
         migrations.AddConstraint(
-            model_name='audiotranscriptionfeedback',
-            constraint=models.UniqueConstraint(fields=('transcription', 'user'), name='unique_audio_transcription_user_feedback'),
+            model_name="audiotranscriptionfeedback",
+            constraint=models.UniqueConstraint(
+                fields=("transcription", "user"),
+                name="unique_audio_transcription_user_feedback",
+            ),
         ),
     ]

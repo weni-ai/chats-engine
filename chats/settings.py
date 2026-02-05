@@ -659,6 +659,10 @@ WS_LAST_SEEN_THRESHOLD_SECONDS = env.int("WS_LAST_SEEN_THRESHOLD_SECONDS", defau
 
 # CSAT
 CSAT_FEATURE_FLAG_KEY = env.str("CSAT_FEATURE_FLAG_KEY", default="weniChatsCSAT")
+CSAT_FLOW_UPDATE_RETRIES = env.int("CSAT_FLOW_UPDATE_RETRIES", default=5)
+CSAT_FLOW_UPDATE_EXPIRATION_TIME = env.int(
+    "CSAT_FLOW_UPDATE_EXPIRATION_TIME", default=24 * 60  # 3 hours
+)  # In minutes
 
 CHATS_BASE_URL = env.str("CHATS_BASE_URL", default="http://localhost:8000")
 

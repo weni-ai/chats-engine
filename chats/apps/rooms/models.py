@@ -2,7 +2,7 @@ import json
 import logging
 import time
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import requests
 import sentry_sdk
@@ -835,6 +835,28 @@ class Room(BaseModel, BaseConfigurableModel):
 
         start_csat_flow.delay(self.uuid)
 
+    @property
+    def is_archived(self) -> bool:
+        from chats.apps.archive_chats.models import RoomArchivedConversation
+        from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
+
+        return RoomArchivedConversation.objects.filter(
+            room=self, status=ArchiveConversationsJobStatus.FINISHED, file__isnull=False
+        ).exists()
+
+    def get_archived_conversation_file_url(self) -> Optional[str]:
+        from chats.apps.archive_chats.models import RoomArchivedConversation
+        from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
+
+        archive = RoomArchivedConversation.objects.filter(
+            room=self, status=ArchiveConversationsJobStatus.FINISHED, file__isnull=False
+        ).first()
+
+        if archive:
+            return archive.file.url
+
+        return None
+
 
 class RoomPin(BaseModel):
     """
@@ -889,7 +911,7 @@ class RoomNote(BaseModel):
         "msgs.Message",
         related_name="internal_note",
         verbose_name=_("message"),
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
     )

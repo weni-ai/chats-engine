@@ -1,8 +1,11 @@
+import time
+
 from abc import ABC, abstractmethod
 from uuid import UUID
 import logging
 from django.conf import settings
 from rest_framework import status
+from sentry_sdk import capture_message
 
 from chats.apps.csat.flows.definitions.flow import (
     CSAT_FLOW_DEFINITION_DATA,
@@ -182,3 +185,85 @@ class CSATFlowService(BaseCSATService):
             project.name,
             project.uuid,
         )
+
+    def update_csat_flow_definition(
+        self, project: Project, definition: dict, version: int
+    ):
+        project_config = CSATFlowProjectConfig.objects.filter(project=project).first()
+
+        if not project_config:
+            raise Exception(
+                f"CSAT flow config not found for project {project.name} "
+                f"({project.uuid})"
+            )
+
+        logger.info(
+            "[CSAT FLOW SERVICE] Updating CSAT flow definition for project %s (%s)",
+            project.name,
+            project.uuid,
+        )
+
+        retries = settings.CSAT_FLOW_UPDATE_RETRIES
+        sleep_time = 1
+
+        is_updated = False
+
+        for _ in range(0, retries):
+            response = self.flows_client.create_or_update_flow(project, definition)
+
+            if not status.is_success(response.status_code):
+                try:
+                    content = response.json()
+                except Exception:
+                    content = response.text
+                logger.error(
+                    "[CSAT FLOW SERVICE] Failed to update flow definition for project %s (%s): %s",
+                    project.name,
+                    project.uuid,
+                    content,
+                )
+                capture_message(
+                    "Failed to update flow definition for project "
+                    f"[{response.status_code}] \n{content}\n"
+                    f"{project.name} ({project.uuid})",
+                )
+                time.sleep(sleep_time)
+                sleep_time *= 2
+                continue
+
+            results = response.json().get("results", [])
+
+            if not results:
+                raise Exception("No results found in the response")
+
+            if not results:
+                self.stdout.write(
+                    self.style.ERROR(
+                        f"No results found for project {project.name} "
+                        f"({project.uuid})"
+                    )
+                )
+                break
+
+            if status.is_success(response.status_code):
+                is_updated = True
+                break
+
+        if not is_updated:
+            raise Exception(
+                f"Failed to update flow definition for project {project.name} "
+                f"({project.uuid})"
+            )
+
+        flow_uuid = results[0].get("uuid")
+        project_config.flow_uuid = flow_uuid
+        project_config.version = version
+        project_config.save(update_fields=["flow_uuid", "version"])
+
+        logger.info(
+            "[CSAT FLOW SERVICE] CSAT flow definition updated for project %s (%s)",
+            project.name,
+            project.uuid,
+        )
+
+        return is_updated

@@ -4,6 +4,7 @@ from django.conf import settings
 from django.utils import translation
 from django.utils.translation import gettext as _
 from rest_framework import status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -39,12 +40,16 @@ class AudioTranscriptionView(APIView):
         Get the first audio media from a message by message UUID.
         Queries MessageMedia table directly (more efficient than querying Message).
         """
-        return MessageMedia.objects.select_related(
-            "message__room"
-        ).filter(
-            message_id=msg_uuid,
-            content_type__startswith="audio",
-        ).first()
+        return (
+            MessageMedia.objects.select_related(
+                "message__room" "message__room__queue__sector"
+            )
+            .filter(
+                message_id=msg_uuid,
+                content_type__startswith="audio",
+            )
+            .first()
+        )
 
     def post(self, request, msg_uuid: str):
         """
@@ -59,6 +64,11 @@ class AudioTranscriptionView(APIView):
                 {"detail": _("No audio media found in this message.")},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
+        room = audio_media.message.room
+
+        if not room.can_retrieve(request.user):
+            raise PermissionDenied()
 
         # Check if room is closed (history)
         if not audio_media.message.room.is_active:
@@ -77,7 +87,8 @@ class AudioTranscriptionView(APIView):
                     "detail": _(
                         "Audio duration exceeds the maximum allowed "
                         "(%(max)s seconds). Audio duration: %(duration)s seconds."
-                    ) % {"max": max_duration, "duration": int(audio_duration)}
+                    )
+                    % {"max": max_duration, "duration": int(audio_duration)}
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -132,17 +143,25 @@ class AudioTranscriptionFeedbackView(APIView):
         """
         Create feedback for an audio transcription.
         """
-        # Get audio media directly from MessageMedia table
-        audio_media = MessageMedia.objects.filter(
-            message_id=msg_uuid,
-            content_type__startswith="audio",
-        ).first()
+        audio_media = (
+            MessageMedia.objects.select_related("message__room__queue__sector")
+            .filter(
+                message_id=msg_uuid,
+                content_type__startswith="audio",
+            )
+            .first()
+        )
 
         if not audio_media:
             return Response(
                 {"detail": _("No audio media found in this message.")},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
+        room = audio_media.message.room
+
+        if not room.can_retrieve(request.user):
+            raise PermissionDenied()
 
         try:
             transcription = AudioTranscription.objects.get(media=audio_media)
