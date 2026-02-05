@@ -5,10 +5,8 @@ from django.db.models import (
     Avg,
     Case,
     Count,
-    ExpressionWrapper,
     Exists,
     F,
-    FloatField,
     IntegerField,
     OuterRef,
     Q,
@@ -17,7 +15,7 @@ from django.db.models import (
     Value,
     When,
 )
-from django.db.models.functions import Coalesce, Concat, Extract, JSONObject
+from django.db.models.functions import Coalesce, Concat, JSONObject
 from django.utils import timezone
 from pendulum.parser import parse as pendulum_parse
 
