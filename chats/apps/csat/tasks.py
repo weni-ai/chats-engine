@@ -43,16 +43,25 @@ def update_all_projects_csat_flow_definition():
 
     for config in configs:
         update_project_csat_flow_definition.apply_async(
-            args=[config.project.uuid], expires=expiration_time
+            args=[config.project.uuid, CSAT_FLOW_DEFINITION_DATA, CSAT_FLOW_VERSION],
+            expires=expiration_time,
         )
 
 
 @app.task
-def update_project_csat_flow_definition(project_uuid: str):
+def update_project_csat_flow_definition(
+    project_uuid: str, definition: dict, version: int
+):
+    if definition != CSAT_FLOW_DEFINITION_DATA:
+        raise ValueError("Definition is not the current CSAT flow definition")
+
+    if version != CSAT_FLOW_VERSION:
+        raise ValueError("Version is not the current CSAT flow version")
+
     project = Project.objects.get(uuid=project_uuid)
 
     CSATFlowService(
         flows_client=FlowRESTClient(),
         cache_client=CacheClient(),
         token_generator=JWTTokenGenerator(),
-    ).update_csat_flow_definition(project, CSAT_FLOW_DEFINITION_DATA, CSAT_FLOW_VERSION)
+    ).update_csat_flow_definition(project, definition, version)
