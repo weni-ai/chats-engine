@@ -1,3 +1,11 @@
+# 3.44.0
+# Add
+  - Async update flows definition
+# Fix
+  - Calculate waiting time when user is changed in rooms update
+# Remove
+  - In service order field in agents query for metrics
+
 # 3.43.1
 # Fix
   - Adding transcription text in message v2 serializer
@@ -1041,6 +1049,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 
