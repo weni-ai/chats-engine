@@ -1,3 +1,14 @@
+# 3.43.1
+# Fix
+  - Adding transcription text in message v2 serializer
+
+# 3.43.0
+# Add
+  - New feature to transcribe contact audio
+  - Archive messages service
+# Refactor
+  - In service time sorting for the new human dashboard
+
 # 3.42.0
 # Fix
   - Correct interaction time
@@ -1030,6 +1041,8 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
+
 
 
 
