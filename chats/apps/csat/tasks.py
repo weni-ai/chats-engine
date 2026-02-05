@@ -56,9 +56,6 @@ def update_all_projects_csat_flow_definition():
 def update_project_csat_flow_definition(
     project_uuid: str, definition: dict, version: int
 ):
-    if definition != CSAT_FLOW_DEFINITION_DATA:
-        raise ValueError("Definition is not the current CSAT flow definition")
-
     if version != CSAT_FLOW_VERSION:
         raise ValueError("Version is not the current CSAT flow version")
 
