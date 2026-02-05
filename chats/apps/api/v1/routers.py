@@ -27,6 +27,10 @@ from chats.apps.api.v1.internal.rooms.viewsets import (
     InternalListRoomsViewSet,
     InternalProtocolRoomsViewSet,
 )
+from chats.apps.api.v1.internal.sectors.viewsets import (
+    SectorInternalViewset,
+    SectorTagsViewset as SectorTagsInternalViewset,
+)
 from chats.apps.api.v1.internal.users import viewsets as user_internal_views
 from chats.apps.api.v1.msgs.viewsets import MessageMediaViewset, MessageViewset
 from chats.apps.api.v1.orgs.viewsets import OrgProjectViewSet
@@ -192,6 +196,16 @@ router.register(
     "internal/contacts",
     RoomsContactsInternalViewSet,
     basename="contact_internal",
+)
+router.register(
+    "internal/sector",
+    SectorInternalViewset,
+    basename="sector_internal",
+)
+router.register(
+    "internal/tag",
+    SectorTagsInternalViewset,
+    basename="tag_internal",
 )
 
 
