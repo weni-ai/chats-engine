@@ -2,6 +2,7 @@ from chats.apps.csat.flows.definitions.flow import (
     CSAT_FLOW_DEFINITION_DATA,
     CSAT_FLOW_VERSION,
 )
+from django.conf import settings
 from datetime import datetime, timedelta
 from chats.apps.csat.models import CSATFlowProjectConfig
 from chats.apps.projects.models.models import Project
@@ -39,7 +40,9 @@ def create_csat_flow(project_uuid: str):
 def update_all_projects_csat_flow_definition():
     configs = CSATFlowProjectConfig.objects.filter(version__lt=CSAT_FLOW_VERSION)
 
-    expiration_time = datetime.now() + timedelta(seconds=10)
+    expiration_time = datetime.now() + timedelta(
+        minutes=settings.CSAT_FLOW_UPDATE_EXPIRATION_TIME
+    )
 
     for config in configs:
         update_project_csat_flow_definition.apply_async(
