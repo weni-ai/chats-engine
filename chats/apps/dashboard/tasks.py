@@ -730,16 +730,30 @@ def _process_csv_report(
 
 
 def _select_report_to_process():
-    """Selects a pending or failed report for processing (with retry limit)."""
+    """Selects a pending, failed, or stuck in_progress report for processing."""
+    from django.db.models import Q
+    from django.utils import timezone as dj_timezone
+
+    stuck_timeout = dj_timezone.now() - timedelta(minutes=1)
+
     with transaction.atomic():
         report = (
             ReportStatus.objects.select_for_update(skip_locked=True)
-            .filter(status__in=["pending", "failed"])
+            .filter(
+                Q(status__in=["pending", "failed"])
+                | Q(status="in_progress", modified_on__lt=stuck_timeout)
+            )
             .filter(retry_count__lt=ReportStatus.MAX_RETRY_COUNT)
             .order_by("created_on")
             .first()
         )
         if report:
+            if report.status == "in_progress":
+                logging.info(
+                    "Resuming stuck report %s (in_progress since %s)",
+                    report.uuid,
+                    report.modified_on,
+                )
             report.status = "in_progress"
             report.save()
         return report
