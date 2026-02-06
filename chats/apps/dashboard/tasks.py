@@ -358,13 +358,16 @@ def _combine_parts_to_sheet(
         if df.empty:
             continue
 
+        write_header = current_row == 0
         df.to_excel(
             writer,
             sheet_name=sheet_name,
             index=False,
-            header=(current_row == 0),
-            startrow=current_row if current_row > 0 else 0,
+            header=write_header,
+            startrow=current_row,
         )
+        if write_header:
+            current_row = 1  # header was written on row 0
         current_row += len(df)
 
 
