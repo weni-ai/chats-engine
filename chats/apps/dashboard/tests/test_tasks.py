@@ -222,8 +222,9 @@ class ProcessPendingReportsTests(TestCase):
         self.assertIsNone(result)
 
     @override_settings(REPORTS_SAVE_LOCALLY=False, REPORTS_SEND_EMAILS=False)
+    @patch("chats.apps.dashboard.tasks.ExcelStorage")
     @patch("chats.apps.api.v1.dashboard.viewsets.ReportFieldsValidatorViewSet")
-    def test_process_pending_report_xlsx(self, mock_viewset_class):
+    def test_process_pending_report_xlsx(self, mock_viewset_class, mock_storage_class):
         report_status = ReportStatus.objects.create(
             project=self.project,
             user=self.user,
@@ -231,6 +232,10 @@ class ProcessPendingReportsTests(TestCase):
             fields_config={"rooms": {"fields": ["uuid"]}, "type": "xlsx"},
         )
 
+        mock_storage = MagicMock()
+        mock_storage.listdir.return_value = ([], [])
+        mock_storage_class.return_value = mock_storage
+
         mock_viewset = MagicMock()
         mock_qs = MagicMock()
         mock_qs.count.return_value = 1
@@ -245,8 +250,9 @@ class ProcessPendingReportsTests(TestCase):
         self.assertEqual(report_status.status, "ready")
 
     @override_settings(REPORTS_SAVE_LOCALLY=False, REPORTS_SEND_EMAILS=False)
+    @patch("chats.apps.dashboard.tasks.ExcelStorage")
     @patch("chats.apps.api.v1.dashboard.viewsets.ReportFieldsValidatorViewSet")
-    def test_process_pending_report_csv(self, mock_viewset_class):
+    def test_process_pending_report_csv(self, mock_viewset_class, mock_storage_class):
         report_status = ReportStatus.objects.create(
             project=self.project,
             user=self.user,
@@ -254,6 +260,10 @@ class ProcessPendingReportsTests(TestCase):
             fields_config={"rooms": {"fields": ["uuid"]}, "type": "csv"},
         )
 
+        mock_storage = MagicMock()
+        mock_storage.listdir.return_value = ([], [])
+        mock_storage_class.return_value = mock_storage
+
         mock_viewset = MagicMock()
         mock_qs = MagicMock()
         mock_qs.count.return_value = 1
@@ -268,14 +278,21 @@ class ProcessPendingReportsTests(TestCase):
         self.assertEqual(report_status.status, "ready")
 
     @override_settings(REPORTS_SAVE_LOCALLY=False, REPORTS_SEND_EMAILS=False)
+    @patch("chats.apps.dashboard.tasks.ExcelStorage")
     @patch("chats.apps.api.v1.dashboard.viewsets.ReportFieldsValidatorViewSet")
-    def test_process_pending_report_failure(self, mock_viewset_class):
+    def test_process_pending_report_failure(
+        self, mock_viewset_class, mock_storage_class
+    ):
         report_status = ReportStatus.objects.create(
             project=self.project,
             user=self.user,
             status="pending",
             fields_config={"rooms": {"fields": ["uuid"]}},
         )
+
+        mock_storage = MagicMock()
+        mock_storage.listdir.return_value = ([], [])
+        mock_storage_class.return_value = mock_storage
 
         mock_viewset = MagicMock()
         mock_viewset._process_model_fields.side_effect = Exception("Processing error")
@@ -288,14 +305,21 @@ class ProcessPendingReportsTests(TestCase):
         self.assertIn("Processing error", report_status.error_message)
 
     @override_settings(REPORTS_SAVE_LOCALLY=False, REPORTS_SEND_EMAILS=False)
+    @patch("chats.apps.dashboard.tasks.ExcelStorage")
     @patch("chats.apps.api.v1.dashboard.viewsets.ReportFieldsValidatorViewSet")
-    def test_process_pending_report_empty_queryset(self, mock_viewset_class):
+    def test_process_pending_report_empty_queryset(
+        self, mock_viewset_class, mock_storage_class
+    ):
         report_status = ReportStatus.objects.create(
             project=self.project,
             user=self.user,
             status="pending",
             fields_config={"rooms": {"fields": ["uuid"]}, "type": "xlsx"},
         )
+
+        mock_storage = MagicMock()
+        mock_storage.listdir.return_value = ([], [])
+        mock_storage_class.return_value = mock_storage
 
         mock_viewset = MagicMock()
         mock_qs = MagicMock()
@@ -309,8 +333,11 @@ class ProcessPendingReportsTests(TestCase):
         self.assertEqual(report_status.status, "ready")
 
     @override_settings(REPORTS_SAVE_LOCALLY=False, REPORTS_SEND_EMAILS=False)
+    @patch("chats.apps.dashboard.tasks.ExcelStorage")
     @patch("chats.apps.api.v1.dashboard.viewsets.ReportFieldsValidatorViewSet")
-    def test_process_pending_report_agent_status_logs(self, mock_viewset_class):
+    def test_process_pending_report_agent_status_logs(
+        self, mock_viewset_class, mock_storage_class
+    ):
         report_status = ReportStatus.objects.create(
             project=self.project,
             user=self.user,
@@ -320,6 +347,10 @@ class ProcessPendingReportsTests(TestCase):
                 "type": "xlsx",
             },
         )
+
+        mock_storage = MagicMock()
+        mock_storage.listdir.return_value = ([], [])
+        mock_storage_class.return_value = mock_storage
 
         mock_viewset = MagicMock()
         mock_qs = MagicMock()
@@ -339,7 +370,12 @@ class ProcessPendingReportsTests(TestCase):
         self.assertEqual(report_status.status, "ready")
 
     @override_settings(REPORTS_SAVE_LOCALLY=False, REPORTS_SEND_EMAILS=False)
-    def test_process_oldest_pending_report_first(self):
+    @patch("chats.apps.dashboard.tasks.ExcelStorage")
+    def test_process_oldest_pending_report_first(self, mock_storage_class):
+        mock_storage = MagicMock()
+        mock_storage.listdir.return_value = ([], [])
+        mock_storage_class.return_value = mock_storage
+
         older_report = ReportStatus.objects.create(
             project=self.project,
             user=self.user,
@@ -371,14 +407,21 @@ class ProcessPendingReportsTests(TestCase):
     @override_settings(
         REPORTS_SAVE_LOCALLY=False, REPORTS_SEND_EMAILS=False, REPORTS_CHUNK_SIZE=100
     )
+    @patch("chats.apps.dashboard.tasks.ExcelStorage")
     @patch("chats.apps.api.v1.dashboard.viewsets.ReportFieldsValidatorViewSet")
-    def test_process_pending_report_large_dataset(self, mock_viewset_class):
+    def test_process_pending_report_large_dataset(
+        self, mock_viewset_class, mock_storage_class
+    ):
         report_status = ReportStatus.objects.create(
             project=self.project,
             user=self.user,
             status="pending",
             fields_config={"rooms": {"fields": ["uuid"]}, "type": "xlsx"},
         )
+
+        mock_storage = MagicMock()
+        mock_storage.listdir.return_value = ([], [])
+        mock_storage_class.return_value = mock_storage
 
         mock_viewset = MagicMock()
         mock_qs = MagicMock()
