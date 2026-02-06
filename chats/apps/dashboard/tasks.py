@@ -834,7 +834,7 @@ def _process_report_with_resume(report, view, available_fields, project_tz):
 
     # Process rooms with resume
     rooms_cfg = fields_config.get("rooms") or {}
-    if rooms_cfg and "rooms" in available_fields:
+    if rooms_cfg.get("fields") and "rooms" in available_fields:
         query_data = view._process_model_fields(
             "rooms", rooms_cfg, report.project, available_fields
         )
@@ -855,7 +855,7 @@ def _process_report_with_resume(report, view, available_fields, project_tz):
 
     # Process agent_status_logs with resume
     agent_status_cfg = fields_config.get("agent_status_logs") or {}
-    if agent_status_cfg and "agent_status_logs" in available_fields:
+    if agent_status_cfg.get("fields") and "agent_status_logs" in available_fields:
         query_data = view._process_model_fields(
             "agent_status_logs", agent_status_cfg, report.project, available_fields
         )
