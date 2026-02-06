@@ -734,7 +734,8 @@ def _select_report_to_process():
     from django.db.models import Q
     from django.utils import timezone as dj_timezone
 
-    stuck_timeout = dj_timezone.now() - timedelta(minutes=1)
+    # Reports stuck in_progress for more than 10 minutes are considered abandoned
+    stuck_timeout = dj_timezone.now() - timedelta(minutes=10)
 
     with transaction.atomic():
         report = (
@@ -789,9 +790,9 @@ def _process_report_with_resume(report, view, available_fields, project_tz):
     storage = ExcelStorage()
     parts_dir = _get_parts_dir(report.project.uuid, report.uuid)
 
-    # Process rooms with resume
+    # Process rooms with resume (only if fields are specified)
     rooms_cfg = fields_config.get("rooms") or {}
-    if rooms_cfg and "rooms" in available_fields:
+    if rooms_cfg.get("fields") and "rooms" in available_fields:
         query_data = view._process_model_fields(
             "rooms", rooms_cfg, report.project, available_fields
         )
@@ -810,9 +811,9 @@ def _process_report_with_resume(report, view, available_fields, project_tz):
                 storage, parts_dir, rooms_qs, chunk_size, existing_rooms_count, "rooms", project_tz
             )
 
-    # Process agent_status_logs with resume
+    # Process agent_status_logs with resume (only if fields are specified)
     agent_status_cfg = fields_config.get("agent_status_logs") or {}
-    if agent_status_cfg and "agent_status_logs" in available_fields:
+    if agent_status_cfg.get("fields") and "agent_status_logs" in available_fields:
         query_data = view._process_model_fields(
             "agent_status_logs", agent_status_cfg, report.project, available_fields
         )
