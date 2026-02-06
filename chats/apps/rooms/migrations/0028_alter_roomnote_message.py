@@ -8,7 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("msgs", "0017_alter_messagemedia_media_file"),
-        ("rooms", "0027_room_last_message_media"),
+        ("rooms", "0025_room_last_message_media"),
     ]
 
     operations = [
