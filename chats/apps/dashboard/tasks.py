@@ -253,7 +253,10 @@ def _read_part_content(storage: ExcelStorage, part_path: str) -> str:
 def _finalize_xlsx_from_parts(
     storage: ExcelStorage, parts: List[str], rooms_cfg: dict
 ) -> bytes:
-    """Combines CSV parts into a final XLSX file."""
+    """Combines CSV parts into a final XLSX file.
+    
+    Note: Part 0 has header, parts 1+ have no header (just data).
+    """
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
         if not parts:
@@ -264,18 +267,19 @@ def _finalize_xlsx_from_parts(
             return output.getvalue()
 
         current_row = 0
+        columns = None
+        
         for idx, part_path in enumerate(parts):
             content = _read_part_content(storage, part_path)
             if not content or not content.strip():
                 continue
 
-            # Skip header for non-first parts
-            if idx > 0 and "\n" in content:
-                content = content.split("\n", 1)[1]
-            if not content.strip():
-                continue
-
-            df = pd.read_csv(io.StringIO(content))
+            if idx == 0:
+                df = pd.read_csv(io.StringIO(content))
+                columns = df.columns.tolist()
+            else:
+                df = pd.read_csv(io.StringIO(content), header=None, names=columns)
+            
             if df.empty:
                 continue
 
@@ -298,7 +302,10 @@ def _finalize_xlsx_from_parts(
 def _finalize_csv_from_parts(
     storage: ExcelStorage, parts: List[str], rooms_cfg: dict
 ) -> bytes:
-    """Combines CSV parts into a final CSV file."""
+    """Combines CSV parts into a final CSV file.
+    
+    Note: Part 0 has header, parts 1+ have no header (just data).
+    """
     combined = io.StringIO()
 
     if not parts:
@@ -312,12 +319,10 @@ def _finalize_csv_from_parts(
         if not content:
             continue
 
-        if idx == 0:
-            combined.write(content)
-        else:
-            # Skip header for non-first parts
-            content = content.split("\n", 1)[1] if "\n" in content else ""
-            combined.write(content)
+        # Part 0 has header, parts 1+ have only data (no header to skip)
+        combined.write(content)
+        if not content.endswith("\n"):
+            combined.write("\n")
 
     return combined.getvalue().encode("utf-8")
 
@@ -338,7 +343,11 @@ def _combine_parts_to_sheet(
     sheet_name: str,
     cfg: dict,
 ) -> None:
-    """Combines CSV parts into an Excel sheet."""
+    """Combines CSV parts into an Excel sheet.
+    
+    Note: Part 0 has header, parts 1+ have no header (just data).
+    We read part 0 with header, and parts 1+ without header using the same columns.
+    """
     if not parts:
         requested_fields = cfg.get("fields") or []
         pd.DataFrame(columns=requested_fields).to_excel(
@@ -347,17 +356,21 @@ def _combine_parts_to_sheet(
         return
 
     current_row = 0
+    columns = None  # Will be set from first part
+    
     for idx, part_path in enumerate(parts):
         content = _read_part_content(storage, part_path)
         if not content or not content.strip():
             continue
 
-        if idx > 0 and "\n" in content:
-            content = content.split("\n", 1)[1]
-        if not content.strip():
-            continue
-
-        df = pd.read_csv(io.StringIO(content))
+        if idx == 0:
+            # First part has header
+            df = pd.read_csv(io.StringIO(content))
+            columns = df.columns.tolist()
+        else:
+            # Other parts have no header, use columns from first part
+            df = pd.read_csv(io.StringIO(content), header=None, names=columns)
+        
         if df.empty:
             continue
 
@@ -379,7 +392,10 @@ def _combine_parts_to_csv(
     parts: List[str],
     cfg: dict,
 ) -> str:
-    """Combines CSV parts into a single CSV string."""
+    """Combines CSV parts into a single CSV string.
+    
+    Note: Part 0 has header, parts 1+ have no header (just data).
+    """
     combined = io.StringIO()
 
     if not parts:
@@ -393,11 +409,11 @@ def _combine_parts_to_csv(
         if not content:
             continue
 
-        if idx == 0:
-            combined.write(content)
-        else:
-            content = content.split("\n", 1)[1] if "\n" in content else ""
-            combined.write(content)
+        # Part 0 has header, parts 1+ have only data (no header to skip)
+        combined.write(content)
+        # Ensure newline between parts
+        if not content.endswith("\n"):
+            combined.write("\n")
 
     return combined.getvalue()
 
