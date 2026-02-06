@@ -279,13 +279,16 @@ def _finalize_xlsx_from_parts(
             if df.empty:
                 continue
 
+            write_header = current_row == 0
             df.to_excel(
                 writer,
                 sheet_name="rooms",
                 index=False,
-                header=(current_row == 0),
-                startrow=current_row if current_row > 0 else 0,
+                header=write_header,
+                startrow=current_row,
             )
+            if write_header:
+                current_row = 1  # header was written on row 0
             current_row += len(df)
 
     output.seek(0)
@@ -780,8 +783,8 @@ def _select_report_to_process():
     from django.db.models import Q
     from django.utils import timezone as dj_timezone
 
-    # Reports stuck in_progress for more than 10 minutes are considered abandoned
-    stuck_timeout = dj_timezone.now() - timedelta(minutes=10)
+    # Reports stuck in_progress for more than 1 minute are considered abandoned
+    stuck_timeout = dj_timezone.now() - timedelta(minutes=1)
 
     with transaction.atomic():
         report = (
