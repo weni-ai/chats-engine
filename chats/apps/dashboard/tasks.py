@@ -254,7 +254,7 @@ def _finalize_xlsx_from_parts(
     storage: ExcelStorage, parts: List[str], rooms_cfg: dict
 ) -> bytes:
     """Combines CSV parts into a final XLSX file.
-    
+
     Note: Part 0 has header, parts 1+ have no header (just data).
     """
     output = io.BytesIO()
@@ -268,7 +268,7 @@ def _finalize_xlsx_from_parts(
 
         current_row = 0
         columns = None
-        
+
         for idx, part_path in enumerate(parts):
             content = _read_part_content(storage, part_path)
             if not content or not content.strip():
@@ -279,7 +279,7 @@ def _finalize_xlsx_from_parts(
                 columns = df.columns.tolist()
             else:
                 df = pd.read_csv(io.StringIO(content), header=None, names=columns)
-            
+
             if df.empty:
                 continue
 
@@ -303,7 +303,7 @@ def _finalize_csv_from_parts(
     storage: ExcelStorage, parts: List[str], rooms_cfg: dict
 ) -> bytes:
     """Combines CSV parts into a final CSV file.
-    
+
     Note: Part 0 has header, parts 1+ have no header (just data).
     """
     combined = io.StringIO()
@@ -344,7 +344,7 @@ def _combine_parts_to_sheet(
     cfg: dict,
 ) -> None:
     """Combines CSV parts into an Excel sheet.
-    
+
     Note: Part 0 has header, parts 1+ have no header (just data).
     We read part 0 with header, and parts 1+ without header using the same columns.
     """
@@ -357,7 +357,7 @@ def _combine_parts_to_sheet(
 
     current_row = 0
     columns = None  # Will be set from first part
-    
+
     for idx, part_path in enumerate(parts):
         content = _read_part_content(storage, part_path)
         if not content or not content.strip():
@@ -370,7 +370,7 @@ def _combine_parts_to_sheet(
         else:
             # Other parts have no header, use columns from first part
             df = pd.read_csv(io.StringIO(content), header=None, names=columns)
-        
+
         if df.empty:
             continue
 
@@ -393,7 +393,7 @@ def _combine_parts_to_csv(
     cfg: dict,
 ) -> str:
     """Combines CSV parts into a single CSV string.
-    
+
     Note: Part 0 has header, parts 1+ have no header (just data).
     """
     combined = io.StringIO()
