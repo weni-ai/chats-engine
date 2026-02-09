@@ -61,7 +61,7 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
             limit=self.queue_limit,
             is_active=self.is_queue_limit_active,
         )
-        
+
     @property
     def limit(self):
         group_sector = self.sector.group_sectors.filter(is_deleted=False).first()
