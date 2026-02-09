@@ -8,12 +8,18 @@ from chats.apps.queues.models import Queue, QueueAuthorization
 User = get_user_model()
 
 
+class QueueLimitSerializer(serializers.Serializer):
+    limit = serializers.IntegerField(required=False)
+    is_active = serializers.BooleanField(required=False)
+
+
 class QueueSerializer(serializers.ModelSerializer):
 
     sector_name = serializers.CharField(source="sector.name", read_only=True)
     required_tags = serializers.BooleanField(
         source="sector.required_tags", read_only=True
     )
+    queue_limit = QueueLimitSerializer(required=False, source="queue_limit_info")
 
     class Meta:
         model = Queue
@@ -51,6 +57,8 @@ class QueueSimpleSerializer(serializers.ModelSerializer):
 
 
 class QueueUpdateSerializer(serializers.ModelSerializer):
+    queue_limit = QueueLimitSerializer(required=False, source="queue_limit_info")
+
     class Meta:
         model = Queue
         fields = "__all__"
@@ -62,6 +70,7 @@ class QueueReadOnlyListSerializer(serializers.ModelSerializer):
     agents = serializers.SerializerMethodField()
     sector_name = serializers.CharField(source="sector.name", read_only=True)
     sector_uuid = serializers.CharField(source="sector.uuid", read_only=True)
+    queue_limit = QueueLimitSerializer(source="queue_limit_info")
 
     class Meta:
         model = Queue
@@ -73,6 +82,7 @@ class QueueReadOnlyListSerializer(serializers.ModelSerializer):
             "sector_name",
             "sector_uuid",
             "required_tags",
+            "queue_limit",
         ]
 
     def get_agents(self, queue: Queue):

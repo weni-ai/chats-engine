@@ -3,6 +3,7 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 from django.test import override_settings
+from rest_framework.response import Response
 
 from chats.apps.accounts.models import User
 from chats.apps.core.internal_domains import get_vtex_internal_domains_with_at_symbol
@@ -117,6 +118,85 @@ class QueueTests(APITestCase):
         client.credentials(HTTP_AUTHORIZATION="Token " + self.admin_token.key)
         response = client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+
+class BaseTestQueueViewSet(APITestCase):
+    def retrieve_queue(self, queue_uuid: str) -> Response:
+        url = reverse("queue-detail", args=[queue_uuid])
+
+        return self.client.get(url)
+
+    def list_queues(self) -> Response:
+        url = reverse("queue-list")
+
+        return self.client.get(url)
+
+
+class TestQueueViewSetAsAnonymousUser(BaseTestQueueViewSet):
+    def test_retrieve_queue_without_permission(self):
+        response = self.retrieve_queue(self.queue.pk)
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
+    def setUp(self):
+        self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            project=self.project,
+            name="Test Sector",
+            rooms_limit=1,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
+
+        self.user = User.objects.create(email="test@test.com")
+        self.client.force_authenticate(user=self.user)
+
+    def test_retrieve_queue_without_permission(self):
+        response = self.retrieve_queue(self.queue.pk)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    @with_project_permission()
+    def test_retrieve_queue_with_project_permission(self):
+        response = self.retrieve_queue(self.queue.pk)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertIn("queue_limit", response.data)
+
+        queue_limit_info = response.data.get("queue_limit")
+
+        self.assertIn("is_active", queue_limit_info)
+        self.assertEqual(queue_limit_info.get("is_active"), False)
+        self.assertIn("limit", queue_limit_info)
+        self.assertEqual(queue_limit_info.get("limit"), None)
+
+    def test_list_queues_without_permission(self):
+        response = self.list_queues()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data.get("results")), 0)
+
+    @with_project_permission()
+    def test_list_queues_with_project_permission(self):
+        response = self.list_queues()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data.get("results")), 1)
+        self.assertEqual(
+            response.data.get("results")[0].get("uuid"), str(self.queue.pk)
+        )
+
+        self.assertIn("queue_limit", response.data.get("results")[0])
+        queue_limit_info = response.data.get("results")[0].get("queue_limit")
+
+        self.assertIn("is_active", queue_limit_info)
+        self.assertEqual(queue_limit_info.get("is_active"), False)
+        self.assertIn("limit", queue_limit_info)
+        self.assertEqual(queue_limit_info.get("limit"), None)
 
 
 class QueueTransferAgentsTests(APITestCase):

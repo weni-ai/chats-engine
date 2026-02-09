@@ -11,6 +11,7 @@ from django.utils.translation import gettext_lazy as _
 from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
 from chats.apps.projects.models.models import CustomStatus
+from chats.apps.queues.dataclass import QueueLimit
 from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
 
 from .queue_managers import QueueManager
@@ -33,8 +34,8 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
     default_message = models.TextField(
         _("Default queue message"), null=True, blank=True
     )
-    limit = models.PositiveIntegerField(_("Limit"), null=True, blank=True)
-    is_limit_active = models.BooleanField(_("Is limit active?"), default=False)
+    queue_limit = models.PositiveIntegerField(_("Limit"), null=True, blank=True)
+    is_queue_limit_active = models.BooleanField(_("Is limit active?"), default=False)
 
     objects = QueueManager()
     all_objects = QueueManager(include_deleted=True)
@@ -54,6 +55,13 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
     def queue(self):
         return self
 
+    @property
+    def queue_limit_info(self):
+        return QueueLimit(
+            limit=self.queue_limit,
+            is_active=self.is_queue_limit_active,
+        )
+        
     @property
     def limit(self):
         group_sector = self.sector.group_sectors.filter(is_deleted=False).first()
