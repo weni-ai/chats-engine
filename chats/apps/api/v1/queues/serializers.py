@@ -67,8 +67,6 @@ class QueueSimpleSerializer(serializers.ModelSerializer):
 
 
 class QueueUpdateSerializer(serializers.ModelSerializer):
-    queue_limit = QueueLimitSerializer(required=False, source="queue_limit_info")
-
     class Meta:
         model = Queue
         fields = "__all__"

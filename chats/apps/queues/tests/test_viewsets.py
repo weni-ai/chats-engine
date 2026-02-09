@@ -273,19 +273,29 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
 
     @with_project_permission()
     def test_update_queue(self):
+        payload = {
+            "name": "Testing",
+            "queue_limit": {
+                "is_active": True,
+                "limit": 17,
+            },
+        }
+
         response = self.update_queue(
             self.queue.pk,
-            {
-                "name": "Testing",
-                "queue_limit": {
-                    "is_active": True,
-                    "limit": 10,
-                },
-            },
+            payload,
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data.get("queue_limit").get("is_active"), True)
-        self.assertEqual(response.data.get("queue_limit").get("limit"), 10)
+
+        self.queue.refresh_from_db()
+
+        self.assertEqual(
+            self.queue.queue_limit, payload.get("queue_limit").get("limit")
+        )
+        self.assertEqual(
+            self.queue.is_queue_limit_active,
+            payload.get("queue_limit").get("is_active"),
+        )
 
     @with_project_permission()
     def test_update_queue_without_queue_limit(self):
@@ -296,9 +306,10 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
             },
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(
-            dict(response.data.get("queue_limit")), {"is_active": False, "limit": None}
-        )
+
+        self.queue.refresh_from_db()
+        self.assertEqual(self.queue.queue_limit, None)
+        self.assertEqual(self.queue.is_queue_limit_active, False)
 
 
 class QueueTransferAgentsTests(APITestCase):
