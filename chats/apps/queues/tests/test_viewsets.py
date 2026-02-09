@@ -137,20 +137,30 @@ class BaseTestQueueViewSet(APITestCase):
 
         return self.client.post(url, data=data, format="json")
 
+    def update_queue(self, queue_uuid: str, data: dict) -> Response:
+        url = reverse("queue-detail", args=[queue_uuid])
+
+        return self.client.patch(url, data=data, format="json")
+
 
 class TestQueueViewSetAsAnonymousUser(BaseTestQueueViewSet):
-    def test_retrieve_queue_without_permission(self):
+    def test_retrieve_queue(self):
         response = self.retrieve_queue(str(uuid.uuid4()))
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
-    def test_list_queues_without_permission(self):
+    def test_list_queues(self):
         response = self.list_queues()
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
-    def test_create_queue_without_permission(self):
+    def test_create_queue(self):
         response = self.create_queue({})
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_update_queue(self):
+        response = self.update_queue(str(uuid.uuid4()), {})
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
@@ -247,6 +257,48 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["queue_limit"]["limit"][0].code, "invalid")
+
+    @with_project_permission()
+    def test_create_queue_without_queue_limit(self):
+        response = self.create_queue(
+            {
+                "name": "Testing",
+                "sector": str(self.sector.pk),
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(
+            dict(response.data.get("queue_limit")), {"is_active": False, "limit": None}
+        )
+
+    @with_project_permission()
+    def test_update_queue(self):
+        response = self.update_queue(
+            self.queue.pk,
+            {
+                "name": "Testing",
+                "queue_limit": {
+                    "is_active": True,
+                    "limit": 10,
+                },
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("queue_limit").get("is_active"), True)
+        self.assertEqual(response.data.get("queue_limit").get("limit"), 10)
+
+    @with_project_permission()
+    def test_update_queue_without_queue_limit(self):
+        response = self.update_queue(
+            self.queue.pk,
+            {
+                "name": "Testing",
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            dict(response.data.get("queue_limit")), {"is_active": False, "limit": None}
+        )
 
 
 class QueueTransferAgentsTests(APITestCase):
