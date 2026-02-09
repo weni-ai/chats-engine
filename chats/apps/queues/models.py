@@ -33,6 +33,9 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
     default_message = models.TextField(
         _("Default queue message"), null=True, blank=True
     )
+    limit = models.PositiveIntegerField(_("Limit"), null=True, blank=True)
+    is_limit_active = models.BooleanField(_("Is limit active?"), default=False)
+
     objects = QueueManager()
     all_objects = QueueManager(include_deleted=True)
 
