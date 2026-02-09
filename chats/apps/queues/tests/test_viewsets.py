@@ -5,6 +5,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 from django.test import override_settings
 from rest_framework.response import Response
+from unittest.mock import patch
 
 from chats.apps.accounts.models import User
 from chats.apps.core.internal_domains import get_vtex_internal_domains_with_at_symbol
@@ -185,8 +186,9 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
-    def test_retrieve_queue_with_project_permission(self):
+    def test_retrieve_queue_with_project_permission(self, mock_is_feature_active):
         response = self.retrieve_queue(self.queue.pk)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -206,8 +208,10 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data.get("results")), 0)
 
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
-    def test_list_queues_with_project_permission(self):
+    def test_list_queues_with_project_permission(self, mock_is_feature_active):
+        mock_is_feature_active.return_value = True
         response = self.list_queues()
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -224,8 +228,10 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
         self.assertIn("limit", queue_limit_info)
         self.assertEqual(queue_limit_info.get("limit"), None)
 
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
-    def test_create_queue(self):
+    def test_create_queue(self, mock_is_feature_active):
+        mock_is_feature_active.return_value = True
         response = self.create_queue(
             {
                 "name": "Testing",
@@ -243,8 +249,32 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
         self.assertEqual(response.data.get("queue_limit").get("is_active"), True)
         self.assertEqual(response.data.get("queue_limit").get("limit"), 10)
 
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=False)
     @with_project_permission()
-    def test_create_queue_with_invalid_queue_limit(self):
+    def test_create_queue_with_queue_limit_feature_flag_is_off(
+        self, mock_is_feature_active
+    ):
+        mock_is_feature_active.return_value = False
+        response = self.create_queue(
+            {
+                "name": "Testing",
+                "sector": str(self.sector.pk),
+                "queue_limit": {
+                    "is_active": True,
+                    "limit": 10,
+                },
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["detail"][0].code,
+            "queue_limit_feature_flag_is_off",
+        )
+
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
+    @with_project_permission()
+    def test_create_queue_with_invalid_queue_limit(self, mock_is_feature_active):
+        mock_is_feature_active.return_value = True
         response = self.create_queue(
             {
                 "name": "Testing",
@@ -258,8 +288,10 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["queue_limit"]["limit"][0].code, "invalid")
 
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
-    def test_create_queue_without_queue_limit(self):
+    def test_create_queue_without_queue_limit(self, mock_is_feature_active):
+        mock_is_feature_active.return_value = True
         response = self.create_queue(
             {
                 "name": "Testing",
@@ -271,8 +303,10 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
             dict(response.data.get("queue_limit")), {"is_active": False, "limit": None}
         )
 
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
-    def test_update_queue(self):
+    def test_update_queue(self, mock_is_feature_active):
+        mock_is_feature_active.return_value = True
         payload = {
             "name": "Testing",
             "queue_limit": {
@@ -297,8 +331,50 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
             payload.get("queue_limit").get("is_active"),
         )
 
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=False)
     @with_project_permission()
-    def test_update_queue_without_queue_limit(self):
+    def test_update_queue_with_queue_limit_feature_flag_is_off(
+        self, mock_is_feature_active
+    ):
+        mock_is_feature_active.return_value = False
+        response = self.update_queue(
+            self.queue.pk,
+            {
+                "name": "Testing",
+                "queue_limit": {
+                    "is_active": True,
+                    "limit": 10,
+                },
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["detail"][0].code,
+            "queue_limit_feature_flag_is_off",
+        )
+
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=False)
+    @with_project_permission()
+    def test_update_queue_with_queue_limit_feature_flag_is_off_and_queue_limit_is_false(
+        self, mock_is_feature_active
+    ):
+        mock_is_feature_active.return_value = False
+        response = self.update_queue(
+            self.queue.pk,
+            {
+                "name": "Testing",
+                "queue_limit": {
+                    "is_active": False,
+                    "limit": 10,
+                },
+            },
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
+    @with_project_permission()
+    def test_update_queue_without_queue_limit(self, mock_is_feature_active):
+        mock_is_feature_active.return_value = True
         response = self.update_queue(
             self.queue.pk,
             {
