@@ -25,7 +25,19 @@ class QueueSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Queue
-        fields = "__all__"
+        fields = [
+            "uuid",
+            "sector_name",
+            "required_tags",
+            "queue_limit",
+            "created_on",
+            "modified_on",
+            "is_deleted",
+            "config",
+            "name",
+            "default_message",
+            "sector",
+        ]
 
     def validate(self, data):
         """
