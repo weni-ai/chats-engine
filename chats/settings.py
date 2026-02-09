@@ -739,3 +739,8 @@ ARCHIVE_CHATS_IS_ACTIVE_FOR_ALL_PROJECTS = env.bool(
 VTEX_INTERNAL_DOMAINS = env.list(
     "VTEX_INTERNAL_DOMAINS", default=["weni.ai", "vtex.com"]
 )
+
+# Queue Limit
+QUEUE_LIMIT_FEATURE_FLAG_KEY = env.str(
+    "QUEUE_LIMIT_FEATURE_FLAG_KEY", default="weniChatsQueueLimit"
+)
