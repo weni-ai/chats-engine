@@ -1,3 +1,4 @@
+import uuid
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.authtoken.models import Token
@@ -134,7 +135,7 @@ class BaseTestQueueViewSet(APITestCase):
 
 class TestQueueViewSetAsAnonymousUser(BaseTestQueueViewSet):
     def test_retrieve_queue_without_permission(self):
-        response = self.retrieve_queue(self.queue.pk)
+        response = self.retrieve_queue(str(uuid.uuid4()))
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
