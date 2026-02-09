@@ -47,6 +47,16 @@ class QueueSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError(
                         {"detail": _("This queue already exists.")}
                     )
+
+        queue_limit = data.pop("queue_limit_info", None)
+
+        if queue_limit and isinstance(queue_limit, dict):
+            if "is_active" in queue_limit:
+                data["is_queue_limit_active"] = queue_limit.get("is_active")
+
+            if "limit" in queue_limit:
+                data["queue_limit"] = queue_limit.get("limit")
+
         return data
 
 
