@@ -233,6 +233,7 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
         self.assertEqual(response.data.get("queue_limit").get("is_active"), True)
         self.assertEqual(response.data.get("queue_limit").get("limit"), 10)
 
+    @with_project_permission()
     def test_create_queue_with_invalid_queue_limit(self):
         response = self.create_queue(
             {
@@ -245,7 +246,7 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
             }
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data.get("queue_limit")[0].code, "invalid")
+        self.assertEqual(response.data["queue_limit"]["limit"][0].code, "invalid")
 
 
 class QueueTransferAgentsTests(APITestCase):
