@@ -67,6 +67,15 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         )
 
     @property
+    def queued_rooms_count(self):
+        """
+        Returns the number of rooms that are queued (waiting for an user to be assigned)
+        """
+        return self.rooms.filter(
+            is_active=True, user__isnull=True, is_waiting=False
+        ).count()
+
+    @property
     def limit(self):
         group_sector = self.sector.group_sectors.filter(is_deleted=False).first()
         if group_sector:
