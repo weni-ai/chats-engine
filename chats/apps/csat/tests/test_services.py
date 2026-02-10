@@ -200,3 +200,26 @@ class TestCSATFlowService(TestCase):
             str(context.exception),
             f"Failed to create CSAT flow [{status_code}]: {response_content}",
         )
+
+    def test_update_csat_flow_definition(self):
+        config = CSATFlowProjectConfig.objects.create(
+            project=self.project,
+            flow_uuid=uuid.uuid4(),
+            version=CSAT_FLOW_VERSION - 1,
+        )
+        new_flow_uuid = uuid.uuid4()
+        self.mock_flows_client.create_or_update_flow.return_value = Mock(
+            status_code=200,
+            json=Mock(return_value={"results": [{"uuid": new_flow_uuid}]}),
+        )
+        self.service.update_csat_flow_definition(
+            self.project, CSAT_FLOW_DEFINITION_DATA, CSAT_FLOW_VERSION
+        )
+        self.mock_flows_client.create_or_update_flow.assert_called_once_with(
+            self.project,
+            CSAT_FLOW_DEFINITION_DATA,
+        )
+
+        config.refresh_from_db()
+        self.assertEqual(config.flow_uuid, new_flow_uuid)
+        self.assertEqual(config.version, CSAT_FLOW_VERSION)

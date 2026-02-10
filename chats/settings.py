@@ -70,9 +70,11 @@ INSTALLED_APPS = [
     "chats.core",
     "chats.apps.ai_features",
     "chats.apps.ai_features.history_summary",
+    "chats.apps.ai_features.audio_transcription",
     "chats.apps.feature_flags",
     "chats.apps.feedbacks",
     "chats.apps.csat",
+    "chats.apps.archive_chats",
     # third party apps
     "weni.feature_flags",  # weni-commons feature flags
     "channels",
@@ -146,7 +148,18 @@ CACHES = {
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
-DATABASES = dict(default=env.db(var="DATABASE_URL"))
+# Connection pooling configuration
+# CONN_MAX_AGE: Keeps connections open for reuse (in seconds)
+# CONN_HEALTH_CHECKS: Validates connection before use (Django 4.1+)
+CONN_MAX_AGE = env.int("CONN_MAX_AGE", default=60)
+
+DATABASES = {
+    "default": {
+        **env.db(var="DATABASE_URL"),
+        "CONN_MAX_AGE": CONN_MAX_AGE,
+        "CONN_HEALTH_CHECKS": True,
+    }
+}
 
 # User
 
@@ -437,6 +450,15 @@ UNPERMITTED_AUDIO_TYPES = env.list(
     ],
 )
 
+# Maximum audio duration in seconds for transcription (default: 5 minutes)
+AUDIO_TRANSCRIPTION_MAX_DURATION_SECONDS = env.int(
+    "AUDIO_TRANSCRIPTION_MAX_DURATION_SECONDS", default=300
+)
+
+# AWS Lambda for audio transcription
+AWS_TRANSCRIPTION_LAMBDA_ARN = env.str("AWS_TRANSCRIPTION_LAMBDA_ARN", default="")
+AWS_TRANSCRIPTION_REGION = env.str("AWS_TRANSCRIPTION_REGION", default="us-east-1")
+
 CHATS_FLOWS_TAG = env.str("CHATS_FLOWS_TAG", default="chats")
 CHATS_CACHE_TIME = env.int("CHATS_CACHE_TIME", default=1 * 60 * 60)
 
@@ -607,6 +629,10 @@ WS_LAST_SEEN_THRESHOLD_SECONDS = env.int("WS_LAST_SEEN_THRESHOLD_SECONDS", defau
 
 # CSAT
 CSAT_FEATURE_FLAG_KEY = env.str("CSAT_FEATURE_FLAG_KEY", default="weniChatsCSAT")
+CSAT_FLOW_UPDATE_RETRIES = env.int("CSAT_FLOW_UPDATE_RETRIES", default=5)
+CSAT_FLOW_UPDATE_EXPIRATION_TIME = env.int(
+    "CSAT_FLOW_UPDATE_EXPIRATION_TIME", default=24 * 60  # 3 hours
+)  # In minutes
 
 CHATS_BASE_URL = env.str("CHATS_BASE_URL", default="http://localhost:8000")
 
@@ -649,3 +675,12 @@ ROOM_24H_VALID_CACHE_TTL = env.int(
 
 # Internal API Token
 INTERNAL_API_TOKEN = env.str("INTERNAL_API_TOKEN")
+
+# Excluded email domains
+# These are domains used by internal users (such as VTEX employees)
+# and should be excluded from some users lists,
+# because, even if they are included in projects (for testing or deployment purposes, for example),
+# they are not part of the organizations operational team.
+VTEX_INTERNAL_DOMAINS = env.list(
+    "VTEX_INTERNAL_DOMAINS", default=["weni.ai", "vtex.com"]
+)

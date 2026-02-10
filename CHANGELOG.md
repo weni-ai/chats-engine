@@ -1,3 +1,59 @@
+# 3.43.1
+# Fix
+  - Adding transcription text in message v2 serializer
+
+# 3.43.0
+# Add
+  - New feature to transcribe contact audio
+  - Archive messages service
+# Refactor
+  - In service time sorting for the new human dashboard
+
+# 3.42.0
+# Fix
+  - Correct interaction time
+  - Calculate waiting time when transferring users from queue
+# Add
+  - Adding conn max age in chats
+  - Adding media field to serializers
+  - Hide users with VTEX and Weni email domains from transfer list
+  
+# 3.41.9
+# Fix
+  - close custom status before setting user online
+  
+# 3.41.8
+# Fix
+  - ordering in agents table for new dashboard
+  
+# 3.41.7
+# Fix
+  - using project timezone when export data
+  
+# 3.41.6
+# Add
+  - feature to disconnect using ping
+  
+# 3.41.5
+# Fix
+  - formating link to redirect do closed rooms
+  
+# 3.41.4
+# Add
+  - link do redirect to closed rooms
+  
+# 3.41.3
+# Add
+  - filter for urn and agents in internal rooms 
+  
+# 3.41.2
+# Add
+  - Adding closed by field in history viewset
+  
+# 3.41.1
+# Add
+  - Adding closed by field when closing a room
+    
 # 3.41.0
 # Fix
   - Removing unused verification when creating a sector
@@ -985,6 +1041,11 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
+
+
+
+
 
 
 

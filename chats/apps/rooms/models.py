@@ -2,7 +2,7 @@ import json
 import logging
 import time
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import requests
 import sentry_sdk
@@ -43,11 +43,6 @@ logger = logging.getLogger(__name__)
 
 
 class Room(BaseModel, BaseConfigurableModel):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.__original_is_active = self.is_active
-        self._original_user = self.user
-
     user = models.ForeignKey(
         "accounts.User",
         related_name="rooms",
@@ -167,8 +162,13 @@ class Room(BaseModel, BaseConfigurableModel):
         on_delete=models.SET_NULL,
         related_name="+",
     )
+    last_message_media = models.JSONField(
+        _("Last message media"),
+        default=list,
+        blank=True,
+    )
 
-    tracker = FieldTracker(fields=["user", "queue"])
+    tracker = FieldTracker(fields=["user_id", "queue_id"])
 
     @property
     def is_billing_notified(self) -> bool:
@@ -191,7 +191,12 @@ class Room(BaseModel, BaseConfigurableModel):
         room_client = RoomInfoUseCase()
         room_client.get_room(self)
 
-        self.set_config("is_billing_notified", True)
+        current_config = self.config or {}
+        new_config = current_config.copy()
+        new_config["is_billing_notified"] = True
+
+        Room.objects.filter(pk=self.pk).update(config=new_config)
+
         logger.info(
             "Billing notified for room %s. Setting is_billing_notified to True",
             self.pk,
@@ -203,7 +208,10 @@ class Room(BaseModel, BaseConfigurableModel):
         Args:
             is_new: Boolean indicando se é uma sala nova
         """
-        old_user = self._original_user
+        old_user_pk = (
+            Room.objects.filter(pk=self.pk).values_list("user", flat=True).first()
+        )
+        old_user = User.objects.get(email=old_user_pk) if old_user_pk else None
         new_user = self.user
 
         project = None
@@ -247,13 +255,17 @@ class Room(BaseModel, BaseConfigurableModel):
         ]
 
     def save(self, *args, **kwargs) -> None:
-        if self._state.adding is False and self.__original_is_active is False:
+        current_is_active = (
+            Room.objects.filter(pk=self.pk).values_list("is_active", flat=True).first()
+        )
+
+        if self._state.adding is False and current_is_active is False:
             raise ValidationError({"detail": _("Closed rooms cannot receive updates")})
 
         if self._state.adding:
             self.added_to_queue_at = timezone.now()
 
-        user_has_changed = self.pk and self.tracker.has_changed("user")
+        user_has_changed = self.pk and self.tracker.has_changed("user_id")
 
         if self.user and not self.user_assigned_at or user_has_changed:
             self.user_assigned_at = timezone.now()
@@ -272,13 +284,13 @@ class Room(BaseModel, BaseConfigurableModel):
 
         is_new = self._state.adding
 
-        queue_has_changed = self.tracker.has_changed("queue")
-        old_queue = self.tracker.previous("queue")
+        queue_has_changed = self.tracker.has_changed("queue_id")
+        old_queue_id = self.tracker.previous("queue_id")
 
         super().save(*args, **kwargs)
 
-        if queue_has_changed and old_queue and self.queue:
-            old_queue = Queue.objects.get(pk=old_queue)
+        if queue_has_changed and old_queue_id and self.queue:
+            old_queue = Queue.objects.get(pk=old_queue_id)
 
             if old_queue.sector != self.queue.sector:
                 self.tags.clear()
@@ -728,12 +740,17 @@ class Room(BaseModel, BaseConfigurableModel):
         """
         Updates last message fields. Used for agent/system messages.
         """
+        media_data = [
+            {"content_type": media.content_type, "url": media.url}
+            for media in message.medias.all()
+        ]
         Room.objects.filter(pk=self.pk).update(
             last_interaction=message.created_on,
             last_message=message,
             last_message_text=message.text,
             last_message_user=user,
             last_message_contact=None,
+            last_message_media=media_data,
         )
 
     def on_new_message(self, message, contact=None, increment_unread: int = 0):
@@ -742,12 +759,17 @@ class Room(BaseModel, BaseConfigurableModel):
         Single UPDATE with all last_message fields.
         Only updates if message is newer than last_interaction.
         """
+        media_data = [
+            {"content_type": media.content_type, "url": media.url}
+            for media in message.medias.all()
+        ]
         update_fields = {
             "last_interaction": message.created_on,
             "last_message": message,
             "last_message_text": message.text,
             "last_message_user": None,
             "last_message_contact": contact,
+            "last_message_media": media_data,
         }
 
         if increment_unread > 0:
@@ -770,6 +792,28 @@ class Room(BaseModel, BaseConfigurableModel):
         from chats.apps.csat.tasks import start_csat_flow
 
         start_csat_flow.delay(self.uuid)
+
+    @property
+    def is_archived(self) -> bool:
+        from chats.apps.archive_chats.models import RoomArchivedConversation
+        from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
+
+        return RoomArchivedConversation.objects.filter(
+            room=self, status=ArchiveConversationsJobStatus.FINISHED, file__isnull=False
+        ).exists()
+
+    def get_archived_conversation_file_url(self) -> Optional[str]:
+        from chats.apps.archive_chats.models import RoomArchivedConversation
+        from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
+
+        archive = RoomArchivedConversation.objects.filter(
+            room=self, status=ArchiveConversationsJobStatus.FINISHED, file__isnull=False
+        ).first()
+
+        if archive:
+            return archive.file.url
+
+        return None
 
 
 class RoomPin(BaseModel):
@@ -825,7 +869,7 @@ class RoomNote(BaseModel):
         "msgs.Message",
         related_name="internal_note",
         verbose_name=_("message"),
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
     )
