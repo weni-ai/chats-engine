@@ -8,6 +8,7 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from weni.feature_flags.shortcuts import is_feature_active
+from rest_framework.exceptions import PermissionDenied
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.accounts.serializers import UserSerializer
@@ -579,7 +580,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             )
             queue_limit = (
                 queue.queue_limit_info.limit
-                if not isinstance(queue.queue_limit_info.limit, int)
+                if isinstance(queue.queue_limit_info.limit, int)
                 else 0
             )
 
@@ -587,8 +588,11 @@ class RoomFlowSerializer(serializers.ModelSerializer):
                 is_queue_limit_feature_active
                 and queue.queued_rooms_count >= queue_limit
             ):
-                raise ValidationError(
-                    {"error": "human_support_queue_limit_reached"},
+                raise PermissionDenied(
+                    {
+                        "error": "human_support_queue_limit_reached",
+                        "description": "Human support queue is full. Please try again later.",
+                    },
                     code="human_support_queue_limit_reached",
                 )
 
