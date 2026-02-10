@@ -478,6 +478,35 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             attrs.pop("project_info")
         return attrs
 
+    def _validate_queue_limit(self, queue: Queue):
+        is_limit_active_for_queue = queue.queue_limit_info.is_active
+
+        if is_limit_active_for_queue:
+            # Only check if the feature flag is enabled and make all the other validations
+            # if the queue limit for this particular queue is active
+            is_queue_limit_feature_active = is_feature_active(
+                settings.QUEUE_LIMIT_FEATURE_FLAG_KEY,
+                None,
+                str(queue.sector.project.uuid),
+            )
+            queue_limit = (
+                queue.queue_limit_info.limit
+                if isinstance(queue.queue_limit_info.limit, int)
+                else 0
+            )
+
+            if (
+                is_queue_limit_feature_active
+                and queue.queued_rooms_count >= queue_limit
+            ):
+                raise PermissionDenied(
+                    {
+                        "error": "human_support_queue_limit_reached",
+                        "description": "Human support queue is full. Please try again later.",
+                    },
+                    code="human_support_queue_limit_reached",
+                )
+
     def create(self, validated_data):
         history_data = validated_data.pop("history", [])
 
@@ -539,6 +568,9 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         validated_data["user"] = get_room_user(
             contact, queue, user, groups, created, flow_uuid, project
         )
+
+        if not validated_data.get("user"):
+            self._validate_queue_limit(queue)
 
         room = Room.objects.create(
             **validated_data,
@@ -604,34 +636,6 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             raise ValidationError(
                 {"detail": _("queue_uuid does not belong to provided sector_uuid")}
             )
-
-        is_limit_active_for_queue = queue.queue_limit_info.is_active
-
-        if is_limit_active_for_queue:
-            # Only check if the feature flag is enabled and make all the other validations
-            # if the queue limit for this particular queue is active
-            is_queue_limit_feature_active = is_feature_active(
-                settings.QUEUE_LIMIT_FEATURE_FLAG_KEY,
-                None,
-                str(sector.project.uuid),
-            )
-            queue_limit = (
-                queue.queue_limit_info.limit
-                if isinstance(queue.queue_limit_info.limit, int)
-                else 0
-            )
-
-            if (
-                is_queue_limit_feature_active
-                and queue.queued_rooms_count >= queue_limit
-            ):
-                raise PermissionDenied(
-                    {
-                        "error": "human_support_queue_limit_reached",
-                        "description": "Human support queue is full. Please try again later.",
-                    },
-                    code="human_support_queue_limit_reached",
-                )
 
         return queue, sector
 
