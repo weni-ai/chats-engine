@@ -1,22 +1,20 @@
 import logging
 import time
-from collections import defaultdict
 from typing import Dict, List, Optional
 
-from celery import group
 from django.conf import settings
-from django.db import transaction
 from django.db.models import QuerySet
-from django.utils import timezone
 
 from chats.apps.accounts.models import User
-from chats.apps.rooms.models import Room, RoomPin
+from chats.apps.rooms.models import Room
+from chats.apps.rooms.views import close_room
 
 logger = logging.getLogger(__name__)
 
 
 class BulkCloseResult:
     """Result object for bulk close operation"""
+
     def __init__(self):
         self.success_count = 0
         self.failed_count = 0
@@ -36,22 +34,20 @@ class BulkCloseResult:
             "success_count": self.success_count,
             "failed_count": self.failed_count,
             "total_processed": self.success_count + self.failed_count,
-            "errors": self.errors[:10] if self.errors else [],  # Limit to first 10 errors
-            "failed_rooms": self.failed_rooms[:10] if self.failed_rooms else [],  # Limit to first 10
+            "errors": self.errors[:10] if self.errors else [],
+            "failed_rooms": self.failed_rooms[:10] if self.failed_rooms else [],
             "has_more_errors": len(self.errors) > 10,
         }
 
 
 class BulkCloseService:
     """
-    Service for bulk closing rooms with optimized database operations.
+    Service for closing multiple rooms using the existing room.close() method.
 
-    Maintains all the logic from room.close() but optimized for batch processing:
-    - Bulk update for room fields
-    - Batch M2M operations for tags
-    - Bulk delete for pins
-    - Optimized InService status updates
-    - Batched Celery task scheduling
+    Processes rooms in configurable batches (settings.BULK_CLOSE_BATCH_SIZE)
+    to avoid overwhelming the database and external dependencies.
+    Each room is closed individually via room.close(), preserving all
+    existing business logic (tags, pins, InService status, CSAT, etc.).
     """
 
     def close(
@@ -62,528 +58,75 @@ class BulkCloseService:
         closed_by: Optional[User] = None,
     ) -> BulkCloseResult:
         """
-        Close rooms in bulk with optimized database operations.
+        Close rooms using room.close() in batches.
 
         Args:
-            rooms: QuerySet of Room objects to close (should be prefetched)
-            room_tags_map: Dict mapping room UUID to list of tag UUIDs (e.g., {"room-uuid": ["tag1", "tag2"]})
-            end_by: String indicating who/what closed the rooms
-            closed_by: User who closed the rooms
+            rooms: QuerySet of Room objects to close.
+            room_tags_map: Dict mapping room UUID to list of tag UUIDs.
+            end_by: String indicating who/what closed the rooms.
+            closed_by: User who closed the rooms.
 
         Returns:
-            BulkCloseResult with success/failure counts and error details
-
-        Raises:
-            ValueError: If rooms queryset is empty or invalid
+            BulkCloseResult with success/failure counts and error details.
         """
         result = BulkCloseResult()
 
         if room_tags_map is None:
             room_tags_map = {}
 
-        # Convert to list to track individual rooms
+        batch_size = getattr(settings, "BULK_CLOSE_BATCH_SIZE", 200)
+
         rooms_list = list(
             rooms.select_related(
                 "queue__sector__project",
                 "user",
-                "closed_by"
             ).prefetch_related("tags")
         )
 
         if not rooms_list:
-            logger.warning("BulkCloseService: No rooms provided")
+            logger.warning("[BULK_CLOSE] No rooms provided")
             return result
+
+        total = len(rooms_list)
+        total_batches = (total + batch_size - 1) // batch_size
+
+        logger.info(
+            f"[BULK_CLOSE] Starting: {total} rooms in {total_batches} "
+            f"batch(es) of {batch_size}"
+        )
 
         start_time = time.perf_counter()
-        logger.info(f"[BULK_CLOSE] ⏱️ Starting bulk close of {len(rooms_list)} rooms")
 
-        # Separate active and already closed rooms
-        validation_start = time.perf_counter()
-        active_rooms = []
-        for room in rooms_list:
-            if not room.is_active:
-                result.add_failure(
-                    room.uuid,
-                    f"Room {room.uuid} is already closed"
-                )
-            else:
-                active_rooms.append(room)
+        for batch_index in range(0, total, batch_size):
+            batch = rooms_list[batch_index:batch_index + batch_size]
+            batch_number = batch_index // batch_size + 1
 
-        validation_time = time.perf_counter() - validation_start
-        logger.info(
-            f"[BULK_CLOSE] ✅ Active rooms filter: {len(active_rooms)} active, "
-            f"{len(rooms_list) - len(active_rooms)} already closed - {validation_time*1000:.2f}ms"
-        )
-
-        if not active_rooms:
-            logger.warning("BulkCloseService: No active rooms to close")
-            return result
-
-        now = timezone.now()
-        successfully_closed = []
-
-        # Process each room individually to track errors and validate required tags
-        individual_validation_start = time.perf_counter()
-        for room in active_rooms:
-            try:
-                # Validate room can be closed
-                self._validate_room_can_close(room)
-
-                # Validate required tags
-                room_tags = room_tags_map.get(str(room.uuid), [])
-                self._validate_required_tags(room, room_tags)
-
-                successfully_closed.append(room)
-                result.add_success()
-            except Exception as e:
-                error_msg = f"Room {room.uuid}: {str(e)}"
-                result.add_failure(room.uuid, error_msg)
-                logger.warning(f"Failed to prepare room for closing: {error_msg}")
-
-        individual_validation_time = time.perf_counter() - individual_validation_start
-        logger.info(
-            f"[BULK_CLOSE] ✅ Individual validation: {len(successfully_closed)} passed, "
-            f"{len(active_rooms) - len(successfully_closed)} failed - {individual_validation_time*1000:.2f}ms"
-        )
-
-        if not successfully_closed:
-            logger.warning("BulkCloseService: No rooms could be closed")
-            return result
-
-        # Now perform bulk operations on successfully validated rooms
-        try:
-            transaction_start = time.perf_counter()
-            with transaction.atomic():
-                bulk_update_start = time.perf_counter()
-                self._bulk_update_rooms(successfully_closed, now, end_by, closed_by)
-                bulk_update_time = time.perf_counter() - bulk_update_start
-                logger.info(f"[BULK_CLOSE] 💾 Bulk update rooms: {len(successfully_closed)} rooms - {bulk_update_time*1000:.2f}ms")
-
-                # Handle tags per room
-                tags_start = time.perf_counter()
-                self._batch_handle_tags_per_room(successfully_closed, room_tags_map)
-                tags_time = time.perf_counter() - tags_start
-                logger.info(f"[BULK_CLOSE] 🏷️  Batch handle tags: {len(successfully_closed)} rooms - {tags_time*1000:.2f}ms")
-
-                # Bulk delete pins
-                pins_start = time.perf_counter()
-                self._bulk_clear_pins(successfully_closed)
-                pins_time = time.perf_counter() - pins_start
-                logger.info(f"[BULK_CLOSE] 📌 Bulk clear pins - {pins_time*1000:.2f}ms")
-            
-            transaction_time = time.perf_counter() - transaction_start
-            logger.info(f"[BULK_CLOSE] 🔒 Transaction total time - {transaction_time*1000:.2f}ms")
-
-            # Refresh rooms from DB to ensure notifications have latest data
-            refresh_start = time.perf_counter()
-            for room in successfully_closed:
-                room.refresh_from_db()
-            refresh_time = time.perf_counter() - refresh_start
-            logger.info(f"[BULK_CLOSE] 🔄 Refresh from DB: {len(successfully_closed)} rooms - {refresh_time*1000:.2f}ms")
-
-            # Notify rooms via websocket (queue and users)
-            notify_start = time.perf_counter()
-            self._batch_notify_rooms(successfully_closed)
-            notify_time = time.perf_counter() - notify_start
-            logger.info(f"[BULK_CLOSE] 📡 WebSocket notifications: {len(successfully_closed)} rooms - {notify_time*1000:.2f}ms")
-
-            # Handle InService status updates (grouped by agent)
-            inservice_start = time.perf_counter()
-            self._batch_update_inservice_status(successfully_closed)
-            inservice_time = time.perf_counter() - inservice_start
-            logger.info(f"[BULK_CLOSE] 👤 InService status update - {inservice_time*1000:.2f}ms")
-
-            # Start queue priority routing for affected queues
-            routing_start = time.perf_counter()
-            self._batch_start_queue_priority_routing(successfully_closed)
-            routing_time = time.perf_counter() - routing_start
-            logger.info(f"[BULK_CLOSE] 🚦 Queue priority routing - {routing_time*1000:.2f}ms")
-
-            # Schedule CSAT flow tasks in batch
-            csat_start = time.perf_counter()
-            self._batch_schedule_csat_tasks(successfully_closed)
-            csat_time = time.perf_counter() - csat_start
-            logger.info(f"[BULK_CLOSE] ⭐ CSAT tasks scheduled - {csat_time*1000:.2f}ms")
-
-            # Schedule metrics tasks in batch
-            metrics_start = time.perf_counter()
-            self._batch_schedule_metrics_tasks(successfully_closed)
-            metrics_time = time.perf_counter() - metrics_start
-            logger.info(f"[BULK_CLOSE] 📊 Metrics tasks scheduled - {metrics_time*1000:.2f}ms")
-
-            total_time = time.perf_counter() - start_time
             logger.info(
-                f"[BULK_CLOSE] ✅ COMPLETED: {result.success_count} succeeded, "
-                f"{result.failed_count} failed - TOTAL TIME: {total_time*1000:.2f}ms ({total_time:.2f}s)"
+                f"[BULK_CLOSE] Processing batch {batch_number}/{total_batches} "
+                f"({len(batch)} rooms)"
             )
 
-        except Exception as e:
-            logger.error(f"BulkCloseService: Critical error during bulk operations: {str(e)}")
-            # Mark all as failed if bulk operation fails
-            for room in successfully_closed:
-                if room.uuid not in result.failed_rooms:
-                    result.add_failure(room.uuid, f"Bulk operation failed: {str(e)}")
-                    result.success_count -= 1  # Adjust success count
+            for room in batch:
+                try:
+                    tags = room_tags_map.get(str(room.uuid), [])
+                    room.close(tags=tags, end_by=end_by, closed_by=closed_by)
+                    close_room(str(room.uuid))
+                    result.add_success()
+                except Exception as e:
+                    error_msg = f"Room {room.uuid}: {str(e)}"
+                    result.add_failure(room.uuid, error_msg)
+                    logger.warning(f"[BULK_CLOSE] Failed to close room: {error_msg}")
+
+            # Small pause between batches to relieve DB pressure
+            has_more_batches = batch_index + batch_size < total
+            if has_more_batches:
+                time.sleep(0.1)
+
+        elapsed = time.perf_counter() - start_time
+
+        logger.info(
+            f"[BULK_CLOSE] Completed: {result.success_count} succeeded, "
+            f"{result.failed_count} failed - {elapsed:.2f}s"
+        )
 
         return result
-
-    def _validate_room_can_close(self, room: Room):
-        """
-        Validate that a room can be closed.
-        Raises exception if validation fails.
-        """
-        # Check if room is already closed (double-check after initial filter)
-        if not room.is_active:
-            raise ValueError("Room is already closed")
-
-        # Add any other validations needed
-        if not room.queue:
-            raise ValueError("Room has no queue assigned")
-
-        if not hasattr(room.queue, 'sector'):
-            raise ValueError("Queue has no sector assigned")
-
-    def _validate_required_tags(self, room: Room, tags: List[str]):
-        """
-        Validate that required tags are provided for rooms that require them.
-        Raises exception if validation fails.
-        """
-        # Check if queue requires tags
-        if room.queue.required_tags:
-            # Check if room already has tags or if new tags are being provided
-            has_existing_tags = room.tags.exists()
-            has_new_tags = len(tags) > 0
-
-            if not has_existing_tags and not has_new_tags:
-                raise ValueError("Tags are required for this queue but none were provided")
-
-    def _bulk_update_rooms(
-        self,
-        rooms_list: List[Room],
-        ended_at: timezone.datetime,
-        end_by: str,
-        closed_by: Optional[User]
-    ):
-        """
-        Update room fields using bulk_update for performance.
-        Single UPDATE query instead of N queries.
-        """
-        prepare_start = time.perf_counter()
-        for room in rooms_list:
-            room.is_active = False
-            room.ended_at = ended_at
-            room.ended_by = end_by
-            room.closed_by = closed_by
-        prepare_time = time.perf_counter() - prepare_start
-
-        db_start = time.perf_counter()
-        Room.objects.bulk_update(
-            rooms_list,
-            ["is_active", "ended_at", "ended_by", "closed_by"],
-            batch_size=500
-        )
-        db_time = time.perf_counter() - db_start
-
-        logger.info(
-            f"[BULK_CLOSE] 💾 Bulk update breakdown: prepare {prepare_time*1000:.2f}ms, "
-            f"DB query {db_time*1000:.2f}ms | {len(rooms_list)} rooms"
-        )
-
-    def _batch_handle_tags_per_room(self, rooms_list: List[Room], room_tags_map: Dict[str, List[str]]):
-        """
-        Handle tags per room, applying specific tags to each room.
-        Each room can have different tags or no tags at all.
-
-        Args:
-            rooms_list: List of Room objects to update
-            room_tags_map: Dict mapping room UUID to list of tag UUIDs
-        """
-        from chats.apps.sectors.models import SectorTag
-
-        if not room_tags_map:
-            logger.info("[BULK_CLOSE] 🏷️  Tags: No tags to apply")
-            return
-
-        validation_start = time.perf_counter()
-        # Collect all unique tag UUIDs to validate in a single query
-        all_tag_uuids = set()
-        for tags in room_tags_map.values():
-            all_tag_uuids.update(tags)
-
-        if all_tag_uuids:
-            # Validate all tags exist in a single query
-            existing_tags = set(
-                str(tag_uuid) for tag_uuid in SectorTag.objects.filter(
-                    uuid__in=all_tag_uuids
-                ).values_list("uuid", flat=True)
-            )
-
-            if len(existing_tags) != len(all_tag_uuids):
-                missing = all_tag_uuids - existing_tags
-                logger.warning(f"Some tags not found: {missing}")
-        
-        validation_time = time.perf_counter() - validation_start
-        logger.info(
-            f"[BULK_CLOSE] 🏷️  Tags validation: {len(all_tag_uuids)} unique tags - {validation_time*1000:.2f}ms"
-        )
-
-        # Process each room's tags individually
-        apply_start = time.perf_counter()
-        rooms_with_tags = 0
-        tags_added = 0
-        tags_removed = 0
-        for room in rooms_list:
-            room_uuid_str = str(room.uuid)
-            new_tags = room_tags_map.get(room_uuid_str, [])
-
-            if not new_tags:
-                continue  # Skip rooms with no tags specified
-
-            # Get current tags for this room
-            current_tag_ids = set(
-                str(tag_uuid) for tag_uuid in room.tags.values_list("uuid", flat=True)
-            )
-
-            # Convert new tags to set of strings
-            new_tag_ids = set(str(tag) for tag in new_tags)
-
-            # Determine which tags to add and which to remove
-            tags_to_add = new_tag_ids - current_tag_ids
-            tags_to_remove = current_tag_ids - new_tag_ids
-
-            if tags_to_add:
-                room.tags.add(*tags_to_add)
-                tags_added += len(tags_to_add)
-            if tags_to_remove:
-                room.tags.remove(*tags_to_remove)
-                tags_removed += len(tags_to_remove)
-
-            rooms_with_tags += 1
-
-        apply_time = time.perf_counter() - apply_start
-        logger.info(
-            f"[BULK_CLOSE] 🏷️  Tags applied: {rooms_with_tags} rooms processed, "
-            f"{tags_added} tags added, {tags_removed} tags removed - {apply_time*1000:.2f}ms"
-        )
-
-    def _bulk_clear_pins(self, rooms_list: List[Room]):
-        """
-        Clear all pins for the rooms in a single DELETE query.
-        """
-        room_ids = [room.pk for room in rooms_list]
-        
-        db_start = time.perf_counter()
-        deleted_count, _ = RoomPin.objects.filter(room_id__in=room_ids).delete()
-        db_time = time.perf_counter() - db_start
-
-        logger.info(
-            f"[BULK_CLOSE] 📌 Pins cleared: {deleted_count} pins deleted from "
-            f"{len(rooms_list)} rooms - {db_time*1000:.2f}ms"
-        )
-
-    def _batch_update_inservice_status(self, rooms_list: List[Room]):
-        """
-        Update InService status for agents in batch.
-        Groups by (user, project) to minimize queries.
-        """
-        from chats.apps.projects.usecases.status_service import InServiceStatusService
-
-        # Group rooms by (user, project) to optimize queries
-        user_project_map = defaultdict(set)
-
-        for room in rooms_list:
-            if not room.user:
-                continue
-
-            project = None
-            if room.queue and hasattr(room.queue, "sector"):
-                sector = room.queue.sector
-                if sector and hasattr(sector, "project"):
-                    project = sector.project
-
-            if project:
-                user_project_map[(room.user, project)].add(room)
-
-        # Call InServiceStatusService for each unique (user, project) pair
-        updated_count = 0
-        for (user, project), room_set in user_project_map.items():
-            try:
-                InServiceStatusService.room_closed(user, project)
-                updated_count += 1
-            except Exception as e:
-                logger.error(
-                    f"Error updating InService status for user {user.email}, "
-                    f"project {project.uuid}: {str(e)}"
-                )
-
-        logger.info(
-            f"[BULK_CLOSE] 👤 InService breakdown: {updated_count} unique user-project pairs updated "
-            f"(from {len(rooms_list)} rooms)"
-        )
-
-    def _batch_notify_rooms(self, rooms_list: List[Room]):
-        """
-        Send SYNCHRONOUS websocket notifications for closed rooms.
-        Notifies both queue and user channels so agents can see rooms were closed.
-        Similar to individual close: notify_queue("close") and notify_user("close")
-        """
-        notified_count = 0
-        notify_queue_total = 0
-        notify_user_total = 0
-        errors = 0
-
-        for room in rooms_list:
-            try:
-                # Notify queue channel (for agents monitoring the queue)
-                queue_start = time.perf_counter()
-                room.notify_queue("close", callback=True)
-                notify_queue_total += (time.perf_counter() - queue_start)
-
-                # Notify user channel (for the assigned agent if any)
-                user_start = time.perf_counter()
-                room.notify_user("close")
-                notify_user_total += (time.perf_counter() - user_start)
-
-                notified_count += 1
-            except Exception as e:
-                errors += 1
-                logger.warning(
-                    f"Failed to notify room {room.uuid}: {str(e)}"
-                )
-
-        if notified_count > 0:
-            logger.info(
-                f"[BULK_CLOSE] 📡 Notification breakdown: {notified_count} rooms, {errors} errors | "
-                f"notify_queue: {notify_queue_total*1000:.2f}ms ({notify_queue_total*1000/notified_count:.2f}ms/room) | "
-                f"notify_user: {notify_user_total*1000:.2f}ms ({notify_user_total*1000/notified_count:.2f}ms/room)"
-            )
-
-    def _batch_start_queue_priority_routing(self, rooms_list: List[Room]):
-        """
-        Start queue priority routing for unique queues.
-        Groups rooms by queue and calls start_queue_priority_routing once per queue.
-        This optimizes routing by processing each queue only once instead of N times.
-        """
-        from chats.apps.queues.utils import start_queue_priority_routing
-
-        # Get unique queues from closed rooms
-        unique_queues = set()
-        for room in rooms_list:
-            if room.queue:
-                unique_queues.add(room.queue)
-
-        if not unique_queues:
-            logger.info("[BULK_CLOSE] 🚦 Queue routing: No queues to process")
-            return
-
-        # Start priority routing for each unique queue
-        routing_success = 0
-        routing_errors = 0
-        for queue in unique_queues:
-            try:
-                logger.debug(
-                    f"Calling start_queue_priority_routing for queue {queue.uuid} "
-                    f"from bulk close"
-                )
-                start_queue_priority_routing(queue)
-                routing_success += 1
-            except Exception as e:
-                routing_errors += 1
-                logger.error(
-                    f"Failed to start priority routing for queue {queue.uuid}: {str(e)}"
-                )
-
-        logger.info(
-            f"[BULK_CLOSE] 🚦 Queue routing breakdown: {routing_success} queues processed, "
-            f"{routing_errors} errors (from {len(rooms_list)} closed rooms)"
-        )
-
-    def _batch_schedule_csat_tasks(self, rooms_list: List[Room]):
-        """
-        Schedule CSAT flow tasks in batches using Celery groups.
-        Only for rooms with CSAT enabled and assigned users.
-        """
-        from chats.apps.csat.tasks import start_csat_flow
-
-        # Filter rooms eligible for CSAT
-        csat_room_uuids = []
-        for room in rooms_list:
-            if (
-                room.queue
-                and room.queue.sector.is_csat_enabled
-                and room.user
-            ):
-                csat_room_uuids.append(str(room.uuid))
-
-        if not csat_room_uuids:
-            logger.info(
-                f"[BULK_CLOSE] ⭐ CSAT: 0 eligible rooms (out of {len(rooms_list)} closed)"
-            )
-            return
-
-        # Batch CSAT tasks in groups of 100 to avoid overwhelming Celery
-        batch_size = 100
-        total_batches = (len(csat_room_uuids) + batch_size - 1) // batch_size
-
-        def schedule_csat_batch():
-            for i in range(0, len(csat_room_uuids), batch_size):
-                batch = csat_room_uuids[i:i + batch_size]
-                task_group = group(
-                    start_csat_flow.s(room_uuid) for room_uuid in batch
-                )
-                task_group.apply_async()
-
-        # Schedule after transaction commits
-        transaction.on_commit(schedule_csat_batch)
-
-        logger.info(
-            f"[BULK_CLOSE] ⭐ CSAT: {len(csat_room_uuids)} tasks scheduled in {total_batches} batches "
-            f"(out of {len(rooms_list)} closed rooms)"
-        )
-
-    def _batch_schedule_metrics_tasks(self, rooms_list: List[Room]):
-        """
-        Schedule metrics generation tasks in batches.
-        Uses Celery for async processing with batching.
-        """
-        from chats.apps.dashboard.tasks import close_metrics, generate_metrics
-
-        room_uuids = [str(room.uuid) for room in rooms_list]
-
-        if not room_uuids:
-            logger.info("[BULK_CLOSE] 📊 Metrics: No rooms to process")
-            return
-
-        # Batch metrics tasks in groups of 100
-        batch_size = 100
-        total_batches = (len(room_uuids) + batch_size - 1) // batch_size
-        use_celery = settings.USE_CELERY
-
-        def schedule_metrics_batch():
-            if use_celery:
-                # Schedule close_metrics tasks in batches
-                for i in range(0, len(room_uuids), batch_size):
-                    batch = room_uuids[i:i + batch_size]
-                    task_group = group(
-                        close_metrics.s(room_uuid)
-                        for room_uuid in batch
-                    )
-                    task_group.apply_async(queue=settings.METRICS_CUSTOM_QUEUE)
-            else:
-                # Fallback: generate metrics synchronously (for testing)
-                for room_uuid in room_uuids:
-                    try:
-                        generate_metrics(room_uuid)
-                    except Exception as e:
-                        logger.error(
-                            f"Error generating metrics for room {room_uuid}: {str(e)}"
-                        )
-
-        # Schedule after transaction commits
-        transaction.on_commit(schedule_metrics_batch)
-
-        mode = "async (Celery)" if use_celery else "sync (fallback)"
-        logger.info(
-            f"[BULK_CLOSE] 📊 Metrics: {len(room_uuids)} tasks scheduled in {total_batches} batches "
-            f"({mode})"
-        )

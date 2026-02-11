@@ -665,9 +665,8 @@ class BulkCloseSerializer(serializers.Serializer):
     rooms = serializers.ListField(
         child=RoomToCloseSerializer(),
         min_length=1,
-        max_length=5000,
         required=True,
-        help_text="List of rooms to close with their specific tags (max 5000)"
+        help_text="List of rooms to close with their specific tags"
     )
     end_by = serializers.CharField(
         max_length=50,
@@ -689,8 +688,11 @@ class BulkCloseSerializer(serializers.Serializer):
         if not value:
             raise serializers.ValidationError("At least one room is required")
 
-        if len(value) > 5000:
-            raise serializers.ValidationError("Cannot close more than 5000 rooms at once")
+        max_rooms = getattr(settings, "BULK_CLOSE_MAX_ROOMS", 200)
+        if len(value) > max_rooms:
+            raise serializers.ValidationError(
+                f"Cannot close more than {max_rooms} rooms at once"
+            )
 
         # Extract UUIDs and validate unique
         room_uuids = [room_data["uuid"] for room_data in value]
