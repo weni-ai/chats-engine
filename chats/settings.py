@@ -587,8 +587,9 @@ MESSAGE_STATUS_UPDATE_ENABLED_PROJECTS = env.list(
 # MESSAGE_BULK_SIZE deve estar no settings.py
 MESSAGE_BULK_SIZE = env.int("MESSAGE_BULK_SIZE", default=100)
 
-# Bulk Close Batch Size - number of rooms to process per batch in bulk close
-BULK_CLOSE_BATCH_SIZE = env.int("BULK_CLOSE_BATCH_SIZE", default=200)
+# Bulk Close Settings
+BULK_CLOSE_BATCH_SIZE = env.int("BULK_CLOSE_BATCH_SIZE", default=50)
+BULK_CLOSE_MAX_ROOMS = env.int("BULK_CLOSE_MAX_ROOMS", default=200)
 
 # Message Status Consumer Settings
 MESSAGE_STATUS_MAX_RETRIES = env.int("MESSAGE_STATUS_MAX_RETRIES", default=3)
