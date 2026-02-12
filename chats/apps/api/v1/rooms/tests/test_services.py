@@ -280,9 +280,7 @@ class BulkCloseServiceTest(TestCase):
         result = self.service.close(rooms)
 
         self.assertEqual(result.success_count, 1)
-        # room.close() calls InServiceStatusService.room_closed twice (known duplicate in model)
-        self.assertEqual(mock_room_closed.call_count, 2)
-        mock_room_closed.assert_called_with(self.user, self.project)
+        mock_room_closed.assert_called_once_with(self.user, self.project)
 
     def test_close_tracks_individual_failures(self):
         """Test that individual failures are tracked with details"""
