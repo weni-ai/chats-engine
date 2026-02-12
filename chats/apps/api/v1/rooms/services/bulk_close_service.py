@@ -105,7 +105,7 @@ class BulkCloseService:
         start_time = time.perf_counter()
 
         for batch_index in range(0, total, batch_size):
-            batch = rooms_list[batch_index : batch_index + batch_size]
+            batch = rooms_list[batch_index:batch_index + batch_size]
             batch_number = batch_index // batch_size + 1
 
             logger.info(
