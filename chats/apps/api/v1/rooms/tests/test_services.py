@@ -437,3 +437,75 @@ class BulkCloseServiceTest(TestCase):
         self.assertEqual(mock_close_room.call_count, 2)
         mock_close_room.assert_any_call(str(room1.uuid))
         mock_close_room.assert_any_call(str(room2.uuid))
+
+    @patch("chats.apps.rooms.models.Room.notify_queue")
+    def test_close_sends_notify_queue_for_all_rooms(self, mock_notify_queue):
+        """Test that notify_queue('close', callback=True) is called for every closed room"""
+        room1 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+        room2 = Room.objects.create(queue=self.queue, user=None, is_active=True)
+
+        rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk])
+
+        result = self.service.close(rooms)
+
+        self.assertEqual(result.success_count, 2)
+        self.assertEqual(mock_notify_queue.call_count, 2)
+        mock_notify_queue.assert_any_call("close", callback=True)
+
+    @patch("chats.apps.rooms.models.Room.notify_user")
+    @patch("chats.apps.rooms.models.Room.notify_queue")
+    def test_close_sends_notify_user_only_for_rooms_in_progress(
+        self, mock_notify_queue, mock_notify_user
+    ):
+        """Test that notify_user('close') is called only for rooms with a user assigned"""
+        room_in_progress = Room.objects.create(
+            queue=self.queue, user=self.user, is_active=True
+        )
+        room_in_queue = Room.objects.create(
+            queue=self.queue, user=None, is_active=True
+        )
+
+        rooms = Room.objects.filter(pk__in=[room_in_progress.pk, room_in_queue.pk])
+
+        result = self.service.close(rooms)
+
+        self.assertEqual(result.success_count, 2)
+        # notify_queue called for both
+        self.assertEqual(mock_notify_queue.call_count, 2)
+        # notify_user called only for the room with a user
+        self.assertEqual(mock_notify_user.call_count, 1)
+        mock_notify_user.assert_called_once_with("close")
+
+    @patch("chats.apps.rooms.models.Room.notify_user")
+    @patch("chats.apps.rooms.models.Room.notify_queue")
+    def test_close_does_not_send_notify_user_for_queued_rooms(
+        self, mock_notify_queue, mock_notify_user
+    ):
+        """Test that notify_user is NOT called for rooms in queue (user=None)"""
+        room1 = Room.objects.create(queue=self.queue, user=None, is_active=True)
+        room2 = Room.objects.create(queue=self.queue, user=None, is_active=True)
+
+        rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk])
+
+        result = self.service.close(rooms)
+
+        self.assertEqual(result.success_count, 2)
+        self.assertEqual(mock_notify_queue.call_count, 2)
+        self.assertEqual(mock_notify_user.call_count, 0)
+
+    @patch("chats.apps.api.v1.rooms.services.bulk_close_service.start_queue_priority_routing")
+    def test_close_triggers_routing_once_per_unique_queue(self, mock_start_routing):
+        """Test that start_queue_priority_routing is called once per unique queue"""
+        queue2 = Queue.objects.create(name="Queue 2", sector=self.sector)
+
+        room1 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+        room2 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+        room3 = Room.objects.create(queue=queue2, user=self.user, is_active=True)
+
+        rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk, room3.pk])
+
+        result = self.service.close(rooms)
+
+        self.assertEqual(result.success_count, 3)
+        # Called once per unique queue (2 queues)
+        self.assertEqual(mock_start_routing.call_count, 2)
