@@ -11,8 +11,8 @@ User = get_user_model()
 
 
 class QueueLimitSerializer(serializers.Serializer):
-    limit = serializers.IntegerField(required=False)
-    is_active = serializers.BooleanField(required=False)
+    limit = serializers.IntegerField(required=False, allow_null=True)
+    is_active = serializers.BooleanField(required=False, allow_null=True)
 
 
 class QueueSerializer(serializers.ModelSerializer):
