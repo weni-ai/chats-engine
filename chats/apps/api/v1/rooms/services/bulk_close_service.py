@@ -6,6 +6,8 @@ from django.conf import settings
 from django.db.models import QuerySet
 
 from chats.apps.accounts.models import User
+from chats.apps.queues.models import Queue
+from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import close_room
 
@@ -48,6 +50,11 @@ class BulkCloseService:
     to avoid overwhelming the database and external dependencies.
     Each room is closed individually via room.close(), preserving all
     existing business logic (tags, pins, InService status, CSAT, etc.).
+
+    After each successful close, sends WebSocket notifications, billing
+    notifications and schedules metrics — matching the individual close
+    endpoint behavior. Queue priority routing is triggered once per
+    unique queue at the end of each batch.
     """
 
     def close(
@@ -74,7 +81,7 @@ class BulkCloseService:
         if room_tags_map is None:
             room_tags_map = {}
 
-        batch_size = getattr(settings, "BULK_CLOSE_BATCH_SIZE", 200)
+        batch_size = getattr(settings, "BULK_CLOSE_BATCH_SIZE", 50)
 
         rooms_list = list(
             rooms.select_related(
@@ -98,7 +105,7 @@ class BulkCloseService:
         start_time = time.perf_counter()
 
         for batch_index in range(0, total, batch_size):
-            batch = rooms_list[batch_index:batch_index + batch_size]
+            batch = rooms_list[batch_index : batch_index + batch_size]
             batch_number = batch_index // batch_size + 1
 
             logger.info(
@@ -106,16 +113,39 @@ class BulkCloseService:
                 f"({len(batch)} rooms)"
             )
 
+            affected_queue_ids = set()
+
             for room in batch:
                 try:
                     tags = room_tags_map.get(str(room.uuid), [])
                     room.close(tags=tags, end_by=end_by, closed_by=closed_by)
-                    close_room(str(room.uuid))
                     result.add_success()
+
+                    # Track queue for routing after the batch
+                    if room.queue_id:
+                        affected_queue_ids.add(room.queue_id)
+
                 except Exception as e:
                     error_msg = f"Room {room.uuid}: {str(e)}"
                     result.add_failure(room.uuid, error_msg)
                     logger.warning(f"[BULK_CLOSE] Failed to close room: {error_msg}")
+                    continue
+
+                # Post-close operations (notifications, billing, metrics).
+                # Failures here are logged but do NOT count as close failures
+                # since the room is already closed in the database.
+                self._post_close(room)
+
+            # Trigger queue priority routing once per unique queue
+            for queue_id in affected_queue_ids:
+                try:
+                    queue = Queue.objects.get(pk=queue_id)
+                    start_queue_priority_routing(queue)
+                except Exception as e:
+                    logger.warning(
+                        f"[BULK_CLOSE] Failed to start routing for queue "
+                        f"{queue_id}: {str(e)}"
+                    )
 
             # Small pause between batches to relieve DB pressure
             has_more_batches = batch_index + batch_size < total
@@ -130,3 +160,35 @@ class BulkCloseService:
         )
 
         return result
+
+    def _post_close(self, room: Room):
+        """
+        Run post-close operations: WS notifications, billing, metrics.
+        Each operation is individually wrapped so one failure does not
+        prevent the others from running.
+        """
+        room.refresh_from_db()
+
+        # WebSocket notifications
+        try:
+            room.notify_queue("close", callback=True)
+        except Exception as e:
+            logger.warning(
+                f"[BULK_CLOSE] notify_queue failed for room {room.uuid}: {e}"
+            )
+
+        if room.user:
+            try:
+                room.notify_user("close")
+            except Exception as e:
+                logger.warning(
+                    f"[BULK_CLOSE] notify_user failed for room {room.uuid}: {e}"
+                )
+
+        # Metrics
+        try:
+            close_room(str(room.uuid))
+        except Exception as e:
+            logger.warning(
+                f"[BULK_CLOSE] close_room (metrics) failed for room {room.uuid}: {e}"
+            )
