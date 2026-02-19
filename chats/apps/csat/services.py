@@ -90,6 +90,8 @@ class CSATFlowService(BaseCSATService):
         secondary_project_uuid = secondary_project_config.get("uuid")
         project_uuid = secondary_project_uuid or room.project.uuid
 
+        project = Project.objects.get(uuid=project_uuid)
+
         flow_uuid = self.get_flow_uuid(project_uuid)
         token = self.token_generator.generate_token(
             {"project": str(room.project.uuid), "room": str(room.uuid)}
@@ -109,7 +111,7 @@ class CSATFlowService(BaseCSATService):
 
         print(f"🔍 DEBUG CSATFlowService.start_csat_flow(): Data: {data}")
 
-        return self.flows_client.start_flow(room.project, data)
+        return self.flows_client.start_flow(project, data)
 
     def create_csat_flow(self, project: Project):
         version = CSAT_FLOW_VERSION
