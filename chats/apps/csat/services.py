@@ -79,7 +79,12 @@ class CSATFlowService(BaseCSATService):
         if room.is_active:
             raise ValidationError("Room is active")
 
-        flow_uuid = self.get_flow_uuid(room.project.uuid)
+        sector = room.queue.sector
+        secondary_project_config = sector.secondary_project or {}
+        secondary_project_uuid = secondary_project_config.get("uuid")
+        project_uuid = secondary_project_uuid or room.project.uuid
+
+        flow_uuid = self.get_flow_uuid(project_uuid)
         token = self.token_generator.generate_token(
             {"project": str(room.project.uuid), "room": str(room.uuid)}
         )
