@@ -14,9 +14,7 @@ class RoomMetrics(BaseModel):
     waiting_time = models.IntegerField(_("Room Waiting time"), default=0)
     queued_count = models.IntegerField(_("Queued count"), default=0)
     message_response_time = models.IntegerField(_("Messages response time"), default=0)
-    first_response_time = models.IntegerField(
-        _("First response time"), null=True, blank=True, default=None
-    )
+    first_response_time = models.IntegerField(_("First response time"), null=True, blank=True, default=None)
     interaction_time = models.IntegerField(_("Room interaction time"), default=0)
     transfer_count = models.IntegerField(_("Room transfer count"), default=0)
 
@@ -33,8 +31,6 @@ class RoomMetrics(BaseModel):
 
 
 class ReportStatus(BaseModel):
-    MAX_RETRY_COUNT = 3
-
     project = models.ForeignKey("projects.Project", on_delete=models.CASCADE)
     user = models.ForeignKey("accounts.User", on_delete=models.CASCADE)
     status = models.CharField(
@@ -44,13 +40,11 @@ class ReportStatus(BaseModel):
             ("ready", "Ready"),
             ("in_progress", "In Progress"),
             ("failed", "Failed"),
-            ("permanently_failed", "Permanently Failed"),
         ],
         default="pending",
     )
     fields_config = models.JSONField()
     error_message = models.TextField(blank=True, null=True)
-    retry_count = models.IntegerField(default=0)
 
     def __str__(self):
         return f"Report Status: {self.project.name} - {self.status}"
