@@ -27,6 +27,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
+from sentry_sdk import capture_exception
 from weni.feature_flags.shortcuts import is_feature_active
 
 from chats.apps.accounts.authentication.drf.authorization import (
@@ -838,10 +839,11 @@ class RoomViewset(
                 f"Bulk close error for user {request.user.email}: {str(e)}",
                 exc_info=True
             )
+            event_id = capture_exception(e)
             return Response(
                 {
                     "success": False,
-                    "error": f"Failed to close rooms: {str(e)}",
+                    "error": f"Failed to close rooms. Event ID: {event_id}",
                     "success_count": 0,
                     "failed_count": 0,
                     "total_processed": 0
