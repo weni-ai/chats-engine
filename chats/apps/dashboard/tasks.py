@@ -172,14 +172,14 @@ def _get_parts_dir(project_uuid: UUID, report_uuid: UUID) -> str:
 
 
 def _list_existing_parts(storage: ExcelStorage, parts_dir: str, prefix: str) -> List[str]:
-    """Lists existing CSV parts sorted by name for a given prefix."""
+    """Lists existing Parquet parts sorted by name for a given prefix."""
     try:
         _, files = storage.listdir(parts_dir)
     except (FileNotFoundError, OSError):
         return []
 
     parts = sorted(
-        f for f in files if f.startswith(f"{prefix}.part") and f.endswith(".csv")
+        f for f in files if f.startswith(f"{prefix}.part") and f.endswith(".parquet")
     )
     return [f"{parts_dir}/{name}" for name in parts]
 
@@ -189,13 +189,13 @@ def _write_chunk_to_part(
     parts_dir: str,
     part_idx: int,
     df: pd.DataFrame,
-    include_header: bool,
     prefix: str,
 ) -> None:
-    """Writes a single chunk as a CSV part file."""
-    csv_content = df.to_csv(index=False, header=include_header)
-    part_name = f"{parts_dir}/{prefix}.part{part_idx:06d}.csv"
-    storage.save(part_name, ContentFile(csv_content.encode("utf-8")))
+    """Writes a single chunk as a Parquet part file."""
+    buffer = io.BytesIO()
+    df.to_parquet(buffer, index=False, engine="pyarrow")
+    part_name = f"{parts_dir}/{prefix}.part{part_idx:06d}.parquet"
+    storage.save(part_name, ContentFile(buffer.getvalue()))
 
 
 def _write_parts_from_queryset(
@@ -208,7 +208,7 @@ def _write_parts_from_queryset(
     project_tz=None,
     report=None,
 ) -> None:
-    """Writes queryset data as CSV parts, resuming from completed_parts_count."""
+    """Writes queryset data as Parquet parts, resuming from completed_parts_count."""
     from django.utils import timezone as dj_timezone
 
     if not queryset.query.order_by:
@@ -220,7 +220,6 @@ def _write_parts_from_queryset(
 
     resume_offset = completed_parts_count * chunk_size
     part_index = completed_parts_count
-    header_written = completed_parts_count > 0
 
     for start in range(resume_offset, total_rows, chunk_size):
         end = min(start + chunk_size, total_rows)
@@ -237,8 +236,7 @@ def _write_parts_from_queryset(
             continue
 
         df = _excel_safe_dataframe(pd.DataFrame(rows), project_tz)
-        _write_chunk_to_part(storage, parts_dir, part_index, df, not header_written, prefix)
-        header_written = True
+        _write_chunk_to_part(storage, parts_dir, part_index, df, prefix)
         part_index += 1
 
         if report is not None:
@@ -247,10 +245,10 @@ def _write_parts_from_queryset(
             )
 
 
-def _read_part_content(storage: ExcelStorage, part_path: str) -> str:
-    """Reads content from a part file."""
+def _read_part_dataframe(storage: ExcelStorage, part_path: str) -> pd.DataFrame:
+    """Reads a Parquet part file and returns a DataFrame."""
     with storage.open(part_path, "rb") as f:
-        return f.read().decode("utf-8")
+        return pd.read_parquet(io.BytesIO(f.read()), engine="pyarrow")
 
 
 def _combine_parts_to_sheet(
@@ -260,10 +258,7 @@ def _combine_parts_to_sheet(
     sheet_name: str,
     config: dict,
 ) -> None:
-    """Combines CSV parts into an Excel sheet.
-
-    Part 0 has the header row; parts 1+ contain only data rows.
-    """
+    """Combines Parquet parts into an Excel sheet."""
     if not part_paths:
         requested_fields = config.get("fields") or []
         pd.DataFrame(columns=requested_fields).to_excel(
@@ -272,19 +267,8 @@ def _combine_parts_to_sheet(
         return
 
     current_row = 0
-    column_names = None
-
-    for index, path in enumerate(part_paths):
-        content = _read_part_content(storage, path)
-        if not content or not content.strip():
-            continue
-
-        if index == 0:
-            df = pd.read_csv(io.StringIO(content))
-            column_names = df.columns.tolist()
-        else:
-            df = pd.read_csv(io.StringIO(content), header=None, names=column_names)
-
+    for path in part_paths:
+        df = _read_part_dataframe(storage, path)
         if df.empty:
             continue
 
@@ -358,7 +342,7 @@ def _finalize_xlsx_from_all_parts(
 def _stream_parts_to_csv_file(
     storage: ExcelStorage, part_paths: List[str], config: dict, destination_path: str
 ) -> None:
-    """Streams CSV parts directly to a file, one part at a time in memory."""
+    """Reads Parquet parts and streams them as CSV to a file."""
     with open(destination_path, "w", encoding="utf-8") as f:
         if not part_paths:
             requested_fields = config.get("fields") or []
@@ -366,13 +350,13 @@ def _stream_parts_to_csv_file(
                 f.write(",".join(requested_fields) + "\n")
             return
 
+        header_written = False
         for path in part_paths:
-            content = _read_part_content(storage, path)
-            if not content:
+            df = _read_part_dataframe(storage, path)
+            if df.empty:
                 continue
-            f.write(content)
-            if not content.endswith("\n"):
-                f.write("\n")
+            f.write(df.to_csv(index=False, header=not header_written))
+            header_written = True
 
 
 def _finalize_csv_from_all_parts(
