@@ -302,6 +302,7 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         ):
             should_trigger_queue_priority_routing = True
 
+        is_new = self._state.adding
         is_csat_enabled_has_changed = self.tracker.has_changed("is_csat_enabled")
 
         super().save(*args, **kwargs)
@@ -315,7 +316,7 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
             for queue in self.queues.all():
                 start_queue_priority_routing(queue)
 
-        if is_csat_enabled_has_changed and self.is_csat_enabled:
+        if self.is_csat_enabled and (is_new or is_csat_enabled_has_changed):
             config: Optional[CSATFlowProjectConfig] = (
                 CSATFlowProjectConfig.objects.filter(project=self.project).first()
             )
@@ -325,7 +326,12 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
                 or config.flow_uuid is None
                 or config.version != CSAT_FLOW_VERSION
             ):
-                create_csat_flow.delay(str(self.project.uuid))
+                secondary_project_config = self.secondary_project or {}
+                secondary_project_uuid = secondary_project_config.get("uuid")
+
+                project_uuid = secondary_project_uuid or self.project.uuid
+
+                create_csat_flow.delay(str(project_uuid))
 
     def delete(self):
         super().delete()
