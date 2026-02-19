@@ -325,7 +325,12 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
                 or config.flow_uuid is None
                 or config.version != CSAT_FLOW_VERSION
             ):
-                create_csat_flow.delay(str(self.project.uuid))
+                secondary_project_config = self.secondary_project or {}
+                secondary_project_uuid = secondary_project_config.get("uuid")
+
+                project_uuid = secondary_project_uuid or self.project.uuid
+
+                create_csat_flow.delay(str(project_uuid))
 
     def delete(self):
         super().delete()
