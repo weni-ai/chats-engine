@@ -189,11 +189,10 @@ def _write_chunk_to_part(
     parts_dir: str,
     part_idx: int,
     df: pd.DataFrame,
-    include_header: bool,
     prefix: str,
 ) -> None:
-    """Writes a single chunk as a CSV part file."""
-    csv_content = df.to_csv(index=False, header=include_header)
+    """Writes a single chunk as a CSV part file, always including the header row."""
+    csv_content = df.to_csv(index=False, header=True)
     part_name = f"{parts_dir}/{prefix}.part{part_idx:06d}.csv"
     storage.save(part_name, ContentFile(csv_content.encode("utf-8")))
 
@@ -220,7 +219,6 @@ def _write_parts_from_queryset(
 
     resume_offset = completed_parts_count * chunk_size
     part_index = completed_parts_count
-    header_written = completed_parts_count > 0
 
     for start in range(resume_offset, total_rows, chunk_size):
         end = min(start + chunk_size, total_rows)
@@ -237,8 +235,7 @@ def _write_parts_from_queryset(
             continue
 
         df = _excel_safe_dataframe(pd.DataFrame(rows), project_tz)
-        _write_chunk_to_part(storage, parts_dir, part_index, df, not header_written, prefix)
-        header_written = True
+        _write_chunk_to_part(storage, parts_dir, part_index, df, prefix)
         part_index += 1
 
         if report is not None:
@@ -262,7 +259,8 @@ def _combine_parts_to_sheet(
 ) -> None:
     """Combines CSV parts into an Excel sheet.
 
-    Part 0 has the header row; parts 1+ contain only data rows.
+    Every part has a header row. Parts 1+ skip their header when reading
+    to avoid duplicating it in the output.
     """
     if not part_paths:
         requested_fields = config.get("fields") or []
@@ -272,7 +270,6 @@ def _combine_parts_to_sheet(
         return
 
     current_row = 0
-    column_names = None
 
     for index, path in enumerate(part_paths):
         content = _read_part_content(storage, path)
@@ -281,9 +278,8 @@ def _combine_parts_to_sheet(
 
         if index == 0:
             df = pd.read_csv(io.StringIO(content))
-            column_names = df.columns.tolist()
         else:
-            df = pd.read_csv(io.StringIO(content), header=None, names=column_names)
+            df = pd.read_csv(io.StringIO(content), skiprows=1)
 
         if df.empty:
             continue
@@ -358,7 +354,11 @@ def _finalize_xlsx_from_all_parts(
 def _stream_parts_to_csv_file(
     storage: ExcelStorage, part_paths: List[str], config: dict, destination_path: str
 ) -> None:
-    """Streams CSV parts directly to a file, one part at a time in memory."""
+    """Streams CSV parts directly to a file, one part at a time in memory.
+
+    Every part has a header row. Parts 1+ skip their header line when
+    concatenating to avoid duplicating it in the output.
+    """
     with open(destination_path, "w", encoding="utf-8") as f:
         if not part_paths:
             requested_fields = config.get("fields") or []
@@ -366,10 +366,14 @@ def _stream_parts_to_csv_file(
                 f.write(",".join(requested_fields) + "\n")
             return
 
-        for path in part_paths:
+        for index, path in enumerate(part_paths):
             content = _read_part_content(storage, path)
             if not content:
                 continue
+            if index > 0:
+                newline_pos = content.find("\n")
+                if newline_pos != -1:
+                    content = content[newline_pos + 1:]
             f.write(content)
             if not content.endswith("\n"):
                 f.write("\n")
