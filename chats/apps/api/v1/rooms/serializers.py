@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime
 
+from django.conf import settings
 from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
 from django.utils import timezone
 from rest_framework import serializers
@@ -601,3 +602,163 @@ class BulkTransferSerializer(serializers.Serializer):
         attrs["rooms"] = Room.objects.filter(uuid__in=attrs.get("rooms_list"))
 
         return super().validate(attrs)
+
+
+class RoomToCloseSerializer(serializers.Serializer):
+    """Serializer for individual room to close with its specific tags"""
+    uuid = serializers.UUIDField(required=True, help_text="Room UUID to close")
+    tags = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        default=list,
+        help_text="List of tag UUIDs to apply to this specific room"
+    )
+
+
+class BulkCloseSerializer(serializers.Serializer):
+    rooms = serializers.ListField(
+        child=RoomToCloseSerializer(),
+        min_length=1,
+        required=True,
+        help_text="List of rooms to close with their specific tags"
+    )
+    end_by = serializers.CharField(
+        max_length=50,
+        required=False,
+        default="",
+        allow_blank=True,
+        help_text="Indicator of who/what closed the rooms (e.g., 'agent', 'system', 'timeout')"
+    )
+    closed_by_email = serializers.EmailField(
+        required=False,
+        allow_null=True,
+        help_text="Email of the user who closed the rooms"
+    )
+
+    def validate_rooms(self, value):
+        """
+        Validate rooms and their tags.
+        """
+        if not value:
+            raise serializers.ValidationError("At least one room is required")
+
+        max_rooms = getattr(settings, "BULK_CLOSE_MAX_ROOMS", 200)
+        if len(value) > max_rooms:
+            raise serializers.ValidationError(
+                f"Cannot close more than {max_rooms} rooms at once"
+            )
+
+        # Extract UUIDs and validate unique
+        room_uuids = [room_data["uuid"] for room_data in value]
+        if len(room_uuids) != len(set(room_uuids)):
+            raise serializers.ValidationError("Duplicate room UUIDs found")
+
+        # Check that rooms exist and are active
+        existing_rooms = Room.objects.filter(uuid__in=room_uuids, is_active=True).select_related(
+            "queue__sector"
+        )
+        existing_room_uuids = {str(room.uuid) for room in existing_rooms}
+
+        if not existing_room_uuids:
+            raise serializers.ValidationError("No active rooms found with the provided UUIDs")
+
+        if len(existing_room_uuids) < len(room_uuids):
+            logger.warning(
+                f"BulkCloseSerializer: {len(room_uuids) - len(existing_room_uuids)} rooms not found or already closed"
+            )
+
+        # Validate tags for each room
+        room_uuid_to_sector = {str(room.uuid): room.queue.sector for room in existing_rooms}
+
+        for room_data in value:
+            room_uuid = str(room_data["uuid"])
+            tags = room_data.get("tags", [])
+
+            if room_uuid not in existing_room_uuids:
+                continue  # Will be handled as "not found" later
+
+            sector = room_uuid_to_sector[room_uuid]
+
+            if tags:
+                # Validate that tags exist and belong to the room's sector
+                tag_uuids = [str(tag_uuid) for tag_uuid in tags]
+                existing_tags = SectorTag.objects.filter(
+                    uuid__in=tag_uuids,
+                    sector=sector
+                )
+                existing_tag_uuids = {str(tag.uuid) for tag in existing_tags}
+
+                invalid_tags = set(tag_uuids) - existing_tag_uuids
+                if invalid_tags:
+                    raise serializers.ValidationError(
+                        f"Room {room_uuid}: {len(invalid_tags)} tag(s) not found or don't belong to room's sector"
+                    )
+
+        return value
+
+    def validate_closed_by_email(self, value):
+        """
+        Validate that closed_by user exists if provided.
+        """
+        if not value:
+            return None
+
+        try:
+            user = User.objects.get(email=value)
+            return user
+        except User.DoesNotExist:
+            raise serializers.ValidationError(f"User with email {value} not found")
+
+    def validate(self, attrs):
+        """
+        Additional cross-field validations.
+        """
+        rooms_data = attrs.get("rooms", [])
+        room_uuids = [room_data["uuid"] for room_data in rooms_data]
+        closed_by = attrs.get("closed_by_email")
+        request = self.context.get("request")
+
+        # Validate permissions: rooms must belong to projects user has access to
+        if request and request.user:
+            from chats.apps.projects.models.models import ProjectPermission
+
+            # Get all unique projects from the rooms
+            rooms_qs = Room.objects.filter(
+                uuid__in=room_uuids,
+                is_active=True
+            ).select_related("queue__sector__project")
+
+            project_uuids = set(
+                rooms_qs.values_list("queue__sector__project__uuid", flat=True).distinct()
+            )
+
+            # Get user's project permissions
+            user_project_uuids = set(
+                ProjectPermission.objects.filter(
+                    user=request.user
+                ).values_list("project__uuid", flat=True)
+            )
+
+            # Check if user has permission for all projects
+            unauthorized_projects = project_uuids - user_project_uuids
+            if unauthorized_projects:
+                raise serializers.ValidationError(
+                    f"User does not have permission for {len(unauthorized_projects)} project(s)"
+                )
+
+            # If closed_by is provided, validate they have permission too
+            if closed_by:
+                closed_by_project_uuids = set(
+                    ProjectPermission.objects.filter(
+                        user=closed_by
+                    ).values_list("project__uuid", flat=True)
+                )
+
+                unauthorized_for_closed_by = project_uuids - closed_by_project_uuids
+                if unauthorized_for_closed_by:
+                    raise serializers.ValidationError(
+                        f"User {closed_by.email} does not have permission for "
+                        f"{len(unauthorized_for_closed_by)} project(s)"
+                    )
+
+        return attrs

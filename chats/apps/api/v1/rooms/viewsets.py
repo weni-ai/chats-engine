@@ -27,6 +27,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
+from sentry_sdk import capture_exception
 from weni.feature_flags.shortcuts import is_feature_active
 
 from chats.apps.accounts.authentication.drf.authorization import (
@@ -49,6 +50,7 @@ from chats.apps.api.v1.rooms.permissions import (
 )
 from chats.apps.api.v1.rooms.serializers import (
     AddRoomTagSerializer,
+    BulkCloseSerializer,
     BulkTransferSerializer,
     ListRoomSerializer,
     PinRoomSerializer,
@@ -63,6 +65,7 @@ from chats.apps.api.v1.rooms.serializers import (
     RoomTagSerializer,
     TransferRoomSerializer,
 )
+from chats.apps.api.v1.rooms.services.bulk_close_service import BulkCloseService
 from chats.apps.api.v1.rooms.services.bulk_transfer_service import BulkTransferService
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
@@ -719,6 +722,134 @@ class RoomViewset(
             {"success": "Mass transfer completed"},
             status=status.HTTP_200_OK,
         )
+
+    @action(
+        detail=False,
+        methods=["POST"],
+        url_name="bulk_close",
+    )
+    def bulk_close(self, request, pk=None):
+        """
+        Endpoint to close multiple rooms in bulk with specific tags per room.
+
+        Supports closing rooms that are:
+        - In progress (assigned to agents: user__isnull=False)
+        - In queue (not assigned: user__isnull=True)
+
+        Request body:
+        {
+            "rooms": [
+                {
+                    "uuid": "uuid1",
+                    "tags": ["tag_uuid1", "tag_uuid2"]  // Optional: specific tags for this room
+                },
+                {
+                    "uuid": "uuid2",
+                    "tags": ["tag_uuid3"]
+                },
+                {
+                    "uuid": "uuid3"  // No tags
+                }
+            ],
+            "end_by": "system",  // Optional: Who/what closed the rooms
+            "closed_by_email": "user@example.com"  // Optional: Email of user who closed
+        }
+
+        Returns:
+        {
+            "success": true,
+            "closed_count": 150,
+            "message": "150 rooms closed successfully"
+        }
+        """
+        serializer = BulkCloseSerializer(
+            data=request.data,
+            context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+
+        # Get validated data
+        rooms_data = serializer.validated_data["rooms"]
+        end_by = serializer.validated_data.get("end_by", "")
+        closed_by = serializer.validated_data.get("closed_by_email")
+
+        # Extract room UUIDs and build tags map
+        room_uuids = [room_data["uuid"] for room_data in rooms_data]
+        room_tags_map = {
+            str(room_data["uuid"]): [str(tag) for tag in room_data.get("tags", [])]
+            for room_data in rooms_data
+        }
+
+        # Fetch active rooms with optimized query
+        rooms = Room.objects.filter(
+            uuid__in=room_uuids,
+            is_active=True
+        ).select_related(
+            "queue__sector__project",
+            "user",
+            "closed_by"
+        ).prefetch_related("tags")
+
+        if not rooms.exists():
+            return Response(
+                {"error": "No active rooms found with the provided UUIDs"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Initialize service and close rooms
+        service = BulkCloseService()
+
+        try:
+            result = service.close(
+                rooms=rooms,
+                room_tags_map=room_tags_map,
+                end_by=end_by,
+                closed_by=closed_by
+            )
+
+            logger.info(
+                f"Bulk close completed by {request.user.email}: "
+                f"{result.success_count} succeeded, {result.failed_count} failed"
+            )
+
+            # Determine response status
+            if result.success_count == 0 and result.failed_count > 0:
+                # All failed
+                response_status = status.HTTP_400_BAD_REQUEST
+                message = "All rooms failed to close"
+            elif result.failed_count > 0:
+                # Partial success
+                response_status = status.HTTP_207_MULTI_STATUS
+                message = f"{result.success_count} rooms closed successfully, {result.failed_count} failed"
+            else:
+                # All succeeded
+                response_status = status.HTTP_200_OK
+                message = f"{result.success_count} rooms closed successfully"
+
+            response_data = {
+                "success": result.success_count > 0,
+                "message": message,
+                **result.to_dict()
+            }
+
+            return Response(response_data, status=response_status)
+
+        except Exception as e:
+            logger.error(
+                f"Bulk close error for user {request.user.email}: {str(e)}",
+                exc_info=True
+            )
+            event_id = capture_exception(e)
+            return Response(
+                {
+                    "success": False,
+                    "error": f"Failed to close rooms. Event ID: {event_id}",
+                    "success_count": 0,
+                    "failed_count": 0,
+                    "total_processed": 0
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=False, methods=["get"], url_path="human-service-count")
     def filter_rooms(self, request, pk=None):
