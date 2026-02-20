@@ -327,18 +327,10 @@ def _finalize_xlsx_from_all_parts(
     rooms_config: dict,
     agent_config: dict,
 ) -> bytes:
-    """Combines CSV parts from both tables into a final XLSX file.
-
-    Uses constant_memory mode so xlsxwriter flushes rows to disk instead of
-    accumulating everything in RAM.  Peak memory ~ one chunk (~5 000 rows).
-    """
+    """Combines CSV parts from both tables into a final XLSX file."""
     _, xlsx_temp_path = tempfile.mkstemp(suffix=".xlsx")
     try:
-        with pd.ExcelWriter(
-            xlsx_temp_path,
-            engine="xlsxwriter",
-            engine_kwargs={"options": {"constant_memory": True}},
-        ) as writer:
+        with pd.ExcelWriter(xlsx_temp_path, engine="xlsxwriter") as writer:
             if rooms_config:
                 _combine_parts_to_sheet(storage, writer, room_part_paths, "rooms", rooms_config)
             if agent_config:
