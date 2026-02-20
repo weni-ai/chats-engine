@@ -96,7 +96,7 @@ class AutomaticMessagesService:
             room.queue.sector.is_automatic_message_active is False
             or not room.queue.sector.automatic_message_text
             or hasattr(room, "automatic_message")
-            or room.messages.filter(user__isnull=False).exists()
+            or room.get_has_agent_messages()
         ):
             logger.info(
                 "[AUTOMATIC MESSAGES SERVICE] Automatic message not sent to room %s",

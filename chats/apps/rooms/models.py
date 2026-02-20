@@ -168,7 +168,16 @@ class Room(BaseModel, BaseConfigurableModel):
         blank=True,
     )
 
+    has_agent_messages = models.BooleanField(
+        _("Has agent messages"), default=False
+    )
+
     tracker = FieldTracker(fields=["user_id", "queue_id"])
+
+    def get_has_agent_messages(self) -> bool:
+        if self.has_agent_messages:
+            return True
+        return self.messages.filter(user__isnull=False).exists()
 
     @property
     def is_billing_notified(self) -> bool:
@@ -739,19 +748,23 @@ class Room(BaseModel, BaseConfigurableModel):
     def update_last_message(self, message, user=None):
         """
         Updates last message fields. Used for agent/system messages.
+        Also sets has_agent_messages when user is provided.
         """
         media_data = [
             {"content_type": media.content_type, "url": media.url}
             for media in message.medias.all()
         ]
-        Room.objects.filter(pk=self.pk).update(
-            last_interaction=message.created_on,
-            last_message=message,
-            last_message_text=message.text,
-            last_message_user=user,
-            last_message_contact=None,
-            last_message_media=media_data,
-        )
+        update_fields = {
+            "last_interaction": message.created_on,
+            "last_message": message,
+            "last_message_text": message.text,
+            "last_message_user": user,
+            "last_message_contact": None,
+            "last_message_media": media_data,
+        }
+        if user is not None:
+            update_fields["has_agent_messages"] = True
+        Room.objects.filter(pk=self.pk).update(**update_fields)
 
     def on_new_message(self, message, contact=None, increment_unread: int = 0):
         """
