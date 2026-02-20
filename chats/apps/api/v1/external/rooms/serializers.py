@@ -2,13 +2,10 @@ import logging
 from typing import Dict, List, Optional
 
 import pendulum
-from django.conf import settings
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from weni.feature_flags.shortcuts import is_feature_active
-from rest_framework.exceptions import PermissionDenied
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.accounts.serializers import UserSerializer
@@ -24,7 +21,6 @@ from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import close_room
 from chats.apps.sectors.utils import working_hours_validator
-
 
 logger = logging.getLogger(__name__)
 
@@ -199,18 +195,6 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
         source="metric.interaction_time",
         help_text="Total interaction time in seconds",
     )
-    waiting_time = serializers.IntegerField(
-        source="metric.waiting_time",
-        help_text="Time in seconds the room waited in queue",
-    )
-    first_response_time = serializers.IntegerField(
-        source="metric.first_response_time",
-        help_text="Time in seconds the first response time",
-    )
-    message_response_time = serializers.IntegerField(
-        source="metric.message_response_time",
-        help_text="Time in seconds the message response time",
-    )
     urn = serializers.CharField(
         help_text="Contact URN (e.g., whatsapp:5511999999999)",
     )
@@ -247,9 +231,6 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
         fields = [
             "created_on",
             "interaction_time",
-            "waiting_time",
-            "first_response_time",
-            "message_response_time",
             "ended_at",
             "urn",
             "contact_external_id",
@@ -329,11 +310,6 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
             }
 
         return None
-
-
-class ProjectInfoSerializer(serializers.Serializer):
-    uuid = serializers.UUIDField(required=False, read_only=False)
-    name = serializers.CharField(required=False, read_only=False)
 
 
 class ProjectInfoSerializer(serializers.Serializer):
@@ -461,35 +437,6 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             attrs.pop("project_info")
         return attrs
 
-    def _validate_queue_limit(self, queue: Queue):
-        is_limit_active_for_queue = queue.queue_limit_info.is_active
-
-        if is_limit_active_for_queue:
-            # Only check if the feature flag is enabled and make all the other validations
-            # if the queue limit for this particular queue is active
-            is_queue_limit_feature_active = is_feature_active(
-                settings.QUEUE_LIMIT_FEATURE_FLAG_KEY,
-                None,
-                str(queue.sector.project.uuid),
-            )
-            queue_limit = (
-                queue.queue_limit_info.limit
-                if isinstance(queue.queue_limit_info.limit, int)
-                else 0
-            )
-
-            if (
-                is_queue_limit_feature_active
-                and queue.queued_rooms_count >= queue_limit
-            ):
-                raise PermissionDenied(
-                    {
-                        "error": "human_support_queue_limit_reached",
-                        "description": "Human support queue is full. Please try again later.",
-                    },
-                    code="human_support_queue_limit_reached",
-                )
-
     def create(self, validated_data):
         history_data = validated_data.pop("history", [])
 
@@ -551,9 +498,6 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         validated_data["user"] = get_room_user(
             contact, queue, user, groups, created, flow_uuid, project
         )
-
-        if not validated_data.get("user"):
-            self._validate_queue_limit(queue)
 
         room = Room.objects.create(
             **validated_data,
