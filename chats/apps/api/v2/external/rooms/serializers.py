@@ -51,6 +51,11 @@ class ExternalRoomMetricsSerializer(serializers.ModelSerializer):
     user = RoomUserSerializer(read_only=True)
     tags = RoomTagSerializer(many=True, read_only=True)
     interaction_time = serializers.IntegerField(source="metric.interaction_time")
+    waiting_time = serializers.IntegerField(source="metric.waiting_time")
+    first_response_time = serializers.IntegerField(source="metric.first_response_time")
+    message_response_time = serializers.IntegerField(
+        source="metric.message_response_time"
+    )
     automatic_message_sent_at = serializers.SerializerMethodField()
     time_to_send_automatic_message = serializers.SerializerMethodField()
     sector = RoomSectorSerializer(read_only=True, source="queue.sector")
@@ -62,6 +67,9 @@ class ExternalRoomMetricsSerializer(serializers.ModelSerializer):
             "uuid",
             "created_on",
             "interaction_time",
+            "waiting_time",
+            "first_response_time",
+            "message_response_time",
             "ended_at",
             "urn",
             "contact",
