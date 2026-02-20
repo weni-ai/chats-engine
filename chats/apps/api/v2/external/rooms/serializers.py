@@ -85,56 +85,31 @@ class ExternalRoomMetricsSerializer(serializers.ModelSerializer):
             "custom_fields",
         ]
 
-    def _is_denormalized_enabled(self, obj) -> bool:
-        project = obj.queue.sector.project if obj.queue else None
-        if not project:
-            return False
-        request = self.context.get("request")
-        user_email = request.user.email if request and hasattr(request, "user") else ""
-        return is_feature_active(
-            settings.DENORMALIZED_MESSAGE_FIELDS_FLAG_KEY,
-            user_email,
-            str(project.uuid),
-        )
-
     def get_first_user_message_sent_at(self, room: Room) -> Optional[datetime]:
-        if self._is_denormalized_enabled(room):
-            if room.first_agent_message_at:
-                return room.first_agent_message_at.astimezone(SERVER_TZ)
-            return None
-        # Fallback: query original
-        first_msg = (
-            room.messages.filter(user__isnull=False).order_by("created_on").first()
-        )
-        if first_msg:
+        if (
+            first_msg := room.messages.filter(user__isnull=False)
+            .order_by("created_on")
+            .first()
+        ):
             return first_msg.created_on.astimezone(SERVER_TZ)
+
         return None
 
     def get_automatic_message_sent_at(self, obj: Room) -> Optional[datetime]:
-        if self._is_denormalized_enabled(obj):
-            if obj.automatic_message_sent_at:
-                return obj.automatic_message_sent_at.astimezone(SERVER_TZ)
-            return None
-        # Fallback: query original
-        automatic_message = AutomaticMessage.objects.filter(room=obj).first()
+        automatic_message: AutomaticMessage = AutomaticMessage.objects.filter(
+            room=obj
+        ).first()
+
         if automatic_message:
             return automatic_message.message.created_on.astimezone(SERVER_TZ)
+
         return None
 
     def get_time_to_send_automatic_message(self, room: Room) -> Optional[int]:
-        if self._is_denormalized_enabled(room):
-            if room.automatic_message_sent_at and room.first_user_assigned_at:
-                return max(
-                    int(
-                        (
-                            room.automatic_message_sent_at - room.first_user_assigned_at
-                        ).total_seconds()
-                    ),
-                    0,
-                )
-            return None
-        # Fallback: query original
-        automatic_message = AutomaticMessage.objects.filter(room=room).first()
+        automatic_message: AutomaticMessage = AutomaticMessage.objects.filter(
+            room=room
+        ).first()
+
         if automatic_message and room.first_user_assigned_at:
             return max(
                 int(
@@ -145,4 +120,5 @@ class ExternalRoomMetricsSerializer(serializers.ModelSerializer):
                 ),
                 0,
             )
+
         return None
