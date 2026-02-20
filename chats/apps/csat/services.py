@@ -109,8 +109,6 @@ class CSATFlowService(BaseCSATService):
             },
         }
 
-        print(f"🔍 DEBUG CSATFlowService.start_csat_flow(): Data: {data}")
-
         return self.flows_client.start_flow(project, data)
 
     def create_csat_flow(self, project: Project):

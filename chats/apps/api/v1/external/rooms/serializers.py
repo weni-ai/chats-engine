@@ -199,6 +199,18 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
         source="metric.interaction_time",
         help_text="Total interaction time in seconds",
     )
+    waiting_time = serializers.IntegerField(
+        source="metric.waiting_time",
+        help_text="Time in seconds the room waited in queue",
+    )
+    first_response_time = serializers.IntegerField(
+        source="metric.first_response_time",
+        help_text="Time in seconds the first response time",
+    )
+    message_response_time = serializers.IntegerField(
+        source="metric.message_response_time",
+        help_text="Time in seconds the message response time",
+    )
     urn = serializers.CharField(
         help_text="Contact URN (e.g., whatsapp:5511999999999)",
     )
@@ -235,6 +247,9 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
         fields = [
             "created_on",
             "interaction_time",
+            "waiting_time",
+            "first_response_time",
+            "message_response_time",
             "ended_at",
             "urn",
             "contact_external_id",

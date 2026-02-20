@@ -28,6 +28,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
+from sentry_sdk import capture_exception
 from weni.feature_flags.shortcuts import is_feature_active
 
 from chats.apps.accounts.authentication.drf.authorization import (
@@ -768,8 +769,7 @@ class RoomViewset(
         }
         """
         serializer = BulkCloseSerializer(
-            data=request.data,
-            context={"request": request}
+            data=request.data, context={"request": request}
         )
         serializer.is_valid(raise_exception=True)
 
@@ -786,19 +786,16 @@ class RoomViewset(
         }
 
         # Fetch active rooms with optimized query
-        rooms = Room.objects.filter(
-            uuid__in=room_uuids,
-            is_active=True
-        ).select_related(
-            "queue__sector__project",
-            "user",
-            "closed_by"
-        ).prefetch_related("tags")
+        rooms = (
+            Room.objects.filter(uuid__in=room_uuids, is_active=True)
+            .select_related("queue__sector__project", "user", "closed_by")
+            .prefetch_related("tags")
+        )
 
         if not rooms.exists():
             return Response(
                 {"error": "No active rooms found with the provided UUIDs"},
-                status=status.HTTP_404_NOT_FOUND
+                status=status.HTTP_404_NOT_FOUND,
             )
 
         # Initialize service and close rooms
@@ -809,7 +806,7 @@ class RoomViewset(
                 rooms=rooms,
                 room_tags_map=room_tags_map,
                 end_by=end_by,
-                closed_by=closed_by
+                closed_by=closed_by,
             )
 
             logger.info(
@@ -834,7 +831,7 @@ class RoomViewset(
             response_data = {
                 "success": result.success_count > 0,
                 "message": message,
-                **result.to_dict()
+                **result.to_dict(),
             }
 
             return Response(response_data, status=response_status)
@@ -842,17 +839,18 @@ class RoomViewset(
         except Exception as e:
             logger.error(
                 f"Bulk close error for user {request.user.email}: {str(e)}",
-                exc_info=True
+                exc_info=True,
             )
+            event_id = capture_exception(e)
             return Response(
                 {
                     "success": False,
-                    "error": f"Failed to close rooms: {str(e)}",
+                    "error": f"Failed to close rooms. Event ID: {event_id}",
                     "success_count": 0,
                     "failed_count": 0,
-                    "total_processed": 0
+                    "total_processed": 0,
                 },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     @action(detail=False, methods=["get"], url_path="human-service-count")
