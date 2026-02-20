@@ -271,15 +271,12 @@ def _combine_parts_to_sheet(
 
     current_row = 0
 
-    for index, path in enumerate(part_paths):
+    for path in part_paths:
         content = _read_part_content(storage, path)
         if not content or not content.strip():
             continue
 
-        if index == 0:
-            df = pd.read_csv(io.StringIO(content))
-        else:
-            df = pd.read_csv(io.StringIO(content), skiprows=1)
+        df = pd.read_csv(io.StringIO(content))
 
         if df.empty:
             continue
