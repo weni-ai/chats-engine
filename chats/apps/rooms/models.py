@@ -168,7 +168,21 @@ class Room(BaseModel, BaseConfigurableModel):
         blank=True,
     )
 
+    first_agent_message_at = models.DateTimeField(
+        _("First agent message at"), null=True, blank=True
+    )
+
     tracker = FieldTracker(fields=["user_id", "queue_id"])
+
+    def get_first_agent_message_at(self) -> Optional[datetime]:
+        if self.first_agent_message_at:
+            return self.first_agent_message_at
+        first_msg = (
+            self.messages.filter(user__isnull=False).order_by("created_on").first()
+        )
+        if first_msg:
+            return first_msg.created_on
+        return None
 
     @property
     def is_billing_notified(self) -> bool:
@@ -739,6 +753,7 @@ class Room(BaseModel, BaseConfigurableModel):
     def update_last_message(self, message, user=None):
         """
         Updates last message fields. Used for agent/system messages.
+        Also updates first_agent_message_at on the first agent message.
         """
         media_data = [
             {"content_type": media.content_type, "url": media.url}
@@ -752,6 +767,10 @@ class Room(BaseModel, BaseConfigurableModel):
             last_message_contact=None,
             last_message_media=media_data,
         )
+        if user is not None:
+            Room.objects.filter(
+                pk=self.pk, first_agent_message_at__isnull=True
+            ).update(first_agent_message_at=message.created_on)
 
     def on_new_message(self, message, contact=None, increment_unread: int = 0):
         """

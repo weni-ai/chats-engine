@@ -254,13 +254,9 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
         return None
 
     def get_first_user_message(self, obj):
-        first_msg = (
-            obj.messages.filter(user__isnull=False).order_by("created_on").first()
-        )
-        if first_msg:
-            msg_date = pendulum.instance(first_msg.created_on).in_tz(
-                "America/Sao_Paulo"
-            )
+        sent_at = obj.get_first_agent_message_at()
+        if sent_at:
+            msg_date = pendulum.instance(sent_at).in_tz("America/Sao_Paulo")
             return msg_date.isoformat()
         return None
 

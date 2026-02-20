@@ -401,14 +401,7 @@ class RoomInfoSerializer(serializers.ModelSerializer):
         return {"email": user.email, "name": name}
 
     def get_first_user_message_sent_at(self, room: Room) -> datetime:
-        if (
-            first_user_message := room.messages.filter(user__isnull=False)
-            .order_by("created_on")
-            .first()
-        ):
-            return first_user_message.created_on
-
-        return None
+        return room.get_first_agent_message_at()
 
 
 class RoomHistorySummarySerializer(serializers.ModelSerializer):

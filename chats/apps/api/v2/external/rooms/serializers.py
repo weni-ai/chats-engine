@@ -76,13 +76,9 @@ class ExternalRoomMetricsSerializer(serializers.ModelSerializer):
         ]
 
     def get_first_user_message_sent_at(self, room: Room) -> Optional[datetime]:
-        if (
-            first_msg := room.messages.filter(user__isnull=False)
-            .order_by("created_on")
-            .first()
-        ):
-            return first_msg.created_on.astimezone(SERVER_TZ)
-
+        sent_at = room.get_first_agent_message_at()
+        if sent_at:
+            return sent_at.astimezone(SERVER_TZ)
         return None
 
     def get_automatic_message_sent_at(self, obj: Room) -> Optional[datetime]:
