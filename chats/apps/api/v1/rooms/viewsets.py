@@ -364,7 +364,11 @@ class RoomViewset(
         # Add send room notification to the channels group
         instance: Room = self.get_object()
 
-        tags = request.data.get("tags", None)
+        if "tags" in request.data:
+            tags = request.data.get("tags")
+            tags = tags if tags is not None else []
+        else:
+            tags = None
 
         if tags is not None:
             sector_tags = [
@@ -380,7 +384,11 @@ class RoomViewset(
                     code="tag_not_found",
                 )
 
-        if instance.queue.required_tags and (not tags and not instance.tags.exists()):
+        # required_tags: sem tags após o close (se sobrescreveu com [] ou não sobrescreveu e sala sem tags)
+        no_tags_after_close = (tags is not None and not tags) or (
+            tags is None and not instance.tags.exists()
+        )
+        if instance.queue.required_tags and no_tags_after_close:
             raise ValidationError(
                 {"tags": ["Tags are required for this queue"]},
                 code="tags_required",
