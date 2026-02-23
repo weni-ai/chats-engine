@@ -323,7 +323,7 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
 
         if self.is_csat_enabled and (is_new or is_csat_enabled_has_changed):
             config: Optional[CSATFlowProjectConfig] = (
-                CSATFlowProjectConfig.objects.filter(project=project_uuid).first()
+                CSATFlowProjectConfig.objects.filter(project_id=project_uuid).first()
             )
 
             if (
