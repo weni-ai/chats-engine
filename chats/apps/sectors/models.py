@@ -316,9 +316,14 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
             for queue in self.queues.all():
                 start_queue_priority_routing(queue)
 
+        secondary_project_config = self.secondary_project or {}
+        secondary_project_uuid = secondary_project_config.get("uuid")
+
+        project_uuid = secondary_project_uuid or self.project.uuid
+
         if self.is_csat_enabled and (is_new or is_csat_enabled_has_changed):
             config: Optional[CSATFlowProjectConfig] = (
-                CSATFlowProjectConfig.objects.filter(project=self.project).first()
+                CSATFlowProjectConfig.objects.filter(project=project_uuid).first()
             )
 
             if (
@@ -326,11 +331,6 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
                 or config.flow_uuid is None
                 or config.version != CSAT_FLOW_VERSION
             ):
-                secondary_project_config = self.secondary_project or {}
-                secondary_project_uuid = secondary_project_config.get("uuid")
-
-                project_uuid = secondary_project_uuid or self.project.uuid
-
                 create_csat_flow.delay(str(project_uuid))
 
     def delete(self):
