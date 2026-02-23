@@ -59,7 +59,7 @@ def calculate_response_time(room: "Room") -> int:
     return int(average_response_seconds)
 
 
-def calculate_last_queue_waiting_time(room: "Room", end_time: datetime):
+def calculate_last_queue_waiting_time(room: "Room", end_time: datetime = None):
     """
     Calculate waiting time for a room.
     """
