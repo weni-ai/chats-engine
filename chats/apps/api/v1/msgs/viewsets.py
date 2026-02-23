@@ -44,6 +44,10 @@ class MessageViewset(
         qs = super().get_paginated_response(data)
         return qs
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        return qs if self.action != "list" else qs.prefetch_related("medias")
+
     def create(self, request, *args, **kwargs):
         request.data["user"] = request.user
 
