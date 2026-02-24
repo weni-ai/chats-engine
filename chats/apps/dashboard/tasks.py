@@ -426,7 +426,9 @@ def generate_metrics(room_uuid: UUID):
         metric_room.interaction_time = 0
 
     if not room.user:
-        metric_room.waiting_time += calculate_last_queue_waiting_time(room)
+        metric_room.waiting_time += calculate_last_queue_waiting_time(
+            room, room.ended_at
+        )
 
     metric_room.save()
 
