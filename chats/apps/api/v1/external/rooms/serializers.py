@@ -464,6 +464,8 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         contact, created = self.update_or_create_contact(validated_data)
 
+        contact = Contact.objects.select_for_update().get(pk=contact.pk)
+
         room = get_active_room_flow_start(contact, flow_uuid, project)
 
         if room is not None:
