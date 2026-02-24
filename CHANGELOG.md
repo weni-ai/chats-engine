@@ -1,3 +1,17 @@
+# 3.44.3
+# Fix
+  - CSAT flow creation for sectors with secondary projects
+
+# 3.44.2
+# Remove
+  - functions to avoid lose reports
+
+# 3.44.1
+# Add
+  - CSAT alternative logic for orgs with main and secondary projects logic
+  - Bulk close rooms
+  - Adding functions to avoid lose reports
+
 # 3.44.0
 # Add
   - Async update flows definition
@@ -1049,6 +1063,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 
