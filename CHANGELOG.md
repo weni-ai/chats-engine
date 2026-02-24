@@ -1,6 +1,10 @@
 # 3.45.0
 # Add
   - Time metrics fields on rooms metrics serializer
+  - Getting tags from request in close
+  - Desnormalizing automatic message send
+  - Constraint to avoid two contacts with the same external id
+  - Setting in service name for in service status, removing break
 # Fix
   - Translations for CSAT flow
   - Waiting time field on listing rooms on internal endpoint
@@ -1070,6 +1074,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 
