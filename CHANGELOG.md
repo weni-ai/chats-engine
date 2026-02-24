@@ -1,3 +1,10 @@
+# 3.45.0
+# Add
+  - Time metrics fields on rooms metrics serializer
+# Fix
+  - Translations for CSAT flow
+  - Waiting time field on listing rooms on internal endpoint
+
 # 3.44.3
 # Fix
   - CSAT flow creation for sectors with secondary projects
@@ -1063,6 +1070,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 
