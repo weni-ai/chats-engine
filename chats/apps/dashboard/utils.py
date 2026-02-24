@@ -1,6 +1,6 @@
 import logging
 from typing import TYPE_CHECKING
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 from django.db.models import Q
 from django.utils import timezone
@@ -59,15 +59,21 @@ def calculate_response_time(room: "Room") -> int:
     return int(average_response_seconds)
 
 
-def calculate_last_queue_waiting_time(room: "Room"):
+def calculate_last_queue_waiting_time(room: "Room", end_time: datetime = None):
     """
     Calculate waiting time for a room.
     """
+    if not end_time:
+        end_time = timezone.now()
 
     if not room.added_to_queue_at:
-        return (timezone.now() - room.created_on).total_seconds()
+        logger.warning(
+            "Room %s has no added to queue at time",
+            room.uuid,
+        )
+        return 0
 
-    return int((timezone.now() - room.added_to_queue_at).total_seconds())
+    return int((end_time - room.added_to_queue_at).total_seconds())
 
 
 def calculate_first_response_time(room: "Room") -> int:
