@@ -1,10 +1,10 @@
 from datetime import datetime
 from typing import Optional
+
 from django.utils import timezone
 from rest_framework import serializers
 
 from chats.apps.accounts.models import User
-from chats.apps.msgs.models import AutomaticMessage
 from chats.apps.rooms.models import Room
 from chats.apps.contacts.models import Contact
 from chats.apps.sectors.models import Sector, SectorTag
@@ -82,33 +82,13 @@ class ExternalRoomMetricsSerializer(serializers.ModelSerializer):
             .first()
         ):
             return first_msg.created_on.astimezone(SERVER_TZ)
-
         return None
 
     def get_automatic_message_sent_at(self, obj: Room) -> Optional[datetime]:
-        automatic_message: AutomaticMessage = AutomaticMessage.objects.filter(
-            room=obj
-        ).first()
-
-        if automatic_message:
-            return automatic_message.message.created_on.astimezone(SERVER_TZ)
-
+        sent_at = obj.get_automatic_message_sent_at()
+        if sent_at:
+            return sent_at.astimezone(SERVER_TZ)
         return None
 
     def get_time_to_send_automatic_message(self, room: Room) -> Optional[int]:
-        automatic_message: AutomaticMessage = AutomaticMessage.objects.filter(
-            room=room
-        ).first()
-
-        if automatic_message and room.first_user_assigned_at:
-            return max(
-                int(
-                    (
-                        automatic_message.message.created_on
-                        - room.first_user_assigned_at
-                    ).total_seconds()
-                ),
-                0,
-            )
-
-        return None
+        return room.get_time_to_send_automatic_message()
