@@ -688,3 +688,8 @@ INTERNAL_API_TOKEN = env.str("INTERNAL_API_TOKEN")
 VTEX_INTERNAL_DOMAINS = env.list(
     "VTEX_INTERNAL_DOMAINS", default=["weni.ai", "vtex.com"]
 )
+
+# Queue Limit
+QUEUE_LIMIT_FEATURE_FLAG_KEY = env.str(
+    "QUEUE_LIMIT_FEATURE_FLAG_KEY", default="weniChatsQueueLimit"
+)
