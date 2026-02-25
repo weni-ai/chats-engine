@@ -177,7 +177,7 @@ class Room(BaseModel, BaseConfigurableModel):
         _("Automatic message sent at"), null=True, blank=True
     )
 
-    tracker = FieldTracker(fields=["user_id", "queue_id"])
+    tracker = FieldTracker(fields=["user_id", "queue_id", "is_active"])
 
     def get_automatic_message_sent_at(self) -> Optional[datetime]:
         if self.automatic_message_sent_at:

@@ -94,6 +94,93 @@ class BulkTransferServiceTest(TestCase):
             str(context.exception), "User has no permission on the project"
         )
 
+    def _create_multiple_rooms(self, count=3):
+        rooms = [self.room]
+        for i in range(1, count):
+            rooms.append(
+                Room.objects.create(queue=self.queue, user=self.user)
+            )
+        return Room.objects.filter(pk__in=[r.pk for r in rooms])
+
+    @patch("chats.apps.rooms.models.Room.update_ticket_async")
+    @patch("chats.apps.rooms.models.Room.mark_notes_as_non_deletable")
+    @patch("chats.apps.api.v1.rooms.services.bulk_transfer_service.start_queue_priority_routing")
+    @patch("chats.apps.rooms.models.Room.notify_user")
+    @patch("chats.apps.rooms.models.Room.notify_queue")
+    @patch("chats.apps.api.v1.rooms.services.bulk_transfer_service.create_room_feedback_message")
+    def test_transfer_user_and_queue_notifies_all_rooms(
+        self,
+        mock_feedback,
+        mock_notify_queue,
+        mock_notify_user,
+        mock_routing,
+        mock_mark_notes,
+        mock_update_ticket,
+    ):
+        user_2 = User.objects.create(email="test2@test.com")
+        queue_2 = Queue.objects.create(name="Test Queue 2", sector=self.sector)
+        rooms = self._create_multiple_rooms(3)
+
+        self.service.transfer_user_and_queue(rooms, user_2, queue_2, self.user)
+
+        self.assertEqual(mock_feedback.call_count, 6)
+        self.assertEqual(mock_notify_queue.call_count, 3)
+        self.assertEqual(mock_notify_user.call_count, 6)
+        self.assertEqual(mock_routing.call_count, 3)
+        self.assertEqual(mock_mark_notes.call_count, 3)
+        self.assertEqual(mock_update_ticket.call_count, 3)
+
+    @patch("chats.apps.rooms.models.Room.update_ticket")
+    @patch("chats.apps.rooms.models.Room.mark_notes_as_non_deletable")
+    @patch("chats.apps.api.v1.rooms.services.bulk_transfer_service.start_queue_priority_routing")
+    @patch("chats.apps.rooms.models.Room.notify_user")
+    @patch("chats.apps.rooms.models.Room.notify_queue")
+    @patch("chats.apps.api.v1.rooms.services.bulk_transfer_service.create_room_feedback_message")
+    def test_transfer_user_notifies_all_rooms(
+        self,
+        mock_feedback,
+        mock_notify_queue,
+        mock_notify_user,
+        mock_routing,
+        mock_mark_notes,
+        mock_update_ticket,
+    ):
+        user_2 = User.objects.create(email="test2@test.com")
+        rooms = self._create_multiple_rooms(3)
+
+        self.service.transfer_user(rooms, user_2, self.user)
+
+        self.assertEqual(mock_feedback.call_count, 3)
+        self.assertEqual(mock_notify_queue.call_count, 3)
+        self.assertEqual(mock_notify_user.call_count, 6)
+        self.assertEqual(mock_routing.call_count, 3)
+        self.assertEqual(mock_mark_notes.call_count, 3)
+        self.assertEqual(mock_update_ticket.call_count, 3)
+
+    @patch("chats.apps.rooms.models.Room.mark_notes_as_non_deletable")
+    @patch("chats.apps.api.v1.rooms.services.bulk_transfer_service.start_queue_priority_routing")
+    @patch("chats.apps.rooms.models.Room.notify_user")
+    @patch("chats.apps.rooms.models.Room.notify_queue")
+    @patch("chats.apps.api.v1.rooms.services.bulk_transfer_service.create_room_feedback_message")
+    def test_transfer_queue_notifies_all_rooms(
+        self,
+        mock_feedback,
+        mock_notify_queue,
+        mock_notify_user,
+        mock_routing,
+        mock_mark_notes,
+    ):
+        queue_2 = Queue.objects.create(name="Test Queue 2", sector=self.sector)
+        rooms = self._create_multiple_rooms(3)
+
+        self.service.transfer_queue(rooms, queue_2, self.user)
+
+        self.assertEqual(mock_feedback.call_count, 3)
+        self.assertEqual(mock_notify_queue.call_count, 3)
+        self.assertEqual(mock_notify_user.call_count, 3)
+        self.assertEqual(mock_routing.call_count, 3)
+        self.assertEqual(mock_mark_notes.call_count, 3)
+
 
 class BulkCloseServiceTest(TestCase):
     def setUp(self):
