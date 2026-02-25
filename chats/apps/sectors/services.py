@@ -107,9 +107,10 @@ class AutomaticMessagesService:
 
         if use_denormalized:
             # Fallback híbrido: usar campo desnormalizado se True, senão fazer query
-            has_agent_messages = room.has_agent_messages or room.messages.filter(
-                user__isnull=False
-            ).exists()
+            has_agent_messages = (
+                room.has_agent_messages
+                or room.messages.filter(user__isnull=False).exists()
+            )
         else:
             # Comportamento original: query direto
             has_agent_messages = room.messages.filter(user__isnull=False).exists()
