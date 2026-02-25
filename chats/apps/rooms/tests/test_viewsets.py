@@ -751,6 +751,106 @@ class RoomsBulkTransferTestCase(APITestCase):
             new_queue.uuid,
         )
 
+    @patch("chats.apps.rooms.models.Room.update_ticket_async")
+    @patch("chats.apps.rooms.models.Room.mark_notes_as_non_deletable")
+    @patch(
+        "chats.apps.api.v1.rooms.services.bulk_transfer_service.start_queue_priority_routing"
+    )
+    @patch("chats.apps.rooms.models.Room.notify_user")
+    @patch("chats.apps.rooms.models.Room.notify_queue")
+    def test_bulk_transfer_to_user_and_queue_notifies_all_rooms(
+        self,
+        mock_notify_queue,
+        mock_notify_user,
+        mock_routing,
+        mock_mark_notes,
+        mock_update_ticket,
+    ):
+        room_2 = Room.objects.create(queue=self.queue, user=self.agent_1)
+        room_3 = Room.objects.create(queue=self.queue, user=self.agent_1)
+
+        new_queue = Queue.objects.create(name="New Queue", sector=self.sector)
+
+        response = self.client.patch(
+            reverse("room-bulk_transfer"),
+            data={
+                "rooms_list": [self.room.uuid, room_2.uuid, room_3.uuid],
+            },
+            format="json",
+            QUERY_STRING=f"user_email={self.agent_2.email}&queue_uuid={new_queue.uuid}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(mock_notify_queue.call_count, 3)
+        self.assertEqual(mock_notify_user.call_count, 6)
+        self.assertEqual(mock_mark_notes.call_count, 3)
+        self.assertEqual(mock_update_ticket.call_count, 3)
+
+    @patch("chats.apps.rooms.models.Room.update_ticket")
+    @patch("chats.apps.rooms.models.Room.mark_notes_as_non_deletable")
+    @patch(
+        "chats.apps.api.v1.rooms.services.bulk_transfer_service.start_queue_priority_routing"
+    )
+    @patch("chats.apps.rooms.models.Room.notify_user")
+    @patch("chats.apps.rooms.models.Room.notify_queue")
+    def test_bulk_transfer_to_user_notifies_all_rooms(
+        self,
+        mock_notify_queue,
+        mock_notify_user,
+        mock_routing,
+        mock_mark_notes,
+        mock_update_ticket,
+    ):
+        room_2 = Room.objects.create(queue=self.queue, user=self.agent_1)
+        room_3 = Room.objects.create(queue=self.queue, user=self.agent_1)
+
+        response = self.client.patch(
+            reverse("room-bulk_transfer"),
+            data={
+                "rooms_list": [self.room.uuid, room_2.uuid, room_3.uuid],
+            },
+            format="json",
+            QUERY_STRING=f"user_email={self.agent_2.email}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(mock_notify_queue.call_count, 3)
+        self.assertEqual(mock_notify_user.call_count, 6)
+        self.assertEqual(mock_mark_notes.call_count, 3)
+        self.assertEqual(mock_update_ticket.call_count, 3)
+
+    @patch("chats.apps.rooms.models.Room.mark_notes_as_non_deletable")
+    @patch(
+        "chats.apps.api.v1.rooms.services.bulk_transfer_service.start_queue_priority_routing"
+    )
+    @patch("chats.apps.rooms.models.Room.notify_user")
+    @patch("chats.apps.rooms.models.Room.notify_queue")
+    def test_bulk_transfer_to_queue_notifies_all_rooms(
+        self,
+        mock_notify_queue,
+        mock_notify_user,
+        mock_routing,
+        mock_mark_notes,
+    ):
+        room_2 = Room.objects.create(queue=self.queue, user=self.agent_1)
+        room_3 = Room.objects.create(queue=self.queue, user=self.agent_1)
+
+        new_queue = Queue.objects.create(name="New Queue", sector=self.sector)
+
+        response = self.client.patch(
+            reverse("room-bulk_transfer"),
+            data={
+                "rooms_list": [self.room.uuid, room_2.uuid, room_3.uuid],
+            },
+            format="json",
+            QUERY_STRING=f"queue_uuid={new_queue.uuid}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(mock_notify_queue.call_count, 3)
+        self.assertEqual(mock_notify_user.call_count, 3)
+        self.assertEqual(mock_mark_notes.call_count, 3)
+
     def test_cannot_transfer_rooms_from_another_project(self):
         p = Project.objects.create(
             name="Another Project",
