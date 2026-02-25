@@ -77,7 +77,7 @@ def log_agent_status_change(
             }
         else:
             status_entry = {
-                "status": "BREAK",
+                "status": custom_status_name if custom_status_name == "In-Service" else "BREAK",
                 "timestamp": local_now.isoformat(),
                 "custom_status": custom_status_name,
             }
