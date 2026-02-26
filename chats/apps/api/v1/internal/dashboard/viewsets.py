@@ -95,11 +95,18 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
 
         custom_status_names = request.query_params.getlist("custom_status")
         if custom_status_names:
-            combined_q |= Q(
-                user_custom_status__status_type__name__in=custom_status_names,
-                user_custom_status__is_active=True,
-                user_custom_status__project=project,
+            custom_emails = list(
+                CustomStatus.objects.filter(
+                    status_type__name__in=custom_status_names,
+                    is_active=True,
+                    project=project,
+                ).values_list("user", flat=True)
             )
+            if custom_emails:
+                combined_q |= Q(email__in=custom_emails)
+
+        if combined_q:
+            agents_data = agents_data.filter(combined_q)
 
         if combined_q:
             agents_data = agents_data.filter(combined_q)
@@ -185,15 +192,26 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         if not requested:
             requested = {"online", "custom_breaks", "offline"}
 
+        custom_status_names = request.query_params.getlist("custom_status")
+
         aggregate_kwargs = {}
         if "online" in requested:
             aggregate_kwargs["online"] = Count(
                 "email", distinct=True, filter=Q(perm_status="ONLINE"),
             )
         if "custom_breaks" in requested:
+            custom_breaks_filter = Q(perm_status="OFFLINE", has_active_custom_status=True)
+            if custom_status_names:
+                custom_emails = list(
+                    CustomStatus.objects.filter(
+                        status_type__name__in=custom_status_names,
+                        is_active=True,
+                        project=project,
+                    ).values_list("user", flat=True)
+                )
+                custom_breaks_filter = Q(email__in=custom_emails) if custom_emails else Q(pk__in=[])
             aggregate_kwargs["custom_breaks"] = Count(
-                "email", distinct=True,
-                filter=Q(perm_status="OFFLINE", has_active_custom_status=True),
+                "email", distinct=True, filter=custom_breaks_filter,
             )
         if "offline" in requested:
             aggregate_kwargs["offline"] = Count(
