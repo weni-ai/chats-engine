@@ -7,10 +7,10 @@ from django.db.models import (
     BooleanField,
     Case,
     DateTimeField,
-    Exists,
     OuterRef,
     Q,
     Subquery,
+    Value,
     When,
 )
 from django.shortcuts import get_object_or_404
@@ -158,6 +158,7 @@ class RoomViewset(
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context["disable_has_history"] = getattr(self, "disable_has_history", False)
+        context["pinned_room_ids"] = getattr(self, "_pinned_room_ids", None)
         return context
 
     def list(self, request, *args, **kwargs):
@@ -257,59 +258,49 @@ class RoomViewset(
         return self._get_paginated_response(annotated_qs)
 
     def _list_with_optimized_pin_order(self, qs, request, project):
-        target_pins_queryset = RoomPin.objects.filter(
-            room__queue__sector__project=project,
-        )
-
+        pin_filters = {"room__queue__sector__project": project}
         if user_email := request.query_params.get("email"):
-            target_pins_queryset = target_pins_queryset.filter(user__email=user_email)
+            pin_filters["user__email"] = user_email
         else:
-            target_pins_queryset = target_pins_queryset.filter(user=request.user)
+            pin_filters["user"] = request.user
 
-        annotation_pins_queryset = RoomPin.objects.filter(
-            room__queue__sector__project=project,
+        pins = list(
+            RoomPin.objects.filter(**pin_filters)
+            .order_by("-created_on")
+            .values("room_id", "created_on")[: settings.MAX_ROOM_PINS_LIMIT]
         )
-        if user_email:
-            annotation_pins_queryset = annotation_pins_queryset.filter(
-                user__email=user_email
-            )
-        else:
-            annotation_pins_queryset = annotation_pins_queryset.filter(
-                user=request.user
-            )
+        pinned_room_ids = [p["room_id"] for p in pins]
+        pin_dates = {p["room_id"]: p["created_on"] for p in pins}
 
-        pin_subquery = annotation_pins_queryset.filter(room=OuterRef("pk")).order_by(
-            "-created_on"
-        )
-        target_pin_subquery = target_pins_queryset.filter(room=OuterRef("pk")).order_by(
-            "-created_on"
-        )
+        self._pinned_room_ids = set(pinned_room_ids)
 
-        annotated_qs = qs.annotate(
-            is_pinned=Exists(pin_subquery),
-            pin_created_on=Subquery(
-                pin_subquery.values("created_on")[:1],
-                output_field=DateTimeField(),
-            ),
-            list_is_pinned=Exists(target_pin_subquery),
-            list_pin_created_on=Subquery(
-                target_pin_subquery.values("created_on")[:1],
-                output_field=DateTimeField(),
-            ),
-        )
+        filtered_qs = self.filter_queryset(qs)
 
-        filtered_qs = self.filter_queryset(annotated_qs)
-        filtered_room_ids = filtered_qs.values("pk").order_by()
+        if not pinned_room_ids:
+            return self._get_paginated_response(filtered_qs)
 
-        secondary_sort = list(filtered_qs.query.order_by or self.ordering or [])
-
-        pinned_room_subquery = target_pins_queryset.values("room_id")
-
-        combined_qs = annotated_qs.filter(
-            Q(pk__in=Subquery(filtered_room_ids))
-            | Q(pk__in=Subquery(pinned_room_subquery))
+        combined_qs = qs.filter(
+            Q(pk__in=filtered_qs) | Q(pk__in=pinned_room_ids)
         ).distinct()
 
+        pin_date_whens = [
+            When(pk=rid, then=Value(dt)) for rid, dt in pin_dates.items()
+        ]
+
+        combined_qs = combined_qs.annotate(
+            is_pinned=Case(
+                When(pk__in=pinned_room_ids, then=True),
+                default=False,
+                output_field=BooleanField(),
+            ),
+            pin_created_on=Case(
+                *pin_date_whens,
+                default=None,
+                output_field=DateTimeField(),
+            ),
+        )
+
+        secondary_sort = list(filtered_qs.query.order_by or self.ordering or [])
         if secondary_sort:
             combined_qs = combined_qs.order_by(
                 "-is_pinned", "-pin_created_on", *secondary_sort
