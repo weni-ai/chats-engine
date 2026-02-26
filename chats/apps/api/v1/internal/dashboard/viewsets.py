@@ -95,11 +95,18 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
 
         custom_status_names = request.query_params.getlist("custom_status")
         if custom_status_names:
-            combined_q |= Q(
-                user_custom_status__status_type__name__in=custom_status_names,
-                user_custom_status__is_active=True,
-                user_custom_status__project=project,
+            custom_emails = list(
+                CustomStatus.objects.filter(
+                    status_type__name__in=custom_status_names,
+                    is_active=True,
+                    project=project,
+                ).values_list("user", flat=True)
             )
+            if custom_emails:
+                combined_q |= Q(email__in=custom_emails)
+
+        if combined_q:
+            agents_data = agents_data.filter(combined_q)
 
         if combined_q:
             agents_data = agents_data.filter(combined_q)
