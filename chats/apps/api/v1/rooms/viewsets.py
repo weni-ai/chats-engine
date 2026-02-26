@@ -282,8 +282,9 @@ class RoomViewset(
             return self._get_paginated_response(filtered_qs)
 
         combined_qs = qs.filter(
-            Q(pk__in=filtered_qs) | Q(pk__in=pinned_room_ids)
-        ).distinct()
+            Q(pk__in=filtered_qs.order_by().values("pk"))
+            | Q(pk__in=pinned_room_ids)
+        )
 
         pin_date_whens = [
             When(pk=rid, then=Value(dt)) for rid, dt in pin_dates.items()
