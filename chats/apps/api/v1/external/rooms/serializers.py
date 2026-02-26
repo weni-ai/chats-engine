@@ -543,7 +543,18 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             contact, queue, user, created, project, last_flow_start
         )
 
-        if not validated_data.get("user") and not last_flow_start:
+        has_room_after_flow_start = False
+
+        if last_flow_start:
+            last_flow_start.refresh_from_db()
+            has_room_after_flow_start = contact.rooms.filter(
+                queue__sector__project=project,
+                created_on__gt=last_flow_start.created_on,
+            ).exists()
+
+        if not validated_data.get("user") and (
+            not last_flow_start or (last_flow_start and not has_room_after_flow_start)
+        ):
             self._validate_queue_limit(queue)
 
         room = Room.objects.create(
