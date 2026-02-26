@@ -21,6 +21,9 @@ from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import close_room
 from chats.apps.sectors.utils import working_hours_validator
+from weni.feature_flags.shortcuts import is_feature_active
+from django.conf import settings
+from rest_framework.exceptions import PermissionDenied
 
 logger = logging.getLogger(__name__)
 
