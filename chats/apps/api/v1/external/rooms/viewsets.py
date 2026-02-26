@@ -131,6 +131,20 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
 
         return [ModuleHasPermission]
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        auth = getattr(self.request, "auth", None)
+
+        if auth == "INTERNAL":
+            return qs
+
+        project = getattr(auth, "project", None)
+
+        if not project:
+            return qs.none()
+
+        return qs.filter(queue__sector__project=project)
+
     def list(self, request, *args, **kwargs):
         """List all rooms accessible via external API."""
         return super().list(request, *args, **kwargs)
