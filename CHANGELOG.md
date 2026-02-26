@@ -1,8 +1,27 @@
+# 3.45.0
+# Add
+  - Time metrics fields on rooms metrics serializer
+  - Getting tags from request in close
+  - Desnormalizing automatic message send
+  - Constraint to avoid two contacts with the same external id
+  - Setting in service name for in service status, removing break
+# Fix
+  - Translations for CSAT flow
+  - Waiting time field on listing rooms on internal endpoint
+
+# 3.44.3
+# Fix
+  - CSAT flow creation for sectors with secondary projects
+
+# 3.44.2
+# Remove
+  - functions to avoid lose reports
+
 # 3.44.1
 # Add
+  - CSAT alternative logic for orgs with main and secondary projects logic
+  - Bulk close rooms
   - Failed or stuck reports are now automatically retried up to 3 times, resuming from the last successfully written chunk instead of restarting from scratch. Reports stuck in `in_progress` for more than 10 minutes are considered abandoned and re-queued.
-  - CSAT alternative logic for orgs with main and secondary projects
-  - bulk actions to close rooms.
 
 # 3.44.0
 # Add
@@ -1055,6 +1074,8 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
+
 
 
 
