@@ -35,7 +35,12 @@ def _build_status_filter(status_list):
     """
     if not status_list:
         return None
-    values = {s.lower().strip() for s in status_list if s}
+    values = set()
+    for s in status_list:
+        for part in s.split(","):
+            part = part.lower().strip()
+            if part:
+                values.add(part)
     if not values:
         return None
     q = Q()
@@ -85,6 +90,14 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         )
         if status_filter is not None:
             agents_data = agents_data.filter(status_filter)
+
+        custom_status_names = request.query_params.getlist("custom_status")
+        if custom_status_names:
+            agents_data = agents_data.filter(
+                user_custom_status__status_type__name__in=custom_status_names,
+                user_custom_status__is_active=True,
+                user_custom_status__project=project,
+            )
 
         agents = DashboardAgentsSerializer(agents_data, many=True)
 
@@ -158,7 +171,12 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         )
 
         status_param = request.query_params.getlist("status")
-        requested = {s.lower().strip() for s in status_param if s}
+        requested = set()
+        for s in status_param:
+            for part in s.split(","):
+                part = part.lower().strip()
+                if part:
+                    requested.add(part)
         if not requested:
             requested = {"online", "custom_breaks", "offline"}
 
@@ -176,6 +194,14 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
             aggregate_kwargs["offline"] = Count(
                 "email", distinct=True,
                 filter=Q(perm_status="OFFLINE", has_active_custom_status=False),
+            )
+
+        custom_status_names = request.query_params.getlist("custom_status")
+        if custom_status_names:
+            agents_query = agents_query.filter(
+                user_custom_status__status_type__name__in=custom_status_names,
+                user_custom_status__is_active=True,
+                user_custom_status__project=project,
             )
 
         totals = agents_query.aggregate(**aggregate_kwargs)
