@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+from django.conf import settings
 from django.urls import reverse
 from rest_framework import status
 from django.test import override_settings
@@ -882,3 +883,112 @@ class RoomsExternalProtocolTests(APITestCase):
 
         room = Room.objects.get(uuid=response.data["uuid"])
         self.assertEqual(room.protocol, "PROTO_CUSTOM")
+
+
+class RoomsQueueLimitExternalTests(APITestCase):
+    def setUp(self) -> None:
+        self.project = Project.objects.create(
+            name="Test Project", timezone="America/Sao_Paulo"
+        )
+        self.sector = Sector.objects.create(
+            project=self.project,
+            name="Test Sector",
+            rooms_limit=1,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
+
+        self.client.credentials(
+            HTTP_AUTHORIZATION=f"Bearer {settings.INTERNAL_API_TOKEN}"
+        )
+
+    def create_room(self, data: dict):
+        url = reverse("external_rooms-list")
+
+        return self.client.post(url, data=data, format="json")
+
+    def test_create_room_without_queue_limit(self):
+        data = {
+            "queue_uuid": str(self.queue.uuid),
+            "contact": {
+                "external_id": "contact-1",
+                "name": "Foo",
+            },
+        }
+        response = self.create_room(data)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    @patch("chats.apps.api.v1.external.rooms.serializers.is_feature_active")
+    def test_create_room_with_queue_limit_when_not_full(self, mock_is_feature_active):
+        mock_is_feature_active.return_value = True
+
+        self.queue.queue_limit = 1
+        self.queue.is_queue_limit_active = True
+
+        self.queue.save()
+
+        data = {
+            "queue_uuid": str(self.queue.uuid),
+            "contact": {
+                "external_id": "contact-2",
+                "name": "Bar",
+            },
+        }
+
+        response = self.create_room(data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    @patch("chats.apps.api.v1.external.rooms.serializers.is_feature_active")
+    def test_create_room_with_queue_limit_when_full(self, mock_is_feature_active):
+        mock_is_feature_active.return_value = True
+
+        Room.objects.create(
+            queue=self.queue,
+            contact=Contact.objects.create(external_id="contact-1", name="Foo"),
+        )
+
+        self.queue.queue_limit = 1
+        self.queue.is_queue_limit_active = True
+
+        self.queue.save()
+
+        data = {
+            "queue_uuid": str(self.queue.uuid),
+            "contact": {
+                "external_id": "contact-2",
+                "name": "Bar",
+            },
+        }
+
+        response = self.create_room(data)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data["error"], "human_support_queue_limit_reached")
+
+    @patch("chats.apps.api.v1.external.rooms.serializers.is_feature_active")
+    def test_create_room_with_queue_limit_when_full_and_feature_flag_is_off(
+        self, mock_is_feature_active
+    ):
+        mock_is_feature_active.return_value = False
+
+        Room.objects.create(
+            queue=self.queue,
+            contact=Contact.objects.create(external_id="contact-1", name="Foo"),
+        )
+
+        self.queue.queue_limit = 1
+        self.queue.is_queue_limit_active = True
+
+        self.queue.save()
+
+        data = {
+            "queue_uuid": str(self.queue.uuid),
+            "contact": {
+                "external_id": "contact-2",
+                "name": "Bar",
+            },
+        }
+
+        response = self.create_room(data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)

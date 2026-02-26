@@ -2,10 +2,13 @@ import logging
 from typing import Dict, List, Optional
 
 import pendulum
+from django.conf import settings
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+from weni.feature_flags.shortcuts import is_feature_active
+from rest_framework.exceptions import PermissionDenied
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.accounts.serializers import UserSerializer
@@ -15,12 +18,13 @@ from chats.apps.api.v1.sectors.serializers import TagSimpleSerializer
 from chats.apps.contacts.models import Contact
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.msgs.models import AutomaticMessage, Message, MessageMedia
-from chats.apps.projects.models.models import Project
+from chats.apps.projects.models.models import FlowStart, Project
 from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import close_room
 from chats.apps.sectors.utils import working_hours_validator
+
 
 logger = logging.getLogger(__name__)
 
@@ -62,19 +66,16 @@ def get_active_room_flow_start(contact, flow_uuid, project):
     return None
 
 
-def get_room_user(
+def get_last_flow_start(
     contact: Contact,
-    queue: Queue,
-    user: User,
-    groups: List[Dict[str, str]],
-    is_created: bool,
-    flow_uuid,
+    groups: List[Dict],
     project: Project,
-):
-    # User that started the flow, if any
+    flow_uuid: Optional[str] = None,
+) -> Optional[FlowStart]:
     reference_filter = [group["uuid"] for group in groups]
     reference_filter.append(contact.external_id)
     query_filters = {"references__external_id__in": reference_filter}
+
     if flow_uuid:
         query_filters["flow"] = flow_uuid
 
@@ -82,6 +83,17 @@ def get_room_user(
         project.flowstarts.order_by("-created_on").filter(**query_filters).first()
     )
 
+    return last_flow_start
+
+
+def get_room_user(
+    contact: Contact,
+    queue: Queue,
+    user: User,
+    is_created: bool,
+    project: Project,
+    last_flow_start: Optional[FlowStart] = None,
+):
     if last_flow_start:
         if is_created is True or not contact.rooms.filter(
             queue__sector__project=project, created_on__gt=last_flow_start.created_on
@@ -437,6 +449,35 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             attrs.pop("project_info")
         return attrs
 
+    def _validate_queue_limit(self, queue: Queue):
+        is_limit_active_for_queue = queue.queue_limit_info.is_active
+
+        if is_limit_active_for_queue:
+            # Only check if the feature flag is enabled and make all the other validations
+            # if the queue limit for this particular queue is active
+            is_queue_limit_feature_active = is_feature_active(
+                settings.QUEUE_LIMIT_FEATURE_FLAG_KEY,
+                None,
+                str(queue.sector.project.uuid),
+            )
+            queue_limit = (
+                queue.queue_limit_info.limit
+                if isinstance(queue.queue_limit_info.limit, int)
+                else 0
+            )
+
+            if (
+                is_queue_limit_feature_active
+                and queue.queued_rooms_count >= queue_limit
+            ):
+                raise PermissionDenied(
+                    {
+                        "error": "human_support_queue_limit_reached",
+                        "description": "Human support queue is full. Please try again later.",
+                    },
+                    code="human_support_queue_limit_reached",
+                )
+
     def create(self, validated_data):
         history_data = validated_data.pop("history", [])
 
@@ -495,9 +536,26 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             return room
 
         user = validated_data.get("user")
+
+        last_flow_start = get_last_flow_start(contact, groups, project, flow_uuid)
+
         validated_data["user"] = get_room_user(
-            contact, queue, user, groups, created, flow_uuid, project
+            contact, queue, user, created, project, last_flow_start
         )
+
+        has_room_after_flow_start = False
+
+        if last_flow_start:
+            last_flow_start.refresh_from_db()
+            has_room_after_flow_start = contact.rooms.filter(
+                queue__sector__project=project,
+                created_on__gt=last_flow_start.created_on,
+            ).exists()
+
+        if not validated_data.get("user") and (
+            not last_flow_start or (last_flow_start and has_room_after_flow_start)
+        ):
+            self._validate_queue_limit(queue)
 
         room = Room.objects.create(
             **validated_data,
