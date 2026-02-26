@@ -15,7 +15,7 @@ from chats.apps.api.v1.sectors.serializers import TagSimpleSerializer
 from chats.apps.contacts.models import Contact
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.msgs.models import Message, MessageMedia
-from chats.apps.projects.models.models import Project
+from chats.apps.projects.models.models import FlowStart, Project
 from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.models import Room
@@ -62,19 +62,16 @@ def get_active_room_flow_start(contact, flow_uuid, project):
     return None
 
 
-def get_room_user(
+def get_last_flow_start(
     contact: Contact,
-    queue: Queue,
-    user: User,
-    groups: List[Dict[str, str]],
-    is_created: bool,
-    flow_uuid,
+    groups: List[Dict],
     project: Project,
-):
-    # User that started the flow, if any
+    flow_uuid: Optional[str] = None,
+) -> Optional[FlowStart]:
     reference_filter = [group["uuid"] for group in groups]
     reference_filter.append(contact.external_id)
     query_filters = {"references__external_id__in": reference_filter}
+
     if flow_uuid:
         query_filters["flow"] = flow_uuid
 
@@ -82,6 +79,17 @@ def get_room_user(
         project.flowstarts.order_by("-created_on").filter(**query_filters).first()
     )
 
+    return last_flow_start
+
+
+def get_room_user(
+    contact: Contact,
+    queue: Queue,
+    user: User,
+    is_created: bool,
+    project: Project,
+    last_flow_start: Optional[FlowStart] = None,
+):
     if last_flow_start:
         if is_created is True or not contact.rooms.filter(
             queue__sector__project=project, created_on__gt=last_flow_start.created_on
@@ -476,9 +484,15 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             return room
 
         user = validated_data.get("user")
+
+        last_flow_start = get_last_flow_start(contact, groups, project, flow_uuid)
+
         validated_data["user"] = get_room_user(
-            contact, queue, user, groups, created, flow_uuid, project
+            contact, queue, user, created, project, last_flow_start
         )
+
+        if not validated_data.get("user") and not last_flow_start:
+            self._validate_queue_limit(queue)
 
         room = Room.objects.create(
             **validated_data,
