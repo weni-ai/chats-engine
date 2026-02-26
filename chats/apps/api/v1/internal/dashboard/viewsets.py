@@ -29,9 +29,9 @@ from chats.apps.core.filters import get_filters_from_query_params
 
 def _build_status_filter(status_list):
     """
-    Monta Q para filtrar agentes por status.
-    Valores aceitos: 'online', 'custom_breaks', 'offline'.
-    Queryset precisa já ter os annotations 'status' e 'has_active_custom_status'.
+    Builds a Q object to filter agents by status.
+    Acceptable values: 'online', 'custom_breaks', 'offline'.
+    The queryset needs to have the annotations 'status' and 'has_active_custom_status'.
     """
     if not status_list:
         return None
@@ -85,6 +85,7 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         agents_service = AgentsService()
         agents_data = agents_service.get_agents_data(filters, project)
 
+        has_filter = False
         combined_q = Q()
 
         status_filter = _build_status_filter(
@@ -92,20 +93,20 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         )
         if status_filter is not None:
             combined_q |= status_filter
+            has_filter = True
 
         custom_status_names = request.query_params.getlist("custom_status")
         if custom_status_names:
-            custom_emails = list(
-                CustomStatus.objects.filter(
-                    status_type__name__in=custom_status_names,
-                    is_active=True,
+            has_filter = True
+            combined_q |= Q(
+                user_custom_status__in=CustomStatus.objects.filter(
                     project=project,
-                ).values_list("user", flat=True)
+                    is_active=True,
+                    status_type__name__in=custom_status_names,
+                )
             )
-            if custom_emails:
-                combined_q |= Q(email__in=custom_emails)
 
-        if combined_q:
+        if has_filter:
             agents_data = agents_data.filter(combined_q)
 
         if combined_q:
@@ -123,12 +124,12 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
     )
     def agents_totals(self, request, *args, **kwargs):
         """
-        Endpoint de contagem de agentes por status.
+        Endpoint to count agents by status.
         GET /v1/internal/dashboard/{project_uuid}/agents_totals/
-        Query params opcionais:
-            - status (lista: 'custom_breaks', 'online', 'offline') — quando vazio traz todos
-            - sector, queue, agent, user_request — mesmos filtros gerais do endpoint de agents
-        Retorna: {"online": N, "custom_breaks": N, "offline": N}
+        Optional query params:
+            - status (list: 'custom_breaks', 'online', 'offline') — when empty, returns all
+            - sector, queue, agent, user_request — same filters as the agents endpoint
+        Returns: {"online": number, "custom_breaks": number, "offline": number}
         """
         project = self.get_object()
 
@@ -189,10 +190,13 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
                 part = part.lower().strip()
                 if part:
                     requested.add(part)
+        custom_status_names = request.query_params.getlist("custom_status")
+
+        if custom_status_names:
+            requested.add("custom_breaks")
+
         if not requested:
             requested = {"online", "custom_breaks", "offline"}
-
-        custom_status_names = request.query_params.getlist("custom_status")
 
         aggregate_kwargs = {}
         if "online" in requested:
@@ -202,14 +206,13 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         if "custom_breaks" in requested:
             custom_breaks_filter = Q(perm_status="OFFLINE", has_active_custom_status=True)
             if custom_status_names:
-                custom_emails = list(
-                    CustomStatus.objects.filter(
-                        status_type__name__in=custom_status_names,
-                        is_active=True,
+                custom_breaks_filter = Q(
+                    user_custom_status__in=CustomStatus.objects.filter(
                         project=project,
-                    ).values_list("user", flat=True)
+                        is_active=True,
+                        status_type__name__in=custom_status_names,
+                    )
                 )
-                custom_breaks_filter = Q(email__in=custom_emails) if custom_emails else Q(pk__in=[])
             aggregate_kwargs["custom_breaks"] = Count(
                 "email", distinct=True, filter=custom_breaks_filter,
             )
