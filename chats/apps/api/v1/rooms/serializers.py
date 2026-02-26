@@ -247,6 +247,10 @@ class ListRoomSerializer(serializers.ModelSerializer):
         }
 
     def get_is_pinned(self, room: Room) -> bool:
+        pinned_room_ids = self.context.get("pinned_room_ids")
+        if pinned_room_ids is not None:
+            return room.pk in pinned_room_ids
+
         request = self.context.get("request")
 
         if not request:
