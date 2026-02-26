@@ -533,7 +533,7 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             ).exists()
 
         if not validated_data.get("user") and (
-            not last_flow_start or (last_flow_start and not has_room_after_flow_start)
+            not last_flow_start or (last_flow_start and has_room_after_flow_start)
         ):
             self._validate_queue_limit(queue)
 
