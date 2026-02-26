@@ -441,6 +441,8 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         groups, flow_uuid = self.extract_flow_start_data(validated_data)
 
+        print(f"flow_uuid: {flow_uuid}")
+
         contact, created = self.update_or_create_contact(validated_data)
 
         room = get_active_room_flow_start(contact, flow_uuid, project)
