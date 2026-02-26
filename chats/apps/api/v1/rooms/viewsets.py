@@ -304,13 +304,13 @@ class RoomViewset(
 
         secondary_sort = list(filtered_qs.query.order_by or self.ordering or [])
         if secondary_sort:
-            annotated_qs = annotated_qs.order_by(
+            combined_qs = combined_qs.order_by(
                 "-is_pinned", "-pin_created_on", *secondary_sort
             )
         else:
-            annotated_qs = annotated_qs.order_by("-is_pinned", "-pin_created_on")
+            combined_qs = combined_qs.order_by("-is_pinned", "-pin_created_on")
 
-        return self._get_paginated_response(annotated_qs)
+        return self._get_paginated_response(combined_qs)
 
     def _get_paginated_response(self, queryset):
         page = self.paginate_queryset(queryset)
