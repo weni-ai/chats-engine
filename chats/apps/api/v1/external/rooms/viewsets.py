@@ -639,7 +639,6 @@ class RoomMetricsViewSet(viewsets.ReadOnlyModelViewSet):
     Rate limited: 20/sec, 600/min, 30k/hour.
     """
 
-    swagger_tag = "Integrations"
     model = Room
     queryset = Room.objects.select_related("user").prefetch_related("messages", "tags")
     serializer_class = RoomMetricsSerializer

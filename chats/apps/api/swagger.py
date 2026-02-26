@@ -4,6 +4,11 @@ from drf_yasg.inspectors import SwaggerAutoSchema
 class TaggedSwaggerAutoSchema(SwaggerAutoSchema):
     """Allow viewsets to declare a single tag/summary per method via attributes."""
 
+    def get_operation(self, operation_keys=None):
+        if getattr(self.view, "swagger_tag", None) == "Integrations":
+            return None
+        return super().get_operation(operation_keys)
+
     def get_tags(self, operation_keys=None):
         tag = getattr(self.view, "swagger_tag", None)
         if isinstance(tag, (list, tuple)):
