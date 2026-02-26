@@ -11,6 +11,8 @@ from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import CursorPagination, LimitOffsetPagination
 from rest_framework.response import Response
+from weni.feature_flags.shortcuts import is_feature_active_for_attributes
+from sentry_sdk import capture_exception
 
 from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
@@ -133,6 +135,21 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+        try:
+            should_filter_queryset = is_feature_active_for_attributes(
+                key=settings.ROOMS_EXTERNAL_API_QUERYSET_FILTER_FLAG_KEY,
+                attributes={},
+            )
+
+        except Exception as e:
+            logger.error(f"Error checking feature flag: {e}")
+            capture_exception(e)
+
+            return qs
+
+        if not should_filter_queryset:
+            return qs
+
         auth = getattr(self.request, "auth", None)
 
         if auth == "INTERNAL":
