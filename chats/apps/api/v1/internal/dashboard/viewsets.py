@@ -85,6 +85,7 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         agents_service = AgentsService()
         agents_data = agents_service.get_agents_data(filters, project)
 
+        has_filter = False
         combined_q = Q()
 
         status_filter = _build_status_filter(
@@ -92,9 +93,11 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         )
         if status_filter is not None:
             combined_q |= status_filter
+            has_filter = True
 
         custom_status_names = request.query_params.getlist("custom_status")
         if custom_status_names:
+            has_filter = True
             custom_emails = list(
                 CustomStatus.objects.filter(
                     status_type__name__in=custom_status_names,
@@ -104,8 +107,10 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
             )
             if custom_emails:
                 combined_q |= Q(email__in=custom_emails)
+            else:
+                combined_q |= Q(pk__in=[])
 
-        if combined_q:
+        if has_filter:
             agents_data = agents_data.filter(combined_q)
 
         agents = DashboardAgentsSerializer(agents_data, many=True)
@@ -186,10 +191,13 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
                 part = part.lower().strip()
                 if part:
                     requested.add(part)
+        custom_status_names = request.query_params.getlist("custom_status")
+
+        if custom_status_names:
+            requested.add("custom_breaks")
+
         if not requested:
             requested = {"online", "custom_breaks", "offline"}
-
-        custom_status_names = request.query_params.getlist("custom_status")
 
         aggregate_kwargs = {}
         if "online" in requested:
