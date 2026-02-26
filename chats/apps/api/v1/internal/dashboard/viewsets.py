@@ -164,41 +164,27 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         )
 
         status_param = request.query_params.getlist("status")
-        if status_param:
-            values = {s.lower().strip() for s in status_param if s}
-            q = Q()
-            if "online" in values:
-                q |= Q(perm_status="ONLINE")
-            if "custom_breaks" in values:
-                q |= Q(perm_status="OFFLINE", has_active_custom_status=True)
-            if "offline" in values:
-                q |= Q(perm_status="OFFLINE", has_active_custom_status=False)
-            if q:
-                agents_query = agents_query.filter(q)
+        requested = {s.lower().strip() for s in status_param if s}
+        if not requested:
+            requested = {"online", "custom_breaks", "offline"}
 
-        totals = agents_query.aggregate(
-            online=Count(
-                "email",
-                distinct=True,
-                filter=Q(perm_status="ONLINE"),
-            ),
-            custom_breaks=Count(
-                "email",
-                distinct=True,
-                filter=Q(
-                    perm_status="OFFLINE",
-                    has_active_custom_status=True,
-                ),
-            ),
-            offline=Count(
-                "email",
-                distinct=True,
-                filter=Q(
-                    perm_status="OFFLINE",
-                    has_active_custom_status=False,
-                ),
-            ),
-        )
+        aggregate_kwargs = {}
+        if "online" in requested:
+            aggregate_kwargs["online"] = Count(
+                "email", distinct=True, filter=Q(perm_status="ONLINE"),
+            )
+        if "custom_breaks" in requested:
+            aggregate_kwargs["custom_breaks"] = Count(
+                "email", distinct=True,
+                filter=Q(perm_status="OFFLINE", has_active_custom_status=True),
+            )
+        if "offline" in requested:
+            aggregate_kwargs["offline"] = Count(
+                "email", distinct=True,
+                filter=Q(perm_status="OFFLINE", has_active_custom_status=False),
+            )
+
+        totals = agents_query.aggregate(**aggregate_kwargs)
 
         return Response(totals, status.HTTP_200_OK)
 
