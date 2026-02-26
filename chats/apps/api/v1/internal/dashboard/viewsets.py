@@ -29,9 +29,9 @@ from chats.apps.core.filters import get_filters_from_query_params
 
 def _build_status_filter(status_list):
     """
-    Monta Q para filtrar agentes por status.
-    Valores aceitos: 'online', 'custom_breaks', 'offline'.
-    Queryset precisa já ter os annotations 'status' e 'has_active_custom_status'.
+    Builds a Q object to filter agents by status.
+    Acceptable values: 'online', 'custom_breaks', 'offline'.
+    The queryset needs to have the annotations 'status' and 'has_active_custom_status'.
     """
     if not status_list:
         return None
@@ -125,12 +125,12 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
     )
     def agents_totals(self, request, *args, **kwargs):
         """
-        Endpoint de contagem de agentes por status.
+        Endpoint to count agents by status.
         GET /v1/internal/dashboard/{project_uuid}/agents_totals/
-        Query params opcionais:
-            - status (lista: 'custom_breaks', 'online', 'offline') — quando vazio traz todos
-            - sector, queue, agent, user_request — mesmos filtros gerais do endpoint de agents
-        Retorna: {"online": N, "custom_breaks": N, "offline": N}
+        Optional query params:
+            - status (list: 'custom_breaks', 'online', 'offline') — when empty, returns all
+            - sector, queue, agent, user_request — same filters as the agents endpoint
+        Returns: {"online": number, "custom_breaks": number, "offline": number}
         """
         project = self.get_object()
 
