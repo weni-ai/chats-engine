@@ -98,17 +98,13 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         custom_status_names = request.query_params.getlist("custom_status")
         if custom_status_names:
             has_filter = True
-            custom_emails = list(
-                CustomStatus.objects.filter(
-                    status_type__name__in=custom_status_names,
-                    is_active=True,
+            combined_q |= Q(
+                user_custom_status__in=CustomStatus.objects.filter(
                     project=project,
-                ).values_list("user", flat=True)
+                    is_active=True,
+                    status_type__name__in=custom_status_names,
+                )
             )
-            if custom_emails:
-                combined_q |= Q(email__in=custom_emails)
-            else:
-                combined_q |= Q(pk__in=[])
 
         if has_filter:
             agents_data = agents_data.filter(combined_q)
@@ -207,14 +203,13 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         if "custom_breaks" in requested:
             custom_breaks_filter = Q(perm_status="OFFLINE", has_active_custom_status=True)
             if custom_status_names:
-                custom_emails = list(
-                    CustomStatus.objects.filter(
-                        status_type__name__in=custom_status_names,
-                        is_active=True,
+                custom_breaks_filter = Q(
+                    user_custom_status__in=CustomStatus.objects.filter(
                         project=project,
-                    ).values_list("user", flat=True)
+                        is_active=True,
+                        status_type__name__in=custom_status_names,
+                    )
                 )
-                custom_breaks_filter = Q(email__in=custom_emails) if custom_emails else Q(pk__in=[])
             aggregate_kwargs["custom_breaks"] = Count(
                 "email", distinct=True, filter=custom_breaks_filter,
             )
