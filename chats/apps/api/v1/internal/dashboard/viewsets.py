@@ -70,10 +70,6 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         project = self.get_object()
         params = request.query_params.dict()
 
-        print(f"🔥 DEBUG VIEWSET: params completos = {params}")
-        print(f"🔥 DEBUG VIEWSET: agent param = '{params.get('agent')}'")
-        print(f"🔥 DEBUG VIEWSET: request.query_params = {dict(request.query_params)}")
-
         filters = Filters(
             start_date=params.get("start_date"),
             end_date=params.get("end_date"),
@@ -86,24 +82,27 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
             ordering=params.get("ordering"),
         )
 
-        print(f"🔥 DEBUG VIEWSET: filters.agent = '{filters.agent}'")
-
         agents_service = AgentsService()
         agents_data = agents_service.get_agents_data(filters, project)
+
+        combined_q = Q()
 
         status_filter = _build_status_filter(
             request.query_params.getlist("status")
         )
         if status_filter is not None:
-            agents_data = agents_data.filter(status_filter)
+            combined_q |= status_filter
 
         custom_status_names = request.query_params.getlist("custom_status")
         if custom_status_names:
-            agents_data = agents_data.filter(
+            combined_q |= Q(
                 user_custom_status__status_type__name__in=custom_status_names,
                 user_custom_status__is_active=True,
                 user_custom_status__project=project,
             )
+
+        if combined_q:
+            agents_data = agents_data.filter(combined_q)
 
         agents = DashboardAgentsSerializer(agents_data, many=True)
 
@@ -200,14 +199,6 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
             aggregate_kwargs["offline"] = Count(
                 "email", distinct=True,
                 filter=Q(perm_status="OFFLINE", has_active_custom_status=False),
-            )
-
-        custom_status_names = request.query_params.getlist("custom_status")
-        if custom_status_names:
-            agents_query = agents_query.filter(
-                user_custom_status__status_type__name__in=custom_status_names,
-                user_custom_status__is_active=True,
-                user_custom_status__project=project,
             )
 
         totals = agents_query.aggregate(**aggregate_kwargs)
