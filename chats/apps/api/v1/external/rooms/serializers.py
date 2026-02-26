@@ -14,7 +14,7 @@ from chats.apps.api.v1.queues.serializers import QueueSerializer
 from chats.apps.api.v1.sectors.serializers import TagSimpleSerializer
 from chats.apps.contacts.models import Contact
 from chats.apps.dashboard.models import RoomMetrics
-from chats.apps.msgs.models import AutomaticMessage, Message, MessageMedia
+from chats.apps.msgs.models import Message, MessageMedia
 from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
@@ -270,35 +270,14 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
         return custom_fields.get("callid", None)
 
     def get_automatic_message_sent_at(self, obj: Room) -> Optional[str]:
-        automatic_message: AutomaticMessage = AutomaticMessage.objects.filter(
-            room=obj
-        ).first()
-
-        if automatic_message:
-            msg_date = pendulum.instance(automatic_message.message.created_on).in_tz(
-                "America/Sao_Paulo"
-            )
+        sent_at = obj.get_automatic_message_sent_at()
+        if sent_at:
+            msg_date = pendulum.instance(sent_at).in_tz("America/Sao_Paulo")
             return msg_date.isoformat()
-
         return None
 
-    def get_time_to_send_automatic_message(self, obj: Room) -> Optional[str]:
-        automatic_message: AutomaticMessage = AutomaticMessage.objects.filter(
-            room=obj
-        ).first()
-
-        if automatic_message and obj.first_user_assigned_at:
-            return max(
-                int(
-                    (
-                        automatic_message.message.created_on
-                        - obj.first_user_assigned_at
-                    ).total_seconds()
-                ),
-                0,
-            )
-
-        return None
+    def get_time_to_send_automatic_message(self, obj: Room) -> Optional[int]:
+        return obj.get_time_to_send_automatic_message()
 
     def get_sector(self, obj: Room) -> Optional[dict]:
         sector = obj.queue.sector if obj.queue else None

@@ -5,6 +5,7 @@ from rest_framework import serializers
 from chats.apps.api.v1.sectors.serializers import TagSimpleSerializer
 from chats.apps.csat.models import CSATSurvey
 from chats.apps.rooms.models import Room
+from chats.apps.dashboard.models import RoomMetrics
 
 
 class RoomInternalListSerializer(serializers.ModelSerializer):
@@ -76,8 +77,15 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
 
     def get_first_response_time(self, obj: Room) -> int:
         try:
-            if hasattr(obj, "metric") and obj.metric.first_response_time is not None:
-                return obj.metric.first_response_time
+            metrics: Optional[RoomMetrics] = getattr(obj, "metric", None)
+
+            if metrics and metrics.first_response_time is not None:
+                return metrics.first_response_time
+
+            if not obj.is_active and (
+                not metrics or metrics.first_response_time is None
+            ):
+                return None
 
             if obj.first_user_assigned_at and obj.is_active and obj.user:
                 has_any_agent_messages = (
@@ -97,9 +105,12 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
         return 0
 
     def get_waiting_time(self, obj: Room) -> int:
-        if not obj.added_to_queue_at or not obj.user_assigned_at:
+        metrics = getattr(obj, "metric", None)
+
+        if not metrics:
             return 0
-        return int((obj.user_assigned_at - obj.added_to_queue_at).total_seconds())
+
+        return metrics.waiting_time
 
     def get_queue_time(self, obj: Room) -> int:
         if obj.is_active and not obj.user:
