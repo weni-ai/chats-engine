@@ -5,7 +5,8 @@ import logging
 import pandas
 import pendulum
 from django.contrib.postgres.aggregates import ArrayAgg
-from django.db.models import Q
+from django.db.models import Case, CharField, F, Q, Value, When
+from django.db.models.functions import Cast
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, serializers, status, viewsets
@@ -526,6 +527,15 @@ class ReportFieldsValidatorViewSet(APIView):
             queue__sector__project=project,
             queue__is_deleted=False,
             queue__sector__is_deleted=False,
+        ).annotate(
+            metric__first_response_time=Case(
+                When(
+                    metric__first_response_time__isnull=False,
+                    then=Cast(F("metric__first_response_time"), CharField()),
+                ),
+                default=Value("No response"),
+                output_field=CharField(),
+            )
         )
 
     def _get_agent_status_logs_queryset(self, project):
@@ -886,7 +896,9 @@ class ReportFieldsValidatorViewSet(APIView):
         try:
             available_fields = ModelFieldsPresenter.get_models_info()
             rooms_config = fields_config.get("rooms", {})
-            query_data = self._process_model_fields("rooms", rooms_config, project, available_fields)
+            query_data = self._process_model_fields(
+                "rooms", rooms_config, project, available_fields
+            )
             return query_data["queryset"].count() if "queryset" in query_data else 0
         except Exception:
             return self._get_rooms_queryset(project).count()
@@ -916,7 +928,9 @@ class ReportFieldsValidatorViewSet(APIView):
             )
 
         try:
-            fields_config = {k: v for k, v in request.data.items() if k != "project_uuid"}
+            fields_config = {
+                k: v for k, v in request.data.items() if k != "project_uuid"
+            }
             file_type = fields_config.pop("type", None)
 
             self._apply_root_filters_to_rooms(fields_config, request.data)
@@ -933,10 +947,17 @@ class ReportFieldsValidatorViewSet(APIView):
             )
 
             minutes = max(1, (estimated_time + 59) // 60)
-            logger.info("ReportStatus created (pending): %s project=%s", report_status.uuid, project.uuid)
+            logger.info(
+                "ReportStatus created (pending): %s project=%s",
+                report_status.uuid,
+                project.uuid,
+            )
 
             return Response(
-                {"time_request": f"{minutes}min", "report_uuid": str(report_status.uuid)},
+                {
+                    "time_request": f"{minutes}min",
+                    "report_uuid": str(report_status.uuid),
+                },
                 status=status.HTTP_200_OK,
             )
         except ValidationError as e:
