@@ -528,14 +528,12 @@ class ReportFieldsValidatorViewSet(APIView):
             queue__is_deleted=False,
             queue__sector__is_deleted=False,
         ).annotate(
-            first_response_time=Cast(
-                Case(
-                    When(
-                        metric__first_response_time__isnull=False,
-                        then=F("metric__first_response_time"),
-                    ),
-                    default=Value("No response"),
+            first_response_time=Case(
+                When(
+                    metric__first_response_time__isnull=False,
+                    then=Cast(F("metric__first_response_time"), CharField()),
                 ),
+                default=Value("No response"),
                 output_field=CharField(),
             )
         )
