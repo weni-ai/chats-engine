@@ -360,10 +360,9 @@ class ModelFieldsPresenter:
                 "required": False,
                 "related_model": "dashboard.roommetrics",
             },
-            "metric__first_response_time": {
-                "type": "IntegerField",
+            "first_response_time": {
+                "type": "CharField",
                 "required": False,
-                "related_model": "dashboard.roommetrics",
             },
             "metric__message_response_time": {
                 "type": "IntegerField",
