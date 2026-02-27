@@ -529,6 +529,7 @@ class ReportFieldsValidatorViewSet(APIView):
         Return base queryset for rooms in the project.
         Excludes rooms from deleted queues or sectors.
         """
+        print("[_get_rooms_queryset] project: ", project)
         return Room.objects.filter(
             queue__sector__project=project,
             queue__is_deleted=False,
