@@ -145,10 +145,15 @@ class QueueViewset(ModelViewSet):
         return instance
 
     def perform_destroy(self, instance):
+        secondary_project_config = instance.sector.secondary_project or {}
+        secondary_project_uuid = secondary_project_config.get("uuid")
+
+        project_uuid = secondary_project_uuid or instance.sector.project.uuid
+
         content = {
             "uuid": str(instance.uuid),
             "sector_uuid": str(instance.sector.uuid),
-            "project_uuid": str(instance.sector.project.uuid),
+            "project_uuid": str(project_uuid),
         }
 
         if not settings.USE_WENI_FLOWS:
