@@ -361,6 +361,11 @@ class ModelFieldsPresenter:
                 "required": False,
                 "related_model": "dashboard.roommetrics",
             },
+            "metric__first_response_time": {
+                "type": "CharField",
+                "required": False,
+                "related_model": "dashboard.roommetrics",
+            },
             "first_response_time": {
                 "type": "CharField",
                 "required": False,
