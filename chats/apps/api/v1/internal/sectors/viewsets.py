@@ -1,10 +1,14 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status, viewsets
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
-from chats.apps.api.v1.internal.sectors.serializers import SectorTagSerializer
+from chats.apps.api.v1.internal.sectors.serializers import (
+    SectorRequiredTagsSerializer,
+    SectorTagSerializer,
+)
 from chats.apps.api.v1.sectors import serializers as sector_serializers
 from chats.apps.api.v1.sectors.filters import SectorFilter
 from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
@@ -55,6 +59,19 @@ class SectorInternalViewset(viewsets.ModelViewSet):
             {"is_deleted": True},
             status.HTTP_200_OK,
         )
+
+    @action(detail=True, methods=["get"], url_path="required-tags")
+    def check_required_tags(self, request, uuid=None):
+        """
+        Check if a sector has required_tags enabled.
+
+        Returns:
+            - uuid: sector UUID
+            - required_tags: boolean indicating if required_tags is enabled
+        """
+        sector = self.get_object()
+        serializer = SectorRequiredTagsSerializer(sector)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class SectorAuthorizationViewset(viewsets.ModelViewSet):
