@@ -362,9 +362,13 @@ class ModelFieldsPresenter:
                 "related_model": "dashboard.roommetrics",
             },
             "metric__first_response_time": {
-                "type": "IntegerField",
+                "type": "CharField",
                 "required": False,
                 "related_model": "dashboard.roommetrics",
+            },
+            "first_response_time": {
+                "type": "CharField",
+                "required": False,
             },
             "metric__message_response_time": {
                 "type": "IntegerField",
