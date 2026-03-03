@@ -886,6 +886,7 @@ class RoomsExternalProtocolTests(APITestCase):
         self.assertEqual(room.protocol, "PROTO_CUSTOM")
 
 
+@patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
 class RoomsQueueLimitExternalTests(APITestCase):
     def setUp(self) -> None:
         self.project = Project.objects.create(
@@ -909,7 +910,8 @@ class RoomsQueueLimitExternalTests(APITestCase):
 
         return self.client.post(url, data=data, format="json")
 
-    def test_create_room_without_queue_limit(self):
+    def test_create_room_without_queue_limit(self, mock_get_room):
+        mock_get_room.return_value = None
         data = {
             "queue_uuid": str(self.queue.uuid),
             "contact": {
@@ -922,7 +924,10 @@ class RoomsQueueLimitExternalTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     @patch("chats.apps.api.v1.external.rooms.serializers.is_feature_active")
-    def test_create_room_with_queue_limit_when_not_full(self, mock_is_feature_active):
+    def test_create_room_with_queue_limit_when_not_full(
+        self, mock_is_feature_active, mock_get_room
+    ):
+        mock_get_room.return_value = None
         mock_is_feature_active.return_value = True
 
         self.queue.queue_limit = 1
@@ -942,7 +947,10 @@ class RoomsQueueLimitExternalTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
     @patch("chats.apps.api.v1.external.rooms.serializers.is_feature_active")
-    def test_create_room_with_queue_limit_when_full(self, mock_is_feature_active):
+    def test_create_room_with_queue_limit_when_full(
+        self, mock_is_feature_active, mock_get_room
+    ):
+        mock_get_room.return_value = None
         mock_is_feature_active.return_value = True
 
         Room.objects.create(
@@ -969,8 +977,9 @@ class RoomsQueueLimitExternalTests(APITestCase):
 
     @patch("chats.apps.api.v1.external.rooms.serializers.is_feature_active")
     def test_create_room_with_queue_limit_when_full_and_feature_flag_is_off(
-        self, mock_is_feature_active
+        self, mock_is_feature_active, mock_get_room
     ):
+        mock_get_room.return_value = None
         mock_is_feature_active.return_value = False
 
         Room.objects.create(

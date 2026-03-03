@@ -2,6 +2,8 @@ import logging
 from typing import Dict, List, Optional
 
 import pendulum
+from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
@@ -535,17 +537,29 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         if not validated_data.get("user") and (
             not last_flow_start or (last_flow_start and has_room_after_flow_start)
         ):
-            self._validate_queue_limit(queue)
+            with transaction.atomic():
+                queue = Queue.objects.select_for_update().get(pk=queue.pk)
+                self._validate_queue_limit(queue)
 
-        room = Room.objects.create(
-            **validated_data,
-            project_uuid=str(queue.project.uuid),
-            contact=contact,
-            queue=queue,
-            protocol=protocol,
-            service_chat=service_chat,
-        )
-        RoomMetrics.objects.create(room=room)
+                room = Room.objects.create(
+                    **validated_data,
+                    project_uuid=str(queue.project.uuid),
+                    contact=contact,
+                    queue=queue,
+                    protocol=protocol,
+                    service_chat=service_chat,
+                )
+                RoomMetrics.objects.create(room=room)
+        else:
+            room = Room.objects.create(
+                **validated_data,
+                project_uuid=str(queue.project.uuid),
+                contact=contact,
+                queue=queue,
+                protocol=protocol,
+                service_chat=service_chat,
+            )
+            RoomMetrics.objects.create(room=room)
 
         if history_data:
             self.process_message_history(room, history_data)
