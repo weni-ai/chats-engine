@@ -168,7 +168,29 @@ class Room(BaseModel, BaseConfigurableModel):
         blank=True,
     )
 
+    automatic_message_sent_at = models.DateTimeField(
+        _("Automatic message sent at"), null=True, blank=True
+    )
+
     tracker = FieldTracker(fields=["user_id", "queue_id"])
+
+    def get_automatic_message_sent_at(self) -> Optional[datetime]:
+        if self.automatic_message_sent_at:
+            return self.automatic_message_sent_at
+        from chats.apps.msgs.models import AutomaticMessage
+
+        auto_msg = AutomaticMessage.objects.filter(room=self).first()
+        if auto_msg:
+            return auto_msg.message.created_on
+        return None
+
+    def get_time_to_send_automatic_message(self) -> Optional[int]:
+        sent_at = self.get_automatic_message_sent_at()
+        if sent_at and self.first_user_assigned_at:
+            return max(
+                int((sent_at - self.first_user_assigned_at).total_seconds()), 0
+            )
+        return None
 
     @property
     def is_billing_notified(self) -> bool:

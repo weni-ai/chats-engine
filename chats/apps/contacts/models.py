@@ -42,6 +42,13 @@ class Contact(BaseModel):
                 condition=models.Q(name__isnull=False),
             ),
         ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["external_id"],
+                condition=models.Q(external_id__isnull=False),
+                name="unique_contact_external_id",
+            ),
+        ]
 
     def __str__(self):
         return str(self.name)
