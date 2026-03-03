@@ -54,31 +54,31 @@ class BulkTransferService:
                 requested_by=user_request,
             )
 
-        create_room_feedback_message(
-            room,
-            feedback_queue,
-            method=RoomFeedbackMethods.ROOM_TRANSFER,
-            requested_by=user_request,
-        )
-        create_room_feedback_message(
-            room,
-            feedback_user,
-            method=RoomFeedbackMethods.ROOM_TRANSFER,
-            requested_by=user_request,
-        )
-        room.notify_queue("update")
-        room.notify_user("update", user=old_user)
-        room.notify_user("update")
+            create_room_feedback_message(
+                room,
+                feedback_queue,
+                method=RoomFeedbackMethods.ROOM_TRANSFER,
+                requested_by=user_request,
+            )
+            create_room_feedback_message(
+                room,
+                feedback_user,
+                method=RoomFeedbackMethods.ROOM_TRANSFER,
+                requested_by=user_request,
+            )
+            room.notify_queue("update")
+            room.notify_user("update", user=old_user)
+            room.notify_user("update")
 
-        logger.info(
-            "Starting queue priority routing for queue %s from bulk transfer to user %s",
-            queue.uuid,
-            user.email,
-        )
-        start_queue_priority_routing(queue)
+            logger.info(
+                "Starting queue priority routing for queue %s from bulk transfer to user %s",
+                queue.uuid,
+                user.email,
+            )
+            start_queue_priority_routing(queue)
 
-        room.mark_notes_as_non_deletable()
-        room.update_ticket_async()
+            room.mark_notes_as_non_deletable()
+            room.update_ticket_async()
 
     def transfer_user(self, rooms: QuerySet[Room], user: User, user_request: User):
         for room in rooms:

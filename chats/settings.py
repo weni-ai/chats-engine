@@ -587,6 +587,10 @@ MESSAGE_STATUS_UPDATE_ENABLED_PROJECTS = env.list(
 # MESSAGE_BULK_SIZE deve estar no settings.py
 MESSAGE_BULK_SIZE = env.int("MESSAGE_BULK_SIZE", default=100)
 
+# Bulk Close Settings
+BULK_CLOSE_BATCH_SIZE = env.int("BULK_CLOSE_BATCH_SIZE", default=50)
+BULK_CLOSE_MAX_ROOMS = env.int("BULK_CLOSE_MAX_ROOMS", default=200)
+
 # Message Status Consumer Settings
 MESSAGE_STATUS_MAX_RETRIES = env.int("MESSAGE_STATUS_MAX_RETRIES", default=3)
 MESSAGE_STATUS_RETRY_DELAY = env.int("MESSAGE_STATUS_RETRY_DELAY", default=2)
@@ -688,4 +692,9 @@ VTEX_INTERNAL_DOMAINS = env.list(
 # Queue Limit
 QUEUE_LIMIT_FEATURE_FLAG_KEY = env.str(
     "QUEUE_LIMIT_FEATURE_FLAG_KEY", default="weniChatsQueueLimit"
+)
+# Rooms External API QuerySet filter feature flag
+ROOMS_EXTERNAL_API_QUERYSET_FILTER_FLAG_KEY = env.str(
+    "ROOMS_EXTERNAL_API_QUERYSET_FILTER_FLAG_KEY",
+    default="weniChatsRoomsExternalApiQuerySetFilter",
 )
