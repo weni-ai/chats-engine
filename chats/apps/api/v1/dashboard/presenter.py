@@ -301,10 +301,6 @@ class ModelFieldsPresenter:
         """
         Return information about rooms and agent_status_logs fields with 1 day cache.
         """
-        cache_key = "model_fields_presenter_models_info"
-        cached_data = cache.get(cache_key)
-        if cached_data is not None:
-            return cached_data
 
         # Define all available fields for rooms export
         rooms_fields = {
@@ -366,7 +362,7 @@ class ModelFieldsPresenter:
                 "required": False,
                 "related_model": "dashboard.roommetrics",
             },
-            "first_response_time": {
+            "metric__first_response_time": {
                 "type": "CharField",
                 "required": False,
             },
@@ -420,5 +416,4 @@ class ModelFieldsPresenter:
             "rooms": rooms_fields,
             "agent_status_logs": agent_status_logs_fields,
         }
-        cache.set(cache_key, models_info, timeout=86400)
         return models_info
