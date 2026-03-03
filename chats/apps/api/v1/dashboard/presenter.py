@@ -1,7 +1,6 @@
 import json
 
 import pendulum
-from django.core.cache import cache
 from django.db.models import Avg, Count, F, Q, Sum
 from django.utils import timezone
 
@@ -299,7 +298,7 @@ class ModelFieldsPresenter:
     @staticmethod
     def get_models_info():
         """
-        Return information about rooms and agent_status_logs fields with 1 day cache.
+        Return information about rooms and agent_status_logs fields
         """
 
         # Define all available fields for rooms export
