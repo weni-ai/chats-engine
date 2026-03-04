@@ -768,3 +768,214 @@ class RoomViewsetBulkCloseTests(TestCase):
 
         # Should fail because tag does not exist in the room's sector
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class RoomViewsetBulkTakeTests(TestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.admin = User.objects.create(email="admin@acme.com")
+        self.agent = User.objects.create(email="agent@acme.com")
+        self.project = Project.objects.create(name="P", timezone="UTC")
+        self.sector = self.project.sectors.create(
+            name="S", rooms_limit=5, work_start="08:00", work_end="18:00"
+        )
+        self.queue = self.sector.queues.create(name="Q")
+        self.perm_admin = ProjectPermission.objects.create(
+            project=self.project, user=self.admin, role=ProjectPermission.ROLE_ADMIN
+        )
+        self.perm_agent = ProjectPermission.objects.create(
+            project=self.project,
+            user=self.agent,
+            role=ProjectPermission.ROLE_ATTENDANT,
+        )
+
+    def test_bulk_take_single_room(self):
+        room = Room.objects.create(
+            queue=self.queue, project_uuid=str(self.project.pk), is_active=True
+        )
+
+        view = RoomViewset.as_view({"patch": "bulk_take"})
+        req = self.factory.patch(
+            "/x",
+            data={"rooms_list": [str(room.uuid)]},
+            content_type="application/json",
+        )
+        force_authenticate(req, user=self.agent)
+        resp = view(req)
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(resp.data["success"])
+        self.assertEqual(resp.data["success_count"], 1)
+        self.assertEqual(resp.data["failed_count"], 0)
+
+        room.refresh_from_db()
+        self.assertEqual(room.user, self.agent)
+
+    def test_bulk_take_multiple_rooms(self):
+        rooms = [
+            Room.objects.create(
+                queue=self.queue,
+                project_uuid=str(self.project.pk),
+                is_active=True,
+            )
+            for _ in range(3)
+        ]
+        rooms_data = [str(r.uuid) for r in rooms]
+
+        view = RoomViewset.as_view({"patch": "bulk_take"})
+        req = self.factory.patch(
+            "/x",
+            data={"rooms_list": rooms_data},
+            content_type="application/json",
+        )
+        force_authenticate(req, user=self.agent)
+        resp = view(req)
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data["success_count"], 3)
+
+        for room in rooms:
+            room.refresh_from_db()
+            self.assertEqual(room.user, self.agent)
+
+    def test_bulk_take_fails_for_assigned_rooms(self):
+        other_user = User.objects.create(email="other@acme.com")
+        room = Room.objects.create(
+            queue=self.queue,
+            project_uuid=str(self.project.pk),
+            is_active=True,
+            user=other_user,
+        )
+
+        view = RoomViewset.as_view({"patch": "bulk_take"})
+        req = self.factory.patch(
+            "/x",
+            data={"rooms_list": [str(room.uuid)]},
+            content_type="application/json",
+        )
+        force_authenticate(req, user=self.agent)
+        resp = view(req)
+
+        # Serializer filters out rooms with user assigned, so no rooms found
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_bulk_take_assigns_requesting_user(self):
+        room = Room.objects.create(
+            queue=self.queue, project_uuid=str(self.project.pk), is_active=True
+        )
+
+        view = RoomViewset.as_view({"patch": "bulk_take"})
+        req = self.factory.patch(
+            "/x",
+            data={"rooms_list": [str(room.uuid)]},
+            content_type="application/json",
+        )
+        force_authenticate(req, user=self.admin)
+        resp = view(req)
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        room.refresh_from_db()
+        self.assertEqual(room.user, self.admin)
+
+    def test_bulk_take_returns_error_for_no_queued_rooms(self):
+        room = Room.objects.create(
+            queue=self.queue,
+            project_uuid=str(self.project.pk),
+            is_active=True,
+            user=self.agent,
+        )
+
+        view = RoomViewset.as_view({"patch": "bulk_take"})
+        req = self.factory.patch(
+            "/x",
+            data={"rooms_list": [str(room.uuid)]},
+            content_type="application/json",
+        )
+        force_authenticate(req, user=self.admin)
+        resp = view(req)
+
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_bulk_take_returns_error_for_empty_list(self):
+        view = RoomViewset.as_view({"patch": "bulk_take"})
+        req = self.factory.patch(
+            "/x",
+            data={"rooms_list": []},
+            content_type="application/json",
+        )
+        force_authenticate(req, user=self.agent)
+        resp = view(req)
+
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_bulk_take_partial_success_returns_207(self):
+        """When some rooms succeed and others fail, return HTTP 207"""
+        other_user = User.objects.create(email="other@acme.com")
+        room_queued = Room.objects.create(
+            queue=self.queue,
+            project_uuid=str(self.project.pk),
+            is_active=True,
+        )
+        room_assigned = Room.objects.create(
+            queue=self.queue,
+            project_uuid=str(self.project.pk),
+            is_active=True,
+            user=other_user,
+        )
+
+        view = RoomViewset.as_view({"patch": "bulk_take"})
+        req = self.factory.patch(
+            "/x",
+            data={"rooms_list": [str(room_queued.uuid), str(room_assigned.uuid)]},
+            content_type="application/json",
+        )
+        force_authenticate(req, user=self.agent)
+        resp = view(req)
+
+        # room_assigned has user so serializer filters it out;
+        # only room_queued passes through and succeeds
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data["success_count"], 1)
+
+        room_queued.refresh_from_db()
+        self.assertEqual(room_queued.user, self.agent)
+
+        room_assigned.refresh_from_db()
+        self.assertEqual(room_assigned.user, other_user)
+
+    def test_bulk_take_validates_max_rooms_limit(self):
+        """Cannot take more than BULK_TAKE_MAX_ROOMS at once"""
+        from django.test import override_settings
+        import uuid as uuid_mod
+
+        uuids = [str(uuid_mod.uuid4()) for _ in range(5)]
+
+        with override_settings(BULK_TAKE_MAX_ROOMS=3):
+            view = RoomViewset.as_view({"patch": "bulk_take"})
+            req = self.factory.patch(
+                "/x",
+                data={"rooms_list": uuids},
+                content_type="application/json",
+            )
+            force_authenticate(req, user=self.agent)
+            resp = view(req)
+
+            self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_bulk_take_rejects_duplicate_uuids(self):
+        room = Room.objects.create(
+            queue=self.queue,
+            project_uuid=str(self.project.pk),
+            is_active=True,
+        )
+
+        view = RoomViewset.as_view({"patch": "bulk_take"})
+        req = self.factory.patch(
+            "/x",
+            data={"rooms_list": [str(room.uuid), str(room.uuid)]},
+            content_type="application/json",
+        )
+        force_authenticate(req, user=self.agent)
+        resp = view(req)
+
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
