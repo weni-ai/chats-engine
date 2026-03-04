@@ -9,9 +9,13 @@ from chats.apps.queues.models import Queue, QueueAuthorization
 
 User = get_user_model()
 
+MAX_INT_32 = 2**31 - 1
+
 
 class QueueLimitSerializer(serializers.Serializer):
-    limit = serializers.IntegerField(required=False, allow_null=True)
+    limit = serializers.IntegerField(
+        required=False, allow_null=True, min_value=0, max_value=MAX_INT_32
+    )
     is_active = serializers.BooleanField(required=False, allow_null=True)
 
 
