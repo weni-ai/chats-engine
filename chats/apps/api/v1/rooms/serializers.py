@@ -654,6 +654,36 @@ class BulkTransferSerializer(serializers.Serializer):
         return super().validate(attrs)
 
 
+class BulkTakeSerializer(serializers.Serializer):
+    rooms_list = serializers.ListField(child=serializers.UUIDField(), required=True)
+
+    def validate_rooms_list(self, value):
+        if not value:
+            raise serializers.ValidationError("At least one room is required")
+
+        max_rooms = getattr(settings, "BULK_TAKE_MAX_ROOMS", 200)
+        if len(value) > max_rooms:
+            raise serializers.ValidationError(
+                f"Cannot take more than {max_rooms} rooms at once"
+            )
+
+        if len(value) != len(set(value)):
+            raise serializers.ValidationError("Duplicate room UUIDs found")
+
+        return value
+
+    def validate(self, attrs):
+        rooms = Room.objects.filter(
+            uuid__in=attrs.get("rooms_list"),
+            is_active=True,
+            user__isnull=True,
+        )
+        if not rooms.exists():
+            raise serializers.ValidationError("No available rooms found in queue")
+        attrs["rooms"] = rooms
+        return super().validate(attrs)
+
+
 class RoomToCloseSerializer(serializers.Serializer):
     """Serializer for individual room to close with its specific tags"""
     uuid = serializers.UUIDField(required=True, help_text="Room UUID to close")
