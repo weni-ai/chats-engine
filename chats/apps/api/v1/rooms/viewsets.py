@@ -51,6 +51,7 @@ from chats.apps.api.v1.rooms.permissions import (
 from chats.apps.api.v1.rooms.serializers import (
     AddRoomTagSerializer,
     BulkCloseSerializer,
+    BulkTakeSerializer,
     BulkTransferSerializer,
     ListRoomSerializer,
     PinRoomSerializer,
@@ -66,6 +67,7 @@ from chats.apps.api.v1.rooms.serializers import (
     TransferRoomSerializer,
 )
 from chats.apps.api.v1.rooms.services.bulk_close_service import BulkCloseService
+from chats.apps.api.v1.rooms.services.bulk_take_service import BulkTakeService
 from chats.apps.api.v1.rooms.services.bulk_transfer_service import BulkTransferService
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
@@ -730,6 +732,66 @@ class RoomViewset(
             {"success": "Mass transfer completed"},
             status=status.HTTP_200_OK,
         )
+
+    @action(
+        detail=False,
+        methods=["PATCH"],
+        url_name="bulk_take",
+    )
+    def bulk_take(self, request, pk=None):
+        serializer = BulkTakeSerializer(
+            data=request.data, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+
+        rooms = serializer.validated_data["rooms"]
+        service = BulkTakeService()
+
+        try:
+            result = service.take(rooms=rooms, user=request.user)
+
+            logger.info(
+                f"Bulk take completed by {request.user.email}: "
+                f"{result.success_count} succeeded, {result.failed_count} failed"
+            )
+
+            if result.success_count == 0 and result.failed_count > 0:
+                response_status = status.HTTP_400_BAD_REQUEST
+                message = "All rooms failed to be taken"
+            elif result.failed_count > 0:
+                response_status = status.HTTP_207_MULTI_STATUS
+                message = (
+                    f"{result.success_count} rooms taken successfully, "
+                    f"{result.failed_count} failed"
+                )
+            else:
+                response_status = status.HTTP_200_OK
+                message = f"{result.success_count} rooms taken successfully"
+
+            response_data = {
+                "success": result.success_count > 0,
+                "message": message,
+                **result.to_dict(),
+            }
+
+            return Response(response_data, status=response_status)
+
+        except Exception as e:
+            logger.error(
+                f"Bulk take error for user {request.user.email}: {str(e)}",
+                exc_info=True,
+            )
+            event_id = capture_exception(e)
+            return Response(
+                {
+                    "success": False,
+                    "error": f"Failed to take rooms. Event ID: {event_id}",
+                    "success_count": 0,
+                    "failed_count": 0,
+                    "total_processed": 0,
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
     @action(
         detail=False,
