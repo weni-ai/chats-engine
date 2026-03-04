@@ -1,3 +1,7 @@
+# 3.46.0
+# Add
+  - Wait limit settings and validations
+
 # 3.45.7
 # Fix
   - First response time correct field and model fields cache removal
@@ -1106,6 +1110,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 
