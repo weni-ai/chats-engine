@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.rooms.services.bulk_close_service import BulkCloseService
+from chats.apps.api.v1.rooms.services.bulk_take_service import BulkTakeService
 from chats.apps.api.v1.rooms.services.bulk_transfer_service import BulkTransferService
 from chats.apps.projects.models.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue
@@ -596,3 +597,190 @@ class BulkCloseServiceTest(TestCase):
         self.assertEqual(result.success_count, 3)
         # Called once per unique queue (2 queues)
         self.assertEqual(mock_start_routing.call_count, 2)
+
+
+class BulkTakeServiceTest(TestCase):
+    def setUp(self):
+        self.service = BulkTakeService()
+        self.project = Project.objects.create(name="Test Project", timezone="UTC")
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
+        self.user = User.objects.create(email="agent@test.com")
+
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=self.user,
+            role=ProjectPermission.ROLE_ATTENDANT,
+        )
+
+    def test_take_single_room(self):
+        room = Room.objects.create(queue=self.queue, user=None, is_active=True)
+        rooms = Room.objects.filter(pk=room.pk)
+
+        result = self.service.take(rooms, self.user)
+
+        self.assertEqual(result.success_count, 1)
+        self.assertEqual(result.failed_count, 0)
+        room.refresh_from_db()
+        self.assertEqual(room.user, self.user)
+
+    def test_take_multiple_rooms(self):
+        rooms_objs = [
+            Room.objects.create(queue=self.queue, user=None, is_active=True)
+            for _ in range(5)
+        ]
+        room_ids = [r.pk for r in rooms_objs]
+        rooms = Room.objects.filter(pk__in=room_ids)
+
+        result = self.service.take(rooms, self.user)
+
+        self.assertEqual(result.success_count, 5)
+        self.assertEqual(result.failed_count, 0)
+        for room in Room.objects.filter(pk__in=room_ids):
+            self.assertEqual(room.user, self.user)
+
+    def test_take_skips_already_assigned_rooms(self):
+        other_user = User.objects.create(email="other@test.com")
+        room_queued = Room.objects.create(queue=self.queue, user=None, is_active=True)
+        room_assigned = Room.objects.create(
+            queue=self.queue, user=other_user, is_active=True
+        )
+
+        rooms = Room.objects.filter(pk__in=[room_queued.pk, room_assigned.pk])
+
+        result = self.service.take(rooms, self.user)
+
+        self.assertEqual(result.success_count, 1)
+        self.assertEqual(result.failed_count, 1)
+        self.assertIn(str(room_assigned.uuid), result.failed_rooms)
+
+        room_queued.refresh_from_db()
+        self.assertEqual(room_queued.user, self.user)
+
+        room_assigned.refresh_from_db()
+        self.assertEqual(room_assigned.user, other_user)
+
+    def test_take_returns_empty_result_for_empty_queryset(self):
+        rooms = Room.objects.none()
+
+        result = self.service.take(rooms, self.user)
+
+        self.assertEqual(result.success_count, 0)
+        self.assertEqual(result.failed_count, 0)
+
+    def test_take_updates_user_assigned_at(self):
+        room = Room.objects.create(queue=self.queue, user=None, is_active=True)
+        rooms = Room.objects.filter(pk=room.pk)
+
+        before = timezone.now()
+        self.service.take(rooms, self.user)
+        after = timezone.now()
+
+        room.refresh_from_db()
+        self.assertIsNotNone(room.user_assigned_at)
+        self.assertGreaterEqual(room.user_assigned_at, before)
+        self.assertLessEqual(room.user_assigned_at, after)
+
+    @patch("chats.apps.api.v1.rooms.services.bulk_take_service.calculate_last_queue_waiting_time")
+    def test_take_updates_room_metrics(self, mock_calc_waiting):
+        mock_calc_waiting.return_value = 42.0
+
+        room = Room.objects.create(queue=self.queue, user=None, is_active=True)
+        rooms = Room.objects.filter(pk=room.pk)
+
+        self.service.take(rooms, self.user)
+
+        from chats.apps.dashboard.models import RoomMetrics
+
+        metric = RoomMetrics.objects.get(room=room)
+        self.assertEqual(metric.queued_count, 1)
+        self.assertEqual(metric.waiting_time, 42.0)
+
+    @patch("chats.apps.rooms.models.Room.notify_queue")
+    @patch("chats.apps.api.v1.rooms.services.bulk_take_service.create_room_feedback_message")
+    def test_take_sends_notify_queue(self, mock_feedback, mock_notify_queue):
+        room1 = Room.objects.create(queue=self.queue, user=None, is_active=True)
+        room2 = Room.objects.create(queue=self.queue, user=None, is_active=True)
+
+        rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk])
+
+        result = self.service.take(rooms, self.user)
+
+        self.assertEqual(result.success_count, 2)
+        self.assertEqual(mock_notify_queue.call_count, 2)
+        mock_notify_queue.assert_any_call("update")
+
+    @patch("chats.apps.rooms.models.Room.send_automatic_message")
+    @patch("chats.apps.api.v1.rooms.services.bulk_take_service.create_room_feedback_message")
+    def test_take_sends_automatic_message(self, mock_feedback, mock_auto_msg):
+        room = Room.objects.create(queue=self.queue, user=None, is_active=True)
+        rooms = Room.objects.filter(pk=room.pk)
+
+        self.service.take(rooms, self.user)
+
+        mock_auto_msg.assert_called_once()
+
+    @patch("chats.apps.api.v1.rooms.services.bulk_take_service.start_queue_priority_routing")
+    @patch("chats.apps.api.v1.rooms.services.bulk_take_service.create_room_feedback_message")
+    def test_take_triggers_routing_once_per_queue(self, mock_feedback, mock_routing):
+        queue2 = Queue.objects.create(name="Queue 2", sector=self.sector)
+
+        room1 = Room.objects.create(queue=self.queue, user=None, is_active=True)
+        room2 = Room.objects.create(queue=self.queue, user=None, is_active=True)
+        room3 = Room.objects.create(queue=queue2, user=None, is_active=True)
+
+        rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk, room3.pk])
+
+        result = self.service.take(rooms, self.user)
+
+        self.assertEqual(result.success_count, 3)
+        self.assertEqual(mock_routing.call_count, 2)
+
+    @patch("chats.apps.api.v1.rooms.services.bulk_take_service.create_room_feedback_message")
+    def test_take_creates_feedback_message(self, mock_feedback):
+        room = Room.objects.create(queue=self.queue, user=None, is_active=True)
+        rooms = Room.objects.filter(pk=room.pk)
+
+        self.service.take(rooms, self.user)
+
+        mock_feedback.assert_called_once()
+        call_args = mock_feedback.call_args
+        self.assertEqual(call_args[0][0], room)
+
+    @override_settings(BULK_TAKE_BATCH_SIZE=3)
+    @patch("chats.apps.api.v1.rooms.services.bulk_take_service.create_room_feedback_message")
+    def test_take_processes_in_batches(self, mock_feedback):
+        rooms_objs = [
+            Room.objects.create(queue=self.queue, user=None, is_active=True)
+            for _ in range(7)
+        ]
+        room_ids = [r.pk for r in rooms_objs]
+        rooms = Room.objects.filter(pk__in=room_ids)
+
+        result = self.service.take(rooms, self.user)
+
+        self.assertEqual(result.success_count, 7)
+        self.assertEqual(result.failed_count, 0)
+        for room in Room.objects.filter(pk__in=room_ids):
+            self.assertEqual(room.user, self.user)
+
+    def test_take_result_to_dict(self):
+        room = Room.objects.create(queue=self.queue, user=None, is_active=True)
+        rooms = Room.objects.filter(pk=room.pk)
+
+        result = self.service.take(rooms, self.user)
+        result_dict = result.to_dict()
+
+        self.assertIn("success_count", result_dict)
+        self.assertIn("failed_count", result_dict)
+        self.assertIn("total_processed", result_dict)
+        self.assertIn("errors", result_dict)
+        self.assertIn("failed_rooms", result_dict)
+        self.assertIn("has_more_errors", result_dict)
+        self.assertEqual(result_dict["total_processed"], 1)
