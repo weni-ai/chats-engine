@@ -1,3 +1,39 @@
+# 3.46.0
+# Add
+  - Wait limit settings and validations
+
+# 3.45.7
+# Fix
+  - First response time correct field and model fields cache removal
+
+# 3.45.6
+# Add
+  - "No response" value for first response time when null
+# Fix
+  - Queue deletion on secondary project
+
+# 3.45.5
+# Add
+  - Functions to avoid lose reports
+
+# 3.45.4
+# Add
+  - Agent custom status related chips and filters
+
+# 3.45.3
+# Fix
+  - Flows viewset change to restrict the queryset based on the token project
+
+# 3.45.2
+# Add
+  - CSAT Flow V5
+# Fix
+  - PR title validation to include optional ticket prefix format
+
+# 3.45.1
+# Fix
+  - Notify problem bulk transfer
+
 # 3.45.0
 # Add
   - Time metrics fields on rooms metrics serializer
@@ -1074,6 +1110,8 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
+
 
 
 
