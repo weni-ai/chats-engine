@@ -12,6 +12,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
+from sentry_sdk import capture_exception
 
 from chats.apps.dashboard.email_templates import get_report_ready_email
 from chats.apps.dashboard.models import ReportStatus, RoomMetrics
@@ -79,7 +80,9 @@ def _get_file_extension(file_type: str) -> str:
     return "xlsx" if file_type == "xlsx" else "zip"
 
 
-def _save_report_locally(report_buffer: io.BytesIO, project_uuid, timestamp: str, file_type: str):
+def _save_report_locally(
+    report_buffer: io.BytesIO, project_uuid, timestamp: str, file_type: str
+):
     base_dir = getattr(
         settings,
         "REPORTS_SAVE_DIR",
@@ -97,7 +100,13 @@ def _save_report_locally(report_buffer: io.BytesIO, project_uuid, timestamp: str
 
 
 def _send_report_email(
-    project_name, project_uuid, user_email, report_buffer, timestamp, file_type, report_uuid
+    project_name,
+    project_uuid,
+    user_email,
+    report_buffer,
+    timestamp,
+    file_type,
+    report_uuid,
 ):
     from chats.core.storages import ReportsStorage
 
@@ -143,12 +152,12 @@ def _send_report_email(
     )
 
 
-def _send_error_email(project_name, user_email, error_message, report_uuid):
+def _send_error_email(project_name, user_email, report_uuid, event_id=None):
     from chats.apps.dashboard.email_templates import get_report_failed_email
 
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
     subject = f"Error generating custom report for project {project_name} - {timestamp}"
-    message_plain, message_html = get_report_failed_email(project_name, error_message)
+    message_plain, message_html = get_report_failed_email(project_name, event_id)
 
     email = EmailMultiAlternatives(
         subject=subject,
@@ -171,7 +180,9 @@ def _get_parts_dir(project_uuid: UUID, report_uuid: UUID) -> str:
     return f"reports/{project_uuid}/{report_uuid}/tmp"
 
 
-def _list_existing_parts(storage: ExcelStorage, parts_dir: str, prefix: str) -> List[str]:
+def _list_existing_parts(
+    storage: ExcelStorage, parts_dir: str, prefix: str
+) -> List[str]:
     """Lists existing CSV parts sorted by name for a given prefix."""
     try:
         _, files = storage.listdir(parts_dir)
@@ -237,7 +248,9 @@ def _write_parts_from_queryset(
             continue
 
         df = _excel_safe_dataframe(pd.DataFrame(rows), project_tz)
-        _write_chunk_to_part(storage, parts_dir, part_index, df, not header_written, prefix)
+        _write_chunk_to_part(
+            storage, parts_dir, part_index, df, not header_written, prefix
+        )
         header_written = True
         part_index += 1
 
@@ -332,7 +345,9 @@ def _finalize_xlsx_from_all_parts(
     try:
         with pd.ExcelWriter(xlsx_temp_path, engine="xlsxwriter") as writer:
             if rooms_config:
-                _combine_parts_to_sheet(storage, writer, room_part_paths, "rooms", rooms_config)
+                _combine_parts_to_sheet(
+                    storage, writer, room_part_paths, "rooms", rooms_config
+                )
             if agent_config:
                 _combine_parts_to_sheet(
                     storage, writer, agent_part_paths, "agent_status_logs", agent_config
@@ -385,13 +400,17 @@ def _finalize_csv_from_all_parts(
             if rooms_config:
                 _, rooms_csv_path = tempfile.mkstemp(suffix=".csv")
                 csv_temp_paths.append(rooms_csv_path)
-                _stream_parts_to_csv_file(storage, room_part_paths, rooms_config, rooms_csv_path)
+                _stream_parts_to_csv_file(
+                    storage, room_part_paths, rooms_config, rooms_csv_path
+                )
                 archive.write(rooms_csv_path, "rooms.csv")
 
             if agent_config:
                 _, agent_csv_path = tempfile.mkstemp(suffix=".csv")
                 csv_temp_paths.append(agent_csv_path)
-                _stream_parts_to_csv_file(storage, agent_part_paths, agent_config, agent_csv_path)
+                _stream_parts_to_csv_file(
+                    storage, agent_part_paths, agent_config, agent_csv_path
+                )
                 archive.write(agent_csv_path, "agent_status_logs.csv")
 
         with open(zip_temp_path, "rb") as f:
@@ -483,7 +502,9 @@ def _write_model_to_csv(archive, model_name: str, model_data: dict, project_tz=N
     raw_data = _strip_tz(model_data.get("data", []), project_tz)
     df = _excel_safe_dataframe(pd.DataFrame(raw_data), project_tz)
     if not df.empty:
-        archive.writestr(f"{model_name[:31]}.csv", df.to_csv(index=False).encode("utf-8"))
+        archive.writestr(
+            f"{model_name[:31]}.csv", df.to_csv(index=False).encode("utf-8")
+        )
 
 
 @app.task
@@ -507,7 +528,9 @@ def generate_custom_fields_report(
 
         available_fields = ModelFieldsPresenter.get_models_info()
         models_config = {
-            key: value for key, value in (fields_config or {}).items() if key in available_fields
+            key: value
+            for key, value in (fields_config or {}).items()
+            if key in available_fields
         }
         report_data = report_validator._generate_report_data(models_config, project)
 
@@ -532,7 +555,9 @@ def generate_custom_fields_report(
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
 
         if getattr(settings, "REPORTS_SAVE_LOCALLY", True):
-            file_path = _save_report_locally(report_buffer, project.uuid, timestamp, file_type)
+            file_path = _save_report_locally(
+                report_buffer, project.uuid, timestamp, file_type
+            )
             logger.info("Custom report saved at: %s", file_path)
 
         if getattr(settings, "REPORTS_SEND_EMAILS", False):
@@ -557,9 +582,13 @@ def generate_custom_fields_report(
         report_status.error_message = str(e)
         report_status.save()
 
+        event_id = capture_exception(e)
+
         if getattr(settings, "REPORTS_SEND_EMAILS", False):
             try:
-                _send_error_email(project.name, user_email, str(e), report_status.uuid)
+                _send_error_email(
+                    project.name, user_email, report_status.uuid, event_id
+                )
             except Exception as email_error:
                 logger.exception(
                     "Error sending error notification email: %s", email_error
@@ -641,12 +670,19 @@ def _process_report_with_resume(report, report_validator, available_fields, proj
 
             if completed_room_count > 0:
                 logging.info(
-                    "Resuming report %s rooms from part %s", report.uuid, completed_room_count
+                    "Resuming report %s rooms from part %s",
+                    report.uuid,
+                    completed_room_count,
                 )
 
             _write_parts_from_queryset(
-                storage, parts_dir, rooms_queryset, chunk_size,
-                completed_room_count, "rooms", project_tz,
+                storage,
+                parts_dir,
+                rooms_queryset,
+                chunk_size,
+                completed_room_count,
+                "rooms",
+                project_tz,
                 report=report,
             )
 
@@ -658,7 +694,9 @@ def _process_report_with_resume(report, report_validator, available_fields, proj
         agent_queryset = (processed or {}).get("queryset")
 
         if agent_queryset is not None:
-            completed_agent_parts = _list_existing_parts(storage, parts_dir, "agent_status_logs")
+            completed_agent_parts = _list_existing_parts(
+                storage, parts_dir, "agent_status_logs"
+            )
             completed_agent_count = len(completed_agent_parts)
 
             if completed_agent_count > 0:
@@ -669,8 +707,13 @@ def _process_report_with_resume(report, report_validator, available_fields, proj
                 )
 
             _write_parts_from_queryset(
-                storage, parts_dir, agent_queryset, chunk_size,
-                completed_agent_count, "agent_status_logs", project_tz,
+                storage,
+                parts_dir,
+                agent_queryset,
+                chunk_size,
+                completed_agent_count,
+                "agent_status_logs",
+                project_tz,
                 report=report,
             )
 
@@ -678,8 +721,13 @@ def _process_report_with_resume(report, report_validator, available_fields, proj
     agent_part_paths = _list_existing_parts(storage, parts_dir, "agent_status_logs")
 
     final_bytes = _finalize_from_all_parts(
-        storage, room_part_paths, agent_part_paths, file_type,
-        rooms_config, agent_config, project_tz,
+        storage,
+        room_part_paths,
+        agent_part_paths,
+        file_type,
+        rooms_config,
+        agent_config,
+        project_tz,
     )
 
     _cleanup_parts(storage, parts_dir)
@@ -693,7 +741,9 @@ def _save_and_send_report(report, report_buffer, file_type, user_email):
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
 
     if getattr(settings, "REPORTS_SAVE_LOCALLY", True):
-        file_path = _save_report_locally(report_buffer, project.uuid, timestamp, file_type)
+        file_path = _save_report_locally(
+            report_buffer, project.uuid, timestamp, file_type
+        )
         logging.info(
             "Custom report saved at: %s | report_uuid=%s", file_path, report.uuid
         )
@@ -715,7 +765,7 @@ def _save_and_send_report(report, report_buffer, file_type, user_email):
             logging.exception("Error sending email report: %s", e)
 
 
-def _handle_report_error(report, error, user_email):
+def _handle_report_error(report, error, user_email, event_id=None):
     """Handles report processing error with retry counting."""
     logging.exception("Error processing pending report: %s", error)
 
@@ -734,7 +784,9 @@ def _handle_report_error(report, error, user_email):
             parts_dir = _get_parts_dir(report.project.uuid, report.uuid)
             _cleanup_parts(storage, parts_dir)
         except Exception:
-            logging.warning("Failed to cleanup parts for permanently failed report %s", report.uuid)
+            logging.warning(
+                "Failed to cleanup parts for permanently failed report %s", report.uuid
+            )
     else:
         report.status = "failed"
         logging.info(
@@ -751,7 +803,7 @@ def _handle_report_error(report, error, user_email):
         settings, "REPORTS_SEND_EMAILS", False
     ):
         try:
-            _send_error_email(report.project.name, user_email, str(error), report.uuid)
+            _send_error_email(report.project.name, user_email, report.uuid, event_id)
         except Exception as email_error:
             logging.exception("Error sending error notification email: %s", email_error)
 
@@ -786,4 +838,5 @@ def process_pending_reports():
         report.save()
 
     except Exception as e:
-        _handle_report_error(report, e, user_email)
+        event_id = capture_exception(e)
+        _handle_report_error(report, e, user_email, event_id)

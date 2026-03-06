@@ -1,3 +1,4 @@
+from typing import Optional
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.translation import gettext as _
@@ -31,28 +32,28 @@ def get_report_ready_email(project_name: str, download_url: str):
     return plain_text, html
 
 
-def get_report_failed_email(project_name: str, error_message: str = None):
+def get_report_failed_email(project_name: str, event_id: Optional[str] = None):
     """
     Returns (plain_text, html) for report failed email.
 
     Args:
         project_name: Name of the project
-        error_message: Error message to display
+        event_id: Event ID to display
 
     Returns:
         Tuple of (plain_text_body, html_body)
     """
     context = {
         "project_name": project_name,
-        "error_message": error_message,
         "current_year": timezone.now().year,
+        "event_id": event_id,
     }
 
     html = render_to_string("rooms/emails/report_failed.html", context)
 
     plain_text = _(
         "An error occurred while generating the custom report for project %(project)s.\n\n"
-        "Error: %(error)s\n\nPlease try again later or contact support."
-    ) % {"project": project_name, "error": error_message or _("Unknown error")}
+        "Event ID: %(event_id)s\n\nPlease try again later or contact support."
+    ) % {"project": project_name, "event_id": event_id}
 
     return plain_text, html
