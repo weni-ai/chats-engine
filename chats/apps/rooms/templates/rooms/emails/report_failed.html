@@ -9,8 +9,10 @@
         {% blocktrans with project_name=project_name %}Unable to generate export of {{ project_name }} project
         data.{%endblocktrans %}
     </p>
-    <p>
-        Use the following information to report to support: {{ error_message }}.
-    </p>
+    {% if event_id %}
+        <p>
+            {% blocktrans with event_id=event_id %}The error occurred in the event with ID: {{ event_id }}.{% endblocktrans %}
+        </p>
+    {% endif %}
 </div>
 {% endblock %}
