@@ -336,6 +336,23 @@ msgstr "¿Está activo?"
 msgid "Room status"
 msgstr "Estado de la sala"
 
+#: chats/apps/api/v1/rooms/serializers.py
+msgid "At least one room is required"
+msgstr "Se requiere al menos una sala"
+
+#: chats/apps/api/v1/rooms/serializers.py
+#, python-format
+msgid "Cannot take more than %(max_rooms)s rooms at once"
+msgstr "No se pueden tomar más de %(max_rooms)s salas a la vez"
+
+#: chats/apps/api/v1/rooms/serializers.py
+msgid "Duplicate room UUIDs found"
+msgstr "Se encontraron UUIDs de sala duplicados"
+
+#: chats/apps/api/v1/rooms/serializers.py
+msgid "No available rooms found in queue"
+msgstr "No se encontraron salas disponibles en la cola"
+
 #: chats/apps/api/v1/rooms/viewsets.py:664
 msgid "Room is not queued"
 msgstr "La sala no está en cola"
