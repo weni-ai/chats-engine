@@ -809,8 +809,8 @@ class RoomViewsetBulkTakeTests(TestCase):
             queue=self.queue, project_uuid=str(self.project.pk), is_active=True
         )
 
-        view = RoomViewset.as_view({"patch": "bulk_take"})
-        req = self.factory.patch(
+        view = RoomViewset.as_view({"post": "bulk_take"})
+        req = self.factory.post(
             "/x",
             data={"rooms_list": [str(room.uuid)]},
             content_type="application/json",
@@ -837,8 +837,8 @@ class RoomViewsetBulkTakeTests(TestCase):
         ]
         rooms_data = [str(r.uuid) for r in rooms]
 
-        view = RoomViewset.as_view({"patch": "bulk_take"})
-        req = self.factory.patch(
+        view = RoomViewset.as_view({"post": "bulk_take"})
+        req = self.factory.post(
             "/x",
             data={"rooms_list": rooms_data},
             content_type="application/json",
@@ -862,8 +862,8 @@ class RoomViewsetBulkTakeTests(TestCase):
             user=other_user,
         )
 
-        view = RoomViewset.as_view({"patch": "bulk_take"})
-        req = self.factory.patch(
+        view = RoomViewset.as_view({"post": "bulk_take"})
+        req = self.factory.post(
             "/x",
             data={"rooms_list": [str(room.uuid)]},
             content_type="application/json",
@@ -879,8 +879,8 @@ class RoomViewsetBulkTakeTests(TestCase):
             queue=self.queue, project_uuid=str(self.project.pk), is_active=True
         )
 
-        view = RoomViewset.as_view({"patch": "bulk_take"})
-        req = self.factory.patch(
+        view = RoomViewset.as_view({"post": "bulk_take"})
+        req = self.factory.post(
             "/x",
             data={"rooms_list": [str(room.uuid)]},
             content_type="application/json",
@@ -900,8 +900,8 @@ class RoomViewsetBulkTakeTests(TestCase):
             user=self.agent,
         )
 
-        view = RoomViewset.as_view({"patch": "bulk_take"})
-        req = self.factory.patch(
+        view = RoomViewset.as_view({"post": "bulk_take"})
+        req = self.factory.post(
             "/x",
             data={"rooms_list": [str(room.uuid)]},
             content_type="application/json",
@@ -912,8 +912,8 @@ class RoomViewsetBulkTakeTests(TestCase):
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_bulk_take_returns_error_for_empty_list(self):
-        view = RoomViewset.as_view({"patch": "bulk_take"})
-        req = self.factory.patch(
+        view = RoomViewset.as_view({"post": "bulk_take"})
+        req = self.factory.post(
             "/x",
             data={"rooms_list": []},
             content_type="application/json",
@@ -938,8 +938,8 @@ class RoomViewsetBulkTakeTests(TestCase):
             user=other_user,
         )
 
-        view = RoomViewset.as_view({"patch": "bulk_take"})
-        req = self.factory.patch(
+        view = RoomViewset.as_view({"post": "bulk_take"})
+        req = self.factory.post(
             "/x",
             data={"rooms_list": [str(room_queued.uuid), str(room_assigned.uuid)]},
             content_type="application/json",
@@ -966,8 +966,8 @@ class RoomViewsetBulkTakeTests(TestCase):
         uuids = [str(uuid_mod.uuid4()) for _ in range(5)]
 
         with override_settings(BULK_TAKE_MAX_ROOMS=3):
-            view = RoomViewset.as_view({"patch": "bulk_take"})
-            req = self.factory.patch(
+            view = RoomViewset.as_view({"post": "bulk_take"})
+            req = self.factory.post(
                 "/x",
                 data={"rooms_list": uuids},
                 content_type="application/json",
@@ -984,8 +984,8 @@ class RoomViewsetBulkTakeTests(TestCase):
             is_active=True,
         )
 
-        view = RoomViewset.as_view({"patch": "bulk_take"})
-        req = self.factory.patch(
+        view = RoomViewset.as_view({"post": "bulk_take"})
+        req = self.factory.post(
             "/x",
             data={"rooms_list": [str(room.uuid), str(room.uuid)]},
             content_type="application/json",

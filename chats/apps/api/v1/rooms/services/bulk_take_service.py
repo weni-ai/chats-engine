@@ -71,19 +71,13 @@ class BulkTakeService:
 
         batch_size = getattr(settings, "BULK_TAKE_BATCH_SIZE", 50)
 
-        rooms_list = list(
-            rooms.select_related(
-                "queue__sector__project",
-                "queue__sector",
-                "user",
-            )
-        )
+        room_pks = list(rooms.values_list("pk", flat=True))
 
-        if not rooms_list:
+        if not room_pks:
             logger.warning("[BULK_TAKE] No rooms provided")
             return result
 
-        total = len(rooms_list)
+        total = len(room_pks)
         total_batches = (total + batch_size - 1) // batch_size
 
         logger.info(
@@ -94,7 +88,14 @@ class BulkTakeService:
         start_time = time.perf_counter()
 
         for batch_index in range(0, total, batch_size):
-            batch = rooms_list[batch_index:batch_index + batch_size]
+            batch_pks = room_pks[batch_index:batch_index + batch_size]
+            batch = list(
+                Room.objects.filter(pk__in=batch_pks).select_related(
+                    "queue__sector__project",
+                    "queue__sector",
+                    "user",
+                )
+            )
             batch_number = batch_index // batch_size + 1
 
             logger.info(

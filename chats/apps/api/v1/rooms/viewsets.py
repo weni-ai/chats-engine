@@ -732,7 +732,7 @@ class RoomViewset(
 
     @action(
         detail=False,
-        methods=["PATCH"],
+        methods=["POST"],
         url_name="bulk_take",
     )
     def bulk_take(self, request, pk=None):
