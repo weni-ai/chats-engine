@@ -4,6 +4,7 @@ from datetime import datetime
 from django.conf import settings
 from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from chats.apps.accounts.models import User
@@ -609,16 +610,19 @@ class BulkTakeSerializer(serializers.Serializer):
 
     def validate_rooms_list(self, value):
         if not value:
-            raise serializers.ValidationError("At least one room is required")
+            raise serializers.ValidationError(
+                _("At least one room is required")
+            )
 
         max_rooms = getattr(settings, "BULK_TAKE_MAX_ROOMS", 200)
         if len(value) > max_rooms:
             raise serializers.ValidationError(
-                f"Cannot take more than {max_rooms} rooms at once"
+                _("Cannot take more than %(max_rooms)s rooms at once")
+                % {"max_rooms": max_rooms}
             )
 
         if len(value) != len(set(value)):
-            raise serializers.ValidationError("Duplicate room UUIDs found")
+            raise serializers.ValidationError(_("Duplicate room UUIDs found"))
 
         return value
 
@@ -629,7 +633,9 @@ class BulkTakeSerializer(serializers.Serializer):
             user__isnull=True,
         )
         if not rooms.exists():
-            raise serializers.ValidationError("No available rooms found in queue")
+            raise serializers.ValidationError(
+                _("No available rooms found in queue")
+            )
         attrs["rooms"] = rooms
         return super().validate(attrs)
 
