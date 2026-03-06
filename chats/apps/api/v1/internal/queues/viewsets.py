@@ -7,6 +7,8 @@ from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.api.v1.queues import serializers as queue_serializers
 from chats.apps.api.v1.queues.filters import QueueFilter
 from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.rooms.models import Room
+from chats.apps.rooms.services import requeue_agent_rooms
 
 
 class QueueInternalViewset(viewsets.ModelViewSet):
@@ -88,6 +90,13 @@ class QueueAuthInternalViewset(viewsets.ModelViewSet):
         serializer.save()
 
     def perform_destroy(self, instance):
+        rooms = Room.objects.filter(
+            user=instance.permission.user,
+            queue=instance.queue,
+            is_active=True,
+        )
+        requeue_agent_rooms(rooms)
+
         instance.is_deleted = True
         instance.save()
         return Response(

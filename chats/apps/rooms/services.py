@@ -19,6 +19,39 @@ from .models import Room
 logger = logging.getLogger(__name__)
 
 
+def requeue_agent_rooms(rooms_queryset):
+    """
+    Return rooms to their queues by removing the assigned agent.
+    Used when an agent loses authorization (project, sector, or queue level).
+    """
+    from chats.apps.queues.utils import start_queue_priority_routing
+
+    affected_queues = set()
+
+    for room in rooms_queryset.select_related("queue", "user"):
+        old_user = room.user
+        if old_user is None:
+            continue
+
+        room.user = None
+        room.save()
+
+        room.notify_user("update", user=old_user)
+        room.notify_queue("update")
+
+        if room.queue:
+            affected_queues.add(room.queue)
+
+        logger.info(
+            "Room %s requeued (agent %s removed from authorization)",
+            room.uuid,
+            old_user.email,
+        )
+
+    for queue in affected_queues:
+        start_queue_priority_routing(queue)
+
+
 def can_retrieve(room, user, project) -> bool:
     filter_project_uuid = models.Q(queue__sector__project__uuid=project)
     is_sector_manager = models.Q(queue__sector__authorizations__permission__user=user)
