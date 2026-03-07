@@ -26,7 +26,6 @@ from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import close_room
 from chats.apps.sectors.utils import working_hours_validator
 
-
 logger = logging.getLogger(__name__)
 
 
