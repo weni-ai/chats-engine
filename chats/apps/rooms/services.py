@@ -12,6 +12,7 @@ from django.utils.translation import gettext as _
 from sentry_sdk import capture_message
 
 from chats.apps.projects.models.models import Project
+from chats.apps.queues.utils import start_queue_priority_routing
 from chats.core.cache import CacheClient
 
 from .models import Room
@@ -24,8 +25,6 @@ def requeue_agent_rooms(rooms_queryset):
     Return rooms to their queues by removing the assigned agent.
     Used when an agent loses authorization (project, sector, or queue level).
     """
-    from chats.apps.queues.utils import start_queue_priority_routing
-
     affected_queues = set()
 
     for room in rooms_queryset.select_related("queue", "user"):
