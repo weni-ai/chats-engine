@@ -1,3 +1,4 @@
+from django.db.models import Prefetch
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
 from rest_framework.viewsets import ReadOnlyModelViewSet
@@ -5,6 +6,7 @@ from rest_framework.viewsets import ReadOnlyModelViewSet
 from chats.apps.accounts.permissions import IsExternalProject
 from chats.apps.api.v2.external.rooms.filters import ExternalRoomMetricsFilter
 from chats.apps.rooms.models import Room
+from chats.apps.sectors.models import SectorTag
 from chats.apps.api.v2.external.rooms.serializers import ExternalRoomMetricsSerializer
 from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
@@ -18,7 +20,10 @@ from chats.apps.api.pagination import CustomCursorPagination
 
 
 class ExternalRoomMetricsViewSet(ReadOnlyModelViewSet):
-    queryset = Room.objects.select_related("user").prefetch_related("messages", "tags")
+    queryset = Room.objects.select_related("user").prefetch_related(
+        "messages",
+        Prefetch("tags", queryset=SectorTag.all_objects.all()),
+    )
     serializer_class = ExternalRoomMetricsSerializer
     authentication_classes = [ProjectAdminAuthentication]
     permission_classes = [IsExternalProject]
