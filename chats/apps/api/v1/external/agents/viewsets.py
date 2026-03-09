@@ -12,6 +12,7 @@ from chats.apps.api.v1.external.agents.serializers import (
     AgentFlowSerializer,
     AgentStatusSerializer,
 )
+from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.external.throttling import (
     ExternalHourRateThrottle,
     ExternalMinuteRateThrottle,
@@ -36,13 +37,10 @@ class AgentFlowViewset(viewsets.ReadOnlyModelViewSet):
     filterset_class = AgentFlowFilter
     lookup_field = "uuid"
     authentication_classes = [ProjectAdminAuthentication]
+    permission_classes = [IsAdminPermission]
 
     def get_queryset(self):
-        permission = self.request.auth
-        qs = super().get_queryset()
-        if permission is None or permission.role != 1:
-            return qs.none()
-        return qs.filter(project=permission.project)
+        return super().get_queryset().filter(project=self.request.auth.project)
 
     def list(self, request, *args, **kwargs):
         """List all agents (users with permissions) in the authenticated project."""
@@ -75,13 +73,10 @@ class ExternalAgentsStatusViewSet(viewsets.ReadOnlyModelViewSet):
     ]
     filter_backends = [DjangoFilterBackend]
     filterset_class = AgentFlowFilter
+    permission_classes = [IsAdminPermission]
 
     def get_queryset(self):
-        permission = self.request.auth
-        if permission is None or permission.role != 1:
-            return ProjectPermission.objects.none()
-
-        project_uuid = permission.project
+        project_uuid = self.request.auth.project
 
         custom_status_qs = CustomStatus.objects.filter(
             user=OuterRef("user__email"),
@@ -127,12 +122,6 @@ class ExternalAgentsStatusViewSet(viewsets.ReadOnlyModelViewSet):
 
     def list(self, request, *args, **kwargs):
         """List all agents with their current status and monitoring data."""
-        if not request.auth:
-            return Response(
-                {"detail": "Authentication credentials were not provided."},
-                status=http_status.HTTP_401_UNAUTHORIZED,
-            )
-
         queryset = self.filter_queryset(self.get_queryset())
         status_log_map = self._build_status_log_map(request.auth.project)
 
