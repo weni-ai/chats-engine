@@ -36,6 +36,12 @@ class RoomTagSerializer(serializers.ModelSerializer):
         fields = ["uuid", "name"]
         ref_name = "V2ExternalRoomTagSerializer"
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if instance.is_deleted:
+            data["name"] = data.get("name", "").split("_is_deleted_")[0]
+        return data
+
 
 class RoomSectorSerializer(serializers.ModelSerializer):
     class Meta:
