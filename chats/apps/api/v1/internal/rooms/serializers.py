@@ -12,6 +12,7 @@ from chats.apps.dashboard.models import RoomMetrics
 class RoomInternalListSerializer(serializers.ModelSerializer):
     contact = serializers.CharField(source="contact.name")
     agent = serializers.SerializerMethodField()
+    user_email = serializers.EmailField(source="user.email", default=None, read_only=True)
     tags = TagSimpleSerializer(many=True, required=False)
     sector = serializers.CharField(source="queue.sector.name")
     queue = serializers.CharField(source="queue.name")
@@ -27,6 +28,7 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
         fields = [
             "uuid",
             "agent",
+            "user_email",
             "contact",
             "urn",
             "is_active",
