@@ -3,6 +3,7 @@ from datetime import date
 from django.db.models import OuterRef, Subquery
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status as http_status, viewsets
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from chats.apps.accounts.authentication.drf.authorization import (
@@ -40,7 +41,11 @@ class AgentFlowViewset(viewsets.ReadOnlyModelViewSet):
     authentication_classes = [ProjectAdminAuthentication]
 
     def get_queryset(self):
-        return super().get_queryset().filter(project=self.request.auth.project)
+        permission = self.request.auth
+        qs = super().get_queryset()
+        if permission is None or permission.role != 1:
+            return qs.none()
+        return qs.filter(project=permission.project)
 
     def list(self, request, *args, **kwargs):
         """List all agents (users with permissions) in the authenticated project."""
@@ -66,6 +71,7 @@ class ExternalAgentsStatusViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = AgentStatusSerializer
     lookup_field = "uuid"
     authentication_classes = [ProjectAdminAuthentication]
+    permission_classes = [IsAuthenticated]
     throttle_classes = [
         ExternalSecondRateThrottle,
         ExternalMinuteRateThrottle,
@@ -73,7 +79,6 @@ class ExternalAgentsStatusViewSet(viewsets.ReadOnlyModelViewSet):
     ]
     filter_backends = [DjangoFilterBackend]
     filterset_class = AgentFlowFilter
-    authentication_classes = [ProjectAdminAuthentication]
 
     def get_queryset(self):
         project_uuid = self.request.auth.project

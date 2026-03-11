@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.core.cache import cache
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -19,6 +20,7 @@ class BaseExternalAgentsStatusTest(APITestCase):
     url = "/v1/external/agents_status/"
 
     def setUp(self):
+        cache.clear()
         self.project = Project.objects.create(name="Status Project")
         self.external_token = self.project.external_token
 
