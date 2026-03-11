@@ -14,7 +14,6 @@ from chats.apps.api.v1.external.agents.serializers import (
     AgentFlowSerializer,
     AgentStatusSerializer,
 )
-from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.external.throttling import (
     ExternalHourRateThrottle,
     ExternalMinuteRateThrottle,
@@ -39,7 +38,6 @@ class AgentFlowViewset(viewsets.ReadOnlyModelViewSet):
     filterset_class = AgentFlowFilter
     lookup_field = "uuid"
     authentication_classes = [ProjectAdminAuthentication]
-    permission_classes = [IsAdminPermission]
 
     def get_queryset(self):
         return super().get_queryset().filter(project=self.request.auth.project)
@@ -75,7 +73,8 @@ class ExternalAgentsStatusViewSet(viewsets.ReadOnlyModelViewSet):
     ]
     filter_backends = [DjangoFilterBackend]
     filterset_class = AgentFlowFilter
-    permission_classes = [IsAdminPermission]
+    authentication_classes = [ProjectAdminAuthentication]
+
 
     def get_queryset(self):
         project_uuid = self.request.auth.project
