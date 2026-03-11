@@ -50,15 +50,12 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
             return ""
 
     def get_link(self, obj: Room) -> dict:
-        if obj.user and obj.is_active:
-            url = f"chats:dashboard/view-mode/{obj.user.email}"
-        elif not obj.user and obj.is_active:
+        if obj.is_active:
             url = f"chats:chats/{obj.uuid}"
         elif not obj.is_active:
             url = f"chats:closed-chats/{obj.uuid}"
         else:
             url = None
-
         return {
             "url": url,
             "type": "internal",
