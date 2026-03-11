@@ -43,6 +43,7 @@ class AgentStatusSerializer(serializers.ModelSerializer):
     active_custom_status = serializers.SerializerMethodField()
     last_status_change = serializers.SerializerMethodField()
     time_in_current_status = serializers.SerializerMethodField()
+    online_time = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectPermission
@@ -57,6 +58,7 @@ class AgentStatusSerializer(serializers.ModelSerializer):
             "last_status_change",
             "time_in_current_status",
             "active_custom_status",
+            "online_time",
         ]
 
     def get_active_custom_status(self, obj):
@@ -78,3 +80,8 @@ class AgentStatusSerializer(serializers.ModelSerializer):
             return None
         last_dt = pendulum_parse(ts)
         return int((timezone.now() - last_dt).total_seconds())
+
+    def get_online_time(self, obj):
+        """Total online time in minutes for the requested date range."""
+        online_time_map = self.context.get("online_time_map", {})
+        return online_time_map.get(obj.user.email)

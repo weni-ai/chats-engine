@@ -1,5 +1,6 @@
+from datetime import date
+
 from django.db.models import OuterRef, Subquery
-from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status as http_status, viewsets
 from rest_framework.response import Response
@@ -7,6 +8,7 @@ from rest_framework.response import Response
 from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
 )
+from chats.apps.api.v1.external.agents.calculator import build_agent_log_maps
 from chats.apps.api.v1.external.agents.filters import AgentFlowFilter
 from chats.apps.api.v1.external.agents.serializers import (
     AgentFlowSerializer,
@@ -19,7 +21,7 @@ from chats.apps.api.v1.external.throttling import (
     ExternalSecondRateThrottle,
 )
 from chats.apps.projects.models import ProjectPermission
-from chats.apps.projects.models.models import AgentStatusLog, CustomStatus
+from chats.apps.projects.models.models import CustomStatus
 
 
 class AgentFlowViewset(viewsets.ReadOnlyModelViewSet):
@@ -103,27 +105,25 @@ class ExternalAgentsStatusViewSet(viewsets.ReadOnlyModelViewSet):
             )
         )
 
-    def _build_status_log_map(self, project_uuid):
-        """
-        Single query to fetch today's status logs for all agents in the project.
-        Returns {email: last_change_timestamp}.
-        """
-        today = timezone.now().date()
-        logs = AgentStatusLog.objects.filter(
-            project__uuid=project_uuid,
-            log_date=today,
-        ).values_list("agent__email", "status_changes")
-
-        status_map = {}
-        for email, changes in logs:
-            if changes and isinstance(changes, list) and len(changes) > 0:
-                status_map[email] = changes[-1].get("timestamp")
-        return status_map
+    def _parse_date_param(self, param_name):
+        raw = self.request.query_params.get(param_name)
+        if not raw:
+            return None
+        try:
+            return date.fromisoformat(raw)
+        except (ValueError, TypeError):
+            return None
 
     def list(self, request, *args, **kwargs):
         """List all agents with their current status and monitoring data."""
         queryset = self.filter_queryset(self.get_queryset())
-        status_log_map = self._build_status_log_map(request.auth.project)
+
+        start_date = self._parse_date_param("start_date")
+        end_date = self._parse_date_param("end_date")
+
+        status_log_map, online_time_map = build_agent_log_maps(
+            request.auth.project, start_date, end_date
+        )
 
         page = self.paginate_queryset(queryset)
         data = page if page is not None else queryset
@@ -134,6 +134,7 @@ class ExternalAgentsStatusViewSet(viewsets.ReadOnlyModelViewSet):
             context={
                 "request": request,
                 "status_log_map": status_log_map,
+                "online_time_map": online_time_map,
             },
         )
 
