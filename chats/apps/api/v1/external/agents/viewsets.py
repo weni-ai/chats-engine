@@ -3,7 +3,6 @@ from datetime import date
 from django.db.models import OuterRef, Subquery
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import status as http_status, viewsets
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from chats.apps.accounts.authentication.drf.authorization import (
@@ -71,7 +70,6 @@ class ExternalAgentsStatusViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = AgentStatusSerializer
     lookup_field = "uuid"
     authentication_classes = [ProjectAdminAuthentication]
-    permission_classes = [IsAuthenticated]
     throttle_classes = [
         ExternalSecondRateThrottle,
         ExternalMinuteRateThrottle,

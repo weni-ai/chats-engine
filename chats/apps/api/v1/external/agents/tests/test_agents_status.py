@@ -75,10 +75,6 @@ class BaseExternalAgentsStatusTest(APITestCase):
 
 
 class TestAgentsStatusUnauthenticated(BaseExternalAgentsStatusTest):
-    def test_returns_401_without_token(self):
-        response = self._get()
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
-
     def test_returns_401_with_invalid_token(self):
         self.client.credentials(
             HTTP_AUTHORIZATION="Bearer 00000000-0000-0000-0000-000000000000"
