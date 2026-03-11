@@ -75,7 +75,6 @@ class ExternalAgentsStatusViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_class = AgentFlowFilter
     authentication_classes = [ProjectAdminAuthentication]
 
-
     def get_queryset(self):
         project_uuid = self.request.auth.project
 
