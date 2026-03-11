@@ -51,11 +51,11 @@ class AgentRepository:
 
         agents_filters = Q(project_permissions__project=project) & Q(is_active=True)
 
-        if filters.queue:
-            rooms_filter["rooms__queue"] = filters.queue
+        if filters.queues:
+            rooms_filter["rooms__queue__in"] = filters.queues
             agents_filters &= Q(
-                project_permissions__queue_authorizations__queue=filters.queue
-            ) | Q(rooms__queue=filters.queue)
+                project_permissions__queue_authorizations__queue__in=filters.queues
+            ) | Q(rooms__queue__in=filters.queues)
 
         elif filters.sector:
             rooms_filter["rooms__queue__sector__in"] = filters.sector
