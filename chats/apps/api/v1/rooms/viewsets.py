@@ -698,7 +698,7 @@ class RoomViewset(
 
     @action(
         detail=False,
-        methods=["PATCH"],
+        methods=["POST"],
         url_name="bulk_transfer",
     )
     def bulk_transfer(self, request, pk=None):
@@ -708,8 +708,8 @@ class RoomViewset(
         serializer.is_valid(raise_exception=True)
 
         rooms = serializer.validated_data["rooms"]
-        user_email = request.query_params.get("user_email")
-        queue_uuid = request.query_params.get("queue_uuid")
+        user_email = serializer.validated_data.get("user_email")
+        queue_uuid = serializer.validated_data.get("queue_uuid")
 
         user = None
         queue = None
@@ -720,18 +720,58 @@ class RoomViewset(
         if queue_uuid:
             queue = get_object_or_404(Queue, pk=queue_uuid)
 
-        user_request = request.user
         service = BulkTransferService()
 
         try:
-            service.transfer(rooms, user_request, user, queue)
-        except ValueError as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            result = service.transfer(
+                rooms=rooms,
+                user_request=request.user,
+                user=user,
+                queue=queue,
+            )
 
-        return Response(
-            {"success": "Mass transfer completed"},
-            status=status.HTTP_200_OK,
-        )
+            logger.info(
+                f"Bulk transfer completed by {request.user.email}: "
+                f"{result.success_count} succeeded, {result.failed_count} failed"
+            )
+
+            if result.success_count == 0 and result.failed_count > 0:
+                response_status = status.HTTP_400_BAD_REQUEST
+                message = "All rooms failed to be transferred"
+            elif result.failed_count > 0:
+                response_status = status.HTTP_207_MULTI_STATUS
+                message = (
+                    f"{result.success_count} rooms transferred successfully, "
+                    f"{result.failed_count} failed"
+                )
+            else:
+                response_status = status.HTTP_200_OK
+                message = f"{result.success_count} rooms transferred successfully"
+
+            response_data = {
+                "success": result.success_count > 0,
+                "message": message,
+                **result.to_dict(),
+            }
+
+            return Response(response_data, status=response_status)
+
+        except Exception as e:
+            logger.error(
+                f"Bulk transfer error for user {request.user.email}: {str(e)}",
+                exc_info=True,
+            )
+            event_id = capture_exception(e)
+            return Response(
+                {
+                    "success": False,
+                    "error": f"Failed to transfer rooms. Event ID: {event_id}",
+                    "success_count": 0,
+                    "failed_count": 0,
+                    "total_processed": 0,
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
     @action(
         detail=False,
