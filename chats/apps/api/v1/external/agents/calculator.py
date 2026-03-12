@@ -43,15 +43,19 @@ def calculate_online_time(all_status_changes, close_open_with_now=False):
     return total
 
 
-def build_agent_log_maps(project_uuid, start_date=None, end_date=None):
+def build_agent_log_maps(project_uuid, start_date=None, end_date=None,
+                         agent_emails=None):
     """
-    Single query on AgentStatusLog for the given project and date range.
+    Fetches AgentStatusLog for the given project and date range.
     Returns a tuple (status_log_map, online_time_map):
       - status_log_map: {email: last_change_timestamp}
-      - online_time_map: {email: online_minutes (float)}
+      - online_time_map: {email: online_seconds (int)}
 
     Defaults to today if no dates are provided.
     If end_date includes today, open online intervals are closed with now().
+
+    If agent_emails is provided, agents without logs in the range get a
+    fallback lookup for their most recent log (single extra query).
     """
     from chats.apps.projects.models.models import AgentStatusLog
 
@@ -83,12 +87,28 @@ def build_agent_log_maps(project_uuid, start_date=None, end_date=None):
     for email, changes in last_day_changes.items():
         status_log_map[email] = changes[-1].get("timestamp")
 
+    if agent_emails:
+        missing = set(agent_emails) - set(status_log_map.keys())
+        if missing:
+            fallback_logs = (
+                AgentStatusLog.objects.filter(
+                    project__uuid=project_uuid,
+                    agent__email__in=missing,
+                )
+                .order_by("agent__email", "-log_date")
+                .distinct("agent__email")
+                .values_list("agent__email", "status_changes")
+            )
+            for email, changes in fallback_logs:
+                if changes and isinstance(changes, list) and len(changes) > 0:
+                    status_log_map[email] = changes[-1].get("timestamp")
+
     close_with_now = end_date >= today
 
     online_time_map = {}
     for email, events in agent_events.items():
         events.sort(key=lambda e: e["timestamp"])
         dt = calculate_online_time(events, close_open_with_now=close_with_now)
-        online_time_map[email] = round(dt.total_seconds() / 60, 2)
+        online_time_map[email] = int(dt.total_seconds())
 
     return status_log_map, online_time_map

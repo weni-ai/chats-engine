@@ -82,6 +82,6 @@ class AgentStatusSerializer(serializers.ModelSerializer):
         return int((timezone.now() - last_dt).total_seconds())
 
     def get_online_time(self, obj):
-        """Total online time in minutes for the requested date range."""
+        """Total online time in seconds for the requested date range."""
         online_time_map = self.context.get("online_time_map", {})
         return online_time_map.get(obj.user.email)

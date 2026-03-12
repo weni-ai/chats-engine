@@ -122,8 +122,11 @@ class ExternalAgentsStatusViewSet(viewsets.ReadOnlyModelViewSet):
         start_date = self._parse_date_param("start_date")
         end_date = self._parse_date_param("end_date")
 
+        agent_emails = list(queryset.values_list("user__email", flat=True))
+
         status_log_map, online_time_map = build_agent_log_maps(
-            request.auth.project, start_date, end_date
+            request.auth.project, start_date, end_date,
+            agent_emails=agent_emails,
         )
 
         page = self.paginate_queryset(queryset)
