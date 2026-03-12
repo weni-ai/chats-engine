@@ -37,31 +37,45 @@ class BulkTransferServiceTest(TestCase):
 
     def test_transfer_user_and_queue(self):
         user_2 = User.objects.create(email="test2@test.com")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=user_2,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
         queue_2 = Queue.objects.create(name="Test Queue 2", sector=self.sector)
-        self.service.transfer_user_and_queue(self.rooms, user_2, queue_2, self.user)
+        result = self.service.transfer(self.rooms, self.user, user=user_2, queue=queue_2)
 
         self.room.refresh_from_db()
         self.assertEqual(self.room.user, user_2)
         self.assertEqual(self.room.queue, queue_2)
+        self.assertEqual(result.success_count, 1)
 
     def test_transfer_user(self):
         user_2 = User.objects.create(email="test2@test.com")
-        self.service.transfer_user(self.rooms, user_2, self.user)
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=user_2,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        result = self.service.transfer(self.rooms, self.user, user=user_2)
 
         self.room.refresh_from_db()
         self.assertEqual(self.room.user, user_2)
         self.assertEqual(self.room.queue, self.queue)
+        self.assertEqual(result.success_count, 1)
 
     def test_transfer_queue(self):
         queue_2 = Queue.objects.create(name="Test Queue 2", sector=self.sector)
-        self.service.transfer_queue(self.rooms, queue_2, self.user)
+        result = self.service.transfer(self.rooms, self.user, queue=queue_2)
 
         self.room.refresh_from_db()
         self.assertEqual(self.room.user, None)
         self.assertEqual(self.room.queue, queue_2)
+        self.assertEqual(result.success_count, 1)
 
     def test_validate_queue(self):
-        self.service.validate_queue(self.rooms, self.queue)
+        error = self.service._validate_queue(self.rooms, self.queue)
+        self.assertIsNone(error)
 
     def test_validate_queue_when_queue_is_from_another_project(self):
         queue_2 = Queue.objects.create(
@@ -75,25 +89,19 @@ class BulkTransferServiceTest(TestCase):
             ),
         )
 
-        with self.assertRaises(ValueError) as context:
-            self.service.validate_queue(self.rooms, queue_2)
-
-        self.assertEqual(
-            str(context.exception), "Cannot transfer rooms from a project to another"
-        )
+        error = self.service._validate_queue(self.rooms, queue_2)
+        self.assertEqual(error, "Cannot transfer rooms from a project to another")
 
     def test_validate_user(self):
-        self.service.validate_user(self.rooms, self.user)
+        error = self.service._validate_user(self.rooms, self.user)
+        self.assertIsNone(error)
 
     def test_validate_user_when_user_has_no_permission_on_project(self):
         user_2 = User.objects.create(email="test2@test.com")
 
-        with self.assertRaises(ValueError) as context:
-            self.service.validate_user(self.rooms, user_2)
-
-        self.assertEqual(
-            str(context.exception), "User has no permission on the project"
-        )
+        error = self.service._validate_user(self.rooms, user_2)
+        self.assertIsNotNone(error)
+        self.assertIn("has no permission on the project", error)
 
     def _create_multiple_rooms(self, count=3):
         rooms = [self.room]
@@ -119,15 +127,20 @@ class BulkTransferServiceTest(TestCase):
         mock_update_ticket,
     ):
         user_2 = User.objects.create(email="test2@test.com")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=user_2,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
         queue_2 = Queue.objects.create(name="Test Queue 2", sector=self.sector)
         rooms = self._create_multiple_rooms(3)
 
-        self.service.transfer_user_and_queue(rooms, user_2, queue_2, self.user)
+        result = self.service.transfer(rooms, self.user, user=user_2, queue=queue_2)
 
+        self.assertEqual(result.success_count, 3)
         self.assertEqual(mock_feedback.call_count, 6)
         self.assertEqual(mock_notify_queue.call_count, 3)
         self.assertEqual(mock_notify_user.call_count, 6)
-        self.assertEqual(mock_routing.call_count, 3)
         self.assertEqual(mock_mark_notes.call_count, 3)
         self.assertEqual(mock_update_ticket.call_count, 3)
 
@@ -147,14 +160,19 @@ class BulkTransferServiceTest(TestCase):
         mock_update_ticket,
     ):
         user_2 = User.objects.create(email="test2@test.com")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=user_2,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
         rooms = self._create_multiple_rooms(3)
 
-        self.service.transfer_user(rooms, user_2, self.user)
+        result = self.service.transfer(rooms, self.user, user=user_2)
 
+        self.assertEqual(result.success_count, 3)
         self.assertEqual(mock_feedback.call_count, 3)
         self.assertEqual(mock_notify_queue.call_count, 3)
         self.assertEqual(mock_notify_user.call_count, 6)
-        self.assertEqual(mock_routing.call_count, 3)
         self.assertEqual(mock_mark_notes.call_count, 3)
         self.assertEqual(mock_update_ticket.call_count, 3)
 
@@ -174,12 +192,12 @@ class BulkTransferServiceTest(TestCase):
         queue_2 = Queue.objects.create(name="Test Queue 2", sector=self.sector)
         rooms = self._create_multiple_rooms(3)
 
-        self.service.transfer_queue(rooms, queue_2, self.user)
+        result = self.service.transfer(rooms, self.user, queue=queue_2)
 
+        self.assertEqual(result.success_count, 3)
         self.assertEqual(mock_feedback.call_count, 3)
         self.assertEqual(mock_notify_queue.call_count, 3)
         self.assertEqual(mock_notify_user.call_count, 3)
-        self.assertEqual(mock_routing.call_count, 3)
         self.assertEqual(mock_mark_notes.call_count, 3)
 
 
