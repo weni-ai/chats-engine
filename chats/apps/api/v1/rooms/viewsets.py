@@ -705,6 +705,7 @@ class RoomViewset(
         serializer.is_valid(raise_exception=True)
 
         rooms = serializer.validated_data["rooms"]
+        skipped_rooms = serializer.validated_data.get("skipped_rooms", set())
         user_email = serializer.validated_data.get("user_email")
         queue_uuid = serializer.validated_data.get("queue_uuid")
 
@@ -726,6 +727,9 @@ class RoomViewset(
                 user=user,
                 queue=queue,
             )
+
+            for room_uuid in skipped_rooms:
+                result.add_failure(room_uuid, f"Room {room_uuid}: not found or not active")
 
             logger.info(
                 f"Bulk transfer completed by {request.user.email}: "
@@ -782,10 +786,14 @@ class RoomViewset(
         serializer.is_valid(raise_exception=True)
 
         rooms = serializer.validated_data["rooms"]
+        skipped_rooms = serializer.validated_data.get("skipped_rooms", set())
         service = BulkTakeService()
 
         try:
             result = service.take(rooms=rooms, user=request.user)
+
+            for room_uuid in skipped_rooms:
+                result.add_failure(room_uuid, f"Room {room_uuid}: not found, not active, or already assigned")
 
             logger.info(
                 f"Bulk take completed by {request.user.email}: "
