@@ -339,7 +339,7 @@ class TestAgentsStatusOnlineTime(BaseExternalAgentsStatusTest):
         )
 
     def test_online_time_simple_interval(self):
-        """Agent online for 2 hours then offline -> online_time = 120 minutes."""
+        """Agent online for 2 hours then offline -> online_time = 7200 seconds."""
         self._create_log(
             self.agent_1,
             self.now.date(),
@@ -361,7 +361,7 @@ class TestAgentsStatusOnlineTime(BaseExternalAgentsStatusTest):
         response = self._get()
 
         agent_data = self._find_agent(response, "agent1@test.com")
-        self.assertAlmostEqual(agent_data["online_time"], 120.0, delta=1)
+        self.assertAlmostEqual(agent_data["online_time"], 7200, delta=10)
 
     def test_online_time_includes_in_service(self):
         """In-Service is treated as online state, no gap created."""
@@ -396,7 +396,7 @@ class TestAgentsStatusOnlineTime(BaseExternalAgentsStatusTest):
         response = self._get()
 
         agent_data = self._find_agent(response, "agent1@test.com")
-        self.assertAlmostEqual(agent_data["online_time"], 150.0, delta=1)
+        self.assertAlmostEqual(agent_data["online_time"], 9000, delta=10)
 
     def test_online_time_currently_online_counts_to_now(self):
         """If last event is ONLINE, time is counted up to now()."""
@@ -416,7 +416,7 @@ class TestAgentsStatusOnlineTime(BaseExternalAgentsStatusTest):
         response = self._get()
 
         agent_data = self._find_agent(response, "agent1@test.com")
-        self.assertAlmostEqual(agent_data["online_time"], 60.0, delta=1)
+        self.assertAlmostEqual(agent_data["online_time"], 3600, delta=10)
 
     def test_online_time_break_stops_counting(self):
         """BREAK status stops online counting."""
@@ -451,7 +451,7 @@ class TestAgentsStatusOnlineTime(BaseExternalAgentsStatusTest):
         response = self._get()
 
         agent_data = self._find_agent(response, "agent1@test.com")
-        self.assertAlmostEqual(agent_data["online_time"], 90.0, delta=1)
+        self.assertAlmostEqual(agent_data["online_time"], 5400, delta=10)
 
     def test_online_time_null_without_logs(self):
         """Agent without any log should have null online_time."""
@@ -498,9 +498,9 @@ class TestAgentsStatusOnlineTime(BaseExternalAgentsStatusTest):
         })
 
         agent_data = self._find_agent(response, "agent1@test.com")
-        expected_minutes = (timedelta(days=1, hours=3) - timedelta(hours=5)).total_seconds() / 60
+        expected_seconds = (timedelta(days=1, hours=3) - timedelta(hours=5)).total_seconds()
         self.assertAlmostEqual(
-            agent_data["online_time"], expected_minutes, delta=1
+            agent_data["online_time"], expected_seconds, delta=10
         )
 
     def test_online_time_with_date_filter(self):
@@ -535,4 +535,4 @@ class TestAgentsStatusOnlineTime(BaseExternalAgentsStatusTest):
         })
 
         agent_data = self._find_agent(response, "agent1@test.com")
-        self.assertAlmostEqual(agent_data["online_time"], 120.0, delta=1)
+        self.assertAlmostEqual(agent_data["online_time"], 7200, delta=10)
