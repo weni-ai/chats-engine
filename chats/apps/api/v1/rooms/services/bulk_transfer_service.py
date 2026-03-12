@@ -213,6 +213,54 @@ class BulkTransferService:
 
         room.mark_notes_as_non_deletable()
 
+    def _check_validations(self, rooms, result, user, queue):
+        for validate, target in [
+            (self._validate_queue, queue),
+            (self._validate_user, user),
+        ]:
+            error = validate(rooms, target)
+            if error:
+                for room in rooms:
+                    result.add_failure(room.uuid, error)
+                return False
+        return True
+
+    def _transfer_room(self, room, user, queue, user_request):
+        if user and queue:
+            self._transfer_user_and_queue(room, user, queue, user_request)
+        elif user:
+            self._transfer_user(room, user, user_request)
+        elif queue:
+            self._transfer_queue(room, queue, user_request)
+
+    def _process_batch(self, batch, result, user, queue, user_request):
+        affected_queue_ids = set()
+
+        for room in batch:
+            try:
+                self._transfer_room(room, user, queue, user_request)
+                result.add_success()
+
+                if room.queue_id:
+                    affected_queue_ids.add(room.queue_id)
+
+            except Exception as e:
+                error_msg = f"Room {room.uuid}: {str(e)}"
+                result.add_failure(room.uuid, error_msg)
+                logger.warning(
+                    f"[BULK_TRANSFER] Failed to transfer room: {error_msg}"
+                )
+
+        for queue_id in affected_queue_ids:
+            try:
+                q = Queue.objects.get(pk=queue_id)
+                start_queue_priority_routing(q)
+            except Exception as e:
+                logger.warning(
+                    f"[BULK_TRANSFER] Failed to start routing for queue "
+                    f"{queue_id}: {str(e)}"
+                )
+
     def transfer(
         self,
         rooms: QuerySet[Room],
@@ -222,16 +270,7 @@ class BulkTransferService:
     ) -> BulkTransferResult:
         result = BulkTransferResult()
 
-        validation_error = self._validate_queue(rooms, queue)
-        if validation_error:
-            for room in rooms:
-                result.add_failure(room.uuid, validation_error)
-            return result
-
-        validation_error = self._validate_user(rooms, user)
-        if validation_error:
-            for room in rooms:
-                result.add_failure(room.uuid, validation_error)
+        if not self._check_validations(rooms, result, user, queue):
             return result
 
         batch_size = getattr(settings, "BULK_TRANSFER_BATCH_SIZE", 50)
@@ -268,38 +307,7 @@ class BulkTransferService:
                 f"({len(batch)} rooms)"
             )
 
-            affected_queue_ids = set()
-
-            for room in batch:
-                try:
-                    if user and queue:
-                        self._transfer_user_and_queue(room, user, queue, user_request)
-                    elif user:
-                        self._transfer_user(room, user, user_request)
-                    elif queue:
-                        self._transfer_queue(room, queue, user_request)
-
-                    result.add_success()
-
-                    if room.queue_id:
-                        affected_queue_ids.add(room.queue_id)
-
-                except Exception as e:
-                    error_msg = f"Room {room.uuid}: {str(e)}"
-                    result.add_failure(room.uuid, error_msg)
-                    logger.warning(
-                        f"[BULK_TRANSFER] Failed to transfer room: {error_msg}"
-                    )
-
-            for queue_id in affected_queue_ids:
-                try:
-                    q = Queue.objects.get(pk=queue_id)
-                    start_queue_priority_routing(q)
-                except Exception as e:
-                    logger.warning(
-                        f"[BULK_TRANSFER] Failed to start routing for queue "
-                        f"{queue_id}: {str(e)}"
-                    )
+            self._process_batch(batch, result, user, queue, user_request)
 
             has_more_batches = batch_index + batch_size < total
             if has_more_batches:
