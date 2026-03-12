@@ -648,10 +648,42 @@ class RoomNoteSerializer(serializers.ModelSerializer):
 
 class BulkTransferSerializer(serializers.Serializer):
     rooms_list = serializers.ListField(child=serializers.UUIDField(), required=True)
+    user_email = serializers.EmailField(required=False, allow_null=True, default=None)
+    queue_uuid = serializers.UUIDField(required=False, allow_null=True, default=None)
+
+    def validate_rooms_list(self, value):
+        if not value:
+            raise serializers.ValidationError(
+                _("At least one room is required")
+            )
+
+        max_rooms = getattr(settings, "BULK_TRANSFER_MAX_ROOMS", 200)
+        if len(value) > max_rooms:
+            raise serializers.ValidationError(
+                _("Cannot transfer more than %(max_rooms)s rooms at once")
+                % {"max_rooms": max_rooms}
+            )
+
+        if len(value) != len(set(value)):
+            raise serializers.ValidationError(_("Duplicate room UUIDs found"))
+
+        return value
 
     def validate(self, attrs):
-        attrs["rooms"] = Room.objects.filter(uuid__in=attrs.get("rooms_list"))
+        if not attrs.get("user_email") and not attrs.get("queue_uuid"):
+            raise serializers.ValidationError(
+                _("At least one of user_email or queue_uuid is required")
+            )
 
+        rooms = Room.objects.filter(
+            uuid__in=attrs.get("rooms_list"),
+            is_active=True,
+        )
+        if not rooms.exists():
+            raise serializers.ValidationError(
+                _("No active rooms found with the provided UUIDs")
+            )
+        attrs["rooms"] = rooms
         return super().validate(attrs)
 
 
