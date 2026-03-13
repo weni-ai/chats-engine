@@ -6,5 +6,4 @@ class SectorsConfig(AppConfig):
     name = "chats.apps.sectors"
 
     def ready(self):
-        # Import signals to ensure they are registered
-        from chats.apps.projects.models import permission_signals  # noqa: F401
+        import chats.apps.sectors.signals  # noqa: F401
