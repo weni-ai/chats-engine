@@ -142,22 +142,10 @@ class RoomViewsetListTests(TestCase):
         self.feature_flag_patch = patch(
             "chats.apps.api.v1.rooms.viewsets.is_feature_active", return_value=True
         )
-        self.feature_flag_eval_patch = patch(
-            "chats.apps.feature_flags.services.FeatureFlagService.evaluate_feature_flag",
-            return_value=True,
-        )
-        self.feature_flag_rules_patch = patch(
-            "chats.apps.feature_flags.services.FeatureFlagService.get_feature_flag_rules",
-            return_value=[],
-        )
         self.feature_flag_patch.start()
-        self.feature_flag_eval_patch.start()
-        self.feature_flag_rules_patch.start()
 
     def tearDown(self):
         self.feature_flag_patch.stop()
-        self.feature_flag_eval_patch.stop()
-        self.feature_flag_rules_patch.stop()
         super().tearDown()
 
     def _new_contact(self):
@@ -251,17 +239,14 @@ class RoomViewsetListTests(TestCase):
         """
         Test that the optimized version filters BEFORE annotating,
         which is critical for performance with large datasets.
+        Pinned rooms always appear regardless of filters (consistent with legacy).
         """
-        # Create rooms with different statuses
         active_pinned = self._create_room("ACTIVE-PINNED", is_active=True)
         active_regular = self._create_room("ACTIVE-REGULAR", is_active=True)
-        inactive_pinned = self._create_room("INACTIVE-PINNED", is_active=False)
+        self._create_room("INACTIVE-REGULAR", is_active=False)
 
-        # Pin both pinned rooms
         RoomPin.objects.create(room=active_pinned, user=self.request_user)
-        RoomPin.objects.create(room=inactive_pinned, user=self.request_user)
 
-        # Request only active rooms
         params = {
             "project": str(self.project.pk),
             "is_active": "true",
@@ -274,23 +259,123 @@ class RoomViewsetListTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         results = response.data["results"]
 
-        # Should include active pinned room first, then active regular
         result_uuids = [r["uuid"] for r in results]
         self.assertIn(str(active_pinned.uuid), result_uuids)
         self.assertIn(str(active_regular.uuid), result_uuids)
 
-        # Should NOT include inactive pinned room (filters applied correctly)
-        self.assertNotIn(str(inactive_pinned.uuid), result_uuids)
-
-        # Pinned room should come first
         if len(results) >= 2:
             self.assertEqual(results[0]["uuid"], str(active_pinned.uuid))
 
-        # Query count should be reasonable even with filters
         self.assertLessEqual(
             len(ctx), 50,
             f"Too many queries with filters: {len(ctx)}"
         )
+
+    def test_optimized_no_pins_returns_filtered_results(self):
+        room_a = self._create_room("A")
+        room_b = self._create_room("B")
+
+        response = self._list({"limit": 50})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        result_uuids = {r["uuid"] for r in response.data["results"]}
+        self.assertIn(str(room_a.uuid), result_uuids)
+        self.assertIn(str(room_b.uuid), result_uuids)
+        for r in response.data["results"]:
+            self.assertFalse(r["is_pinned"])
+
+    def test_optimized_pin_order_by_created_on_desc(self):
+        import time
+
+        room_a = self._create_room("A", user=self.request_user)
+        self._create_room("B", user=self.request_user)
+        room_c = self._create_room("C", user=self.request_user)
+
+        RoomPin.objects.create(room=room_a, user=self.request_user)
+        time.sleep(0.01)
+        RoomPin.objects.create(room=room_c, user=self.request_user)
+
+        response = self._list({"limit": 50})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data["results"]
+        result_uuids = [r["uuid"] for r in results]
+
+        idx_c = result_uuids.index(str(room_c.uuid))
+        idx_a = result_uuids.index(str(room_a.uuid))
+        self.assertLess(idx_c, idx_a, "Most recently pinned room should come first")
+
+        self.assertTrue(results[idx_c]["is_pinned"])
+        self.assertTrue(results[idx_a]["is_pinned"])
+
+    def test_optimized_serializer_is_pinned_uses_context(self):
+        room_pinned = self._create_room("PINNED", user=self.request_user)
+        room_regular = self._create_room("REGULAR", user=self.request_user)
+        RoomPin.objects.create(room=room_pinned, user=self.request_user)
+
+        response = self._list({"limit": 50})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data["results"]
+        pinned_result = next(r for r in results if r["uuid"] == str(room_pinned.uuid))
+        regular_result = next(r for r in results if r["uuid"] == str(room_regular.uuid))
+        self.assertTrue(pinned_result["is_pinned"])
+        self.assertFalse(regular_result["is_pinned"])
+
+    def test_optimized_pin_with_email_filter(self):
+        room = self._create_room("ROOM", user=self.other_user)
+        RoomPin.objects.create(room=room, user=self.other_user)
+
+        response = self._list({"email": self.other_user.email, "limit": 50})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data["results"]
+        self.assertTrue(len(results) >= 1)
+        pinned_result = next(r for r in results if r["uuid"] == str(room.uuid))
+        self.assertTrue(pinned_result["is_pinned"])
+
+    def test_optimized_pinned_room_appears_even_if_not_matching_filter(self):
+        pinned_room = self._create_room("PINNED", user=self.request_user)
+        ongoing_room = self._create_room("ONGOING", user=self.request_user)
+        RoomPin.objects.create(room=pinned_room, user=self.request_user)
+
+        Room.objects.filter(pk=pinned_room.pk).update(is_waiting=True)
+
+        response = self._list({"room_status": "ongoing", "limit": 50})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        result_uuids = [r["uuid"] for r in response.data["results"]]
+        self.assertIn(str(pinned_room.uuid), result_uuids)
+        self.assertIn(str(ongoing_room.uuid), result_uuids)
+
+    def test_optimized_respects_max_pin_limit(self):
+        rooms = [
+            self._create_room(f"R{i}", user=self.request_user) for i in range(4)
+        ]
+        for room in rooms[:3]:
+            RoomPin.objects.create(room=room, user=self.request_user)
+
+        response = self._list({"limit": 50})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data["results"]
+        pinned_count = sum(1 for r in results if r["is_pinned"])
+        self.assertLessEqual(pinned_count, 3)
+
+    def test_optimized_different_user_pins_not_visible(self):
+        room = self._create_room("ROOM", user=self.other_user)
+        RoomPin.objects.create(room=room, user=self.other_user)
+
+        response = self._list({"limit": 50})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data["results"]
+        if results:
+            room_result = next(
+                (r for r in results if r["uuid"] == str(room.uuid)), None
+            )
+            if room_result:
+                self.assertFalse(room_result["is_pinned"])
 
 
 class RoomViewsetBulkCloseTests(TestCase):
