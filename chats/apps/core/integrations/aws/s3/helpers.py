@@ -41,3 +41,9 @@ def get_presigned_url(object_key: str) -> str:
         Params={"Bucket": settings.AWS_STORAGE_BUCKET_NAME, "Key": object_key},
         ExpiresIn=3600,
     )
+
+
+def get_object_key(url: str) -> str:
+    parsed = urlparse(url)
+
+    return parsed.path.lstrip("/")

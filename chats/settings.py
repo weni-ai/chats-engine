@@ -702,3 +702,9 @@ ROOMS_EXTERNAL_API_QUERYSET_FILTER_FLAG_KEY = env.str(
     "ROOMS_EXTERNAL_API_QUERYSET_FILTER_FLAG_KEY",
     default="weniChatsRoomsExternalApiQuerySetFilter",
 )
+
+# Flows Media URL
+USE_FLOWS_MEDIA_URL_FEATURE_FLAG_KEY = env.str(
+    "USE_FLOWS_MEDIA_URL_FEATURE_FLAG_KEY",
+    default="weniChatsUseFlowsMediaUrl",
+)
