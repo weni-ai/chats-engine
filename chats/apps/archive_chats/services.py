@@ -31,6 +31,10 @@ from chats.apps.msgs.models import Message, MessageMedia
 logger = logging.getLogger(__name__)
 
 
+def is_file_on_chats_bucket(url: str) -> bool:
+    return is_file_in_the_same_bucket(url, settings.AWS_STORAGE_BUCKET_NAME)
+
+
 class BaseArchiveChatsService(ABC):
     @abstractmethod
     def archive_room_history(self, room: Room, job: ArchiveConversationsJob) -> None:
@@ -213,22 +217,29 @@ class ArchiveChatsService(BaseArchiveChatsService):
             if not media.media_url:
                 return
 
-            return media.media_url
+            if is_file_on_chats_bucket(media.media_url):
+                return self._get_chats_media_redirect_url(media.media_url)
 
-        if is_file_in_the_same_bucket(
-            media.media_file.url, settings.AWS_STORAGE_BUCKET_NAME
-        ):
+            return self._get_flows_media_redirect_url(media.media_url)
+
+        if is_file_on_chats_bucket(media.media_file.url):
             object_key = media.media_file.name
 
-            return self._get_redirect_url(object_key)
+            return self._get_chats_media_redirect_url(object_key)
 
         return None
 
-    def _get_redirect_url(self, object_key: str) -> str:
+    def _get_chats_media_redirect_url(self, object_key: str) -> str:
         base_url = settings.CHATS_BASE_URL
         path = reverse("get_archived_media")
 
         return f"{base_url}{path}?object_key={object_key}"
+
+    def _get_flows_media_redirect_url(self, object_key: str) -> str:
+        base_url = settings.FLOWS_BASE_URL
+        path = f"{base_url}/api/v2/internals/media/download"
+
+        return f"{path}/{object_key}"
 
     def get_archived_media_url(self, object_key: str) -> str:
         parts = object_key.split("/")
