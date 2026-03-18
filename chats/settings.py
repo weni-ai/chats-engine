@@ -702,3 +702,5 @@ ROOMS_EXTERNAL_API_QUERYSET_FILTER_FLAG_KEY = env.str(
     "ROOMS_EXTERNAL_API_QUERYSET_FILTER_FLAG_KEY",
     default="weniChatsRoomsExternalApiQuerySetFilter",
 )
+
+FLOWS_BASE_URL = env.str("FLOWS_BASE_URL", default="https://flows.weni.ai")
