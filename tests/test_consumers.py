@@ -4,6 +4,9 @@ from django.test import SimpleTestCase
 
 from chats.apps.msgs.consumers.msg_consumer import MsgConsumer
 from chats.apps.projects.consumers.project_consumer import ProjectConsumer
+from chats.apps.projects.consumers.project_update_consumer import (
+    ProjectUpdateConsumer,
+)
 from chats.apps.projects.consumers.sector_consumer import SectorConsumer
 
 
@@ -74,6 +77,56 @@ class ProjectConsumerTests(SimpleTestCase):
         # Ensure the creation usecase was instantiated with the mocked sector handler
         mock_proj_usecase_cls.assert_called_once_with(mock_sector_handler.return_value)
         # Ensure execute path acked the message
+        self.assertEqual(self.message.channel.acked, [1])
+
+
+class ProjectUpdateConsumerTests(SimpleTestCase):
+    def setUp(self):
+        self.message = DummyMessage(body=b"{}")
+
+    @mock.patch(
+        "chats.apps.projects.consumers.project_update_consumer.JSONParser.parse",
+        return_value={
+            "project_uuid": "p1",
+            "user_email": "user@test.com",
+            "name": "New Name",
+            "timezone": "America/Sao_Paulo",
+            "date_format": "D",
+            "config": {"key": "value"},
+        },
+    )
+    @mock.patch(
+        "chats.apps.projects.consumers.project_update_consumer.ProjectUpdateUseCase"
+    )
+    def test_project_update_consumer_triggers_update(
+        self, mock_usecase_cls, _
+    ):
+        ProjectUpdateConsumer.consume(self.message)
+
+        mock_usecase_cls.assert_called_once()
+        mock_usecase_cls.return_value.update_project.assert_called_once()
+        self.assertEqual(self.message.channel.acked, [1])
+
+    @mock.patch(
+        "chats.apps.projects.consumers.project_update_consumer.JSONParser.parse",
+        return_value={
+            "project_uuid": "p1",
+            "user_email": "user@test.com",
+        },
+    )
+    @mock.patch(
+        "chats.apps.projects.consumers.project_update_consumer.ProjectUpdateUseCase"
+    )
+    def test_project_update_consumer_with_partial_fields(
+        self, mock_usecase_cls, _
+    ):
+        ProjectUpdateConsumer.consume(self.message)
+
+        mock_usecase_cls.return_value.update_project.assert_called_once()
+        dto = mock_usecase_cls.return_value.update_project.call_args[0][0]
+        self.assertEqual(dto.project_uuid, "p1")
+        self.assertIsNone(dto.name)
+        self.assertIsNone(dto.timezone)
         self.assertEqual(self.message.channel.acked, [1])
 
 
