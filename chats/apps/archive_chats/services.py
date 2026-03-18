@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import io
 import json
 import logging
+from urllib.parse import urlparse
 
 import boto3
 from typing import List
@@ -218,7 +219,8 @@ class ArchiveChatsService(BaseArchiveChatsService):
             if is_file_on_chats_bucket(media.media_url):
                 return self._get_chats_media_redirect_url(media.media_url)
 
-            return self._get_flows_media_redirect_url(media.media_url)
+            object_key = urlparse(media.media_url).path.lstrip("/")
+            return self._get_flows_media_redirect_url(object_key)
 
         if is_file_on_chats_bucket(media.media_file.url):
             object_key = media.media_file.name

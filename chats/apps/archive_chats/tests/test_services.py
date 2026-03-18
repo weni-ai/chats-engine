@@ -290,6 +290,32 @@ class TestArchiveChatsService(TestCase):
             f"https://test-bucket.s3.amazonaws.com/{object_key}",
         )
 
+    @patch(
+        "chats.apps.archive_chats.services.is_file_on_chats_bucket", return_value=False
+    )
+    def test_process_media_extracts_object_key_from_url(
+        self, mock_is_file_on_chats_bucket
+    ):
+        message = Message.objects.create(
+            room=self.room,
+            contact=self.contact,
+            text="Test message",
+            created_on=timezone.now(),
+        )
+        media = MessageMedia.objects.create(
+            message=message,
+            content_type="image/jpeg",
+            media_url="https://flows-test-fictional-bucket.s3.sa-east-1.amazonaws.com/media/12345/kall/1234/example-here.jpg",
+        )
+
+        url = self.service.process_media(media)
+
+        expected_object_key = "media/12345/kall/1234/example-here.jpg"
+        self.assertEqual(
+            url,
+            f"https://flows.weni.ai/api/v2/internals/media/download/{expected_object_key}",
+        )
+
     def test_delete_room_messages(self):
         archived_conversation = RoomArchivedConversation.objects.create(
             job=self.service.start_archive_job(),
