@@ -1,11 +1,18 @@
 import json
 from unittest.mock import MagicMock, patch
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
-from rest_framework.test import APIRequestFactory
+from rest_framework.test import APIRequestFactory, force_authenticate
 
 from chats.apps.api.v1.internal.human_support.views import HumanSupportView
 from chats.core import cache_utils
+
+User = get_user_model()
+
+PERMISSION_PATCH = (
+    "chats.apps.api.v1.internal.permissions.ModuleHasPermission.has_permission"
+)
 
 
 class FakeRedis:
@@ -29,7 +36,6 @@ NEXUS_RESPONSE_DATA = {
     "human_support": True,
     "human_support_prompt": "Aguarde enquanto conectamos você com um atendente.",
 }
-AUTH_TOKEN = "Bearer test-internal-token"
 
 
 def _make_fake_nexus_response(status_code=200, json_data=None):
@@ -47,28 +53,29 @@ class HumanSupportViewTestMixin:
         self.factory = APIRequestFactory()
         self.view = HumanSupportView.as_view()
         self.fake_redis = FakeRedis()
+        self.user = User.objects.create_user(
+            email="internal@module.com", password="x"
+        )
 
     def _get_request(self, method="get", data=None):
+        url = f"/v1/internal/human-support/{PROJECT_UUID}/"
         if method == "get":
-            request = self.factory.get(
-                f"/v1/internal/human-support/{PROJECT_UUID}/",
-                HTTP_AUTHORIZATION=AUTH_TOKEN,
-            )
+            request = self.factory.get(url)
         else:
             request = self.factory.patch(
-                f"/v1/internal/human-support/{PROJECT_UUID}/",
+                url,
                 data=json.dumps(data) if data else None,
                 content_type="application/json",
-                HTTP_AUTHORIZATION=AUTH_TOKEN,
             )
+        force_authenticate(request, user=self.user)
         return request
 
 
-@override_settings(INTERNAL_API_TOKEN="test-internal-token")
+@patch(PERMISSION_PATCH, return_value=True)
 class HumanSupportGetTests(HumanSupportViewTestMixin, TestCase):
 
     @patch("chats.apps.api.v1.internal.human_support.views.get_human_support_cached")
-    def test_get_returns_cached_data(self, mock_cache_get):
+    def test_get_returns_cached_data(self, mock_cache_get, _perm):
         mock_cache_get.return_value = NEXUS_RESPONSE_DATA
 
         request = self._get_request()
@@ -84,7 +91,7 @@ class HumanSupportGetTests(HumanSupportViewTestMixin, TestCase):
     )
     @patch("chats.apps.api.v1.internal.human_support.views.get_human_support_cached")
     def test_get_cache_miss_calls_nexus(
-        self, mock_cache_get, mock_nexus_get, mock_cache_set
+        self, mock_cache_get, mock_nexus_get, mock_cache_set, _perm
     ):
         mock_cache_get.return_value = None
         mock_nexus_get.return_value = _make_fake_nexus_response()
@@ -101,7 +108,9 @@ class HumanSupportGetTests(HumanSupportViewTestMixin, TestCase):
         "chats.apps.api.v1.internal.rest_clients.nexus_rest_client.NexusRESTClient.get_human_support"
     )
     @patch("chats.apps.api.v1.internal.human_support.views.get_human_support_cached")
-    def test_get_nexus_error_forwards_status(self, mock_cache_get, mock_nexus_get):
+    def test_get_nexus_error_forwards_status(
+        self, mock_cache_get, mock_nexus_get, _perm
+    ):
         mock_cache_get.return_value = None
         error_data = {"error": "Project with uuid `abc` does not exist"}
         mock_nexus_get.return_value = _make_fake_nexus_response(
@@ -119,7 +128,7 @@ class HumanSupportGetTests(HumanSupportViewTestMixin, TestCase):
     )
     @patch("chats.apps.api.v1.internal.human_support.views.get_human_support_cached")
     def test_get_nexus_connection_error_returns_502(
-        self, mock_cache_get, mock_nexus_get
+        self, mock_cache_get, mock_nexus_get, _perm
     ):
         mock_cache_get.return_value = None
         mock_nexus_get.side_effect = ConnectionError("Connection refused")
@@ -134,7 +143,7 @@ class HumanSupportGetTests(HumanSupportViewTestMixin, TestCase):
         "chats.apps.api.v1.internal.rest_clients.nexus_rest_client.NexusRESTClient.get_human_support"
     )
     @patch("chats.core.cache_utils.get_redis_connection", side_effect=Exception("down"))
-    def test_get_redis_down_falls_back_to_nexus(self, _, mock_nexus_get):
+    def test_get_redis_down_falls_back_to_nexus(self, _, mock_nexus_get, _perm):
         mock_nexus_get.return_value = _make_fake_nexus_response()
 
         request = self._get_request()
@@ -149,7 +158,7 @@ class HumanSupportGetTests(HumanSupportViewTestMixin, TestCase):
     )
     @patch("chats.apps.api.v1.internal.human_support.views.get_human_support_cached")
     def test_get_nexus_error_does_not_cache(
-        self, mock_cache_get, mock_nexus_get, mock_cache_set
+        self, mock_cache_get, mock_nexus_get, mock_cache_set, _perm
     ):
         mock_cache_get.return_value = None
         mock_nexus_get.return_value = _make_fake_nexus_response(
@@ -163,14 +172,16 @@ class HumanSupportGetTests(HumanSupportViewTestMixin, TestCase):
         mock_cache_set.assert_not_called()
 
 
-@override_settings(INTERNAL_API_TOKEN="test-internal-token")
+@patch(PERMISSION_PATCH, return_value=True)
 class HumanSupportPatchTests(HumanSupportViewTestMixin, TestCase):
 
     @patch("chats.apps.api.v1.internal.human_support.views.set_human_support_cache")
     @patch(
         "chats.apps.api.v1.internal.rest_clients.nexus_rest_client.NexusRESTClient.patch_human_support"
     )
-    def test_patch_success_updates_cache(self, mock_nexus_patch, mock_cache_set):
+    def test_patch_success_updates_cache(
+        self, mock_nexus_patch, mock_cache_set, _perm
+    ):
         updated = {"human_support": True, "human_support_prompt": "Updated prompt"}
         mock_nexus_patch.return_value = _make_fake_nexus_response(
             json_data=updated
@@ -187,7 +198,7 @@ class HumanSupportPatchTests(HumanSupportViewTestMixin, TestCase):
     @patch(
         "chats.apps.api.v1.internal.rest_clients.nexus_rest_client.NexusRESTClient.patch_human_support"
     )
-    def test_patch_only_human_support(self, mock_nexus_patch):
+    def test_patch_only_human_support(self, mock_nexus_patch, _perm):
         payload = {"human_support": False}
         nexus_resp = {"human_support": False, "human_support_prompt": "existing prompt"}
         mock_nexus_patch.return_value = _make_fake_nexus_response(
@@ -203,7 +214,7 @@ class HumanSupportPatchTests(HumanSupportViewTestMixin, TestCase):
     @patch(
         "chats.apps.api.v1.internal.rest_clients.nexus_rest_client.NexusRESTClient.patch_human_support"
     )
-    def test_patch_only_prompt(self, mock_nexus_patch):
+    def test_patch_only_prompt(self, mock_nexus_patch, _perm):
         payload = {"human_support_prompt": "New prompt"}
         nexus_resp = {"human_support": True, "human_support_prompt": "New prompt"}
         mock_nexus_patch.return_value = _make_fake_nexus_response(
@@ -216,27 +227,27 @@ class HumanSupportPatchTests(HumanSupportViewTestMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         mock_nexus_patch.assert_called_once_with(PROJECT_UUID, payload)
 
-    def test_patch_missing_fields_returns_400(self):
+    def test_patch_missing_fields_returns_400(self, _perm):
         request = self._get_request("patch", data={"unrelated_field": "value"})
         response = self.view(request, project_uuid=PROJECT_UUID)
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("At least one of", response.data["error"])
 
-    def test_patch_empty_body_returns_400(self):
+    def test_patch_empty_body_returns_400(self, _perm):
         request = self._get_request("patch", data={})
         response = self.view(request, project_uuid=PROJECT_UUID)
 
         self.assertEqual(response.status_code, 400)
 
-    def test_patch_human_support_wrong_type_returns_400(self):
+    def test_patch_human_support_wrong_type_returns_400(self, _perm):
         request = self._get_request("patch", data={"human_support": "yes"})
         response = self.view(request, project_uuid=PROJECT_UUID)
 
         self.assertEqual(response.status_code, 400)
         self.assertIn("must be a boolean", response.data["error"])
 
-    def test_patch_prompt_wrong_type_returns_400(self):
+    def test_patch_prompt_wrong_type_returns_400(self, _perm):
         request = self._get_request("patch", data={"human_support_prompt": 123})
         response = self.view(request, project_uuid=PROJECT_UUID)
 
@@ -248,7 +259,7 @@ class HumanSupportPatchTests(HumanSupportViewTestMixin, TestCase):
         "chats.apps.api.v1.internal.rest_clients.nexus_rest_client.NexusRESTClient.patch_human_support"
     )
     def test_patch_nexus_error_does_not_update_cache(
-        self, mock_nexus_patch, mock_cache_set
+        self, mock_nexus_patch, mock_cache_set, _perm
     ):
         mock_nexus_patch.return_value = _make_fake_nexus_response(
             status_code=400,
@@ -264,7 +275,7 @@ class HumanSupportPatchTests(HumanSupportViewTestMixin, TestCase):
     @patch(
         "chats.apps.api.v1.internal.rest_clients.nexus_rest_client.NexusRESTClient.patch_human_support"
     )
-    def test_patch_nexus_connection_error_returns_502(self, mock_nexus_patch):
+    def test_patch_nexus_connection_error_returns_502(self, mock_nexus_patch, _perm):
         mock_nexus_patch.side_effect = ConnectionError("Connection refused")
 
         request = self._get_request("patch", data={"human_support": True})
@@ -273,7 +284,7 @@ class HumanSupportPatchTests(HumanSupportViewTestMixin, TestCase):
         self.assertEqual(response.status_code, 502)
 
 
-@override_settings(INTERNAL_API_TOKEN="test-internal-token")
+@patch(PERMISSION_PATCH, return_value=True)
 class HumanSupportCacheIntegrationTests(HumanSupportViewTestMixin, TestCase):
 
     @patch("chats.core.cache_utils.get_redis_connection")
@@ -281,7 +292,7 @@ class HumanSupportCacheIntegrationTests(HumanSupportViewTestMixin, TestCase):
         "chats.apps.api.v1.internal.rest_clients.nexus_rest_client.NexusRESTClient.get_human_support"
     )
     def test_get_populates_cache_then_serves_from_cache(
-        self, mock_nexus_get, mock_redis_conn
+        self, mock_nexus_get, mock_redis_conn, _perm
     ):
         mock_redis_conn.return_value = self.fake_redis
         mock_nexus_get.return_value = _make_fake_nexus_response()
@@ -306,7 +317,7 @@ class HumanSupportCacheIntegrationTests(HumanSupportViewTestMixin, TestCase):
         "chats.apps.api.v1.internal.rest_clients.nexus_rest_client.NexusRESTClient.get_human_support"
     )
     def test_patch_updates_cache_for_subsequent_gets(
-        self, mock_nexus_get, mock_nexus_patch, mock_redis_conn
+        self, mock_nexus_get, mock_nexus_patch, mock_redis_conn, _perm
     ):
         mock_redis_conn.return_value = self.fake_redis
         mock_nexus_get.return_value = _make_fake_nexus_response()
@@ -333,7 +344,7 @@ class HumanSupportCacheIntegrationTests(HumanSupportViewTestMixin, TestCase):
     @patch(
         "chats.apps.api.v1.internal.rest_clients.nexus_rest_client.NexusRESTClient.get_human_support"
     )
-    def test_cache_disabled_always_calls_nexus(self, mock_nexus_get):
+    def test_cache_disabled_always_calls_nexus(self, mock_nexus_get, _perm):
         mock_nexus_get.return_value = _make_fake_nexus_response()
 
         request = self._get_request()
@@ -390,9 +401,18 @@ class NexusRESTClientTests(TestCase):
 
     @override_settings(NEXUS_API_URL="https://nexus.example.com")
     @patch(
+        "chats.apps.api.v1.internal.rest_clients.nexus_rest_client.NexusRESTClient.headers",
+        new_callable=lambda: property(
+            lambda self: {
+                "Content-Type": "application/json; charset: utf-8",
+                "Authorization": "Bearer keycloak-token",
+            }
+        ),
+    )
+    @patch(
         "chats.apps.api.v1.internal.rest_clients.nexus_rest_client.get_request_session_with_retries"
     )
-    def test_get_human_support(self, mock_session_factory):
+    def test_get_human_support(self, mock_session_factory, _headers):
         mock_session = MagicMock()
         mock_session.get.return_value = _make_fake_nexus_response()
         mock_session_factory.return_value = mock_session
@@ -401,24 +421,33 @@ class NexusRESTClientTests(TestCase):
             NexusRESTClient,
         )
 
-        client = NexusRESTClient(auth_token="Bearer my-token")
+        client = NexusRESTClient()
         response = client.get_human_support(PROJECT_UUID)
 
         self.assertEqual(response.status_code, 200)
         mock_session.get.assert_called_once_with(
             url=f"https://nexus.example.com/api/{PROJECT_UUID}/human-support",
             headers={
-                "Content-Type": "application/json; charset=utf-8",
-                "Authorization": "Bearer my-token",
+                "Content-Type": "application/json; charset: utf-8",
+                "Authorization": "Bearer keycloak-token",
             },
             timeout=10,
         )
 
     @override_settings(NEXUS_API_URL="https://nexus.example.com/")
     @patch(
+        "chats.apps.api.v1.internal.rest_clients.nexus_rest_client.NexusRESTClient.headers",
+        new_callable=lambda: property(
+            lambda self: {
+                "Content-Type": "application/json; charset: utf-8",
+                "Authorization": "Bearer keycloak-token",
+            }
+        ),
+    )
+    @patch(
         "chats.apps.api.v1.internal.rest_clients.nexus_rest_client.get_request_session_with_retries"
     )
-    def test_trailing_slash_stripped(self, mock_session_factory):
+    def test_trailing_slash_stripped(self, mock_session_factory, _headers):
         mock_session = MagicMock()
         mock_session.patch.return_value = _make_fake_nexus_response()
         mock_session_factory.return_value = mock_session
@@ -427,15 +456,15 @@ class NexusRESTClientTests(TestCase):
             NexusRESTClient,
         )
 
-        client = NexusRESTClient(auth_token="Bearer my-token")
+        client = NexusRESTClient()
         payload = {"human_support": True}
         client.patch_human_support(PROJECT_UUID, payload)
 
         mock_session.patch.assert_called_once_with(
             url=f"https://nexus.example.com/api/{PROJECT_UUID}/human-support",
             headers={
-                "Content-Type": "application/json; charset=utf-8",
-                "Authorization": "Bearer my-token",
+                "Content-Type": "application/json; charset: utf-8",
+                "Authorization": "Bearer keycloak-token",
             },
             json=payload,
             timeout=10,
