@@ -591,6 +591,10 @@ MESSAGE_BULK_SIZE = env.int("MESSAGE_BULK_SIZE", default=100)
 BULK_CLOSE_BATCH_SIZE = env.int("BULK_CLOSE_BATCH_SIZE", default=50)
 BULK_CLOSE_MAX_ROOMS = env.int("BULK_CLOSE_MAX_ROOMS", default=200)
 
+# Bulk Take Settings
+BULK_TAKE_BATCH_SIZE = env.int("BULK_TAKE_BATCH_SIZE", default=50)
+BULK_TAKE_MAX_ROOMS = env.int("BULK_TAKE_MAX_ROOMS", default=200)
+
 # Message Status Consumer Settings
 MESSAGE_STATUS_MAX_RETRIES = env.int("MESSAGE_STATUS_MAX_RETRIES", default=3)
 MESSAGE_STATUS_RETRY_DELAY = env.int("MESSAGE_STATUS_RETRY_DELAY", default=2)
@@ -704,3 +708,5 @@ USE_FLOWS_MEDIA_URL_FEATURE_FLAG_KEY = env.str(
     "USE_FLOWS_MEDIA_URL_FEATURE_FLAG_KEY",
     default="weniChatsUseFlowsMediaUrl",
 )
+
+FLOWS_BASE_URL = env.str("FLOWS_BASE_URL", default="https://flows.weni.ai")

@@ -11,6 +11,7 @@ from chats.apps.dashboard.models import RoomMetrics
 class RoomInternalListSerializer(serializers.ModelSerializer):
     contact = serializers.CharField(source="contact.name")
     agent = serializers.SerializerMethodField()
+    user_email = serializers.EmailField(source="user.email", default=None, read_only=True)
     tags = TagSimpleSerializer(many=True, required=False)
     sector = serializers.CharField(source="queue.sector.name")
     queue = serializers.CharField(source="queue.name")
@@ -26,6 +27,7 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
         fields = [
             "uuid",
             "agent",
+            "user_email",
             "contact",
             "urn",
             "is_active",
@@ -51,7 +53,7 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
 
     def get_link(self, obj: Room) -> dict:
         if obj.user and obj.is_active:
-            url = f"chats:dashboard/view-mode/{obj.user.email}"
+            url = f"chats:dashboard/view-mode/{obj.user.email}?uuid_room={obj.uuid}"
         elif not obj.user and obj.is_active:
             url = f"chats:chats/{obj.uuid}"
         elif not obj.is_active:

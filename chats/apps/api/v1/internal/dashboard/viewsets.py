@@ -76,7 +76,7 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
             agent=params.get("agent"),
             sector=request.query_params.getlist("sector"),
             tag=params.get("tags"),
-            queue=params.get("queue"),
+            queues=request.query_params.getlist("queue"),
             user_request=params.get("user_request", ""),
             is_weni_admin=should_exclude_admin_domains(params.get("user_request", "")),
             ordering=params.get("ordering"),
@@ -138,14 +138,14 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
             project_permissions__project=project, is_active=True
         )
 
-        queue = request.query_params.get("queue")
+        queues = request.query_params.getlist("queue")
         sectors = request.query_params.getlist("sector")
         agent = request.query_params.get("agent")
 
-        if queue:
+        if queues:
             agents_filters &= (
-                Q(project_permissions__queue_authorizations__queue=queue)
-                | Q(rooms__queue=queue)
+                Q(project_permissions__queue_authorizations__queue__in=queues)
+                | Q(rooms__queue__in=queues)
             )
         elif sectors:
             agents_filters &= (
