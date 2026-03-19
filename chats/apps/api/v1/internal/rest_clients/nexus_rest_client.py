@@ -3,22 +3,17 @@ import logging
 import requests
 from django.conf import settings
 
+from chats.apps.api.v1.internal.rest_clients.internal_authorization import (
+    InternalAuthentication,
+)
 from chats.core.requests import get_request_session_with_retries
 
 logger = logging.getLogger(__name__)
 
 
-class NexusRESTClient:
-    def __init__(self, auth_token: str):
+class NexusRESTClient(InternalAuthentication):
+    def __init__(self):
         self.base_url = settings.NEXUS_API_URL.rstrip("/")
-        self.auth_token = auth_token
-
-    @property
-    def headers(self):
-        return {
-            "Content-Type": "application/json; charset=utf-8",
-            "Authorization": self.auth_token,
-        }
 
     def _get_session(self):
         return get_request_session_with_retries(

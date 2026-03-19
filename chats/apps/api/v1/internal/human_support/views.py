@@ -1,15 +1,10 @@
 import logging
-from functools import cached_property
 
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from chats.apps.accounts.authentication.drf.authorization import (
-    get_token_auth_classes,
-)
-from chats.apps.api.authentication.permissions import InternalAPITokenRequiredPermission
-from chats.apps.api.v1.external.permissions import IsAdminPermission
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.api.v1.internal.rest_clients.nexus_rest_client import NexusRESTClient
 from chats.core.cache_utils import (
@@ -21,28 +16,14 @@ logger = logging.getLogger(__name__)
 
 
 class HumanSupportView(APIView):
-    @cached_property
-    def authentication_classes(self):
-        return get_token_auth_classes(self.request)
-
-    @cached_property
-    def permission_classes(self):
-        if self.request.auth and hasattr(self.request.auth, "project"):
-            return [IsAdminPermission]
-        elif self.request.auth == "INTERNAL":
-            return [InternalAPITokenRequiredPermission]
-        return [ModuleHasPermission]
-
-    def _get_auth_token(self):
-        auth_header = self.request.META.get("HTTP_AUTHORIZATION", "")
-        return auth_header
+    permission_classes = [IsAuthenticated, ModuleHasPermission]
 
     def get(self, request, project_uuid):
         cached = get_human_support_cached(project_uuid)
         if cached is not None:
             return Response(cached, status=status.HTTP_200_OK)
 
-        client = NexusRESTClient(auth_token=self._get_auth_token())
+        client = NexusRESTClient()
         try:
             response = client.get_human_support(project_uuid)
         except Exception:
@@ -102,7 +83,7 @@ class HumanSupportView(APIView):
         if has_prompt:
             payload["human_support_prompt"] = data["human_support_prompt"]
 
-        client = NexusRESTClient(auth_token=self._get_auth_token())
+        client = NexusRESTClient()
         try:
             response = client.patch_human_support(project_uuid, payload)
         except Exception:
