@@ -305,7 +305,7 @@ class TestArchiveChatsService(TestCase):
         media = MessageMedia.objects.create(
             message=message,
             content_type="image/jpeg",
-            media_url="https://flows-test-fictional-bucket.s3.sa-east-1.amazonaws.com/media/12345/kall/1234/example-here.jpg",
+            media_url="https://example.s3.sa-east-1.amazonaws.com/media/12345/kall/1234/example-here.jpg",
         )
 
         url = self.service.process_media(media)
