@@ -703,4 +703,10 @@ ROOMS_EXTERNAL_API_QUERYSET_FILTER_FLAG_KEY = env.str(
     default="weniChatsRoomsExternalApiQuerySetFilter",
 )
 
+# Flows Media URL
+USE_FLOWS_MEDIA_URL_FEATURE_FLAG_KEY = env.str(
+    "USE_FLOWS_MEDIA_URL_FEATURE_FLAG_KEY",
+    default="weniChatsUseFlowsMediaUrl",
+)
+
 FLOWS_BASE_URL = env.str("FLOWS_BASE_URL", default="https://flows.weni.ai")
