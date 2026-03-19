@@ -362,6 +362,9 @@ USE_CONNECT_V2 = env.bool("USE_CONNECT_V2", default=False)
 
 INTEGRATIONS_API_URL = env.str("INTEGRATIONS_API_URL", default="")
 FLOWS_API_URL = env.str("FLOWS_API_URL", default="")
+NEXUS_API_URL = env.str("NEXUS_API_URL", default="")
+HUMAN_SUPPORT_CACHE_TTL = env.int("HUMAN_SUPPORT_CACHE_TTL", default=300)
+HUMAN_SUPPORT_CACHE_ENABLED = env.bool("HUMAN_SUPPORT_CACHE_ENABLED", default=True)
 USE_WENI_FLOWS = env.bool("USE_WENI_FLOWS", default=False)
 FLOWS_TICKETER_TYPE = env.str("FLOWS_TICKETER_TYPE", default="wenichats")
 FLOWS_AUTH_TOKEN_RETRIES = env.int(
