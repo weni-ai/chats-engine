@@ -1,3 +1,21 @@
+# 3.47.1
+# Add
+  - New endpoint to list user status
+# Fix
+  - Redirect link to view mode
+  
+# 3.47.0
+# Add
+  - Bulk take feature
+  
+# 3.46.2
+# Add
+  - Support for multiple queues in filter for human support dashboard
+  
+# 3.46.1
+# Fix
+  - Report ready status
+  
 # 3.46.0
 # Add
   - Wait limit settings and validations
@@ -1110,6 +1128,7 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
 
 
 

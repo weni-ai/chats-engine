@@ -15,6 +15,8 @@ PROJECT_CONFIG_TTL = getattr(settings, "PROJECT_CONFIG_TTL", 900)
 PROJECT_CACHE_ENABLED = getattr(settings, "PROJECT_CACHE_ENABLED", True)
 USER_OBJECT_CACHE_TTL = getattr(settings, "USER_OBJECT_CACHE_TTL", 300)
 USER_OBJECT_CACHE_ENABLED = getattr(settings, "USER_OBJECT_CACHE_ENABLED", True)
+HUMAN_SUPPORT_CACHE_TTL = getattr(settings, "HUMAN_SUPPORT_CACHE_TTL", 300)
+HUMAN_SUPPORT_CACHE_ENABLED = getattr(settings, "HUMAN_SUPPORT_CACHE_ENABLED", True)
 
 
 def _normalize_email(email: Optional[str]) -> Optional[str]:
@@ -391,5 +393,54 @@ def invalidate_cached_user(email: str) -> None:
         cache_key = f"user:object:{normalized_email}"
         redis_conn.delete(cache_key)
         invalidate_user_email_cache(email)
+    except Exception:
+        pass
+
+
+def get_human_support_cached(project_uuid: str) -> Optional[Dict[str, Any]]:
+    if not HUMAN_SUPPORT_CACHE_ENABLED:
+        return None
+
+    if not project_uuid:
+        return None
+
+    redis_conn = _get_redis_connection_safe()
+    if not redis_conn:
+        return None
+
+    cache_key = f"human_support:{project_uuid}"
+    cached_value = redis_conn.get(cache_key)
+    if cached_value:
+        return json.loads(cached_value)
+
+    return None
+
+
+def set_human_support_cache(project_uuid: str, data: Dict[str, Any]) -> None:
+    if not HUMAN_SUPPORT_CACHE_ENABLED:
+        return
+
+    if not project_uuid:
+        return
+
+    redis_conn = _get_redis_connection_safe()
+    if not redis_conn:
+        return
+
+    cache_key = f"human_support:{project_uuid}"
+    redis_conn.setex(cache_key, HUMAN_SUPPORT_CACHE_TTL, json.dumps(data))
+
+
+def invalidate_human_support_cache(project_uuid: str) -> None:
+    if not HUMAN_SUPPORT_CACHE_ENABLED:
+        return
+
+    if not project_uuid:
+        return
+
+    try:
+        redis_conn = get_redis_connection()
+        cache_key = f"human_support:{project_uuid}"
+        redis_conn.delete(cache_key)
     except Exception:
         pass
