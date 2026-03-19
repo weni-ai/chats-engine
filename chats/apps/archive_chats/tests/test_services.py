@@ -1,7 +1,5 @@
 import json
 from unittest.mock import patch, MagicMock
-import uuid
-
 
 from django.core.exceptions import ValidationError
 from django.test import TestCase
@@ -21,7 +19,6 @@ from chats.apps.sectors.models import Sector
 from chats.apps.projects.models import Project
 from chats.apps.contacts.models import Contact
 from chats.apps.accounts.models import User
-from chats.apps.archive_chats.exceptions import InvalidObjectKey
 
 
 class TestArchiveChatsService(TestCase):
@@ -293,38 +290,31 @@ class TestArchiveChatsService(TestCase):
             f"https://test-bucket.s3.amazonaws.com/{object_key}",
         )
 
-    def test_get_archived_media_url_with_invalid_project_uuid(self):
-        valid_uuid = uuid.uuid4()
-        with self.assertRaises(InvalidObjectKey):
-            self.service.get_archived_media_url(
-                f"archived_conversations/invalid-project-uuid/{valid_uuid}/media/test.jpg"
-            )
+    @patch(
+        "chats.apps.archive_chats.services.is_file_on_chats_bucket", return_value=False
+    )
+    def test_process_media_extracts_object_key_from_url(
+        self, mock_is_file_on_chats_bucket
+    ):
+        message = Message.objects.create(
+            room=self.room,
+            contact=self.contact,
+            text="Test message",
+            created_on=timezone.now(),
+        )
+        media = MessageMedia.objects.create(
+            message=message,
+            content_type="image/jpeg",
+            media_url="https://example.s3.sa-east-1.amazonaws.com/media/12345/kall/1234/example-here.jpg",
+        )
 
-    def test_get_archived_media_url_with_invalid_room_uuid(self):
-        valid_uuid = uuid.uuid4()
-        with self.assertRaises(InvalidObjectKey):
-            self.service.get_archived_media_url(
-                f"archived_conversations/{valid_uuid}/invalid-room-uuid/media/test.jpg"
-            )
+        url = self.service.process_media(media)
 
-    def test_get_archived_media_url_without_media_part(self):
-        valid_uuid = uuid.uuid4()
-        with self.assertRaises(InvalidObjectKey):
-            self.service.get_archived_media_url(
-                f"archived_conversations/{valid_uuid}/{valid_uuid}/messages.jsonl"
-            )
-
-    def test_get_archived_media_url_with_room_not_archived(self):
-        with self.assertRaises(InvalidObjectKey):
-            self.service.get_archived_media_url(
-                f"archived_conversations/{self.project.uuid}/{self.room.uuid}/media/test.jpg"
-            )
-
-    def test_get_archived_media_url_with_non_existent_room(self):
-        with self.assertRaises(InvalidObjectKey):
-            self.service.get_archived_media_url(
-                f"archived_conversations/{self.project.uuid}/{uuid.uuid4()}/media/test.jpg"
-            )
+        expected_object_key = "media/12345/kall/1234/example-here.jpg"
+        self.assertEqual(
+            url,
+            f"https://flows.weni.ai/api/v2/internals/media/download/{expected_object_key}",
+        )
 
     def test_delete_room_messages(self):
         archived_conversation = RoomArchivedConversation.objects.create(
