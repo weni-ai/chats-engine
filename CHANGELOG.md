@@ -1,3 +1,17 @@
+# 3.48.0
+# Add
+  - New consumer to edit projects
+  - Fix url media validation
+  - Requeue rooms when a user that have rooms are removed from project
+  
+# 3.47.3
+# Add
+  - Flows media URL endpoint to archive messages service
+  
+# 3.47.2
+# Add
+  - Flows base URL to settings
+  
 # 3.47.1
 # Add
   - New endpoint to list user status
