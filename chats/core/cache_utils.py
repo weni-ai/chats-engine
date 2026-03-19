@@ -430,18 +430,3 @@ def set_nexus_settings_cache(project_uuid: str, data: Dict[str, Any]) -> None:
 
     cache_key = f"nexus_settings:{project_uuid}"
     redis_conn.setex(cache_key, NEXUS_SETTINGS_CACHE_TTL, json.dumps(data))
-
-
-def invalidate_nexus_settings_cache(project_uuid: str) -> None:
-    if not NEXUS_SETTINGS_CACHE_ENABLED:
-        return
-
-    if not project_uuid:
-        return
-
-    try:
-        redis_conn = get_redis_connection()
-        cache_key = f"nexus_settings:{project_uuid}"
-        redis_conn.delete(cache_key)
-    except Exception:
-        pass
