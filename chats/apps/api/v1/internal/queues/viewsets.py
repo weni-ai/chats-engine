@@ -88,4 +88,9 @@ class QueueAuthInternalViewset(viewsets.ModelViewSet):
         serializer.save()
 
     def perform_destroy(self, instance):
-        instance.delete()
+        instance.is_deleted = True
+        instance.save()
+        return Response(
+            {"is_deleted": True},
+            status.HTTP_200_OK,
+        )

@@ -1,9 +1,7 @@
-from django.db.models.signals import post_delete, post_save, pre_delete
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
-from chats.apps.projects.models import Project, ProjectPermission
-from chats.apps.rooms.models import Room
-from chats.apps.rooms.tasks import requeue_agent_rooms_task
+from chats.apps.projects.models import Project
 from chats.core.cache_utils import invalidate_project_cache
 
 
@@ -21,20 +19,3 @@ def invalidate_project_cache_on_delete(sender, instance, **kwargs):
     Invalidate cache when project is deleted
     """
     invalidate_project_cache(str(instance.uuid))
-
-
-@receiver(pre_delete, sender=ProjectPermission)
-def requeue_rooms_on_permission_delete(sender, instance, **kwargs):
-    """
-    When an agent is removed from a project, return their active rooms
-    back to the queue so they can be reassigned.
-    """
-    room_uuids = list(
-        Room.objects.filter(
-            user=instance.user,
-            queue__sector__project=instance.project,
-            is_active=True,
-        ).values_list("uuid", flat=True)
-    )
-    if room_uuids:
-        requeue_agent_rooms_task.delay([str(u) for u in room_uuids])
