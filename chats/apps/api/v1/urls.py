@@ -71,7 +71,7 @@ urlpatterns = [
         name="get_archived_media",
     ),
     path(
-        "project/<str:project_uuid>/human-support/",
+        "human-support/<str:project_uuid>/",
         HumanSupportNexusSettingsView.as_view(),
         name="human_support_nexus_settings",
     ),
