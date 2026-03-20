@@ -3,6 +3,7 @@ from amqp.channel import Channel
 from .consumers import (
     TemplateTypeConsumer,
     ProjectConsumer,
+    ProjectUpdateConsumer,
     DeadLetterConsumer,
     ProjectPermissionConsumer,
     SectorConsumer,
@@ -14,6 +15,9 @@ def handle_consumers(channel: Channel) -> None:
         "chats.template-types", callback=TemplateTypeConsumer().handle
     )
     channel.basic_consume("chats.projects", callback=ProjectConsumer().handle)
+    channel.basic_consume(
+        "chats.update-projects", callback=ProjectUpdateConsumer().handle
+    )
     channel.basic_consume(
         "chats.permissions", callback=ProjectPermissionConsumer().handle
     )
