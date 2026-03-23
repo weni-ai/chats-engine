@@ -14,8 +14,8 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
     agent = serializers.SerializerMethodField()
     user_email = serializers.EmailField(source="user.email", default=None, read_only=True)
     tags = TagSimpleSerializer(many=True, required=False)
-    sector = serializers.CharField(source="queue.sector.name")
-    queue = serializers.CharField(source="queue.name")
+    sector = serializers.SerializerMethodField()
+    queue = serializers.SerializerMethodField()
     link = serializers.SerializerMethodField()
     duration = serializers.SerializerMethodField()
     first_response_time = serializers.SerializerMethodField()
@@ -45,6 +45,23 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
             "csat_rating",
             "protocol",
         ]
+
+    def _clean_soft_deleted_name(self, name: str) -> str:
+        if "_is_deleted_" in name:
+            return name.split("_is_deleted_")[0]
+        return name
+
+    def get_sector(self, obj) -> str:
+        try:
+            return self._clean_soft_deleted_name(obj.queue.sector.name)
+        except AttributeError:
+            return ""
+
+    def get_queue(self, obj) -> str:
+        try:
+            return self._clean_soft_deleted_name(obj.queue.name)
+        except AttributeError:
+            return ""
 
     def get_agent(self, obj):
         try:

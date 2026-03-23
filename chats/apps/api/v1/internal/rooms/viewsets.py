@@ -137,7 +137,7 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
 
         queryset = queryset.annotate(**annotations)
 
-        return queryset.filter(queue__is_deleted=False, queue__sector__is_deleted=False)
+        return queryset
 
 
 class InternalProtocolRoomsViewSet(ListModelMixin, GenericViewSet):
