@@ -70,7 +70,7 @@ class ProjectCreationUseCase:
         )
 
         creator_permission, _ = ProjectPermission.all_objects.get_or_create(
-            user=user, project=project, role=1, is_deleted=False
+            user=user, project=project, role=1, defaults={"is_deleted": False}
         )
 
         for permission in project_dto.authorizations:
