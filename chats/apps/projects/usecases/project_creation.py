@@ -69,17 +69,21 @@ class ProjectCreationUseCase:
             config=_config,
         )
 
-        creator_permission, _ = ProjectPermission.objects.get_or_create(
-            user=user, project=project, role=1
+        creator_permission, _ = ProjectPermission.all_objects.get_or_create(
+            user=user, project=project, role=1, is_deleted=False
         )
 
         for permission in project_dto.authorizations:
             permission_user = User.objects.get_or_create(
                 email=permission.get("user_email")
             )[0]
-            project.permissions.get_or_create(
+            ProjectPermission.all_objects.get_or_create(
+                project=project,
                 user=permission_user,
-                defaults={"role": 1 if permission.get("role") == 3 else 2},
+                defaults={
+                    "role": 1 if permission.get("role") == 3 else 2,
+                    "is_deleted": False,
+                },
             )
 
         if project_dto.is_template:
