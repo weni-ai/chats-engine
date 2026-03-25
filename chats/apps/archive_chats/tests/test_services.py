@@ -1,5 +1,5 @@
 import json
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from django.core.exceptions import ValidationError
 from django.test import TestCase
@@ -13,7 +13,7 @@ from chats.apps.archive_chats.models import (
 from chats.apps.archive_chats.serializers import ArchiveMessageSerializer
 from chats.apps.archive_chats.services import ArchiveChatsService
 from chats.apps.msgs.models import AutomaticMessage, Message, MessageMedia
-from chats.apps.rooms.models import Room
+from chats.apps.rooms.models import Room, RoomNote
 from chats.apps.queues.models import Queue
 from chats.apps.sectors.models import Sector
 from chats.apps.projects.models import Project
@@ -23,7 +23,9 @@ from chats.apps.accounts.models import User
 
 class TestArchiveChatsService(TestCase):
     def setUp(self):
-        self.service = ArchiveChatsService()
+        self.bucket = MagicMock()
+        self.bucket.name = "test-bucket"
+        self.service = ArchiveChatsService(bucket=self.bucket)
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
             name="Test Sector",
@@ -115,7 +117,28 @@ class TestArchiveChatsService(TestCase):
             text="Test message",
             created_on=timezone.now(),
         )
-        messages = [message_a, message_b]
+        message_c = Message.objects.create(
+            room=self.room,
+            user=self.user,
+            text="Test message",
+            created_on=timezone.now(),
+        )
+        AutomaticMessage.objects.create(
+            message=message_c,
+            room=self.room,
+        )
+        message_d = Message.objects.create(
+            room=self.room,
+            user=self.user,
+            text="Test message",
+            created_on=timezone.now(),
+        )
+        RoomNote.objects.create(
+            room=self.room,
+            user=self.user,
+            text="Test note",
+        )
+        messages = [message_a, message_b, message_c, message_d]
 
         archived_conversation = RoomArchivedConversation.objects.create(
             job=self.service.start_archive_job(),
@@ -135,7 +158,7 @@ class TestArchiveChatsService(TestCase):
         self.assertIsNotNone(archived_conversation.archive_process_started_at)
 
         self.assertIsInstance(messages_data, list)
-        self.assertEqual(len(messages_data), 2)
+        self.assertEqual(len(messages_data), 4)
 
         for i, message in enumerate(messages):
             self.assertEqual(messages_data[i].get("uuid"), str(message.uuid))
@@ -157,6 +180,19 @@ class TestArchiveChatsService(TestCase):
                 contact_data.get("name"),
                 message.contact.name if message.contact else None,
             )
+            self.assertEqual(
+                messages_data[i].get("is_automatic_message"),
+                message.is_automatic_message,
+            )
+
+            if internal_note := getattr(message, "internal_note", None):
+                self.assertEqual(
+                    messages_data[i].get("internal_note"),
+                    {
+                        "uuid": str(internal_note.uuid),
+                        "text": internal_note.text,
+                    },
+                )
 
     def test_upload_messages_file(self):
         archived_conversation = RoomArchivedConversation.objects.create(
@@ -232,6 +268,52 @@ class TestArchiveChatsService(TestCase):
         self.assertEqual(
             archived_conversation.status,
             ArchiveConversationsJobStatus.PENDING,
+        )
+
+    @patch("chats.apps.archive_chats.services.get_presigned_url")
+    def test_get_archived_media_url(self, mock_get_presigned_url):
+        object_key = f"archived_conversations/{self.project.uuid}/{self.room.uuid}/media/test.jpg"
+        mock_get_presigned_url.return_value = (
+            f"https://test-bucket.s3.amazonaws.com/{object_key}"
+        )
+
+        RoomArchivedConversation.objects.create(
+            job=self.service.start_archive_job(),
+            room=self.room,
+            status=ArchiveConversationsJobStatus.FINISHED,
+        )
+
+        url = self.service.get_archived_media_url(object_key)
+
+        self.assertEqual(
+            url,
+            f"https://test-bucket.s3.amazonaws.com/{object_key}",
+        )
+
+    @patch(
+        "chats.apps.archive_chats.services.is_file_on_chats_bucket", return_value=False
+    )
+    def test_process_media_extracts_object_key_from_url(
+        self, mock_is_file_on_chats_bucket
+    ):
+        message = Message.objects.create(
+            room=self.room,
+            contact=self.contact,
+            text="Test message",
+            created_on=timezone.now(),
+        )
+        media = MessageMedia.objects.create(
+            message=message,
+            content_type="image/jpeg",
+            media_url="https://example.s3.sa-east-1.amazonaws.com/media/12345/kall/1234/example-here.jpg",
+        )
+
+        url = self.service.process_media(media)
+
+        expected_object_key = "media/12345/kall/1234/example-here.jpg"
+        self.assertEqual(
+            url,
+            f"https://flows.weni.ai/api/v2/internals/media/download/{expected_object_key}",
         )
 
     def test_delete_room_messages(self):

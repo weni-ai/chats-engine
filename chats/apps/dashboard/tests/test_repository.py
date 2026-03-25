@@ -38,10 +38,15 @@ class RepositoryTests(TestCase):
             filters=filter,
             project=project,
         )
+        agents_fields = sorted(agents_fields, key=lambda x: x.email)
 
-        self.assertEqual(agents_fields[2].first_name, "")
-        self.assertEqual(agents_fields[2].last_name, "")
-        self.assertEqual(agents_fields[2].email, "amywong@chats.weni.ai")
-        self.assertEqual(agents_fields[2].agent_status, "OFFLINE")
-        self.assertEqual(agents_fields[2].closed_rooms, 0)
-        self.assertEqual(agents_fields[2].opened_rooms, 1)
+        agent = next(
+            (a for a in agents_fields if a.email == "amywong@chats.weni.ai"), None
+        )
+        self.assertIsNotNone(agent)
+        self.assertEqual(agent.first_name, "")
+        self.assertEqual(agent.last_name, "")
+        self.assertEqual(agent.email, "amywong@chats.weni.ai")
+        self.assertEqual(agent.agent_status, "OFFLINE")
+        self.assertEqual(agent.closed_rooms, 0)
+        self.assertEqual(agent.opened_rooms, 1)

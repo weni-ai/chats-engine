@@ -1,7 +1,6 @@
 import json
 
 import pendulum
-from django.core.cache import cache
 from django.db.models import Avg, Count, F, Q, Sum
 from django.utils import timezone
 
@@ -299,12 +298,8 @@ class ModelFieldsPresenter:
     @staticmethod
     def get_models_info():
         """
-        Return information about rooms and agent_status_logs fields with 1 day cache.
+        Return information about rooms and agent_status_logs fields
         """
-        cache_key = "model_fields_presenter_models_info"
-        cached_data = cache.get(cache_key)
-        if cached_data is not None:
-            return cached_data
 
         # Define all available fields for rooms export
         rooms_fields = {
@@ -362,9 +357,8 @@ class ModelFieldsPresenter:
                 "related_model": "dashboard.roommetrics",
             },
             "metric__first_response_time": {
-                "type": "IntegerField",
+                "type": "CharField",
                 "required": False,
-                "related_model": "dashboard.roommetrics",
             },
             "metric__message_response_time": {
                 "type": "IntegerField",
@@ -416,5 +410,4 @@ class ModelFieldsPresenter:
             "rooms": rooms_fields,
             "agent_status_logs": agent_status_logs_fields,
         }
-        cache.set(cache_key, models_info, timeout=86400)
         return models_info

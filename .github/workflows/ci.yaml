@@ -20,8 +20,25 @@ env:
   USE_EDA: true
   GROWTHBOOK_CLIENT_KEY: "dummy_key_ci"
   GROWTHBOOK_HOST_BASE_URL: "http://localhost"
+  INTERNAL_API_TOKEN: "dummy-token"
 
 jobs:
+  pr-title:
+    name: PR title (semantic)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Check PR title
+        run: |
+          title="${{ github.event.pull_request.title }}"
+          if ! echo "$title" | grep -qE '^(\[[A-Z]+-[0-9]+\] )?(feat|fix|docs|style|refactor|test|chore)(\([a-z0-9-]+\))?: [A-Za-z].+'; then
+            echo "Título do PR inválido: $title"
+            echo "Use: type(scope): subject (ex: feat: add login ou fix(api): corrige timeout)"
+            echo "Prefixo de ticket opcional: [ENGAGE-1234] feat: add login"
+            exit 1
+          fi
+          echo "Título OK: $title"
+
   build:
     runs-on: ubuntu-latest
 

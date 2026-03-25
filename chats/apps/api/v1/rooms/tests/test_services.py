@@ -1,11 +1,16 @@
-from django.test import TestCase
+from unittest.mock import patch
 
+from django.test import TestCase, override_settings
+from django.utils import timezone
+
+from chats.apps.accounts.models import User
+from chats.apps.api.v1.rooms.services.bulk_close_service import BulkCloseService
+from chats.apps.api.v1.rooms.services.bulk_take_service import BulkTakeService
 from chats.apps.api.v1.rooms.services.bulk_transfer_service import BulkTransferService
 from chats.apps.projects.models.models import Project, ProjectPermission
-from chats.apps.sectors.models import Sector
 from chats.apps.queues.models import Queue
-from chats.apps.accounts.models import User
-from chats.apps.rooms.models import Room
+from chats.apps.rooms.models import Room, RoomPin
+from chats.apps.sectors.models import Sector, SectorTag
 
 
 class BulkTransferServiceTest(TestCase):
@@ -33,7 +38,7 @@ class BulkTransferServiceTest(TestCase):
     def test_transfer_user_and_queue(self):
         user_2 = User.objects.create(email="test2@test.com")
         queue_2 = Queue.objects.create(name="Test Queue 2", sector=self.sector)
-        self.service.transfer_user_and_queue(self.rooms, user_2, queue_2)
+        self.service.transfer_user_and_queue(self.rooms, user_2, queue_2, self.user)
 
         self.room.refresh_from_db()
         self.assertEqual(self.room.user, user_2)
@@ -89,3 +94,693 @@ class BulkTransferServiceTest(TestCase):
         self.assertEqual(
             str(context.exception), "User has no permission on the project"
         )
+
+    def _create_multiple_rooms(self, count=3):
+        rooms = [self.room]
+        for i in range(1, count):
+            rooms.append(
+                Room.objects.create(queue=self.queue, user=self.user)
+            )
+        return Room.objects.filter(pk__in=[r.pk for r in rooms])
+
+    @patch("chats.apps.rooms.models.Room.update_ticket_async")
+    @patch("chats.apps.rooms.models.Room.mark_notes_as_non_deletable")
+    @patch("chats.apps.api.v1.rooms.services.bulk_transfer_service.start_queue_priority_routing")
+    @patch("chats.apps.rooms.models.Room.notify_user")
+    @patch("chats.apps.rooms.models.Room.notify_queue")
+    @patch("chats.apps.api.v1.rooms.services.bulk_transfer_service.create_room_feedback_message")
+    def test_transfer_user_and_queue_notifies_all_rooms(
+        self,
+        mock_feedback,
+        mock_notify_queue,
+        mock_notify_user,
+        mock_routing,
+        mock_mark_notes,
+        mock_update_ticket,
+    ):
+        user_2 = User.objects.create(email="test2@test.com")
+        queue_2 = Queue.objects.create(name="Test Queue 2", sector=self.sector)
+        rooms = self._create_multiple_rooms(3)
+
+        self.service.transfer_user_and_queue(rooms, user_2, queue_2, self.user)
+
+        self.assertEqual(mock_feedback.call_count, 6)
+        self.assertEqual(mock_notify_queue.call_count, 3)
+        self.assertEqual(mock_notify_user.call_count, 6)
+        self.assertEqual(mock_routing.call_count, 3)
+        self.assertEqual(mock_mark_notes.call_count, 3)
+        self.assertEqual(mock_update_ticket.call_count, 3)
+
+    @patch("chats.apps.rooms.models.Room.update_ticket")
+    @patch("chats.apps.rooms.models.Room.mark_notes_as_non_deletable")
+    @patch("chats.apps.api.v1.rooms.services.bulk_transfer_service.start_queue_priority_routing")
+    @patch("chats.apps.rooms.models.Room.notify_user")
+    @patch("chats.apps.rooms.models.Room.notify_queue")
+    @patch("chats.apps.api.v1.rooms.services.bulk_transfer_service.create_room_feedback_message")
+    def test_transfer_user_notifies_all_rooms(
+        self,
+        mock_feedback,
+        mock_notify_queue,
+        mock_notify_user,
+        mock_routing,
+        mock_mark_notes,
+        mock_update_ticket,
+    ):
+        user_2 = User.objects.create(email="test2@test.com")
+        rooms = self._create_multiple_rooms(3)
+
+        self.service.transfer_user(rooms, user_2, self.user)
+
+        self.assertEqual(mock_feedback.call_count, 3)
+        self.assertEqual(mock_notify_queue.call_count, 3)
+        self.assertEqual(mock_notify_user.call_count, 6)
+        self.assertEqual(mock_routing.call_count, 3)
+        self.assertEqual(mock_mark_notes.call_count, 3)
+        self.assertEqual(mock_update_ticket.call_count, 3)
+
+    @patch("chats.apps.rooms.models.Room.mark_notes_as_non_deletable")
+    @patch("chats.apps.api.v1.rooms.services.bulk_transfer_service.start_queue_priority_routing")
+    @patch("chats.apps.rooms.models.Room.notify_user")
+    @patch("chats.apps.rooms.models.Room.notify_queue")
+    @patch("chats.apps.api.v1.rooms.services.bulk_transfer_service.create_room_feedback_message")
+    def test_transfer_queue_notifies_all_rooms(
+        self,
+        mock_feedback,
+        mock_notify_queue,
+        mock_notify_user,
+        mock_routing,
+        mock_mark_notes,
+    ):
+        queue_2 = Queue.objects.create(name="Test Queue 2", sector=self.sector)
+        rooms = self._create_multiple_rooms(3)
+
+        self.service.transfer_queue(rooms, queue_2, self.user)
+
+        self.assertEqual(mock_feedback.call_count, 3)
+        self.assertEqual(mock_notify_queue.call_count, 3)
+        self.assertEqual(mock_notify_user.call_count, 3)
+        self.assertEqual(mock_routing.call_count, 3)
+        self.assertEqual(mock_mark_notes.call_count, 3)
+
+
+class BulkCloseServiceTest(TestCase):
+    def setUp(self):
+        self.service = BulkCloseService()
+        self.project = Project.objects.create(name="Test Project", timezone="UTC")
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+            is_csat_enabled=False,
+        )
+        self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
+        self.user = User.objects.create(email="test@test.com")
+
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=self.user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+
+    def test_close_single_room(self):
+        """Test closing a single room via room.close()"""
+        room = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+        rooms = Room.objects.filter(pk=room.pk)
+
+        result = self.service.close(rooms)
+
+        self.assertEqual(result.success_count, 1)
+        self.assertEqual(result.failed_count, 0)
+        room.refresh_from_db()
+        self.assertFalse(room.is_active)
+        self.assertIsNotNone(room.ended_at)
+
+    def test_close_multiple_rooms(self):
+        """Test closing multiple rooms"""
+        rooms_objs = [
+            Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+            for _ in range(10)
+        ]
+        room_ids = [room.pk for room in rooms_objs]
+        rooms = Room.objects.filter(pk__in=room_ids)
+
+        result = self.service.close(rooms)
+
+        self.assertEqual(result.success_count, 10)
+        self.assertEqual(result.failed_count, 0)
+        for room in Room.objects.filter(pk__in=room_ids):
+            self.assertFalse(room.is_active)
+            self.assertIsNotNone(room.ended_at)
+
+    def test_close_with_end_by_and_closed_by(self):
+        """Test that end_by and closed_by are passed to room.close()"""
+        room = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+        closer_user = User.objects.create(email="closer@test.com")
+        rooms = Room.objects.filter(pk=room.pk)
+
+        result = self.service.close(
+            rooms,
+            end_by="agent",
+            closed_by=closer_user,
+        )
+
+        self.assertEqual(result.success_count, 1)
+        self.assertEqual(result.failed_count, 0)
+        room.refresh_from_db()
+        self.assertEqual(room.ended_by, "agent")
+        self.assertEqual(room.closed_by, closer_user)
+
+    def test_close_with_tags(self):
+        """Test that tags are forwarded to room.close()"""
+        room = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+        tag1 = SectorTag.objects.create(name="Tag1", sector=self.sector)
+        tag2 = SectorTag.objects.create(name="Tag2", sector=self.sector)
+        rooms = Room.objects.filter(pk=room.pk)
+
+        room_tags_map = {
+            str(room.uuid): [str(tag1.uuid), str(tag2.uuid)]
+        }
+
+        result = self.service.close(rooms, room_tags_map=room_tags_map)
+
+        self.assertEqual(result.success_count, 1)
+        self.assertEqual(result.failed_count, 0)
+        room.refresh_from_db()
+        self.assertFalse(room.is_active)
+        self.assertEqual(room.tags.count(), 2)
+        self.assertIn(tag1, room.tags.all())
+        self.assertIn(tag2, room.tags.all())
+
+    def test_close_clears_pins(self):
+        """Test that room.close() clears pins for each room"""
+        room1 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+        room2 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+
+        RoomPin.objects.create(room=room1, user=self.user)
+        RoomPin.objects.create(room=room2, user=self.user)
+
+        rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk])
+        self.assertEqual(RoomPin.objects.filter(room__in=rooms).count(), 2)
+
+        result = self.service.close(rooms)
+
+        self.assertEqual(result.success_count, 2)
+        self.assertEqual(result.failed_count, 0)
+        self.assertEqual(RoomPin.objects.filter(room__in=rooms).count(), 0)
+
+    def test_close_tracks_already_closed_rooms_as_failures(self):
+        """Test that already-closed rooms are recorded as failures"""
+        room1 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+        room2 = Room.objects.create(queue=self.queue, user=self.user, is_active=False)
+
+        rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk])
+
+        result = self.service.close(rooms)
+
+        self.assertEqual(result.success_count, 1)
+        self.assertEqual(result.failed_count, 1)
+        self.assertIn(str(room2.uuid), result.failed_rooms)
+
+    def test_close_returns_empty_result_for_empty_queryset(self):
+        """Test that an empty queryset returns a zero-count result"""
+        rooms = Room.objects.none()
+
+        result = self.service.close(rooms)
+
+        self.assertEqual(result.success_count, 0)
+        self.assertEqual(result.failed_count, 0)
+
+    def test_close_rooms_in_queue(self):
+        """Test closing rooms in queue (no user assigned)"""
+        room1 = Room.objects.create(queue=self.queue, user=None, is_active=True)
+        room2 = Room.objects.create(queue=self.queue, user=None, is_active=True)
+
+        rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk])
+
+        result = self.service.close(rooms)
+
+        self.assertEqual(result.success_count, 2)
+        self.assertEqual(result.failed_count, 0)
+        for room in [room1, room2]:
+            room.refresh_from_db()
+            self.assertFalse(room.is_active)
+
+    def test_close_rooms_in_progress(self):
+        """Test closing rooms in progress (user assigned)"""
+        user1 = User.objects.create(email="agent1@test.com")
+        user2 = User.objects.create(email="agent2@test.com")
+        room1 = Room.objects.create(queue=self.queue, user=user1, is_active=True)
+        room2 = Room.objects.create(queue=self.queue, user=user2, is_active=True)
+
+        rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk])
+
+        result = self.service.close(rooms)
+
+        self.assertEqual(result.success_count, 2)
+        self.assertEqual(result.failed_count, 0)
+        for room in [room1, room2]:
+            room.refresh_from_db()
+            self.assertFalse(room.is_active)
+
+    def test_close_updates_ended_at_timestamp(self):
+        """Test that ended_at is set by room.close()"""
+        room = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+        rooms = Room.objects.filter(pk=room.pk)
+
+        before_close = timezone.now()
+        result = self.service.close(rooms)
+        after_close = timezone.now()
+
+        self.assertEqual(result.success_count, 1)
+        room.refresh_from_db()
+        self.assertIsNotNone(room.ended_at)
+        self.assertGreaterEqual(room.ended_at, before_close)
+        self.assertLessEqual(room.ended_at, after_close)
+
+    @patch("chats.apps.projects.usecases.status_service.InServiceStatusService.room_closed")
+    def test_close_calls_inservice_status_update(self, mock_room_closed):
+        """Test that room.close() triggers InService status update"""
+        room = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+        rooms = Room.objects.filter(pk=room.pk)
+
+        result = self.service.close(rooms)
+
+        self.assertEqual(result.success_count, 1)
+        mock_room_closed.assert_called_once_with(self.user, self.project)
+
+    def test_close_tracks_individual_failures(self):
+        """Test that individual failures are tracked with details"""
+        room1 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+        room2 = Room.objects.create(queue=self.queue, user=self.user, is_active=False)
+        room3 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+
+        rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk, room3.pk])
+
+        result = self.service.close(rooms)
+
+        self.assertEqual(result.success_count, 2)
+        self.assertEqual(result.failed_count, 1)
+        self.assertEqual(len(result.failed_rooms), 1)
+        self.assertIn(str(room2.uuid), result.failed_rooms)
+
+    def test_close_result_to_dict(self):
+        """Test that BulkCloseResult.to_dict() returns correct structure"""
+        room = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+        rooms = Room.objects.filter(pk=room.pk)
+
+        result = self.service.close(rooms)
+        result_dict = result.to_dict()
+
+        self.assertIn("success_count", result_dict)
+        self.assertIn("failed_count", result_dict)
+        self.assertIn("total_processed", result_dict)
+        self.assertIn("errors", result_dict)
+        self.assertIn("failed_rooms", result_dict)
+        self.assertIn("has_more_errors", result_dict)
+        self.assertEqual(result_dict["total_processed"], 1)
+
+    def test_close_with_different_tags_per_room(self):
+        """Test closing rooms with different tags for each"""
+        room1 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+        room2 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+        room3 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+
+        tag1 = SectorTag.objects.create(name="Tag1", sector=self.sector)
+        tag2 = SectorTag.objects.create(name="Tag2", sector=self.sector)
+        tag3 = SectorTag.objects.create(name="Tag3", sector=self.sector)
+
+        rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk, room3.pk])
+
+        room_tags_map = {
+            str(room1.uuid): [str(tag1.uuid)],
+            str(room2.uuid): [str(tag2.uuid), str(tag3.uuid)],
+            str(room3.uuid): [],
+        }
+
+        result = self.service.close(rooms, room_tags_map=room_tags_map)
+
+        self.assertEqual(result.success_count, 3)
+        self.assertEqual(result.failed_count, 0)
+
+        room1.refresh_from_db()
+        room2.refresh_from_db()
+        room3.refresh_from_db()
+
+        self.assertEqual(room1.tags.count(), 1)
+        self.assertIn(tag1, room1.tags.all())
+
+        self.assertEqual(room2.tags.count(), 2)
+        self.assertIn(tag2, room2.tags.all())
+        self.assertIn(tag3, room2.tags.all())
+
+        self.assertEqual(room3.tags.count(), 0)
+
+    def test_close_multiple_sectors_with_different_tags(self):
+        """Test closing rooms from different sectors with sector-specific tags"""
+        sector2 = Sector.objects.create(
+            name="Test Sector 2",
+            project=self.project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+            is_csat_enabled=False,
+        )
+        queue2 = Queue.objects.create(name="Test Queue 2", sector=sector2)
+
+        room1 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+        room2 = Room.objects.create(queue=queue2, user=self.user, is_active=True)
+
+        tag1 = SectorTag.objects.create(name="Sector1Tag", sector=self.sector)
+        tag2 = SectorTag.objects.create(name="Sector2Tag", sector=sector2)
+
+        rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk])
+
+        room_tags_map = {
+            str(room1.uuid): [str(tag1.uuid)],
+            str(room2.uuid): [str(tag2.uuid)],
+        }
+
+        result = self.service.close(rooms, room_tags_map=room_tags_map)
+
+        self.assertEqual(result.success_count, 2)
+        self.assertEqual(result.failed_count, 0)
+
+        room1.refresh_from_db()
+        room2.refresh_from_db()
+
+        self.assertEqual(room1.tags.count(), 1)
+        self.assertIn(tag1, room1.tags.all())
+
+        self.assertEqual(room2.tags.count(), 1)
+        self.assertIn(tag2, room2.tags.all())
+
+    @override_settings(BULK_CLOSE_BATCH_SIZE=3)
+    def test_close_processes_rooms_across_multiple_batches(self):
+        """Test that rooms are split across batches correctly"""
+        rooms_objs = [
+            Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+            for _ in range(7)
+        ]
+        room_ids = [room.pk for room in rooms_objs]
+        rooms = Room.objects.filter(pk__in=room_ids)
+
+        result = self.service.close(rooms)
+
+        # All 7 rooms closed despite batch_size=3 (3 batches: 3+3+1)
+        self.assertEqual(result.success_count, 7)
+        self.assertEqual(result.failed_count, 0)
+        self.assertEqual(
+            Room.objects.filter(pk__in=room_ids, is_active=True).count(), 0
+        )
+
+    @override_settings(BULK_CLOSE_BATCH_SIZE=2)
+    def test_close_batch_failures_dont_stop_other_batches(self):
+        """Test that a failure in one batch does not prevent the next batch"""
+        room1 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+        room2 = Room.objects.create(queue=self.queue, user=self.user, is_active=False)
+        room3 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+        room4 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+
+        rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk, room3.pk, room4.pk])
+
+        result = self.service.close(rooms)
+
+        # room2 fails, the rest succeed across batches
+        self.assertEqual(result.success_count, 3)
+        self.assertEqual(result.failed_count, 1)
+
+    @patch("chats.apps.api.v1.rooms.services.bulk_close_service.close_room")
+    def test_close_calls_close_room_for_metrics(self, mock_close_room):
+        """Test that close_room() is called for each successfully closed room"""
+        room1 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+        room2 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+
+        rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk])
+
+        result = self.service.close(rooms)
+
+        self.assertEqual(result.success_count, 2)
+        self.assertEqual(mock_close_room.call_count, 2)
+        mock_close_room.assert_any_call(str(room1.uuid))
+        mock_close_room.assert_any_call(str(room2.uuid))
+
+    @patch("chats.apps.rooms.models.Room.notify_queue")
+    def test_close_sends_notify_queue_for_all_rooms(self, mock_notify_queue):
+        """Test that notify_queue('close', callback=True) is called for every closed room"""
+        room1 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+        room2 = Room.objects.create(queue=self.queue, user=None, is_active=True)
+
+        rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk])
+
+        result = self.service.close(rooms)
+
+        self.assertEqual(result.success_count, 2)
+        self.assertEqual(mock_notify_queue.call_count, 2)
+        mock_notify_queue.assert_any_call("close", callback=True)
+
+    @patch("chats.apps.rooms.models.Room.notify_user")
+    @patch("chats.apps.rooms.models.Room.notify_queue")
+    def test_close_sends_notify_user_only_for_rooms_in_progress(
+        self, mock_notify_queue, mock_notify_user
+    ):
+        """Test that notify_user('close') is called only for rooms with a user assigned"""
+        room_in_progress = Room.objects.create(
+            queue=self.queue, user=self.user, is_active=True
+        )
+        room_in_queue = Room.objects.create(
+            queue=self.queue, user=None, is_active=True
+        )
+
+        rooms = Room.objects.filter(pk__in=[room_in_progress.pk, room_in_queue.pk])
+
+        result = self.service.close(rooms)
+
+        self.assertEqual(result.success_count, 2)
+        # notify_queue called for both
+        self.assertEqual(mock_notify_queue.call_count, 2)
+        # notify_user called only for the room with a user
+        self.assertEqual(mock_notify_user.call_count, 1)
+        mock_notify_user.assert_called_once_with("close")
+
+    @patch("chats.apps.rooms.models.Room.notify_user")
+    @patch("chats.apps.rooms.models.Room.notify_queue")
+    def test_close_does_not_send_notify_user_for_queued_rooms(
+        self, mock_notify_queue, mock_notify_user
+    ):
+        """Test that notify_user is NOT called for rooms in queue (user=None)"""
+        room1 = Room.objects.create(queue=self.queue, user=None, is_active=True)
+        room2 = Room.objects.create(queue=self.queue, user=None, is_active=True)
+
+        rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk])
+
+        result = self.service.close(rooms)
+
+        self.assertEqual(result.success_count, 2)
+        self.assertEqual(mock_notify_queue.call_count, 2)
+        self.assertEqual(mock_notify_user.call_count, 0)
+
+    @patch("chats.apps.api.v1.rooms.services.bulk_close_service.start_queue_priority_routing")
+    def test_close_triggers_routing_once_per_unique_queue(self, mock_start_routing):
+        """Test that start_queue_priority_routing is called once per unique queue"""
+        queue2 = Queue.objects.create(name="Queue 2", sector=self.sector)
+
+        room1 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+        room2 = Room.objects.create(queue=self.queue, user=self.user, is_active=True)
+        room3 = Room.objects.create(queue=queue2, user=self.user, is_active=True)
+
+        rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk, room3.pk])
+
+        result = self.service.close(rooms)
+
+        self.assertEqual(result.success_count, 3)
+        # Called once per unique queue (2 queues)
+        self.assertEqual(mock_start_routing.call_count, 2)
+
+
+class BulkTakeServiceTest(TestCase):
+    def setUp(self):
+        self.service = BulkTakeService()
+        self.project = Project.objects.create(name="Test Project", timezone="UTC")
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
+        self.user = User.objects.create(email="agent@test.com")
+
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=self.user,
+            role=ProjectPermission.ROLE_ATTENDANT,
+        )
+
+    def test_take_single_room(self):
+        room = Room.objects.create(queue=self.queue, user=None, is_active=True)
+        rooms = Room.objects.filter(pk=room.pk)
+
+        result = self.service.take(rooms, self.user)
+
+        self.assertEqual(result.success_count, 1)
+        self.assertEqual(result.failed_count, 0)
+        room.refresh_from_db()
+        self.assertEqual(room.user, self.user)
+
+    def test_take_multiple_rooms(self):
+        rooms_objs = [
+            Room.objects.create(queue=self.queue, user=None, is_active=True)
+            for _ in range(5)
+        ]
+        room_ids = [r.pk for r in rooms_objs]
+        rooms = Room.objects.filter(pk__in=room_ids)
+
+        result = self.service.take(rooms, self.user)
+
+        self.assertEqual(result.success_count, 5)
+        self.assertEqual(result.failed_count, 0)
+        for room in Room.objects.filter(pk__in=room_ids):
+            self.assertEqual(room.user, self.user)
+
+    def test_take_skips_already_assigned_rooms(self):
+        other_user = User.objects.create(email="other@test.com")
+        room_queued = Room.objects.create(queue=self.queue, user=None, is_active=True)
+        room_assigned = Room.objects.create(
+            queue=self.queue, user=other_user, is_active=True
+        )
+
+        rooms = Room.objects.filter(pk__in=[room_queued.pk, room_assigned.pk])
+
+        result = self.service.take(rooms, self.user)
+
+        self.assertEqual(result.success_count, 1)
+        self.assertEqual(result.failed_count, 1)
+        self.assertIn(str(room_assigned.uuid), result.failed_rooms)
+
+        room_queued.refresh_from_db()
+        self.assertEqual(room_queued.user, self.user)
+
+        room_assigned.refresh_from_db()
+        self.assertEqual(room_assigned.user, other_user)
+
+    def test_take_returns_empty_result_for_empty_queryset(self):
+        rooms = Room.objects.none()
+
+        result = self.service.take(rooms, self.user)
+
+        self.assertEqual(result.success_count, 0)
+        self.assertEqual(result.failed_count, 0)
+
+    def test_take_updates_user_assigned_at(self):
+        room = Room.objects.create(queue=self.queue, user=None, is_active=True)
+        rooms = Room.objects.filter(pk=room.pk)
+
+        before = timezone.now()
+        self.service.take(rooms, self.user)
+        after = timezone.now()
+
+        room.refresh_from_db()
+        self.assertIsNotNone(room.user_assigned_at)
+        self.assertGreaterEqual(room.user_assigned_at, before)
+        self.assertLessEqual(room.user_assigned_at, after)
+
+    @patch("chats.apps.api.v1.rooms.services.bulk_take_service.calculate_last_queue_waiting_time")
+    def test_take_updates_room_metrics(self, mock_calc_waiting):
+        mock_calc_waiting.return_value = 42.0
+
+        room = Room.objects.create(queue=self.queue, user=None, is_active=True)
+        rooms = Room.objects.filter(pk=room.pk)
+
+        self.service.take(rooms, self.user)
+
+        from chats.apps.dashboard.models import RoomMetrics
+
+        metric = RoomMetrics.objects.get(room=room)
+        self.assertEqual(metric.queued_count, 1)
+        self.assertEqual(metric.waiting_time, 42.0)
+
+    @patch("chats.apps.rooms.models.Room.notify_queue")
+    @patch("chats.apps.api.v1.rooms.services.bulk_take_service.create_room_feedback_message")
+    def test_take_sends_notify_queue(self, mock_feedback, mock_notify_queue):
+        room1 = Room.objects.create(queue=self.queue, user=None, is_active=True)
+        room2 = Room.objects.create(queue=self.queue, user=None, is_active=True)
+
+        rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk])
+
+        result = self.service.take(rooms, self.user)
+
+        self.assertEqual(result.success_count, 2)
+        self.assertEqual(mock_notify_queue.call_count, 2)
+        mock_notify_queue.assert_any_call("update")
+
+    @patch("chats.apps.rooms.models.Room.send_automatic_message")
+    @patch("chats.apps.api.v1.rooms.services.bulk_take_service.create_room_feedback_message")
+    def test_take_sends_automatic_message(self, mock_feedback, mock_auto_msg):
+        room = Room.objects.create(queue=self.queue, user=None, is_active=True)
+        rooms = Room.objects.filter(pk=room.pk)
+
+        self.service.take(rooms, self.user)
+
+        mock_auto_msg.assert_called_once()
+
+    @patch("chats.apps.api.v1.rooms.services.bulk_take_service.start_queue_priority_routing")
+    @patch("chats.apps.api.v1.rooms.services.bulk_take_service.create_room_feedback_message")
+    def test_take_triggers_routing_once_per_queue(self, mock_feedback, mock_routing):
+        queue2 = Queue.objects.create(name="Queue 2", sector=self.sector)
+
+        room1 = Room.objects.create(queue=self.queue, user=None, is_active=True)
+        room2 = Room.objects.create(queue=self.queue, user=None, is_active=True)
+        room3 = Room.objects.create(queue=queue2, user=None, is_active=True)
+
+        rooms = Room.objects.filter(pk__in=[room1.pk, room2.pk, room3.pk])
+
+        result = self.service.take(rooms, self.user)
+
+        self.assertEqual(result.success_count, 3)
+        self.assertEqual(mock_routing.call_count, 2)
+
+    @patch("chats.apps.api.v1.rooms.services.bulk_take_service.create_room_feedback_message")
+    def test_take_creates_feedback_message(self, mock_feedback):
+        room = Room.objects.create(queue=self.queue, user=None, is_active=True)
+        rooms = Room.objects.filter(pk=room.pk)
+
+        self.service.take(rooms, self.user)
+
+        mock_feedback.assert_called_once()
+        call_args = mock_feedback.call_args
+        self.assertEqual(call_args[0][0], room)
+
+    @override_settings(BULK_TAKE_BATCH_SIZE=3)
+    @patch("chats.apps.api.v1.rooms.services.bulk_take_service.create_room_feedback_message")
+    def test_take_processes_in_batches(self, mock_feedback):
+        rooms_objs = [
+            Room.objects.create(queue=self.queue, user=None, is_active=True)
+            for _ in range(7)
+        ]
+        room_ids = [r.pk for r in rooms_objs]
+        rooms = Room.objects.filter(pk__in=room_ids)
+
+        result = self.service.take(rooms, self.user)
+
+        self.assertEqual(result.success_count, 7)
+        self.assertEqual(result.failed_count, 0)
+        for room in Room.objects.filter(pk__in=room_ids):
+            self.assertEqual(room.user, self.user)
+
+    def test_take_result_to_dict(self):
+        room = Room.objects.create(queue=self.queue, user=None, is_active=True)
+        rooms = Room.objects.filter(pk=room.pk)
+
+        result = self.service.take(rooms, self.user)
+        result_dict = result.to_dict()
+
+        self.assertIn("success_count", result_dict)
+        self.assertIn("failed_count", result_dict)
+        self.assertIn("total_processed", result_dict)
+        self.assertIn("errors", result_dict)
+        self.assertIn("failed_rooms", result_dict)
+        self.assertIn("has_more_errors", result_dict)
+        self.assertEqual(result_dict["total_processed"], 1)

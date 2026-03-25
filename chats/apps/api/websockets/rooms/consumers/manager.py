@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 import uuid
@@ -55,7 +56,9 @@ class ManagerAgentRoomConsumer(AgentRoomConsumer):
                 user_email = self.scope["query_params"].get("user_email")[0]
                 is_manager = await self.check_is_manager()
                 if user_email and UserModel and is_manager:
-                    self.user = await database_sync_to_async(UserModel.objects.get)(email=user_email)
+                    self.user = await database_sync_to_async(UserModel.objects.get)(
+                        email=user_email
+                    )
                     self.permission = await self.get_permission()
                 else:
                     close = True
@@ -73,6 +76,15 @@ class ManagerAgentRoomConsumer(AgentRoomConsumer):
                 await self.load_queues()
                 await self.load_user()
                 self.last_ping = timezone.now()
+                self._last_seen_updated_at = None  # Force first update
+
+                # Start background task to monitor ping timeout if feature is enabled
+                if await self.is_ping_timeout_feature_enabled():
+                    # Update last_seen immediately on connect
+                    await self.maybe_update_last_seen()
+                    self.ping_timeout_task = asyncio.create_task(
+                        self.ping_timeout_checker()
+                    )
 
     async def disconnect(self, *args, **kwargs):
         try:

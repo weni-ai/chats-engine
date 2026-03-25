@@ -62,9 +62,33 @@ class GetUserIdByEmailCachedTests(TestCase):
             cache_utils.get_user_id_by_email_cached(self.email), self.user.pk
         )
 
+    @patch("chats.core.cache_utils.EMAIL_LOOKUP_CACHE_ENABLED", False)
+    def test_cache_disabled_user_not_found(self):
+        self.assertIsNone(cache_utils.get_user_id_by_email_cached("notexist@acme.com"))
+
     def test_blank_email_returns_none(self):
         self.assertIsNone(cache_utils.get_user_id_by_email_cached(""))
         self.assertIsNone(cache_utils.get_user_id_by_email_cached(None))
+
+    @patch("chats.core.cache_utils.get_redis_connection")
+    def test_stale_cache_deleted_user(self, mock_conn):
+        r = FakeRedis()
+        mock_conn.return_value = r
+
+        uid = cache_utils.get_user_id_by_email_cached(self.email)
+        self.assertEqual(uid, self.user.pk)
+
+        self.user.delete()
+
+        uid2 = cache_utils.get_user_id_by_email_cached(self.email)
+        self.assertIsNone(uid2)
+
+    @patch("chats.core.cache_utils.get_redis_connection")
+    def test_redis_connection_returns_none(self, mock_conn):
+        mock_conn.return_value = None
+
+        uid = cache_utils.get_user_id_by_email_cached(self.email)
+        self.assertEqual(uid, self.user.pk)
 
 
 class CacheInvalidationTests(TestCase):
@@ -145,3 +169,77 @@ class ProjectCacheTests(TestCase):
 
         config = cache_utils.get_project_config_cached(str(self.project.uuid))
         self.assertEqual(config["test_key"], "test_value")
+
+
+class GetCachedUserTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create(
+            email="cached@test.com",
+            first_name="Cached",
+            last_name="User",
+            is_staff=False,
+            is_active=True,
+            is_superuser=False,
+        )
+        self.email = "Cached@Test.com"
+
+    @patch("chats.core.cache_utils.get_redis_connection")
+    def test_cache_hit_returns_user(self, mock_conn):
+        r = FakeRedis()
+        mock_conn.return_value = r
+
+        user = cache_utils.get_cached_user(self.email)
+        self.assertEqual(user.id, self.user.id)
+        self.assertEqual(user.email, self.user.email)
+
+        user2 = cache_utils.get_cached_user(self.email)
+        self.assertEqual(user2.id, self.user.id)
+
+    @patch("chats.core.cache_utils.get_redis_connection")
+    def test_negative_cache_returns_none(self, mock_conn):
+        r = FakeRedis()
+        mock_conn.return_value = r
+
+        user = cache_utils.get_cached_user("nonexistent@test.com")
+        self.assertIsNone(user)
+        self.assertEqual(r.get("user:object:nonexistent@test.com"), b"-1")
+
+        user2 = cache_utils.get_cached_user("nonexistent@test.com")
+        self.assertIsNone(user2)
+
+    @patch("chats.core.cache_utils.get_redis_connection", side_effect=Exception("down"))
+    def test_redis_down_fallbacks_to_db(self, _):
+        user = cache_utils.get_cached_user(self.email)
+        self.assertEqual(user.id, self.user.id)
+
+    @patch("chats.core.cache_utils.USER_OBJECT_CACHE_ENABLED", False)
+    def test_cache_disabled_queries_db(self):
+        user = cache_utils.get_cached_user(self.email)
+        self.assertEqual(user.id, self.user.id)
+
+    def test_blank_email_returns_none(self):
+        self.assertIsNone(cache_utils.get_cached_user(""))
+        self.assertIsNone(cache_utils.get_cached_user(None))
+
+    @patch("chats.core.cache_utils.get_redis_connection")
+    def test_invalid_cached_data_deleted(self, mock_conn):
+        r = FakeRedis()
+        mock_conn.return_value = r
+
+        cache_key = "user:object:cached@test.com"
+        r.store[cache_key] = b"invalid json"
+
+        user = cache_utils.get_cached_user(self.email)
+        self.assertEqual(user.id, self.user.id)
+
+    @patch("chats.core.cache_utils.get_redis_connection")
+    def test_cached_user_has_correct_fields(self, mock_conn):
+        r = FakeRedis()
+        mock_conn.return_value = r
+
+        user = cache_utils.get_cached_user(self.email)
+        self.assertEqual(user.first_name, "Cached")
+        self.assertEqual(user.last_name, "User")
+        self.assertFalse(user.is_staff)
+        self.assertTrue(user.is_active)
+        self.assertFalse(user.is_superuser)

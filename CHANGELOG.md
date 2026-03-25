@@ -1,3 +1,233 @@
+# 3.47.1
+# Add
+  - New endpoint to list user status
+# Fix
+  - Redirect link to view mode
+  
+# 3.47.0
+# Add
+  - Bulk take feature
+  
+# 3.46.2
+# Add
+  - Support for multiple queues in filter for human support dashboard
+  
+# 3.46.1
+# Fix
+  - Report ready status
+  
+# 3.46.0
+# Add
+  - Wait limit settings and validations
+
+# 3.45.7
+# Fix
+  - First response time correct field and model fields cache removal
+
+# 3.45.6
+# Add
+  - "No response" value for first response time when null
+# Fix
+  - Queue deletion on secondary project
+
+# 3.45.5
+# Add
+  - Functions to avoid lose reports
+
+# 3.45.4
+# Add
+  - Agent custom status related chips and filters
+
+# 3.45.3
+# Fix
+  - Flows viewset change to restrict the queryset based on the token project
+
+# 3.45.2
+# Add
+  - CSAT Flow V5
+# Fix
+  - PR title validation to include optional ticket prefix format
+
+# 3.45.1
+# Fix
+  - Notify problem bulk transfer
+
+# 3.45.0
+# Add
+  - Time metrics fields on rooms metrics serializer
+  - Getting tags from request in close
+  - Desnormalizing automatic message send
+  - Constraint to avoid two contacts with the same external id
+  - Setting in service name for in service status, removing break
+# Fix
+  - Translations for CSAT flow
+  - Waiting time field on listing rooms on internal endpoint
+
+# 3.44.3
+# Fix
+  - CSAT flow creation for sectors with secondary projects
+
+# 3.44.2
+# Remove
+  - functions to avoid lose reports
+
+# 3.44.1
+# Add
+  - CSAT alternative logic for orgs with main and secondary projects logic
+  - Bulk close rooms
+  - Failed or stuck reports are now automatically retried up to 3 times, resuming from the last successfully written chunk instead of restarting from scratch. Reports stuck in `in_progress` for more than 10 minutes are considered abandoned and re-queued.
+
+# 3.44.0
+# Add
+  - Async update flows definition
+# Fix
+  - Calculate waiting time when user is changed in rooms update
+# Remove
+  - In service order field in agents query for metrics
+
+# 3.43.1
+# Fix
+  - Adding transcription text in message v2 serializer
+
+# 3.43.0
+# Add
+  - New feature to transcribe contact audio
+  - Archive messages service
+# Refactor
+  - In service time sorting for the new human dashboard
+
+# 3.42.0
+# Fix
+  - Correct interaction time
+  - Calculate waiting time when transferring users from queue
+# Add
+  - Adding conn max age in chats
+  - Adding media field to serializers
+  - Hide users with VTEX and Weni email domains from transfer list
+  
+# 3.41.9
+# Fix
+  - close custom status before setting user online
+  
+# 3.41.8
+# Fix
+  - ordering in agents table for new dashboard
+  
+# 3.41.7
+# Fix
+  - using project timezone when export data
+  
+# 3.41.6
+# Add
+  - feature to disconnect using ping
+  
+# 3.41.5
+# Fix
+  - formating link to redirect do closed rooms
+  
+# 3.41.4
+# Add
+  - link do redirect to closed rooms
+  
+# 3.41.3
+# Add
+  - filter for urn and agents in internal rooms 
+  
+# 3.41.2
+# Add
+  - Adding closed by field in history viewset
+  
+# 3.41.1
+# Add
+  - Adding closed by field when closing a room
+    
+# 3.41.0
+# Fix
+  - Removing unused verification when creating a sector
+# Add
+  - Adds cyclomatic complexity analysis to flake8
+  - Adding filters to avoid return rooms from sectors/queues that are deleted
+  - Better documentation for external endpoints
+  
+# 3.40.1
+  - Filter rooms in the CSAT score by agents by project
+  
+# 3.40.0
+# Add
+  - Update CSAT flows command
+  - Update CSAT Flow to version 2
+# Fix 
+  - Filter rooms in CSAT by project
+  
+# 3.39.2
+# Add
+  - Adding the new routing using the correct configuration for growthbook feature flag
+  
+# 3.39.1
+# Hotfix
+  - Removing new routing feature flag configuration
+  
+# 3.39.0
+# Add
+  - Static token authentication for rooms and messages endpoints (used by Mailroom)
+
+# 3.38.0
+# Add
+  - CSAT metrics internal endpoints
+
+# 3.37.0
+# Fix
+  - Prevent users names from being blank
+  - Date range filter on dashboard metrics
+# Refactor
+  - Cyclomatic complexity reduction
+# Add
+  - Prevent users from closing rooms from queue (optional)
+
+# 3.36.7
+# Add
+  - Normalization of last message related fields in rooms list
+
+# 3.36.6
+# Remove
+  - Automatic message feature flag
+
+# 3.36.5
+# Fix
+  - Chats history summary key name in Project's config
+
+# 3.36.4
+# Add
+  - Return has chats history summary enabled in Project's config
+
+# 3.36.3
+# Add
+  - Rooms unread messages count field (replacing the usage of Message's "seen" count)
+
+# 3.36.2
+# Refactor
+  - Rooms bulk transfer
+
+# 3.36.1
+# Add
+  - Removal of WhatsApp's 24h window validation in rooms list (disabled by default, can be activated again via feature flag, if needed).
+
+# 3.36.0
+# Add
+  - CSAT native feature (partial)
+
+# 3.35.0
+# Add
+  - Tags to history summary feedback
+
+# 3.34.1
+# Fix
+  - Calling the correct method to get features
+
+# 3.34.0
+# Add
+  - Send room notification after transaction to avoid race condition
+
 # 3.33.6
 # Fix
   - Order internal rooms by user full name
@@ -898,6 +1128,22 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

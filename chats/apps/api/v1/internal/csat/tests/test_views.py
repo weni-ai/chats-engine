@@ -75,8 +75,24 @@ class TestCSATWebhookView(BaseTestCSATWebhookView):
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    @with_project_jwt_token(room_uuid="4e839702-a638-46c7-b11a-a5612b79a785")
+    def test_cannot_create_csat_for_room_different_from_the_one_in_the_token(self):
+        room_2 = Room.objects.create(
+            project_uuid=self.project.uuid,
+            queue=self.queue,
+        )
+
+        response = self.create(
+            {"room": room_2.uuid, "rating": 5, "comment": "Test Comment"}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     @with_project_jwt_token
     def test_cannot_create_csat_for_active_room(self):
+        self.room.is_active = True
+        self.room.save(update_fields=["is_active"])
+
         response = self.create(
             {"room": self.room.uuid, "rating": 5, "comment": "Test Comment"}
         )
@@ -136,7 +152,28 @@ class TestCSATWebhookView(BaseTestCSATWebhookView):
 
     @with_project_jwt_token
     @with_closed_room
-    def test_cannot_create_csat_if_already_exists(self):
+    def test_cannot_create_csat_without_rating(self):
+        response = self.create({"room": self.room.uuid, "comment": "Test Comment"})
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["rating"][0].code, "required")
+
+    @with_project_jwt_token
+    @with_closed_room
+    def test_create_csat_updating_with_comment(self):
+        survey = CSATSurvey.objects.create(
+            room=self.room, rating=5, answered_on=timezone.now()
+        )
+
+        response = self.create({"room": self.room.uuid, "comment": "New Comment"})
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        survey.refresh_from_db()
+        self.assertEqual(survey.comment, "New Comment")
+
+    @with_project_jwt_token
+    @with_closed_room
+    def test_cannot_create_csat_if_already_completed(self):
         CSATSurvey.objects.create(
             room=self.room, rating=5, comment="Test Comment", answered_on=timezone.now()
         )

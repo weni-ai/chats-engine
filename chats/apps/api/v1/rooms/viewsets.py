@@ -8,7 +8,6 @@ from django.db.models import (
     Case,
     DateTimeField,
     Exists,
-    Max,
     OuterRef,
     Q,
     Subquery,
@@ -28,6 +27,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
+from sentry_sdk import capture_exception
 from weni.feature_flags.shortcuts import is_feature_active
 
 from chats.apps.accounts.authentication.drf.authorization import (
@@ -50,6 +50,8 @@ from chats.apps.api.v1.rooms.permissions import (
 )
 from chats.apps.api.v1.rooms.serializers import (
     AddRoomTagSerializer,
+    BulkCloseSerializer,
+    BulkTakeSerializer,
     BulkTransferSerializer,
     ListRoomSerializer,
     PinRoomSerializer,
@@ -64,6 +66,8 @@ from chats.apps.api.v1.rooms.serializers import (
     RoomTagSerializer,
     TransferRoomSerializer,
 )
+from chats.apps.api.v1.rooms.services.bulk_close_service import BulkCloseService
+from chats.apps.api.v1.rooms.services.bulk_take_service import BulkTakeService
 from chats.apps.api.v1.rooms.services.bulk_transfer_service import BulkTransferService
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
@@ -87,8 +91,6 @@ from chats.apps.rooms.views import (
     update_custom_fields,
     update_flows_custom_fields,
 )
-
-
 from chats.apps.sectors.models import SectorTag
 
 logger = logging.getLogger(__name__)
@@ -144,53 +146,7 @@ class RoomViewset(
             .filter(queue__sector__project__permissions__user=self.request.user)
         )
 
-        annotations = {
-            "last_interaction": Max("messages__created_on"),
-            "last_message_text": Subquery(
-                Message.objects.filter(room=OuterRef("pk"))
-                .exclude(user__isnull=True, contact__isnull=True)
-                .exclude(text="")
-                .order_by("-created_on")
-                .values("text")[:1]
-            ),
-        }
-
-        project_uuid = self.request.query_params.get("project")
-
-        if project_uuid and self.request.user.is_authenticated:
-            try:
-                if is_feature_active(
-                    settings.WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY,
-                    self.request.user.email,
-                    project_uuid,
-                ):
-                    last_24h = timezone.now() - timedelta(days=1)
-                    annotations["last_contact_interaction"] = Max(
-                        Case(
-                            When(
-                                messages__contact__isnull=False,
-                                then="messages__created_on",
-                            ),
-                            output_field=DateTimeField(),
-                        )
-                    )
-                    annotations["is_24h_valid_computed"] = Case(
-                        When(
-                            Q(
-                                urn__startswith="whatsapp",
-                                last_contact_interaction__lt=last_24h,
-                            ),
-                            then=False,
-                        ),
-                        default=True,
-                        output_field=BooleanField(),
-                    )
-            except Exception as e:
-                logger.error(f"Error checking feature flag: {e}")
-
-        qs = qs.annotate(**annotations).select_related(
-            "user", "contact", "queue", "queue__sector"
-        )
+        qs = qs.select_related("user", "contact", "queue", "queue__sector")
 
         return qs
 
@@ -410,7 +366,11 @@ class RoomViewset(
         # Add send room notification to the channels group
         instance: Room = self.get_object()
 
-        tags = request.data.get("tags", None)
+        if "tags" in request.data:
+            tags = request.data.get("tags")
+            tags = tags if tags is not None else []
+        else:
+            tags = None
 
         if tags is not None:
             sector_tags = [
@@ -426,14 +386,30 @@ class RoomViewset(
                     code="tag_not_found",
                 )
 
-        if instance.queue.required_tags and (not tags and not instance.tags.exists()):
+        # required_tags: sem tags após o close (se sobrescreveu com [] ou não sobrescreveu e sala sem tags)
+        no_tags_after_close = (tags is not None and not tags) or (
+            tags is None and not instance.tags.exists()
+        )
+        if instance.queue.required_tags and no_tags_after_close:
             raise ValidationError(
                 {"tags": ["Tags are required for this queue"]},
                 code="tags_required",
             )
 
+        if (
+            instance.user is None
+            and instance.queue
+            and instance.queue.sector.can_close_chats_in_queue
+        ):
+            permission = instance.project.get_permission(request.user)
+            if not permission or not permission.is_admin:
+                raise PermissionDenied(
+                    detail=_("Agents cannot close queued rooms in this sector."),
+                    code="queued_room_close_disabled",
+                )
+
         with transaction.atomic():
-            instance.close(tags, "agent")
+            instance.close(tags, "agent", request.user)
 
         instance.refresh_from_db()
         serialized_data = RoomSerializer(instance=instance)
@@ -466,6 +442,7 @@ class RoomViewset(
         # TODO Separate this into smaller methods
         old_instance = serializer.instance
         old_user = old_instance.user
+        old_user = old_instance.user
 
         user = self.request.data.get("user_email")
         queue = self.request.data.get("queue_uuid")
@@ -481,12 +458,11 @@ class RoomViewset(
 
         # Create transfer object based on whether it's a user or a queue transfer and add it to the history
         if user:
-            if old_instance.user is None:
-                time = timezone.now() - old_instance.modified_on
+            if old_user is None:
                 room_metric = RoomMetrics.objects.select_related("room").get_or_create(
                     room=instance
                 )[0]
-                room_metric.waiting_time += time.total_seconds()
+                room_metric.waiting_time += calculate_last_queue_waiting_time(instance)
                 room_metric.queued_count += 1
                 room_metric.save()
             else:
@@ -502,6 +478,7 @@ class RoomViewset(
                 action=action,
                 from_=old_instance.user or old_instance.queue,
                 to=instance.user,
+                requested_by=self.request.user,
             )
 
         if queue:
@@ -510,6 +487,7 @@ class RoomViewset(
                 action="transfer",
                 from_=old_instance.user or old_instance.queue,
                 to=instance.queue,
+                requested_by=self.request.user,
             )
             if (
                 not user
@@ -528,7 +506,10 @@ class RoomViewset(
         # Create a message with the transfer data and Send to the room group
         # TODO separate create message in a function
         create_room_feedback_message(
-            instance, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+            instance,
+            feedback,
+            method=RoomFeedbackMethods.ROOM_TRANSFER,
+            requested_by=self.request.user,
         )
 
         if old_user is None and user:  # queued > agent
@@ -631,7 +612,10 @@ class RoomViewset(
             "new": new_custom_field_value,
         }
         create_room_feedback_message(
-            room, feedback, method=RoomFeedbackMethods.EDIT_CUSTOM_FIELDS
+            room,
+            feedback,
+            method=RoomFeedbackMethods.EDIT_CUSTOM_FIELDS,
+            requested_by=request.user,
         )
 
         return Response(
@@ -669,6 +653,7 @@ class RoomViewset(
             action=action,
             from_=room.queue,
             to=user,
+            requested_by=request.user,
         )
 
         try:
@@ -677,7 +662,10 @@ class RoomViewset(
             room.add_transfer_to_history(feedback)
 
             create_room_feedback_message(
-                room, feedback, method=RoomFeedbackMethods.ROOM_TRANSFER
+                room,
+                feedback,
+                method=RoomFeedbackMethods.ROOM_TRANSFER,
+                requested_by=request.user,
             )
             room.notify_queue("update")
 
@@ -744,6 +732,194 @@ class RoomViewset(
             {"success": "Mass transfer completed"},
             status=status.HTTP_200_OK,
         )
+
+    @action(
+        detail=False,
+        methods=["POST"],
+        url_name="bulk_take",
+    )
+    def bulk_take(self, request, pk=None):
+        serializer = BulkTakeSerializer(
+            data=request.data, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+
+        rooms = serializer.validated_data["rooms"]
+        service = BulkTakeService()
+
+        try:
+            result = service.take(rooms=rooms, user=request.user)
+
+            logger.info(
+                f"Bulk take completed by {request.user.email}: "
+                f"{result.success_count} succeeded, {result.failed_count} failed"
+            )
+
+            if result.success_count == 0 and result.failed_count > 0:
+                response_status = status.HTTP_400_BAD_REQUEST
+                message = "All rooms failed to be taken"
+            elif result.failed_count > 0:
+                response_status = status.HTTP_207_MULTI_STATUS
+                message = (
+                    f"{result.success_count} rooms taken successfully, "
+                    f"{result.failed_count} failed"
+                )
+            else:
+                response_status = status.HTTP_200_OK
+                message = f"{result.success_count} rooms taken successfully"
+
+            response_data = {
+                "success": result.success_count > 0,
+                "message": message,
+                **result.to_dict(),
+            }
+
+            return Response(response_data, status=response_status)
+
+        except Exception as e:
+            logger.error(
+                f"Bulk take error for user {request.user.email}: {str(e)}",
+                exc_info=True,
+            )
+            event_id = capture_exception(e)
+            return Response(
+                {
+                    "success": False,
+                    "error": f"Failed to take rooms. Event ID: {event_id}",
+                    "success_count": 0,
+                    "failed_count": 0,
+                    "total_processed": 0,
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(
+        detail=False,
+        methods=["POST"],
+        url_name="bulk_close",
+    )
+    def bulk_close(self, request, pk=None):
+        """
+        Endpoint to close multiple rooms in bulk with specific tags per room.
+
+        Supports closing rooms that are:
+        - In progress (assigned to agents: user__isnull=False)
+        - In queue (not assigned: user__isnull=True)
+
+        Request body:
+        {
+            "rooms": [
+                {
+                    "uuid": "uuid1",
+                    "tags": ["tag_uuid1", "tag_uuid2"]  // Optional: specific tags for this room
+                },
+                {
+                    "uuid": "uuid2",
+                    "tags": ["tag_uuid3"]
+                },
+                {
+                    "uuid": "uuid3"  // No tags
+                }
+            ],
+            "end_by": "system",  // Optional: Who/what closed the rooms
+            "closed_by_email": "user@example.com"  // Optional: Email of user who closed
+        }
+
+        Returns:
+        {
+            "success": true,
+            "closed_count": 150,
+            "message": "150 rooms closed successfully"
+        }
+        """
+        serializer = BulkCloseSerializer(
+            data=request.data,
+            context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+
+        # Get validated data
+        rooms_data = serializer.validated_data["rooms"]
+        end_by = serializer.validated_data.get("end_by", "")
+        closed_by = serializer.validated_data.get("closed_by_email")
+
+        # Extract room UUIDs and build tags map
+        room_uuids = [room_data["uuid"] for room_data in rooms_data]
+        room_tags_map = {
+            str(room_data["uuid"]): [str(tag) for tag in room_data.get("tags", [])]
+            for room_data in rooms_data
+        }
+
+        # Fetch active rooms with optimized query
+        rooms = Room.objects.filter(
+            uuid__in=room_uuids,
+            is_active=True
+        ).select_related(
+            "queue__sector__project",
+            "user",
+            "closed_by"
+        ).prefetch_related("tags")
+
+        if not rooms.exists():
+            return Response(
+                {"error": "No active rooms found with the provided UUIDs"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Initialize service and close rooms
+        service = BulkCloseService()
+
+        try:
+            result = service.close(
+                rooms=rooms,
+                room_tags_map=room_tags_map,
+                end_by=end_by,
+                closed_by=closed_by
+            )
+
+            logger.info(
+                f"Bulk close completed by {request.user.email}: "
+                f"{result.success_count} succeeded, {result.failed_count} failed"
+            )
+
+            # Determine response status
+            if result.success_count == 0 and result.failed_count > 0:
+                # All failed
+                response_status = status.HTTP_400_BAD_REQUEST
+                message = "All rooms failed to close"
+            elif result.failed_count > 0:
+                # Partial success
+                response_status = status.HTTP_207_MULTI_STATUS
+                message = f"{result.success_count} rooms closed successfully, {result.failed_count} failed"
+            else:
+                # All succeeded
+                response_status = status.HTTP_200_OK
+                message = f"{result.success_count} rooms closed successfully"
+
+            response_data = {
+                "success": result.success_count > 0,
+                "message": message,
+                **result.to_dict()
+            }
+
+            return Response(response_data, status=response_status)
+
+        except Exception as e:
+            logger.error(
+                f"Bulk close error for user {request.user.email}: {str(e)}",
+                exc_info=True
+            )
+            event_id = capture_exception(e)
+            return Response(
+                {
+                    "success": False,
+                    "error": f"Failed to close rooms. Event ID: {event_id}",
+                    "success_count": 0,
+                    "failed_count": 0,
+                    "total_processed": 0
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(detail=False, methods=["get"], url_path="human-service-count")
     def filter_rooms(self, request, pk=None):

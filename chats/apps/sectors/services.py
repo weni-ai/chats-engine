@@ -6,17 +6,15 @@ from django.conf import settings
 from django.db import transaction
 from sentry_sdk import capture_exception
 
-
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
-from chats.apps.msgs.models import Message, AutomaticMessage
+from chats.apps.msgs.models import AutomaticMessage, Message
 from chats.apps.projects.models.models import Project
-
+from chats.apps.rooms.models import Room
 
 logger = logging.getLogger(__name__)
 
 
 if TYPE_CHECKING:
-    from chats.apps.rooms.models import Room
     from chats.apps.accounts.models import User
 
 
@@ -107,10 +105,11 @@ class AutomaticMessagesService:
             return False
 
         try:
+            message_text = message
             with transaction.atomic():
                 message = Message.objects.create(
                     room=room,
-                    text=message,
+                    text=message_text,
                     user=user,
                     contact=None,
                 )
@@ -118,6 +117,13 @@ class AutomaticMessagesService:
                     room=room,
                     message=message,
                 )
+
+                Room.objects.filter(pk=room.pk).update(
+                    automatic_message_sent_at=message.created_on
+                )
+
+                if message_text:
+                    room.update_last_message(message=message, user=user)
 
                 transaction.on_commit(lambda: message.notify_room("create", True))
 

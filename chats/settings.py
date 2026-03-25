@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     "chats.core",
     "chats.apps.ai_features",
     "chats.apps.ai_features.history_summary",
+    "chats.apps.ai_features.audio_transcription",
     "chats.apps.feature_flags",
     "chats.apps.feedbacks",
     "chats.apps.csat",
@@ -147,7 +148,18 @@ CACHES = {
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
 
-DATABASES = dict(default=env.db(var="DATABASE_URL"))
+# Connection pooling configuration
+# CONN_MAX_AGE: Keeps connections open for reuse (in seconds)
+# CONN_HEALTH_CHECKS: Validates connection before use (Django 4.1+)
+CONN_MAX_AGE = env.int("CONN_MAX_AGE", default=60)
+
+DATABASES = {
+    "default": {
+        **env.db(var="DATABASE_URL"),
+        "CONN_MAX_AGE": CONN_MAX_AGE,
+        "CONN_HEALTH_CHECKS": True,
+    }
+}
 
 # User
 
@@ -438,6 +450,15 @@ UNPERMITTED_AUDIO_TYPES = env.list(
     ],
 )
 
+# Maximum audio duration in seconds for transcription (default: 5 minutes)
+AUDIO_TRANSCRIPTION_MAX_DURATION_SECONDS = env.int(
+    "AUDIO_TRANSCRIPTION_MAX_DURATION_SECONDS", default=300
+)
+
+# AWS Lambda for audio transcription
+AWS_TRANSCRIPTION_LAMBDA_ARN = env.str("AWS_TRANSCRIPTION_LAMBDA_ARN", default="")
+AWS_TRANSCRIPTION_REGION = env.str("AWS_TRANSCRIPTION_REGION", default="us-east-1")
+
 CHATS_FLOWS_TAG = env.str("CHATS_FLOWS_TAG", default="chats")
 CHATS_CACHE_TIME = env.int("CHATS_CACHE_TIME", default=1 * 60 * 60)
 
@@ -494,6 +515,9 @@ if USE_EDA:
     FLOWS_TICKETER_EXCHANGE = env("FLOWS_TICKETER_EXCHANGE", default="sectors.topic")
     FLOWS_QUEUE_EXCHANGE = env("FLOWS_QUEUE_EXCHANGE", default="queues.topic")
     ROOMS_INFO_EXCHANGE = env("ROOMS_INFO_EXCHANGE", default="rooms.topic")
+    PROJECT_UPDATE_EXCHANGE = env(
+        "PROJECT_UPDATE_EXCHANGE", default="update-projects.topic"
+    )
 
     FLOWS_DEFAULT_DEAD_LETTER_EXCHANGE = env(
         "FLOWS_DEFAULT_DEAD_LETTER_EXCHANGE", default="flows.dlx.topic"
@@ -566,6 +590,14 @@ MESSAGE_STATUS_UPDATE_ENABLED_PROJECTS = env.list(
 # MESSAGE_BULK_SIZE deve estar no settings.py
 MESSAGE_BULK_SIZE = env.int("MESSAGE_BULK_SIZE", default=100)
 
+# Bulk Close Settings
+BULK_CLOSE_BATCH_SIZE = env.int("BULK_CLOSE_BATCH_SIZE", default=50)
+BULK_CLOSE_MAX_ROOMS = env.int("BULK_CLOSE_MAX_ROOMS", default=200)
+
+# Bulk Take Settings
+BULK_TAKE_BATCH_SIZE = env.int("BULK_TAKE_BATCH_SIZE", default=50)
+BULK_TAKE_MAX_ROOMS = env.int("BULK_TAKE_MAX_ROOMS", default=200)
+
 # Message Status Consumer Settings
 MESSAGE_STATUS_MAX_RETRIES = env.int("MESSAGE_STATUS_MAX_RETRIES", default=3)
 MESSAGE_STATUS_RETRY_DELAY = env.int("MESSAGE_STATUS_RETRY_DELAY", default=2)
@@ -596,9 +628,22 @@ FEEDBACK_FEATURE_FLAG_KEY = env.str(
 AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY = env.str(
     "AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY", default="weniChatsAutomaticMessage"
 )
+WS_PING_TIMEOUT_FEATURE_FLAG_KEY = env.str(
+    "WS_PING_TIMEOUT_FEATURE_FLAG_KEY", default="weniChatsPingTimeout"
+)
+WS_PING_TIMEOUT_SECONDS = env.int("WS_PING_TIMEOUT_SECONDS", default=60)
+WS_PING_CHECK_INTERVAL_SECONDS = env.int("WS_PING_CHECK_INTERVAL_SECONDS", default=10)
+WS_LAST_SEEN_UPDATE_INTERVAL_SECONDS = env.int(
+    "WS_LAST_SEEN_UPDATE_INTERVAL_SECONDS", default=60
+)
+WS_LAST_SEEN_THRESHOLD_SECONDS = env.int("WS_LAST_SEEN_THRESHOLD_SECONDS", default=90)
 
 # CSAT
 CSAT_FEATURE_FLAG_KEY = env.str("CSAT_FEATURE_FLAG_KEY", default="weniChatsCSAT")
+CSAT_FLOW_UPDATE_RETRIES = env.int("CSAT_FLOW_UPDATE_RETRIES", default=5)
+CSAT_FLOW_UPDATE_EXPIRATION_TIME = env.int(
+    "CSAT_FLOW_UPDATE_EXPIRATION_TIME", default=24 * 60  # 3 hours
+)  # In minutes
 
 CHATS_BASE_URL = env.str("CHATS_BASE_URL", default="http://localhost:8000")
 
@@ -617,6 +662,10 @@ WENI_CHATS_PIN_ROOMS_OPTIMIZATION_FLAG_KEY = env.str(
 WENI_CHATS_DISABLE_HAS_HISTORY_FLAG_KEY = env.str(
     "WENI_CHATS_DISABLE_HAS_HISTORY_FLAG_KEY",
     default="weniChatsDisableHasHistory",
+)
+LEAST_ROOMS_CLOSED_TODAY_FEATURE_FLAG_KEY = env.str(
+    "LEAST_ROOMS_CLOSED_TODAY_FEATURE_FLAG_KEY",
+    default="weniChatsLeastRoomsClosedToday",
 )
 WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY = env.str(
     "WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY",
@@ -645,3 +694,27 @@ ARCHIVE_CHATS_PROJECTS_LIST_FEATURE_FLAG_KEY = env.str(
 ARCHIVE_CHATS_IS_ACTIVE_FOR_ALL_PROJECTS = env.bool(
     "ARCHIVE_CHATS_IS_ACTIVE_FOR_ALL_PROJECTS", default=False
 )
+
+# Internal API Token
+INTERNAL_API_TOKEN = env.str("INTERNAL_API_TOKEN")
+
+# Excluded email domains
+# These are domains used by internal users (such as VTEX employees)
+# and should be excluded from some users lists,
+# because, even if they are included in projects (for testing or deployment purposes, for example),
+# they are not part of the organizations operational team.
+VTEX_INTERNAL_DOMAINS = env.list(
+    "VTEX_INTERNAL_DOMAINS", default=["weni.ai", "vtex.com"]
+)
+
+# Queue Limit
+QUEUE_LIMIT_FEATURE_FLAG_KEY = env.str(
+    "QUEUE_LIMIT_FEATURE_FLAG_KEY", default="weniChatsQueueLimit"
+)
+# Rooms External API QuerySet filter feature flag
+ROOMS_EXTERNAL_API_QUERYSET_FILTER_FLAG_KEY = env.str(
+    "ROOMS_EXTERNAL_API_QUERYSET_FILTER_FLAG_KEY",
+    default="weniChatsRoomsExternalApiQuerySetFilter",
+)
+
+FLOWS_BASE_URL = env.str("FLOWS_BASE_URL", default="https://flows.weni.ai")

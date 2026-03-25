@@ -110,6 +110,18 @@ msgstr "Perfil"
 msgid "Profiles"
 msgstr "Perfis"
 
+#: chats/apps/ai_features/audio_transcription/enums.py:10
+msgid "Incorrect transcription"
+msgstr "Transcrição incorreta"
+
+#: chats/apps/ai_features/audio_transcription/enums.py:11
+msgid "Incomplete transcription"
+msgstr "Transcrição incompleta"
+
+#: chats/apps/ai_features/audio_transcription/enums.py:12
+msgid "Hard to understand"
+msgstr "Difícil de entender"
+
 #: chats/apps/ai_features/history_summary/enums.py:10
 msgid "Incorrect summary"
 msgstr "Resumo incorreto"
@@ -323,6 +335,23 @@ msgstr "Está ativo?"
 #: chats/apps/api/v1/rooms/filters.py:37
 msgid "Room status"
 msgstr "Status da sala"
+
+#: chats/apps/api/v1/rooms/serializers.py
+msgid "At least one room is required"
+msgstr "Pelo menos uma sala é necessária"
+
+#: chats/apps/api/v1/rooms/serializers.py
+#, python-format
+msgid "Cannot take more than %(max_rooms)s rooms at once"
+msgstr "Não é possível assumir mais de %(max_rooms)s salas de uma vez"
+
+#: chats/apps/api/v1/rooms/serializers.py
+msgid "Duplicate room UUIDs found"
+msgstr "UUIDs de sala duplicados encontrados"
+
+#: chats/apps/api/v1/rooms/serializers.py
+msgid "No available rooms found in queue"
+msgstr "Nenhuma sala disponível encontrada na fila"
 
 #: chats/apps/api/v1/rooms/viewsets.py:664
 msgid "Room is not queued"

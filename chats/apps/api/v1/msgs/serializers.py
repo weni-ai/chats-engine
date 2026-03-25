@@ -22,6 +22,7 @@ TODO: Refactor these serializers into less classes
 
 class MessageMediaSimpleSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField(read_only=True)
+    transcription = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = MessageMedia
@@ -31,6 +32,7 @@ class MessageMediaSimpleSerializer(serializers.ModelSerializer):
             "media_file",
             "url",
             "created_on",
+            "transcription",
         ]
         ref_name = "V1MessageMediaSimpleSerializer"
         extra_kwargs = {
@@ -47,10 +49,39 @@ class MessageMediaSimpleSerializer(serializers.ModelSerializer):
         except AttributeError:
             return ""
 
+    def get_transcription(self, media: MessageMedia):
+        """
+        Get transcription data for audio media.
+        Returns text and feedback for the current user.
+        """
+        try:
+            transcription = media.transcription
+        except Exception:
+            return None
+
+        if not transcription or transcription.status != "DONE":
+            return None
+
+        result = {"text": transcription.text}
+
+        # Get user feedback if available
+        request = self.context.get("request")
+        if request and hasattr(request, "user") and request.user.is_authenticated:
+            feedback = transcription.feedbacks.filter(user=request.user).first()
+            if feedback:
+                result["feedback"] = {"liked": feedback.liked}
+            else:
+                result["feedback"] = {"liked": None}
+        else:
+            result["feedback"] = {"liked": None}
+
+        return result
+
 
 class MessageMediaSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField(read_only=True)
     sender = serializers.SerializerMethodField(read_only=True)
+    transcription = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = MessageMedia
@@ -61,6 +92,7 @@ class MessageMediaSerializer(serializers.ModelSerializer):
             "media_file",
             "url",
             "created_on",
+            "transcription",
         ]
 
         extra_kwargs = {
@@ -75,6 +107,34 @@ class MessageMediaSerializer(serializers.ModelSerializer):
             return media.message.get_sender().full_name
         except AttributeError:
             return ""
+
+    def get_transcription(self, media: MessageMedia):
+        """
+        Get transcription data for audio media.
+        Returns text and feedback for the current user.
+        """
+        try:
+            transcription = media.transcription
+        except Exception:
+            return None
+
+        if not transcription or transcription.status != "DONE":
+            return None
+
+        result = {"text": transcription.text}
+
+        # Get user feedback if available
+        request = self.context.get("request")
+        if request and hasattr(request, "user") and request.user.is_authenticated:
+            feedback = transcription.feedbacks.filter(user=request.user).first()
+            if feedback:
+                result["feedback"] = {"liked": feedback.liked}
+            else:
+                result["feedback"] = {"liked": None}
+        else:
+            result["feedback"] = {"liked": None}
+
+        return result
 
     def create(self, validated_data):
         media = validated_data["media_file"]

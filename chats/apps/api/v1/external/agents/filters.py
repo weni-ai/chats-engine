@@ -13,14 +13,14 @@ class AgentFlowFilter(filters.FilterSet):
         field_name="queue",
         required=False,
         method="filter_queue",
-        help_text=_("Queue's ID"),
+        help_text=_("Filter by queue UUID"),
     )
 
     sector = filters.CharFilter(
         field_name="sector",
         required=False,
         method="filter_sector",
-        help_text=_("Sector's ID"),
+        help_text=_("Filter by sector UUID"),
     )
 
     def filter_queue(self, queryset, name, value):
