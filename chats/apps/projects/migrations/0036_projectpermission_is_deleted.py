@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('projects', '0032_projectpermission_last_seen'),
+        ("projects", "0035_projectpermission_last_seen"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='projectpermission',
-            name='is_deleted',
-            field=models.BooleanField(default=False, verbose_name='is deleted?'),
+            model_name="projectpermission",
+            name="is_deleted",
+            field=models.BooleanField(default=False, verbose_name="is deleted?"),
         ),
     ]
