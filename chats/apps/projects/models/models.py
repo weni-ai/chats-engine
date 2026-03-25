@@ -323,9 +323,7 @@ class Project(BaseConfigurableModel, BaseModel):
         return self.sectors.filter(is_csat_enabled=True).exists()
 
 
-class ProjectPermission(
-    BaseModel
-):  # TODO: ADD CONSTRAINT NOT TO SAVE THE SAME USER 2 TIME IN THE PROJECT
+class ProjectPermission(BaseSoftDeleteModel, BaseModel):
     ROLE_NOT_SETTED = 0
     ROLE_ADMIN = 1
     ROLE_ATTENDANT = 2
