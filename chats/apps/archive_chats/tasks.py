@@ -38,6 +38,12 @@ def start_archive_rooms_messages():
         )
         projects = service.get_projects()
 
+        if len(projects) == 0 or not projects:
+            logger.info(
+                "[start_archive_rooms_messages] No projects found, skipping archive"
+            )
+            return
+
         rooms_query = rooms_query.filter(queue__sector__project__in=projects)
 
     rooms = rooms_query.order_by("ended_at")[: settings.ARCHIVE_CHATS_MAX_ROOMS]
