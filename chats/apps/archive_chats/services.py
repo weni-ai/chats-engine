@@ -211,7 +211,7 @@ class ArchiveChatsService(BaseArchiveChatsService):
         file_object = io.BytesIO()
 
         for message in messages:
-            file_object.write(json.dumps(message).encode("utf-8"))
+            file_object.write(json.dumps(message, ensure_ascii=False).encode("utf-8"))
             file_object.write(b"\n")
 
         file_object.seek(0)
