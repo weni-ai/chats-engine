@@ -4399,37 +4399,37 @@ files = [
 
 [[package]]
 name = "weni-commons"
-version = "1.1.0"
+version = "1.1.2"
 description = "Weni's common utilities for Python backends"
 optional = false
 python-versions = "<4.0,>=3.8"
 files = [
-    {file = "weni_commons-1.1.0-py3-none-any.whl", hash = "sha256:b7337fb5432040ce9a402b661ec67b067d3d8abf585853c5ba39284d7843dd6b"},
-    {file = "weni_commons-1.1.0.tar.gz", hash = "sha256:ecc4f8f8b374f35c18b5c736e28414c5781ce147016b7fd6ca7a951ba10a1889"},
+    {file = "weni_commons-1.1.2-py3-none-any.whl", hash = "sha256:b727a4c2985c0acc8310c90e0ba1348278183c80452d26c13ece31c6239a3a3f"},
+    {file = "weni_commons-1.1.2.tar.gz", hash = "sha256:04ff80b6674ab5a2d512b3eac33ea5bfabe651810b8390af8040fe120c50e542"},
 ]
 
 [package.dependencies]
 celery = ">=5.0.0,<6.0"
 django = ">=3.2.22,<6.0"
-django-redis = ">=4.0.0,<6.0"
+django-redis = ">=4.0.0,<=6.0"
 djangorestframework = ">=3.12.0,<4.0"
-weni-feature-flags = ">=2.1.0,<3.0.0"
+weni-feature-flags = ">=2.1.2,<3.0.0"
 
 [[package]]
 name = "weni-feature-flags"
-version = "2.1.0"
+version = "2.1.2"
 description = "Weni's feature flags SDK for Python backends"
 optional = false
 python-versions = "<4.0,>=3.8"
 files = [
-    {file = "weni_feature_flags-2.1.0-py3-none-any.whl", hash = "sha256:ff5ac66c809f0eff56818f85f7d3ba67b19164ffcf3493cd0a278497bf165e34"},
-    {file = "weni_feature_flags-2.1.0.tar.gz", hash = "sha256:026647c8ca97e09360df7f162b5655bc23d367cd21464f7688d7891047a865fd"},
+    {file = "weni_feature_flags-2.1.2-py3-none-any.whl", hash = "sha256:ce8ef0b8b0a78fa75c2399469b6deaeb4518cc4568b85111663080992536a3c4"},
+    {file = "weni_feature_flags-2.1.2.tar.gz", hash = "sha256:f38544ab5a8ec08d6257127769c2aa7dc64c709c75ffe613be82188aa29f7404"},
 ]
 
 [package.dependencies]
 celery = ">=5.0.0,<6.0"
 django = ">=3.2.22,<6.0"
-django-redis = ">=4.0.0,<6.0"
+django-redis = ">=4.0.0,<=6.0"
 djangorestframework = ">=3.12.0,<4.0"
 growthbook = ">=1.0.0,<2.0"
 requests = ">=2.25.0,<3.0"
@@ -4646,4 +4646,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "8842cadbd41ed7da49522b6e0c20ff0eb8bc3f9effeae3ea7978de0be4d0637c"
+content-hash = "f2be56796c39ec2ce982c80b81ad9042ca55eea633b7d7ac88cc1715f53b283b"

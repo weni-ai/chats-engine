@@ -8,6 +8,7 @@ from mozilla_django_oidc.contrib.drf import OIDCAuthentication
 from rest_framework import exceptions
 from rest_framework.authentication import TokenAuthentication, get_authorization_header
 
+from chats.apps.api.authentication.classes import InternalAPITokenAuthentication
 from chats.apps.projects.models import ProjectPermission
 
 
@@ -94,7 +95,7 @@ class ProjectAdminAuthentication(TokenAuthentication):
         return (authorization.user_email, authorization)
 
 
-def get_auth_class(request):
+def get_token_auth_classes(request):
     auth = get_authorization_header(request)
     token = auth.split()[1].decode() if len(auth.split()) > 1 else ""
 
@@ -102,4 +103,4 @@ def get_auth_class(request):
         UUID(token)
         return [ProjectAdminAuthentication]
     except ValueError:
-        return [TOKEN_AUTHENTICATION_CLASS]
+        return [InternalAPITokenAuthentication, TOKEN_AUTHENTICATION_CLASS]

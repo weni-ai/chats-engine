@@ -14,6 +14,10 @@ class ExternalBaseThrottle(SimpleRateThrottle):
                 "accounts.can_communicate_internally"
             ):
                 return True
+
+        if getattr(request, "auth", None) == "INTERNAL":
+            return True
+
         return super().allow_request(request, view)
 
     def get_rate(self):

@@ -24,7 +24,10 @@ def create_user_and_token(nickname: str = "fake"):
 def create_message(text, room, user=None, contact=None):
     if user == contact:
         return None
-    return Message.objects.create(room=room, text=text, user=user, contact=contact)
+    message = Message.objects.create(room=room, text=text, user=user, contact=contact)
+    if text:
+        room.update_last_message(message=message, user=user)
+    return message
 
 
 def create_contact(

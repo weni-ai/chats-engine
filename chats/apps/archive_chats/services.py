@@ -2,15 +2,19 @@ from abc import ABC, abstractmethod
 import io
 import json
 import logging
+from urllib.parse import urlparse
 
+import boto3
 from typing import List
 from uuid import UUID
 from django.core.exceptions import ValidationError
+from django.urls import reverse
 from django.utils import timezone
 from django.core.files.base import ContentFile
 from sentry_sdk import capture_exception
-from weni.feature_flags.services import FeatureFlagsService
 from django.conf import settings
+from django.db import transaction
+from weni.feature_flags.services import FeatureFlagsService
 
 
 from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
@@ -19,13 +23,17 @@ from chats.apps.archive_chats.models import (
     RoomArchivedConversation,
 )
 from chats.apps.archive_chats.serializers import ArchiveMessageSerializer
+from chats.apps.core.integrations.aws.s3.helpers import is_file_in_the_same_bucket
+from chats.apps.core.integrations.aws.s3.helpers import get_presigned_url
 from chats.apps.rooms.models import Room
-from chats.apps.msgs.models import (
-    Message,
-)
+from chats.apps.msgs.models import Message, MessageMedia
 
 
 logger = logging.getLogger(__name__)
+
+
+def is_file_on_chats_bucket(url: str) -> bool:
+    return is_file_in_the_same_bucket(url, settings.AWS_STORAGE_BUCKET_NAME)
 
 
 class BaseArchiveChatsService(ABC):
@@ -44,11 +52,25 @@ class BaseArchiveChatsService(ABC):
         pass
 
     @abstractmethod
+    def get_archived_media_url(self, object_key: str) -> str:
+        pass
+
+    @abstractmethod
     def delete_room_messages(self, room: Room) -> None:
         pass
 
 
 class ArchiveChatsService(BaseArchiveChatsService):
+    def __init__(self, bucket=None):
+        bucket_name_from_settings = getattr(settings, "AWS_STORAGE_BUCKET_NAME", None)
+
+        if not bucket_name_from_settings and not bucket:
+            raise ValueError(
+                "AWS_STORAGE_BUCKET_NAME is not set and no bucket was provided"
+            )
+
+        self.bucket = bucket or boto3.resource("s3").Bucket(bucket_name_from_settings)
+
     def start_archive_job(self) -> ArchiveConversationsJob:
         logger.info("[ArchiveChatsService] Starting archive job")
 
@@ -119,12 +141,22 @@ class ArchiveChatsService(BaseArchiveChatsService):
         messages = Message.objects.filter(room=room).order_by("created_on")
 
         for message in messages:
+            message_context = {"media": []}
             if message.medias.exists():
                 for media in message.medias.all():  # noqa
-                    # TODO: Implement media processing
-                    pass
+                    url = self.process_media(media)
+                    media_data = {
+                        "url": url,
+                        "content_type": media.content_type,
+                        "created_on": media.created_on.isoformat(),
+                    }
 
-            messages_data.append(ArchiveMessageSerializer(message).data)
+                    if url:
+                        message_context["media"].append(media_data)
+
+            messages_data.append(
+                ArchiveMessageSerializer(message, context=message_context).data
+            )
 
         room_archived_conversation.status = (
             ArchiveConversationsJobStatus.MESSAGES_PROCESSED
@@ -181,6 +213,39 @@ class ArchiveChatsService(BaseArchiveChatsService):
 
         return room_archived_conversation
 
+    def process_media(self, media: MessageMedia) -> None:
+        if not media.media_file:
+            if not media.media_url:
+                return
+
+            if is_file_on_chats_bucket(media.media_url):
+                return self._get_chats_media_redirect_url(media.media_url)
+
+            object_key = urlparse(media.media_url).path.lstrip("/")
+            return self._get_flows_media_redirect_url(object_key)
+
+        if is_file_on_chats_bucket(media.media_file.url):
+            object_key = media.media_file.name
+
+            return self._get_chats_media_redirect_url(object_key)
+
+        return None
+
+    def _get_chats_media_redirect_url(self, object_key: str) -> str:
+        base_url = settings.CHATS_BASE_URL
+        path = reverse("get_archived_media")
+
+        return f"{base_url}{path}?object_key={object_key}"
+
+    def _get_flows_media_redirect_url(self, object_key: str) -> str:
+        base_url = settings.FLOWS_BASE_URL
+        path = f"{base_url}/api/v2/internals/media/download"
+
+        return f"{path}/{object_key}"
+
+    def get_archived_media_url(self, object_key: str) -> str:
+        return get_presigned_url(object_key)
+
     def delete_room_messages(
         self,
         room_archived_conversation: RoomArchivedConversation,
@@ -202,19 +267,24 @@ class ArchiveChatsService(BaseArchiveChatsService):
             f"[ArchiveChatsService] Deleting room messages for room {room.uuid}"
         )
 
-        messages = Message.objects.filter(room=room).values_list("pk", flat=True)
+        messages_count = Message.objects.filter(room=room).count()
+        batches_count = messages_count // batch_size + 1
 
-        for i in range(0, len(messages), batch_size):
-            messages_batch = Message.objects.filter(
-                pk__in=Message.objects.filter(room=room).values_list("pk", flat=True)[
-                    :batch_size
-                ]
-            )
+        logger.info(
+            f"[ArchiveChatsService] Deleting {messages_count} messages "
+            f"for room {room.uuid} in {batches_count} batches"
+        )
 
-            if len(messages_batch) == 0:
-                break
+        with transaction.atomic():
+            for _ in range(batches_count):
+                messages_pks = Message.objects.filter(room=room).values_list(
+                    "pk", flat=True
+                )[:batch_size]
 
-            messages_batch.delete()
+                if len(messages_pks) == 0:
+                    break
+
+                Message.objects.filter(pk__in=messages_pks).delete()
 
         room_archived_conversation.status = (
             ArchiveConversationsJobStatus.MESSAGES_DELETED_FROM_DB

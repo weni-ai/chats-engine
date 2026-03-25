@@ -14,7 +14,6 @@ from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
 
-
 User = get_user_model()
 
 
@@ -114,6 +113,101 @@ class UpdateStatusMessageUseCaseTests(TestCase):
             use_case.update_status_message("ext-trigger", "READ")
 
         mock_bulk.assert_called_once()
+
+    def test_bulk_create_skips_already_read_message(self):
+        self.message.is_read = "read"
+        self.message.save(update_fields=["is_read"])
+
+        with patch(
+            "chats.apps.msgs.usecases.UpdateStatusMessageUseCase.Message.objects.bulk_update"
+        ) as mock_bulk:
+            self.use_case.update_status_message(self.reply_index.external_id, "READ")
+            self.use_case._bulk_create()
+
+        mock_bulk.assert_not_called()
+
+    def test_bulk_create_skips_already_delivered_message(self):
+        self.message.is_delivered = "delivered"
+        self.message.save(update_fields=["is_delivered"])
+
+        with patch(
+            "chats.apps.msgs.usecases.UpdateStatusMessageUseCase.Message.objects.bulk_update"
+        ) as mock_bulk:
+            self.use_case.update_status_message(
+                self.reply_index.external_id, "DELIVERED"
+            )
+            self.use_case._bulk_create()
+
+        mock_bulk.assert_not_called()
+
+    def test_bulk_create_skips_nonexistent_reply_index(self):
+        with patch(
+            "chats.apps.msgs.usecases.UpdateStatusMessageUseCase.Message.objects.bulk_update"
+        ) as mock_bulk:
+            self.use_case.update_status_message("nonexistent-id", "READ")
+            self.use_case._bulk_create()
+
+        mock_bulk.assert_not_called()
+
+    @patch.object(
+        MessageStatusNotifier,
+        "notify_for_message",
+        side_effect=Exception("notify error"),
+    )
+    def test_bulk_create_continues_on_notification_error(self, mock_notify):
+        second_message, second_reply = self._create_message_with_reply("ext-notify-err")
+
+        self.use_case.update_status_message(self.reply_index.external_id, "READ")
+        self.use_case.update_status_message(second_reply.external_id, "DELIVERED")
+        self.use_case._bulk_create()
+
+        self.message.refresh_from_db()
+        second_message.refresh_from_db()
+
+        self.assertEqual(self.message.is_read, "read")
+        self.assertEqual(second_message.is_delivered, "delivered")
+        self.assertEqual(mock_notify.call_count, 2)
+
+    def test_bulk_create_handles_empty_status(self):
+        with patch(
+            "chats.apps.msgs.usecases.UpdateStatusMessageUseCase.Message.objects.bulk_update"
+        ) as mock_bulk:
+            self.use_case.update_status_message(self.reply_index.external_id, "")
+            self.use_case._bulk_create()
+
+        mock_bulk.assert_not_called()
+
+    def test_bulk_create_handles_none_status(self):
+        with patch(
+            "chats.apps.msgs.usecases.UpdateStatusMessageUseCase.Message.objects.bulk_update"
+        ) as mock_bulk:
+            self.use_case.update_status_message(self.reply_index.external_id, None)
+            self.use_case._bulk_create()
+
+        mock_bulk.assert_not_called()
+
+    def test_bulk_create_returns_early_on_empty_queue(self):
+        with patch(
+            "chats.apps.msgs.usecases.UpdateStatusMessageUseCase.Message.objects.bulk_update"
+        ) as mock_bulk:
+            self.use_case._bulk_create()
+
+        mock_bulk.assert_not_called()
+
+    def test_bulk_create_groups_messages_by_update_fields(self):
+        second_message, second_reply = self._create_message_with_reply("ext-group-1")
+        third_message, third_reply = self._create_message_with_reply("ext-group-2")
+
+        self.use_case.update_status_message(self.reply_index.external_id, "READ")
+        self.use_case.update_status_message(second_reply.external_id, "READ")
+        self.use_case.update_status_message(third_reply.external_id, "DELIVERED")
+
+        with patch(
+            "chats.apps.msgs.usecases.UpdateStatusMessageUseCase.Message.objects.bulk_update"
+        ) as mock_bulk:
+            self.use_case._bulk_create()
+
+        self.assertEqual(mock_bulk.call_count, 2)
 
 
 class MessageStatusNotifierTests(TestCase):

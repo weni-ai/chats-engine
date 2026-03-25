@@ -2,10 +2,14 @@ import logging
 from typing import Dict, List, Optional
 
 import pendulum
+from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+from weni.feature_flags.shortcuts import is_feature_active
+from rest_framework.exceptions import PermissionDenied
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.accounts.serializers import UserSerializer
@@ -14,13 +18,14 @@ from chats.apps.api.v1.queues.serializers import QueueSerializer
 from chats.apps.api.v1.sectors.serializers import TagSimpleSerializer
 from chats.apps.contacts.models import Contact
 from chats.apps.dashboard.models import RoomMetrics
-from chats.apps.msgs.models import AutomaticMessage, Message, MessageMedia
-from chats.apps.projects.models.models import Project
+from chats.apps.msgs.models import Message, MessageMedia
+from chats.apps.projects.models.models import FlowStart, Project
 from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import close_room
 from chats.apps.sectors.utils import working_hours_validator
+
 
 logger = logging.getLogger(__name__)
 
@@ -62,19 +67,16 @@ def get_active_room_flow_start(contact, flow_uuid, project):
     return None
 
 
-def get_room_user(
+def get_last_flow_start(
     contact: Contact,
-    queue: Queue,
-    user: User,
-    groups: List[Dict[str, str]],
-    is_created: bool,
-    flow_uuid,
+    groups: List[Dict],
     project: Project,
-):
-    # User that started the flow, if any
+    flow_uuid: Optional[str] = None,
+) -> Optional[FlowStart]:
     reference_filter = [group["uuid"] for group in groups]
     reference_filter.append(contact.external_id)
     query_filters = {"references__external_id__in": reference_filter}
+
     if flow_uuid:
         query_filters["flow"] = flow_uuid
 
@@ -82,6 +84,17 @@ def get_room_user(
         project.flowstarts.order_by("-created_on").filter(**query_filters).first()
     )
 
+    return last_flow_start
+
+
+def get_room_user(
+    contact: Contact,
+    queue: Queue,
+    user: User,
+    is_created: bool,
+    project: Project,
+    last_flow_start: Optional[FlowStart] = None,
+):
     if last_flow_start:
         if is_created is True or not contact.rooms.filter(
             queue__sector__project=project, created_on__gt=last_flow_start.created_on
@@ -127,11 +140,33 @@ def get_room_user(
 
 
 class RoomListSerializer(serializers.ModelSerializer):
-    contact = serializers.CharField(source="contact.name")
-    contact_external_id = serializers.CharField(source="contact.external_id")
-    waiting_time = serializers.IntegerField(source="metric.waiting_time")
-    interaction_time = serializers.IntegerField(source="metric.interaction_time")
-    tags = TagSimpleSerializer(many=True, required=False)
+    """
+    Serializer for listing rooms via external API.
+
+    Returns room details including contact info, agent, metrics and tags.
+    """
+
+    contact = serializers.CharField(
+        source="contact.name",
+        help_text="Contact display name",
+    )
+    contact_external_id = serializers.CharField(
+        source="contact.external_id",
+        help_text="Contact external ID from the source system",
+    )
+    waiting_time = serializers.IntegerField(
+        source="metric.waiting_time",
+        help_text="Time in seconds the room waited in queue",
+    )
+    interaction_time = serializers.IntegerField(
+        source="metric.interaction_time",
+        help_text="Total interaction time in seconds",
+    )
+    tags = TagSimpleSerializer(
+        many=True,
+        required=False,
+        help_text="List of tags associated with the room",
+    )
 
     class Meta:
         model = Room
@@ -151,19 +186,58 @@ class RoomListSerializer(serializers.ModelSerializer):
 
 
 class RoomMetricsSerializer(serializers.ModelSerializer):
-    user_name = serializers.SerializerMethodField()
-    first_user_message = serializers.SerializerMethodField()
-    tags = TagSimpleSerializer(many=True, required=False)
-    interaction_time = serializers.IntegerField(source="metric.interaction_time")
-    urn = serializers.CharField()
-    contact_external_id = serializers.CharField(source="contact.external_id")
-    protocol = serializers.CharField(read_only=True)
-    callid = serializers.SerializerMethodField()
-    automatic_message_sent_at = serializers.SerializerMethodField()
-    first_user_assigned_at = serializers.DateTimeField()
-    time_to_send_automatic_message = serializers.SerializerMethodField()
-    sector = serializers.SerializerMethodField()
-    custom_fields = serializers.JSONField(read_only=True)
+    """
+    Serializer for room metrics via external API.
+
+    Returns detailed metrics including interaction time, tags, protocol,
+    automatic message timing, and custom fields.
+    """
+
+    user_name = serializers.SerializerMethodField(
+        help_text="Full name of the assigned agent",
+    )
+    first_user_message = serializers.SerializerMethodField(
+        help_text="Timestamp of the first agent message (ISO 8601)",
+    )
+    tags = TagSimpleSerializer(
+        many=True,
+        required=False,
+        help_text="List of tags associated with the room",
+    )
+    interaction_time = serializers.IntegerField(
+        source="metric.interaction_time",
+        help_text="Total interaction time in seconds",
+    )
+    urn = serializers.CharField(
+        help_text="Contact URN (e.g., whatsapp:5511999999999)",
+    )
+    contact_external_id = serializers.CharField(
+        source="contact.external_id",
+        help_text="Contact external ID from the source system",
+    )
+    protocol = serializers.CharField(
+        read_only=True,
+        help_text="Room protocol number",
+    )
+    callid = serializers.SerializerMethodField(
+        help_text="Call ID from custom fields (if available)",
+    )
+    automatic_message_sent_at = serializers.SerializerMethodField(
+        help_text="Timestamp when automatic message was sent (ISO 8601)",
+    )
+    first_user_assigned_at = serializers.DateTimeField(
+        help_text="Timestamp when first agent was assigned (ISO 8601)",
+    )
+    time_to_send_automatic_message = serializers.SerializerMethodField(
+        help_text="Time in seconds from assignment to automatic message",
+    )
+    sector = serializers.SerializerMethodField(
+        help_text="Sector info: {uuid, name}",
+    )
+    custom_fields = serializers.JSONField(
+        read_only=True,
+        help_text="Custom fields as JSON object",
+    )
 
     class Meta:
         model = Room
@@ -209,35 +283,14 @@ class RoomMetricsSerializer(serializers.ModelSerializer):
         return custom_fields.get("callid", None)
 
     def get_automatic_message_sent_at(self, obj: Room) -> Optional[str]:
-        automatic_message: AutomaticMessage = AutomaticMessage.objects.filter(
-            room=obj
-        ).first()
-
-        if automatic_message:
-            msg_date = pendulum.instance(automatic_message.message.created_on).in_tz(
-                "America/Sao_Paulo"
-            )
+        sent_at = obj.get_automatic_message_sent_at()
+        if sent_at:
+            msg_date = pendulum.instance(sent_at).in_tz("America/Sao_Paulo")
             return msg_date.isoformat()
-
         return None
 
-    def get_time_to_send_automatic_message(self, obj: Room) -> Optional[str]:
-        automatic_message: AutomaticMessage = AutomaticMessage.objects.filter(
-            room=obj
-        ).first()
-
-        if automatic_message and obj.first_user_assigned_at:
-            return max(
-                int(
-                    (
-                        automatic_message.message.created_on
-                        - obj.first_user_assigned_at
-                    ).total_seconds()
-                ),
-                0,
-            )
-
-        return None
+    def get_time_to_send_automatic_message(self, obj: Room) -> Optional[int]:
+        return obj.get_time_to_send_automatic_message()
 
     def get_sector(self, obj: Room) -> Optional[dict]:
         sector = obj.queue.sector if obj.queue else None
@@ -268,6 +321,13 @@ class ProjectInfoSerializer(serializers.Serializer):
 
 
 class RoomFlowSerializer(serializers.ModelSerializer):
+    """
+    Serializer for creating and managing rooms (tickets) via external API.
+
+    Supports room creation with queue or sector assignment, contact data,
+    optional flow start, and message history.
+    """
+
     user = UserSerializer(many=False, required=False, read_only=True)
     user_email = serializers.SlugRelatedField(
         queryset=User.objects.all(),
@@ -276,22 +336,55 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         slug_field="email",
         write_only=True,
         allow_null=True,
+        help_text="Email of the agent to assign to the room",
     )
     sector_uuid = serializers.CharField(
-        required=False, write_only=True, allow_null=True
+        required=False,
+        write_only=True,
+        allow_null=True,
+        help_text="UUID of the sector (alternative to queue_uuid)",
     )
     queue_uuid = serializers.PrimaryKeyRelatedField(
-        queryset=Queue.objects.all(), required=False, source="queue", write_only=True
+        queryset=Queue.objects.all(),
+        required=False,
+        source="queue",
+        write_only=True,
+        help_text="UUID of the queue to assign the room",
     )
     queue = QueueSerializer(many=False, required=False, read_only=True)
-    contact = ContactRelationsSerializer(many=False, required=False, read_only=False)
-    flow_uuid = serializers.CharField(required=False, write_only=True, allow_null=True)
-    is_anon = serializers.BooleanField(write_only=True, required=False, default=False)
-    ticket_uuid = serializers.UUIDField(required=False)
-    history = serializers.ListField(
-        child=serializers.DictField(), required=False, write_only=True
+    contact = ContactRelationsSerializer(
+        many=False,
+        required=False,
+        read_only=False,
+        help_text="Contact data (external_id, name, email, phone, custom_fields)",
     )
-    project_info = ProjectInfoSerializer(required=False, write_only=True)
+    flow_uuid = serializers.CharField(
+        required=False,
+        write_only=True,
+        allow_null=True,
+        help_text="UUID of the flow that started this room",
+    )
+    is_anon = serializers.BooleanField(
+        write_only=True,
+        required=False,
+        default=False,
+        help_text="If true, the URN will not be saved",
+    )
+    ticket_uuid = serializers.UUIDField(
+        required=False,
+        help_text="External ticket UUID for integration",
+    )
+    history = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        write_only=True,
+        help_text="List of messages to create as history",
+    )
+    project_info = ProjectInfoSerializer(
+        required=False,
+        write_only=True,
+        help_text="Project information for context",
+    )
 
     class Meta:
         model = Room
@@ -335,6 +428,35 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         if "project_info" in attrs:
             attrs.pop("project_info")
         return attrs
+
+    def _validate_queue_limit(self, queue: Queue):
+        is_limit_active_for_queue = queue.queue_limit_info.is_active
+
+        if is_limit_active_for_queue:
+            # Only check if the feature flag is enabled and make all the other validations
+            # if the queue limit for this particular queue is active
+            is_queue_limit_feature_active = is_feature_active(
+                settings.QUEUE_LIMIT_FEATURE_FLAG_KEY,
+                None,
+                str(queue.sector.project.uuid),
+            )
+            queue_limit = (
+                queue.queue_limit_info.limit
+                if isinstance(queue.queue_limit_info.limit, int)
+                else 0
+            )
+
+            if (
+                is_queue_limit_feature_active
+                and queue.queued_rooms_count >= queue_limit
+            ):
+                raise PermissionDenied(
+                    {
+                        "error": "human_support_queue_limit_reached",
+                        "description": "Human support queue is full. Please try again later.",
+                    },
+                    code="human_support_queue_limit_reached",
+                )
 
     def create(self, validated_data):
         history_data = validated_data.pop("history", [])
@@ -394,19 +516,48 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             return room
 
         user = validated_data.get("user")
+
+        last_flow_start = get_last_flow_start(contact, groups, project, flow_uuid)
+
         validated_data["user"] = get_room_user(
-            contact, queue, user, groups, created, flow_uuid, project
+            contact, queue, user, created, project, last_flow_start
         )
 
-        room = Room.objects.create(
-            **validated_data,
-            project_uuid=str(queue.project.uuid),
-            contact=contact,
-            queue=queue,
-            protocol=protocol,
-            service_chat=service_chat,
-        )
-        RoomMetrics.objects.create(room=room)
+        has_room_after_flow_start = False
+
+        if last_flow_start:
+            last_flow_start.refresh_from_db()
+            has_room_after_flow_start = contact.rooms.filter(
+                queue__sector__project=project,
+                created_on__gt=last_flow_start.created_on,
+            ).exists()
+
+        if not validated_data.get("user") and (
+            not last_flow_start or (last_flow_start and has_room_after_flow_start)
+        ):
+            with transaction.atomic():
+                queue = Queue.objects.select_for_update().get(pk=queue.pk)
+                self._validate_queue_limit(queue)
+
+                room = Room.objects.create(
+                    **validated_data,
+                    project_uuid=str(queue.project.uuid),
+                    contact=contact,
+                    queue=queue,
+                    protocol=protocol,
+                    service_chat=service_chat,
+                )
+                RoomMetrics.objects.create(room=room)
+        else:
+            room = Room.objects.create(
+                **validated_data,
+                project_uuid=str(queue.project.uuid),
+                contact=contact,
+                queue=queue,
+                protocol=protocol,
+                service_chat=service_chat,
+            )
+            RoomMetrics.objects.create(room=room)
 
         if history_data:
             self.process_message_history(room, history_data)
@@ -584,5 +735,9 @@ class RoomFlowSerializer(serializers.ModelSerializer):
             if room.user is None and room.contact and any_incoming_msgs:
                 room.trigger_default_message()
 
-            created_messages_count = len(created_messages)
-            room.increment_unread_messages_count(created_messages_count, timezone.now())
+            last_msg = created_messages[-1]
+            room.on_new_message(
+                message=last_msg,
+                contact=last_msg.contact,
+                increment_unread=len(created_messages),
+            )

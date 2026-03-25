@@ -1,13 +1,17 @@
+from typing import Optional
 from django.utils import timezone
 from rest_framework import serializers
 
 from chats.apps.api.v1.sectors.serializers import TagSimpleSerializer
+from chats.apps.csat.models import CSATSurvey
 from chats.apps.rooms.models import Room
+from chats.apps.dashboard.models import RoomMetrics
 
 
 class RoomInternalListSerializer(serializers.ModelSerializer):
     contact = serializers.CharField(source="contact.name")
     agent = serializers.SerializerMethodField()
+    user_email = serializers.EmailField(source="user.email", default=None, read_only=True)
     tags = TagSimpleSerializer(many=True, required=False)
     sector = serializers.CharField(source="queue.sector.name")
     queue = serializers.CharField(source="queue.name")
@@ -16,12 +20,14 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
     first_response_time = serializers.SerializerMethodField()
     waiting_time = serializers.SerializerMethodField()
     queue_time = serializers.SerializerMethodField()
+    csat_rating = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
         fields = [
             "uuid",
             "agent",
+            "user_email",
             "contact",
             "urn",
             "is_active",
@@ -35,6 +41,7 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
             "first_response_time",
             "waiting_time",
             "queue_time",
+            "csat_rating",
             "protocol",
         ]
 
@@ -46,9 +53,11 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
 
     def get_link(self, obj: Room) -> dict:
         if obj.user and obj.is_active:
-            url = f"chats:dashboard/view-mode/{obj.user.email}"
+            url = f"chats:dashboard/view-mode/{obj.user.email}?uuid_room={obj.uuid}"
         elif not obj.user and obj.is_active:
             url = f"chats:chats/{obj.uuid}"
+        elif not obj.is_active:
+            url = f"chats:closed-chats/{obj.uuid}"
         else:
             url = None
 
@@ -70,8 +79,15 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
 
     def get_first_response_time(self, obj: Room) -> int:
         try:
-            if hasattr(obj, "metric") and obj.metric.first_response_time is not None:
-                return obj.metric.first_response_time
+            metrics: Optional[RoomMetrics] = getattr(obj, "metric", None)
+
+            if metrics and metrics.first_response_time is not None:
+                return metrics.first_response_time
+
+            if not obj.is_active and (
+                not metrics or metrics.first_response_time is None
+            ):
+                return None
 
             if obj.first_user_assigned_at and obj.is_active and obj.user:
                 has_any_agent_messages = (
@@ -91,15 +107,26 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
         return 0
 
     def get_waiting_time(self, obj: Room) -> int:
-        if not obj.added_to_queue_at or not obj.user_assigned_at:
+        metrics = getattr(obj, "metric", None)
+
+        if not metrics:
             return 0
-        return int((obj.user_assigned_at - obj.added_to_queue_at).total_seconds())
+
+        return metrics.waiting_time
 
     def get_queue_time(self, obj: Room) -> int:
         if obj.is_active and not obj.user:
             queue_start = obj.added_to_queue_at
             return int((timezone.now() - queue_start).total_seconds())
         return 0
+
+    def get_csat_rating(self, obj: Room) -> int:
+        csat_survey: Optional[CSATSurvey] = getattr(obj, "csat_survey", None)
+
+        if csat_survey:
+            return csat_survey.rating
+
+        return None
 
 
 class InternalProtocolRoomsSerializer(serializers.ModelSerializer):
