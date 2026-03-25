@@ -140,7 +140,7 @@ class MessageSerializerV2(serializers.ModelSerializer):
                         {
                             "content_type": media.content_type,
                             "message": str(media.message.uuid),
-                            "url": media.url,
+                            "url": media.public_url,
                             "created_on": media.created_on,
                         }
                     )

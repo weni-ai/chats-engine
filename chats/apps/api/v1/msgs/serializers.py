@@ -41,7 +41,7 @@ class MessageMediaSimpleSerializer(serializers.ModelSerializer):
         }
 
     def get_url(self, media: MessageMedia):
-        return media.url
+        return media.public_url
 
     def get_sender(self, media: MessageMedia):
         try:
@@ -100,7 +100,7 @@ class MessageMediaSerializer(serializers.ModelSerializer):
         }
 
     def get_url(self, media: MessageMedia):
-        return media.url
+        return media.public_url
 
     def get_sender(self, media: MessageMedia):
         try:
@@ -238,7 +238,7 @@ class MessageAndMediaSerializer(serializers.ModelSerializer):
         }
 
     def get_url(self, media: MessageMedia):
-        return media.url
+        return media.public_url
 
     def get_sender(self, media: MessageMedia):
         try:

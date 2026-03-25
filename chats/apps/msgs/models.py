@@ -9,6 +9,7 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
 from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
+from sentry_sdk import capture_exception
 from chats.apps.core.integrations.aws.s3.helpers import get_object_key
 from chats.core.models import BaseModelWithManualCreatedOn, BaseModel
 from chats.core.requests import get_request_session_with_retries
@@ -259,6 +260,9 @@ class MessageMedia(BaseModelWithManualCreatedOn):
 
     @property
     def public_url(self):
+        if self.media_file:
+            return self.media_file.url
+
         try:
             project_uuid = self.message.room.queue.sector.project.uuid
             use_flows_media_url = is_feature_active_for_attributes(
@@ -268,6 +272,7 @@ class MessageMedia(BaseModelWithManualCreatedOn):
                 },
             )
         except Exception as e:
+            capture_exception(e)
             logger.error(
                 f"Error checking if use flows media url feature flag is active: {e}"
             )
@@ -275,9 +280,6 @@ class MessageMedia(BaseModelWithManualCreatedOn):
 
         if not use_flows_media_url:
             return self.url
-
-        if self.media_file:
-            return self.media_file.url
 
         return self.get_flows_media_url(self.media_url)
 
