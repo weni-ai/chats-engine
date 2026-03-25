@@ -284,11 +284,13 @@ class ArchiveChatsService(BaseArchiveChatsService):
 
                 Message.objects.filter(pk__in=messages_pks).delete()
 
-        room_archived_conversation.status = (
-            ArchiveConversationsJobStatus.MESSAGES_DELETED_FROM_DB
-        )
-        room_archived_conversation.messages_deleted_at = timezone.now()
-        room_archived_conversation.save(update_fields=["status", "messages_deleted_at"])
+            room_archived_conversation.status = (
+                ArchiveConversationsJobStatus.MESSAGES_DELETED_FROM_DB
+            )
+            room_archived_conversation.messages_deleted_at = timezone.now()
+            room_archived_conversation.save(
+                update_fields=["status", "messages_deleted_at"]
+            )
 
         logger.info(
             f"[ArchiveChatsService] Room archived conversation status updated to "
