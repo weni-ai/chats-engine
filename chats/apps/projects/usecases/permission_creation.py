@@ -35,6 +35,7 @@ class ProjectPermissionCreationUseCase:
         project_permission.project = project
         project_permission.user = user
         project_permission.role = role_value
+        project_permission.is_deleted = False
         project_permission.save()
 
     def create_permission(self, project_permission_dto: ProjectPermissionDTO):

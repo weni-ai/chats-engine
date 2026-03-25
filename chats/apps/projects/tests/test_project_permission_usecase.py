@@ -126,14 +126,13 @@ class TestProjectPermissionCreationUseCase(TestCase):
         dto = self._make_dto()
         self.use_case.create_permission(dto)
 
-        perms = ProjectPermission.all_objects.filter(
-            project=self.project, user=self.user
-        )
+        perms = ProjectPermission.objects.filter(project=self.project, user=self.user)
         self.assertEqual(perms.count(), 1)
 
         perm = perms.first()
         self.assertEqual(perm.uuid, soft_perm.uuid)
         self.assertEqual(perm.role, 2)
+        self.assertFalse(perm.is_deleted)
 
     def test_create_permission_updates_existing_active_permission(self):
         """When an active permission already exists, create_permission should
