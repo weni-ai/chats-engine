@@ -566,3 +566,57 @@ class SectorTicketerCreationTests(APITestCase):
 
         self.assertEqual(mock_create_ticketer.call_count, 0)
         self.assertEqual(mock_integrate_individual.call_count, 1)
+
+
+class SectorRoomsCountTests(APITestCase):
+    fixtures = ["chats/fixtures/fixture_sector.json"]
+
+    def setUp(self):
+        self.user = User.objects.get(pk=8)
+        self.token = Token.objects.get(user=self.user)
+        self.project = Project.objects.get(pk="34a93b52-231e-11ed-861d-0242ac120002")
+        self.sector = Sector.objects.get(pk="21aecf8c-0c73-4059-ba82-4343e0cc627c")
+        self.queue = Queue.objects.get(uuid="f2519480-7e58-4fc4-9894-9ab1769e29cf")
+
+        self.contact = Contact.objects.create(name="Test Contact")
+        self.agent = User.objects.get(pk=6)
+
+    def _get_rooms_count(self, sector_uuid, token):
+        url = reverse("sector-rooms-count", args=[sector_uuid])
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + token)
+        return self.client.get(url)
+
+    def test_rooms_count_no_rooms(self):
+        response = self._get_rooms_count(self.sector.pk, self.token.key)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["waiting"], 0)
+        self.assertEqual(response.data["in_service"], 0)
+
+    def test_rooms_count_with_waiting_and_in_service(self):
+        Room.objects.create(queue=self.queue, contact=self.contact, is_active=True)
+        Room.objects.create(
+            queue=self.queue, contact=self.contact, user=self.agent, is_active=True
+        )
+
+        response = self._get_rooms_count(self.sector.pk, self.token.key)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["waiting"], 1)
+        self.assertEqual(response.data["in_service"], 1)
+
+    def test_rooms_count_ignores_closed_rooms(self):
+        Room.objects.create(queue=self.queue, contact=self.contact, is_active=True)
+        closed_room = Room.objects.create(
+            queue=self.queue, contact=self.contact, is_active=True
+        )
+        closed_room.is_active = False
+        closed_room.save(update_fields=["is_active"])
+
+        response = self._get_rooms_count(self.sector.pk, self.token.key)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["waiting"], 1)
+        self.assertEqual(response.data["in_service"], 0)
+
+    def test_rooms_count_unauthenticated(self):
+        url = reverse("sector-rooms-count", args=[self.sector.pk])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
