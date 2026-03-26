@@ -351,9 +351,10 @@ class TestMessageMediaCallback(TestCase):
             media_url="https://example.com/image.jpg",
         )
 
+    @patch("chats.apps.msgs.models.is_feature_active_for_attributes", return_value=False)
     @patch("chats.apps.msgs.models.logger")
     @patch("chats.apps.msgs.models.get_request_session_with_retries")
-    def test_callback_success(self, mock_get_session, mock_logger):
+    def test_callback_success(self, mock_get_session, mock_logger, _mock_ff):
         """Test successful MessageMedia callback"""
         mock_response = Mock()
         mock_response.status_code = 200
@@ -376,9 +377,10 @@ class TestMessageMediaCallback(TestCase):
 
         mock_logger.error.assert_not_called()
 
+    @patch("chats.apps.msgs.models.is_feature_active_for_attributes", return_value=False)
     @patch("chats.apps.msgs.models.logger")
     @patch("chats.apps.msgs.models.get_request_session_with_retries")
-    def test_callback_error_logging(self, mock_get_session, mock_logger):
+    def test_callback_error_logging(self, mock_get_session, mock_logger, _mock_ff):
         """Test MessageMedia callback error logging"""
         mock_session = Mock()
         mock_session.post.side_effect = Exception("Generic error")
