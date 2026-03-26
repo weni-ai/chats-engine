@@ -10,6 +10,7 @@ from chats.apps.api.v1.dashboard.viewsets import (
 from chats.apps.api.v1.routers import router
 from chats.apps.api.v1.internal.ai_features.views import FeaturePromptsView
 from chats.apps.api.v1.internal.agents.views import AgentDisconnectView
+from chats.apps.api.v1.human_support.views import HumanSupportNexusSettingsView
 from chats.apps.api.v1.ai_features.views import HistorySummaryFeedbackTagsView
 from chats.apps.ai_features.audio_transcription.views import (
     AudioTranscriptionView,
@@ -61,6 +62,11 @@ urlpatterns = [
         "archived_chats/media/",
         GetArchivedMediaView.as_view(),
         name="get_archived_media",
+    ),
+    path(
+        "human-support/<str:project_uuid>/",
+        HumanSupportNexusSettingsView.as_view(),
+        name="human_support_nexus_settings",
     ),
     path("", include(router.urls)),
 ]
