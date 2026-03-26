@@ -316,6 +316,260 @@ class TestArchiveChatsService(TestCase):
             f"https://flows.weni.ai/api/v2/internals/media/download/{expected_object_key}",
         )
 
+    def test_get_or_create_room_archived_conversation_creates_new(self):
+        job = self.service.start_archive_job()
+
+        self.assertFalse(RoomArchivedConversation.objects.filter(room=self.room).exists())
+
+        result = self.service._get_or_create_room_archived_conversation(self.room, job)
+
+        self.assertEqual(result.room, self.room)
+        self.assertEqual(result.job, job)
+        self.assertEqual(result.status, ArchiveConversationsJobStatus.PENDING)
+        self.assertEqual(
+            RoomArchivedConversation.objects.filter(room=self.room).count(), 1
+        )
+
+    def test_get_or_create_room_archived_conversation_reuses_existing_and_updates_job(self):
+        job_a = self.service.start_archive_job()
+        job_b = self.service.start_archive_job()
+
+        existing = RoomArchivedConversation.objects.create(
+            job=job_a,
+            room=self.room,
+            status=ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED,
+        )
+
+        result = self.service._get_or_create_room_archived_conversation(
+            self.room, job_b
+        )
+
+        self.assertEqual(result.uuid, existing.uuid)
+        result.refresh_from_db()
+        self.assertEqual(result.job, job_b)
+        self.assertEqual(
+            RoomArchivedConversation.objects.filter(room=self.room).count(), 1
+        )
+
+    def test_get_or_create_room_archived_conversation_does_not_update_finished_job(self):
+        job_a = self.service.start_archive_job()
+        job_b = self.service.start_archive_job()
+
+        existing = RoomArchivedConversation.objects.create(
+            job=job_a,
+            room=self.room,
+            status=ArchiveConversationsJobStatus.FINISHED,
+        )
+
+        result = self.service._get_or_create_room_archived_conversation(
+            self.room, job_b
+        )
+
+        self.assertEqual(result.uuid, existing.uuid)
+        result.refresh_from_db()
+        self.assertEqual(result.job, job_a)
+
+    def test_needs_processing_and_upload_returns_true_for_pending(self):
+        conv = RoomArchivedConversation.objects.create(
+            job=self.service.start_archive_job(),
+            room=self.room,
+            status=ArchiveConversationsJobStatus.PENDING,
+        )
+        self.assertTrue(self.service._needs_processing_and_upload(conv))
+
+    def test_needs_processing_and_upload_returns_true_for_processing_messages(self):
+        conv = RoomArchivedConversation.objects.create(
+            job=self.service.start_archive_job(),
+            room=self.room,
+            status=ArchiveConversationsJobStatus.PROCESSING_MESSAGES,
+        )
+        self.assertTrue(self.service._needs_processing_and_upload(conv))
+
+    def test_needs_processing_and_upload_returns_false_for_uploaded(self):
+        conv = RoomArchivedConversation.objects.create(
+            job=self.service.start_archive_job(),
+            room=self.room,
+            status=ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED,
+        )
+        self.assertFalse(self.service._needs_processing_and_upload(conv))
+
+    def test_needs_processing_and_upload_returns_false_for_deleting(self):
+        conv = RoomArchivedConversation.objects.create(
+            job=self.service.start_archive_job(),
+            room=self.room,
+            status=ArchiveConversationsJobStatus.DELETING_MESSAGES_FROM_DB,
+        )
+        self.assertFalse(self.service._needs_processing_and_upload(conv))
+
+    def test_needs_processing_and_upload_returns_false_for_deleted(self):
+        conv = RoomArchivedConversation.objects.create(
+            job=self.service.start_archive_job(),
+            room=self.room,
+            status=ArchiveConversationsJobStatus.MESSAGES_DELETED_FROM_DB,
+        )
+        self.assertFalse(self.service._needs_processing_and_upload(conv))
+
+    def test_needs_processing_and_upload_returns_false_for_failed_with_file(self):
+        conv = RoomArchivedConversation.objects.create(
+            job=self.service.start_archive_job(),
+            room=self.room,
+            status=ArchiveConversationsJobStatus.FAILED,
+            file="some/file.jsonl",
+        )
+        self.assertFalse(self.service._needs_processing_and_upload(conv))
+
+    def test_needs_processing_and_upload_returns_true_for_failed_without_file(self):
+        conv = RoomArchivedConversation.objects.create(
+            job=self.service.start_archive_job(),
+            room=self.room,
+            status=ArchiveConversationsJobStatus.FAILED,
+        )
+        self.assertTrue(self.service._needs_processing_and_upload(conv))
+
+    def test_needs_message_deletion_returns_true_for_uploaded(self):
+        conv = RoomArchivedConversation.objects.create(
+            job=self.service.start_archive_job(),
+            room=self.room,
+            status=ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED,
+        )
+        self.assertTrue(self.service._needs_message_deletion(conv))
+
+    def test_needs_message_deletion_returns_false_for_messages_deleted(self):
+        conv = RoomArchivedConversation.objects.create(
+            job=self.service.start_archive_job(),
+            room=self.room,
+            status=ArchiveConversationsJobStatus.MESSAGES_DELETED_FROM_DB,
+        )
+        self.assertFalse(self.service._needs_message_deletion(conv))
+
+    def test_needs_message_deletion_returns_false_for_failed_with_deleted_at(self):
+        conv = RoomArchivedConversation.objects.create(
+            job=self.service.start_archive_job(),
+            room=self.room,
+            status=ArchiveConversationsJobStatus.FAILED,
+            messages_deleted_at=timezone.now(),
+        )
+        self.assertFalse(self.service._needs_message_deletion(conv))
+
+    def test_needs_message_deletion_returns_true_for_failed_without_deleted_at(self):
+        conv = RoomArchivedConversation.objects.create(
+            job=self.service.start_archive_job(),
+            room=self.room,
+            status=ArchiveConversationsJobStatus.FAILED,
+        )
+        self.assertTrue(self.service._needs_message_deletion(conv))
+
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.process_messages")
+    def test_archive_room_history_skips_already_finished(self, mock_process_messages):
+        job = self.service.start_archive_job()
+
+        existing = RoomArchivedConversation.objects.create(
+            job=job,
+            room=self.room,
+            status=ArchiveConversationsJobStatus.FINISHED,
+        )
+
+        result = self.service.archive_room_history(self.room, job)
+
+        self.assertEqual(result.uuid, existing.uuid)
+        self.assertEqual(result.status, ArchiveConversationsJobStatus.FINISHED)
+        mock_process_messages.assert_not_called()
+
+    @patch(
+        "chats.apps.archive_chats.services.ArchiveChatsService.delete_room_messages"
+    )
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.process_messages")
+    def test_archive_room_history_resumes_from_uploaded_skips_processing(
+        self, mock_process_messages, mock_delete_messages
+    ):
+        job = self.service.start_archive_job()
+
+        RoomArchivedConversation.objects.create(
+            job=job,
+            room=self.room,
+            status=ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED,
+        )
+
+        self.service.archive_room_history(self.room, job)
+
+        mock_process_messages.assert_not_called()
+        mock_delete_messages.assert_called_once()
+
+    @patch(
+        "chats.apps.archive_chats.services.ArchiveChatsService.delete_room_messages"
+    )
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.process_messages")
+    def test_archive_room_history_resumes_from_failed_with_file(
+        self, mock_process_messages, mock_delete_messages
+    ):
+        job = self.service.start_archive_job()
+
+        RoomArchivedConversation.objects.create(
+            job=job,
+            room=self.room,
+            status=ArchiveConversationsJobStatus.FAILED,
+            file="some/file.jsonl",
+        )
+
+        self.service.archive_room_history(self.room, job)
+
+        mock_process_messages.assert_not_called()
+        mock_delete_messages.assert_called_once()
+
+    @patch(
+        "chats.apps.archive_chats.services.ArchiveChatsService.delete_room_messages"
+    )
+    @patch(
+        "chats.apps.archive_chats.services.ArchiveChatsService.upload_messages_file"
+    )
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.process_messages")
+    def test_archive_room_history_resumes_from_failed_with_messages_deleted(
+        self, mock_process_messages, mock_upload, mock_delete_messages
+    ):
+        job = self.service.start_archive_job()
+
+        RoomArchivedConversation.objects.create(
+            job=job,
+            room=self.room,
+            status=ArchiveConversationsJobStatus.FAILED,
+            file="some/file.jsonl",
+            messages_deleted_at=timezone.now(),
+        )
+
+        result = self.service.archive_room_history(self.room, job)
+
+        mock_process_messages.assert_not_called()
+        mock_upload.assert_not_called()
+        mock_delete_messages.assert_not_called()
+        self.assertEqual(result.status, ArchiveConversationsJobStatus.FINISHED)
+
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.process_messages")
+    def test_archive_room_history_reuses_record_on_retry(self, mock_process_messages):
+        mock_process_messages.return_value = []
+        job_a = self.service.start_archive_job()
+        job_b = self.service.start_archive_job()
+
+        self.service.archive_room_history(self.room, job_a)
+        self.service.archive_room_history(self.room, job_b)
+
+        self.assertEqual(
+            RoomArchivedConversation.objects.filter(room=self.room).count(), 1
+        )
+
+    def test_unique_constraint_on_room(self):
+        from django.db import IntegrityError
+
+        job = self.service.start_archive_job()
+
+        RoomArchivedConversation.objects.create(
+            job=job, room=self.room, status=ArchiveConversationsJobStatus.PENDING
+        )
+
+        with self.assertRaises(IntegrityError):
+            RoomArchivedConversation.objects.create(
+                job=job, room=self.room, status=ArchiveConversationsJobStatus.PENDING
+            )
+
     def test_delete_room_messages(self):
         archived_conversation = RoomArchivedConversation.objects.create(
             job=self.service.start_archive_job(),
