@@ -106,6 +106,12 @@ class RoomArchivedConversation(models.Model):
     class Meta:
         verbose_name = _("Room Archived Conversation")
         verbose_name_plural = _("Room Archived Conversations")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["room"],
+                name="unique_room_archived_conversation",
+            ),
+        ]
 
     def __str__(self):
         return f"Room Archived Conversation {self.room.uuid} - {self.room.queue.sector.project.name}"
