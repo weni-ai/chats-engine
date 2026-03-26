@@ -3,6 +3,8 @@ import logging
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django_filters.rest_framework import DjangoFilterBackend
+from django.utils.decorators import method_decorator
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import exceptions, filters, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -40,6 +42,10 @@ LOGGER = logging.getLogger(__name__)
 User = get_user_model()
 
 
+@method_decorator(name="create", decorator=swagger_auto_schema(auto_schema=None))
+@method_decorator(name="update", decorator=swagger_auto_schema(auto_schema=None))
+@method_decorator(name="partial_update", decorator=swagger_auto_schema(auto_schema=None))
+@method_decorator(name="destroy", decorator=swagger_auto_schema(auto_schema=None))
 class QueueViewset(ModelViewSet):
     swagger_tag = "Queues"
     queryset = Queue.objects.all()

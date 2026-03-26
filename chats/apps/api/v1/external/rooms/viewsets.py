@@ -6,7 +6,9 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
+from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import CursorPagination, LimitOffsetPagination
@@ -106,6 +108,9 @@ def add_user_or_queue_to_room(instance: Room, request):
     return instance
 
 
+@method_decorator(name="update", decorator=swagger_auto_schema(auto_schema=None))
+@method_decorator(name="partial_update", decorator=swagger_auto_schema(auto_schema=None))
+@method_decorator(name="destroy", decorator=swagger_auto_schema(auto_schema=None))
 class RoomFlowViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing rooms (tickets) via external API.
@@ -162,14 +167,17 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
 
         return qs.filter(queue__sector__project=project)
 
+    @swagger_auto_schema(auto_schema=None)
     def list(self, request, *args, **kwargs):
         """List all rooms accessible via external API."""
         return super().list(request, *args, **kwargs)
 
+    @swagger_auto_schema(auto_schema=None)
     def retrieve(self, request, *args, **kwargs):
         """Retrieve details of a specific room by UUID."""
         return super().retrieve(request, *args, **kwargs)
 
+    @swagger_auto_schema(auto_schema=None)
     @action(detail=True, methods=["PUT", "PATCH"], url_name="close")
     def close(
         self, request, *args, **kwargs
@@ -200,6 +208,7 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
             start_queue_priority_routing(instance.queue)
         return Response(serialized_data.data, status=status.HTTP_200_OK)
 
+    @swagger_auto_schema(auto_schema=None)
     @action(detail=True, methods=["POST"])
     def history(self, request, uuid=None):
         """
@@ -243,6 +252,7 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
 
         return Response(status=status.HTTP_201_CREATED)
 
+    @swagger_auto_schema(auto_schema=None)
     def create(self, request, *args, **kwargs):
         """Create a new room (ticket) for a contact in a queue or sector."""
         try:
@@ -356,6 +366,7 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
     ]
     authentication_classes = [ProjectAdminAuthentication]
 
+    @swagger_auto_schema(auto_schema=None)
     def partial_update(self, request, pk=None):
         """Assign an agent to a queued room by ticket ID."""
         if pk is None:
@@ -468,6 +479,7 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
         ExternalHourRateThrottle,
     ]
 
+    @swagger_auto_schema(auto_schema=None)
     def partial_update(self, request, pk=None):
         """Update custom fields for a room by contact external ID."""
         custom_fields_update = request.data
