@@ -8,10 +8,12 @@ from rest_framework.response import Response
 from unittest.mock import patch
 
 from chats.apps.accounts.models import User
+from chats.apps.contacts.models import Contact
 from chats.apps.core.internal_domains import get_vtex_internal_domains_with_at_symbol
 from chats.apps.projects.models import Project
 from chats.apps.projects.models.models import ProjectPermission
 from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorAuthorization
 
 from chats.apps.projects.tests.decorators import with_project_permission
@@ -603,3 +605,57 @@ class QueueTransferAgentsTests(APITestCase):
 
         for domain in get_vtex_internal_domains_with_at_symbol():
             self.assertIn("internal" + domain, returned_emails)
+
+
+class QueueRoomsCountTests(APITestCase):
+    fixtures = ["chats/fixtures/fixture_sector.json"]
+
+    def setUp(self):
+        self.user = User.objects.get(pk=8)
+        self.token = Token.objects.get(user=self.user)
+        self.project = Project.objects.get(pk="34a93b52-231e-11ed-861d-0242ac120002")
+        self.sector = Sector.objects.get(pk="21aecf8c-0c73-4059-ba82-4343e0cc627c")
+        self.queue = Queue.objects.get(uuid="f2519480-7e58-4fc4-9894-9ab1769e29cf")
+
+        self.contact = Contact.objects.create(name="Test Contact")
+        self.agent = User.objects.get(pk=6)
+
+    def _get_rooms_count(self, queue_uuid, token):
+        url = reverse("queue-rooms-count", args=[queue_uuid])
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + token)
+        return self.client.get(url)
+
+    def test_rooms_count_no_rooms(self):
+        response = self._get_rooms_count(self.queue.pk, self.token.key)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["waiting"], 0)
+        self.assertEqual(response.data["in_service"], 0)
+
+    def test_rooms_count_with_waiting_and_in_service(self):
+        Room.objects.create(queue=self.queue, contact=self.contact, is_active=True)
+        Room.objects.create(
+            queue=self.queue, contact=self.contact, user=self.agent, is_active=True
+        )
+
+        response = self._get_rooms_count(self.queue.pk, self.token.key)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["waiting"], 1)
+        self.assertEqual(response.data["in_service"], 1)
+
+    def test_rooms_count_ignores_closed_rooms(self):
+        Room.objects.create(queue=self.queue, contact=self.contact, is_active=True)
+        closed_room = Room.objects.create(
+            queue=self.queue, contact=self.contact, is_active=True
+        )
+        closed_room.is_active = False
+        closed_room.save(update_fields=["is_active"])
+
+        response = self._get_rooms_count(self.queue.pk, self.token.key)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["waiting"], 1)
+        self.assertEqual(response.data["in_service"], 0)
+
+    def test_rooms_count_unauthenticated(self):
+        url = reverse("queue-rooms-count", args=[self.queue.pk])
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
