@@ -598,10 +598,9 @@ class SectorEndAllChatsTests(APITestCase):
 
     def _delete_sector(self, sector_uuid, end_all_chats=False):
         url = reverse("sector-detail", args=[sector_uuid])
-        params = {}
         if end_all_chats:
-            params["end_all_chats"] = "true"
-        return self.client.delete(url, params)
+            url += "?end_all_chats=true"
+        return self.client.delete(url)
 
     @with_project_permission()
     def test_delete_sector_without_flag_does_not_close_rooms(self):

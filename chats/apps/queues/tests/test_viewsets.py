@@ -632,10 +632,9 @@ class QueueEndAllChatsTests(APITestCase):
 
     def _delete_queue(self, queue_uuid, end_all_chats=False):
         url = reverse("queue-detail", args=[queue_uuid])
-        params = {}
         if end_all_chats:
-            params["end_all_chats"] = "true"
-        return self.client.delete(url, params)
+            url += "?end_all_chats=true"
+        return self.client.delete(url)
 
     @with_project_permission()
     def test_delete_queue_without_flag_does_not_close_rooms(self):
