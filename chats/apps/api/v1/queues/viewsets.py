@@ -21,9 +21,11 @@ from chats.apps.api.v1.permissions import (
 )
 from chats.apps.api.v1.queues import serializers as queue_serializers
 from chats.apps.api.v1.queues.filters import QueueAuthorizationFilter, QueueFilter
+from chats.apps.api.v1.rooms.services.bulk_close_service import BulkCloseService
 from chats.apps.projects.models.models import Project
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorGroupSector
 from chats.apps.sectors.usecases.group_sector_authorization import (
     QueueGroupSectorAuthorizationCreationUseCase,
@@ -147,7 +149,47 @@ class QueueViewset(ModelViewSet):
 
         return instance
 
+    def _close_active_rooms(self, instance):
+        rooms = Room.objects.filter(
+            queue=instance,
+            is_active=True,
+        )
+        if not rooms.exists():
+            return None
+
+        service = BulkCloseService()
+        result = service.close(
+            rooms=rooms,
+            end_by="queue_deleted",
+        )
+
+        if result.success_count == 0 and result.failed_count > 0:
+            raise exceptions.APIException(
+                detail=(
+                    f"Failed to close all {result.failed_count} active rooms "
+                    f"for queue {instance.uuid}. Deletion aborted."
+                ),
+            )
+
+        if result.failed_count > 0:
+            LOGGER.warning(
+                "[QUEUE_DELETE] Partial room closure for queue %s: "
+                "%d succeeded, %d failed",
+                instance.uuid,
+                result.success_count,
+                result.failed_count,
+            )
+
+        return result
+
     def perform_destroy(self, instance):
+        end_all_chats = (
+            self.request.query_params.get("end_all_chats", "").lower() == "true"
+        )
+
+        if end_all_chats:
+            self._close_active_rooms(instance)
+
         secondary_project_config = instance.sector.secondary_project or {}
         secondary_project_uuid = secondary_project_config.get("uuid")
 
