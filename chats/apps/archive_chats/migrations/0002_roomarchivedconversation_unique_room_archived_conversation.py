@@ -6,12 +6,14 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('archive_chats', '0001_initial'),
+        ("archive_chats", "0001_initial"),
     ]
 
     operations = [
         migrations.AddConstraint(
-            model_name='roomarchivedconversation',
-            constraint=models.UniqueConstraint(fields=('room',), name='unique_room_archived_conversation'),
+            model_name="roomarchivedconversation",
+            constraint=models.UniqueConstraint(
+                fields=("room",), name="unique_room_archived_conversation"
+            ),
         ),
     ]

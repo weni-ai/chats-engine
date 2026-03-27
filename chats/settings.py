@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/4.0/ref/settings/
 
 import os
 from pathlib import Path
+from celery.schedules import crontab
 
 import environ
 import sentry_sdk
@@ -486,7 +487,11 @@ CELERY_BEAT_SCHEDULE = {
     "process-pending-reports": {
         "task": "process_pending_reports",
         "schedule": 20.0,
-    }
+    },
+    "start-archive-rooms-messages": {
+        "task": "start_archive_rooms_messages",
+        "schedule": crontab(hour=0, minute=0),
+    },
 }
 
 # Disable report emails unless explicitly enabled
@@ -748,6 +753,9 @@ ARCHIVE_CHATS_PROJECTS_LIST_FEATURE_FLAG_KEY = env.str(
 ARCHIVE_CHATS_IS_ACTIVE_FOR_ALL_PROJECTS = env.bool(
     "ARCHIVE_CHATS_IS_ACTIVE_FOR_ALL_PROJECTS", default=False
 )
+
+# Internal API Token
+INTERNAL_API_TOKEN = env.str("INTERNAL_API_TOKEN")
 
 # Excluded email domains
 # These are domains used by internal users (such as VTEX employees)

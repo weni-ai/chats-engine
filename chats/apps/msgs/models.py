@@ -286,7 +286,7 @@ class MessageMedia(BaseModelWithManualCreatedOn):
     def get_flows_media_url(self, original_url: str):
         object_key = get_object_key(original_url)
 
-        return f"{settings.FLOWS_API_URL}/api/v2/internals/media/download/{object_key}"
+        return f"{settings.FLOWS_BASE_URL}/api/v2/internals/media/download/{object_key}"
 
     def get_authorization(self, user):
         return self.room.get_authorization(user)
