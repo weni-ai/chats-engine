@@ -64,15 +64,14 @@ class RoomViewsetBulkTransferTests(TestCase):
             queue=self.queue, project_uuid=str(self.project.pk)
         )
 
-    @patch("chats.apps.api.v1.rooms.viewsets.create_room_feedback_message")
-    @patch("chats.apps.api.v1.rooms.viewsets.start_queue_priority_routing")
-    @patch("chats.apps.api.v1.rooms.viewsets.get_user_id_by_email_cached")
-    def test_bulk_transfer_assigns_user_instance(self, mock_cache, _routing, _feedback):
-        mock_cache.return_value = self.agent.pk
-        view = RoomViewset.as_view({"patch": "bulk_transfer"})
-        req = self.factory.patch(
-            "/x?user_email=agent@acme.com",
-            data={"rooms_list": [str(self.room.uuid)]},
+    def test_bulk_transfer_assigns_user_instance(self):
+        view = RoomViewset.as_view({"post": "bulk_transfer"})
+        req = self.factory.post(
+            "/x",
+            data={
+                "rooms_list": [str(self.room.uuid)],
+                "user_email": "agent@acme.com",
+            },
             content_type="application/json",
         )
         force_authenticate(req, user=self.admin)
@@ -81,23 +80,22 @@ class RoomViewsetBulkTransferTests(TestCase):
         self.room.refresh_from_db()
         self.assertEqual(self.room.user, self.agent)
 
-    @patch(
-        "chats.apps.api.v1.rooms.viewsets.get_user_id_by_email_cached",
-        return_value=None,
-    )
-    def test_bulk_transfer_returns_400_when_user_not_found(self, _):
-        view = RoomViewset.as_view({"patch": "bulk_transfer"})
-        req = self.factory.patch(
-            "/x?user_email=no@acme.com",
-            data={"rooms_list": [str(self.room.uuid)]},
+    def test_bulk_transfer_returns_404_when_user_not_found(self):
+        view = RoomViewset.as_view({"post": "bulk_transfer"})
+        req = self.factory.post(
+            "/x",
+            data={
+                "rooms_list": [str(self.room.uuid)],
+                "user_email": "no@acme.com",
+            },
             content_type="application/json",
         )
         force_authenticate(req, user=self.admin)
         resp = view(req)
-        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.status_code, 404)
 
     def test_transfer_to_both_user_and_queue(self):
-        view = RoomViewset.as_view({"patch": "bulk_transfer"})
+        view = RoomViewset.as_view({"post": "bulk_transfer"})
 
         self.room.user = self.agent
         self.room.save()
@@ -106,9 +104,13 @@ class RoomViewsetBulkTransferTests(TestCase):
         ProjectPermission.objects.create(project=self.project, user=other_agent, role=1)
         other_queue = self.sector.queues.create(name="Other Queue", sector=self.sector)
 
-        req = self.factory.patch(
-            f"/x?user_email={other_agent.email}&queue_uuid={other_queue.uuid}",
-            data={"rooms_list": [str(self.room.uuid)]},
+        req = self.factory.post(
+            "/x",
+            data={
+                "rooms_list": [str(self.room.uuid)],
+                "user_email": other_agent.email,
+                "queue_uuid": str(other_queue.uuid),
+            },
             content_type="application/json",
         )
         force_authenticate(req, user=self.admin)
