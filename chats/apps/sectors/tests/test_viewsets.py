@@ -13,6 +13,8 @@ from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorTag
 
+from chats.apps.projects.tests.decorators import with_project_permission
+
 
 class SectorTests(APITestCase):
     fixtures = ["chats/fixtures/fixture_sector.json"]
@@ -566,3 +568,125 @@ class SectorTicketerCreationTests(APITestCase):
 
         self.assertEqual(mock_create_ticketer.call_count, 0)
         self.assertEqual(mock_integrate_individual.call_count, 1)
+
+
+class SectorEndAllChatsTests(APITestCase):
+
+    def setUp(self):
+        self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            project=self.project,
+            name="Test Sector",
+            rooms_limit=5,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
+        self.queue_2 = Queue.objects.create(
+            name="Test Queue 2", sector=self.sector
+        )
+        self.contact = Contact.objects.create(
+            external_id="ext-1", name="Contact 1"
+        )
+        self.contact_2 = Contact.objects.create(
+            external_id="ext-2", name="Contact 2"
+        )
+
+        self.user = User.objects.create(email="admin@endall.test")
+        self.agent = User.objects.create(email="agent@endall.test")
+        self.client.force_authenticate(user=self.user)
+
+    def _delete_sector(self, sector_uuid, end_all_chats=False):
+        url = reverse("sector-detail", args=[sector_uuid])
+        params = {}
+        if end_all_chats:
+            params["end_all_chats"] = "true"
+        return self.client.delete(url, params)
+
+    @with_project_permission()
+    def test_delete_sector_without_flag_does_not_close_rooms(self):
+        room = Room.objects.create(
+            contact=self.contact,
+            queue=self.queue,
+            user=self.agent,
+            is_active=True,
+        )
+        response = self._delete_sector(self.sector.uuid)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        room.refresh_from_db()
+        self.assertTrue(room.is_active)
+
+    @with_project_permission()
+    def test_delete_sector_with_flag_closes_ongoing_rooms(self):
+        room = Room.objects.create(
+            contact=self.contact,
+            queue=self.queue,
+            user=self.agent,
+            is_active=True,
+        )
+        response = self._delete_sector(self.sector.uuid, end_all_chats=True)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        room.refresh_from_db()
+        self.assertFalse(room.is_active)
+        self.assertEqual(room.ended_by, "sector_deleted")
+
+    @with_project_permission()
+    def test_delete_sector_with_flag_closes_waiting_rooms(self):
+        room = Room.objects.create(
+            contact=self.contact,
+            queue=self.queue,
+            user=None,
+            is_active=True,
+        )
+        response = self._delete_sector(self.sector.uuid, end_all_chats=True)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        room.refresh_from_db()
+        self.assertFalse(room.is_active)
+
+    @with_project_permission()
+    def test_delete_sector_with_flag_closes_rooms_across_all_queues(self):
+        room_q1 = Room.objects.create(
+            contact=self.contact,
+            queue=self.queue,
+            user=self.agent,
+            is_active=True,
+        )
+        room_q2 = Room.objects.create(
+            contact=self.contact_2,
+            queue=self.queue_2,
+            user=None,
+            is_active=True,
+        )
+        response = self._delete_sector(self.sector.uuid, end_all_chats=True)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        room_q1.refresh_from_db()
+        room_q2.refresh_from_db()
+        self.assertFalse(room_q1.is_active)
+        self.assertFalse(room_q2.is_active)
+
+    @with_project_permission()
+    def test_delete_sector_with_flag_no_active_rooms_succeeds(self):
+        response = self._delete_sector(self.sector.uuid, end_all_chats=True)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Sector.objects.filter(uuid=self.sector.uuid).exists())
+
+    @with_project_permission()
+    def test_delete_sector_with_flag_skips_already_closed_rooms(self):
+        closed_room = Room.objects.create(
+            contact=self.contact,
+            queue=self.queue,
+            user=self.agent,
+            is_active=False,
+        )
+        active_room = Room.objects.create(
+            contact=self.contact_2,
+            queue=self.queue,
+            user=None,
+            is_active=True,
+        )
+        response = self._delete_sector(self.sector.uuid, end_all_chats=True)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        active_room.refresh_from_db()
+        self.assertFalse(active_room.is_active)
+        closed_room.refresh_from_db()
+        self.assertFalse(closed_room.is_active)
