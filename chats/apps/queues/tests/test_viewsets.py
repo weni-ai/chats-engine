@@ -8,10 +8,12 @@ from rest_framework.response import Response
 from unittest.mock import patch
 
 from chats.apps.accounts.models import User
+from chats.apps.contacts.models import Contact
 from chats.apps.core.internal_domains import get_vtex_internal_domains_with_at_symbol
 from chats.apps.projects.models import Project
 from chats.apps.projects.models.models import ProjectPermission
 from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorAuthorization
 
 from chats.apps.projects.tests.decorators import with_project_permission
@@ -603,3 +605,125 @@ class QueueTransferAgentsTests(APITestCase):
 
         for domain in get_vtex_internal_domains_with_at_symbol():
             self.assertIn("internal" + domain, returned_emails)
+
+
+class QueueEndAllChatsTests(APITestCase):
+
+    def setUp(self):
+        self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            project=self.project,
+            name="Test Sector",
+            rooms_limit=5,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
+        self.contact = Contact.objects.create(
+            external_id="ext-q1", name="Contact Q1"
+        )
+        self.contact_2 = Contact.objects.create(
+            external_id="ext-q2", name="Contact Q2"
+        )
+
+        self.user = User.objects.create(email="admin@endall-queue.test")
+        self.agent = User.objects.create(email="agent@endall-queue.test")
+        self.client.force_authenticate(user=self.user)
+
+    def _delete_queue(self, queue_uuid, end_all_chats=False):
+        url = reverse("queue-detail", args=[queue_uuid])
+        params = {}
+        if end_all_chats:
+            params["end_all_chats"] = "true"
+        return self.client.delete(url, params)
+
+    @with_project_permission()
+    def test_delete_queue_without_flag_does_not_close_rooms(self):
+        room = Room.objects.create(
+            contact=self.contact,
+            queue=self.queue,
+            user=self.agent,
+            is_active=True,
+        )
+        response = self._delete_queue(self.queue.uuid)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        room.refresh_from_db()
+        self.assertTrue(room.is_active)
+
+    @with_project_permission()
+    def test_delete_queue_with_flag_closes_ongoing_rooms(self):
+        room = Room.objects.create(
+            contact=self.contact,
+            queue=self.queue,
+            user=self.agent,
+            is_active=True,
+        )
+        response = self._delete_queue(self.queue.uuid, end_all_chats=True)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        room.refresh_from_db()
+        self.assertFalse(room.is_active)
+        self.assertEqual(room.ended_by, "queue_deleted")
+
+    @with_project_permission()
+    def test_delete_queue_with_flag_closes_waiting_rooms(self):
+        room = Room.objects.create(
+            contact=self.contact,
+            queue=self.queue,
+            user=None,
+            is_active=True,
+        )
+        response = self._delete_queue(self.queue.uuid, end_all_chats=True)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        room.refresh_from_db()
+        self.assertFalse(room.is_active)
+
+    @with_project_permission()
+    def test_delete_queue_with_flag_no_active_rooms_succeeds(self):
+        response = self._delete_queue(self.queue.uuid, end_all_chats=True)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Queue.objects.filter(uuid=self.queue.uuid).exists())
+
+    @with_project_permission()
+    def test_delete_queue_with_flag_only_closes_rooms_in_that_queue(self):
+        other_queue = Queue.objects.create(
+            name="Other Queue", sector=self.sector
+        )
+        room_target = Room.objects.create(
+            contact=self.contact,
+            queue=self.queue,
+            user=self.agent,
+            is_active=True,
+        )
+        room_other = Room.objects.create(
+            contact=self.contact_2,
+            queue=other_queue,
+            user=self.agent,
+            is_active=True,
+        )
+        response = self._delete_queue(self.queue.uuid, end_all_chats=True)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        room_target.refresh_from_db()
+        room_other.refresh_from_db()
+        self.assertFalse(room_target.is_active)
+        self.assertTrue(room_other.is_active)
+
+    @with_project_permission()
+    def test_delete_queue_with_flag_skips_already_closed_rooms(self):
+        closed_room = Room.objects.create(
+            contact=self.contact,
+            queue=self.queue,
+            user=self.agent,
+            is_active=False,
+        )
+        active_room = Room.objects.create(
+            contact=self.contact_2,
+            queue=self.queue,
+            user=None,
+            is_active=True,
+        )
+        response = self._delete_queue(self.queue.uuid, end_all_chats=True)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        active_room.refresh_from_db()
+        self.assertFalse(active_room.is_active)
+        closed_room.refresh_from_db()
+        self.assertFalse(closed_room.is_active)
