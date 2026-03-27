@@ -616,9 +616,9 @@ class QueueRoomsCountTests(APITestCase):
         self.project = Project.objects.get(pk="34a93b52-231e-11ed-861d-0242ac120002")
         self.sector = Sector.objects.get(pk="21aecf8c-0c73-4059-ba82-4343e0cc627c")
         self.queue = Queue.objects.get(uuid="f2519480-7e58-4fc4-9894-9ab1769e29cf")
-
-        self.contact = Contact.objects.create(name="Test Contact")
         self.agent = User.objects.get(pk=6)
+
+        Room.objects.filter(queue=self.queue).update(is_active=False)
 
     def _get_rooms_count(self, queue_uuid, token):
         url = reverse("queue-rooms-count", args=[queue_uuid])
@@ -632,9 +632,16 @@ class QueueRoomsCountTests(APITestCase):
         self.assertEqual(response.data["in_service"], 0)
 
     def test_rooms_count_with_waiting_and_in_service(self):
-        Room.objects.create(queue=self.queue, contact=self.contact, is_active=True)
+        contact_waiting = Contact.objects.create(name="Waiting Contact")
+        contact_service = Contact.objects.create(name="Service Contact")
         Room.objects.create(
-            queue=self.queue, contact=self.contact, user=self.agent, is_active=True
+            queue=self.queue, contact=contact_waiting, is_active=True
+        )
+        Room.objects.create(
+            queue=self.queue,
+            contact=contact_service,
+            user=self.agent,
+            is_active=True,
         )
 
         response = self._get_rooms_count(self.queue.pk, self.token.key)
@@ -643,9 +650,13 @@ class QueueRoomsCountTests(APITestCase):
         self.assertEqual(response.data["in_service"], 1)
 
     def test_rooms_count_ignores_closed_rooms(self):
-        Room.objects.create(queue=self.queue, contact=self.contact, is_active=True)
+        contact_active = Contact.objects.create(name="Active Contact")
+        contact_closed = Contact.objects.create(name="Closed Contact")
+        Room.objects.create(
+            queue=self.queue, contact=contact_active, is_active=True
+        )
         closed_room = Room.objects.create(
-            queue=self.queue, contact=self.contact, is_active=True
+            queue=self.queue, contact=contact_closed, is_active=True
         )
         closed_room.is_active = False
         closed_room.save(update_fields=["is_active"])
