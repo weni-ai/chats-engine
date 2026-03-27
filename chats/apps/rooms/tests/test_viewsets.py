@@ -317,9 +317,11 @@ class RoomsManagerTests(APITestCase):
         self.assertEquals(response.status_code, status.HTTP_200_OK)
 
         self.room.refresh_from_db()
-        feedback_message = self.room.messages.filter(
-            text__contains=RoomFeedbackMethods.ROOM_TRANSFER
-        ).order_by("-created_on").first()
+        feedback_message = (
+            self.room.messages.filter(text__contains=RoomFeedbackMethods.ROOM_TRANSFER)
+            .order_by("-created_on")
+            .first()
+        )
 
         self.assertIsNotNone(feedback_message)
 
@@ -327,9 +329,7 @@ class RoomsManagerTests(APITestCase):
         feedback_content = message_data.get("content", {})
 
         self.assertIn("requested_by", feedback_content)
-        self.assertEqual(
-            feedback_content["requested_by"]["email"], self.admin.email
-        )
+        self.assertEqual(feedback_content["requested_by"]["email"], self.admin.email)
         self.assertEqual(feedback_content["requested_by"]["type"], "user")
 
 
@@ -637,9 +637,7 @@ class RoomPickTests(APITestCase):
         feedback_content = message_data.get("content", {})
 
         self.assertIn("requested_by", feedback_content)
-        self.assertEqual(
-            feedback_content["requested_by"]["email"], self.user.email
-        )
+        self.assertEqual(feedback_content["requested_by"]["email"], self.user.email)
         self.assertEqual(feedback_content["requested_by"]["type"], "user")
 
 
@@ -732,8 +730,46 @@ class RoomsBulkTransferTestCase(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["success_count"], 1)
-        mock_start_queue_priority_routing.assert_called_once()
+
+        self.assertEqual(mock_start_queue_priority_routing.call_count, 2)
+        mock_start_queue_priority_routing.assert_any_call(new_queue)
+        mock_start_queue_priority_routing.assert_any_call(self.queue)
+
+    @patch(
+        "chats.apps.api.v1.rooms.services.bulk_transfer_service.start_queue_priority_routing"
+    )
+    @patch("chats.apps.api.v1.rooms.services.bulk_transfer_service.logger")
+    def test_bulk_transfer_to_user_and_queue(
+        self, mock_logger, mock_start_queue_priority_routing
+    ):
+        mock_start_queue_priority_routing.return_value = None
+
+        url = reverse("room-bulk_transfer")
+
+        new_queue = Queue.objects.create(
+            name="New Queue",
+            sector=self.sector,
+        )
+
+        response = self.client.patch(
+            url,
+            data={
+                "rooms_list": [self.room.uuid],
+            },
+            format="json",
+            QUERY_STRING=f"user_email={self.agent_2.email}&queue_uuid={new_queue.uuid}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertEqual(mock_start_queue_priority_routing.call_count, 2)
+        mock_start_queue_priority_routing.assert_any_call(new_queue)
+        mock_start_queue_priority_routing.assert_any_call(self.queue)
+        mock_logger.info.assert_called_once_with(
+            "Starting queue priority routing for queue %s from bulk transfer to user %s",
+            new_queue.uuid,
+            self.agent_2.email,
+        )
 
     @patch("chats.apps.rooms.models.Room.update_ticket_async")
     @patch("chats.apps.rooms.models.Room.mark_notes_as_non_deletable")
