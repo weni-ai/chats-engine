@@ -1,5 +1,5 @@
 import uuid
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from django.test import TestCase
 from django.utils import timezone
@@ -284,3 +284,100 @@ class TestProjectCreationUsecase(TestCase):
 
         config = self.use_case._config_its_principal(different_org_dto)
         self.assertEqual(config, {})
+
+    def test_create_project_permissions_are_not_soft_deleted(self):
+        """
+        All permissions created during project creation (creator + authorizations)
+        should have is_deleted=False.
+        """
+        auth_users = self._create_test_users(2)
+        project_dto = self._create_base_project_dto(
+            authorizations=[
+                {"user_email": auth_users[0].email, "role": 2},
+                {"user_email": auth_users[1].email, "role": 3},
+            ]
+        )
+
+        self.use_case.create_project(project_dto)
+        project = Project.objects.get(uuid=project_dto.uuid)
+
+        all_permissions = ProjectPermission.all_objects.filter(project=project)
+        self.assertEqual(all_permissions.count(), 3)
+
+        for perm in all_permissions:
+            self.assertFalse(perm.is_deleted)
+
+    def _setup_project_with_soft_deleted_permission(self, **perm_kwargs):
+        """
+        Helper that creates a project and a soft-deleted permission on it,
+        then returns (project, soft_deleted_permission, project_dto).
+        Patches Project so create_project bypasses the UUID check and creation.
+        """
+        project = Project.objects.create(
+            uuid=str(uuid.uuid4()),
+            name="Test Project",
+            org=self.org_uuid,
+        )
+        soft_perm = ProjectPermission.all_objects.create(
+            project=project, is_deleted=True, **perm_kwargs
+        )
+        return project, soft_perm
+
+    def test_create_project_reuses_soft_deleted_creator_permission(self):
+        """
+        When a soft-deleted creator permission exists for the same user+project+role,
+        the use case should find it via all_objects instead of raising IntegrityError.
+        """
+        project, soft_perm = self._setup_project_with_soft_deleted_permission(
+            user=self.user, role=1
+        )
+        project_dto = self._create_base_project_dto(uuid=str(project.uuid))
+
+        mock_qs = MagicMock()
+        mock_qs.exists.return_value = False
+
+        with patch(
+            "chats.apps.projects.usecases.project_creation.Project"
+        ) as MockProject:
+            MockProject.objects.filter.return_value = mock_qs
+            MockProject.objects.create.return_value = project
+
+            self.use_case.create_project(project_dto)
+
+        creator_perms = ProjectPermission.all_objects.filter(
+            user=self.user, project=project, role=1
+        )
+        self.assertEqual(creator_perms.count(), 1)
+        self.assertEqual(creator_perms.first().uuid, soft_perm.uuid)
+
+    def test_create_project_reuses_soft_deleted_authorization_permission(self):
+        """
+        When a soft-deleted authorization permission exists for the same user+project,
+        the use case should find it via all_objects instead of raising IntegrityError.
+        """
+        auth_user = self._create_test_users(1)[0]
+
+        project, soft_perm = self._setup_project_with_soft_deleted_permission(
+            user=auth_user, role=2
+        )
+        project_dto = self._create_base_project_dto(
+            uuid=str(project.uuid),
+            authorizations=[{"user_email": auth_user.email, "role": 2}],
+        )
+
+        mock_qs = MagicMock()
+        mock_qs.exists.return_value = False
+
+        with patch(
+            "chats.apps.projects.usecases.project_creation.Project"
+        ) as MockProject:
+            MockProject.objects.filter.return_value = mock_qs
+            MockProject.objects.create.return_value = project
+
+            self.use_case.create_project(project_dto)
+
+        auth_perms = ProjectPermission.all_objects.filter(
+            user=auth_user, project=project
+        )
+        self.assertEqual(auth_perms.count(), 1)
+        self.assertEqual(auth_perms.first().uuid, soft_perm.uuid)
