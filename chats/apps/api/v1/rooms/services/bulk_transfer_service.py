@@ -76,6 +76,7 @@ class BulkTransferService:
                 user.email,
             )
             start_queue_priority_routing(queue)
+            start_queue_priority_routing(old_queue)
 
             room.mark_notes_as_non_deletable()
             room.update_ticket_async()
@@ -144,6 +145,9 @@ class BulkTransferService:
                 to=queue,
                 requested_by=user_request,
             )
+
+            old_queue = room.queue
+
             room.user = None
             room.queue = queue
             room.save()
@@ -163,6 +167,7 @@ class BulkTransferService:
                 queue.uuid,
             )
             start_queue_priority_routing(queue)
+            start_queue_priority_routing(old_queue)
 
             # Mark all notes as non-deletable when room is transferred
             room.mark_notes_as_non_deletable()
