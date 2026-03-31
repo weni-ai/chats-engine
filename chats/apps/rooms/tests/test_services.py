@@ -11,12 +11,89 @@ from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.projects.models.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
-from chats.apps.rooms.services import RoomsReportService, can_retrieve
+from chats.apps.rooms.services import RoomsReportService, can_retrieve, requeue_agent_rooms
 from chats.apps.sectors.models import Sector, SectorAuthorization
 from chats.core.cache import CacheClient
 
 
 User = get_user_model()
+
+
+class RequeueAgentRoomsTestCase(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="Requeue Project")
+        self.sector = Sector.objects.create(
+            name="Sector",
+            project=self.project,
+            rooms_limit=5,
+            work_start="00:00",
+            work_end="23:59",
+        )
+        self.queue = Queue.objects.create(name="Queue", sector=self.sector)
+        self.contact = Contact.objects.create(name="Client")
+        self.agent = User.objects.create_user(email="agent@test.com", password="pw")
+
+    @patch("chats.apps.rooms.services.start_queue_priority_routing")
+    def test_rooms_are_unassigned_from_user(self, mock_routing):
+        room = Room.objects.create(
+            queue=self.queue, contact=self.contact, user=self.agent, is_active=True
+        )
+        requeue_agent_rooms(Room.objects.filter(uuid=room.uuid))
+        room.refresh_from_db()
+        self.assertIsNone(room.user)
+
+    @patch("chats.apps.rooms.services.start_queue_priority_routing")
+    def test_inactive_rooms_are_excluded_by_filter(self, mock_routing):
+        inactive_room = Room.objects.create(
+            queue=self.queue, contact=self.contact, user=self.agent, is_active=False
+        )
+        active_room = Room.objects.create(
+            queue=self.queue, contact=self.contact, user=self.agent, is_active=True
+        )
+        rooms = Room.objects.filter(user=self.agent, is_active=True)
+        self.assertEqual(rooms.count(), 1)
+        requeue_agent_rooms(rooms)
+        active_room.refresh_from_db()
+        inactive_room.refresh_from_db()
+        self.assertIsNone(active_room.user)
+        self.assertEqual(inactive_room.user, self.agent)
+
+    @patch("chats.apps.rooms.services.start_queue_priority_routing")
+    def test_rooms_without_user_are_skipped(self, mock_routing):
+        room = Room.objects.create(
+            queue=self.queue, contact=self.contact, user=None, is_active=True
+        )
+        requeue_agent_rooms(Room.objects.filter(uuid=room.uuid))
+        room.refresh_from_db()
+        self.assertIsNone(room.user)
+        mock_routing.assert_not_called()
+
+    @patch("chats.apps.rooms.services.start_queue_priority_routing")
+    def test_queue_routing_is_triggered_for_affected_queues(self, mock_routing):
+        Room.objects.create(
+            queue=self.queue, contact=self.contact, user=self.agent, is_active=True
+        )
+        requeue_agent_rooms(Room.objects.filter(user=self.agent, is_active=True))
+        mock_routing.assert_called_once_with(self.queue)
+
+    @patch("chats.apps.rooms.services.start_queue_priority_routing")
+    def test_multiple_rooms_across_queues(self, mock_routing):
+        queue_2 = Queue.objects.create(name="Queue 2", sector=self.sector)
+        Room.objects.create(
+            queue=self.queue, contact=self.contact, user=self.agent, is_active=True
+        )
+        Room.objects.create(
+            queue=queue_2, contact=self.contact, user=self.agent, is_active=True
+        )
+        requeue_agent_rooms(Room.objects.filter(user=self.agent, is_active=True))
+        self.assertEqual(mock_routing.call_count, 2)
+        called_queues = {call.args[0] for call in mock_routing.call_args_list}
+        self.assertEqual(called_queues, {self.queue, queue_2})
+
+    @patch("chats.apps.rooms.services.start_queue_priority_routing")
+    def test_empty_queryset_does_nothing(self, mock_routing):
+        requeue_agent_rooms(Room.objects.none())
+        mock_routing.assert_not_called()
 
 
 @override_settings(SEND_EMAILS=True)
