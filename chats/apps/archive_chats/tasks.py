@@ -15,7 +15,7 @@ from chats.apps.archive_chats.services import ArchiveChatsService
 logger = logging.getLogger(__name__)
 
 
-@shared_task(queue="archive-chats")
+@shared_task(name="start_archive_rooms_messages", queue="archive-chats")
 def start_archive_rooms_messages():
     """
     This task is used to archive the messages of the rooms that were created more than 1 year ago.

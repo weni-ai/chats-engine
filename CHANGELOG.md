@@ -1,3 +1,12 @@
+# 3.52.1
+# Add
+  - Soft delete for project permissions
+
+# 3.52.0
+# Fix
+  - Priority routing support for bulk transfer in both new and old queues
+  - Archive rooms messages Celery Beat task naming
+
 # 3.51.0
 # Add
   - Use Flows media endpoint in messages

@@ -200,6 +200,94 @@ class BulkTransferServiceTest(TestCase):
         self.assertEqual(mock_notify_user.call_count, 3)
         self.assertEqual(mock_mark_notes.call_count, 3)
 
+    @patch("chats.apps.rooms.models.Room.update_ticket_async")
+    @patch("chats.apps.rooms.models.Room.mark_notes_as_non_deletable")
+    @patch("chats.apps.api.v1.rooms.services.bulk_transfer_service.start_queue_priority_routing")
+    @patch("chats.apps.rooms.models.Room.notify_user")
+    @patch("chats.apps.rooms.models.Room.notify_queue")
+    @patch("chats.apps.api.v1.rooms.services.bulk_transfer_service.create_room_feedback_message")
+    def test_transfer_queue_triggers_routing_for_old_and_new_queues(
+        self,
+        mock_feedback,
+        mock_notify_queue,
+        mock_notify_user,
+        mock_routing,
+        mock_mark_notes,
+        mock_update_ticket,
+    ):
+        queue_2 = Queue.objects.create(name="Test Queue 2", sector=self.sector)
+        rooms = self._create_multiple_rooms(3)
+
+        result = self.service.transfer(rooms, self.user, queue=queue_2)
+
+        self.assertEqual(result.success_count, 3)
+        self.assertEqual(mock_routing.call_count, 2)
+        routed_queue_ids = {call[0][0].pk for call in mock_routing.call_args_list}
+        self.assertIn(self.queue.pk, routed_queue_ids)
+        self.assertIn(queue_2.pk, routed_queue_ids)
+
+    @patch("chats.apps.rooms.models.Room.update_ticket_async")
+    @patch("chats.apps.rooms.models.Room.mark_notes_as_non_deletable")
+    @patch("chats.apps.api.v1.rooms.services.bulk_transfer_service.start_queue_priority_routing")
+    @patch("chats.apps.rooms.models.Room.notify_user")
+    @patch("chats.apps.rooms.models.Room.notify_queue")
+    @patch("chats.apps.api.v1.rooms.services.bulk_transfer_service.create_room_feedback_message")
+    def test_transfer_user_and_queue_triggers_routing_for_old_and_new_queues(
+        self,
+        mock_feedback,
+        mock_notify_queue,
+        mock_notify_user,
+        mock_routing,
+        mock_mark_notes,
+        mock_update_ticket,
+    ):
+        user_2 = User.objects.create(email="test2@test.com")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=user_2,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        queue_2 = Queue.objects.create(name="Test Queue 2", sector=self.sector)
+        rooms = self._create_multiple_rooms(3)
+
+        result = self.service.transfer(rooms, self.user, user=user_2, queue=queue_2)
+
+        self.assertEqual(result.success_count, 3)
+        self.assertEqual(mock_routing.call_count, 2)
+        routed_queue_ids = {call[0][0].pk for call in mock_routing.call_args_list}
+        self.assertIn(self.queue.pk, routed_queue_ids)
+        self.assertIn(queue_2.pk, routed_queue_ids)
+
+    @patch("chats.apps.rooms.models.Room.update_ticket")
+    @patch("chats.apps.rooms.models.Room.mark_notes_as_non_deletable")
+    @patch("chats.apps.api.v1.rooms.services.bulk_transfer_service.start_queue_priority_routing")
+    @patch("chats.apps.rooms.models.Room.notify_user")
+    @patch("chats.apps.rooms.models.Room.notify_queue")
+    @patch("chats.apps.api.v1.rooms.services.bulk_transfer_service.create_room_feedback_message")
+    def test_transfer_user_only_triggers_routing_once_for_same_queue(
+        self,
+        mock_feedback,
+        mock_notify_queue,
+        mock_notify_user,
+        mock_routing,
+        mock_mark_notes,
+        mock_update_ticket,
+    ):
+        user_2 = User.objects.create(email="test2@test.com")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=user_2,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        rooms = self._create_multiple_rooms(3)
+
+        result = self.service.transfer(rooms, self.user, user=user_2)
+
+        self.assertEqual(result.success_count, 3)
+        self.assertEqual(mock_routing.call_count, 1)
+        routed_queue_ids = {call[0][0].pk for call in mock_routing.call_args_list}
+        self.assertIn(self.queue.pk, routed_queue_ids)
+
 
 class BulkCloseServiceTest(TestCase):
     def setUp(self):

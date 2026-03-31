@@ -734,6 +734,11 @@ class RoomsBulkTransferTestCase(APITestCase):
         self.assertEqual(mock_start_queue_priority_routing.call_count, 2)
         mock_start_queue_priority_routing.assert_any_call(new_queue)
         mock_start_queue_priority_routing.assert_any_call(self.queue)
+        mock_logger.info.assert_called_once_with(
+            "Starting queue priority routing for room %s from bulk transfer to queue %s",
+            self.room.uuid,
+            new_queue.uuid,
+        )
 
     @patch(
         "chats.apps.api.v1.rooms.services.bulk_transfer_service.start_queue_priority_routing"
