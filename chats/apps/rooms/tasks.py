@@ -10,10 +10,10 @@ logger = logging.getLogger(__name__)
 
 
 @app.task
-def requeue_agent_rooms_task(user_id: str, project_id: str):
+def requeue_agent_rooms_task(user_email: str, project_uuid: str):
     rooms = Room.objects.filter(
-        user_id=user_id,
-        queue__sector__project_id=project_id,
+        user__email=user_email,
+        queue__sector__project__uuid=project_uuid,
         is_active=True,
     )
     requeue_agent_rooms(rooms)

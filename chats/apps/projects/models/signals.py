@@ -35,6 +35,6 @@ def requeue_rooms_on_permission_delete(sender, instance, **kwargs):
 
     if not old.is_deleted and instance.is_deleted:
         requeue_agent_rooms_task.delay(
-            str(instance.user_id),
-            str(instance.project_id),
+            str(instance.user.email),
+            str(instance.project.uuid),
         )

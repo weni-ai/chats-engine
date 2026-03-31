@@ -22,8 +22,8 @@ class RequeueRoomsOnPermissionDeleteTestCase(TestCase):
     def test_requeue_triggered_on_permission_delete(self, mock_task):
         self.permission.delete()
         mock_task.delay.assert_called_once_with(
-            str(self.agent.pk),
-            str(self.project.pk),
+            str(self.agent.email),
+            str(self.project.uuid),
         )
 
     @patch("chats.apps.projects.models.signals.requeue_agent_rooms_task")
