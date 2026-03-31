@@ -1,3 +1,9 @@
+# 3.53.0
+# Add
+  - Requeue rooms when a user is removed from project
+  - Update audio transcription service to use final media URL
+  - Bulk transfers rooms
+  
 # 3.52.1
 # Add
   - Soft delete for project permissions
