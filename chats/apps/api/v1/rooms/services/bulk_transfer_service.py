@@ -238,9 +238,12 @@ class BulkTransferService:
 
         for room in batch:
             try:
+                old_queue_id = room.queue_id
                 self._transfer_room(room, user, queue, user_request)
                 result.add_success()
 
+                if old_queue_id:
+                    affected_queue_ids.add(old_queue_id)
                 if room.queue_id:
                     affected_queue_ids.add(room.queue_id)
 
