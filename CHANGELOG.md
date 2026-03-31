@@ -1,3 +1,103 @@
+# 3.52.1
+# Add
+  - Soft delete for project permissions
+
+# 3.52.0
+# Fix
+  - Priority routing support for bulk transfer in both new and old queues
+  - Archive rooms messages Celery Beat task naming
+
+# 3.51.0
+# Add
+  - Use Flows media endpoint in messages
+  - Use Flows media endpoint on audio transcriptions
+
+# 3.50.0
+# Add
+  - New human support config for chats
+
+# 3.49.0
+# Add
+  - Archive conversations tasks
+  - Celery Beat config to start archive
+  - Status verification logic on archive chats service
+
+# 3.48.2
+# Add
+  - Atomic transaction to archive rooms history
+# Fix
+  - Archive messages encoding
+
+# 3.48.1
+# Remove
+  - Revert requeue rooms when user is removed from project
+
+# 3.48.0
+# Fix
+  - URL media validation
+
+# 3.47.3
+# Fix
+  - Add Flows base URL to settings
+
+# 3.47.2
+# Add
+  - Flows media URL endpoint call
+
+# 3.47.1
+# Add
+  - New endpoint to list user status
+# Fix
+  - Redirect link to view mode
+  
+# 3.47.0
+# Add
+  - Bulk take feature
+  
+# 3.46.2
+# Add
+  - Support for multiple queues in filter for human support dashboard
+  
+# 3.46.1
+# Fix
+  - Report ready status
+  
+# 3.46.0
+# Add
+  - Wait limit settings and validations
+
+# 3.45.7
+# Fix
+  - First response time correct field and model fields cache removal
+
+# 3.45.6
+# Add
+  - "No response" value for first response time when null
+# Fix
+  - Queue deletion on secondary project
+
+# 3.45.5
+# Add
+  - Functions to avoid lose reports
+
+# 3.45.4
+# Add
+  - Agent custom status related chips and filters
+
+# 3.45.3
+# Fix
+  - Flows viewset change to restrict the queryset based on the token project
+
+# 3.45.2
+# Add
+  - CSAT Flow V5
+# Fix
+  - PR title validation to include optional ticket prefix format
+
+# 3.45.1
+# Fix
+  - Notify problem bulk transfer
+
 # 3.45.0
 # Add
   - Time metrics fields on rooms metrics serializer
@@ -1074,6 +1174,9 @@
 
 ## Change
   - Function is attending now uses pendulum to parse timezone in sector.
+
+
+
 
 
 

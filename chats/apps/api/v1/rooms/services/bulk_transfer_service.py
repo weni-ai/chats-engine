@@ -62,8 +62,162 @@ class BulkTransferService:
     each batch instead of per-room.
     """
 
-    def _get_rooms_projects(self, rooms):
-        return set(
+    def transfer_user_and_queue(
+        self, rooms: QuerySet[Room], user: User, queue: Queue, user_request: User
+    ):
+        for room in rooms:
+            old_user = room.user
+            old_queue = room.queue
+
+            room.user = user
+            room.queue = queue
+
+            room.save()
+
+            if not old_user:
+                metrics = RoomMetrics.objects.get_or_create(room=room)[0]
+                metrics.waiting_time += calculate_last_queue_waiting_time(room)
+                metrics.queued_count += 1
+                metrics.save()
+
+            feedback_queue = create_transfer_json(
+                action="transfer",
+                from_=old_queue,
+                to=queue,
+                requested_by=user_request,
+            )
+            feedback_user = create_transfer_json(
+                action="transfer",
+                from_=old_user,
+                to=user,
+                requested_by=user_request,
+            )
+
+            create_room_feedback_message(
+                room,
+                feedback_queue,
+                method=RoomFeedbackMethods.ROOM_TRANSFER,
+                requested_by=user_request,
+            )
+            create_room_feedback_message(
+                room,
+                feedback_user,
+                method=RoomFeedbackMethods.ROOM_TRANSFER,
+                requested_by=user_request,
+            )
+            room.notify_queue("update")
+            room.notify_user("update", user=old_user)
+            room.notify_user("update")
+
+            logger.info(
+                "Starting queue priority routing for queue %s from bulk transfer to user %s",
+                queue.uuid,
+                user.email,
+            )
+            start_queue_priority_routing(queue)
+            start_queue_priority_routing(old_queue)
+
+            room.mark_notes_as_non_deletable()
+            room.update_ticket_async()
+
+    def transfer_user(self, rooms: QuerySet[Room], user: User, user_request: User):
+        for room in rooms:
+            old_user = room.user
+
+            transfer_user = room.user if room.user else user_request
+
+            feedback_user = create_transfer_json(
+                action="transfer",
+                from_=old_user,
+                to=transfer_user,
+                requested_by=user_request,
+            )
+
+            old_user_assigned_at = room.user_assigned_at
+
+            room.user = user
+            room.save()
+
+            if not old_user:
+                metrics = RoomMetrics.objects.get_or_create(room=room)[0]
+                metrics.waiting_time += calculate_last_queue_waiting_time(room)
+                metrics.queued_count += 1
+                metrics.save()
+
+            logger.info(
+                "Starting queue priority routing for room %s from bulk transfer to user %s",
+                room.uuid,
+                user.email,
+            )
+            start_queue_priority_routing(room.queue)
+
+            create_room_feedback_message(
+                room,
+                feedback_user,
+                method=RoomFeedbackMethods.ROOM_TRANSFER,
+                requested_by=user_request,
+            )
+            if old_user:
+                room.notify_user("update", user=old_user)
+            else:
+                room.notify_user("update", user=transfer_user)
+            room.notify_user("update")
+            room.notify_queue("update")
+
+            room.update_ticket()
+            room.mark_notes_as_non_deletable()
+
+            if (
+                not old_user_assigned_at
+                and room.queue.sector.is_automatic_message_active
+                and room.queue.sector.automatic_message_text
+            ):
+                room.send_automatic_message()
+
+    def transfer_queue(self, rooms: QuerySet[Room], queue: Queue, user_request: User):
+        for room in rooms:
+            transfer_user = room.user if room.user else user_request
+
+            feedback = create_transfer_json(
+                action="transfer",
+                from_=transfer_user,
+                to=queue,
+                requested_by=user_request,
+            )
+
+            old_queue = room.queue
+
+            room.user = None
+            room.queue = queue
+            room.save()
+
+            create_room_feedback_message(
+                room,
+                feedback,
+                method=RoomFeedbackMethods.ROOM_TRANSFER,
+                requested_by=user_request,
+            )
+            room.notify_user("update", user=transfer_user)
+            room.notify_queue("update")
+
+            logger.info(
+                "Starting queue priority routing for room %s from bulk transfer to queue %s",
+                room.uuid,
+                queue.uuid,
+            )
+            start_queue_priority_routing(queue)
+            start_queue_priority_routing(old_queue)
+
+            # Mark all notes as non-deletable when room is transferred
+            room.mark_notes_as_non_deletable()
+
+    def get_rooms_projects(self, rooms: QuerySet[Room]):
+        cache_key = "_rooms_projects"
+
+        if cached_projects := getattr(self, cache_key, None):
+            return cached_projects
+
+        projects = set(
             rooms.values_list("queue__sector__project__uuid", flat=True).distinct()
         )
 

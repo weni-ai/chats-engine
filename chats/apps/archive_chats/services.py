@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import io
 import json
 import logging
+from urllib.parse import urlparse
 
 import boto3
 from typing import List
@@ -13,10 +14,10 @@ from django.core.files.base import ContentFile
 from sentry_sdk import capture_exception
 from django.conf import settings
 from django.db import transaction
+from weni.feature_flags.services import FeatureFlagsService
 
 
 from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
-from chats.apps.archive_chats.exceptions import InvalidObjectKey
 from chats.apps.archive_chats.models import (
     ArchiveConversationsJob,
     RoomArchivedConversation,
@@ -29,6 +30,10 @@ from chats.apps.msgs.models import Message, MessageMedia
 
 
 logger = logging.getLogger(__name__)
+
+
+def is_file_on_chats_bucket(url: str) -> bool:
+    return is_file_in_the_same_bucket(url, settings.AWS_STORAGE_BUCKET_NAME)
 
 
 class BaseArchiveChatsService(ABC):
@@ -78,22 +83,44 @@ class ArchiveChatsService(BaseArchiveChatsService):
             f"[ArchiveChatsService] Archiving room history for room {room.uuid} with job {job.uuid}"
         )
 
-        room_archived_conversation = RoomArchivedConversation.objects.create(
-            job=job,
-            room=room,
-            status=ArchiveConversationsJobStatus.PENDING,
-        )
-        logger.info(
-            f"[ArchiveChatsService] Room archived conversation created: "
-            f"{room_archived_conversation.uuid} with status "
-            f"{room_archived_conversation.status} for room {room.uuid} "
-            f"and job {job.uuid}"
+        room_archived_conversation = self._get_or_create_room_archived_conversation(
+            room, job
         )
 
+        if room_archived_conversation.status == ArchiveConversationsJobStatus.FINISHED:
+            logger.info(
+                f"[ArchiveChatsService] Room {room.uuid} is already archived "
+                f"(conversation {room_archived_conversation.uuid}), skipping"
+            )
+            return room_archived_conversation
+
         try:
-            messages_data = self.process_messages(room_archived_conversation)
-            self.upload_messages_file(room_archived_conversation, messages_data)
-            self.delete_room_messages(room_archived_conversation)
+            if self._needs_processing_and_upload(room_archived_conversation):
+                messages_data = self.process_messages(room_archived_conversation)
+                self.upload_messages_file(room_archived_conversation, messages_data)
+            else:
+                logger.info(
+                    f"[ArchiveChatsService] Skipping message processing and upload "
+                    f"for room {room.uuid} - file already uploaded"
+                )
+
+            room_archived_conversation.refresh_from_db()
+
+            if self._needs_message_deletion(room_archived_conversation):
+                if (
+                    room_archived_conversation.status
+                    != ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED
+                ):
+                    room_archived_conversation.status = (
+                        ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED
+                    )
+                    room_archived_conversation.save(update_fields=["status"])
+                self.delete_room_messages(room_archived_conversation)
+            else:
+                logger.info(
+                    f"[ArchiveChatsService] Skipping message deletion "
+                    f"for room {room.uuid} - messages already deleted"
+                )
 
             room_archived_conversation.refresh_from_db()
             room_archived_conversation.status = ArchiveConversationsJobStatus.FINISHED
@@ -112,6 +139,65 @@ class ArchiveChatsService(BaseArchiveChatsService):
         room_archived_conversation.refresh_from_db()
 
         return room_archived_conversation
+
+    def _get_or_create_room_archived_conversation(
+        self, room: Room, job: ArchiveConversationsJob
+    ) -> RoomArchivedConversation:
+        existing = RoomArchivedConversation.objects.filter(room=room).first()
+
+        if existing:
+            if existing.status != ArchiveConversationsJobStatus.FINISHED:
+                logger.info(
+                    f"[ArchiveChatsService] Resuming room archived conversation "
+                    f"{existing.uuid} with status {existing.status} "
+                    f"for room {room.uuid} and job {job.uuid}"
+                )
+                existing.job = job
+                existing.save(update_fields=["job"])
+            return existing
+
+        room_archived_conversation = RoomArchivedConversation.objects.create(
+            job=job,
+            room=room,
+            status=ArchiveConversationsJobStatus.PENDING,
+        )
+        logger.info(
+            f"[ArchiveChatsService] Room archived conversation created: "
+            f"{room_archived_conversation.uuid} with status "
+            f"{room_archived_conversation.status} for room {room.uuid} "
+            f"and job {job.uuid}"
+        )
+        return room_archived_conversation
+
+    def _needs_processing_and_upload(
+        self, room_archived_conversation: RoomArchivedConversation
+    ) -> bool:
+        status = room_archived_conversation.status
+        if status in {
+            ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED,
+            ArchiveConversationsJobStatus.DELETING_MESSAGES_FROM_DB,
+            ArchiveConversationsJobStatus.MESSAGES_DELETED_FROM_DB,
+        }:
+            return False
+        if (
+            status == ArchiveConversationsJobStatus.FAILED
+            and room_archived_conversation.file
+        ):
+            return False
+        return True
+
+    def _needs_message_deletion(
+        self, room_archived_conversation: RoomArchivedConversation
+    ) -> bool:
+        status = room_archived_conversation.status
+        if status == ArchiveConversationsJobStatus.MESSAGES_DELETED_FROM_DB:
+            return False
+        if (
+            status == ArchiveConversationsJobStatus.FAILED
+            and room_archived_conversation.messages_deleted_at
+        ):
+            return False
+        return True
 
     def process_messages(
         self, room_archived_conversation: RoomArchivedConversation
@@ -188,7 +274,7 @@ class ArchiveChatsService(BaseArchiveChatsService):
         file_object = io.BytesIO()
 
         for message in messages:
-            file_object.write(json.dumps(message).encode("utf-8"))
+            file_object.write(json.dumps(message, ensure_ascii=False).encode("utf-8"))
             file_object.write(b"\n")
 
         file_object.seek(0)
@@ -213,47 +299,32 @@ class ArchiveChatsService(BaseArchiveChatsService):
             if not media.media_url:
                 return
 
-            return media.media_url
+            if is_file_on_chats_bucket(media.media_url):
+                return self._get_chats_media_redirect_url(media.media_url)
 
-        if is_file_in_the_same_bucket(
-            media.media_file.url, settings.AWS_STORAGE_BUCKET_NAME
-        ):
+            object_key = urlparse(media.media_url).path.lstrip("/")
+            return self._get_flows_media_redirect_url(object_key)
+
+        if is_file_on_chats_bucket(media.media_file.url):
             object_key = media.media_file.name
 
-            return self._get_redirect_url(object_key)
+            return self._get_chats_media_redirect_url(object_key)
 
         return None
 
-    def _get_redirect_url(self, object_key: str) -> str:
+    def _get_chats_media_redirect_url(self, object_key: str) -> str:
         base_url = settings.CHATS_BASE_URL
         path = reverse("get_archived_media")
 
         return f"{base_url}{path}?object_key={object_key}"
 
+    def _get_flows_media_redirect_url(self, object_key: str) -> str:
+        base_url = settings.FLOWS_BASE_URL
+        path = f"{base_url}/api/v2/internals/media/download"
+
+        return f"{path}/{object_key}"
+
     def get_archived_media_url(self, object_key: str) -> str:
-        parts = object_key.split("/")
-
-        project_uuid = parts[1]
-        room_uuid = parts[2]
-
-        for _uuid in (project_uuid, room_uuid):
-            try:
-                UUID(_uuid)
-            except ValueError:
-                raise InvalidObjectKey("Invalid object key")
-
-        try:
-            room = Room.objects.get(uuid=room_uuid)
-        except Room.DoesNotExist:
-            raise InvalidObjectKey("Room not found")
-
-        is_archived = RoomArchivedConversation.objects.filter(
-            room=room, status=ArchiveConversationsJobStatus.FINISHED
-        ).exists()
-
-        if not is_archived:
-            raise InvalidObjectKey("Room is not archived")
-
         return get_presigned_url(object_key)
 
     def delete_room_messages(
@@ -296,11 +367,13 @@ class ArchiveChatsService(BaseArchiveChatsService):
 
                 Message.objects.filter(pk__in=messages_pks).delete()
 
-        room_archived_conversation.status = (
-            ArchiveConversationsJobStatus.MESSAGES_DELETED_FROM_DB
-        )
-        room_archived_conversation.messages_deleted_at = timezone.now()
-        room_archived_conversation.save(update_fields=["status", "messages_deleted_at"])
+            room_archived_conversation.status = (
+                ArchiveConversationsJobStatus.MESSAGES_DELETED_FROM_DB
+            )
+            room_archived_conversation.messages_deleted_at = timezone.now()
+            room_archived_conversation.save(
+                update_fields=["status", "messages_deleted_at"]
+            )
 
         logger.info(
             f"[ArchiveChatsService] Room archived conversation status updated to "
@@ -309,3 +382,30 @@ class ArchiveChatsService(BaseArchiveChatsService):
         )
 
         return room_archived_conversation
+
+    def get_projects(self) -> List[UUID]:
+        feature_flags_service = FeatureFlagsService()
+        feature_flag_key = settings.ARCHIVE_CHATS_PROJECTS_LIST_FEATURE_FLAG_KEY
+        features = feature_flags_service.get_features()
+
+        projects_list_feature_flag = features.get(feature_flag_key)
+
+        if not projects_list_feature_flag:
+            return []
+
+        try:
+            projects_list = projects_list_feature_flag["rules"][0]["condition"][
+                "projectUUID"
+            ]["$in"]
+        except Exception as e:
+            event_id = capture_exception(e)
+
+            logger.error(
+                "[ArchiveChatsService] Error getting projects list from feature flag "
+                f"{feature_flag_key}: {e} with event id {event_id}",
+                exc_info=True,
+            )
+
+            return []
+
+        return projects_list

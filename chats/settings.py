@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/4.0/ref/settings/
 
 import os
 from pathlib import Path
+from celery.schedules import crontab
 
 import environ
 import sentry_sdk
@@ -362,6 +363,9 @@ USE_CONNECT_V2 = env.bool("USE_CONNECT_V2", default=False)
 
 INTEGRATIONS_API_URL = env.str("INTEGRATIONS_API_URL", default="")
 FLOWS_API_URL = env.str("FLOWS_API_URL", default="")
+NEXUS_API_URL = env.str("NEXUS_API_URL", default="")
+NEXUS_SETTINGS_CACHE_TTL = env.int("NEXUS_SETTINGS_CACHE_TTL", default=300)
+NEXUS_SETTINGS_CACHE_ENABLED = env.bool("NEXUS_SETTINGS_CACHE_ENABLED", default=True)
 USE_WENI_FLOWS = env.bool("USE_WENI_FLOWS", default=False)
 FLOWS_TICKETER_TYPE = env.str("FLOWS_TICKETER_TYPE", default="wenichats")
 FLOWS_AUTH_TOKEN_RETRIES = env.int(
@@ -480,7 +484,11 @@ CELERY_BEAT_SCHEDULE = {
     "process-pending-reports": {
         "task": "process_pending_reports",
         "schedule": 20.0,
-    }
+    },
+    "start-archive-rooms-messages": {
+        "task": "start_archive_rooms_messages",
+        "schedule": crontab(hour=0, minute=0),
+    },
 }
 
 # Disable report emails unless explicitly enabled
@@ -515,6 +523,9 @@ if USE_EDA:
     FLOWS_TICKETER_EXCHANGE = env("FLOWS_TICKETER_EXCHANGE", default="sectors.topic")
     FLOWS_QUEUE_EXCHANGE = env("FLOWS_QUEUE_EXCHANGE", default="queues.topic")
     ROOMS_INFO_EXCHANGE = env("ROOMS_INFO_EXCHANGE", default="rooms.topic")
+    PROJECT_UPDATE_EXCHANGE = env(
+        "PROJECT_UPDATE_EXCHANGE", default="update-projects.topic"
+    )
 
     FLOWS_DEFAULT_DEAD_LETTER_EXCHANGE = env(
         "FLOWS_DEFAULT_DEAD_LETTER_EXCHANGE", default="flows.dlx.topic"
@@ -685,6 +696,17 @@ ROOM_24H_VALID_CACHE_TTL = env.int(
 )  # 0 means no cache
 
 
+# Archive chats
+ARCHIVE_CHATS_MAX_ROOMS = env.int("ARCHIVE_CHATS_MAX_ROOMS", default=10000)
+ARCHIVE_CHATS_MAX_HOUR = env.str("ARCHIVE_CHATS_MAX_HOUR", default="08:59")  # UTC-0
+ARCHIVE_CHATS_PROJECTS_LIST_FEATURE_FLAG_KEY = env.str(
+    "ARCHIVE_CHATS_PROJECTS_LIST_FEATURE_FLAG_KEY",
+    default="weniChatsArchiveChatsProjectsList",
+)
+ARCHIVE_CHATS_IS_ACTIVE_FOR_ALL_PROJECTS = env.bool(
+    "ARCHIVE_CHATS_IS_ACTIVE_FOR_ALL_PROJECTS", default=False
+)
+
 # Internal API Token
 INTERNAL_API_TOKEN = env.str("INTERNAL_API_TOKEN")
 
@@ -706,3 +728,11 @@ ROOMS_EXTERNAL_API_QUERYSET_FILTER_FLAG_KEY = env.str(
     "ROOMS_EXTERNAL_API_QUERYSET_FILTER_FLAG_KEY",
     default="weniChatsRoomsExternalApiQuerySetFilter",
 )
+
+# Flows Media URL
+USE_FLOWS_MEDIA_URL_FEATURE_FLAG_KEY = env.str(
+    "USE_FLOWS_MEDIA_URL_FEATURE_FLAG_KEY",
+    default="weniChatsUseFlowsMediaUrl",
+)
+
+FLOWS_BASE_URL = env.str("FLOWS_BASE_URL", default="https://flows.weni.ai")
