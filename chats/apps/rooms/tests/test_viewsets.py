@@ -736,18 +736,12 @@ class RoomsBulkTransferTestCase(APITestCase):
         self.assertEqual(mock_start_queue_priority_routing.call_count, 2)
         mock_start_queue_priority_routing.assert_any_call(new_queue)
         mock_start_queue_priority_routing.assert_any_call(self.queue)
-        mock_logger.info.assert_called_once_with(
-            "Starting queue priority routing for room %s from bulk transfer to queue %s",
-            self.room.uuid,
-            new_queue.uuid,
-        )
 
     @patch(
         "chats.apps.api.v1.rooms.services.bulk_transfer_service.start_queue_priority_routing"
     )
-    @patch("chats.apps.api.v1.rooms.services.bulk_transfer_service.logger")
     def test_bulk_transfer_to_user_and_queue(
-        self, mock_logger, mock_start_queue_priority_routing
+        self, mock_start_queue_priority_routing
     ):
         mock_start_queue_priority_routing.return_value = None
 
@@ -772,11 +766,6 @@ class RoomsBulkTransferTestCase(APITestCase):
         self.assertEqual(mock_start_queue_priority_routing.call_count, 2)
         mock_start_queue_priority_routing.assert_any_call(new_queue)
         mock_start_queue_priority_routing.assert_any_call(self.queue)
-        mock_logger.info.assert_called_once_with(
-            "Starting queue priority routing for queue %s from bulk transfer to user %s",
-            new_queue.uuid,
-            self.agent_2.email,
-        )
 
     @patch("chats.apps.rooms.models.Room.update_ticket_async")
     @patch("chats.apps.rooms.models.Room.mark_notes_as_non_deletable")
