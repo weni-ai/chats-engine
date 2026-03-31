@@ -211,7 +211,7 @@ class BulkTransferService:
             # Mark all notes as non-deletable when room is transferred
             room.mark_notes_as_non_deletable()
 
-    def get_rooms_projects(self, rooms: QuerySet[Room]):
+    def _get_rooms_projects(self, rooms: QuerySet[Room]):
         cache_key = "_rooms_projects"
 
         if cached_projects := getattr(self, cache_key, None):
@@ -220,6 +220,8 @@ class BulkTransferService:
         projects = set(
             rooms.values_list("queue__sector__project__uuid", flat=True).distinct()
         )
+        setattr(self, cache_key, projects)
+        return projects
 
     def _validate_queue(self, rooms, queue: Optional[Queue]):
         if not queue:
