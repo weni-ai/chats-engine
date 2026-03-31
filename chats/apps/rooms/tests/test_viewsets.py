@@ -750,13 +750,14 @@ class RoomsBulkTransferTestCase(APITestCase):
             sector=self.sector,
         )
 
-        response = self.client.patch(
+        response = self.client.post(
             url,
             data={
                 "rooms_list": [self.room.uuid],
+                "user_email": self.agent_2.email,
+                "queue_uuid": str(new_queue.uuid),
             },
             format="json",
-            QUERY_STRING=f"user_email={self.agent_2.email}&queue_uuid={new_queue.uuid}",
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
