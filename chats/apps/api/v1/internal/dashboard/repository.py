@@ -624,7 +624,7 @@ class AgentRepository:
                 ),
                 Value(0.0),
             ),
-        )
+        ).exclude(is_deleted=True, rooms_count=0)
 
         return self._get_csat_general(filters, project), agents
 
