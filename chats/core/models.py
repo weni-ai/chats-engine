@@ -70,7 +70,8 @@ class BaseSoftDeleteModel(models.Model):
 
     def delete(self):
         self.is_deleted = True
-        self.name += self.deleted_sufix()
+        if hasattr(self, "name"):
+            self.name += self.deleted_sufix()
         self.save()
 
 

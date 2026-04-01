@@ -1,11 +1,22 @@
 import logging
 from uuid import UUID
 from chats.apps.projects.models.models import Project
-from chats.apps.rooms.services import RoomsReportService
+from chats.apps.rooms.models import Room
+from chats.apps.rooms.services import requeue_agent_rooms, RoomsReportService
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.celery import app
 
 logger = logging.getLogger(__name__)
+
+
+@app.task
+def requeue_agent_rooms_task(user_email: str, project_uuid: str):
+    rooms = Room.objects.filter(
+        user__email=user_email,
+        queue__sector__project__uuid=project_uuid,
+        is_active=True,
+    )
+    requeue_agent_rooms(rooms)
 
 
 @app.task

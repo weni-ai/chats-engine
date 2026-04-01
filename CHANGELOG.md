@@ -1,3 +1,55 @@
+# 3.53.0
+# Add
+  - Requeue rooms when a user is removed from project
+  - Update audio transcription service to use final media URL
+  - Bulk transfers rooms
+  
+# 3.52.1
+# Add
+  - Soft delete for project permissions
+
+# 3.52.0
+# Fix
+  - Priority routing support for bulk transfer in both new and old queues
+  - Archive rooms messages Celery Beat task naming
+
+# 3.51.0
+# Add
+  - Use Flows media endpoint in messages
+  - Use Flows media endpoint on audio transcriptions
+
+# 3.50.0
+# Add
+  - New human support config for chats
+
+# 3.49.0
+# Add
+  - Archive conversations tasks
+  - Celery Beat config to start archive
+  - Status verification logic on archive chats service
+
+# 3.48.2
+# Add
+  - Atomic transaction to archive rooms history
+# Fix
+  - Archive messages encoding
+
+# 3.48.1
+# Remove
+  - Revert requeue rooms when user is removed from project
+
+# 3.48.0
+# Fix
+  - URL media validation
+
+# 3.47.3
+# Fix
+  - Add Flows base URL to settings
+
+# 3.47.2
+# Add
+  - Flows media URL endpoint call
+
 # 3.47.1
 # Add
   - New endpoint to list user status

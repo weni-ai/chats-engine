@@ -461,6 +461,142 @@ class TestRetryConfiguration(TestCase):
         self.assertNotIn(404, call_args["status_forcelist"])
 
 
+class TestMessageMediaURLProperties(TestCase):
+    """Test MessageMedia URL-related properties: is_flows_media_url_feature_active,
+    public_url, final_media_url, and get_flows_media_url."""
+
+    def setUp(self):
+        self.project = Project.objects.create(name="Test Project", timezone="UTC")
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="09:00:00",
+            work_end="18:00:00",
+        )
+        self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
+        self.room = Room.objects.create(queue=self.queue)
+        self.message = Message.objects.create(room=self.room, text="Test message")
+        self.media = MessageMedia.objects.create(
+            message=self.message,
+            content_type="audio/ogg",
+            media_url="https://s3.example.com/bucket/audio.ogg",
+        )
+
+    # --- is_flows_media_url_feature_active ---
+
+    @patch(
+        "chats.apps.msgs.models.is_feature_active_for_attributes", return_value=True
+    )
+    def test_is_flows_media_url_feature_active_returns_true(self, mock_ff):
+        self.assertTrue(self.media.is_flows_media_url_feature_active)
+        mock_ff.assert_called_once()
+
+    @patch(
+        "chats.apps.msgs.models.is_feature_active_for_attributes", return_value=False
+    )
+    def test_is_flows_media_url_feature_active_returns_false(self, mock_ff):
+        self.assertFalse(self.media.is_flows_media_url_feature_active)
+
+    @patch(
+        "chats.apps.msgs.models.is_feature_active_for_attributes",
+        side_effect=Exception("feature flag service unavailable"),
+    )
+    def test_is_flows_media_url_feature_active_returns_false_on_exception(
+        self, mock_ff
+    ):
+        self.assertFalse(self.media.is_flows_media_url_feature_active)
+
+    @patch(
+        "chats.apps.msgs.models.is_feature_active_for_attributes", return_value=True
+    )
+    def test_is_flows_media_url_feature_active_passes_project_uuid(self, mock_ff):
+        self.media.is_flows_media_url_feature_active
+
+        call_attrs = mock_ff.call_args[0][1]
+        self.assertEqual(call_attrs["projectUUID"], str(self.project.uuid))
+
+    # --- public_url ---
+
+    @patch(
+        "chats.apps.msgs.models.is_feature_active_for_attributes", return_value=False
+    )
+    def test_public_url_returns_url_when_feature_inactive(self, _mock_ff):
+        self.assertEqual(self.media.public_url, self.media.url)
+
+    @override_settings(FLOWS_BASE_URL="https://flows.example.com")
+    @patch(
+        "chats.apps.msgs.models.is_feature_active_for_attributes", return_value=True
+    )
+    def test_public_url_returns_flows_media_url_when_feature_active(self, _mock_ff):
+        result = self.media.public_url
+        self.assertIn("https://flows.example.com/api/v2/internals/media/download/", result)
+
+    def test_public_url_returns_media_file_url_when_file_exists(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        file = SimpleUploadedFile("audio.ogg", b"content", content_type="audio/ogg")
+        self.media.media_file = file
+        self.media.save()
+
+        self.assertEqual(self.media.public_url, self.media.media_file.url)
+
+    # --- final_media_url ---
+
+    @patch(
+        "chats.apps.msgs.models.is_feature_active_for_attributes", return_value=False
+    )
+    def test_final_media_url_returns_url_when_feature_inactive(self, _mock_ff):
+        self.assertEqual(self.media.final_media_url, self.media.url)
+
+    @patch("chats.apps.msgs.models.requests.head")
+    @patch(
+        "chats.apps.msgs.models.is_feature_active_for_attributes", return_value=True
+    )
+    def test_final_media_url_follows_redirects_when_feature_active(
+        self, _mock_ff, mock_head
+    ):
+        final_url = "https://cdn.example.com/final-audio.ogg"
+        mock_response = Mock()
+        mock_response.url = final_url
+        mock_head.return_value = mock_response
+
+        result = self.media.final_media_url
+
+        self.assertEqual(result, final_url)
+        mock_head.assert_called_once_with(self.media.url, allow_redirects=True)
+
+    @patch("chats.apps.msgs.models.requests.head", side_effect=Exception("timeout"))
+    @patch(
+        "chats.apps.msgs.models.is_feature_active_for_attributes", return_value=True
+    )
+    def test_final_media_url_returns_original_url_on_exception(
+        self, _mock_ff, _mock_head
+    ):
+        self.assertEqual(self.media.final_media_url, self.media.url)
+
+    def test_final_media_url_returns_media_file_url_when_file_exists(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        file = SimpleUploadedFile("audio.ogg", b"content", content_type="audio/ogg")
+        self.media.media_file = file
+        self.media.save()
+
+        self.assertEqual(self.media.final_media_url, self.media.media_file.url)
+
+    # --- get_flows_media_url ---
+
+    @override_settings(FLOWS_BASE_URL="https://flows.example.com")
+    def test_get_flows_media_url_builds_correct_url(self):
+        original_url = "https://s3.example.com/bucket/path/to/audio.ogg"
+        result = self.media.get_flows_media_url(original_url)
+
+        self.assertEqual(
+            result,
+            "https://flows.example.com/api/v2/internals/media/download/bucket/path/to/audio.ogg",
+        )
+
+
 class TestMessageMediaUploadTo(TestCase):
     """Test MessageMedia upload_to functionality for unique file names"""
 
