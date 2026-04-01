@@ -501,6 +501,39 @@ class AgentRepositoryTestCase(TestCase):
         self.assertIn("agent1@test.com", agent_emails)
         self.assertIn("agent2@test.com", agent_emails)
 
+        for agent in agents:
+            self.assertFalse(agent.is_deleted)
+
+    def test_get_csat_agents_includes_soft_deleted(self):
+        from chats.apps.accounts.models import User
+        from chats.apps.projects.models import ProjectPermission
+
+        active_user = User.objects.create(
+            email="active@test.com", first_name="Active", last_name="Agent"
+        )
+        removed_user = User.objects.create(
+            email="removed@test.com", first_name="Removed", last_name="Agent"
+        )
+
+        ProjectPermission.objects.create(
+            user=active_user, project=self.project, role=2
+        )
+        ProjectPermission.all_objects.create(
+            user=removed_user, project=self.project, role=2, is_deleted=True
+        )
+
+        filters = Filters()
+        agents = self.repository._get_csat_agents(filters, self.project)
+
+        self.assertEqual(agents.count(), 2)
+        agent_emails = list(agents.values_list("email", flat=True))
+        self.assertIn("active@test.com", agent_emails)
+        self.assertIn("removed@test.com", agent_emails)
+
+        agents_by_email = {a.email: a for a in agents}
+        self.assertFalse(agents_by_email["active@test.com"].is_deleted)
+        self.assertTrue(agents_by_email["removed@test.com"].is_deleted)
+
     def test_get_csat_agents_admin_filtering(self):
         from chats.apps.accounts.models import User
         from chats.apps.projects.models import ProjectPermission
@@ -819,6 +852,61 @@ class AgentRepositoryTestCase(TestCase):
             self.assertEqual(agent_data.rooms_count, 2)
             self.assertEqual(agent_data.reviews, 2)
             self.assertEqual(agent_data.avg_rating, 4.0)
+            self.assertFalse(agent_data.is_deleted)
+
+    def test_get_agents_csat_score_includes_soft_deleted_agents(self):
+        user_active = User.objects.create(
+            email="active@test.com", first_name="Active", last_name="Agent"
+        )
+        user_removed = User.objects.create(
+            email="removed@test.com", first_name="Removed", last_name="Agent"
+        )
+
+        ProjectPermission.objects.create(
+            user=user_active, project=self.project, role=2
+        )
+        ProjectPermission.all_objects.create(
+            user=user_removed, project=self.project, role=2, is_deleted=True
+        )
+
+        room_active = Room.objects.create(
+            queue=self.queue,
+            contact=self.contact,
+            project_uuid=self.project.uuid,
+            is_active=False,
+            ended_at=timezone.now(),
+            user=user_active,
+        )
+        room_removed = Room.objects.create(
+            queue=self.queue,
+            contact=self.contact,
+            project_uuid=self.project.uuid,
+            is_active=False,
+            ended_at=timezone.now(),
+            user=user_removed,
+        )
+
+        CSATSurvey.objects.create(
+            room=room_active, rating=5, answered_on=timezone.now()
+        )
+        CSATSurvey.objects.create(
+            room=room_removed, rating=3, answered_on=timezone.now()
+        )
+
+        filters = Filters()
+        general_csat, agents_csat = self.repository.get_agents_csat_score(
+            filters, self.project
+        )
+
+        agents_by_email = {a.email: a for a in agents_csat}
+        self.assertIn("active@test.com", agents_by_email)
+        self.assertIn("removed@test.com", agents_by_email)
+
+        self.assertFalse(agents_by_email["active@test.com"].is_deleted)
+        self.assertTrue(agents_by_email["removed@test.com"].is_deleted)
+
+        self.assertEqual(agents_by_email["active@test.com"].avg_rating, 5.0)
+        self.assertEqual(agents_by_email["removed@test.com"].avg_rating, 3.0)
 
 
 class CSATRepositoryTest(TestCase):

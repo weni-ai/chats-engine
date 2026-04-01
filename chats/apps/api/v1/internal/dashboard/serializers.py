@@ -160,6 +160,7 @@ class DashboardCSATScoreByAgentsSerializer(serializers.Serializer):
         return {
             "name": name,
             "email": obj.email,
+            "is_deleted": obj.is_deleted,
         }
 
     def get_rooms(self, obj: User):
