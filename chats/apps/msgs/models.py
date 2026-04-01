@@ -1,6 +1,7 @@
 import json
 import logging
 
+import requests
 import sentry_sdk
 from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
@@ -259,10 +260,10 @@ class MessageMedia(BaseModelWithManualCreatedOn):
         return url
 
     @property
-    def public_url(self):
-        if self.media_file:
-            return self.media_file.url
-
+    def is_flows_media_url_feature_active(self):
+        """
+        Check if the use flows media url feature flag is active.
+        """
         try:
             project_uuid = self.message.room.queue.sector.project.uuid
             use_flows_media_url = is_feature_active_for_attributes(
@@ -276,12 +277,41 @@ class MessageMedia(BaseModelWithManualCreatedOn):
             logger.error(
                 f"Error checking if use flows media url feature flag is active: {e}"
             )
+            return False
+
+        return use_flows_media_url
+
+    @property
+    def public_url(self):
+        """
+        Get the public media url.
+        """
+        if self.media_file:
+            return self.media_file.url
+
+        if self.is_flows_media_url_feature_active:
+            return self.get_flows_media_url(self.url)
+        else:
             return self.url
 
-        if not use_flows_media_url:
-            return self.url
+    @property
+    def final_media_url(self):
+        """
+        Get the final media url after following redirects.
+        """
+        if self.media_file:
+            return self.media_file.url
 
-        return self.get_flows_media_url(self.media_url)
+        if self.is_flows_media_url_feature_active:
+            try:
+                response = requests.head(self.url, allow_redirects=True)
+                return response.url
+            except Exception as e:
+                capture_exception(e)
+                logger.error(f"Error getting final media url: {e}")
+                return self.url
+        else:
+            return self.url
 
     def get_flows_media_url(self, original_url: str):
         object_key = get_object_key(original_url)
