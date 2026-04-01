@@ -5,7 +5,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 from django.test import override_settings
 from rest_framework.response import Response
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from chats.apps.accounts.models import User
 from chats.apps.contacts.models import Contact
@@ -726,3 +726,178 @@ class QueueEndAllChatsTests(APITestCase):
         self.assertFalse(active_room.is_active)
         closed_room.refresh_from_db()
         self.assertFalse(closed_room.is_active)
+
+
+class QueueTransferOnDeleteTests(APITestCase):
+
+    def setUp(self):
+        self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            project=self.project,
+            name="Test Sector",
+            rooms_limit=5,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(name="Queue To Delete", sector=self.sector)
+        self.target_queue = Queue.objects.create(
+            name="Target Queue", sector=self.sector
+        )
+        self.contact = Contact.objects.create(
+            external_id="ext-transfer-q1", name="Contact T1"
+        )
+        self.contact_2 = Contact.objects.create(
+            external_id="ext-transfer-q2", name="Contact T2"
+        )
+
+        self.user = User.objects.create(email="admin@transfer-queue.test")
+        self.agent = User.objects.create(email="agent@transfer-queue.test")
+        self.client.force_authenticate(user=self.user)
+
+    def _delete_queue(self, queue_uuid, transfer_to_queue=None, end_all_chats=False):
+        url = reverse("queue-detail", args=[queue_uuid])
+        params = []
+        if transfer_to_queue:
+            params.append(f"transfer_to_queue={transfer_to_queue}")
+        if end_all_chats:
+            params.append("end_all_chats=true")
+        if params:
+            url += "?" + "&".join(params)
+        return self.client.delete(url)
+
+    @with_project_permission()
+    def test_transfer_succeeds_and_queue_is_deleted(self):
+        room = Room.objects.create(
+            contact=self.contact,
+            queue=self.queue,
+            user=self.agent,
+            is_active=True,
+        )
+        response = self._delete_queue(
+            self.queue.uuid, transfer_to_queue=self.target_queue.uuid
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["is_deleted"])
+        self.assertIsNotNone(response.data["transfer"])
+        self.assertEqual(response.data["transfer"]["success_count"], 1)
+        self.assertEqual(response.data["transfer"]["failed_count"], 0)
+
+        room.refresh_from_db()
+        self.assertEqual(room.queue, self.target_queue)
+        self.assertTrue(room.is_active)
+        self.assertFalse(Queue.objects.filter(uuid=self.queue.uuid).exists())
+
+    @with_project_permission()
+    def test_transfer_failure_aborts_deletion(self):
+        room = Room.objects.create(
+            contact=self.contact,
+            queue=self.queue,
+            user=self.agent,
+            is_active=True,
+        )
+        with patch(
+            "chats.apps.api.v1.queues.viewsets.BulkTransferService.transfer"
+        ) as mock_transfer:
+            mock_result = MagicMock()
+            mock_result.failed_count = 1
+            mock_result.success_count = 0
+            mock_result.to_dict.return_value = {
+                "success_count": 0,
+                "failed_count": 1,
+                "total_processed": 1,
+                "errors": ["Room failed"],
+                "failed_rooms": [str(room.uuid)],
+                "has_more_errors": False,
+            }
+            mock_transfer.return_value = mock_result
+
+            response = self._delete_queue(
+                self.queue.uuid, transfer_to_queue=self.target_queue.uuid
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertIn("transfer", response.data)
+        self.assertEqual(response.data["transfer"]["failed_count"], 1)
+        self.assertTrue(Queue.objects.filter(uuid=self.queue.uuid).exists())
+
+    @with_project_permission()
+    def test_target_queue_not_found(self):
+        response = self._delete_queue(
+            self.queue.uuid, transfer_to_queue=str(uuid.uuid4())
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertTrue(Queue.objects.filter(uuid=self.queue.uuid).exists())
+
+    @with_project_permission()
+    def test_target_queue_is_same_as_source(self):
+        response = self._delete_queue(
+            self.queue.uuid, transfer_to_queue=self.queue.uuid
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(Queue.objects.filter(uuid=self.queue.uuid).exists())
+
+    @with_project_permission()
+    def test_target_queue_in_different_project(self):
+        other_project = Project.objects.create(name="Other Project")
+        other_sector = Sector.objects.create(
+            project=other_project,
+            name="Other Sector",
+            rooms_limit=5,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        other_queue = Queue.objects.create(
+            name="Other Queue", sector=other_sector
+        )
+        response = self._delete_queue(
+            self.queue.uuid, transfer_to_queue=other_queue.uuid
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(Queue.objects.filter(uuid=self.queue.uuid).exists())
+
+    @with_project_permission()
+    def test_transfer_and_end_all_chats_are_mutually_exclusive(self):
+        response = self._delete_queue(
+            self.queue.uuid,
+            transfer_to_queue=self.target_queue.uuid,
+            end_all_chats=True,
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(Queue.objects.filter(uuid=self.queue.uuid).exists())
+
+    @with_project_permission()
+    def test_transfer_no_active_rooms_deletes_queue(self):
+        response = self._delete_queue(
+            self.queue.uuid, transfer_to_queue=self.target_queue.uuid
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["is_deleted"])
+        self.assertIsNone(response.data["transfer"])
+        self.assertFalse(Queue.objects.filter(uuid=self.queue.uuid).exists())
+
+    @with_project_permission()
+    def test_transfer_only_affects_rooms_in_deleted_queue(self):
+        room_target = Room.objects.create(
+            contact=self.contact,
+            queue=self.queue,
+            user=self.agent,
+            is_active=True,
+        )
+        room_other = Room.objects.create(
+            contact=self.contact_2,
+            queue=self.target_queue,
+            user=self.agent,
+            is_active=True,
+        )
+        response = self._delete_queue(
+            self.queue.uuid, transfer_to_queue=self.target_queue.uuid
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["transfer"]["success_count"], 1)
+
+        room_target.refresh_from_db()
+        self.assertEqual(room_target.queue, self.target_queue)
+
+        room_other.refresh_from_db()
+        self.assertEqual(room_other.queue, self.target_queue)
+        self.assertTrue(room_other.is_active)
