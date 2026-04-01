@@ -554,7 +554,7 @@ class AgentRepository:
 
     def _get_csat_agents(self, filters: Filters, project: Project) -> QuerySet[User]:
         agents = User.objects.filter(
-            pk__in=ProjectPermission.all_objects.filter(project=project).values_list(
+            email__in=ProjectPermission.all_objects.filter(project=project).values_list(
                 "user_id", flat=True
             )
         ).annotate(
