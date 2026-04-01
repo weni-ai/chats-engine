@@ -151,16 +151,15 @@ class TestArchiveChatsService(TestCase):
             archive_process_finished_at=timezone.now(),
             messages_deleted_at=timezone.now(),
         )
-        messages_data = self.service.process_messages(archived_conversation)
+        messages_data = list(self.service.process_messages(archived_conversation))
 
         archived_conversation.refresh_from_db()
         self.assertEqual(
             archived_conversation.status,
-            ArchiveConversationsJobStatus.MESSAGES_PROCESSED,
+            ArchiveConversationsJobStatus.PROCESSING_MESSAGES,
         )
         self.assertIsNotNone(archived_conversation.archive_process_started_at)
 
-        self.assertIsInstance(messages_data, list)
         self.assertEqual(len(messages_data), 4)
 
         for i, message in enumerate(messages):
@@ -221,7 +220,7 @@ class TestArchiveChatsService(TestCase):
             ArchiveMessageSerializer(message_b).data,
         ]
 
-        archived_conversation.status = ArchiveConversationsJobStatus.MESSAGES_PROCESSED
+        archived_conversation.status = ArchiveConversationsJobStatus.PROCESSING_MESSAGES
         archived_conversation.save(update_fields=["status"])
 
         self.service.upload_messages_file(
@@ -248,7 +247,7 @@ class TestArchiveChatsService(TestCase):
         self.assertEqual(json.loads(lines[0]), messages[0])
         self.assertEqual(json.loads(lines[1]), messages[1])
 
-    def test_upload_messages_file_when_status_is_not_messages_processed(self):
+    def test_upload_messages_file_when_status_is_not_processing_messages(self):
         archived_conversation = RoomArchivedConversation.objects.create(
             job=self.service.start_archive_job(),
             room=self.room,
@@ -263,7 +262,7 @@ class TestArchiveChatsService(TestCase):
 
         self.assertEqual(
             context.exception.message,
-            f"Room archived conversation {archived_conversation.uuid} is not in messages processed status",
+            f"Room archived conversation {archived_conversation.uuid} is not in processing messages status",
         )
 
         archived_conversation.refresh_from_db()
