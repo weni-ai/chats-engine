@@ -169,27 +169,27 @@ class AuthorizationManagerFilterTestCase(TestCase):
     @patch("chats.apps.projects.models.signals.requeue_agent_rooms_task")
     def test_sector_auth_visible_when_permission_active(self, mock_task):
         self.assertTrue(
-            SectorAuthorization.objects.filter(pk=self.sector_auth.pk).exists()
+            SectorAuthorization.all_objects.filter(pk=self.sector_auth.pk).exists()
         )
 
     @patch("chats.apps.projects.models.signals.requeue_agent_rooms_task")
     def test_queue_auth_visible_when_permission_active(self, mock_task):
         self.assertTrue(
-            QueueAuthorization.objects.filter(pk=self.queue_auth.pk).exists()
+            QueueAuthorization.all_objects.filter(pk=self.queue_auth.pk).exists()
         )
 
     @patch("chats.apps.projects.models.signals.requeue_agent_rooms_task")
     def test_sector_auth_hidden_when_permission_soft_deleted(self, mock_task):
         self.permission.delete()
         self.assertFalse(
-            SectorAuthorization.objects.filter(pk=self.sector_auth.pk).exists()
+            SectorAuthorization.all_objects.filter(pk=self.sector_auth.pk).exists()
         )
 
     @patch("chats.apps.projects.models.signals.requeue_agent_rooms_task")
     def test_queue_auth_hidden_when_permission_soft_deleted(self, mock_task):
         self.permission.delete()
         self.assertFalse(
-            QueueAuthorization.objects.filter(pk=self.queue_auth.pk).exists()
+            QueueAuthorization.all_objects.filter(pk=self.queue_auth.pk).exists()
         )
 
     @patch("chats.apps.projects.models.signals.requeue_agent_rooms_task")
@@ -212,8 +212,8 @@ class AuthorizationManagerFilterTestCase(TestCase):
         self.permission.delete()
 
         self.assertTrue(
-            SectorAuthorization.objects.filter(pk=other_sector_auth.pk).exists()
+            SectorAuthorization.all_objects.filter(pk=other_sector_auth.pk).exists()
         )
         self.assertTrue(
-            QueueAuthorization.objects.filter(pk=other_queue_auth.pk).exists()
+            QueueAuthorization.all_objects.filter(pk=other_queue_auth.pk).exists()
         )
