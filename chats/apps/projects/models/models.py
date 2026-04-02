@@ -175,7 +175,7 @@ class Project(BaseConfigurableModel, BaseModel):
 
     def get_permission(self, user):
         try:
-            return self.permissions.get(user=user)
+            return self.permissions.get(user=user, is_deleted=False)
         except ProjectPermission.DoesNotExist:
             return None
 
@@ -224,7 +224,9 @@ class Project(BaseConfigurableModel, BaseModel):
     @property
     def admins(self):
         return User.objects.filter(
-            project_permissions__project=self, project_permissions__role=1
+            project_permissions__project=self,
+            project_permissions__role=1,
+            project_permissions__is_deleted=False,
         )
 
     @property
@@ -233,6 +235,7 @@ class Project(BaseConfigurableModel, BaseModel):
             project_permissions__project=self,
             project_permissions__role=1,
             project_permissions__status="ONLINE",
+            project_permissions__is_deleted=False,
         )
 
     @property
