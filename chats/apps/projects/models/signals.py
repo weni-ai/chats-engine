@@ -33,6 +33,7 @@ def track_permission_soft_delete(sender, instance, **kwargs):
         return
 
     instance._was_soft_deleted = not old.is_deleted and instance.is_deleted
+    print(f"{instance.user.email} was_soft_deleted: {instance._was_soft_deleted}")
 
 
 @receiver(post_save, sender=ProjectPermission)
@@ -43,6 +44,9 @@ def handle_permission_soft_delete(sender, instance, **kwargs):
     - Remove their queue and sector authorizations
     """
     if not getattr(instance, "_was_soft_deleted", False):
+        print(
+            f"{instance.user.email} not was_soft_deleted: {instance._was_soft_deleted}"
+        )
         return
 
     requeue_agent_rooms_task.delay(
@@ -51,3 +55,4 @@ def handle_permission_soft_delete(sender, instance, **kwargs):
     )
     SectorAuthorization.objects.filter(permission=instance).delete()
     QueueAuthorization.objects.filter(permission=instance).delete()
+    print(f"{instance.user.email} authorizations deleted")
