@@ -371,6 +371,7 @@ class SectorAuthorization(BaseModel):
     )
 
     objects = SectorAuthorizationManager()
+    all_objects = SectorAuthorizationManager(include_deleted=True)
 
     class Meta:
         verbose_name = _("Sector Authorization")

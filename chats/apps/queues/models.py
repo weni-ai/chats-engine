@@ -310,6 +310,7 @@ class QueueAuthorization(BaseModel):
     )
 
     objects = QueueAuthorizationManager()
+    all_objects = QueueAuthorizationManager(include_deleted=True)
 
     class Meta:
         verbose_name = _("Sector Queue Authorization")

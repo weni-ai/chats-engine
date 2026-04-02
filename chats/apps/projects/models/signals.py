@@ -53,6 +53,5 @@ def handle_permission_soft_delete(sender, instance, **kwargs):
         str(instance.user.email),
         str(instance.project.uuid),
     )
-    SectorAuthorization.objects.filter(permission=instance).delete()
-    QueueAuthorization.objects.filter(permission=instance).delete()
-    print(f"{instance.user.email} authorizations deleted")
+    SectorAuthorization.all_objects.filter(permission=instance).delete()
+    QueueAuthorization.all_objects.filter(permission=instance).delete()
