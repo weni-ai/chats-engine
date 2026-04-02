@@ -66,11 +66,15 @@ class InternalListRoomsViewSetV2(viewsets.ReadOnlyModelViewSet):
     pagination_class.page_size = 5
 
     def get_queryset(self):
-        queryset = super().get_queryset().select_related(
-            "user",
-            "queue",
-            "queue__sector",
-            "queue__sector__project",
+        queryset = (
+            super()
+            .get_queryset()
+            .select_related(
+                "user",
+                "queue",
+                "queue__sector",
+                "queue__sector__project",
+            )
         )
 
         annotations = {
@@ -131,4 +135,4 @@ class InternalListRoomsViewSetV2(viewsets.ReadOnlyModelViewSet):
 
         queryset = queryset.annotate(**annotations)
 
-        return queryset.filter(queue__is_deleted=False, queue__sector__is_deleted=False)
+        return queryset
