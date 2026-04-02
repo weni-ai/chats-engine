@@ -215,7 +215,7 @@ class QueueViewset(ModelViewSet):
         queue_agents = agents.filter(
             project_permissions__queue_authorizations__role=1,
             project_permissions__queue_authorizations__queue=instance,
-        )
+        ).exclude(project_permissions__is_deleted=True)
 
         sector = Sector.objects.get(queues=instance)
         sector_agents = sector.managers
