@@ -18,7 +18,7 @@ from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteMo
 # Threshold for considering an agent as "recently seen" (in seconds)
 LAST_SEEN_THRESHOLD_SECONDS = 60
 
-from .queue_managers import QueueManager
+from .queue_managers import QueueAuthorizationManager, QueueManager
 
 # Threshold for considering an agent as "recently seen" (in seconds)
 # Should be greater than WS_LAST_SEEN_UPDATE_INTERVAL_SECONDS to avoid false negatives
@@ -97,6 +97,7 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         return User.objects.filter(
             project_permissions__project=self.sector.project,
             project_permissions__queue_authorizations__queue=self,
+            project_permissions__is_deleted=False,
         )
 
     def _is_ping_timeout_feature_enabled(self) -> bool:
@@ -307,6 +308,8 @@ class QueueAuthorization(BaseModel):
         related_name="queue_authorizations",
         on_delete=models.CASCADE,
     )
+
+    objects = QueueAuthorizationManager()
 
     class Meta:
         verbose_name = _("Sector Queue Authorization")
