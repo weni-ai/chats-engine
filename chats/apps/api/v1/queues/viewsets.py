@@ -24,6 +24,7 @@ from chats.apps.api.v1.queues.filters import QueueAuthorizationFilter, QueueFilt
 from chats.apps.projects.models.models import Project
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorGroupSector
 from chats.apps.sectors.usecases.group_sector_authorization import (
     QueueGroupSectorAuthorizationCreationUseCase,
@@ -54,6 +55,8 @@ class QueueViewset(ModelViewSet):
         permission_classes = self.permission_classes
         if self.action in ["list", "transfer_agents"]:
             permission_classes = [IsAuthenticated, ProjectAnyPermission]
+        elif self.action == "rooms_count":
+            permission_classes = [IsAuthenticated]
         else:
             permission_classes = [IsAuthenticated, IsSectorManager]
 
@@ -249,6 +252,16 @@ class QueueViewset(ModelViewSet):
         )
 
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["GET"], url_path="rooms_count")
+    def rooms_count(self, request, *args, **kwargs):
+        instance = self.get_object()
+        queryset = Room.objects.filter(queue=instance, is_active=True)
+        waiting = queryset.filter(user__isnull=True).count()
+        in_service = queryset.filter(user__isnull=False).count()
+        return Response(
+            {"waiting": waiting, "in_service": in_service}, status=status.HTTP_200_OK
+        )
 
     @action(detail=False, methods=["GET"])
     def list_queue_permissions(self, request, *args, **kwargs):
