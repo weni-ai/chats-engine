@@ -47,6 +47,9 @@ def start_archive_rooms_messages():
         rooms_query = rooms_query.filter(queue__sector__project__in=projects)
 
     rooms = rooms_query.order_by("ended_at")[: settings.ARCHIVE_CHATS_MAX_ROOMS]
+    rooms_count = len(rooms)
+
+    logger.info(f"[start_archive_rooms_messages] Found {rooms_count} rooms to archive")
 
     expiration_dt = calculate_archive_task_expiration_dt(
         settings.ARCHIVE_CHATS_MAX_HOUR
