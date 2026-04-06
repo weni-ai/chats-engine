@@ -55,15 +55,53 @@ class RoomSerializer(serializers.ModelSerializer):
     can_edit_custom_fields = serializers.SerializerMethodField()
     config = serializers.JSONField(required=False, read_only=True)
     imported_history_url = serializers.CharField(read_only=True, default="")
-    full_transfer_history = serializers.JSONField(
-        required=False, read_only=True, default=list
-    )
     added_to_queue_at = serializers.DateTimeField(read_only=True)
     has_history = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
-        fields = "__all__"
+        fields = [
+            "added_to_queue_at",
+            "automatic_message_sent_at",
+            "callback_url",
+            "can_edit_custom_fields",
+            "closed_by",
+            "config",
+            "contact",
+            "created_on",
+            "custom_fields",
+            "ended_at",
+            "ended_by",
+            "first_user_assigned_at",
+            "flowstart_data",
+            "has_history",
+            "imported_history_url",
+            "is_24h_valid",
+            "is_active",
+            "is_waiting",
+            "last_interaction",
+            "last_message",
+            "last_message_contact",
+            "last_message_media",
+            "last_message_text",
+            "last_message_user",
+            "last_unread_message_at",
+            "linked_user",
+            "modified_on",
+            "project_uuid",
+            "protocol",
+            "queue",
+            "service_chat",
+            "tags",
+            "ticket_uuid",
+            "transfer_history",
+            "unread_messages_count",
+            "unread_msgs",
+            "urn",
+            "user",
+            "user_assigned_at",
+            "uuid",
+        ]
         read_only_fields = [
             "created_on",
             "ended_at",
@@ -74,7 +112,6 @@ class RoomSerializer(serializers.ModelSerializer):
             "last_interaction",
             "can_edit_custom_fields",
             "imported_history_url",
-            "full_transfer_history",
             "added_to_queue_at",
             "has_history",
             "unread_msgs",
@@ -109,12 +146,14 @@ class RoomSerializer(serializers.ModelSerializer):
                 "uuid": room.last_message.uuid,
                 "text": room.last_message_text or "",
                 "created_on": room.last_interaction,
-                "user": room.last_message_user.email
-                if room.last_message_user
-                else None,
-                "contact": room.last_message_contact.uuid
-                if room.last_message_contact
-                else None,
+                "user": (
+                    room.last_message_user.email if room.last_message_user else None
+                ),
+                "contact": (
+                    room.last_message_contact.uuid
+                    if room.last_message_contact
+                    else None
+                ),
                 "media": room.last_message_media or [],
             }
         return None
@@ -230,12 +269,14 @@ class ListRoomSerializer(serializers.ModelSerializer):
                 "uuid": room.last_message.uuid,
                 "text": room.last_message_text or "",
                 "created_on": room.last_interaction,
-                "user": room.last_message_user.email
-                if room.last_message_user
-                else None,
-                "contact": room.last_message_contact.uuid
-                if room.last_message_contact
-                else None,
+                "user": (
+                    room.last_message_user.email if room.last_message_user else None
+                ),
+                "contact": (
+                    room.last_message_contact.uuid
+                    if room.last_message_contact
+                    else None
+                ),
                 "media": room.last_message_media or [],
             }
         return {
@@ -653,9 +694,7 @@ class BulkTransferSerializer(serializers.Serializer):
 
     def validate_rooms_list(self, value):
         if not value:
-            raise serializers.ValidationError(
-                _("At least one room is required")
-            )
+            raise serializers.ValidationError(_("At least one room is required"))
 
         max_rooms = getattr(settings, "BULK_TRANSFER_MAX_ROOMS", 200)
         if len(value) > max_rooms:
@@ -692,9 +731,7 @@ class BulkTakeSerializer(serializers.Serializer):
 
     def validate_rooms_list(self, value):
         if not value:
-            raise serializers.ValidationError(
-                _("At least one room is required")
-            )
+            raise serializers.ValidationError(_("At least one room is required"))
 
         max_rooms = getattr(settings, "BULK_TAKE_MAX_ROOMS", 200)
         if len(value) > max_rooms:
@@ -715,21 +752,20 @@ class BulkTakeSerializer(serializers.Serializer):
             user__isnull=True,
         )
         if not rooms.exists():
-            raise serializers.ValidationError(
-                _("No available rooms found in queue")
-            )
+            raise serializers.ValidationError(_("No available rooms found in queue"))
         attrs["rooms"] = rooms
         return super().validate(attrs)
 
 
 class RoomToCloseSerializer(serializers.Serializer):
     """Serializer for individual room to close with its specific tags"""
+
     uuid = serializers.UUIDField(required=True, help_text="Room UUID to close")
     tags = serializers.ListField(
         child=serializers.UUIDField(),
         required=False,
         default=list,
-        help_text="List of tag UUIDs to apply to this specific room"
+        help_text="List of tag UUIDs to apply to this specific room",
     )
 
 
@@ -738,19 +774,19 @@ class BulkCloseSerializer(serializers.Serializer):
         child=RoomToCloseSerializer(),
         min_length=1,
         required=True,
-        help_text="List of rooms to close with their specific tags"
+        help_text="List of rooms to close with their specific tags",
     )
     end_by = serializers.CharField(
         max_length=50,
         required=False,
         default="",
         allow_blank=True,
-        help_text="Indicator of who/what closed the rooms (e.g., 'agent', 'system', 'timeout')"
+        help_text="Indicator of who/what closed the rooms (e.g., 'agent', 'system', 'timeout')",
     )
     closed_by_email = serializers.EmailField(
         required=False,
         allow_null=True,
-        help_text="Email of the user who closed the rooms"
+        help_text="Email of the user who closed the rooms",
     )
 
     def validate_rooms(self, value):
@@ -772,13 +808,15 @@ class BulkCloseSerializer(serializers.Serializer):
             raise serializers.ValidationError("Duplicate room UUIDs found")
 
         # Check that rooms exist and are active
-        existing_rooms = Room.objects.filter(uuid__in=room_uuids, is_active=True).select_related(
-            "queue__sector"
-        )
+        existing_rooms = Room.objects.filter(
+            uuid__in=room_uuids, is_active=True
+        ).select_related("queue__sector")
         existing_room_uuids = {str(room.uuid) for room in existing_rooms}
 
         if not existing_room_uuids:
-            raise serializers.ValidationError("No active rooms found with the provided UUIDs")
+            raise serializers.ValidationError(
+                "No active rooms found with the provided UUIDs"
+            )
 
         if len(existing_room_uuids) < len(room_uuids):
             logger.warning(
@@ -786,7 +824,9 @@ class BulkCloseSerializer(serializers.Serializer):
             )
 
         # Validate tags for each room
-        room_uuid_to_sector = {str(room.uuid): room.queue.sector for room in existing_rooms}
+        room_uuid_to_sector = {
+            str(room.uuid): room.queue.sector for room in existing_rooms
+        }
 
         for room_data in value:
             room_uuid = str(room_data["uuid"])
@@ -801,8 +841,7 @@ class BulkCloseSerializer(serializers.Serializer):
                 # Validate that tags exist and belong to the room's sector
                 tag_uuids = [str(tag_uuid) for tag_uuid in tags]
                 existing_tags = SectorTag.objects.filter(
-                    uuid__in=tag_uuids,
-                    sector=sector
+                    uuid__in=tag_uuids, sector=sector
                 )
                 existing_tag_uuids = {str(tag.uuid) for tag in existing_tags}
 
@@ -842,19 +881,20 @@ class BulkCloseSerializer(serializers.Serializer):
 
             # Get all unique projects from the rooms
             rooms_qs = Room.objects.filter(
-                uuid__in=room_uuids,
-                is_active=True
+                uuid__in=room_uuids, is_active=True
             ).select_related("queue__sector__project")
 
             project_uuids = set(
-                rooms_qs.values_list("queue__sector__project__uuid", flat=True).distinct()
+                rooms_qs.values_list(
+                    "queue__sector__project__uuid", flat=True
+                ).distinct()
             )
 
             # Get user's project permissions
             user_project_uuids = set(
-                ProjectPermission.objects.filter(
-                    user=request.user
-                ).values_list("project__uuid", flat=True)
+                ProjectPermission.objects.filter(user=request.user).values_list(
+                    "project__uuid", flat=True
+                )
             )
 
             # Check if user has permission for all projects
@@ -867,9 +907,9 @@ class BulkCloseSerializer(serializers.Serializer):
             # If closed_by is provided, validate they have permission too
             if closed_by:
                 closed_by_project_uuids = set(
-                    ProjectPermission.objects.filter(
-                        user=closed_by
-                    ).values_list("project__uuid", flat=True)
+                    ProjectPermission.objects.filter(user=closed_by).values_list(
+                        "project__uuid", flat=True
+                    )
                 )
 
                 unauthorized_for_closed_by = project_uuids - closed_by_project_uuids
