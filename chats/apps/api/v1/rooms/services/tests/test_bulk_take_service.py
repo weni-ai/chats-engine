@@ -158,8 +158,8 @@ class BulkTakeServiceTestCase(TestCase):
     @patch("chats.apps.api.v1.rooms.services.bulk_take_service.create_room_feedback_message")
     @patch("chats.utils.websockets.send_channels_group")
     def test_feedback_message_created_for_each_room(self, mock_ws, mock_feedback, mock_waiting, mock_routing):
-        room1 = Room.objects.create(queue=self.queue, contact=self.contact1, is_active=True)
-        room2 = Room.objects.create(queue=self.queue, contact=self.contact2, is_active=True)
+        Room.objects.create(queue=self.queue, contact=self.contact1, is_active=True)
+        Room.objects.create(queue=self.queue, contact=self.contact2, is_active=True)
 
         self.service.take(Room.objects.filter(is_active=True), self.agent)
 
@@ -218,7 +218,9 @@ class BulkTakeServiceTestCase(TestCase):
     @patch("chats.apps.api.v1.rooms.services.bulk_take_service.calculate_last_queue_waiting_time", return_value=0)
     @patch("chats.apps.api.v1.rooms.services.bulk_take_service.create_room_feedback_message")
     @patch("chats.utils.websockets.send_channels_group")
-    def test_post_take_ws_failure_does_not_count_as_take_failure(self, mock_ws, mock_feedback, mock_waiting, mock_routing):
+    def test_post_take_ws_failure_does_not_count_as_take_failure(
+        self, mock_ws, mock_feedback, mock_waiting, mock_routing
+    ):
         mock_ws.side_effect = Exception("WS down")
         room = Room.objects.create(
             queue=self.queue, contact=self.contact1, is_active=True
