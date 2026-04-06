@@ -2,6 +2,7 @@ import logging
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import exceptions, filters, status
 from rest_framework.decorators import action
@@ -246,6 +247,89 @@ class QueueViewset(ModelViewSet):
         )
 
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["POST"])
+    def bulk_create(self, request, *args, **kwargs):
+        serializer = queue_serializers.BulkQueueCreateSerializer(
+            data=request.data, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+
+        sector = serializer.validated_data["sector"]
+        queues_data = serializer.validated_data["queues"]
+
+        project = Project.objects.get(uuid=sector.project.uuid)
+        use_group_sectors = SectorGroupSector.objects.filter(sector=sector).exists()
+        should_use_integration = (
+            project.config
+            and project.config.get("its_principal", False)
+            and sector.secondary_project
+        )
+
+        created_queues = []
+
+        with transaction.atomic():
+            for queue_data in queues_data:
+                queue_limit_data = queue_data.pop("queue_limit", None)
+                queue = Queue.objects.create(
+                    sector=sector,
+                    name=queue_data["name"],
+                    default_message=queue_data.get("default_message"),
+                    config=queue_data.get("config"),
+                    queue_limit=queue_limit_data.get("limit") if queue_limit_data else None,
+                    is_queue_limit_active=queue_limit_data.get("is_active", False) if queue_limit_data else False,
+                )
+
+                if use_group_sectors:
+                    QueueGroupSectorAuthorizationCreationUseCase(queue).execute()
+
+                created_queues.append(queue)
+
+        if not settings.USE_WENI_FLOWS:
+            return Response(
+                queue_serializers.QueueSerializer(
+                    created_queues, many=True, context={"request": request}
+                ).data,
+                status=status.HTTP_201_CREATED,
+            )
+
+        flows_registered = []
+        try:
+            for queue in created_queues:
+                if should_use_integration:
+                    IntegratedTicketers().integrate_individual_topic(
+                        project, sector.secondary_project
+                    )
+                else:
+                    content = {
+                        "uuid": str(queue.uuid),
+                        "name": queue.name,
+                        "sector_uuid": str(sector.uuid),
+                        "project_uuid": str(project.uuid),
+                    }
+                    response = FlowRESTClient().create_queue(**content)
+                    if response.status_code not in [
+                        status.HTTP_200_OK,
+                        status.HTTP_201_CREATED,
+                    ]:
+                        raise exceptions.APIException(
+                            detail=f"[{response.status_code}] Error posting the queue on flows. Exception: {response.content}"
+                        )
+                    flows_registered.append(queue)
+        except exceptions.APIException:
+            for registered_queue in flows_registered:
+                FlowRESTClient().destroy_queue(
+                    uuid=str(registered_queue.uuid),
+                    sector_uuid=str(sector.uuid),
+                    project_uuid=str(project.uuid),
+                )
+            Queue.objects.filter(pk__in=[q.pk for q in created_queues]).delete()
+            raise
+
+        response_serializer = queue_serializers.QueueSerializer(
+            created_queues, many=True, context={"request": request}
+        )
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=["GET"])
     def list_queue_permissions(self, request, *args, **kwargs):
