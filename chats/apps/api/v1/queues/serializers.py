@@ -6,6 +6,7 @@ from weni.feature_flags.shortcuts import is_feature_active
 from django.conf import settings
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.sectors.models import Sector
 
 User = get_user_model()
 
@@ -224,5 +225,71 @@ class QueuePermissionsListQueryParamsSerializer(serializers.Serializer):
 
         if project is None or project == "":
             data.pop("project")
+
+        return data
+
+
+class BulkQueueItemSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=150)
+    default_message = serializers.CharField(
+        required=False, allow_null=True, allow_blank=True
+    )
+    config = serializers.JSONField(required=False, allow_null=True)
+    queue_limit = QueueLimitSerializer(required=False, allow_null=True)
+
+
+class BulkQueueCreateSerializer(serializers.Serializer):
+    sector = serializers.PrimaryKeyRelatedField(
+        queryset=Sector.objects.filter(is_deleted=False),
+        pk_field=serializers.UUIDField(format="hex_verbose"),
+    )
+    queues = BulkQueueItemSerializer(many=True)
+
+    def validate(self, data):
+        sector = data["sector"]
+        queues = data["queues"]
+
+        if not queues:
+            raise serializers.ValidationError(
+                {"queues": _("At least one queue is required.")}
+            )
+
+        names = [q["name"] for q in queues]
+
+        if len(names) != len(set(names)):
+            raise serializers.ValidationError(
+                {"queues": _("There are duplicate queue names in the request.")}
+            )
+
+        existing = list(
+            Queue.objects.filter(
+                sector=sector, name__in=names, is_deleted=False
+            ).values_list("name", flat=True)
+        )
+        if existing:
+            raise serializers.ValidationError(
+                {
+                    "queues": f"{_('Queue(s) already exist in this sector')}: {', '.join(existing)}."
+                }
+            )
+
+        request = self.context.get("request")
+        if request:
+            is_queue_limit_feature_active = is_feature_active(
+                settings.QUEUE_LIMIT_FEATURE_FLAG_KEY,
+                request.user.email,
+                str(sector.project.uuid),
+            )
+            for queue_data in queues:
+                queue_limit = queue_data.get("queue_limit")
+                if (
+                    queue_limit
+                    and not is_queue_limit_feature_active
+                    and queue_limit.get("is_active") is True
+                ):
+                    raise serializers.ValidationError(
+                        {"detail": _("Queue limit feature is not active.")},
+                        code="queue_limit_feature_flag_is_off",
+                    )
 
         return data
