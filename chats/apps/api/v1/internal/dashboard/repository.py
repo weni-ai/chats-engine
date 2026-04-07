@@ -39,7 +39,7 @@ class AgentRepository:
     def __init__(self):
         self.model = User.objects
 
-    def get_agents_data(self, filters: Filters, project):
+    def get_agents_data(self, filters: Filters, project, include_removed: bool = False):
         tz = project.timezone
         initial_datetime = (
             timezone.now()
@@ -51,6 +51,18 @@ class AgentRepository:
         opened_rooms = {}
 
         agents_filters = Q(project_permissions__project=project) & Q(is_active=True)
+
+        if include_removed:
+            agents_filters = (
+                Q(project_permissions__project=project)
+                | Exists(
+                    ProjectPermission.all_objects.filter(
+                        project=project,
+                        user_id=OuterRef("email"),
+                        is_deleted=True,
+                    )
+                )
+            ) & Q(is_active=True)
 
         if filters.queues:
             rooms_filter["rooms__queue__in"] = filters.queues
@@ -88,7 +100,12 @@ class AgentRepository:
         if filters.agent:
             rooms_filter["rooms__user"] = filters.agent
 
-        project_permission_subquery = ProjectPermission.objects.filter(
+        permission_manager = (
+            ProjectPermission.all_objects
+            if include_removed
+            else ProjectPermission.objects
+        )
+        project_permission_subquery = permission_manager.filter(
             project_id=project,
             user_id=OuterRef("email"),
         ).values("status")[:1]
@@ -183,11 +200,19 @@ class AgentRepository:
             ).exclude(status_type__name__iexact="in-service")
         )
 
+        permission_is_deleted_subquery = ~Exists(
+            ProjectPermission.objects.filter(
+                project=project,
+                user_id=OuterRef("email"),
+            )
+        )
+
         agents_query = (
             agents_query.filter(agents_filters)
             .annotate(
                 status=Subquery(project_permission_subquery),
                 has_active_custom_status=has_active_custom_status_subquery,
+                is_deleted=permission_is_deleted_subquery,
                 status_order=Case(
                     When(status="ONLINE", then=Value(1)),
                     When(
@@ -229,6 +254,17 @@ class AgentRepository:
             .distinct()
         )
 
+        if include_removed:
+            active_permission_exists = Exists(
+                ProjectPermission.objects.filter(
+                    project=project,
+                    user_id=OuterRef("email"),
+                )
+            )
+            agents_query = agents_query.filter(
+                active_permission_exists | Q(closed__gt=0) | Q(opened__gt=0)
+            )
+
         agents_query = agents_query.values(
             "first_name",
             "last_name",
@@ -236,6 +272,7 @@ class AgentRepository:
             "status",
             "status_order",
             "has_active_custom_status",
+            "is_deleted",
             "closed",
             "opened",
             "avg_first_response_time",
