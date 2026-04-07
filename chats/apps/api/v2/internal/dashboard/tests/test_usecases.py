@@ -50,6 +50,7 @@ class InternalDashboardAgentsUsecaseTests(TestCase):
 
         mock_service.get_agents_data.assert_called_once()
         dto, project = mock_service.get_agents_data.call_args[0]
+        kwargs = mock_service.get_agents_data.call_args[1]
 
         self.assertIsInstance(dto, Filters)
         self.assertEqual(dto.start_date, "2024-01-01")
@@ -61,6 +62,7 @@ class InternalDashboardAgentsUsecaseTests(TestCase):
         self.assertEqual(dto.user_request, "user@test.com")
         self.assertEqual(dto.ordering, "status")
         self.assertEqual(project, self.project)
+        self.assertTrue(kwargs.get("include_removed"))
 
     @patch(f"{USECASE_MODULE}.AgentsService")
     def test_execute_with_empty_filters(self, mock_service_cls):
@@ -69,6 +71,7 @@ class InternalDashboardAgentsUsecaseTests(TestCase):
         self.usecase.execute(self.project, {})
 
         dto = mock_service.get_agents_data.call_args[0][0]
+        kwargs = mock_service.get_agents_data.call_args[1]
 
         self.assertIsNone(dto.start_date)
         self.assertIsNone(dto.end_date)
@@ -78,6 +81,7 @@ class InternalDashboardAgentsUsecaseTests(TestCase):
         self.assertIsNone(dto.queues)
         self.assertEqual(dto.user_request, "")
         self.assertIsNone(dto.ordering)
+        self.assertTrue(kwargs.get("include_removed"))
 
     @patch(f"{USECASE_MODULE}.should_exclude_admin_domains")
     @patch(f"{USECASE_MODULE}.AgentsService")

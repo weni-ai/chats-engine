@@ -101,6 +101,7 @@ class TestInternalDashboardViewsetV2AsAuthenticatedUser(
                 "status": "ONLINE",
                 "status_order": 1,
                 "has_active_custom_status": False,
+                "is_deleted": False,
                 "closed": 5,
                 "opened": 2,
                 "avg_first_response_time": 30,
@@ -115,6 +116,8 @@ class TestInternalDashboardViewsetV2AsAuthenticatedUser(
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         results = response.data["results"]
         self.assertEqual(len(results), 1)
-        self.assertEqual(results[0]["agent_email"], "agent1@test.com")
+        self.assertEqual(results[0]["agent"]["email"], "agent1@test.com")
+        self.assertEqual(results[0]["agent"]["name"], "Agent One")
+        self.assertFalse(results[0]["agent"]["is_deleted"])
         self.assertEqual(results[0]["closed"], 5)
         self.assertEqual(results[0]["opened"], 2)

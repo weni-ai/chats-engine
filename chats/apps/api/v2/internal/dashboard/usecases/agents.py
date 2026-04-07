@@ -23,7 +23,9 @@ class InternalDashboardAgentsUsecase:
             ordering=filters.get("ordering"),
         )
 
-        agents_data = AgentsService().get_agents_data(dto, project)
+        agents_data = AgentsService().get_agents_data(
+            dto, project, include_removed=True
+        )
 
         has_filter = False
         combined_q = Q()

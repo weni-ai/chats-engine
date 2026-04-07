@@ -60,6 +60,7 @@ class DashboardAgentsSerializerV2(serializers.Serializer):
         return {
             "name": name,
             "email": obj.get("email"),
+            "is_deleted": obj.get("is_deleted", False),
         }
 
     def get_time_in_service(self, obj):
