@@ -75,6 +75,7 @@ class SectorAuthorizationViewset(viewsets.ModelViewSet):
         serializer.instance.notify_user("update")
 
     def perform_destroy(self, instance):
+        instance.deleted_by = self.request.user
         instance.notify_user("destroy")
         super().perform_destroy(instance)
 

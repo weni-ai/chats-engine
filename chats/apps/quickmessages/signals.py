@@ -16,6 +16,6 @@ def log_quick_message_deletion(sender, instance, **kwargs):
             f"Shortcut: {instance.shortcut} | "
             f"Owner: {instance.user.email}"
         ),
-        deleted_by=None,
+        deleted_by=getattr(instance, "deleted_by", None),
         project=project,
     )

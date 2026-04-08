@@ -319,6 +319,10 @@ class QueueAuthorizationViewset(ModelViewSet):
     def perform_update(self, serializer):
         serializer.save(modified_by=self.request.user)
 
+    def perform_destroy(self, instance):
+        instance.deleted_by = self.request.user
+        super().perform_destroy(instance)
+
     @action(detail=True, methods=["PATCH"])
     def update_queue_permissions(self, request, *args, **kwargs):
         queue_permission = self.get_object()

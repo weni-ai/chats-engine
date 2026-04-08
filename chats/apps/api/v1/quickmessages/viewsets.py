@@ -21,6 +21,10 @@ class QuickMessageViewset(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         serializer.save(modified_by=self.request.user)
 
+    def perform_destroy(self, instance):
+        instance.deleted_by = self.request.user
+        super().perform_destroy(instance)
+
     def update(self, request, *args, **kwargs):
         if self.get_object().user == request.user:
             return super().update(request, *args, **kwargs)
@@ -73,3 +77,7 @@ class SectorQuickMessageViewset(viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         serializer.save(modified_by=self.request.user)
+
+    def perform_destroy(self, instance):
+        instance.deleted_by = self.request.user
+        super().perform_destroy(instance)

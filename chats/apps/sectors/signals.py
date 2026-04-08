@@ -15,6 +15,6 @@ def log_sector_authorization_deletion(sender, instance, **kwargs):
             f"Sector: {instance.sector.name} | "
             f"Manager: {instance.permission.user.email}"
         ),
-        deleted_by=None,
+        deleted_by=getattr(instance, "deleted_by", None),
         project=instance.project,
     )

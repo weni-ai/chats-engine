@@ -15,6 +15,6 @@ def log_queue_authorization_deletion(sender, instance, **kwargs):
             f"Queue: {instance.queue.name} | "
             f"Agent: {instance.permission.user.email}"
         ),
-        deleted_by=None,
+        deleted_by=getattr(instance, "deleted_by", None),
         project=instance.project,
     )
