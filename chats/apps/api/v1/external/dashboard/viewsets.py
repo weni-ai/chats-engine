@@ -87,7 +87,6 @@ class ExternalFinishedRoomsStatusViewSet(viewsets.GenericViewSet):
 
         agent = request.query_params.get("agent")
         if agent:
-            # Room.user uses to_field="email", so filtering by email string works directly
             rooms_filter &= Q(user=agent)
 
         rooms_qs = Room.objects.filter(rooms_filter)
