@@ -12,10 +12,10 @@ https://docs.djangoproject.com/en/4.0/ref/settings/
 
 import os
 from pathlib import Path
-from celery.schedules import crontab
 
 import environ
 import sentry_sdk
+from celery.schedules import crontab
 from django.utils.log import DEFAULT_LOGGING
 from sentry_sdk.integrations.django import DjangoIntegration
 
@@ -682,6 +682,9 @@ LEAST_ROOMS_CLOSED_TODAY_FEATURE_FLAG_KEY = env.str(
 WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY = env.str(
     "WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY",
     default="weniChatsBackEndReturn24hValidOnRoomsList",
+)
+AUDIT_LOG_FEATURE_FLAG_KEY = env.str(
+    "AUDIT_LOG_FEATURE_FLAG_KEY", default="weniChatsAuditLog"
 )
 
 

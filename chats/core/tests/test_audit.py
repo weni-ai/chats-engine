@@ -1,4 +1,5 @@
 import datetime
+from unittest.mock import patch
 
 from django.test import TestCase
 
@@ -13,6 +14,11 @@ from chats.apps.sectors.models import Sector, SectorHoliday
 
 class AuditableMixinCreateUpdateTests(TestCase):
     def setUp(self):
+        patcher = patch(
+            "chats.core.models.is_feature_active_for_attributes", return_value=True
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.user = User.objects.create_user(email="audit@test.com", password="x")
         self.other_user = User.objects.create_user(email="other@test.com", password="x")
         self.project = Project.objects.create(name="Audit Project", timezone="UTC")
@@ -69,6 +75,11 @@ class AuditableMixinCreateUpdateTests(TestCase):
 
 class AuditableMixinSoftDeleteTests(TestCase):
     def setUp(self):
+        patcher = patch(
+            "chats.core.models.is_feature_active_for_attributes", return_value=True
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.user = User.objects.create_user(email="deleter@test.com", password="x")
         self.project = Project.objects.create(name="Delete Project", timezone="UTC")
         self.sector = Sector.objects.create(

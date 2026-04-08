@@ -145,9 +145,10 @@ class SectorViewset(viewsets.ModelViewSet):
             "user_email": self.request.query_params.get("user_email"),
         }
 
+        instance.deleted_by = self.request.user
+        instance.modified_by = self.request.user
+
         if not settings.USE_WENI_FLOWS:
-            instance.deleted_by = self.request.user
-            instance.modified_by = self.request.user
             instance.delete()
             return
 
@@ -160,8 +161,6 @@ class SectorViewset(viewsets.ModelViewSet):
             raise exceptions.APIException(
                 detail=f"[{response.status_code}] Error deleting the sector on flows. Exception: {response.content}"
             )
-        instance.deleted_by = self.request.user
-        instance.modified_by = self.request.user
         instance.delete()
         return Response(
             {"is_deleted": True},
