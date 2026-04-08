@@ -34,8 +34,10 @@ class IsProjectAdmin(permissions.BasePermission):
 class IsSectorManager(permissions.BasePermission):
     def has_permission(self, request, view):
         data = request.data or request.query_params
-        if view.action in ["list", "create"]:
+        if view.action in ["list", "create", "bulk_create"]:
             permission = GetPermission(request).permission
+            if permission is None:
+                return False
             kwargs = {"sector": data.get("sector"), "queue": data.get("queue")}
             return permission.is_manager(**kwargs)
 
