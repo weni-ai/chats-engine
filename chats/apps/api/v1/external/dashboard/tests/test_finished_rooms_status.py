@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.core.cache import cache
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -16,6 +17,7 @@ BASE_URL = "/v1/external/dashboard/{uuid}/finished_rooms_status/"
 
 class BaseFinishedRoomsStatusTest(APITestCase):
     def setUp(self):
+        cache.clear()
         self.project = Project.objects.create(name="Test Project", timezone="UTC")
         self.external_token = self.project.external_token
 
