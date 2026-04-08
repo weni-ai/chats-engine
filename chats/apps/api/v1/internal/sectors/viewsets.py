@@ -89,3 +89,4 @@ class SectorTagsViewset(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["sector"]
     lookup_field = "uuid"
+

@@ -1,12 +1,13 @@
 import uuid
 
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from chats.core.managers import SoftDeletableManager
 from chats.utils.websockets import send_channels_group
-
+from chats.core.middleware import get_current_user
 
 class WebSocketsNotifiableMixin:
     @property
@@ -43,7 +44,7 @@ class BaseModel(models.Model):
 
     @property
     def edited(self) -> bool:
-        return bool(self.modified_by)
+        return hasattr(self, "modified_by") and bool(self.modified_by)
 
 
 class BaseModelWithManualCreatedOn(BaseModel):
@@ -104,3 +105,65 @@ class BaseIntegrationConfigurableModel(models.Model):
 
     class Meta:
         abstract = True
+
+
+
+class AuditableMixin(models.Model):
+    """
+    Tracks who created, last modified, and deleted each record.
+    Requires CurrentUserMiddleware to be registered in MIDDLEWARE after
+    AuthenticationMiddleware so that request.user is available.
+    """
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="+",
+        on_delete=models.SET_NULL,
+        verbose_name=_("Created by"),
+    )
+    modified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="+",
+        on_delete=models.SET_NULL,
+        verbose_name=_("Modified by"),
+    )
+    deleted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="+",
+        on_delete=models.SET_NULL,
+        verbose_name=_("Deleted by"),
+    )
+
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        user = get_current_user()
+        if user and not getattr(user, "is_anonymous", True):
+            if self._state.adding:
+                self.created_by = user
+            self.modified_by = user
+            if (
+                hasattr(self, "is_deleted")
+                and self.is_deleted
+                and not self.deleted_by_id
+            ):
+                self.deleted_by = user
+
+            update_fields = kwargs.get("update_fields")
+            if update_fields is not None:
+                extra = {"modified_by"}
+                if self.deleted_by_id:
+                    extra.add("deleted_by")
+                kwargs["update_fields"] = list(set(update_fields) | extra)
+
+        super().save(*args, **kwargs)

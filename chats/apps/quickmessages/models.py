@@ -2,10 +2,10 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from chats.core.models import BaseModel
+from chats.core.models import AuditableMixin, BaseModel
 
 
-class QuickMessage(BaseModel):
+class QuickMessage(AuditableMixin, BaseModel):
     user = models.ForeignKey(
         "accounts.User",
         verbose_name=_("quick_messages"),

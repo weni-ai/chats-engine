@@ -699,6 +699,41 @@ class CustomStatus(BaseModel):
             raise
 
 
+class DeletionLog(BaseModel):
+    """
+    Audit log for hard-deleted records.
+    Created automatically via pre_delete signals before the record is removed.
+    """
+
+    model_name = models.CharField(_("Model name"), max_length=100)
+    object_uuid = models.UUIDField(_("Object UUID"))
+    object_repr = models.CharField(_("Object description"), max_length=255)
+    deleted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="deletion_logs",
+        verbose_name=_("Deleted by"),
+    )
+    project = models.ForeignKey(
+        "projects.Project",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="deletion_logs",
+        verbose_name=_("Project"),
+    )
+
+    class Meta:
+        verbose_name = _("Deletion log")
+        verbose_name_plural = _("Deletion logs")
+        ordering = ["-created_on"]
+
+    def __str__(self):
+        return f"{self.model_name} {self.object_uuid} deleted by {self.deleted_by}"
+
+
 class AgentDisconnectLog(BaseModel):
     """
     Audit log for supervisor-enforced agent disconnections.

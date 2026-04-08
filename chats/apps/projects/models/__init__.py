@@ -1,5 +1,6 @@
 from .models import (  # noqa
     ContactGroupFlowReference,
+    DeletionLog,
     FlowStart,
     LinkContact,
     Project,
