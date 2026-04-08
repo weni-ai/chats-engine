@@ -70,7 +70,9 @@ class SectorViewset(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         try:
-            instance = serializer.save(created_by=self.request.user, modified_by=self.request.user)
+            instance = serializer.save(
+                created_by=self.request.user, modified_by=self.request.user
+            )
         except IntegrityError as e:
             raise exceptions.APIException(
                 detail=f"Error when saving the sector. Exception: {str(e)}"
@@ -331,7 +333,6 @@ class SectorAuthorizationViewset(viewsets.ModelViewSet):
         serializer.instance.notify_user("update")
 
     def perform_destroy(self, instance):
-        instance.deleted_by = self.request.user
         instance.notify_user("destroy")
         super().perform_destroy(instance)
 

@@ -9,10 +9,6 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
-from chats.apps.core.internal_domains import (
-    is_vtex_internal_domain,
-    exclude_vtex_internal_domains,
-)
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.api.v1.permissions import (
     IsQueueAgent,
@@ -21,6 +17,10 @@ from chats.apps.api.v1.permissions import (
 )
 from chats.apps.api.v1.queues import serializers as queue_serializers
 from chats.apps.api.v1.queues.filters import QueueAuthorizationFilter, QueueFilter
+from chats.apps.core.internal_domains import (
+    exclude_vtex_internal_domains,
+    is_vtex_internal_domain,
+)
 from chats.apps.projects.models.models import Project
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.queues.models import Queue, QueueAuthorization
@@ -82,7 +82,9 @@ class QueueViewset(ModelViewSet):
         return super().get_serializer_class()
 
     def perform_create(self, serializer):
-        instance = serializer.save(created_by=self.request.user, modified_by=self.request.user)
+        instance = serializer.save(
+            created_by=self.request.user, modified_by=self.request.user
+        )
 
         project = Project.objects.get(uuid=instance.sector.project.uuid)
 
@@ -318,10 +320,6 @@ class QueueAuthorizationViewset(ModelViewSet):
 
     def perform_update(self, serializer):
         serializer.save(modified_by=self.request.user)
-
-    def perform_destroy(self, instance):
-        instance.deleted_by = self.request.user
-        super().perform_destroy(instance)
 
     @action(detail=True, methods=["PATCH"])
     def update_queue_permissions(self, request, *args, **kwargs):

@@ -16,14 +16,14 @@ class QuickMessageViewset(viewsets.ModelViewSet):
     ]
 
     def perform_create(self, serializer):
-        return serializer.save(user=self.request.user, created_by=self.request.user, modified_by=self.request.user)
+        return serializer.save(
+            user=self.request.user,
+            created_by=self.request.user,
+            modified_by=self.request.user,
+        )
 
     def perform_update(self, serializer):
         serializer.save(modified_by=self.request.user)
-
-    def perform_destroy(self, instance):
-        instance.deleted_by = self.request.user
-        super().perform_destroy(instance)
 
     def update(self, request, *args, **kwargs):
         if self.get_object().user == request.user:
@@ -73,11 +73,11 @@ class SectorQuickMessageViewset(viewsets.ModelViewSet):
         return [permission() for permission in permission_classes]
 
     def perform_create(self, serializer):
-        return serializer.save(user=self.request.user, created_by=self.request.user, modified_by=self.request.user)
+        return serializer.save(
+            user=self.request.user,
+            created_by=self.request.user,
+            modified_by=self.request.user,
+        )
 
     def perform_update(self, serializer):
         serializer.save(modified_by=self.request.user)
-
-    def perform_destroy(self, instance):
-        instance.deleted_by = self.request.user
-        super().perform_destroy(instance)

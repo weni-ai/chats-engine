@@ -1,11 +1,10 @@
 from .models import (  # noqa
     ContactGroupFlowReference,
-    DeletionLog,
+    CustomStatus,
+    CustomStatusType,
     FlowStart,
     LinkContact,
     Project,
     ProjectPermission,
     TemplateType,
-    CustomStatus,
-    CustomStatusType,
 )
