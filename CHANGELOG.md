@@ -1,3 +1,7 @@
+# 3.53.3
+# Fix
+  - Remove full transfer history from serialized room data
+
 # 3.53.2
 # Fix
   - Remove queue and sector authorizations when a project permission is soft-deleted;
