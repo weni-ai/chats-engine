@@ -11,7 +11,6 @@ from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorTag
 
-
 BASE_URL = "/v1/external/dashboard/{uuid}/finished_rooms_status/"
 
 
@@ -63,7 +62,9 @@ class BaseFinishedRoomsStatusTest(APITestCase):
             first_user_assigned_at=self.now - timedelta(minutes=5),
         )
 
-    def _make_metrics(self, room, *, waiting=0, first_response=0, interaction=0, message_response=0):
+    def _make_metrics(
+        self, room, *, waiting=0, first_response=0, interaction=0, message_response=0
+    ):
         return RoomMetrics.objects.create(
             room=room,
             waiting_time=waiting,
@@ -71,11 +72,6 @@ class BaseFinishedRoomsStatusTest(APITestCase):
             interaction_time=interaction,
             message_response_time=message_response,
         )
-
-
-# ---------------------------------------------------------------------------
-# Authentication
-# ---------------------------------------------------------------------------
 
 
 class TestFinishedRoomsStatusAuth(BaseFinishedRoomsStatusTest):
@@ -104,11 +100,6 @@ class TestFinishedRoomsStatusAuth(BaseFinishedRoomsStatusTest):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
 
-# ---------------------------------------------------------------------------
-# Response shape
-# ---------------------------------------------------------------------------
-
-
 class TestFinishedRoomsStatusResponseShape(BaseFinishedRoomsStatusTest):
     def test_response_contains_all_expected_fields(self):
         self._auth()
@@ -129,11 +120,6 @@ class TestFinishedRoomsStatusResponseShape(BaseFinishedRoomsStatusTest):
         self.assertEqual(response.data["average_first_response_time"], 0.0)
         self.assertEqual(response.data["average_response_time"], 0.0)
         self.assertEqual(response.data["average_conversation_duration"], 0.0)
-
-
-# ---------------------------------------------------------------------------
-# finished count
-# ---------------------------------------------------------------------------
 
 
 class TestFinishedCount(BaseFinishedRoomsStatusTest):
@@ -189,37 +175,26 @@ class TestFinishedCount(BaseFinishedRoomsStatusTest):
         self.assertEqual(response.data["finished"], 1)
 
 
-# ---------------------------------------------------------------------------
-# Date defaults
-# ---------------------------------------------------------------------------
-
-
 class TestDateDefaults(BaseFinishedRoomsStatusTest):
     def test_no_date_params_counts_rooms_from_today(self):
         self._make_room()
 
         old_room = self._make_room(ended_at=self.now - timedelta(days=2))
-        # old_room should not be counted (before today's start)
-        _ = old_room  # suppress unused variable warning
+        _ = old_room
 
         self._auth()
         response = self._get()
 
         self.assertEqual(response.data["finished"], 1)
 
-    def test_no_date_params_does_not_count_future_rooms(self):
-        future = self.now + timedelta(hours=2)
-        self._make_room(ended_at=future)
+    def test_no_date_params_does_not_count_rooms_from_tomorrow(self):
+        tomorrow = self.now + timedelta(days=1)
+        self._make_room(ended_at=tomorrow)
 
         self._auth()
         response = self._get()
 
         self.assertEqual(response.data["finished"], 0)
-
-
-# ---------------------------------------------------------------------------
-# Filters
-# ---------------------------------------------------------------------------
 
 
 class TestFilterBySector(BaseFinishedRoomsStatusTest):
@@ -240,11 +215,13 @@ class TestFilterBySector(BaseFinishedRoomsStatusTest):
 
         self._auth()
         today = self.now.strftime("%Y-%m-%d")
-        response = self._get({
-            "start_date": today,
-            "end_date": today,
-            "sector": str(self.sector.uuid),
-        })
+        response = self._get(
+            {
+                "start_date": today,
+                "end_date": today,
+                "sector": str(self.sector.uuid),
+            }
+        )
 
         self.assertEqual(response.data["finished"], 1)
 
@@ -254,11 +231,13 @@ class TestFilterBySector(BaseFinishedRoomsStatusTest):
 
         self._auth()
         today = self.now.strftime("%Y-%m-%d")
-        response = self._get({
-            "start_date": today,
-            "end_date": today,
-            "sector": [str(self.sector.uuid), str(self.sector2.uuid)],
-        })
+        response = self._get(
+            {
+                "start_date": today,
+                "end_date": today,
+                "sector": f"{self.sector.uuid},{self.sector2.uuid}",
+            }
+        )
 
         self.assertEqual(response.data["finished"], 2)
 
@@ -274,11 +253,13 @@ class TestFilterByQueue(BaseFinishedRoomsStatusTest):
 
         self._auth()
         today = self.now.strftime("%Y-%m-%d")
-        response = self._get({
-            "start_date": today,
-            "end_date": today,
-            "queue": str(self.queue.uuid),
-        })
+        response = self._get(
+            {
+                "start_date": today,
+                "end_date": today,
+                "queue": str(self.queue.uuid),
+            }
+        )
 
         self.assertEqual(response.data["finished"], 1)
 
@@ -288,11 +269,13 @@ class TestFilterByQueue(BaseFinishedRoomsStatusTest):
 
         self._auth()
         today = self.now.strftime("%Y-%m-%d")
-        response = self._get({
-            "start_date": today,
-            "end_date": today,
-            "queue": [str(self.queue.uuid), str(self.queue2.uuid)],
-        })
+        response = self._get(
+            {
+                "start_date": today,
+                "end_date": today,
+                "queue": f"{self.queue.uuid},{self.queue2.uuid}",
+            }
+        )
 
         self.assertEqual(response.data["finished"], 2)
 
@@ -312,11 +295,13 @@ class TestFilterByTag(BaseFinishedRoomsStatusTest):
 
         self._auth()
         today = self.now.strftime("%Y-%m-%d")
-        response = self._get({
-            "start_date": today,
-            "end_date": today,
-            "tag": str(self.tag1.uuid),
-        })
+        response = self._get(
+            {
+                "start_date": today,
+                "end_date": today,
+                "tag": str(self.tag1.uuid),
+            }
+        )
 
         self.assertEqual(response.data["finished"], 1)
 
@@ -332,11 +317,13 @@ class TestFilterByTag(BaseFinishedRoomsStatusTest):
 
         self._auth()
         today = self.now.strftime("%Y-%m-%d")
-        response = self._get({
-            "start_date": today,
-            "end_date": today,
-            "tag": [str(self.tag1.uuid), str(self.tag2.uuid)],
-        })
+        response = self._get(
+            {
+                "start_date": today,
+                "end_date": today,
+                "tag": f"{self.tag1.uuid},{self.tag2.uuid}",
+            }
+        )
 
         self.assertEqual(response.data["finished"], 2)
 
@@ -361,11 +348,13 @@ class TestFilterByAgent(BaseFinishedRoomsStatusTest):
 
         self._auth()
         today = self.now.strftime("%Y-%m-%d")
-        response = self._get({
-            "start_date": today,
-            "end_date": today,
-            "agent": self.agent.email,
-        })
+        response = self._get(
+            {
+                "start_date": today,
+                "end_date": today,
+                "agent": self.agent.email,
+            }
+        )
 
         self.assertEqual(response.data["finished"], 1)
 
@@ -378,19 +367,16 @@ class TestFilterByAgent(BaseFinishedRoomsStatusTest):
 
         self._auth()
         today = self.now.strftime("%Y-%m-%d")
-        response = self._get({
-            "start_date": today,
-            "end_date": today,
-            "agent": self.agent.email,
-        })
+        response = self._get(
+            {
+                "start_date": today,
+                "end_date": today,
+                "agent": self.agent.email,
+            }
+        )
 
         self.assertEqual(response.data["finished"], 1)
         self.assertEqual(response.data["average_waiting_time"], 60.0)
-
-
-# ---------------------------------------------------------------------------
-# Metrics calculation
-# ---------------------------------------------------------------------------
 
 
 class TestMetricsCalculation(BaseFinishedRoomsStatusTest):
@@ -404,6 +390,7 @@ class TestMetricsCalculation(BaseFinishedRoomsStatusTest):
         today = self.now.strftime("%Y-%m-%d")
         response = self._get({"start_date": today, "end_date": today})
 
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data["average_waiting_time"], 90.0)
 
     def test_average_first_response_time(self):
@@ -416,12 +403,12 @@ class TestMetricsCalculation(BaseFinishedRoomsStatusTest):
         today = self.now.strftime("%Y-%m-%d")
         response = self._get({"start_date": today, "end_date": today})
 
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data["average_first_response_time"], 60.0)
 
     def test_average_response_time_excludes_zero_values(self):
         r1 = self._make_room()
         r2 = self._make_room()
-        # r2 has message_response_time=0, should be excluded from average
         self._make_metrics(r1, message_response=100)
         self._make_metrics(r2, message_response=0)
 
@@ -429,6 +416,7 @@ class TestMetricsCalculation(BaseFinishedRoomsStatusTest):
         today = self.now.strftime("%Y-%m-%d")
         response = self._get({"start_date": today, "end_date": today})
 
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data["average_response_time"], 100.0)
 
     def test_average_response_time_without_metrics_returns_zero(self):
@@ -438,6 +426,7 @@ class TestMetricsCalculation(BaseFinishedRoomsStatusTest):
         today = self.now.strftime("%Y-%m-%d")
         response = self._get({"start_date": today, "end_date": today})
 
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data["average_response_time"], 0.0)
 
     def test_average_conversation_duration_uses_interaction_time(self):
@@ -450,11 +439,13 @@ class TestMetricsCalculation(BaseFinishedRoomsStatusTest):
         today = self.now.strftime("%Y-%m-%d")
         response = self._get({"start_date": today, "end_date": today})
 
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data["average_conversation_duration"], 400.0)
 
-    def test_average_conversation_duration_excludes_rooms_without_agent_assignment(self):
+    def test_average_conversation_duration_excludes_rooms_without_agent_assignment(
+        self,
+    ):
         r1 = self._make_room()
-        # r2 never had first_user_assigned_at set
         r2 = Room.objects.create(
             queue=self.queue,
             is_active=False,
@@ -468,20 +459,18 @@ class TestMetricsCalculation(BaseFinishedRoomsStatusTest):
         today = self.now.strftime("%Y-%m-%d")
         response = self._get({"start_date": today, "end_date": today})
 
-        # Only r1 (with first_user_assigned_at) counts for conversation duration
         self.assertEqual(response.data["average_conversation_duration"], 200.0)
-        # But both rooms count for finished
         self.assertEqual(response.data["finished"], 2)
 
     def test_rooms_without_metrics_contribute_zero_to_averages(self):
         r1 = self._make_room()
-        self._make_room()  # no metrics
+        self._make_room()
         self._make_metrics(r1, waiting=100)
 
         self._auth()
         today = self.now.strftime("%Y-%m-%d")
         response = self._get({"start_date": today, "end_date": today})
 
-        # r2 has no metric record, so NULL is excluded from Avg by default in Django
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(response.data["average_waiting_time"], 100.0)
         self.assertEqual(response.data["finished"], 2)
