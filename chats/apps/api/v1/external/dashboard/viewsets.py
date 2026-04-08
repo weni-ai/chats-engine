@@ -6,6 +6,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from chats.apps.accounts.authentication.drf.authorization import ProjectAdminAuthentication
+from chats.apps.accounts.permissions import IsExternalProject
 from chats.apps.api.v1.external.throttling import (
     ExternalHourRateThrottle,
     ExternalMinuteRateThrottle,
@@ -25,6 +26,7 @@ class ExternalFinishedRoomsStatusViewSet(viewsets.GenericViewSet):
     swagger_tag = "Integrations"
     lookup_field = "uuid"
     authentication_classes = [ProjectAdminAuthentication]
+    permission_classes = [IsExternalProject]
     throttle_classes = [
         ExternalSecondRateThrottle,
         ExternalMinuteRateThrottle,
