@@ -3,6 +3,7 @@ from django.contrib.postgres.fields import JSONField
 from django.db.models import (
     QuerySet,
     Avg,
+    BooleanField,
     Case,
     Count,
     Exists,
@@ -271,17 +272,17 @@ class AgentRepository:
         if filters.queue and filters.sector:
             rooms_filter["rooms__queue"] = filters.queue
             rooms_filter["rooms__queue__sector__in"] = filters.sector
-            agents_filter[
-                "project_permissions__queue_authorizations__queue"
-            ] = filters.queue
+            agents_filter["project_permissions__queue_authorizations__queue"] = (
+                filters.queue
+            )
             agents_filter[
                 "project_permissions__queue_authorizations__queue__sector__in"
             ] = filters.sector
         elif filters.queue:
             rooms_filter["rooms__queue"] = filters.queue
-            agents_filter[
-                "project_permissions__queue_authorizations__queue"
-            ] = filters.queue
+            agents_filter["project_permissions__queue_authorizations__queue"] = (
+                filters.queue
+            )
         elif filters.sector:
             rooms_filter["rooms__queue__sector__in"] = filters.sector
             agents_filter[
@@ -552,7 +553,19 @@ class AgentRepository:
         )
 
     def _get_csat_agents(self, filters: Filters, project: Project) -> QuerySet[User]:
-        agents = User.objects.filter(project_permissions__project=project)
+        agents = User.objects.filter(
+            email__in=ProjectPermission.all_objects.filter(project=project).values_list(
+                "user_id", flat=True
+            )
+        ).annotate(
+            is_deleted=Subquery(
+                ProjectPermission.all_objects.filter(
+                    project=project,
+                    user_id=OuterRef("email"),
+                ).values("is_deleted")[:1],
+                output_field=BooleanField(),
+            ),
+        )
 
         if not filters.is_weni_admin:
             agents = agents.exclude(get_admin_domains_exclude_filter())
@@ -611,7 +624,7 @@ class AgentRepository:
                 ),
                 Value(0.0),
             ),
-        )
+        ).exclude(is_deleted=True, rooms_count=0)
 
         return self._get_csat_general(filters, project), agents
 
