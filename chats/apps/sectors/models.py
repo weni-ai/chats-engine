@@ -704,5 +704,10 @@ class SectorHoliday(AuditableMixin, BaseSoftDeleteModel, BaseModel):
 
     def delete(self, *args, **kwargs):
         self.is_deleted = True
-        super().save(update_fields=["is_deleted"])
+        update_fields = ["is_deleted"]
+        if self.deleted_by_id:
+            update_fields.append("deleted_by")
+        if self.modified_by_id:
+            update_fields.append("modified_by")
+        super().save(update_fields=update_fields)
         self._invalidate_cache()

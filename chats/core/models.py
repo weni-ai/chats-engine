@@ -7,7 +7,6 @@ from django.utils.translation import gettext_lazy as _
 
 from chats.core.managers import SoftDeletableManager
 from chats.utils.websockets import send_channels_group
-from chats.core.middleware import get_current_user
 
 class WebSocketsNotifiableMixin:
     @property
@@ -146,24 +145,3 @@ class AuditableMixin(models.Model):
     class Meta:
         abstract = True
 
-    def save(self, *args, **kwargs):
-        user = get_current_user()
-        if user and not getattr(user, "is_anonymous", True):
-            if self._state.adding:
-                self.created_by = user
-            self.modified_by = user
-            if (
-                hasattr(self, "is_deleted")
-                and self.is_deleted
-                and not self.deleted_by_id
-            ):
-                self.deleted_by = user
-
-            update_fields = kwargs.get("update_fields")
-            if update_fields is not None:
-                extra = {"modified_by"}
-                if self.deleted_by_id:
-                    extra.add("deleted_by")
-                kwargs["update_fields"] = list(set(update_fields) | extra)
-
-        super().save(*args, **kwargs)
