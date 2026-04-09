@@ -13,8 +13,8 @@ from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import CursorPagination, LimitOffsetPagination
 from rest_framework.response import Response
-from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 from sentry_sdk import capture_exception
+from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
 from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
@@ -109,7 +109,9 @@ def add_user_or_queue_to_room(instance: Room, request):
 
 
 @method_decorator(name="update", decorator=swagger_auto_schema(auto_schema=None))
-@method_decorator(name="partial_update", decorator=swagger_auto_schema(auto_schema=None))
+@method_decorator(
+    name="partial_update", decorator=swagger_auto_schema(auto_schema=None)
+)
 @method_decorator(name="destroy", decorator=swagger_auto_schema(auto_schema=None))
 class RoomFlowViewSet(viewsets.ModelViewSet):
     """
@@ -177,7 +179,7 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         """Retrieve details of a specific room by UUID."""
         return super().retrieve(request, *args, **kwargs)
 
-    @swagger_auto_schema(auto_schema=None)
+    @swagger_auto_schema(methods=["put", "patch"], auto_schema=None)
     @action(detail=True, methods=["PUT", "PATCH"], url_name="close")
     def close(
         self, request, *args, **kwargs
