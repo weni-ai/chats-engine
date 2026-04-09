@@ -72,6 +72,9 @@ class QueueViewset(ModelViewSet):
         else:
             qs = qs.exclude(is_deleted=True)
 
+        if self.action == "rooms_count":
+            return qs
+
         # Allow all projects for internal communication users
         if self.request.user.has_perm("accounts.can_communicate_internally"):
             return qs
