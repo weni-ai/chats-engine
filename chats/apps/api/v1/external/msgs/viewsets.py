@@ -1,6 +1,7 @@
 from functools import cached_property
 
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import filters, mixins, viewsets
 
 from chats.apps.accounts.authentication.drf.authorization import (
@@ -56,14 +57,17 @@ class MessageFlowViewset(
             return [InternalAPITokenRequiredPermission]
         return [ModuleHasPermission]
 
+    @swagger_auto_schema(auto_schema=None)
     def list(self, request, *args, **kwargs):
         """List messages filtered by room or other criteria."""
         return super().list(request, *args, **kwargs)
 
+    @swagger_auto_schema(auto_schema=None)
     def create(self, request, *args, **kwargs):
         """Create a new message in a room (incoming or outgoing direction)."""
         return super().create(request, *args, **kwargs)
 
+    @swagger_auto_schema(auto_schema=None)
     def partial_update(self, request, *args, **kwargs):
         """Update message fields (e.g., mark as seen)."""
         return super().partial_update(request, *args, **kwargs)

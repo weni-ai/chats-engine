@@ -19,6 +19,7 @@ from django.utils import timezone
 from django.utils.timezone import make_aware
 from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
@@ -570,6 +571,7 @@ class RoomViewset(
             status=completion_response.status_code, data=completion_response.json()
         )
 
+    @swagger_auto_schema(auto_schema=None)
     @action(
         detail=True,
         methods=["PATCH"],
