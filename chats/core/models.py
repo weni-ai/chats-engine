@@ -151,23 +151,26 @@ class AuditableMixin(models.Model):
     class Meta:
         abstract = True
 
-    def _get_audit_project_uuid(self):
+    def _get_project(self):
+        """
+        Returns the project associated with this instance.
+        Models using this mixin must define a `project` attribute or property.
+        """
         project = getattr(self, "project", None)
         if project is None:
-            sector = getattr(self, "sector", None)
-            if sector is None:
-                queue = getattr(self, "queue", None)
-                sector = getattr(queue, "sector", None)
-            project = getattr(sector, "project", None)
-        return getattr(project, "uuid", None)
+            raise AttributeError(
+                f"{self.__class__.__name__} must define a `project` attribute or property "
+                "to use AuditableMixin."
+            )
+        return project
 
     def save(self, *args, **kwargs):
         if self.created_by_id or self.modified_by_id or self.deleted_by_id:
             try:
-                project_uuid = self._get_audit_project_uuid()
-                if project_uuid and not is_feature_active_for_attributes(
+                project = self._get_project()
+                if not is_feature_active_for_attributes(
                     settings.AUDIT_LOG_FEATURE_FLAG_KEY,
-                    {"projectUUID": str(project_uuid)},
+                    {"projectUUID": str(project.uuid)},
                 ):
                     self.created_by = None
                     self.modified_by = None

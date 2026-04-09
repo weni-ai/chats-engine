@@ -28,6 +28,10 @@ class QuickMessage(AuditableMixin, BaseModel):
         verbose_name = _("Quick Message")
         verbose_name_plural = _("Quick Messages")
 
+    @property
+    def project(self):
+        return self.sector.project if self.sector else None
+
     def get_permission(self, user):
         try:
             return self.sector.get_permission(user)

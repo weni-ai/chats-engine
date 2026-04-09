@@ -4,8 +4,16 @@ from unittest.mock import patch
 from django.test import TestCase
 
 from chats.apps.accounts.models import User
-from chats.apps.projects.models import Project
-from chats.apps.sectors.models import Sector, SectorHoliday
+from chats.apps.projects.models import Project, ProjectPermission
+from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.quickmessages.models import QuickMessage
+from chats.apps.sectors.models import (
+    GroupSector,
+    Sector,
+    SectorAuthorization,
+    SectorHoliday,
+    SectorTag,
+)
 
 # ---------------------------------------------------------------------------
 # AuditableMixin — created_by / modified_by
@@ -141,3 +149,98 @@ class AuditableMixinSoftDeleteTests(TestCase):
 
         holiday.refresh_from_db()
         self.assertEqual(holiday.deleted_by, self.user)
+
+
+# ---------------------------------------------------------------------------
+# AuditableMixin._get_project — all models
+# ---------------------------------------------------------------------------
+
+
+class AuditableMixinGetProjectTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(email="proj@test.com", password="x")
+        self.project = Project.objects.create(name="GP Project", timezone="UTC")
+        self.permission = ProjectPermission.objects.create(
+            project=self.project,
+            user=self.user,
+            role=ProjectPermission.ROLE_ATTENDANT,
+        )
+        self.sector = Sector.objects.create(
+            name="GP Sector",
+            project=self.project,
+            rooms_limit=5,
+            work_start="08:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(name="GP Queue", sector=self.sector)
+
+    def test_sector_returns_project(self):
+        self.assertEqual(self.sector._get_project(), self.project)
+
+    def test_sector_authorization_returns_project(self):
+        auth = SectorAuthorization.objects.create(
+            sector=self.sector,
+            permission=self.permission,
+            role=SectorAuthorization.ROLE_MANAGER,
+        )
+        self.assertEqual(auth._get_project(), self.project)
+
+    def test_sector_tag_returns_project(self):
+        tag = SectorTag.objects.create(name="Tag GP", sector=self.sector)
+        self.assertEqual(tag._get_project(), self.project)
+
+    def test_sector_holiday_returns_project(self):
+        holiday = SectorHoliday.objects.create(
+            sector=self.sector,
+            date=datetime.date(2025, 6, 12),
+            day_type=SectorHoliday.CLOSED,
+        )
+        self.assertEqual(holiday._get_project(), self.project)
+
+    def test_group_sector_returns_project(self):
+        group = GroupSector.objects.create(
+            name="GP Group", project=self.project, rooms_limit=5
+        )
+        self.assertEqual(group._get_project(), self.project)
+
+    def test_queue_returns_project(self):
+        self.assertEqual(self.queue._get_project(), self.project)
+
+    def test_queue_authorization_returns_project(self):
+        auth = QueueAuthorization.objects.create(
+            queue=self.queue,
+            permission=self.permission,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+        self.assertEqual(auth._get_project(), self.project)
+
+    def test_quick_message_with_sector_returns_project(self):
+        qm = QuickMessage.objects.create(
+            user=self.user,
+            shortcut="/oi",
+            text="Olá",
+            sector=self.sector,
+        )
+        self.assertEqual(qm._get_project(), self.project)
+
+    def test_quick_message_without_sector_raises_attribute_error(self):
+        qm = QuickMessage.objects.create(
+            user=self.user,
+            shortcut="/oi2",
+            text="Olá",
+        )
+        with self.assertRaises(AttributeError):
+            qm._get_project()
+
+    def test_model_without_project_raises_attribute_error(self):
+        """Ensures AttributeError is raised for models without a project attribute."""
+        from chats.core.models import AuditableMixin
+        from django.db import models as dj_models
+
+        class NoProjectModel(AuditableMixin):
+            class Meta:
+                app_label = "core"
+
+        instance = NoProjectModel.__new__(NoProjectModel)
+        with self.assertRaises(AttributeError):
+            instance._get_project()
