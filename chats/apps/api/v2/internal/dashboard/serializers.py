@@ -4,17 +4,17 @@ from chats.apps.api.utils import calculate_in_service_time
 
 
 class InternalDashboardQueryParamsSerializer(serializers.Serializer):
-    start_date = serializers.DateField()
-    end_date = serializers.DateField()
-    agent = serializers.CharField()
-    sector = serializers.ListField(child=serializers.CharField())
-    tag = serializers.ListField(child=serializers.CharField())
-    queue = serializers.ListField(child=serializers.CharField())
-    user_request = serializers.CharField()
-    is_weni_admin = serializers.BooleanField()
-    ordering = serializers.CharField()
-    status = serializers.ListField(child=serializers.CharField())
-    custom_status = serializers.ListField(child=serializers.CharField())
+    start_date = serializers.DateField(required=False)
+    end_date = serializers.DateField(required=False)
+    agent = serializers.CharField(required=False)
+    sector = serializers.ListField(child=serializers.CharField(), required=False)
+    tag = serializers.ListField(child=serializers.CharField(), required=False)
+    queue = serializers.ListField(child=serializers.CharField(), required=False)
+    user_request = serializers.CharField(required=False)
+    is_weni_admin = serializers.BooleanField(required=False)
+    ordering = serializers.CharField(required=False)
+    status = serializers.ListField(child=serializers.CharField(), required=False)
+    custom_status = serializers.ListField(child=serializers.CharField(), required=False)
 
 
 class DashboardAgentsSerializerV2(serializers.Serializer):
