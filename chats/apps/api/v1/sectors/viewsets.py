@@ -56,7 +56,7 @@ class SectorViewset(viewsets.ModelViewSet):
 
     def get_permissions(self):
         permission_classes = self.permission_classes
-        if self.action == "list":
+        if self.action in ["list", "rooms_count"]:
             permission_classes = [IsAuthenticated]
         elif self.action in ["create", "destroy"]:
             permission_classes = (IsAuthenticated, IsProjectAdmin)
@@ -319,6 +319,16 @@ class SectorViewset(viewsets.ModelViewSet):
                 .count()
             )
         return Response({"sector_count": sector_count}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["GET"], url_path="rooms_count")
+    def rooms_count(self, request, *args, **kwargs):
+        instance = self.get_object()
+        queryset = Room.objects.filter(queue__sector=instance, is_active=True)
+        waiting = queryset.filter(user__isnull=True).count()
+        in_service = queryset.filter(user__isnull=False).count()
+        return Response(
+            {"waiting": waiting, "in_service": in_service}, status=status.HTTP_200_OK
+        )
 
     @action(detail=True, methods=["POST"])
     def authorization(self, request, *args, **kwargs):
