@@ -9,8 +9,6 @@ class UUIDInFilter(BaseInFilter, UUIDFilter):
 
 
 class ExternalFinishedRoomsStatusFilter(django_filters.FilterSet):
-    start_date = django_filters.DateFilter(method="filter_start_date")
-    end_date = django_filters.DateFilter(method="filter_end_date")
     sector = UUIDInFilter(field_name="queue__sector__uuid", lookup_expr="in")
     queue = UUIDInFilter(field_name="queue__uuid", lookup_expr="in")
     tag = UUIDInFilter(field_name="tags__uuid", lookup_expr="in")
@@ -19,9 +17,3 @@ class ExternalFinishedRoomsStatusFilter(django_filters.FilterSet):
     class Meta:
         model = Room
         fields = []
-
-    def filter_start_date(self, queryset, name, value):
-        return queryset.filter(ended_at__date__gte=value)
-
-    def filter_end_date(self, queryset, name, value):
-        return queryset.filter(ended_at__date__lte=value)

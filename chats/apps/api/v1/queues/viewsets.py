@@ -62,10 +62,8 @@ class QueueViewset(ModelViewSet):
 
     def get_permissions(self):
         permission_classes = self.permission_classes
-        if self.action in ["list", "transfer_agents"]:
+        if self.action in ["list", "transfer_agents", "rooms_count"]:
             permission_classes = [IsAuthenticated, ProjectAnyPermission]
-        elif self.action == "rooms_count":
-            permission_classes = [IsAuthenticated]
         else:
             permission_classes = [IsAuthenticated, IsSectorManager]
 
@@ -80,9 +78,6 @@ class QueueViewset(ModelViewSet):
             qs = qs.filter(is_deleted=self.request.query_params.get("is_deleted", None))
         else:
             qs = qs.exclude(is_deleted=True)
-
-        if self.action == "rooms_count":
-            return qs
 
         # Allow all projects for internal communication users
         if self.request.user.has_perm("accounts.can_communicate_internally"):
