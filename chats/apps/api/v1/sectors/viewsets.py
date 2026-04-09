@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 from django.conf import settings
@@ -16,6 +17,7 @@ from chats.apps.api.v1.permissions import (
     IsProjectAdmin,
     IsSectorManager,
 )
+from chats.apps.api.v1.rooms.services.bulk_close_service import BulkCloseService
 from chats.apps.api.v1.sectors import serializers as sector_serializers
 from chats.apps.api.v1.sectors.filters import (
     SectorAuthorizationFilter,
@@ -25,6 +27,7 @@ from chats.apps.api.v1.sectors.filters import (
 from chats.apps.projects.models import Project
 from chats.apps.projects.models.models import ProjectPermission
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
+from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import (
     Sector,
     SectorAuthorization,
@@ -32,6 +35,8 @@ from chats.apps.sectors.models import (
     SectorTag,
 )
 from chats.apps.sectors.utils import get_country_from_timezone, get_country_holidays
+
+logger = logging.getLogger(__name__)
 
 
 class SectorViewset(viewsets.ModelViewSet):
@@ -135,7 +140,47 @@ class SectorViewset(viewsets.ModelViewSet):
                 )
         return super().update(request, *args, **kwargs)
 
+    def _close_active_rooms(self, instance):
+        rooms = Room.objects.filter(
+            queue__sector=instance,
+            is_active=True,
+        )
+        if not rooms.exists():
+            return None
+
+        service = BulkCloseService()
+        result = service.close(
+            rooms=rooms,
+            end_by="sector_deleted",
+        )
+
+        if result.success_count == 0 and result.failed_count > 0:
+            raise exceptions.APIException(
+                detail=(
+                    f"Failed to close all {result.failed_count} active rooms "
+                    f"for sector {instance.uuid}. Deletion aborted."
+                ),
+            )
+
+        if result.failed_count > 0:
+            logger.warning(
+                "[SECTOR_DELETE] Partial room closure for sector %s: "
+                "%d succeeded, %d failed",
+                instance.uuid,
+                result.success_count,
+                result.failed_count,
+            )
+
+        return result
+
     def perform_destroy(self, instance):
+        end_all_chats = (
+            self.request.query_params.get("end_all_chats", "").lower() == "true"
+        )
+
+        if end_all_chats:
+            self._close_active_rooms(instance)
+
         content = {
             "sector_uuid": str(instance.uuid),
             "user_email": self.request.query_params.get("user_email"),
