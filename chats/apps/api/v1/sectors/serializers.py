@@ -3,7 +3,6 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 
 from chats.apps.api.v1.accounts.serializers import UserSerializer
-from chats.apps.projects.models.models import Project
 from chats.apps.sectors.models import (
     Sector,
     SectorAuthorization,
