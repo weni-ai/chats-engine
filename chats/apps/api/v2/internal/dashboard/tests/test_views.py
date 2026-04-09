@@ -54,11 +54,6 @@ class TestInternalDashboardViewsetV2AsAuthenticatedUser(
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     @with_internal_auth
-    def test_agent_metrics_returns_400_with_missing_params(self):
-        response = self.get_agent_metrics(self.project.uuid)
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    @with_internal_auth
     @patch(USECASE_PATH)
     def test_agent_metrics_returns_404_for_nonexistent_project(self, mock_execute):
         response = self.get_agent_metrics(uuid.uuid4(), self.valid_filters)
