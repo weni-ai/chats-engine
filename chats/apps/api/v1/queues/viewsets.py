@@ -22,7 +22,10 @@ from chats.apps.api.v1.permissions import (
 from chats.apps.api.v1.queues import serializers as queue_serializers
 from chats.apps.api.v1.queues.filters import QueueAuthorizationFilter, QueueFilter
 from chats.apps.api.v1.rooms.services.bulk_close_service import BulkCloseService
+<<<<<<< feat/transfer-rooms-in-delete-queue-and-sector
 from chats.apps.api.v1.rooms.services.bulk_transfer_service import BulkTransferService
+=======
+>>>>>>> feat/close-rooms-in-delete-queue-and-sector-endpoints
 from chats.apps.projects.models.models import Project
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.queues.models import Queue, QueueAuthorization
@@ -183,6 +186,7 @@ class QueueViewset(ModelViewSet):
 
         return result
 
+<<<<<<< feat/transfer-rooms-in-delete-queue-and-sector
     def _transfer_active_rooms(self, instance, target_queue):
         rooms = Room.objects.filter(
             queue=instance,
@@ -267,6 +271,8 @@ class QueueViewset(ModelViewSet):
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+=======
+>>>>>>> feat/close-rooms-in-delete-queue-and-sector-endpoints
     def perform_destroy(self, instance):
         end_all_chats = (
             self.request.query_params.get("end_all_chats", "").lower() == "true"
