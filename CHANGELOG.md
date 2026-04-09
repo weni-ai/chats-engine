@@ -1,3 +1,11 @@
+# 3.54.0
+ # Add
+  - Endpoint internal count rooms 
+  - Adjust delete queue/sector endpoint to support transfer and delete rooms
+  - Removing from docs, endpoints exclusive for flows use
+  - New endpoint for external closed rooms data
+  - Unit tests for bulk actions and projects
+  
 # 3.53.3
 # Fix
   - Remove full transfer history from serialized room data
