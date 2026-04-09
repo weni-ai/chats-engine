@@ -206,8 +206,11 @@ class QueueAgentsSerializer(serializers.ModelSerializer):
     def get_status(self, obj):
         project = self.context.get("project")
         if project:
-            project_permission = obj.project_permissions.get(project=project)
-            if project_permission.status == "ONLINE":
+            project_permission = obj.project_permissions.filter(project=project)
+            if (
+                project_permission.exists()
+                and project_permission.first().status == "ONLINE"
+            ):
                 return "online"
         return "offline"
 

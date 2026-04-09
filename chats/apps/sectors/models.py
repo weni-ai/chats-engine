@@ -17,7 +17,7 @@ from chats.apps.queues.utils import start_queue_priority_routing
 from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
 from chats.utils.websockets import send_channels_group
 
-from .sector_managers import SectorManager
+from .sector_managers import SectorAuthorizationManager, SectorManager
 
 User = get_user_model()
 
@@ -176,12 +176,14 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         return User.objects.filter(
             project_permissions__project=self.project,
             project_permissions__queue_authorizations__isnull=False,
+            project_permissions__is_deleted=False,
         ).distinct()
 
     @property
     def managers(self):
         return User.objects.filter(
-            project_permissions__sector_authorizations__sector=self
+            project_permissions__sector_authorizations__sector=self,
+            project_permissions__sector_authorizations__permission__is_deleted=False,
         )
 
     @property
@@ -189,6 +191,7 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         return User.objects.filter(
             project_permissions__sector_authorizations__sector=self,
             project_permissions__status="ONLINE",
+            project_permissions__sector_authorizations__permission__is_deleted=False,
         )
 
     @property
@@ -226,7 +229,8 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         is_online = False
         if queue:
             is_online = queue.authorizations.filter(
-                permission__status="ONLINE"
+                permission__status="ONLINE",
+                permission__is_deleted=False,
             ).exists()
         else:
             is_online = (
@@ -365,6 +369,9 @@ class SectorAuthorization(BaseModel):
     role = models.PositiveIntegerField(
         _("role"), choices=ROLE_CHOICES, default=ROLE_NOT_SETTED
     )
+
+    objects = SectorAuthorizationManager()
+    all_objects = SectorAuthorizationManager(include_deleted=True)
 
     class Meta:
         verbose_name = _("Sector Authorization")
