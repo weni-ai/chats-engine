@@ -71,6 +71,8 @@ class ExternalFinishedRoomsStatusViewSet(viewsets.GenericViewSet):
             data=filter_data,
             queryset=Room.objects.filter(
                 queue__sector__project=project,
+                queue__is_deleted=False,
+                queue__sector__is_deleted=False,
                 is_active=False,
                 ended_at__range=[start_time, end_time],
             ),
