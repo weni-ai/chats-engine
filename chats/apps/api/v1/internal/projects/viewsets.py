@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
@@ -40,6 +41,7 @@ class ProjectViewset(viewsets.ModelViewSet):
         """Retrieve the metadata of a project for internal modules."""
         return super().retrieve(request, *args, **kwargs)
 
+    @swagger_auto_schema(auto_schema=None)
     def create(self, request, *args, **kwargs):
         """Create a project through the internal service (syncing Keycloak when needed)."""
         if settings.OIDC_ENABLED:
