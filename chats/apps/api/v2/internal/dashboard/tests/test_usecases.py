@@ -179,9 +179,7 @@ class InternalDashboardAgentsUsecaseTests(TestCase):
         mock_filtered = MagicMock()
         mock_queryset.filter.return_value = mock_filtered
 
-        result = self.usecase.execute(
-            self.project, {"custom_status": ["NonExistent"]}
-        )
+        result = self.usecase.execute(self.project, {"custom_status": ["NonExistent"]})
 
         mock_queryset.filter.assert_called_once()
         filter_arg = mock_queryset.filter.call_args[0][0]
@@ -205,7 +203,7 @@ class InternalDashboardAgentsUsecaseTests(TestCase):
             project=self.project,
         )
 
-        result = self.usecase.execute(self.project, {"custom_status": ["Pausa"]})
+        self.usecase.execute(self.project, {"custom_status": ["Pausa"]})
 
         filter_arg = mock_queryset.filter.call_args[0][0]
         self.assertIn("pk__in", str(filter_arg))
@@ -216,9 +214,7 @@ class InternalDashboardAgentsUsecaseTests(TestCase):
         mock_filtered = MagicMock()
         mock_queryset.filter.return_value = mock_filtered
 
-        other_project = Project.objects.create(
-            name="Other Project", timezone="UTC"
-        )
+        other_project = Project.objects.create(name="Other Project", timezone="UTC")
         user = User.objects.create(email="agent@test.com")
         status_type = CustomStatusType.objects.create(
             name="Pausa", project=other_project
@@ -230,7 +226,7 @@ class InternalDashboardAgentsUsecaseTests(TestCase):
             project=other_project,
         )
 
-        result = self.usecase.execute(self.project, {"custom_status": ["Pausa"]})
+        self.usecase.execute(self.project, {"custom_status": ["Pausa"]})
 
         filter_arg = mock_queryset.filter.call_args[0][0]
         self.assertIn("pk__in", str(filter_arg))
