@@ -37,17 +37,6 @@ def validate_is_csat_enabled(project: Project, value: bool, context: dict) -> bo
     user = getattr(request, "user", None)
     project = project
 
-    if value is True and not is_feature_active(
-        settings.CSAT_FEATURE_FLAG_KEY, user.email, str(project.uuid)
-    ):
-        raise serializers.ValidationError(
-            {
-                "is_csat_enabled": [
-                    _("The CSAT feature is not available for this sector")
-                ]
-            },
-            code="csat_feature_flag_is_off",
-        )
     return value
 
 
