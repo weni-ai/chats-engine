@@ -1,5 +1,6 @@
 from django.db.models import Avg
 from django.utils import timezone as django_timezone
+from pendulum.parser import parse as pendulum_parse
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -62,11 +63,16 @@ class ExternalFinishedRoomsStatusViewSet(viewsets.GenericViewSet):
             filter_data.setdefault("start_date", today)
             filter_data.setdefault("end_date", today)
 
+        tz = project.timezone
+        start_time = pendulum_parse(filter_data["start_date"], tzinfo=tz)
+        end_time = pendulum_parse(filter_data["end_date"] + " 23:59:59", tzinfo=tz)
+
         rooms_qs = ExternalFinishedRoomsStatusFilter(
             data=filter_data,
             queryset=Room.objects.filter(
                 queue__sector__project=project,
                 is_active=False,
+                ended_at__range=[start_time, end_time],
             ),
             request=request,
         ).qs
