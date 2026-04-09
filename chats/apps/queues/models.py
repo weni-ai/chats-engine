@@ -12,7 +12,7 @@ from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
 from chats.apps.projects.models.models import CustomStatus
 from chats.apps.queues.dataclass import QueueLimit
-from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
+from chats.core.models import AuditableMixin, BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
 
 from .queue_managers import QueueAuthorizationManager, QueueManager
 
@@ -23,7 +23,7 @@ LAST_SEEN_THRESHOLD_SECONDS = getattr(settings, "WS_LAST_SEEN_THRESHOLD_SECONDS"
 User = get_user_model()
 
 
-class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
+class Queue(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
     sector = models.ForeignKey(
         "sectors.Sector",
         verbose_name=_("sector"),
@@ -275,7 +275,7 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         return self.sector.required_tags
 
 
-class QueueAuthorization(BaseModel):
+class QueueAuthorization(AuditableMixin, BaseModel):
     ROLE_NOT_SETTED = 0
     ROLE_AGENT = 1
 

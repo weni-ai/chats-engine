@@ -9,10 +9,6 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
-from chats.apps.core.internal_domains import (
-    is_vtex_internal_domain,
-    exclude_vtex_internal_domains,
-)
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.api.v1.permissions import (
     IsQueueAgent,
@@ -21,6 +17,10 @@ from chats.apps.api.v1.permissions import (
 )
 from chats.apps.api.v1.queues import serializers as queue_serializers
 from chats.apps.api.v1.queues.filters import QueueAuthorizationFilter, QueueFilter
+from chats.apps.core.internal_domains import (
+    exclude_vtex_internal_domains,
+    is_vtex_internal_domain,
+)
 from chats.apps.projects.models.models import Project
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.queues.models import Queue, QueueAuthorization
@@ -82,7 +82,9 @@ class QueueViewset(ModelViewSet):
         return super().get_serializer_class()
 
     def perform_create(self, serializer):
-        instance = serializer.save()
+        instance = serializer.save(
+            created_by=self.request.user, modified_by=self.request.user
+        )
 
         project = Project.objects.get(uuid=instance.sector.project.uuid)
 
@@ -126,7 +128,7 @@ class QueueViewset(ModelViewSet):
         return instance
 
     def perform_update(self, serializer):
-        instance = serializer.save()
+        instance = serializer.save(modified_by=self.request.user)
         content = {
             "uuid": str(instance.uuid),
             "name": instance.name,
@@ -159,13 +161,18 @@ class QueueViewset(ModelViewSet):
             "project_uuid": str(project_uuid),
         }
 
+        instance.deleted_by = self.request.user
+        instance.modified_by = self.request.user
+
         if not settings.USE_WENI_FLOWS:
-            return super().perform_destroy(instance)
+            instance.delete()
+            return
 
         response = FlowRESTClient().destroy_queue(**content)
 
         if response.status_code == status.HTTP_404_NOT_FOUND:
-            return super().perform_destroy(instance)
+            instance.delete()
+            return
 
         if response.status_code not in [
             status.HTTP_200_OK,
@@ -175,7 +182,7 @@ class QueueViewset(ModelViewSet):
             raise exceptions.APIException(
                 detail=f"[{response.status_code}] Error deleting the queue on flows. Exception: {response.content}"
             )
-        return super().perform_destroy(instance)
+        instance.delete()
 
     @action(detail=True, methods=["POST"])
     def authorization(self, request, *args, **kwargs):
@@ -308,6 +315,12 @@ class QueueAuthorizationViewset(ModelViewSet):
             return queue_serializers.QueueAuthorizationReadOnlyListSerializer
         return super().get_serializer_class()
 
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user, modified_by=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(modified_by=self.request.user)
+
     @action(detail=True, methods=["PATCH"])
     def update_queue_permissions(self, request, *args, **kwargs):
         queue_permission = self.get_object()
@@ -315,6 +328,7 @@ class QueueAuthorizationViewset(ModelViewSet):
         role = request.data.get("role")
 
         queue_permission.role = role
+        queue_permission.modified_by = request.user
         queue_permission.save()
 
         serializer_data = queue_serializers.QueueAuthorizationUpdateSerializer(

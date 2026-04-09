@@ -45,13 +45,18 @@ class GroupSectorViewset(viewsets.ModelViewSet):
 
     @transaction.atomic
     def perform_create(self, serializer):
-        serializer.save()
+        serializer.save(created_by=self.request.user, modified_by=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(modified_by=self.request.user)
 
     def perform_destroy(self, instance):
         for sector in instance.sectors.all():
             RemoveSectorFromGroupSectorUseCase(
                 sector_uuid=sector.uuid, group_sector=instance
             ).execute()
+        instance.deleted_by = self.request.user
+        instance.modified_by = self.request.user
         instance.delete()
 
     @action(
