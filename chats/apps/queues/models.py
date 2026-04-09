@@ -5,7 +5,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
-from django.db.models import OuterRef, Q, Subquery
+from django.db.models import IntegerField, OuterRef, Q, Subquery
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from weni.feature_flags.shortcuts import is_feature_active_for_attributes
@@ -138,17 +138,39 @@ class Queue(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
 
     @property
     def available_agents(self):
+        from chats.apps.projects.models.models import ProjectPermission
+
         routing_option = self.project.routing_option
         rooms_active_filter = models.Q(rooms__is_active=True)
         rooms_sector_filter = models.Q(rooms__queue__sector=self.sector)
 
         rooms_count_filter = models.Q(rooms_active_filter & rooms_sector_filter)
+
+        # Agents with is_custom_limit_active=True use their own custom_rooms_limit;
+        # all others fall back to the sector rooms_limit.
+        custom_limit_subquery = ProjectPermission.objects.filter(
+            user_id=OuterRef("email"),
+            project=self.sector.project,
+            is_custom_limit_active=True,
+            custom_rooms_limit__isnull=False,
+        ).values("custom_rooms_limit")[:1]
+
         online_agents = self.online_agents.annotate(
             active_rooms_count=models.Count(
                 "rooms",
                 filter=rooms_count_filter,
-            )
-        ).filter(active_rooms_count__lt=self.limit)
+                distinct=True,
+            ),
+            _custom_limit=Subquery(custom_limit_subquery),
+            effective_limit=models.Case(
+                models.When(
+                    _custom_limit__isnull=False,
+                    then=models.F("_custom_limit"),
+                ),
+                default=models.Value(self.limit),
+                output_field=models.IntegerField(),
+            ),
+        ).filter(active_rooms_count__lt=models.F("effective_limit"))
 
         if routing_option == "general":
             rooms_day_closed_filter = models.Q(

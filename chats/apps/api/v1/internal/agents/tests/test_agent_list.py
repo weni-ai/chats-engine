@@ -1,133 +1,168 @@
-from unittest.mock import MagicMock, patch
-
-from django.contrib.auth.models import Permission
-from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from chats.apps.accounts.models import User
-from chats.apps.api.v1.internal.agents.viewsets import AgentListViewset
+from chats.apps.api.v1.agents.views import AllAgentsView
 from chats.apps.projects.models import Project, ProjectPermission
+from chats.apps.projects.models.models import CustomStatus, CustomStatusType
 from chats.apps.queues.models import QueueAuthorization
 
 
-def _make_mock_redis():
-    return MagicMock(**{"get.return_value": None, "set.return_value": None})
-
-
-def _make_module_perm():
-    content_type = ContentType.objects.get_for_model(User)
-    perm, _ = Permission.objects.get_or_create(
-        codename="can_communicate_internally",
-        content_type=content_type,
+def _make_manager(project):
+    user = User.objects.create_user(email="manager@test.com", password="x")
+    ProjectPermission.objects.create(
+        project=project, user=user, role=ProjectPermission.ROLE_ADMIN
     )
-    return perm
+    return user
+
+
+def _make_agent(project, email, first_name, agent_status):
+    user = User.objects.create_user(email=email, password="x", first_name=first_name)
+    ProjectPermission.objects.create(
+        project=project,
+        user=user,
+        role=ProjectPermission.ROLE_ATTENDANT,
+        status=agent_status,
+    )
+    return user
+
+
+def _put_on_pause(user, project, pause_name="Lunch"):
+    status_type, _ = CustomStatusType.objects.get_or_create(
+        name=pause_name, project=project
+    )
+    return CustomStatus.objects.create(
+        user=user, status_type=status_type, is_active=True
+    )
 
 
 # ===========================================================================
 # ENGAGE-7555 — Agent ordering by status and name
-# Order: ONLINE → pause (AWAY/BUSY) → OFFLINE; alphabetical within each group
+# Order: ONLINE → pause (active custom status) → OFFLINE, alphabetical within
 # ===========================================================================
 
 
 class AgentListOrderingTests(TestCase):
     def setUp(self):
         self.factory = APIRequestFactory()
-        self.module_perm = _make_module_perm()
-
-        self.internal_user = User.objects.create_user(
-            email="internal@module.com", password="x"
-        )
-        self.internal_user.user_permissions.add(self.module_perm)
-
         self.project = Project.objects.create(name="Test Project", timezone="UTC")
+        self.manager = _make_manager(self.project)
 
-    def _create_agent(self, email, first_name, agent_status):
-        user = User.objects.create_user(
-            email=email, password="x", first_name=first_name
-        )
-        ProjectPermission.objects.create(
-            project=self.project,
-            user=user,
-            role=ProjectPermission.ROLE_ATTENDANT,
-            status=agent_status,
-        )
-        return user
-
-    def _list_agents(self, mock_redis):
-        mock_redis.return_value = _make_mock_redis()
-        view = AgentListViewset.as_view({"get": "list"})
-        request = self.factory.get(f"/internal/agents/?project={self.project.pk}")
-        force_authenticate(request, user=self.internal_user)
-        return view(request)
+    def _list(self, extra_params=None):
+        view = AllAgentsView.as_view()
+        params = extra_params or {}
+        request = self.factory.get(f"/project/{self.project.pk}/all_agents/", params)
+        force_authenticate(request, user=self.manager)
+        return view(request, project_uuid=str(self.project.pk))
 
     def _statuses(self, response):
         results = response.data.get("results", response.data)
-        return [item["status"] for item in results]
+        return [item["agent"]["chats_limit"]["active"] for item in results]
+
+    def _status_values(self, response):
+        """Return raw ProjectPermission status from the DB, ordered as returned."""
+        results = response.data.get("results", response.data)
+        emails = [item["email"] for item in results]
+        perms = {
+            p.user.email: p.status
+            for p in ProjectPermission.objects.filter(
+                project=self.project,
+                user__email__in=emails,
+            ).select_related("user")
+        }
+        return [perms[e] for e in emails]
 
     def _names(self, response):
         results = response.data.get("results", response.data)
-        return [item["user"]["first_name"] for item in results]
+        return [item["agent"]["name"].strip() for item in results]
 
     # ------------------------------------------------------------------
     # Case 20
     # ------------------------------------------------------------------
 
-    @patch("chats.apps.api.v1.internal.permissions.get_redis_connection")
-    def test_online_agents_appear_first(self, mock_redis):
+    def test_online_agents_appear_first(self):
         """ONLINE agents appear first in the listing."""
-        self._create_agent("offline@test.com", "Offline", ProjectPermission.STATUS_OFFLINE)
-        self._create_agent("online@test.com", "Online", ProjectPermission.STATUS_ONLINE)
+        _make_agent(
+            self.project,
+            "offline@test.com",
+            "Offline",
+            ProjectPermission.STATUS_OFFLINE,
+        )
+        _make_agent(
+            self.project, "online@test.com", "Online", ProjectPermission.STATUS_ONLINE
+        )
 
-        response = self._list_agents(mock_redis)
+        response = self._list()
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(self._statuses(response)[0], ProjectPermission.STATUS_ONLINE)
+        statuses = self._status_values(response)
+        self.assertEqual(statuses[0], ProjectPermission.STATUS_ONLINE)
 
     # ------------------------------------------------------------------
     # Case 21
     # ------------------------------------------------------------------
 
-    @patch("chats.apps.api.v1.internal.permissions.get_redis_connection")
-    def test_away_agents_appear_between_online_and_offline(self, mock_redis):
-        """AWAY agents appear after ONLINE and before OFFLINE agents."""
-        self._create_agent("offline@test.com", "Offline", ProjectPermission.STATUS_OFFLINE)
-        self._create_agent("away@test.com", "Away", ProjectPermission.STATUS_AWAY)
-        self._create_agent("online@test.com", "Online", ProjectPermission.STATUS_ONLINE)
+    def test_paused_agents_appear_between_online_and_offline(self):
+        """Agents with an active custom status appear after ONLINE and before OFFLINE."""
+        offline_user = _make_agent(
+            self.project,
+            "offline@test.com",
+            "Offline",
+            ProjectPermission.STATUS_OFFLINE,
+        )
+        online_user = _make_agent(
+            self.project, "online@test.com", "Online", ProjectPermission.STATUS_ONLINE
+        )
+        paused_user = _make_agent(
+            self.project, "paused@test.com", "Paused", ProjectPermission.STATUS_ONLINE
+        )
+        _put_on_pause(paused_user, self.project)
 
-        response = self._list_agents(mock_redis)
+        response = self._list()
 
-        statuses = self._statuses(response)
-        self.assertEqual(statuses[0], ProjectPermission.STATUS_ONLINE)
-        self.assertEqual(statuses[1], ProjectPermission.STATUS_AWAY)
-        self.assertEqual(statuses[2], ProjectPermission.STATUS_OFFLINE)
+        statuses = self._status_values(response)
+        emails = [item["email"] for item in response.data.get("results", response.data)]
+
+        self.assertEqual(emails[0], online_user.email)
+        self.assertEqual(emails[1], paused_user.email)
+        self.assertEqual(emails[2], offline_user.email)
 
     # ------------------------------------------------------------------
     # Case 22
     # ------------------------------------------------------------------
 
-    @patch("chats.apps.api.v1.internal.permissions.get_redis_connection")
-    def test_offline_agents_appear_last(self, mock_redis):
+    def test_offline_agents_appear_last(self):
         """OFFLINE agents appear last in the listing."""
-        self._create_agent("online@test.com", "Online", ProjectPermission.STATUS_ONLINE)
-        self._create_agent("offline@test.com", "Offline", ProjectPermission.STATUS_OFFLINE)
+        _make_agent(
+            self.project, "online@test.com", "Online", ProjectPermission.STATUS_ONLINE
+        )
+        _make_agent(
+            self.project,
+            "offline@test.com",
+            "Offline",
+            ProjectPermission.STATUS_OFFLINE,
+        )
 
-        response = self._list_agents(mock_redis)
+        response = self._list()
 
-        self.assertEqual(self._statuses(response)[-1], ProjectPermission.STATUS_OFFLINE)
+        statuses = self._status_values(response)
+        self.assertEqual(statuses[-1], ProjectPermission.STATUS_OFFLINE)
 
     # ------------------------------------------------------------------
     # Case 23
     # ------------------------------------------------------------------
 
-    @patch("chats.apps.api.v1.internal.permissions.get_redis_connection")
-    def test_same_status_ordered_alphabetically_by_name(self, mock_redis):
-        """Agents with the same status are ordered alphabetically by name."""
-        self._create_agent("zara@test.com", "Zara", ProjectPermission.STATUS_ONLINE)
-        self._create_agent("ana@test.com", "Ana", ProjectPermission.STATUS_ONLINE)
+    def test_same_status_ordered_alphabetically_by_name(self):
+        """Agents with the same status are ordered alphabetically by first name."""
+        _make_agent(
+            self.project, "zara@test.com", "Zara", ProjectPermission.STATUS_ONLINE
+        )
+        _make_agent(
+            self.project, "ana@test.com", "Ana", ProjectPermission.STATUS_ONLINE
+        )
 
-        response = self._list_agents(mock_redis)
+        response = self._list()
 
         names = self._names(response)
         self.assertEqual(names, sorted(names))
@@ -136,53 +171,62 @@ class AgentListOrderingTests(TestCase):
     # Case 24
     # ------------------------------------------------------------------
 
-    @patch("chats.apps.api.v1.internal.permissions.get_redis_connection")
-    def test_full_ordering_with_all_statuses_and_mixed_names(self, mock_redis):
-        """Full ordering: ONLINE → AWAY/BUSY → OFFLINE, each group sorted alphabetically."""
-        self._create_agent("zara.online@test.com", "Zara", ProjectPermission.STATUS_ONLINE)
-        self._create_agent("ana.online@test.com", "Ana", ProjectPermission.STATUS_ONLINE)
-        self._create_agent("busy@test.com", "Marcus", ProjectPermission.STATUS_BUSY)
-        self._create_agent("away@test.com", "Carlos", ProjectPermission.STATUS_AWAY)
-        self._create_agent("zara.offline@test.com", "Zara", ProjectPermission.STATUS_OFFLINE)
-        self._create_agent("ana.offline@test.com", "Ana", ProjectPermission.STATUS_OFFLINE)
+    def test_full_ordering_with_all_statuses_and_mixed_names(self):
+        """Full ordering: ONLINE → pause → OFFLINE, each group sorted alphabetically."""
+        _make_agent(
+            self.project,
+            "zara.online@test.com",
+            "Zara",
+            ProjectPermission.STATUS_ONLINE,
+        )
+        _make_agent(
+            self.project, "ana.online@test.com", "Ana", ProjectPermission.STATUS_ONLINE
+        )
+        paused = _make_agent(
+            self.project, "paused@test.com", "Marcus", ProjectPermission.STATUS_ONLINE
+        )
+        _put_on_pause(paused, self.project)
+        _make_agent(
+            self.project,
+            "zara.offline@test.com",
+            "Zara",
+            ProjectPermission.STATUS_OFFLINE,
+        )
+        _make_agent(
+            self.project,
+            "ana.offline@test.com",
+            "Ana",
+            ProjectPermission.STATUS_OFFLINE,
+        )
 
-        response = self._list_agents(mock_redis)
-
-        statuses = self._statuses(response)
+        response = self._list()
+        emails = [item["email"] for item in response.data.get("results", response.data)]
         names = self._names(response)
-        pause_statuses = {ProjectPermission.STATUS_AWAY, ProjectPermission.STATUS_BUSY}
 
-        # Two ONLINE first
-        self.assertEqual(statuses[0], ProjectPermission.STATUS_ONLINE)
-        self.assertEqual(statuses[1], ProjectPermission.STATUS_ONLINE)
-        # Two pause statuses in the middle
-        self.assertIn(statuses[2], pause_statuses)
-        self.assertIn(statuses[3], pause_statuses)
-        # Two OFFLINE last
-        self.assertEqual(statuses[4], ProjectPermission.STATUS_OFFLINE)
-        self.assertEqual(statuses[5], ProjectPermission.STATUS_OFFLINE)
-        # Each group sorted alphabetically
+        # Two ONLINE first (alphabetical)
+        self.assertIn("ana.online@test.com", emails[:2])
+        self.assertIn("zara.online@test.com", emails[:2])
         self.assertEqual(names[:2], sorted(names[:2]))
-        self.assertEqual(names[4:], sorted(names[4:]))
+        # Paused in the middle
+        self.assertEqual(emails[2], paused.email)
+        # Two OFFLINE last (alphabetical)
+        self.assertIn("ana.offline@test.com", emails[3:])
+        self.assertIn("zara.offline@test.com", emails[3:])
+        self.assertEqual(names[3:], sorted(names[3:]))
 
 
 # ===========================================================================
 # ENGAGE-7556 — Agent list filters
-# Filters: status, attendant (name/email), sector, queue
+# Filters: status, custom_status, agent (email), sector, queue
 # ===========================================================================
 
 
 class AgentListFilterTests(TestCase):
     def setUp(self):
         self.factory = APIRequestFactory()
-        self.module_perm = _make_module_perm()
-
-        self.internal_user = User.objects.create_user(
-            email="internal@module.com", password="x"
-        )
-        self.internal_user.user_permissions.add(self.module_perm)
-
         self.project = Project.objects.create(name="Test Project", timezone="UTC")
+        self.manager = _make_manager(self.project)
+
         self.sector = self.project.sectors.create(
             name="Support", rooms_limit=5, work_start="08:00", work_end="18:00"
         )
@@ -217,29 +261,26 @@ class AgentListFilterTests(TestCase):
             role=QueueAuthorization.ROLE_AGENT,
         )
 
-    def _list_agents(self, mock_redis, extra_filters=""):
-        mock_redis.return_value = _make_mock_redis()
-        view = AgentListViewset.as_view({"get": "list"})
+    def _list(self, extra_params=None):
+        view = AllAgentsView.as_view()
         request = self.factory.get(
-            f"/internal/agents/?project={self.project.pk}{extra_filters}"
+            f"/project/{self.project.pk}/all_agents/",
+            extra_params or {},
         )
-        force_authenticate(request, user=self.internal_user)
-        return view(request)
+        force_authenticate(request, user=self.manager)
+        return view(request, project_uuid=str(self.project.pk))
 
     def _emails(self, response):
         results = response.data.get("results", response.data)
-        return {item["user"]["email"] for item in results}
+        return {item["email"] for item in results}
 
     # ------------------------------------------------------------------
     # Case 25
     # ------------------------------------------------------------------
 
-    @patch("chats.apps.api.v1.internal.permissions.get_redis_connection")
-    def test_filter_by_online_status_returns_only_online_agents(self, mock_redis):
-        """Filter status=ONLINE returns only online agents."""
-        response = self._list_agents(
-            mock_redis, f"&status={ProjectPermission.STATUS_ONLINE}"
-        )
+    def test_filter_by_online_status_returns_only_online_agents(self):
+        """Filter status=online returns only agents that are ONLINE without a pause."""
+        response = self._list({"status": "online"})
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         emails = self._emails(response)
@@ -250,25 +291,35 @@ class AgentListFilterTests(TestCase):
     # Case 26
     # ------------------------------------------------------------------
 
-    @patch("chats.apps.api.v1.internal.permissions.get_redis_connection")
-    def test_filter_by_offline_status_returns_only_offline_agents(self, mock_redis):
-        """Filter status=OFFLINE returns only offline agents."""
-        response = self._list_agents(
-            mock_redis, f"&status={ProjectPermission.STATUS_OFFLINE}"
-        )
+    def test_filter_by_offline_status_returns_only_offline_agents(self):
+        """Filter status=offline returns only agents that are OFFLINE."""
+        response = self._list({"status": "offline"})
 
         emails = self._emails(response)
         self.assertIn(self.offline_user.email, emails)
         self.assertNotIn(self.online_user.email, emails)
 
     # ------------------------------------------------------------------
+    # Case 26b
+    # ------------------------------------------------------------------
+
+    def test_filter_by_custom_status_returns_paused_agents(self):
+        """Filter custom_status=Lunch returns only agents currently on that pause."""
+        _put_on_pause(self.online_user, self.project, "Lunch")
+
+        response = self._list({"custom_status": "Lunch"})
+
+        emails = self._emails(response)
+        self.assertIn(self.online_user.email, emails)
+        self.assertNotIn(self.offline_user.email, emails)
+
+    # ------------------------------------------------------------------
     # Case 27
     # ------------------------------------------------------------------
 
-    @patch("chats.apps.api.v1.internal.permissions.get_redis_connection")
-    def test_filter_by_attendant_name_returns_matching_agents(self, mock_redis):
-        """Filter by attendant name returns only matching agents."""
-        response = self._list_agents(mock_redis, "&attendant=Ana")
+    def test_filter_by_agent_email_returns_matching_agents(self):
+        """Filter by agent email (partial match) returns only matching agents."""
+        response = self._list({"agent": "online"})
 
         emails = self._emails(response)
         self.assertIn(self.online_user.email, emails)
@@ -278,9 +329,8 @@ class AgentListFilterTests(TestCase):
     # Case 28
     # ------------------------------------------------------------------
 
-    @patch("chats.apps.api.v1.internal.permissions.get_redis_connection")
-    def test_filter_by_sector_returns_only_agents_in_that_sector(self, mock_redis):
-        """Filter by sector returns only agents authorized in that sector."""
+    def test_filter_by_sector_returns_only_agents_in_that_sector(self):
+        """Filter by sector returns only agents authorised in that sector."""
         other_sector = self.project.sectors.create(
             name="Other Sector", rooms_limit=5, work_start="08:00", work_end="18:00"
         )
@@ -292,12 +342,10 @@ class AgentListFilterTests(TestCase):
             role=ProjectPermission.ROLE_ATTENDANT,
         )
         QueueAuthorization.objects.create(
-            permission=other_perm,
-            queue=other_queue,
-            role=QueueAuthorization.ROLE_AGENT,
+            permission=other_perm, queue=other_queue, role=QueueAuthorization.ROLE_AGENT
         )
 
-        response = self._list_agents(mock_redis, f"&sector={self.sector.pk}")
+        response = self._list({"sector": str(self.sector.pk)})
 
         emails = self._emails(response)
         self.assertIn(self.online_user.email, emails)
@@ -308,9 +356,8 @@ class AgentListFilterTests(TestCase):
     # Case 29
     # ------------------------------------------------------------------
 
-    @patch("chats.apps.api.v1.internal.permissions.get_redis_connection")
-    def test_filter_by_queue_returns_only_agents_in_that_queue(self, mock_redis):
-        """Filter by queue returns only agents authorized in that queue."""
+    def test_filter_by_queue_returns_only_agents_in_that_queue(self):
+        """Filter by queue returns only agents authorised in that queue."""
         second_queue = self.sector.queues.create(name="Queue 2")
         other_user = User.objects.create_user(email="other@test.com", password="x")
         other_perm = ProjectPermission.objects.create(
@@ -324,7 +371,7 @@ class AgentListFilterTests(TestCase):
             role=QueueAuthorization.ROLE_AGENT,
         )
 
-        response = self._list_agents(mock_redis, f"&queue={self.queue.pk}")
+        response = self._list({"queue": str(self.queue.pk)})
 
         emails = self._emails(response)
         self.assertIn(self.online_user.email, emails)
@@ -335,13 +382,9 @@ class AgentListFilterTests(TestCase):
     # Case 30
     # ------------------------------------------------------------------
 
-    @patch("chats.apps.api.v1.internal.permissions.get_redis_connection")
-    def test_combined_filters_status_and_queue(self, mock_redis):
+    def test_combined_filters_status_and_queue(self):
         """Combining status and queue filters works correctly."""
-        response = self._list_agents(
-            mock_redis,
-            f"&status={ProjectPermission.STATUS_ONLINE}&queue={self.queue.pk}",
-        )
+        response = self._list({"status": "online", "queue": str(self.queue.pk)})
 
         emails = self._emails(response)
         self.assertIn(self.online_user.email, emails)
@@ -351,10 +394,9 @@ class AgentListFilterTests(TestCase):
     # Case 31
     # ------------------------------------------------------------------
 
-    @patch("chats.apps.api.v1.internal.permissions.get_redis_connection")
-    def test_no_extra_filters_returns_all_project_agents(self, mock_redis):
-        """Without extra filters, returns all agents in the project."""
-        response = self._list_agents(mock_redis)
+    def test_no_extra_filters_returns_all_project_agents(self):
+        """Without extra filters, returns all attendant agents in the project."""
+        response = self._list()
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         emails = self._emails(response)

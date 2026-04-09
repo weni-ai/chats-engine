@@ -1,23 +1,27 @@
 from django.urls import include, path
 from weni.feature_flags.views import FeatureFlagsWebhookView
 
+from chats.apps.ai_features.audio_transcription.views import (
+    AudioTranscriptionFeedbackTagsView,
+    AudioTranscriptionFeedbackView,
+    AudioTranscriptionView,
+)
+from chats.apps.api.v1.agents.views import (
+    AgentQueuePermissionsView,
+    AllAgentsView,
+    UpdateQueuePermissionsView,
+)
+from chats.apps.api.v1.ai_features.views import HistorySummaryFeedbackTagsView
 from chats.apps.api.v1.archive_chats.views import GetArchivedMediaView
-from chats.apps.api.v1.rooms.viewsets import RoomsReportViewSet
 from chats.apps.api.v1.dashboard.viewsets import (
     ModelFieldsViewSet,
     ReportFieldsValidatorViewSet,
 )
-from chats.apps.api.v1.routers import router
-from chats.apps.api.v1.internal.ai_features.views import FeaturePromptsView
-from chats.apps.api.v1.internal.agents.views import AgentDisconnectView
 from chats.apps.api.v1.human_support.views import HumanSupportNexusSettingsView
-from chats.apps.api.v1.ai_features.views import HistorySummaryFeedbackTagsView
-from chats.apps.ai_features.audio_transcription.views import (
-    AudioTranscriptionView,
-    AudioTranscriptionFeedbackView,
-    AudioTranscriptionFeedbackTagsView,
-)
-
+from chats.apps.api.v1.internal.agents.views import AgentDisconnectView
+from chats.apps.api.v1.internal.ai_features.views import FeaturePromptsView
+from chats.apps.api.v1.rooms.viewsets import RoomsReportViewSet
+from chats.apps.api.v1.routers import router
 
 urlpatterns = [
     path(
@@ -67,6 +71,21 @@ urlpatterns = [
         "human-support/<str:project_uuid>/",
         HumanSupportNexusSettingsView.as_view(),
         name="human_support_nexus_settings",
+    ),
+    path(
+        "project/<uuid:project_uuid>/all_agents/",
+        AllAgentsView.as_view(),
+        name="all_agents",
+    ),
+    path(
+        "agent/queue_permissions/",
+        AgentQueuePermissionsView.as_view(),
+        name="agent_queue_permissions",
+    ),
+    path(
+        "agent/update_queue_permissions/",
+        UpdateQueuePermissionsView.as_view(),
+        name="update_queue_permissions",
     ),
     path("", include(router.urls)),
 ]

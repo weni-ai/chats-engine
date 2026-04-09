@@ -1,51 +1,41 @@
 import uuid
-from unittest.mock import MagicMock, patch
 
-from django.contrib.auth.models import Permission
-from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from chats.apps.accounts.models import User
-from chats.apps.api.v1.internal.agents.viewsets import (
-    AgentQueueAuthorizationViewset,
-    QueueAuthorizationManagementViewset,
+from chats.apps.api.v1.agents.views import (
+    AgentQueuePermissionsView,
+    UpdateQueuePermissionsView,
 )
 from chats.apps.projects.models import Project, ProjectPermission
-from chats.apps.queues.models import QueueAuthorization
+from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.sectors.models import Sector, SectorAuthorization
 
 
-def _make_mock_redis():
-    return MagicMock(**{"get.return_value": None, "set.return_value": None})
-
-
-def _make_module_perm():
-    content_type = ContentType.objects.get_for_model(User)
-    perm, _ = Permission.objects.get_or_create(
-        codename="can_communicate_internally",
-        content_type=content_type,
+def _make_manager(project):
+    """Creates a manager user with SectorAuthorization so is_manager() returns True."""
+    user = User.objects.create_user(email="manager@test.com", password="x")
+    perm = ProjectPermission.objects.create(
+        project=project, user=user, role=ProjectPermission.ROLE_ADMIN
     )
-    return perm
+    return user, perm
 
 
 # ===========================================================================
-# ENGAGE-7558 — GET /internal/agents/{permission_uuid}/
-# Endpoint that returns all sectors and queues for a given user
+# ENGAGE-7558 — GET /v1/agent/queue_permissions/?agent={email}&project={uuid}
+# Returns all sectors/queues for an agent with agent_in_queue flag + chats_limit
 # ===========================================================================
 
 
-class AgentQueueAuthorizationViewsetTests(TestCase):
+class AgentQueuePermissionsViewTests(TestCase):
     def setUp(self):
         self.factory = APIRequestFactory()
-        self.module_perm = _make_module_perm()
-
-        self.internal_user = User.objects.create_user(
-            email="internal@module.com", password="x"
-        )
-        self.internal_user.user_permissions.add(self.module_perm)
 
         self.project = Project.objects.create(name="Test Project", timezone="UTC")
+        self.manager_user, _ = _make_manager(self.project)
+
         self.agent_user = User.objects.create_user(email="agent@test.com", password="x")
         self.permission = ProjectPermission.objects.create(
             project=self.project,
@@ -62,50 +52,56 @@ class AgentQueueAuthorizationViewsetTests(TestCase):
             role=QueueAuthorization.ROLE_AGENT,
         )
 
-    def _retrieve(self, mock_redis, permission_uuid=None, user=None):
-        mock_redis.return_value = _make_mock_redis()
-        target_uuid = permission_uuid or str(self.permission.pk)
-        view = AgentQueueAuthorizationViewset.as_view({"get": "retrieve"})
-        request = self.factory.get(f"/internal/agents/{target_uuid}/")
-        force_authenticate(request, user=user or self.internal_user)
-        return view(request, uuid=target_uuid)
+    def _get(self, agent_email=None, project_uuid=None, user=None):
+        view = AgentQueuePermissionsView.as_view()
+        params = {}
+        if agent_email is not None:
+            params["agent"] = agent_email
+        if project_uuid is not None:
+            params["project"] = str(project_uuid)
+        request = self.factory.get("/agent/queue_permissions/", params)
+        force_authenticate(request, user=user or self.manager_user)
+        return view(request)
 
     # ------------------------------------------------------------------
     # Case 1
     # ------------------------------------------------------------------
 
-    @patch("chats.apps.api.v1.internal.permissions.get_redis_connection")
-    def test_returns_all_queue_authorizations_for_valid_user(self, mock_redis):
-        """Returns all QueueAuthorizations (queue + sector) for a valid user."""
-        response = self._retrieve(mock_redis)
+    def test_returns_queue_permissions_with_agent_in_queue_flag(self):
+        """Returns sector/queue structure with agent_in_queue=True for authorised queues."""
+        response = self._get(
+            agent_email=self.agent_user.email,
+            project_uuid=self.project.pk,
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIn("queue_authorizations", response.data)
-        self.assertEqual(len(response.data["queue_authorizations"]), 1)
+        self.assertIn("queue_permissions", response.data)
+        self.assertIn("chats_limit", response.data)
 
-        auth = response.data["queue_authorizations"][0]
-        self.assertEqual(auth["uuid"], str(self.queue_auth.pk))
-        self.assertEqual(auth["queue"]["uuid"], str(self.queue.pk))
-        self.assertEqual(auth["queue"]["sector"]["uuid"], str(self.sector.pk))
+        sector_entry = response.data["queue_permissions"][0]
+        self.assertEqual(sector_entry["sector"]["name"], self.sector.name)
+
+        queues = sector_entry["sector"]["queues"]
+        queue_entry = next(q for q in queues if q["uuid"] == str(self.queue.pk))
+        self.assertTrue(queue_entry["agent_in_queue"])
 
     # ------------------------------------------------------------------
     # Case 2
     # ------------------------------------------------------------------
 
-    @patch("chats.apps.api.v1.internal.permissions.get_redis_connection")
-    def test_returns_empty_when_user_has_no_queue_authorizations(self, mock_redis):
-        """Returns an empty list for a user with no QueueAuthorizations."""
-        other_agent = User.objects.create_user(email="other@test.com", password="x")
-        permission_without_auth = ProjectPermission.objects.create(
-            project=self.project,
-            user=other_agent,
-            role=ProjectPermission.ROLE_ATTENDANT,
+    def test_agent_not_in_queue_returns_agent_in_queue_false(self):
+        """Queues the agent does NOT belong to have agent_in_queue=False."""
+        second_queue = self.sector.queues.create(name="Queue 2")
+
+        response = self._get(
+            agent_email=self.agent_user.email,
+            project_uuid=self.project.pk,
         )
 
-        response = self._retrieve(mock_redis, permission_uuid=str(permission_without_auth.pk))
-
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["queue_authorizations"], [])
+        queues = response.data["queue_permissions"][0]["sector"]["queues"]
+        second = next(q for q in queues if q["uuid"] == str(second_queue.pk))
+        self.assertFalse(second["agent_in_queue"])
 
     # ------------------------------------------------------------------
     # Case 3
@@ -113,72 +109,80 @@ class AgentQueueAuthorizationViewsetTests(TestCase):
 
     def test_unauthenticated_returns_401(self):
         """Returns 401 when no authentication credentials are provided."""
-        view = AgentQueueAuthorizationViewset.as_view({"get": "retrieve"})
-        request = self.factory.get(f"/internal/agents/{self.permission.pk}/")
-        response = view(request, uuid=str(self.permission.pk))
-
+        view = AgentQueuePermissionsView.as_view()
+        request = self.factory.get(
+            "/agent/queue_permissions/",
+            {"agent": self.agent_user.email, "project": str(self.project.pk)},
+        )
+        response = view(request)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     # ------------------------------------------------------------------
     # Case 4
     # ------------------------------------------------------------------
 
-    @patch("chats.apps.api.v1.internal.permissions.get_redis_connection")
-    def test_without_module_permission_returns_403(self, mock_redis):
-        """Returns 403 when user lacks the can_communicate_internally permission."""
-        unauthorized_user = User.objects.create_user(email="unauth@test.com", password="x")
-
-        response = self._retrieve(mock_redis, user=unauthorized_user)
-
+    def test_non_manager_returns_403(self):
+        """Returns 403 when the requesting user is not a manager."""
+        regular_user = User.objects.create_user(email="regular@test.com", password="x")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=regular_user,
+            role=ProjectPermission.ROLE_ATTENDANT,
+        )
+        response = self._get(
+            agent_email=self.agent_user.email,
+            project_uuid=self.project.pk,
+            user=regular_user,
+        )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     # ------------------------------------------------------------------
     # Case 5
     # ------------------------------------------------------------------
 
-    @patch("chats.apps.api.v1.internal.permissions.get_redis_connection")
-    def test_returns_multiple_authorizations_when_agent_has_multiple_queues(self, mock_redis):
-        """Returns all authorizations when the agent belongs to more than one queue."""
-        second_queue = self.sector.queues.create(name="Queue 2")
-        QueueAuthorization.objects.create(
-            permission=self.permission,
-            queue=second_queue,
-            role=QueueAuthorization.ROLE_AGENT,
+    def test_returns_all_sectors_even_without_agent_authorization(self):
+        """All project sectors are returned regardless of the agent's membership."""
+        second_sector = self.project.sectors.create(
+            name="Billing", rooms_limit=3, work_start="09:00", work_end="17:00"
+        )
+        second_sector.queues.create(name="Billing Queue")
+
+        response = self._get(
+            agent_email=self.agent_user.email,
+            project_uuid=self.project.pk,
         )
 
-        response = self._retrieve(mock_redis)
-
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data["queue_authorizations"]), 2)
+        sector_names = [e["sector"]["name"] for e in response.data["queue_permissions"]]
+        self.assertIn(self.sector.name, sector_names)
+        self.assertIn(second_sector.name, sector_names)
 
     # ------------------------------------------------------------------
     # Case 6
     # ------------------------------------------------------------------
 
-    @patch("chats.apps.api.v1.internal.permissions.get_redis_connection")
-    def test_nonexistent_permission_uuid_returns_404(self, mock_redis):
-        """Returns 404 when the permission UUID does not exist."""
-        response = self._retrieve(mock_redis, permission_uuid=str(uuid.uuid4()))
-
+    def test_nonexistent_agent_returns_404(self):
+        """Returns 404 when the agent email does not belong to the project."""
+        response = self._get(
+            agent_email="ghost@test.com",
+            project_uuid=self.project.pk,
+        )
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
 
 # ===========================================================================
-# ENGAGE-7557 — CRUD + bulk delete of QueueAuthorization
+# ENGAGE-7557 — POST /v1/agent/update_queue_permissions/
+# Single endpoint handling add, remove and bulk operations
 # ===========================================================================
 
 
-class QueueAuthorizationManagementViewsetTests(TestCase):
+class UpdateQueuePermissionsViewTests(TestCase):
     def setUp(self):
         self.factory = APIRequestFactory()
-        self.module_perm = _make_module_perm()
-
-        self.internal_user = User.objects.create_user(
-            email="internal@module.com", password="x"
-        )
-        self.internal_user.user_permissions.add(self.module_perm)
 
         self.project = Project.objects.create(name="Test Project", timezone="UTC")
+        self.manager_user, _ = _make_manager(self.project)
+
         self.agent_user = User.objects.create_user(email="agent@test.com", password="x")
         self.permission = ProjectPermission.objects.create(
             project=self.project,
@@ -195,72 +199,36 @@ class QueueAuthorizationManagementViewsetTests(TestCase):
             role=QueueAuthorization.ROLE_AGENT,
         )
 
-    def _list(self, mock_redis, query_string=""):
-        mock_redis.return_value = _make_mock_redis()
-        view = QueueAuthorizationManagementViewset.as_view({"get": "list"})
-        request = self.factory.get(f"/internal/queue-authorizations/{query_string}")
-        force_authenticate(request, user=self.internal_user)
-        return view(request)
-
-    def _create(self, mock_redis, data):
-        mock_redis.return_value = _make_mock_redis()
-        view = QueueAuthorizationManagementViewset.as_view({"post": "create"})
+    def _post(self, data, user=None):
+        view = UpdateQueuePermissionsView.as_view()
         request = self.factory.post(
-            "/internal/queue-authorizations/", data, format="json"
+            "/agent/update_queue_permissions/", data, format="json"
         )
-        force_authenticate(request, user=self.internal_user)
+        force_authenticate(request, user=user or self.manager_user)
         return view(request)
 
-    def _partial_update(self, mock_redis, auth_uuid, data):
-        mock_redis.return_value = _make_mock_redis()
-        view = QueueAuthorizationManagementViewset.as_view({"patch": "partial_update"})
-        request = self.factory.patch(
-            f"/internal/queue-authorizations/{auth_uuid}/", data, format="json"
-        )
-        force_authenticate(request, user=self.internal_user)
-        return view(request, uuid=str(auth_uuid))
-
-    def _destroy(self, mock_redis, auth_uuid):
-        mock_redis.return_value = _make_mock_redis()
-        view = QueueAuthorizationManagementViewset.as_view({"delete": "destroy"})
-        request = self.factory.delete(f"/internal/queue-authorizations/{auth_uuid}/")
-        force_authenticate(request, user=self.internal_user)
-        return view(request, uuid=str(auth_uuid))
-
-    def _bulk_delete(self, mock_redis, data):
-        mock_redis.return_value = _make_mock_redis()
-        view = QueueAuthorizationManagementViewset.as_view({"post": "bulk_delete"})
-        request = self.factory.post(
-            "/internal/queue-authorizations/bulk_delete/", data, format="json"
-        )
-        force_authenticate(request, user=self.internal_user)
-        return view(request)
+    def _base_body(self, **overrides):
+        body = {
+            "agents": [self.agent_user.email],
+            "project": str(self.project.pk),
+        }
+        body.update(overrides)
+        return body
 
     # ------------------------------------------------------------------
     # Case 7
     # ------------------------------------------------------------------
 
-    @patch("chats.apps.api.v1.internal.permissions.get_redis_connection")
-    def test_create_with_valid_data_returns_201(self, mock_redis):
-        """Creates a QueueAuthorization with valid data and returns 201."""
-        other_agent = User.objects.create_user(email="other@test.com", password="x")
-        other_permission = ProjectPermission.objects.create(
-            project=self.project,
-            user=other_agent,
-            role=ProjectPermission.ROLE_ATTENDANT,
-        )
+    def test_add_agent_to_queue_creates_authorization(self):
+        """to_add creates a new QueueAuthorization for the agent."""
         second_queue = self.sector.queues.create(name="Queue 2")
 
-        response = self._create(mock_redis, {
-            "queue": str(second_queue.pk),
-            "permission": str(other_permission.pk),
-            "role": QueueAuthorization.ROLE_AGENT,
-        })
+        response = self._post(self._base_body(to_add=[str(second_queue.pk)]))
 
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(
             QueueAuthorization.objects.filter(
-                queue=second_queue, permission=other_permission
+                permission=self.permission, queue=second_queue
             ).exists()
         )
 
@@ -268,117 +236,131 @@ class QueueAuthorizationManagementViewsetTests(TestCase):
     # Case 8
     # ------------------------------------------------------------------
 
-    @patch("chats.apps.api.v1.internal.permissions.get_redis_connection")
-    def test_create_duplicate_returns_400(self, mock_redis):
-        """Returns 400 when trying to create a duplicate (same queue + permission)."""
-        response = self._create(mock_redis, {
-            "queue": str(self.queue.pk),
-            "permission": str(self.permission.pk),
-            "role": QueueAuthorization.ROLE_AGENT,
-        })
+    def test_add_agent_to_queue_is_idempotent(self):
+        """Adding the agent to a queue they already belong to does not raise an error."""
+        response = self._post(self._base_body(to_add=[str(self.queue.pk)]))
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(
+            QueueAuthorization.objects.filter(
+                permission=self.permission, queue=self.queue
+            ).count(),
+            1,
+        )
 
     # ------------------------------------------------------------------
     # Case 9
     # ------------------------------------------------------------------
 
-    @patch("chats.apps.api.v1.internal.permissions.get_redis_connection")
-    def test_partial_update_role_returns_200(self, mock_redis):
-        """Updates the role of an existing authorization and returns 200."""
-        response = self._partial_update(mock_redis, self.queue_auth.pk, {
-            "role": QueueAuthorization.ROLE_NOT_SETTED,
-        })
+    def test_remove_agent_from_queue_deletes_authorization(self):
+        """to_remove deletes the QueueAuthorization for the agent."""
+        response = self._post(self._base_body(to_remove=[str(self.queue.pk)]))
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.queue_auth.refresh_from_db()
-        self.assertEqual(self.queue_auth.role, QueueAuthorization.ROLE_NOT_SETTED)
+        self.assertFalse(
+            QueueAuthorization.objects.filter(
+                permission=self.permission, queue=self.queue
+            ).exists()
+        )
 
     # ------------------------------------------------------------------
     # Case 10
     # ------------------------------------------------------------------
 
-    @patch("chats.apps.api.v1.internal.permissions.get_redis_connection")
-    def test_destroy_single_authorization_returns_204(self, mock_redis):
-        """Deletes a single authorization and returns 204."""
-        response = self._destroy(mock_redis, self.queue_auth.pk)
+    def test_update_chats_limit_saves_on_permission(self):
+        """chats_limit updates is_custom_limit_active and custom_rooms_limit on ProjectPermission."""
+        response = self._post(self._base_body(chats_limit={"active": True, "total": 8}))
 
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(
-            QueueAuthorization.objects.filter(pk=self.queue_auth.pk).exists()
-        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.permission.refresh_from_db()
+        self.assertTrue(self.permission.is_custom_limit_active)
+        self.assertEqual(self.permission.custom_rooms_limit, 8)
 
     # ------------------------------------------------------------------
     # Case 11
     # ------------------------------------------------------------------
 
-    @patch("chats.apps.api.v1.internal.permissions.get_redis_connection")
-    def test_bulk_delete_valid_uuids_deletes_all(self, mock_redis):
-        """Bulk delete with a list of valid UUIDs removes all of them."""
+    def test_bulk_operation_applies_to_all_agents_in_list(self):
+        """When agents has multiple entries, changes apply to all of them."""
+        second_agent = User.objects.create_user(email="agent2@test.com", password="x")
+        second_perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=second_agent,
+            role=ProjectPermission.ROLE_ATTENDANT,
+        )
         second_queue = self.sector.queues.create(name="Queue 2")
-        second_auth = QueueAuthorization.objects.create(
-            permission=self.permission,
-            queue=second_queue,
-            role=QueueAuthorization.ROLE_AGENT,
+
+        response = self._post(
+            {
+                "agents": [self.agent_user.email, second_agent.email],
+                "project": str(self.project.pk),
+                "to_add": [str(second_queue.pk)],
+            }
         )
 
-        response = self._bulk_delete(mock_redis, {
-            "uuids": [str(self.queue_auth.pk), str(second_auth.pk)],
-        })
-
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(QueueAuthorization.objects.filter(pk=self.queue_auth.pk).exists())
-        self.assertFalse(QueueAuthorization.objects.filter(pk=second_auth.pk).exists())
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(
+            QueueAuthorization.objects.filter(
+                permission=self.permission, queue=second_queue
+            ).exists()
+        )
+        self.assertTrue(
+            QueueAuthorization.objects.filter(
+                permission=second_perm, queue=second_queue
+            ).exists()
+        )
 
     # ------------------------------------------------------------------
     # Case 12
     # ------------------------------------------------------------------
 
-    @patch("chats.apps.api.v1.internal.permissions.get_redis_connection")
-    def test_bulk_delete_with_nonexistent_uuid_returns_400(self, mock_redis):
-        """Bulk delete with nonexistent UUIDs returns 400 with a descriptive error."""
-        response = self._bulk_delete(mock_redis, {
-            "uuids": [str(self.queue_auth.pk), str(uuid.uuid4())],
-        })
-
+    def test_agent_not_in_project_returns_400(self):
+        """Returns 400 when an agent email does not exist in the project."""
+        response = self._post(
+            self._base_body(
+                agents=["ghost@test.com"],
+                to_add=[str(self.queue.pk)],
+            )
+        )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("uuids", response.data)
 
     # ------------------------------------------------------------------
     # Case 13
     # ------------------------------------------------------------------
 
-    @patch("chats.apps.api.v1.internal.permissions.get_redis_connection")
-    def test_bulk_delete_with_empty_list_returns_400(self, mock_redis):
-        """Bulk delete with an empty list returns 400."""
-        response = self._bulk_delete(mock_redis, {"uuids": []})
-
+    def test_missing_required_fields_returns_400(self):
+        """Returns 400 when none of to_add, to_remove, or chats_limit is provided."""
+        response = self._post(
+            {
+                "agents": [self.agent_user.email],
+                "project": str(self.project.pk),
+            }
+        )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     # ------------------------------------------------------------------
     # Case 14
     # ------------------------------------------------------------------
 
-    @patch("chats.apps.api.v1.internal.permissions.get_redis_connection")
-    def test_list_filtered_by_permission_returns_only_matching_authorizations(self, mock_redis):
-        """Listing filtered by permission returns only the authorizations of that agent."""
-        other_agent = User.objects.create_user(email="other@test.com", password="x")
-        other_permission = ProjectPermission.objects.create(
-            project=self.project,
-            user=other_agent,
-            role=ProjectPermission.ROLE_ATTENDANT,
-        )
+    def test_add_and_remove_in_same_request(self):
+        """to_add and to_remove can be combined in a single request."""
         second_queue = self.sector.queues.create(name="Queue 2")
-        other_auth = QueueAuthorization.objects.create(
-            permission=other_permission,
-            queue=second_queue,
-            role=QueueAuthorization.ROLE_AGENT,
-        )
 
-        response = self._list(mock_redis, f"?permission={self.permission.pk}")
+        response = self._post(
+            self._base_body(
+                to_add=[str(second_queue.pk)],
+                to_remove=[str(self.queue.pk)],
+            )
+        )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        results = response.data.get("results", response.data)
-        returned_uuids = {item["uuid"] for item in results}
-        self.assertIn(str(self.queue_auth.pk), returned_uuids)
-        self.assertNotIn(str(other_auth.pk), returned_uuids)
+        self.assertTrue(
+            QueueAuthorization.objects.filter(
+                permission=self.permission, queue=second_queue
+            ).exists()
+        )
+        self.assertFalse(
+            QueueAuthorization.objects.filter(
+                permission=self.permission, queue=self.queue
+            ).exists()
+        )
