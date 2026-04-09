@@ -1393,13 +1393,20 @@ msgstr "Feriados do Setor"
 
 #: chats/apps/sectors/utils.py:48 chats/apps/sectors/utils.py:72
 #: chats/apps/sectors/utils.py:150 chats/apps/sectors/utils.py:162
-#: chats/apps/sectors/utils.py:171 chats/apps/sectors/utils.py:183
 #: chats/apps/sectors/utils.py:198 chats/apps/sectors/utils.py:206
 #: chats/apps/sectors/utils.py:226 chats/apps/sectors/utils.py:231
 #: chats/apps/sectors/utils.py:276 chats/apps/sectors/utils.py:289
 #: chats/apps/sectors/utils.py:297
 msgid "Contact cannot be done outside working hours"
 msgstr "O contato não pode ser feito fora do horário de trabalho"
+
+#: chats/apps/sectors/utils.py:151 chats/apps/sectors/utils.py:172
+msgid "Contact couldn't be started because today is a holiday"
+msgstr "Não foi possível iniciar o contato pois hoje é feriado"
+
+#: chats/apps/sectors/utils.py:163 chats/apps/sectors/utils.py:184
+msgid "Contact couldn't be started outside the holiday working hours"
+msgstr "Não foi possível iniciar o contato fora do horário de atendimento do feriado"
 
 #: chats/core/models.py:37 chats/core/models.py:51
 msgid "Created on"
