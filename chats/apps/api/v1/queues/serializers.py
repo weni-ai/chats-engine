@@ -64,12 +64,6 @@ class QueueSerializer(serializers.ModelSerializer):
                         {"detail": _("This queue already exists.")}
                     )
 
-        if self.instance:
-            sector = self.instance.sector
-
-        else:
-            sector = data.get("sector")
-
         queue_limit = data.pop("queue_limit_info", None)
 
         if queue_limit and isinstance(queue_limit, dict):

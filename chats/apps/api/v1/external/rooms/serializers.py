@@ -2,13 +2,11 @@ import logging
 from typing import Dict, List, Optional
 
 import pendulum
-from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from weni.feature_flags.shortcuts import is_feature_active
 from rest_framework.exceptions import PermissionDenied
 
 from chats.apps.accounts.models import User
