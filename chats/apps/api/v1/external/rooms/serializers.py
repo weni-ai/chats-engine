@@ -433,23 +433,13 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         is_limit_active_for_queue = queue.queue_limit_info.is_active
 
         if is_limit_active_for_queue:
-            # Only check if the feature flag is enabled and make all the other validations
-            # if the queue limit for this particular queue is active
-            is_queue_limit_feature_active = is_feature_active(
-                settings.QUEUE_LIMIT_FEATURE_FLAG_KEY,
-                None,
-                str(queue.sector.project.uuid),
-            )
             queue_limit = (
                 queue.queue_limit_info.limit
                 if isinstance(queue.queue_limit_info.limit, int)
                 else 0
             )
 
-            if (
-                is_queue_limit_feature_active
-                and queue.queued_rooms_count >= queue_limit
-            ):
+            if queue.queued_rooms_count >= queue_limit:
                 raise PermissionDenied(
                     {
                         "error": "human_support_queue_limit_reached",
