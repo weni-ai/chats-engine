@@ -6,6 +6,8 @@ proc_name = "chats"
 default_proc_name = proc_name
 worker_class = "sync"
 accesslog = "gunicorn.access"
+max_requests = 3000
+max_requests_jitter = 1000
 timeout = 120
 bind = "0.0.0.0"
 raw_env = ["DJANGO_SETTINGS_MODULE=chats.settings"]
