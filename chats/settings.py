@@ -719,10 +719,6 @@ VTEX_INTERNAL_DOMAINS = env.list(
     "VTEX_INTERNAL_DOMAINS", default=["weni.ai", "vtex.com"]
 )
 
-# Queue Limit
-QUEUE_LIMIT_FEATURE_FLAG_KEY = env.str(
-    "QUEUE_LIMIT_FEATURE_FLAG_KEY", default="weniChatsQueueLimit"
-)
 # Rooms External API QuerySet filter feature flag
 ROOMS_EXTERNAL_API_QUERYSET_FILTER_FLAG_KEY = env.str(
     "ROOMS_EXTERNAL_API_QUERYSET_FILTER_FLAG_KEY",
