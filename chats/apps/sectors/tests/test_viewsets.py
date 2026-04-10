@@ -115,15 +115,12 @@ class SectorTests(APITestCase):
         self.assertEqual(response.data["automatic_message"]["is_active"], False)
         self.assertIsNone(response.data["automatic_message"]["text"])
 
-    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active")
     def test_create_sector_with_right_project_token_and_automatic_message_active(
         self,
-        mock_is_feature_active,
     ):
         """
         Verify if the endpoint for create in sector is working with correctly.
         """
-        mock_is_feature_active.return_value = True
         url = reverse("sector-list")
         client = self.client
         client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
@@ -159,12 +156,10 @@ class SectorTests(APITestCase):
         sector = Sector.objects.get(pk="21aecf8c-0c73-4059-ba82-4343e0cc627c")
         self.assertEqual("sector 2 updated", sector.name)
 
-    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active")
-    def test_update_sector_automatic_message(self, mock_is_feature_active):
+    def test_update_sector_automatic_message(self):
         """
         Verify if the endpoint for update in sector is working with correctly.
         """
-        mock_is_feature_active.return_value = True
         self.sector.is_automatic_message_active = False
         self.sector.save(update_fields=["is_automatic_message_active"])
         url = reverse("sector-detail", args=[self.sector.pk])
@@ -199,34 +194,10 @@ class SectorTests(APITestCase):
         response = client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
-    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active")
-    def test_update_sector_csat_enabled_when_feature_flag_is_off(
-        self, mock_is_feature_active
-    ):
+    def test_update_sector_csat_enabled(self):
         """
         Verify if the endpoint for update in sector is working with correctly.
         """
-        mock_is_feature_active.return_value = False
-        url = reverse("sector-detail", args=[self.sector.pk])
-        client = self.client
-        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
-        response = client.patch(url, data={"is_csat_enabled": True})
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
-            response.data["is_csat_enabled"][0].code,
-            "csat_feature_flag_is_off",
-        )
-        self.sector.refresh_from_db()
-        self.assertFalse(self.sector.is_csat_enabled)
-
-    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active")
-    def test_update_sector_csat_enabled_when_feature_flag_is_on(
-        self, mock_is_feature_active
-    ):
-        """
-        Verify if the endpoint for update in sector is working with correctly.
-        """
-        mock_is_feature_active.return_value = True
         url = reverse("sector-detail", args=[self.sector.pk])
         client = self.client
         client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
@@ -488,9 +459,7 @@ class SectorTicketerCreationTests(APITestCase):
         mock_integrate_individual.assert_called_once()
         call_args = mock_integrate_individual.call_args
         self.assertEqual(str(call_args[0][0].uuid), str(self.principal_project.uuid))
-        self.assertEqual(
-            call_args[0][1], {"uuid": str(self.secondary_project.uuid)}
-        )
+        self.assertEqual(call_args[0][1], {"uuid": str(self.secondary_project.uuid)})
 
     @patch(
         "chats.apps.api.v1.sectors.viewsets.IntegratedTicketers.integrate_individual_ticketer"

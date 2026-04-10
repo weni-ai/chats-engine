@@ -1,11 +1,8 @@
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
-from weni.feature_flags.shortcuts import is_feature_active
 
 from chats.apps.api.v1.accounts.serializers import UserSerializer
-from chats.apps.projects.models.models import Project
 from chats.apps.sectors.models import (
     Sector,
     SectorAuthorization,
@@ -27,28 +24,6 @@ def _apply_sector_config_defaults(instance: Sector, data: dict) -> dict:
             config.setdefault("can_close_chats_in_queue", False)
     data["config"] = config
     return data
-
-
-def validate_is_csat_enabled(project: Project, value: bool, context: dict) -> bool:
-    """
-    Validate if the CSAT feature is enabled for the sector.
-    """
-    request = context.get("request")
-    user = getattr(request, "user", None)
-    project = project
-
-    if value is True and not is_feature_active(
-        settings.CSAT_FEATURE_FLAG_KEY, user.email, str(project.uuid)
-    ):
-        raise serializers.ValidationError(
-            {
-                "is_csat_enabled": [
-                    _("The CSAT feature is not available for this sector")
-                ]
-            },
-            code="csat_feature_flag_is_off",
-        )
-    return value
 
 
 class SectorAutomaticMessageSerializer(serializers.ModelSerializer):
@@ -115,14 +90,6 @@ class SectorSerializer(serializers.ModelSerializer):
 
             data["is_automatic_message_active"] = automatic_message.get("is_active")
             data["automatic_message_text"] = automatic_message.get("text")
-
-        project = self.instance.project if self.instance else data.get("project")
-
-        if (
-            project
-            and (is_csat_enabled := data.get("is_csat_enabled", None)) is not None
-        ):
-            validate_is_csat_enabled(project, is_csat_enabled, self.context)
 
         config = data.get("config", {})
         if "secondary_project" in config:
@@ -199,8 +166,6 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
         return sector
 
     def validate(self, attrs: dict):
-        project = self.instance.project
-
         automatic_message = attrs.get("automatic_message", None)
 
         if automatic_message is not None:
@@ -209,10 +174,6 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
             attrs.pop("automatic_message")
             attrs["is_automatic_message_active"] = new_is_automatic_message_active
             attrs["automatic_message_text"] = automatic_message.get("text")
-
-        project = self.instance.project
-
-        validate_is_csat_enabled(project, attrs.get("is_csat_enabled"), self.context)
 
         config = attrs.get("config", {})
         if "secondary_project" in config:
