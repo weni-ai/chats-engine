@@ -47,18 +47,16 @@ class SectorInternalViewset(viewsets.ModelViewSet):
         )
 
     def perform_create(self, serializer):
-        serializer.save()
+        serializer.save(created_by=self.request.user, modified_by=self.request.user)
 
     def perform_update(self, serializer):
-        serializer.save()
+        serializer.save(modified_by=self.request.user)
 
     def perform_destroy(self, instance):
         instance.is_deleted = True
+        instance.deleted_by = self.request.user
+        instance.modified_by = self.request.user
         instance.save()
-        return Response(
-            {"is_deleted": True},
-            status.HTTP_200_OK,
-        )
 
     @action(detail=True, methods=["get"], url_path="required-tags")
     def check_required_tags(self, request, uuid=None):
@@ -86,11 +84,11 @@ class SectorAuthorizationViewset(viewsets.ModelViewSet):
     lookup_field = "uuid"
 
     def perform_create(self, serializer):
-        serializer.save()
+        serializer.save(created_by=self.request.user, modified_by=self.request.user)
         serializer.instance.notify_user("create")
 
     def perform_update(self, serializer):
-        serializer.save()
+        serializer.save(modified_by=self.request.user)
         serializer.instance.notify_user("update")
 
     def perform_destroy(self, instance):
@@ -106,3 +104,14 @@ class SectorTagsViewset(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["sector"]
     lookup_field = "uuid"
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user, modified_by=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(modified_by=self.request.user)
+
+    def perform_destroy(self, instance):
+        instance.deleted_by = self.request.user
+        instance.modified_by = self.request.user
+        instance.delete()

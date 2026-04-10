@@ -82,7 +82,9 @@ class SectorViewset(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         try:
-            instance = serializer.save()
+            instance = serializer.save(
+                created_by=self.request.user, modified_by=self.request.user
+            )
         except IntegrityError as e:
             raise exceptions.APIException(
                 detail=f"Error when saving the sector. Exception: {str(e)}"
@@ -267,6 +269,8 @@ class SectorViewset(viewsets.ModelViewSet):
 
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
+    def perform_update(self, serializer):
+        serializer.save(modified_by=self.request.user)
 
     def perform_destroy(self, instance):
         end_all_chats = (
@@ -281,8 +285,12 @@ class SectorViewset(viewsets.ModelViewSet):
             "user_email": self.request.query_params.get("user_email"),
         }
 
+        instance.deleted_by = self.request.user
+        instance.modified_by = self.request.user
+
         if not settings.USE_WENI_FLOWS:
-            return super().perform_destroy(instance)
+            instance.delete()
+            return
 
         response = FlowRESTClient().destroy_sector(**content)
         if response.status_code not in [
@@ -428,6 +436,17 @@ class SectorTagsViewset(viewsets.ModelViewSet):
 
         return [permission() for permission in permission_classes]
 
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user, modified_by=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(modified_by=self.request.user)
+
+    def perform_destroy(self, instance):
+        instance.deleted_by = self.request.user
+        instance.modified_by = self.request.user
+        instance.delete()
+
 
 class SectorAuthorizationViewset(viewsets.ModelViewSet):
     swagger_tag = "Sectors"
@@ -460,11 +479,11 @@ class SectorAuthorizationViewset(viewsets.ModelViewSet):
             )
 
     def perform_create(self, serializer):
-        serializer.save()
+        serializer.save(created_by=self.request.user, modified_by=self.request.user)
         serializer.instance.notify_user("create")
 
     def perform_update(self, serializer):
-        serializer.save()
+        serializer.save(modified_by=self.request.user)
         serializer.instance.notify_user("update")
 
     def perform_destroy(self, instance):
@@ -521,7 +540,10 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
         """
         Sector must be passed in the request body
         """
-        serializer.save()
+        serializer.save(created_by=self.request.user, modified_by=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(modified_by=self.request.user)
 
     def create(self, request, *args, **kwargs):
         """
@@ -586,6 +608,8 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         instance.is_deleted = True
+        instance.deleted_by = request.user
+        instance.modified_by = request.user
         instance.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 

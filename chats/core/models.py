@@ -1,8 +1,10 @@
 import uuid
 
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
 from chats.core.managers import SoftDeletableManager
 from chats.utils.websockets import send_channels_group
@@ -10,12 +12,15 @@ from chats.utils.websockets import send_channels_group
 
 class WebSocketsNotifiableMixin:
     @property
-    def serialized_ws_data(self) -> dict: ...
+    def serialized_ws_data(self) -> dict:
+        ...
 
     @property
-    def notification_groups(self) -> list: ...
+    def notification_groups(self) -> list:
+        ...
 
-    def get_action(self, action: str) -> str: ...
+    def get_action(self, action: str) -> str:
+        ...
 
     def notify(self, action: str, groups: list = [], content: dict = {}) -> None:
         if "." not in action:
@@ -43,7 +48,7 @@ class BaseModel(models.Model):
 
     @property
     def edited(self) -> bool:
-        return bool(self.modified_by)
+        return hasattr(self, "modified_by") and bool(self.modified_by)
 
 
 class BaseModelWithManualCreatedOn(BaseModel):
@@ -104,3 +109,72 @@ class BaseIntegrationConfigurableModel(models.Model):
 
     class Meta:
         abstract = True
+
+
+class AuditableMixin(models.Model):
+    """
+    Tracks who created, last modified, and deleted each record.
+    Fields are populated explicitly in views:
+        serializer.save(created_by=request.user, modified_by=request.user)
+    Audit is only persisted if the AUDIT_LOG_FEATURE_FLAG_KEY flag is enabled
+    for the record's project.
+    """
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="+",
+        on_delete=models.SET_NULL,
+        verbose_name=_("Created by"),
+    )
+    modified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="+",
+        on_delete=models.SET_NULL,
+        verbose_name=_("Modified by"),
+    )
+    deleted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="+",
+        on_delete=models.SET_NULL,
+        verbose_name=_("Deleted by"),
+    )
+
+    class Meta:
+        abstract = True
+
+    def _get_project(self):
+        """
+        Returns the project associated with this instance.
+        Models using this mixin must define a `project` attribute or property.
+        """
+        project = getattr(self, "project", None)
+        if project is None:
+            raise AttributeError(
+                f"{self.__class__.__name__} must define a `project` attribute or property "
+                "to use AuditableMixin."
+            )
+        return project
+
+    def save(self, *args, **kwargs):
+        if self.created_by_id or self.modified_by_id or self.deleted_by_id:
+            try:
+                project = self._get_project()
+                if not is_feature_active_for_attributes(
+                    settings.AUDIT_LOG_FEATURE_FLAG_KEY,
+                    {"projectUUID": str(project.uuid)},
+                ):
+                    self.created_by = None
+                    self.modified_by = None
+                    self.deleted_by = None
+            except Exception:
+                pass
+        super().save(*args, **kwargs)
