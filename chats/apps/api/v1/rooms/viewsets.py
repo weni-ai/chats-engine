@@ -1041,15 +1041,23 @@ class RoomViewset(
         """
         room = self.get_object()
 
-        history_summary = (
-            HistorySummary.objects.filter(
-                room=room, status=HistorySummaryStatus.DONE, summary__gt=""
-            )
-            .order_by("modified_on")
-            .last()
+        history_summaries = HistorySummary.objects.filter(room=room).order_by(
+            "modified_on"
         )
 
-        if not history_summary:
+        if pending_history_summary := history_summaries.filter(
+            status=HistorySummaryStatus.PENDING
+        ).last():
+            serializer = RoomHistorySummarySerializer(
+                pending_history_summary, context={"request": request}
+            )
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        done_history_summary = history_summaries.filter(
+            status=HistorySummaryStatus.DONE, summary__gt=""
+        ).last()
+
+        if not done_history_summary:
             return Response(
                 {
                     "status": HistorySummaryStatus.UNAVAILABLE,
@@ -1060,7 +1068,7 @@ class RoomViewset(
             )
 
         serializer = RoomHistorySummarySerializer(
-            history_summary, context={"request": request}
+            done_history_summary, context={"request": request}
         )
 
         return Response(serializer.data, status=status.HTTP_200_OK)

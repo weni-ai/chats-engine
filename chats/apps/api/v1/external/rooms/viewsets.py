@@ -254,6 +254,12 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
                     countdown=settings.HISTORY_SUMMARY_GENERATION_DELAY,
                 )
 
+                cancel_history_summary_generation.apply_async(
+                    args=[history_summary.uuid],
+                    countdown=settings.HISTORY_SUMMARY_CANCELLATION_DELAY
+                    + settings.HISTORY_SUMMARY_GENERATION_DELAY,
+                )
+
         return Response(status=status.HTTP_201_CREATED)
 
     @swagger_auto_schema(auto_schema=None)
@@ -344,7 +350,8 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
             else:
                 cancel_history_summary_generation.apply_async(
                     args=[history_summary.uuid],
-                    countdown=settings.HISTORY_SUMMARY_CANCELLATION_DELAY,
+                    countdown=settings.HISTORY_SUMMARY_CANCELLATION_DELAY
+                    + settings.HISTORY_SUMMARY_GENERATION_DELAY,
                 )
 
     def perform_update(self, serializer):
