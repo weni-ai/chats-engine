@@ -1,3 +1,19 @@
+# 3.54.4
+ # Add
+  - New templates for exports
+  
+# 3.54.3
+ # Fix
+  - Removing queue and sector from rooms count external
+ 
+ # 3.54.2
+ # Fix
+  - Removing queue and sector from rooms count internal
+  
+# 3.54.1
+ # Fix
+  - Correct filter for data in external endpoint for closed rooms 
+  
 # 3.54.0
  # Add
   - Endpoint internal count rooms 
