@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import logging
 
 
+from chats.apps.ai_features.integrations.base_client import BaseAIPlatformClient
 from chats.apps.msgs.models import Message
 from chats.apps.ai_features.improve_user_message.choices import (
     ImprovedUserMessageTypeChoices,
@@ -29,11 +30,22 @@ class BaseImproveUserMessageService(ABC):
     ):
         raise NotImplementedError
 
+    @abstractmethod
+    def generate_improved_message(
+        self,
+        text: str,
+        improvement_type: ImprovedUserMessageTypeChoices,
+    ) -> str:
+        raise NotImplementedError
+
 
 class ImproveUserMessageService(BaseImproveUserMessageService):
     """
     Service for improving user messages.
     """
+
+    def __init__(self, integration_client_class: BaseAIPlatformClient):
+        self.integration_client_class = integration_client_class
 
     def register_message_improvement(
         self,
