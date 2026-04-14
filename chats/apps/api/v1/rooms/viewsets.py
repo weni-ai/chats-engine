@@ -19,6 +19,7 @@ from django.utils import timezone
 from django.utils.timezone import make_aware
 from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
@@ -570,6 +571,7 @@ class RoomViewset(
             status=completion_response.status_code, data=completion_response.json()
         )
 
+    @swagger_auto_schema(auto_schema=None)
     @action(
         detail=True,
         methods=["PATCH"],
@@ -729,7 +731,9 @@ class RoomViewset(
             )
 
             for room_uuid in skipped_rooms:
-                result.add_failure(room_uuid, f"Room {room_uuid}: not found or not active")
+                result.add_failure(
+                    room_uuid, f"Room {room_uuid}: not found or not active"
+                )
 
             logger.info(
                 f"Bulk transfer completed by {request.user.email}: "
@@ -780,9 +784,7 @@ class RoomViewset(
         url_name="bulk_take",
     )
     def bulk_take(self, request, pk=None):
-        serializer = BulkTakeSerializer(
-            data=request.data, context={"request": request}
-        )
+        serializer = BulkTakeSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
 
         rooms = serializer.validated_data["rooms"]
@@ -793,7 +795,10 @@ class RoomViewset(
             result = service.take(rooms=rooms, user=request.user)
 
             for room_uuid in skipped_rooms:
-                result.add_failure(room_uuid, f"Room {room_uuid}: not found, not active, or already assigned")
+                result.add_failure(
+                    room_uuid,
+                    f"Room {room_uuid}: not found, not active, or already assigned",
+                )
 
             logger.info(
                 f"Bulk take completed by {request.user.email}: "
@@ -1034,7 +1039,11 @@ class RoomViewset(
         room = self.get_object()
 
         history_summary = (
-            HistorySummary.objects.filter(room=room).order_by("created_on").last()
+            HistorySummary.objects.filter(
+                room=room, status=HistorySummaryStatus.DONE, summary__gt=""
+            )
+            .order_by("modified_on")
+            .last()
         )
 
         if not history_summary:

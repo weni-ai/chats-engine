@@ -2,6 +2,7 @@ from datetime import date
 
 from django.db.models import OuterRef, Subquery
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status as http_status, viewsets
 from rest_framework.response import Response
 
@@ -46,10 +47,12 @@ class AgentFlowViewset(viewsets.ReadOnlyModelViewSet):
             return qs.none()
         return qs.filter(project=permission.project)
 
+    @swagger_auto_schema(auto_schema=None)
     def list(self, request, *args, **kwargs):
         """List all agents (users with permissions) in the authenticated project."""
         return super().list(request, *args, **kwargs)
 
+    @swagger_auto_schema(auto_schema=None)
     def retrieve(self, request, *args, **kwargs):
         """Retrieve details of a specific agent by UUID."""
         return super().retrieve(request, *args, **kwargs)

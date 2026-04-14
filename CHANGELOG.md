@@ -1,3 +1,26 @@
+# 3.54.0
+ # Add
+  - Endpoint internal count rooms 
+  - Adjust delete queue/sector endpoint to support transfer and delete rooms
+  - Removing from docs, endpoints exclusive for flows use
+  - New endpoint for external closed rooms data
+  - Unit tests for bulk actions and projects
+  
+# 3.53.3
+# Fix
+  - Remove full transfer history from serialized room data
+
+# 3.53.2
+# Fix
+  - Remove queue and sector authorizations when a project permission is soft-deleted;
+  requeue rooms and scope queue agent and permission queries to active permissions
+
+# 3.53.1
+# Add
+  - Archive chats: iterable message processing and improved memory use for uploads
+# Fix
+  - Clearer messages when a room cannot open on a holiday
+
 # 3.53.0
 # Add
   - Requeue rooms when a user is removed from project

@@ -4,6 +4,8 @@ from django.conf import settings
 from django.db import IntegrityError
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
+from django.utils.decorators import method_decorator
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import exceptions, filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import LimitOffsetPagination
@@ -34,6 +36,8 @@ from chats.apps.sectors.models import (
 from chats.apps.sectors.utils import get_country_from_timezone, get_country_holidays
 
 
+@method_decorator(name="create", decorator=swagger_auto_schema(auto_schema=None))
+@method_decorator(name="destroy", decorator=swagger_auto_schema(auto_schema=None))
 class SectorViewset(viewsets.ModelViewSet):
     swagger_tag = "Sectors"
     queryset = Sector.objects.exclude(is_deleted=True)
