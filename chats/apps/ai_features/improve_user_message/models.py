@@ -13,12 +13,11 @@ class MessageImprovementStatus(BaseModel):
     A model to store the status of the improved user message.
     """
 
-    message = models.ForeignKey(
+    message = models.OneToOneField(
         "msgs.Message",
         verbose_name=_("Message"),
         on_delete=models.CASCADE,
         related_name="improved_user_message_status",
-        unique=True,
     )
     status = models.CharField(
         _("Status"),

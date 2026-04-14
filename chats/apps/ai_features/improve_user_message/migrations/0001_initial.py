@@ -22,7 +22,7 @@ class Migration(migrations.Migration):
                 ('modified_on', models.DateTimeField(auto_now=True, verbose_name='Modified on')),
                 ('status', models.CharField(choices=[('USED', 'Used'), ('DISCARDED', 'Discarded'), ('EDITED', 'Edited')], max_length=20, verbose_name='Status')),
                 ('type', models.CharField(choices=[('GRAMMAR_AND_SPELLING', 'Grammar and spelling'), ('MORE_EMPATHY', 'More empathy'), ('MORE_CLARITY', 'More clarity')], max_length=20, verbose_name='Type')),
-                ('message', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='improved_user_message_status', to='msgs.message', unique=True, verbose_name='Message')),
+                ('message', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='improved_user_message_status', to='msgs.message', verbose_name='Message')),
             ],
             options={
                 'verbose_name': 'Message Improvement Status',
