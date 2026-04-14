@@ -85,12 +85,12 @@ class ImproveUserMessageServiceTests(TestCase):
 
         self.service.register_message_improvement(
             message=message,
-            improvement_type=ImprovedUserMessageTypeChoices.MORE_CLARITY,
+            improvement_type=ImprovedUserMessageTypeChoices.CLARITY,
             status=ImprovedUserMessageStatusChoices.EDITED,
         )
 
         improvement = MessageImprovementStatus.objects.get(message=message)
-        self.assertEqual(improvement.type, ImprovedUserMessageTypeChoices.MORE_CLARITY)
+        self.assertEqual(improvement.type, ImprovedUserMessageTypeChoices.CLARITY)
         self.assertEqual(improvement.status, ImprovedUserMessageStatusChoices.EDITED)
 
     def test_register_message_improvement_skips_duplicate(self):

@@ -19,4 +19,4 @@ class ImprovedUserMessageTypeChoices(models.TextChoices):
 
     GRAMMAR_AND_SPELLING = "GRAMMAR_AND_SPELLING", _("Grammar and spelling")
     MORE_EMPATHY = "MORE_EMPATHY", _("More empathy")
-    MORE_CLARITY = "MORE_CLARITY", _("More clarity")
+    CLARITY = "CLARITY", _("Clarity")
