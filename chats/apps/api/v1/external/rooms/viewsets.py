@@ -249,8 +249,10 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
                 ).first()
             ):
                 history_summary = HistorySummary.objects.create(room=room)
-
-            generate_history_summary.delay(history_summary.uuid)
+                generate_history_summary.apply_async(
+                    args=[history_summary.uuid],
+                    countdown=settings.HISTORY_SUMMARY_GENERATION_DELAY,
+                )
 
         return Response(status=status.HTTP_201_CREATED)
 
@@ -334,12 +336,16 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
             if room.messages.filter(
                 Q(user__isnull=False) | Q(contact__isnull=False)
             ).exists():
-                generate_history_summary.delay(history_summary.uuid)
+                generate_history_summary.apply_async(
+                    args=[history_summary.uuid],
+                    countdown=settings.HISTORY_SUMMARY_GENERATION_DELAY,
+                )
 
             else:
                 cancel_history_summary_generation.apply_async(
-                    args=[history_summary.uuid], countdown=30
-                )  # 30 seconds delay
+                    args=[history_summary.uuid],
+                    countdown=settings.HISTORY_SUMMARY_CANCELLATION_DELAY,
+                )
 
     def perform_update(self, serializer):
         serializer.save()
