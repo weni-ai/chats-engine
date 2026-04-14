@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-04-13 17:34-0300\n"
+"POT-Creation-Date: 2026-04-14 09:57-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -1307,11 +1307,11 @@ msgstr ""
 "\n"
 "Por favor, tente novamente mais tarde ou entre em contato com o suporte."
 
-#: chats/apps/rooms/templates/rooms/emails/base.html:27
+#: chats/apps/rooms/templates/rooms/emails/base.html:26
 msgid "2026 © VTEX CX Platform. All rights reserved."
 msgstr "2026 © VTEX CX Platform. Todos os direitos reservados."
 
-#: chats/apps/rooms/templates/rooms/emails/base.html:31
+#: chats/apps/rooms/templates/rooms/emails/base.html:30
 msgid ""
 "You are receiving this mail because you registered in VTEX CX Platform. This "
 "also shows that you agree to our Terms of use and Privacy Policies. If you "
@@ -1323,47 +1323,49 @@ msgstr ""
 "privacidade. Se não quiser mais receber e-mails, clique no link de "
 "cancelamento de assinatura abaixo para cancelar."
 
-#: chats/apps/rooms/templates/rooms/emails/base.html:34
+#: chats/apps/rooms/templates/rooms/emails/base.html:33
 msgid "Privacy Policy"
 msgstr "Política de Privacidade"
 
-#: chats/apps/rooms/templates/rooms/emails/base.html:38
+#: chats/apps/rooms/templates/rooms/emails/base.html:37
 msgid "Terms of use"
 msgstr "Termos de uso"
 
-#: chats/apps/rooms/templates/rooms/emails/base.html:42
+#: chats/apps/rooms/templates/rooms/emails/base.html:41
 msgid "Help Center"
 msgstr "Central de Ajuda"
 
-#: chats/apps/rooms/templates/rooms/emails/base.html:46
+#: chats/apps/rooms/templates/rooms/emails/base.html:45
 msgid "Unsubscribe"
 msgstr "Cancelar inscrição"
 
-#: chats/apps/rooms/templates/rooms/emails/report_failed.html:7
-#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:7
+#: chats/apps/rooms/templates/rooms/emails/report_failed.html:16
+#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:16
 msgid "Hi,"
 msgstr "Olá,"
 
-#: chats/apps/rooms/templates/rooms/emails/report_failed.html:9
+#: chats/apps/rooms/templates/rooms/emails/report_failed.html:31
 #, python-format
-msgid ""
-"Unable to generate export of %(project_name)s project\n"
-"        data."
+msgid "Unable to generate export of %(project_name)s project data."
 msgstr ""
 "Não foi possível gerar a exportação de dados do projeto %(project_name)s."
 
-#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:9
+#: chats/apps/rooms/templates/rooms/emails/report_failed.html:34
+msgid "Use the following information to report to support:"
+msgstr "Use as informações abaixo para reportar ao suporte:"
+
+#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:31
 #, python-format
 msgid ""
-"The data export for the %(project_name)s\n"
-"        project is ready and you can download it by <a clicktracking=off "
-"style=\"color: #00A49F; text-decoration: none;\"\n"
-"            href=\"%(file_link)s\" target=\"_blank\">clicking here</a>."
+"The data export for the %(project_name)s project is ready. Click the button "
+"below to download it."
 msgstr ""
-"A exportação de dados do projeto %(project_name)s\n"
-"        está pronta e você pode baixá-la <a clicktracking=off style=\"color: "
-"#00A49F; text-decoration: none;\"\n"
-"            href=\"%(file_link)s\" target=\"_blank\">clicando aqui</a>."
+"A exportação de dados do projeto %(project_name)s está pronta. Clique no "
+"botão abaixo para baixá-la."
+
+#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:63
+msgid "Download report"
+msgstr "Baixar relatório"
 
 #: chats/apps/sectors/models.py:36
 msgid "Secondary Project"
