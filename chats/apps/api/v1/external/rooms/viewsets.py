@@ -334,20 +334,16 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         if room.queue.sector.project.has_chats_summary:
             history_summary = HistorySummary.objects.create(room=room)
 
-            if room.messages.filter(
-                Q(user__isnull=False) | Q(contact__isnull=False)
-            ).exists():
-                generate_history_summary.apply_async(
-                    args=[history_summary.uuid],
-                    countdown=settings.HISTORY_SUMMARY_GENERATION_DELAY,
-                )
+            generate_history_summary.apply_async(
+                args=[history_summary.uuid],
+                countdown=settings.HISTORY_SUMMARY_GENERATION_DELAY,
+            )
 
-            else:
-                cancel_history_summary_generation.apply_async(
-                    args=[history_summary.uuid],
-                    countdown=settings.HISTORY_SUMMARY_CANCELLATION_DELAY
-                    + settings.HISTORY_SUMMARY_GENERATION_DELAY,
-                )
+            cancel_history_summary_generation.apply_async(
+                args=[history_summary.uuid],
+                countdown=settings.HISTORY_SUMMARY_CANCELLATION_DELAY
+                + settings.HISTORY_SUMMARY_GENERATION_DELAY,
+            )
 
     def perform_update(self, serializer):
         serializer.save()
