@@ -63,6 +63,7 @@ class BedrockClient(BaseAIPlatformClient):
         """
         try:
             request_body = self.format_request_body(prompt_settings, prompt_msgs)
+            print("Request body: %s", request_body)
 
             response = self.client.invoke_model(
                 modelId=self.model_id,
@@ -74,5 +75,7 @@ class BedrockClient(BaseAIPlatformClient):
             return self.get_text_from_response(response_body)
 
         except (ClientError, Exception) as e:
+            print("Error generating text for model %s: %s", self.model_id, e)
+            print("Traceback: %s", traceback.format_exc())
             logger.error("ERROR: Can't invoke '%s'. Reason: %s", self.model_id, e)
             raise e
