@@ -12,10 +12,10 @@ https://docs.djangoproject.com/en/4.0/ref/settings/
 
 import os
 from pathlib import Path
-from celery.schedules import crontab
 
 import environ
 import sentry_sdk
+from celery.schedules import crontab
 from django.utils.log import DEFAULT_LOGGING
 from sentry_sdk.integrations.django import DjangoIntegration
 from celery.schedules import crontab
@@ -731,10 +731,9 @@ DENORMALIZED_MESSAGE_FIELDS_FLAG_KEY = env.str(
     default="weniChatsDenormalizedMessageFields",
 )
 
-# CSAT
-CSAT_FEATURE_FLAG_KEY = env.str("CSAT_FEATURE_FLAG_KEY", default="weniChatsCSAT")
-
-CHATS_BASE_URL = env.str("CHATS_BASE_URL", default="http://localhost:8000")
+AUDIT_LOG_FEATURE_FLAG_KEY = env.str(
+    "AUDIT_LOG_FEATURE_FLAG_KEY", default="weniChatsAuditLog"
+)
 
 # USER CACHE
 USER_OBJECT_CACHE_TTL = env.int("USER_OBJECT_CACHE_TTL", default=300)

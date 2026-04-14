@@ -12,10 +12,6 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
-from chats.apps.core.internal_domains import (
-    is_vtex_internal_domain,
-    exclude_vtex_internal_domains,
-)
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.api.v1.permissions import (
     IsQueueAgent,
@@ -24,9 +20,16 @@ from chats.apps.api.v1.permissions import (
 )
 from chats.apps.api.v1.queues import serializers as queue_serializers
 from chats.apps.api.v1.queues.filters import QueueAuthorizationFilter, QueueFilter
+from chats.apps.api.v1.rooms.services.bulk_close_service import BulkCloseService
+from chats.apps.api.v1.rooms.services.bulk_transfer_service import BulkTransferService
+from chats.apps.core.internal_domains import (
+    exclude_vtex_internal_domains,
+    is_vtex_internal_domain,
+)
 from chats.apps.projects.models.models import Project
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorGroupSector
 from chats.apps.sectors.usecases.group_sector_authorization import (
     QueueGroupSectorAuthorizationCreationUseCase,
@@ -59,7 +62,7 @@ class QueueViewset(ModelViewSet):
 
     def get_permissions(self):
         permission_classes = self.permission_classes
-        if self.action in ["list", "transfer_agents"]:
+        if self.action in ["list", "transfer_agents", "rooms_count"]:
             permission_classes = [IsAuthenticated, ProjectAnyPermission]
         else:
             permission_classes = [IsAuthenticated, IsSectorManager]
@@ -89,7 +92,9 @@ class QueueViewset(ModelViewSet):
         return super().get_serializer_class()
 
     def perform_create(self, serializer):
-        instance = serializer.save()
+        instance = serializer.save(
+            created_by=self.request.user, modified_by=self.request.user
+        )
 
         project = Project.objects.get(uuid=instance.sector.project.uuid)
 
@@ -130,7 +135,7 @@ class QueueViewset(ModelViewSet):
         return instance
 
     def perform_update(self, serializer):
-        instance = serializer.save()
+        instance = serializer.save(modified_by=self.request.user)
         content = {
             "uuid": str(instance.uuid),
             "name": instance.name,
@@ -151,7 +156,131 @@ class QueueViewset(ModelViewSet):
 
         return instance
 
+    def _close_active_rooms(self, instance):
+        rooms = Room.objects.filter(
+            queue=instance,
+            is_active=True,
+        )
+        if not rooms.exists():
+            return None
+
+        service = BulkCloseService()
+        result = service.close(
+            rooms=rooms,
+            end_by="queue_deleted",
+        )
+
+        if result.success_count == 0 and result.failed_count > 0:
+            raise exceptions.APIException(
+                detail=(
+                    f"Failed to close all {result.failed_count} active rooms "
+                    f"for queue {instance.uuid}. Deletion aborted."
+                ),
+            )
+
+        if result.failed_count > 0:
+            LOGGER.warning(
+                "[QUEUE_DELETE] Partial room closure for queue %s: "
+                "%d succeeded, %d failed",
+                instance.uuid,
+                result.success_count,
+                result.failed_count,
+            )
+
+        return result
+
+    def _transfer_active_rooms(self, instance, target_queue):
+        rooms = Room.objects.filter(
+            queue=instance,
+            is_active=True,
+        )
+        if not rooms.exists():
+            return None
+
+        service = BulkTransferService()
+        return service.transfer(
+            rooms=rooms,
+            user_request=self.request.user,
+            queue=target_queue,
+        )
+
+    def _validate_transfer_queue(self, instance, transfer_to_queue_uuid):
+        try:
+            target_queue = Queue.objects.select_related("sector__project").get(
+                uuid=transfer_to_queue_uuid
+            )
+        except Queue.DoesNotExist:
+            return None, Response(
+                {"detail": f"Target queue {transfer_to_queue_uuid} not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if target_queue.uuid == instance.uuid:
+            return None, Response(
+                {"detail": "Cannot transfer rooms to the same queue being deleted"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if target_queue.sector.project_id != instance.sector.project_id:
+            return None, Response(
+                {"detail": "Target queue must belong to the same project"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return target_queue, None
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        transfer_to_queue_uuid = request.query_params.get("transfer_to_queue")
+        end_all_chats = (
+            request.query_params.get("end_all_chats", "").lower() == "true"
+        )
+
+        if transfer_to_queue_uuid and end_all_chats:
+            return Response(
+                {"detail": "Cannot use both 'transfer_to_queue' and 'end_all_chats'"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if transfer_to_queue_uuid:
+            target_queue, error_response = self._validate_transfer_queue(
+                instance, transfer_to_queue_uuid
+            )
+            if error_response:
+                return error_response
+
+            result = self._transfer_active_rooms(instance, target_queue)
+
+            if result and result.failed_count > 0:
+                return Response(
+                    {
+                        "detail": "Failed to transfer all rooms. Deletion aborted.",
+                        "transfer": result.to_dict(),
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            self.perform_destroy(instance)
+            return Response(
+                {
+                    "is_deleted": True,
+                    "transfer": result.to_dict() if result else None,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
     def perform_destroy(self, instance):
+        end_all_chats = (
+            self.request.query_params.get("end_all_chats", "").lower() == "true"
+        )
+
+        if end_all_chats:
+            self._close_active_rooms(instance)
+
         secondary_project_config = instance.sector.secondary_project or {}
         secondary_project_uuid = secondary_project_config.get("uuid")
 
@@ -163,13 +292,18 @@ class QueueViewset(ModelViewSet):
             "project_uuid": str(project_uuid),
         }
 
+        instance.deleted_by = self.request.user
+        instance.modified_by = self.request.user
+
         if not settings.USE_WENI_FLOWS:
-            return super().perform_destroy(instance)
+            instance.delete()
+            return
 
         response = FlowRESTClient().destroy_queue(**content)
 
         if response.status_code == status.HTTP_404_NOT_FOUND:
-            return super().perform_destroy(instance)
+            instance.delete()
+            return
 
         if response.status_code not in [
             status.HTTP_200_OK,
@@ -179,7 +313,7 @@ class QueueViewset(ModelViewSet):
             raise exceptions.APIException(
                 detail=f"[{response.status_code}] Error deleting the queue on flows. Exception: {response.content}"
             )
-        return super().perform_destroy(instance)
+        instance.delete()
 
     @action(detail=True, methods=["POST"])
     def authorization(self, request, *args, **kwargs):
@@ -395,6 +529,12 @@ class QueueAuthorizationViewset(ModelViewSet):
             return queue_serializers.QueueAuthorizationReadOnlyListSerializer
         return super().get_serializer_class()
 
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user, modified_by=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(modified_by=self.request.user)
+
     @action(detail=True, methods=["PATCH"])
     def update_queue_permissions(self, request, *args, **kwargs):
         queue_permission = self.get_object()
@@ -402,6 +542,7 @@ class QueueAuthorizationViewset(ModelViewSet):
         role = request.data.get("role")
 
         queue_permission.role = role
+        queue_permission.modified_by = request.user
         queue_permission.save()
 
         serializer_data = queue_serializers.QueueAuthorizationUpdateSerializer(

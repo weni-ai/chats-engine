@@ -40,18 +40,16 @@ class QueueInternalViewset(viewsets.ModelViewSet):
         )
 
     def perform_create(self, serializer):
-        serializer.save()
+        serializer.save(created_by=self.request.user, modified_by=self.request.user)
 
     def perform_update(self, serializer):
-        serializer.save()
+        serializer.save(modified_by=self.request.user)
 
     def perform_destroy(self, instance):
         instance.is_deleted = True
+        instance.deleted_by = self.request.user
+        instance.modified_by = self.request.user
         instance.save()
-        return Response(
-            {"is_deleted": True},
-            status.HTTP_200_OK,
-        )
 
 
 class QueueAuthInternalViewset(viewsets.ModelViewSet):
@@ -82,15 +80,13 @@ class QueueAuthInternalViewset(viewsets.ModelViewSet):
         )
 
     def perform_create(self, serializer):
-        serializer.save()
+        serializer.save(created_by=self.request.user, modified_by=self.request.user)
 
     def perform_update(self, serializer):
-        serializer.save()
+        serializer.save(modified_by=self.request.user)
 
     def perform_destroy(self, instance):
         instance.is_deleted = True
+        instance.deleted_by = self.request.user
+        instance.modified_by = self.request.user
         instance.save()
-        return Response(
-            {"is_deleted": True},
-            status.HTTP_200_OK,
-        )
