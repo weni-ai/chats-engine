@@ -1159,62 +1159,64 @@ msgstr ""
 "\n"
 "Por favor, tente novamente mais tarde ou entre em contato com o suporte."
 
+#: chats/apps/rooms/templates/rooms/emails/base.html:26
+msgid "All rights reserved."
+msgstr "Todos os direitos reservados."
+
 #: chats/apps/rooms/templates/rooms/emails/base.html:30
-msgid "Our site"
-msgstr "Nosso site"
-
-#: chats/apps/rooms/templates/rooms/emails/base.html:48
-msgid "2025 © Weni by VTEX. All rights reserved."
-msgstr "2025 © Weni by VTEX. Todos os direitos reservados."
-
-#: chats/apps/rooms/templates/rooms/emails/base.html:54
 msgid ""
-"You are receiving this mail because you registered in Weni platform. This "
-"also shows that\n"
-"            you agree to our Terms of use and Privacy Policies."
+"You are receiving this mail because you registered in VTEX CX Platform. This "
+"also shows that you agree to our Terms of use and Privacy Policies. If you no "
+"longer want to receive mails from use, click the unsubscribe link below to "
+"unsubscribe."
 msgstr ""
-"Você está recebendo este e-mail porque se registrou na plataforma Weni. Isso "
-"também mostra que\n"
-"            você concorda com nossos Termos de uso e Políticas de "
-"privacidade."
+"Você está recebendo este e-mail porque se registrou na VTEX CX Platform. Isso "
+"também mostra que você concorda com nossos Termos de uso e Políticas de "
+"privacidade. Se não quiser mais receber e-mails, clique no link de "
+"cancelamento de assinatura abaixo para cancelar."
 
-#: chats/apps/rooms/templates/rooms/emails/base.html:59
+#: chats/apps/rooms/templates/rooms/emails/base.html:33
 msgid "Privacy Policy"
 msgstr "Política de Privacidade"
 
-#: chats/apps/rooms/templates/rooms/emails/base.html:65
+#: chats/apps/rooms/templates/rooms/emails/base.html:37
 msgid "Terms of use"
 msgstr "Termos de uso"
 
-#: chats/apps/rooms/templates/rooms/emails/base.html:71
+#: chats/apps/rooms/templates/rooms/emails/base.html:41
 msgid "Help Center"
-msgstr "Centro de Ajuda"
+msgstr "Central de Ajuda"
 
-#: chats/apps/rooms/templates/rooms/emails/report_failed.html:7
-#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:7
-msgid "Hi,"
-msgstr "Olá,"
+#: chats/apps/rooms/templates/rooms/emails/base.html:45
+msgid "Unsubscribe"
+msgstr "Cancelar inscrição"
 
-#: chats/apps/rooms/templates/rooms/emails/report_failed.html:9
+#: chats/apps/rooms/templates/rooms/emails/report_failed.html:16
+#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:16
+msgid "Hi, here is your data export"
+msgstr "Olá, aqui está sua exportação de dados"
+
+#: chats/apps/rooms/templates/rooms/emails/report_failed.html:31
+#, python-format
+msgid "Unable to generate export of %(project_name)s project data."
+msgstr "Não foi possível gerar a exportação de dados do projeto %(project_name)s."
+
+#: chats/apps/rooms/templates/rooms/emails/report_failed.html:34
+msgid "Use the following information to report to support:"
+msgstr "Use as informações abaixo para reportar ao suporte:"
+
+#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:31
 #, python-format
 msgid ""
-"Unable to generate export of %(project_name)s project\n"
-"        data."
+"The data export for the %(project_name)s project is ready. Click the button "
+"below to download it."
 msgstr ""
-"Não foi possível gerar a exportação de dados do projeto %(project_name)s."
+"A exportação de dados do projeto %(project_name)s está pronta. Clique no "
+"botão abaixo para baixá-la."
 
-#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:9
-#, python-format
-msgid ""
-"The data export for the %(project_name)s\n"
-"        project is ready and you can download it by <a clicktracking=off "
-"style=\"color: #00A49F; text-decoration: none;\"\n"
-"            href=\"%(file_link)s\" target=\"_blank\">clicking here</a>."
-msgstr ""
-"A exportação de dados do projeto %(project_name)s\n"
-"        está pronta e você pode baixá-la <a clicktracking=off style=\"color: "
-"#00A49F; text-decoration: none;\"\n"
-"            href=\"%(file_link)s\" target=\"_blank\">clicando aqui</a>."
+#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:63
+msgid "Download report"
+msgstr "Baixar relatório"
 
 #: chats/apps/sectors/models.py:33
 msgid "Secondary Project"
