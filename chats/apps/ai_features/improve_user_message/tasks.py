@@ -20,7 +20,8 @@ def register_message_improvement_task(
     Register a message improvement.
     """
     logger.info(
-        "[register_message_improvement_task] Starting task to register message improvement for message %s with type %s and status %s",
+        "[register_message_improvement_task] Starting task to register message improvement"
+        " for message %s with type %s and status %s",
         message_uuid,
         improvement_type,
         status,
@@ -41,7 +42,8 @@ def register_message_improvement_task(
         status=status,
     )
     logger.info(
-        "[register_message_improvement_task] Message improvement registered for message %s with type %s and status %s",
+        "[register_message_improvement_task] Message improvement registered"
+        " for message %s with type %s and status %s",
         message_uuid,
         improvement_type,
         status,
