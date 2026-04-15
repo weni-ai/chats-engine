@@ -1045,11 +1045,11 @@ class RoomViewset(
             "modified_on"
         )
 
-        if pending_history_summary := history_summaries.filter(
-            status=HistorySummaryStatus.PENDING
+        if pending_or_processing_history_summary := history_summaries.filter(
+            status__in=[HistorySummaryStatus.PENDING, HistorySummaryStatus.PROCESSING]
         ).last():
             serializer = RoomHistorySummarySerializer(
-                pending_history_summary, context={"request": request}
+                pending_or_processing_history_summary, context={"request": request}
             )
             return Response(serializer.data, status=status.HTTP_200_OK)
 
