@@ -237,20 +237,23 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         serializer = RoomFlowSerializer()
         serializer.process_message_history(room, messages_data)
 
-        if (
-            room.queue.sector.project.has_chats_summary
-            and room.messages.filter(
-                Q(user__isnull=False) | Q(contact__isnull=False)
-            ).exists()
-        ):
+        if room.queue.sector.project.has_chats_summary:
             if not (
                 history_summary := HistorySummary.objects.filter(
                     room=room, status=HistorySummaryStatus.PENDING
                 ).first()
             ):
                 history_summary = HistorySummary.objects.create(room=room)
+                generate_history_summary.apply_async(
+                    args=[history_summary.uuid],
+                    countdown=settings.HISTORY_SUMMARY_GENERATION_DELAY,
+                )
 
-            generate_history_summary.delay(history_summary.uuid)
+                cancel_history_summary_generation.apply_async(
+                    args=[history_summary.uuid],
+                    countdown=settings.HISTORY_SUMMARY_CANCELLATION_DELAY
+                    + settings.HISTORY_SUMMARY_GENERATION_DELAY,
+                )
 
         return Response(status=status.HTTP_201_CREATED)
 
@@ -331,15 +334,16 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         if room.queue.sector.project.has_chats_summary:
             history_summary = HistorySummary.objects.create(room=room)
 
-            if room.messages.filter(
-                Q(user__isnull=False) | Q(contact__isnull=False)
-            ).exists():
-                generate_history_summary.delay(history_summary.uuid)
+            generate_history_summary.apply_async(
+                args=[history_summary.uuid],
+                countdown=settings.HISTORY_SUMMARY_GENERATION_DELAY,
+            )
 
-            else:
-                cancel_history_summary_generation.apply_async(
-                    args=[history_summary.uuid], countdown=30
-                )  # 30 seconds delay
+            cancel_history_summary_generation.apply_async(
+                args=[history_summary.uuid],
+                countdown=settings.HISTORY_SUMMARY_CANCELLATION_DELAY
+                + settings.HISTORY_SUMMARY_GENERATION_DELAY,
+            )
 
     def perform_update(self, serializer):
         serializer.save()

@@ -73,7 +73,7 @@ class HistorySummaryService:
 
         try:
             messages: QuerySet["Message"] = room.messages.filter(
-                Q(user__isnull=False) | Q(contact__isnull=False)
+                (Q(user__isnull=False) | Q(contact__isnull=False)) & Q(text__gt="")
             ).select_related("contact", "user")
 
             conversation = []
@@ -116,6 +116,17 @@ class HistorySummaryService:
                     "A summary could not be generated for room %s. The reason provided by the AI was: %s",
                     room.uuid,
                     reason,
+                )
+            if summary_text.strip() == "":
+                history_summary.update_status(HistorySummaryStatus.UNAVAILABLE)
+                logger.error(
+                    "A summary could not be generated for room %s. The AI returned an empty summary.",
+                    room.uuid,
+                )
+                capture_message(
+                    "A summary could not be generated for room %s. The AI returned an empty summary."
+                    % room.uuid,
+                    level="error",
                 )
             else:
                 history_summary.summary = summary_text
