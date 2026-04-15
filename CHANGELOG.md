@@ -1,3 +1,7 @@
+# 3.54.5
+# Fix
+ - Empty history summary
+
 # 3.54.4
  # Add
   - New templates for exports
