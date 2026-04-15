@@ -22,9 +22,8 @@ from chats.apps.api.v1.permissions import (
 )
 from chats.apps.api.v1.queues import serializers as queue_serializers
 from chats.apps.api.v1.queues.filters import QueueAuthorizationFilter, QueueFilter
-from chats.apps.projects.models.models import Project
+from chats.apps.projects.models.models import Project, ProjectPermission
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
-from chats.apps.projects.models.models import ProjectPermission
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.sectors.models import Sector, SectorGroupSector
 from chats.apps.sectors.usecases.group_sector_authorization import (
@@ -251,12 +250,13 @@ class QueueViewset(ModelViewSet):
 
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def _create_queue_authorizations(self, queue, agent_emails, project):
+    @staticmethod
+    def _create_queue_authorizations(queue, agent_emails, project):
         if not agent_emails:
             return
         permissions = ProjectPermission.objects.filter(
             project=project,
-            user__in=[e.lower() for e in agent_emails],
+            user__in=[email.lower() for email in agent_emails],
             is_deleted=False,
         )
         QueueAuthorization.objects.bulk_create(
@@ -280,8 +280,8 @@ class QueueViewset(ModelViewSet):
         sector = serializer.validated_data["sector"]
         queues_data = serializer.validated_data["queues"]
 
-        project = Project.objects.get(uuid=sector.project.uuid)
-        use_group_sectors = SectorGroupSector.objects.filter(sector=sector).exists()
+        project = sector.project
+        has_group_sectors = SectorGroupSector.objects.filter(sector=sector).exists()
         should_use_integration = (
             project.config
             and project.config.get("its_principal", False)
@@ -303,9 +303,9 @@ class QueueViewset(ModelViewSet):
                     is_queue_limit_active=queue_limit_data.get("is_active", False) if queue_limit_data else False,
                 )
 
-                self._create_queue_authorizations(queue, agent_emails, sector.project)
+                self._create_queue_authorizations(queue, agent_emails, project)
 
-                if use_group_sectors:
+                if has_group_sectors:
                     QueueGroupSectorAuthorizationCreationUseCase(queue).execute()
 
                 created_queues.append(queue)
@@ -318,7 +318,7 @@ class QueueViewset(ModelViewSet):
                 status=status.HTTP_201_CREATED,
             )
 
-        flows_registered = []
+        flows_synced_queues = []
         try:
             for queue in created_queues:
                 if should_use_integration:
@@ -326,23 +326,26 @@ class QueueViewset(ModelViewSet):
                         project, sector.secondary_project
                     )
                 else:
-                    content = {
+                    flows_payload = {
                         "uuid": str(queue.uuid),
                         "name": queue.name,
                         "sector_uuid": str(sector.uuid),
                         "project_uuid": str(project.uuid),
                     }
-                    response = FlowRESTClient().create_queue(**content)
-                    if response.status_code not in [
+                    flows_response = FlowRESTClient().create_queue(**flows_payload)
+                    if flows_response.status_code not in [
                         status.HTTP_200_OK,
                         status.HTTP_201_CREATED,
                     ]:
                         raise exceptions.APIException(
-                            detail=f"[{response.status_code}] Error posting the queue on flows. Exception: {response.content}"
+                            detail=(
+                                f"[{flows_response.status_code}] Error posting the queue"
+                                f" on flows. Exception: {flows_response.content}"
+                            )
                         )
-                    flows_registered.append(queue)
+                    flows_synced_queues.append(queue)
         except exceptions.APIException:
-            for registered_queue in flows_registered:
+            for registered_queue in flows_synced_queues:
                 FlowRESTClient().destroy_queue(
                     uuid=str(registered_queue.uuid),
                     sector_uuid=str(sector.uuid),

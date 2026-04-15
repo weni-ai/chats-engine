@@ -58,10 +58,9 @@ class TestBulkQueueCreate(APITestCase):
         response = self.client.post(self._url(), data=self._payload(), format="json")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
-    def test_empty_queues_list_returns_400(self, mock_ff):
+    def test_empty_queues_list_returns_400(self, mock_feature_flag):
         response = self.client.post(
             self._url(),
             data={"sector": str(self.sector.pk), "queues": []},
@@ -71,7 +70,7 @@ class TestBulkQueueCreate(APITestCase):
 
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
-    def test_duplicate_names_in_request_returns_400(self, mock_ff):
+    def test_duplicate_names_in_request_returns_400(self, mock_feature_flag):
         response = self.client.post(
             self._url(),
             data=self._payload(queues=[{"name": "Fila 1"}, {"name": "Fila 1"}]),
@@ -81,7 +80,7 @@ class TestBulkQueueCreate(APITestCase):
 
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
-    def test_existing_queue_name_in_sector_returns_400(self, mock_ff):
+    def test_existing_queue_name_in_sector_returns_400(self, mock_feature_flag):
         Queue.objects.create(name="Fila Existente", sector=self.sector)
 
         response = self.client.post(
@@ -95,7 +94,7 @@ class TestBulkQueueCreate(APITestCase):
 
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=False)
     @with_project_permission()
-    def test_queue_limit_active_with_feature_flag_off_returns_400(self, mock_ff):
+    def test_queue_limit_active_with_feature_flag_off_returns_400(self, mock_feature_flag):
         response = self.client.post(
             self._url(),
             data=self._payload(
@@ -112,7 +111,7 @@ class TestBulkQueueCreate(APITestCase):
 
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=False)
     @with_project_permission()
-    def test_queue_limit_inactive_with_feature_flag_off_is_allowed(self, mock_ff):
+    def test_queue_limit_inactive_with_feature_flag_off_is_allowed(self, mock_feature_flag):
         with override_settings(USE_WENI_FLOWS=False):
             response = self.client.post(
                 self._url(),
@@ -128,11 +127,10 @@ class TestBulkQueueCreate(APITestCase):
             )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-
     @override_settings(USE_WENI_FLOWS=False)
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
-    def test_creates_all_queues_in_db(self, mock_ff):
+    def test_creates_all_queues_in_db(self, mock_feature_flag):
         response = self.client.post(self._url(), data=self._payload(), format="json")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -142,7 +140,7 @@ class TestBulkQueueCreate(APITestCase):
     @override_settings(USE_WENI_FLOWS=False)
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
-    def test_response_contains_expected_fields(self, mock_ff):
+    def test_response_contains_expected_fields(self, mock_feature_flag):
         response = self.client.post(self._url(), data=self._payload(), format="json")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -155,7 +153,7 @@ class TestBulkQueueCreate(APITestCase):
     @override_settings(USE_WENI_FLOWS=False)
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
-    def test_returned_names_match_request(self, mock_ff):
+    def test_returned_names_match_request(self, mock_feature_flag):
         response = self.client.post(self._url(), data=self._payload(), format="json")
 
         returned_names = {q["name"] for q in response.data}
@@ -164,7 +162,7 @@ class TestBulkQueueCreate(APITestCase):
     @override_settings(USE_WENI_FLOWS=False)
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
-    def test_creates_queue_with_all_optional_fields(self, mock_ff):
+    def test_creates_queue_with_all_optional_fields(self, mock_feature_flag):
         payload = {
             "sector": str(self.sector.pk),
             "queues": [
@@ -189,7 +187,7 @@ class TestBulkQueueCreate(APITestCase):
     @override_settings(USE_WENI_FLOWS=False)
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
-    def test_creates_queue_without_queue_limit_uses_defaults(self, mock_ff):
+    def test_creates_queue_without_queue_limit_uses_defaults(self, mock_feature_flag):
         response = self.client.post(
             self._url(),
             data=self._payload(queues=[{"name": "Fila Simples"}]),
@@ -206,7 +204,7 @@ class TestBulkQueueCreate(APITestCase):
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @patch("chats.apps.api.v1.queues.viewsets.FlowRESTClient")
     @with_project_permission()
-    def test_calls_flows_create_for_each_queue(self, mock_flows_cls, mock_ff):
+    def test_calls_flows_create_for_each_queue(self, mock_flows_cls, mock_feature_flag):
         mock_flows_cls.return_value.create_queue.return_value = make_flows_response(201)
 
         response = self.client.post(self._url(), data=self._payload(), format="json")
@@ -220,7 +218,7 @@ class TestBulkQueueCreate(APITestCase):
     @patch("chats.apps.api.v1.queues.viewsets.FlowRESTClient")
     @with_project_permission()
     def test_flows_failure_on_first_queue_rolls_back_db_and_skips_destroy(
-        self, mock_flows_cls, mock_ff
+        self, mock_flows_cls, mock_feature_flag
     ):
         mock_flows_cls.return_value.create_queue.return_value = make_flows_response(500)
         mock_flows_cls.return_value.destroy_queue.return_value = make_flows_response(200)
@@ -236,7 +234,7 @@ class TestBulkQueueCreate(APITestCase):
     @patch("chats.apps.api.v1.queues.viewsets.FlowRESTClient")
     @with_project_permission()
     def test_flows_failure_on_second_queue_rolls_back_db_and_destroys_first(
-        self, mock_flows_cls, mock_ff
+        self, mock_flows_cls, mock_feature_flag
     ):
         mock_flows_cls.return_value.create_queue.side_effect = [
             make_flows_response(201),
@@ -254,7 +252,7 @@ class TestBulkQueueCreate(APITestCase):
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @patch("chats.apps.api.v1.queues.viewsets.FlowRESTClient")
     @with_project_permission()
-    def test_flows_calls_include_correct_uuids(self, mock_flows_cls, mock_ff):
+    def test_flows_calls_include_correct_uuids(self, mock_flows_cls, mock_feature_flag):
         mock_flows_cls.return_value.create_queue.return_value = make_flows_response(201)
 
         self.client.post(self._url(), data=self._payload(), format="json")
@@ -268,13 +266,12 @@ class TestBulkQueueCreate(APITestCase):
             self.assertIn("uuid", kwargs)
             self.assertIn("name", kwargs)
 
-
     @override_settings(USE_WENI_FLOWS=True)
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @patch("chats.apps.api.v1.queues.viewsets.IntegratedTicketers")
     @with_project_permission()
     def test_uses_integrated_ticketers_when_its_principal_configured(
-        self, mock_ticketers_cls, mock_ff
+        self, mock_ticketers_cls, mock_feature_flag
     ):
         self.project.config = {"its_principal": True}
         self.project.save(update_fields=["config"])
@@ -295,7 +292,7 @@ class TestBulkQueueCreate(APITestCase):
     @patch("chats.apps.api.v1.queues.viewsets.FlowRESTClient")
     @with_project_permission()
     def test_does_not_use_integrated_ticketers_when_not_configured(
-        self, mock_flows_cls, mock_ff
+        self, mock_flows_cls, mock_feature_flag
     ):
         mock_flows_cls.return_value.create_queue.return_value = make_flows_response(201)
 
@@ -305,7 +302,6 @@ class TestBulkQueueCreate(APITestCase):
             self.client.post(self._url(), data=self._payload(), format="json")
             mock_ticketers_cls.return_value.integrate_individual_topic.assert_not_called()
 
-
     @override_settings(USE_WENI_FLOWS=False)
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @patch(
@@ -313,7 +309,7 @@ class TestBulkQueueCreate(APITestCase):
     )
     @with_project_permission()
     def test_calls_group_sector_authorization_use_case_when_group_sector_exists(
-        self, mock_use_case_cls, mock_ff
+        self, mock_use_case_cls, mock_feature_flag
     ):
         mock_use_case_cls.return_value.execute.return_value = None
 
@@ -339,7 +335,7 @@ class TestBulkQueueCreate(APITestCase):
     )
     @with_project_permission()
     def test_does_not_call_group_sector_use_case_when_no_group_sector(
-        self, mock_use_case_cls, mock_ff
+        self, mock_use_case_cls, mock_feature_flag
     ):
         mock_use_case_cls.return_value.execute.return_value = None
 
@@ -351,7 +347,7 @@ class TestBulkQueueCreate(APITestCase):
     @override_settings(USE_WENI_FLOWS=False)
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
-    def test_creates_queue_authorizations_for_agents(self, mock_ff):
+    def test_creates_queue_authorizations_for_agents(self, mock_feature_flag):
         agent1 = User.objects.create(email="agent1@test.com")
         agent2 = User.objects.create(email="agent2@test.com")
         ProjectPermission.objects.create(user=agent1, project=self.project, role=2)
@@ -367,25 +363,25 @@ class TestBulkQueueCreate(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        fila1 = Queue.objects.get(sector=self.sector, name="Fila 1")
-        fila2 = Queue.objects.get(sector=self.sector, name="Fila 2")
+        queue_1 = Queue.objects.get(sector=self.sector, name="Fila 1")
+        queue_2 = Queue.objects.get(sector=self.sector, name="Fila 2")
 
-        self.assertEqual(fila1.authorizations.count(), 2)
-        self.assertEqual(fila2.authorizations.count(), 1)
+        self.assertEqual(queue_1.authorizations.count(), 2)
+        self.assertEqual(queue_2.authorizations.count(), 1)
         self.assertTrue(
-            fila1.authorizations.filter(permission__user=agent1).exists()
+            queue_1.authorizations.filter(permission__user=agent1).exists()
         )
         self.assertTrue(
-            fila1.authorizations.filter(permission__user=agent2).exists()
+            queue_1.authorizations.filter(permission__user=agent2).exists()
         )
         self.assertTrue(
-            fila2.authorizations.filter(permission__user=agent1).exists()
+            queue_2.authorizations.filter(permission__user=agent1).exists()
         )
 
     @override_settings(USE_WENI_FLOWS=False)
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
-    def test_creates_queues_without_agents_field(self, mock_ff):
+    def test_creates_queues_without_agents_field(self, mock_feature_flag):
         response = self.client.post(self._url(), data=self._payload(), format="json")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -395,7 +391,7 @@ class TestBulkQueueCreate(APITestCase):
     @override_settings(USE_WENI_FLOWS=False)
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
-    def test_agent_authorizations_have_agent_role(self, mock_ff):
+    def test_agent_authorizations_have_agent_role(self, mock_feature_flag):
         agent = User.objects.create(email="agent@test.com")
         ProjectPermission.objects.create(user=agent, project=self.project, role=2)
 
@@ -414,7 +410,7 @@ class TestBulkQueueCreate(APITestCase):
     @override_settings(USE_WENI_FLOWS=False)
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
-    def test_ignores_agents_without_project_permission(self, mock_ff):
+    def test_ignores_agents_without_project_permission(self, mock_feature_flag):
         agent_with_perm = User.objects.create(email="valid@test.com")
         User.objects.create(email="noperm@test.com")
         ProjectPermission.objects.create(
@@ -430,8 +426,8 @@ class TestBulkQueueCreate(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        fila = Queue.objects.get(sector=self.sector, name="Fila 1")
-        self.assertEqual(fila.authorizations.count(), 1)
+        queue = Queue.objects.get(sector=self.sector, name="Fila 1")
+        self.assertEqual(queue.authorizations.count(), 1)
         self.assertTrue(
-            fila.authorizations.filter(permission__user=agent_with_perm).exists()
+            queue.authorizations.filter(permission__user=agent_with_perm).exists()
         )

@@ -263,15 +263,15 @@ class BulkQueueCreateSerializer(serializers.Serializer):
                 {"queues": _("There are duplicate queue names in the request.")}
             )
 
-        existing = list(
+        existing_names = list(
             Queue.objects.filter(
                 sector=sector, name__in=names, is_deleted=False
             ).values_list("name", flat=True)
         )
-        if existing:
+        if existing_names:
             raise serializers.ValidationError(
                 {
-                    "queues": f"{_('Queue(s) already exist in this sector')}: {', '.join(existing)}."
+                    "queues": f"{_('Queue(s) already exist in this sector')}: {', '.join(existing_names)}."
                 }
             )
 
