@@ -1,5 +1,3 @@
-import uuid
-
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, force_authenticate
@@ -10,8 +8,7 @@ from chats.apps.api.v1.agents.views import (
     UpdateQueuePermissionsView,
 )
 from chats.apps.projects.models import Project, ProjectPermission
-from chats.apps.queues.models import Queue, QueueAuthorization
-from chats.apps.sectors.models import Sector, SectorAuthorization
+from chats.apps.queues.models import QueueAuthorization
 
 
 def _make_manager(project):

@@ -121,7 +121,6 @@ class AgentListOrderingTests(TestCase):
 
         response = self._list()
 
-        statuses = self._status_values(response)
         emails = [item["agent"]["email"] for item in response.data.get("results", response.data)]
 
         self.assertEqual(emails[0], online_user.email)
