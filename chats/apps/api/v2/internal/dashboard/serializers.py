@@ -1,6 +1,9 @@
+from django.db.models import Q
+
 from rest_framework import serializers
 
 from chats.apps.api.utils import calculate_in_service_time
+from chats.apps.projects.models.models import CustomStatusType
 
 
 class InternalDashboardQueryParamsSerializer(serializers.Serializer):
@@ -67,3 +70,48 @@ class DashboardAgentsSerializerV2(serializers.Serializer):
         return calculate_in_service_time(
             obj.get("custom_status"), user_status=obj.get("status")
         )
+
+
+class DashboardCustomStatusByAgentSerializerV2(serializers.Serializer):
+    agent = serializers.SerializerMethodField()
+    custom_status = serializers.SerializerMethodField()
+    link = serializers.SerializerMethodField()
+
+    def get_agent(self, obj):
+        name = f"{obj.first_name} {obj.last_name}"
+
+        return {
+            "name": name,
+            "email": obj.email,
+            "is_deleted": getattr(obj, "is_deleted", False),
+        }
+
+    def get_custom_status(self, obj):
+        project = self.context.get("project")
+        custom_status_types = CustomStatusType.objects.filter(
+            Q(project=project) & Q(is_deleted=False) & ~Q(name__iexact="In-Service")
+        ).values_list("name", flat=True)
+
+        custom_status_list = getattr(obj, "custom_status", []) or []
+
+        status_dict = {status_type: 0 for status_type in custom_status_types}
+
+        for status_item in custom_status_list:
+            status_type = status_item.get("status_type")
+            break_time = status_item.get("break_time", 0)
+
+            if status_type in status_dict:
+                status_dict[status_type] += break_time
+            else:
+                status_dict[status_type] = break_time
+
+        return [
+            {"status_type": status_type, "break_time": break_time}
+            for status_type, break_time in status_dict.items()
+        ]
+
+    def get_link(self, obj):
+        return {
+            "url": f"chats:dashboard/view-mode/{obj.email}",
+            "type": "internal",
+        }
