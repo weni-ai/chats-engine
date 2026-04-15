@@ -12,7 +12,6 @@ from chats.apps.projects.tests.decorators import with_project_permission
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.sectors.models import GroupSector, Sector, SectorGroupSector
 
-
 BULK_CREATE_URL = "queue-bulk-create"
 
 
@@ -94,7 +93,9 @@ class TestBulkQueueCreate(APITestCase):
 
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=False)
     @with_project_permission()
-    def test_queue_limit_active_with_feature_flag_off_returns_400(self, mock_feature_flag):
+    def test_queue_limit_active_with_feature_flag_off_returns_400(
+        self, mock_feature_flag
+    ):
         response = self.client.post(
             self._url(),
             data=self._payload(
@@ -111,7 +112,9 @@ class TestBulkQueueCreate(APITestCase):
 
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=False)
     @with_project_permission()
-    def test_queue_limit_inactive_with_feature_flag_off_is_allowed(self, mock_feature_flag):
+    def test_queue_limit_inactive_with_feature_flag_off_is_allowed(
+        self, mock_feature_flag
+    ):
         with override_settings(USE_WENI_FLOWS=False):
             response = self.client.post(
                 self._url(),
@@ -156,7 +159,7 @@ class TestBulkQueueCreate(APITestCase):
     def test_returned_names_match_request(self, mock_feature_flag):
         response = self.client.post(self._url(), data=self._payload(), format="json")
 
-        returned_names = {q["name"] for q in response.data}
+        returned_names = {queue_data["name"] for queue_data in response.data}
         self.assertEqual(returned_names, {"Fila 1", "Fila 2"})
 
     @override_settings(USE_WENI_FLOWS=False)
@@ -221,7 +224,9 @@ class TestBulkQueueCreate(APITestCase):
         self, mock_flows_cls, mock_feature_flag
     ):
         mock_flows_cls.return_value.create_queue.return_value = make_flows_response(500)
-        mock_flows_cls.return_value.destroy_queue.return_value = make_flows_response(200)
+        mock_flows_cls.return_value.destroy_queue.return_value = make_flows_response(
+            200
+        )
 
         response = self.client.post(self._url(), data=self._payload(), format="json")
 
@@ -240,7 +245,9 @@ class TestBulkQueueCreate(APITestCase):
             make_flows_response(201),
             make_flows_response(500),
         ]
-        mock_flows_cls.return_value.destroy_queue.return_value = make_flows_response(200)
+        mock_flows_cls.return_value.destroy_queue.return_value = make_flows_response(
+            200
+        )
 
         response = self.client.post(self._url(), data=self._payload(), format="json")
 
@@ -368,15 +375,9 @@ class TestBulkQueueCreate(APITestCase):
 
         self.assertEqual(queue_1.authorizations.count(), 2)
         self.assertEqual(queue_2.authorizations.count(), 1)
-        self.assertTrue(
-            queue_1.authorizations.filter(permission__user=agent1).exists()
-        )
-        self.assertTrue(
-            queue_1.authorizations.filter(permission__user=agent2).exists()
-        )
-        self.assertTrue(
-            queue_2.authorizations.filter(permission__user=agent1).exists()
-        )
+        self.assertTrue(queue_1.authorizations.filter(permission__user=agent1).exists())
+        self.assertTrue(queue_1.authorizations.filter(permission__user=agent2).exists())
+        self.assertTrue(queue_2.authorizations.filter(permission__user=agent1).exists())
 
     @override_settings(USE_WENI_FLOWS=False)
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
@@ -418,9 +419,7 @@ class TestBulkQueueCreate(APITestCase):
         )
 
         payload = self._payload(
-            queues=[
-                {"name": "Fila 1", "agents": ["valid@test.com", "noperm@test.com"]}
-            ]
+            queues=[{"name": "Fila 1", "agents": ["valid@test.com", "noperm@test.com"]}]
         )
         response = self.client.post(self._url(), data=payload, format="json")
 

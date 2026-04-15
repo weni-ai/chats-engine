@@ -1,9 +1,9 @@
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from weni.feature_flags.shortcuts import is_feature_active
 
-from django.conf import settings
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.sectors.models import Sector
@@ -256,16 +256,16 @@ class BulkQueueCreateSerializer(serializers.Serializer):
                 {"queues": _("At least one queue is required.")}
             )
 
-        names = [q["name"] for q in queues]
+        queue_names = [queue_data["name"] for queue_data in queues]
 
-        if len(names) != len(set(names)):
+        if len(queue_names) != len(set(queue_names)):
             raise serializers.ValidationError(
                 {"queues": _("There are duplicate queue names in the request.")}
             )
 
         existing_names = list(
             Queue.objects.filter(
-                sector=sector, name__in=names, is_deleted=False
+                sector=sector, name__in=queue_names, is_deleted=False
             ).values_list("name", flat=True)
         )
         if existing_names:

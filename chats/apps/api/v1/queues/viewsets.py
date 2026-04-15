@@ -10,10 +10,6 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
-from chats.apps.core.internal_domains import (
-    is_vtex_internal_domain,
-    exclude_vtex_internal_domains,
-)
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.api.v1.permissions import (
     IsQueueAgent,
@@ -22,6 +18,10 @@ from chats.apps.api.v1.permissions import (
 )
 from chats.apps.api.v1.queues import serializers as queue_serializers
 from chats.apps.api.v1.queues.filters import QueueAuthorizationFilter, QueueFilter
+from chats.apps.core.internal_domains import (
+    exclude_vtex_internal_domains,
+    is_vtex_internal_domain,
+)
 from chats.apps.projects.models.models import Project, ProjectPermission
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.queues.models import Queue, QueueAuthorization
@@ -299,8 +299,12 @@ class QueueViewset(ModelViewSet):
                     name=queue_data["name"],
                     default_message=queue_data.get("default_message"),
                     config=queue_data.get("config"),
-                    queue_limit=queue_limit_data.get("limit") if queue_limit_data else None,
-                    is_queue_limit_active=queue_limit_data.get("is_active", False) if queue_limit_data else False,
+                    queue_limit=queue_limit_data.get("limit")
+                    if queue_limit_data
+                    else None,
+                    is_queue_limit_active=queue_limit_data.get("is_active", False)
+                    if queue_limit_data
+                    else False,
                 )
 
                 self._create_queue_authorizations(queue, agent_emails, project)
@@ -351,7 +355,7 @@ class QueueViewset(ModelViewSet):
                     sector_uuid=str(sector.uuid),
                     project_uuid=str(project.uuid),
                 )
-            Queue.objects.filter(pk__in=[q.pk for q in created_queues]).delete()
+            Queue.objects.filter(pk__in=[queue.pk for queue in created_queues]).delete()
             raise
 
         response_serializer = queue_serializers.QueueSerializer(
