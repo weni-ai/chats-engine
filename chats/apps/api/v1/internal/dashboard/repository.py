@@ -544,6 +544,16 @@ class AgentRepository:
 
         agents = agents.annotate(**annotations)
 
+        if include_removed:
+            active_permission_exists = Exists(
+                ProjectPermission.objects.filter(
+                    project=project,
+                    user_id=OuterRef("email"),
+                )
+            )
+            has_custom_status = Exists(custom_status_base_query)
+            agents = agents.filter(active_permission_exists | has_custom_status)
+
         ordering_fields = ["-agent", "agent"]
 
         if filters.ordering and filters.ordering in ordering_fields:
