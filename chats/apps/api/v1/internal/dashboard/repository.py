@@ -439,8 +439,20 @@ class AgentRepository:
 
         return agents_query
 
-    def _get_agents_query(self, filters: Filters, project: Project):
-        agents = self.model.filter(project_permissions__project=project)
+    def _get_agents_query(self, filters: Filters, project: Project, include_removed: bool = False):
+        if include_removed:
+            agents = self.model.filter(
+                Q(project_permissions__project=project)
+                | Exists(
+                    ProjectPermission.all_objects.filter(
+                        project=project,
+                        user_id=OuterRef("email"),
+                        is_deleted=True,
+                    )
+                )
+            )
+        else:
+            agents = self.model.filter(project_permissions__project=project)
 
         if not filters.is_weni_admin:
             agents = agents.exclude(get_admin_domains_exclude_filter())
@@ -498,9 +510,9 @@ class AgentRepository:
         return custom_status
 
     def get_agents_custom_status(
-        self, filters: Filters, project: Project
+        self, filters: Filters, project: Project, include_removed: bool = False
     ) -> QuerySet[User]:
-        agents = self._get_agents_query(filters, project)
+        agents = self._get_agents_query(filters, project, include_removed)
 
         custom_status_base_query = self._get_custom_status_query(filters, project)
 
@@ -518,10 +530,20 @@ class AgentRepository:
             output_field=JSONField(),
         )
 
-        agents = agents.annotate(
-            custom_status=custom_status_subquery,
-            agent=Concat(F("first_name"), Value(" "), F("last_name")),
-        )
+        annotations = {
+            "custom_status": custom_status_subquery,
+            "agent": Concat(F("first_name"), Value(" "), F("last_name")),
+        }
+
+        if include_removed:
+            annotations["is_deleted"] = ~Exists(
+                ProjectPermission.objects.filter(
+                    project=project,
+                    user_id=OuterRef("email"),
+                )
+            )
+
+        agents = agents.annotate(**annotations)
 
         ordering_fields = ["-agent", "agent"]
 

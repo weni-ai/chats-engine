@@ -8,6 +8,9 @@ from chats.apps.api.v1.internal.dashboard.dto import Filters
 from chats.apps.api.v2.internal.dashboard.usecases.agents import (
     InternalDashboardAgentsUsecase,
 )
+from chats.apps.api.v2.internal.dashboard.usecases.custom_status_by_agent import (
+    InternalDashboardCustomStatusByAgentUsecase,
+)
 from chats.apps.projects.models.models import (
     CustomStatus,
     CustomStatusType,
@@ -264,3 +267,97 @@ class InternalDashboardAgentsUsecaseTests(TestCase):
         self.assertIn("status", filter_str)
         self.assertIn("email__in", filter_str)
         self.assertEqual(result, mock_filtered)
+
+
+CUSTOM_STATUS_USECASE_MODULE = (
+    "chats.apps.api.v2.internal.dashboard.usecases.custom_status_by_agent"
+)
+
+
+class InternalDashboardCustomStatusByAgentUsecaseTests(TestCase):
+    def setUp(self):
+        self.usecase = InternalDashboardCustomStatusByAgentUsecase()
+        self.project = Project.objects.create(
+            name="Test Project",
+            timezone="America/Sao_Paulo",
+        )
+
+    def _mock_agents_service(self, mock_service_cls):
+        mock_service = mock_service_cls.return_value
+        mock_queryset = MagicMock()
+        mock_service.get_agents_custom_status.return_value = mock_queryset
+        return mock_service, mock_queryset
+
+    @patch(f"{CUSTOM_STATUS_USECASE_MODULE}.AgentsService")
+    def test_execute_builds_filters_dto(self, mock_service_cls):
+        mock_service, _ = self._mock_agents_service(mock_service_cls)
+
+        filters = {
+            "start_date": "2024-01-01",
+            "end_date": "2024-01-31",
+            "agent": "agent@test.com",
+            "sector": ["sector-uuid"],
+            "tag": ["tag1"],
+            "queue": "queue-uuid",
+            "user_request": "user@test.com",
+            "ordering": "agent",
+        }
+
+        self.usecase.execute(self.project, filters)
+
+        mock_service.get_agents_custom_status.assert_called_once()
+        dto, project = mock_service.get_agents_custom_status.call_args[0][:2]
+        kwargs = mock_service.get_agents_custom_status.call_args[1]
+
+        self.assertIsInstance(dto, Filters)
+        self.assertEqual(dto.start_date, "2024-01-01")
+        self.assertEqual(dto.end_date, "2024-01-31")
+        self.assertEqual(dto.agent, "agent@test.com")
+        self.assertEqual(dto.sector, ["sector-uuid"])
+        self.assertEqual(dto.tag, ["tag1"])
+        self.assertEqual(dto.queue, "queue-uuid")
+        self.assertEqual(dto.user_request, "user@test.com")
+        self.assertEqual(dto.ordering, "agent")
+        self.assertEqual(project, self.project)
+        self.assertTrue(kwargs.get("include_removed"))
+
+    @patch(f"{CUSTOM_STATUS_USECASE_MODULE}.AgentsService")
+    def test_execute_with_empty_filters(self, mock_service_cls):
+        mock_service, _ = self._mock_agents_service(mock_service_cls)
+
+        self.usecase.execute(self.project, {})
+
+        dto = mock_service.get_agents_custom_status.call_args[0][0]
+        kwargs = mock_service.get_agents_custom_status.call_args[1]
+
+        self.assertIsNone(dto.start_date)
+        self.assertIsNone(dto.end_date)
+        self.assertIsNone(dto.agent)
+        self.assertIsNone(dto.sector)
+        self.assertIsNone(dto.tag)
+        self.assertIsNone(dto.queue)
+        self.assertEqual(dto.user_request, "")
+        self.assertIsNone(dto.ordering)
+        self.assertTrue(kwargs.get("include_removed"))
+
+    @patch(f"{CUSTOM_STATUS_USECASE_MODULE}.should_exclude_admin_domains")
+    @patch(f"{CUSTOM_STATUS_USECASE_MODULE}.AgentsService")
+    def test_execute_computes_is_weni_admin_from_user_request(
+        self, mock_service_cls, mock_exclude
+    ):
+        mock_service, _ = self._mock_agents_service(mock_service_cls)
+        mock_exclude.return_value = True
+
+        self.usecase.execute(self.project, {"user_request": "admin@weni.ai"})
+
+        mock_exclude.assert_called_once_with("admin@weni.ai")
+        dto = mock_service.get_agents_custom_status.call_args[0][0]
+        self.assertTrue(dto.is_weni_admin)
+
+    @patch(f"{CUSTOM_STATUS_USECASE_MODULE}.AgentsService")
+    def test_execute_returns_service_data(self, mock_service_cls):
+        _, mock_queryset = self._mock_agents_service(mock_service_cls)
+
+        result = self.usecase.execute(self.project, {})
+
+        self.assertEqual(result, mock_queryset)
