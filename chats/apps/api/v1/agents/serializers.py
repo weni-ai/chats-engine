@@ -17,10 +17,13 @@ class ChatsLimitSerializer(serializers.Serializer):
 class AllAgentsAgentSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
     chats_limit = serializers.SerializerMethodField()
+    email = serializers.EmailField(source="user.email")
+    sector = serializers.SerializerMethodField()
+    sector_chats_total_limit = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectPermission
-        fields = ["name", "chats_limit"]
+        fields = ["name", "chats_limit", "email", "sector", "sector_chats_total_limit"]
 
     def get_name(self, obj):
         user = obj.user
@@ -31,19 +34,44 @@ class AllAgentsAgentSerializer(serializers.ModelSerializer):
     def get_chats_limit(self, obj):
         return ChatsLimitSerializer(obj).data
 
+    def _get_agent_sectors_with_queues(self, obj):
+        sectors = {}
+
+        for sa in obj.sector_authorizations.all():
+            sector = sa.sector
+            if sector.pk not in sectors:
+                sectors[sector.pk] = {"sector": sector, "queues": set()}
+
+        for qa in obj.queue_authorizations.all():
+            queue = qa.queue
+            sector = queue.sector
+            if sector.pk not in sectors:
+                sectors[sector.pk] = {"sector": sector, "queues": set()}
+            sectors[sector.pk]["queues"].add(queue.name)
+
+        return sectors
+
+    def get_sector(self, obj):
+        sectors = self._get_agent_sectors_with_queues(obj)
+        return [
+            {
+                "name": data["sector"].name,
+                "queues": sorted(data["queues"]),
+            }
+            for data in sectors.values()
+        ]
+
+    def get_sector_chats_total_limit(self, obj):
+        sectors = self._get_agent_sectors_with_queues(obj)
+        return sum(data["sector"].rooms_limit for data in sectors.values())
+
 
 class AllAgentsSerializer(serializers.ModelSerializer):
     agent = AllAgentsAgentSerializer(source="*")
-    email = serializers.EmailField(source="user.email")
-    sector_auth = serializers.SerializerMethodField()
 
     class Meta:
         model = ProjectPermission
-        fields = ["agent", "email", "sector_auth"]
-
-    def get_sector_auth(self, obj):
-        sectors = obj.get_sectors()
-        return list(sectors.values_list("name", flat=True))
+        fields = ["agent"]
 
 
 # ---------------------------------------------------------------------------

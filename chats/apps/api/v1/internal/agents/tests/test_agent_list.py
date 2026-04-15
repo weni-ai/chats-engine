@@ -63,7 +63,7 @@ class AgentListOrderingTests(TestCase):
     def _status_values(self, response):
         """Return raw ProjectPermission status from the DB, ordered as returned."""
         results = response.data.get("results", response.data)
-        emails = [item["email"] for item in results]
+        emails = [item["agent"]["email"] for item in results]
         perms = {
             p.user.email: p.status
             for p in ProjectPermission.objects.filter(
@@ -122,7 +122,7 @@ class AgentListOrderingTests(TestCase):
         response = self._list()
 
         statuses = self._status_values(response)
-        emails = [item["email"] for item in response.data.get("results", response.data)]
+        emails = [item["agent"]["email"] for item in response.data.get("results", response.data)]
 
         self.assertEqual(emails[0], online_user.email)
         self.assertEqual(emails[1], paused_user.email)
@@ -200,7 +200,7 @@ class AgentListOrderingTests(TestCase):
         )
 
         response = self._list()
-        emails = [item["email"] for item in response.data.get("results", response.data)]
+        emails = [item["agent"]["email"] for item in response.data.get("results", response.data)]
         names = self._names(response)
 
         # Two ONLINE first (alphabetical)
@@ -268,11 +268,14 @@ class AgentListFilterTests(TestCase):
             extra_params or {},
         )
         force_authenticate(request, user=self.manager)
+        request.resolver_match = type(
+            "ResolverMatch", (), {"kwargs": {"project_uuid": str(self.project.pk)}}
+        )()
         return view(request, project_uuid=str(self.project.pk))
 
     def _emails(self, response):
         results = response.data.get("results", response.data)
-        return {item["email"] for item in results}
+        return {item["agent"]["email"] for item in results}
 
     # ------------------------------------------------------------------
     # Case 25
@@ -402,3 +405,225 @@ class AgentListFilterTests(TestCase):
         emails = self._emails(response)
         self.assertIn(self.online_user.email, emails)
         self.assertIn(self.offline_user.email, emails)
+
+
+# ===========================================================================
+# ENGAGE-7672 — Response structure: sector, sector_chats_total_limit, email
+# ===========================================================================
+
+
+class AgentListResponseStructureTests(TestCase):
+    """Validates the new response structure with sector details and sector_chats_total_limit."""
+
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.project = Project.objects.create(name="Test Project", timezone="UTC")
+        self.manager = _make_manager(self.project)
+
+        self.sector_a = self.project.sectors.create(
+            name="Support", rooms_limit=5, work_start="08:00", work_end="18:00"
+        )
+        self.sector_b = self.project.sectors.create(
+            name="Sales", rooms_limit=3, work_start="08:00", work_end="18:00"
+        )
+        self.queue_a1 = self.sector_a.queues.create(name="Queue A1")
+        self.queue_a2 = self.sector_a.queues.create(name="Queue A2")
+        self.queue_b1 = self.sector_b.queues.create(name="Queue B1")
+
+        self.agent_user = User.objects.create_user(
+            email="agent@test.com", password="x", first_name="Ana", last_name="Silva"
+        )
+        self.agent_perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=self.agent_user,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status=ProjectPermission.STATUS_ONLINE,
+        )
+        QueueAuthorization.objects.create(
+            permission=self.agent_perm,
+            queue=self.queue_a1,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+        QueueAuthorization.objects.create(
+            permission=self.agent_perm,
+            queue=self.queue_a2,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+        QueueAuthorization.objects.create(
+            permission=self.agent_perm,
+            queue=self.queue_b1,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+    def _list(self):
+        view = AllAgentsView.as_view()
+        request = self.factory.get(f"/project/{self.project.pk}/all_agents/")
+        force_authenticate(request, user=self.manager)
+        return view(request, project_uuid=str(self.project.pk))
+
+    def _agent_data(self, response, email):
+        results = response.data.get("results", response.data)
+        return next(item["agent"] for item in results if item["agent"]["email"] == email)
+
+    # ------------------------------------------------------------------
+    # Case 32
+    # ------------------------------------------------------------------
+
+    def test_email_is_inside_agent_object(self):
+        """The email field is nested inside the agent object."""
+        response = self._list()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data.get("results", response.data)
+        first_item = results[0]
+        self.assertIn("email", first_item["agent"])
+        self.assertNotIn("email", first_item)
+
+    # ------------------------------------------------------------------
+    # Case 33
+    # ------------------------------------------------------------------
+
+    def test_sector_auth_no_longer_in_response(self):
+        """The old sector_auth field is no longer present in the response."""
+        response = self._list()
+
+        results = response.data.get("results", response.data)
+        first_item = results[0]
+        self.assertNotIn("sector_auth", first_item)
+
+    # ------------------------------------------------------------------
+    # Case 34
+    # ------------------------------------------------------------------
+
+    def test_sector_lists_sectors_with_queue_names(self):
+        """The sector field returns sector objects with name and list of queue names."""
+        response = self._list()
+
+        agent = self._agent_data(response, self.agent_user.email)
+        sector_names = {s["name"] for s in agent["sector"]}
+        self.assertEqual(sector_names, {"Support", "Sales"})
+
+        support = next(s for s in agent["sector"] if s["name"] == "Support")
+        self.assertEqual(sorted(support["queues"]), ["Queue A1", "Queue A2"])
+
+        sales = next(s for s in agent["sector"] if s["name"] == "Sales")
+        self.assertEqual(sales["queues"], ["Queue B1"])
+
+    # ------------------------------------------------------------------
+    # Case 35
+    # ------------------------------------------------------------------
+
+    def test_sector_only_shows_authorized_queues(self):
+        """Agent's sector only includes queues the agent is authorized in."""
+        self.sector_a.queues.create(name="Queue A3 (not authorized)")
+
+        response = self._list()
+
+        agent = self._agent_data(response, self.agent_user.email)
+        support = next(s for s in agent["sector"] if s["name"] == "Support")
+        self.assertNotIn("Queue A3 (not authorized)", support["queues"])
+        self.assertEqual(sorted(support["queues"]), ["Queue A1", "Queue A2"])
+
+    # ------------------------------------------------------------------
+    # Case 36
+    # ------------------------------------------------------------------
+
+    def test_sector_chats_total_limit_sums_rooms_limit_from_all_sectors(self):
+        """sector_chats_total_limit returns the sum of rooms_limit across all agent sectors."""
+        response = self._list()
+
+        agent = self._agent_data(response, self.agent_user.email)
+        # Support (5) + Sales (3) = 8
+        self.assertEqual(agent["sector_chats_total_limit"], 8)
+
+    # ------------------------------------------------------------------
+    # Case 37
+    # ------------------------------------------------------------------
+
+    def test_sector_chats_total_limit_with_single_sector(self):
+        """sector_chats_total_limit returns just the one sector's limit when agent has one sector."""
+        single_user = User.objects.create_user(
+            email="single@test.com", password="x", first_name="Bob"
+        )
+        single_perm = ProjectPermission.objects.create(
+            project=self.project,
+            user=single_user,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status=ProjectPermission.STATUS_ONLINE,
+        )
+        QueueAuthorization.objects.create(
+            permission=single_perm,
+            queue=self.queue_b1,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        response = self._list()
+
+        agent = self._agent_data(response, single_user.email)
+        self.assertEqual(agent["sector_chats_total_limit"], 3)
+
+    # ------------------------------------------------------------------
+    # Case 38
+    # ------------------------------------------------------------------
+
+    def test_sector_chats_total_limit_zero_when_no_queues(self):
+        """sector_chats_total_limit is 0 when agent has no queue authorizations."""
+        lonely_user = User.objects.create_user(
+            email="lonely@test.com", password="x", first_name="Lonely"
+        )
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=lonely_user,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status=ProjectPermission.STATUS_ONLINE,
+        )
+
+        response = self._list()
+
+        agent = self._agent_data(response, lonely_user.email)
+        self.assertEqual(agent["sector_chats_total_limit"], 0)
+        self.assertEqual(agent["sector"], [])
+
+    # ------------------------------------------------------------------
+    # Case 39
+    # ------------------------------------------------------------------
+
+    def test_sector_does_not_duplicate_when_multiple_queues_in_same_sector(self):
+        """A sector appears only once even if the agent has multiple queues in it."""
+        response = self._list()
+
+        agent = self._agent_data(response, self.agent_user.email)
+        support_entries = [s for s in agent["sector"] if s["name"] == "Support"]
+        self.assertEqual(len(support_entries), 1)
+
+    # ------------------------------------------------------------------
+    # Case 40
+    # ------------------------------------------------------------------
+
+    def test_chats_limit_independent_of_sector_chats_total_limit(self):
+        """chats_limit reflects the custom per-agent config, independent of sector totals."""
+        self.agent_perm.is_custom_limit_active = True
+        self.agent_perm.custom_rooms_limit = 20
+        self.agent_perm.save(
+            update_fields=["is_custom_limit_active", "custom_rooms_limit"]
+        )
+
+        response = self._list()
+
+        agent = self._agent_data(response, self.agent_user.email)
+        self.assertEqual(agent["chats_limit"]["active"], True)
+        self.assertEqual(agent["chats_limit"]["total"], 20)
+        # sector total remains the sum of sector limits, unaffected
+        self.assertEqual(agent["sector_chats_total_limit"], 8)
+
+    # ------------------------------------------------------------------
+    # Case 41
+    # ------------------------------------------------------------------
+
+    def test_sector_chats_total_limit_does_not_double_count_sector(self):
+        """A sector's rooms_limit is counted once even with multiple queues authorized."""
+        response = self._list()
+
+        agent = self._agent_data(response, self.agent_user.email)
+        # Agent has 2 queues in Support but rooms_limit=5 counted once
+        self.assertEqual(agent["sector_chats_total_limit"], 8)
