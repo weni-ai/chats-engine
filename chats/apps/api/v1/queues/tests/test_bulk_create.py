@@ -9,7 +9,7 @@ from rest_framework.test import APITestCase
 from chats.apps.accounts.models import User
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.projects.tests.decorators import with_project_permission
-from chats.apps.queues.models import Queue
+from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.sectors.models import GroupSector, Sector, SectorGroupSector
 
 
@@ -347,3 +347,91 @@ class TestBulkQueueCreate(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         mock_use_case_cls.return_value.execute.assert_not_called()
+
+    @override_settings(USE_WENI_FLOWS=False)
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
+    @with_project_permission()
+    def test_creates_queue_authorizations_for_agents(self, mock_ff):
+        agent1 = User.objects.create(email="agent1@test.com")
+        agent2 = User.objects.create(email="agent2@test.com")
+        ProjectPermission.objects.create(user=agent1, project=self.project, role=2)
+        ProjectPermission.objects.create(user=agent2, project=self.project, role=2)
+
+        payload = self._payload(
+            queues=[
+                {"name": "Fila 1", "agents": ["agent1@test.com", "agent2@test.com"]},
+                {"name": "Fila 2", "agents": ["agent1@test.com"]},
+            ]
+        )
+        response = self.client.post(self._url(), data=payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        fila1 = Queue.objects.get(sector=self.sector, name="Fila 1")
+        fila2 = Queue.objects.get(sector=self.sector, name="Fila 2")
+
+        self.assertEqual(fila1.authorizations.count(), 2)
+        self.assertEqual(fila2.authorizations.count(), 1)
+        self.assertTrue(
+            fila1.authorizations.filter(permission__user=agent1).exists()
+        )
+        self.assertTrue(
+            fila1.authorizations.filter(permission__user=agent2).exists()
+        )
+        self.assertTrue(
+            fila2.authorizations.filter(permission__user=agent1).exists()
+        )
+
+    @override_settings(USE_WENI_FLOWS=False)
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
+    @with_project_permission()
+    def test_creates_queues_without_agents_field(self, mock_ff):
+        response = self.client.post(self._url(), data=self._payload(), format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        for queue in Queue.objects.filter(sector=self.sector):
+            self.assertEqual(queue.authorizations.count(), 0)
+
+    @override_settings(USE_WENI_FLOWS=False)
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
+    @with_project_permission()
+    def test_agent_authorizations_have_agent_role(self, mock_ff):
+        agent = User.objects.create(email="agent@test.com")
+        ProjectPermission.objects.create(user=agent, project=self.project, role=2)
+
+        payload = self._payload(
+            queues=[{"name": "Fila 1", "agents": ["agent@test.com"]}]
+        )
+        response = self.client.post(self._url(), data=payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        auth = QueueAuthorization.objects.get(
+            queue__name="Fila 1", permission__user=agent
+        )
+        self.assertEqual(auth.role, QueueAuthorization.ROLE_AGENT)
+
+    @override_settings(USE_WENI_FLOWS=False)
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
+    @with_project_permission()
+    def test_ignores_agents_without_project_permission(self, mock_ff):
+        agent_with_perm = User.objects.create(email="valid@test.com")
+        User.objects.create(email="noperm@test.com")
+        ProjectPermission.objects.create(
+            user=agent_with_perm, project=self.project, role=2
+        )
+
+        payload = self._payload(
+            queues=[
+                {"name": "Fila 1", "agents": ["valid@test.com", "noperm@test.com"]}
+            ]
+        )
+        response = self.client.post(self._url(), data=payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        fila = Queue.objects.get(sector=self.sector, name="Fila 1")
+        self.assertEqual(fila.authorizations.count(), 1)
+        self.assertTrue(
+            fila.authorizations.filter(permission__user=agent_with_perm).exists()
+        )

@@ -233,6 +233,11 @@ class BulkQueueItemSerializer(serializers.Serializer):
     )
     config = serializers.JSONField(required=False, allow_null=True)
     queue_limit = QueueLimitSerializer(required=False, allow_null=True)
+    agents = serializers.ListField(
+        child=serializers.EmailField(),
+        required=False,
+        default=list,
+    )
 
 
 class BulkQueueCreateSerializer(serializers.Serializer):

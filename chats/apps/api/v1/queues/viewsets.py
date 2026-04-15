@@ -24,6 +24,7 @@ from chats.apps.api.v1.queues import serializers as queue_serializers
 from chats.apps.api.v1.queues.filters import QueueAuthorizationFilter, QueueFilter
 from chats.apps.projects.models.models import Project
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
+from chats.apps.projects.models.models import ProjectPermission
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.sectors.models import Sector, SectorGroupSector
 from chats.apps.sectors.usecases.group_sector_authorization import (
@@ -250,6 +251,25 @@ class QueueViewset(ModelViewSet):
 
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    def _create_queue_authorizations(self, queue, agent_emails, project):
+        if not agent_emails:
+            return
+        permissions = ProjectPermission.objects.filter(
+            project=project,
+            user__in=[e.lower() for e in agent_emails],
+            is_deleted=False,
+        )
+        QueueAuthorization.objects.bulk_create(
+            [
+                QueueAuthorization(
+                    queue=queue,
+                    permission=perm,
+                    role=QueueAuthorization.ROLE_AGENT,
+                )
+                for perm in permissions
+            ]
+        )
+
     @action(detail=False, methods=["POST"])
     def bulk_create(self, request, *args, **kwargs):
         serializer = queue_serializers.BulkQueueCreateSerializer(
@@ -273,6 +293,7 @@ class QueueViewset(ModelViewSet):
         with transaction.atomic():
             for queue_data in queues_data:
                 queue_limit_data = queue_data.pop("queue_limit", None)
+                agent_emails = queue_data.pop("agents", [])
                 queue = Queue.objects.create(
                     sector=sector,
                     name=queue_data["name"],
@@ -281,6 +302,8 @@ class QueueViewset(ModelViewSet):
                     queue_limit=queue_limit_data.get("limit") if queue_limit_data else None,
                     is_queue_limit_active=queue_limit_data.get("is_active", False) if queue_limit_data else False,
                 )
+
+                self._create_queue_authorizations(queue, agent_emails, sector.project)
 
                 if use_group_sectors:
                     QueueGroupSectorAuthorizationCreationUseCase(queue).execute()
