@@ -469,7 +469,7 @@ class AgentRepository:
                 project_permissions__queue_authorizations__queue__sector__in=filters.sector
             )
 
-        return agents
+        return agents.distinct()
 
     def _get_custom_status_query(self, filters: Filters, project: Project):
         custom_status = CustomStatus.objects.filter(
