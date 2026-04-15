@@ -15,55 +15,47 @@ class ChatsLimitSerializer(serializers.Serializer):
 
 
 class AllAgentsAgentSerializer(serializers.ModelSerializer):
-    name = serializers.SerializerMethodField()
-    chats_limit = serializers.SerializerMethodField()
-    email = serializers.EmailField(source="user.email")
-    sector = serializers.SerializerMethodField()
-    sector_chats_total_limit = serializers.SerializerMethodField()
-
     class Meta:
         model = ProjectPermission
-        fields = ["name", "chats_limit", "email", "sector", "sector_chats_total_limit"]
+        fields = []
 
-    def get_name(self, obj):
+    def _build_sectors(self, permission):
+        sectors_by_uuid = {}
+
+        for sector_auth in permission.sector_authorizations.all():
+            sector = sector_auth.sector
+            if sector.pk not in sectors_by_uuid:
+                sectors_by_uuid[sector.pk] = {"sector": sector, "queue_names": set()}
+
+        for queue_auth in permission.queue_authorizations.all():
+            sector = queue_auth.queue.sector
+            if sector.pk not in sectors_by_uuid:
+                sectors_by_uuid[sector.pk] = {"sector": sector, "queue_names": set()}
+            sectors_by_uuid[sector.pk]["queue_names"].add(queue_auth.queue.name)
+
+        return sectors_by_uuid
+
+    def to_representation(self, obj):
         user = obj.user
-        if not user:
-            return ""
-        return f"{user.first_name} {user.last_name}".strip()
+        name = f"{user.first_name} {user.last_name}".strip() if user else ""
 
-    def get_chats_limit(self, obj):
-        return ChatsLimitSerializer(obj).data
+        sectors_by_uuid = self._build_sectors(obj)
 
-    def _get_agent_sectors_with_queues(self, obj):
-        sectors = {}
-
-        for sa in obj.sector_authorizations.all():
-            sector = sa.sector
-            if sector.pk not in sectors:
-                sectors[sector.pk] = {"sector": sector, "queues": set()}
-
-        for qa in obj.queue_authorizations.all():
-            queue = qa.queue
-            sector = queue.sector
-            if sector.pk not in sectors:
-                sectors[sector.pk] = {"sector": sector, "queues": set()}
-            sectors[sector.pk]["queues"].add(queue.name)
-
-        return sectors
-
-    def get_sector(self, obj):
-        sectors = self._get_agent_sectors_with_queues(obj)
-        return [
-            {
-                "name": data["sector"].name,
-                "queues": sorted(data["queues"]),
-            }
-            for data in sectors.values()
-        ]
-
-    def get_sector_chats_total_limit(self, obj):
-        sectors = self._get_agent_sectors_with_queues(obj)
-        return sum(data["sector"].rooms_limit for data in sectors.values())
+        return {
+            "name": name,
+            "chats_limit": ChatsLimitSerializer(obj).data,
+            "email": user.email if user else "",
+            "sector": [
+                {
+                    "name": entry["sector"].name,
+                    "queues": sorted(entry["queue_names"]),
+                }
+                for entry in sectors_by_uuid.values()
+            ],
+            "sector_chats_total_limit": sum(
+                entry["sector"].rooms_limit for entry in sectors_by_uuid.values()
+            ),
+        }
 
 
 class AllAgentsSerializer(serializers.ModelSerializer):
