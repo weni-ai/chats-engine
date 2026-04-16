@@ -21,7 +21,12 @@ class InternalErrorHandlerMiddleware:
         if not event_id:
             event_id = sentry_sdk.capture_exception(exception)
 
-        logger.exception(f"Internal error: {exception}")
+        logger.exception(
+            "Internal error on %s %s: %s",
+            request.method,
+            request.get_full_path(),
+            exception,
+        )
 
         response_data = {
             "code": "INTERNAL_ERROR",
