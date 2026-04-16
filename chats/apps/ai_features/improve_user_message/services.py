@@ -1,10 +1,7 @@
 from abc import ABC, abstractmethod
 import logging
+from typing import TYPE_CHECKING
 
-
-from chats.apps.ai_features.integrations.base_client import BaseAIPlatformClient
-from chats.apps.ai_features.integrations.dataclass import PromptMessage
-from chats.apps.msgs.models import Message
 from chats.apps.ai_features.improve_user_message.choices import (
     ImprovedUserMessageTypeChoices,
     ImprovedUserMessageStatusChoices,
@@ -12,7 +9,13 @@ from chats.apps.ai_features.improve_user_message.choices import (
 from chats.apps.ai_features.improve_user_message.models import (
     MessageImprovementStatus,
 )
+from chats.apps.ai_features.integrations.base_client import BaseAIPlatformClient
+from chats.apps.ai_features.integrations.dataclass import PromptMessage
 from chats.apps.ai_features.models import FeaturePrompt
+from chats.apps.msgs.models import Message
+
+if TYPE_CHECKING:
+    from typing import Type
 
 
 logger = logging.getLogger(__name__)
@@ -42,7 +45,7 @@ class BaseImproveUserMessageService(ABC):
     @abstractmethod
     def generate_improved_message(
         self,
-        text: str,
+        user_message_text: str,
         improvement_type: ImprovedUserMessageTypeChoices,
     ) -> str:
         raise NotImplementedError
@@ -53,7 +56,7 @@ class ImproveUserMessageService(BaseImproveUserMessageService):
     Service for improving user messages.
     """
 
-    def __init__(self, integration_client_class: BaseAIPlatformClient):
+    def __init__(self, integration_client_class: "Type[BaseAIPlatformClient]"):
         self.integration_client_class = integration_client_class
 
     def register_message_improvement(
@@ -78,9 +81,9 @@ class ImproveUserMessageService(BaseImproveUserMessageService):
             status=status,
         )
 
-    def get_improvement_feature_prompt_config(
+    def _get_improvement_feature_prompt_config(
         self, improvement_type: ImprovedUserMessageTypeChoices
-    ) -> str:
+    ) -> FeaturePrompt:
         """
         Get the improvement feature prompt config.
         """
@@ -110,14 +113,17 @@ class ImproveUserMessageService(BaseImproveUserMessageService):
         """
         Generate an improved message.
         """
-        feature_prompt_config = self.get_improvement_feature_prompt_config(
+        feature_prompt_config = self._get_improvement_feature_prompt_config(
             improvement_type
         )
         model_id = feature_prompt_config.model
         prompt_text = feature_prompt_config.prompt
 
-        if "{message}" not in prompt_text:
+        message_placeholder_count = prompt_text.count("{message}")
+        if message_placeholder_count == 0:
             raise ValueError("Prompt text needs to have a {message} placeholder")
+        if message_placeholder_count > 1:
+            raise ValueError("Prompt text must have exactly one {message} placeholder")
 
         prompt_initial_context = prompt_text.split("{message}")[0]
 

@@ -197,7 +197,7 @@ class GetImprovementFeaturePromptConfigTests(TestCase):
             version=1,
         )
 
-        result = self.service.get_improvement_feature_prompt_config(
+        result = self.service._get_improvement_feature_prompt_config(
             ImprovedUserMessageTypeChoices.GRAMMAR_AND_SPELLING
         )
 
@@ -217,7 +217,7 @@ class GetImprovementFeaturePromptConfigTests(TestCase):
             version=2,
         )
 
-        result = self.service.get_improvement_feature_prompt_config(
+        result = self.service._get_improvement_feature_prompt_config(
             ImprovedUserMessageTypeChoices.MORE_EMPATHY
         )
 
@@ -226,13 +226,13 @@ class GetImprovementFeaturePromptConfigTests(TestCase):
 
     def test_raises_for_invalid_improvement_type(self):
         with self.assertRaises(ValueError) as ctx:
-            self.service.get_improvement_feature_prompt_config("INVALID_TYPE")
+            self.service._get_improvement_feature_prompt_config("INVALID_TYPE")
 
         self.assertIn("Invalid improvement type", str(ctx.exception))
 
     def test_raises_when_no_feature_prompt_exists(self):
         with self.assertRaises(ValueError) as ctx:
-            self.service.get_improvement_feature_prompt_config(
+            self.service._get_improvement_feature_prompt_config(
                 ImprovedUserMessageTypeChoices.CLARITY
             )
 
@@ -253,7 +253,7 @@ class GetImprovementFeaturePromptConfigTests(TestCase):
                 version=1,
             )
 
-            result = self.service.get_improvement_feature_prompt_config(choice)
+            result = self.service._get_improvement_feature_prompt_config(choice)
             self.assertEqual(result.feature, feature_name)
 
 
@@ -327,6 +327,22 @@ class GenerateImprovedMessageTests(TestCase):
             )
 
         self.assertIn("{message}", str(ctx.exception))
+
+    def test_raises_when_prompt_has_multiple_message_placeholders(self):
+        FeaturePrompt.objects.create(
+            feature="grammar_and_spelling",
+            model="test-model",
+            prompt="Fix: {message} and also {message}",
+            version=1,
+        )
+
+        with self.assertRaises(ValueError) as ctx:
+            self.service.generate_improved_message(
+                user_message_text="hello",
+                improvement_type=ImprovedUserMessageTypeChoices.GRAMMAR_AND_SPELLING,
+            )
+
+        self.assertIn("exactly one", str(ctx.exception))
 
     def test_uses_latest_feature_prompt_version(self):
         FeaturePrompt.objects.create(
