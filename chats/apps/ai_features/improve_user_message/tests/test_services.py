@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock
+
 from django.test import TestCase
 
 from chats.apps.accounts.models import User
@@ -11,6 +13,8 @@ from chats.apps.ai_features.improve_user_message.models import (
 from chats.apps.ai_features.improve_user_message.services import (
     ImproveUserMessageService,
 )
+from chats.apps.ai_features.integrations.dataclass import PromptMessage
+from chats.apps.ai_features.models import FeaturePrompt
 from chats.apps.contacts.models import Contact
 from chats.apps.msgs.models import Message
 from chats.apps.projects.models import Project
@@ -21,7 +25,8 @@ from chats.apps.sectors.models import Sector
 
 class ImproveUserMessageServiceTests(TestCase):
     def setUp(self):
-        self.service = ImproveUserMessageService()
+        self.mock_client_class = MagicMock()
+        self.service = ImproveUserMessageService(self.mock_client_class)
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
             name="Test Sector",
@@ -178,3 +183,171 @@ class ImproveUserMessageServiceTests(TestCase):
         )
 
         self.assertIsNone(result)
+
+
+class GetImprovementFeaturePromptConfigTests(TestCase):
+    def setUp(self):
+        self.service = ImproveUserMessageService(MagicMock())
+
+    def test_returns_feature_prompt_for_valid_type(self):
+        feature_prompt = FeaturePrompt.objects.create(
+            feature="grammar_and_spelling",
+            model="test-model",
+            prompt="Fix grammar: {message}",
+            version=1,
+        )
+
+        result = self.service.get_improvement_feature_prompt_config(
+            ImprovedUserMessageTypeChoices.GRAMMAR_AND_SPELLING
+        )
+
+        self.assertEqual(result, feature_prompt)
+
+    def test_returns_latest_version(self):
+        FeaturePrompt.objects.create(
+            feature="more_empathy",
+            model="old-model",
+            prompt="Old prompt: {message}",
+            version=1,
+        )
+        latest = FeaturePrompt.objects.create(
+            feature="more_empathy",
+            model="new-model",
+            prompt="New prompt: {message}",
+            version=2,
+        )
+
+        result = self.service.get_improvement_feature_prompt_config(
+            ImprovedUserMessageTypeChoices.MORE_EMPATHY
+        )
+
+        self.assertEqual(result, latest)
+        self.assertEqual(result.model, "new-model")
+
+    def test_raises_for_invalid_improvement_type(self):
+        with self.assertRaises(ValueError) as ctx:
+            self.service.get_improvement_feature_prompt_config("INVALID_TYPE")
+
+        self.assertIn("Invalid improvement type", str(ctx.exception))
+
+    def test_raises_when_no_feature_prompt_exists(self):
+        with self.assertRaises(ValueError) as ctx:
+            self.service.get_improvement_feature_prompt_config(
+                ImprovedUserMessageTypeChoices.CLARITY
+            )
+
+        self.assertIn("No feature prompt found", str(ctx.exception))
+
+    def test_works_for_all_valid_improvement_types(self):
+        for choice in ImprovedUserMessageTypeChoices:
+            feature_name = {
+                ImprovedUserMessageTypeChoices.GRAMMAR_AND_SPELLING: "grammar_and_spelling",
+                ImprovedUserMessageTypeChoices.MORE_EMPATHY: "more_empathy",
+                ImprovedUserMessageTypeChoices.CLARITY: "clarity",
+            }[choice]
+
+            FeaturePrompt.objects.create(
+                feature=feature_name,
+                model="test-model",
+                prompt=f"Prompt for {feature_name}: {{message}}",
+                version=1,
+            )
+
+            result = self.service.get_improvement_feature_prompt_config(choice)
+            self.assertEqual(result.feature, feature_name)
+
+
+class GenerateImprovedMessageTests(TestCase):
+    def setUp(self):
+        self.mock_client_class = MagicMock()
+        self.mock_client_instance = MagicMock()
+        self.mock_client_class.return_value = self.mock_client_instance
+        self.service = ImproveUserMessageService(self.mock_client_class)
+
+    def test_generates_improved_message(self):
+        FeaturePrompt.objects.create(
+            feature="grammar_and_spelling",
+            model="test-model",
+            prompt="Fix the grammar of this text: {message}",
+            settings={"temperature": 0.5},
+            version=1,
+        )
+        self.mock_client_instance.generate_text.return_value = "Improved text"
+
+        result = self.service.generate_improved_message(
+            user_message_text="hello wrold",
+            improvement_type=ImprovedUserMessageTypeChoices.GRAMMAR_AND_SPELLING,
+        )
+
+        self.assertEqual(result, "Improved text")
+        self.mock_client_class.assert_called_once_with("test-model")
+        self.mock_client_instance.generate_text.assert_called_once()
+
+    def test_passes_correct_prompt_messages(self):
+        FeaturePrompt.objects.create(
+            feature="clarity",
+            model="test-model",
+            prompt="Improve clarity: {message}",
+            settings={"temperature": 0.3},
+            version=1,
+        )
+        self.mock_client_instance.generate_text.return_value = "Clear text"
+
+        self.service.generate_improved_message(
+            user_message_text="unclear text",
+            improvement_type=ImprovedUserMessageTypeChoices.CLARITY,
+        )
+
+        call_args = self.mock_client_instance.generate_text.call_args
+        settings_arg = call_args[0][0]
+        prompt_msgs_arg = call_args[0][1]
+
+        self.assertEqual(settings_arg, {"temperature": 0.3})
+        self.assertEqual(len(prompt_msgs_arg), 2)
+        self.assertEqual(
+            prompt_msgs_arg[0],
+            PromptMessage(text="Improve clarity: ", should_cache=True),
+        )
+        self.assertEqual(
+            prompt_msgs_arg[1], PromptMessage(text="unclear text", should_cache=False)
+        )
+
+    def test_raises_when_prompt_missing_message_placeholder(self):
+        FeaturePrompt.objects.create(
+            feature="grammar_and_spelling",
+            model="test-model",
+            prompt="Fix the grammar of this text",
+            version=1,
+        )
+
+        with self.assertRaises(ValueError) as ctx:
+            self.service.generate_improved_message(
+                user_message_text="hello",
+                improvement_type=ImprovedUserMessageTypeChoices.GRAMMAR_AND_SPELLING,
+            )
+
+        self.assertIn("{message}", str(ctx.exception))
+
+    def test_uses_latest_feature_prompt_version(self):
+        FeaturePrompt.objects.create(
+            feature="more_empathy",
+            model="old-model",
+            prompt="Old: {message}",
+            settings={"temperature": 0.9},
+            version=1,
+        )
+        FeaturePrompt.objects.create(
+            feature="more_empathy",
+            model="new-model",
+            prompt="New: {message}",
+            settings={"temperature": 0.7},
+            version=2,
+        )
+        self.mock_client_instance.generate_text.return_value = "Empathetic text"
+
+        self.service.generate_improved_message(
+            user_message_text="cold text",
+            improvement_type=ImprovedUserMessageTypeChoices.MORE_EMPATHY,
+        )
+
+        self.mock_client_class.assert_called_once_with("new-model")
