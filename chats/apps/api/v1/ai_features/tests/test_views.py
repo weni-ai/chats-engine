@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from django.conf import settings
 from django.urls import reverse
@@ -139,9 +139,7 @@ class TestAITextImprovementViewAsAnonymousUser(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
-@patch(
-    "chats.apps.api.v1.ai_features.views.ImproveUserMessageUseCase"
-)
+@patch("chats.apps.api.v1.ai_features.views.ImproveUserMessageUseCase")
 class TestAITextImprovementViewAsAuthenticatedUser(APITestCase):
     def setUp(self):
         self.user = User.objects.create(email="test@test.com")
