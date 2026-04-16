@@ -3,9 +3,7 @@ from django.utils.translation import gettext_lazy as _
 
 
 class ImprovedUserMessageStatusChoices(models.TextChoices):
-    """
-    A model to store the status of the improved user message.
-    """
+    """Status options for an improved user message."""
 
     USED = "USED", _("Used")
     DISCARDED = "DISCARDED", _("Discarded")
@@ -13,9 +11,7 @@ class ImprovedUserMessageStatusChoices(models.TextChoices):
 
 
 class ImprovedUserMessageTypeChoices(models.TextChoices):
-    """
-    A model to store the type of the improved user message.
-    """
+    """Type options for an improved user message."""
 
     GRAMMAR_AND_SPELLING = "GRAMMAR_AND_SPELLING", _("Grammar and spelling")
     MORE_EMPATHY = "MORE_EMPATHY", _("More empathy")
