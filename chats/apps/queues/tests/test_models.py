@@ -156,6 +156,83 @@ class QueueAvailableAgentsDefaultTestCase(QueueSetUpMixin, TestCase):
         self.assertEqual(self.agent_2, self.queue.available_agents.first())
 
 
+class QueueAvailableAgentsCustomLimitTestCase(QueueSetUpMixin, TestCase):
+    """
+    Tests for per-agent custom rooms limit on ProjectPermission.
+
+    When is_custom_limit_active=False (default): sector.rooms_limit is used.
+    When is_custom_limit_active=True + custom_rooms_limit set: that value is used
+    instead of the sector limit — only for that specific agent.
+    """
+
+    def setUp(self):
+        super().setUp()
+        # Both agents online; sector rooms_limit = 1
+        self.agent_permission.status = "ONLINE"
+        self.agent_permission.last_seen = timezone.now()
+        self.agent_permission.save()
+        self.agent_2_permission.status = "ONLINE"
+        self.agent_2_permission.last_seen = timezone.now()
+        self.agent_2_permission.save()
+        # Give agent a room so they sit exactly at the sector limit
+        self.room.user = self.agent
+        self.room.is_active = True
+        self.room.save()
+
+    def test_agent_blocked_by_sector_limit_when_custom_limit_inactive(self):
+        """Default behaviour: sector rooms_limit blocks the agent."""
+        # agent has 1 active room, sector limit = 1 → blocked
+        self.assertNotIn(self.agent, self.queue.available_agents)
+        # agent_2 has 0 rooms → available
+        self.assertIn(self.agent_2, self.queue.available_agents)
+
+    def test_custom_limit_allows_agent_beyond_sector_limit(self):
+        """When is_custom_limit_active=True, custom_rooms_limit overrides sector limit."""
+        self.agent_permission.is_custom_limit_active = True
+        self.agent_permission.custom_rooms_limit = 5
+        self.agent_permission.save(
+            update_fields=["is_custom_limit_active", "custom_rooms_limit"]
+        )
+
+        # agent has 1 active room; custom limit = 5 → still available
+        self.assertIn(self.agent, self.queue.available_agents)
+
+    def test_custom_limit_does_not_affect_other_agents(self):
+        """A custom limit on one agent does not change the limit for others."""
+        self.agent_permission.is_custom_limit_active = True
+        self.agent_permission.custom_rooms_limit = 5
+        self.agent_permission.save(
+            update_fields=["is_custom_limit_active", "custom_rooms_limit"]
+        )
+
+        # Give agent_2 a room so they hit the sector limit (1)
+        contact = Contact.objects.create(name="Extra contact")
+        Room.objects.create(
+            contact=contact, queue=self.queue, user=self.agent_2, is_active=True
+        )
+
+        # agent_2 has no custom limit → blocked by sector limit (1)
+        self.assertNotIn(self.agent_2, self.queue.available_agents)
+        # agent has custom limit → still available (1 room < limit 5)
+        self.assertIn(self.agent, self.queue.available_agents)
+
+    def test_custom_limit_inactive_after_deactivation(self):
+        """Deactivating custom limit restores sector limit behaviour."""
+        self.agent_permission.is_custom_limit_active = True
+        self.agent_permission.custom_rooms_limit = 5
+        self.agent_permission.save(
+            update_fields=["is_custom_limit_active", "custom_rooms_limit"]
+        )
+        self.assertIn(self.agent, self.queue.available_agents)
+
+        # Now deactivate
+        self.agent_permission.is_custom_limit_active = False
+        self.agent_permission.save(update_fields=["is_custom_limit_active"])
+
+        # Back to sector limit (1) → agent blocked again
+        self.assertNotIn(self.agent, self.queue.available_agents)
+
+
 class QueueAvailableAgentsGaneralTestCase(TestCase):
     fixtures = ["chats/fixtures/fixture_app.json", "chats/fixtures/fixture_room.json"]
 

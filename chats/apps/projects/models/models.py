@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Optional
 from uuid import UUID
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import (
@@ -348,6 +349,16 @@ class ProjectPermission(BaseSoftDeleteModel, BaseModel):
         null=True,
         blank=True,
         help_text=_("Last time the agent sent a ping (heartbeat)"),
+    )
+
+    custom_rooms_limit = models.PositiveIntegerField(
+        _("Custom rooms limit"),
+        null=True,
+        blank=True,
+    )
+    is_custom_limit_active = models.BooleanField(
+        _("Is custom limit active?"),
+        default=False,
     )
 
     objects = UserPermissionsManager()
