@@ -7,6 +7,8 @@ from django.test import TestCase, override_settings
 from chats.apps.accounts.models import User
 from chats.apps.contacts.models import Contact
 from chats.apps.dashboard.models import ReportStatus
+from chats.apps.api.v1.dashboard.presenter import ModelFieldsPresenter
+from chats.apps.api.v1.dashboard.viewsets import ReportFieldsValidatorViewSet
 from chats.apps.dashboard.tasks import (
     _norm_file_type,
     _strip_tz,
@@ -439,3 +441,105 @@ class ProcessPendingReportsTests(TestCase):
 
         report_status.refresh_from_db()
         self.assertEqual(report_status.status, "ready")
+
+
+class ModelFieldsPresenterTests(TestCase):
+    def test_rooms_fields_contains_expected_keys(self):
+        models_info = ModelFieldsPresenter.get_models_info()
+        rooms_fields = models_info["rooms"]
+
+        expected_fields = {
+            "user__first_name",
+            "user__last_name",
+            "user__email",
+            "queue__sector__name",
+            "queue__name",
+            "is_active",
+            "protocol",
+            "tags",
+            "created_on",
+            "ended_at",
+            "full_transfer_history",
+            "contact__name",
+            "contact__uuid",
+            "urn",
+            "custom_fields",
+            "metric__waiting_time",
+            "metric__first_response_time",
+            "metric__message_response_time",
+            "metric__interaction_time",
+        }
+        self.assertEqual(set(rooms_fields.keys()), expected_fields)
+
+    def test_rooms_fields_does_not_contain_removed_keys(self):
+        models_info = ModelFieldsPresenter.get_models_info()
+        rooms_fields = models_info["rooms"]
+
+        self.assertNotIn("uuid", rooms_fields)
+        self.assertNotIn("transfer_history", rooms_fields)
+
+    def test_rooms_fields_uses_full_transfer_history(self):
+        models_info = ModelFieldsPresenter.get_models_info()
+        rooms_fields = models_info["rooms"]
+
+        self.assertIn("full_transfer_history", rooms_fields)
+        self.assertEqual(rooms_fields["full_transfer_history"]["type"], "JSONField")
+
+    def test_agent_status_logs_contains_expected_keys(self):
+        models_info = ModelFieldsPresenter.get_models_info()
+        agent_fields = models_info["agent_status_logs"]
+
+        expected_fields = {
+            "agent__email",
+            "agent__first_name",
+            "agent__last_name",
+            "project__name",
+            "project__uuid",
+            "log_date",
+            "created_on",
+        }
+        self.assertEqual(set(agent_fields.keys()), expected_fields)
+
+    def test_agent_status_logs_does_not_contain_removed_keys(self):
+        models_info = ModelFieldsPresenter.get_models_info()
+        agent_fields = models_info["agent_status_logs"]
+
+        self.assertNotIn("uuid", agent_fields)
+        self.assertNotIn("status_changes", agent_fields)
+        self.assertNotIn("modified_on", agent_fields)
+
+
+class SortFieldsByPriorityTests(TestCase):
+    def setUp(self):
+        self.viewset = ReportFieldsValidatorViewSet()
+
+    def test_sorts_rooms_fields_in_correct_order(self):
+        fields = ["custom_fields", "created_on", "user__first_name", "full_transfer_history"]
+        sorted_fields = self.viewset._sort_fields_by_priority(fields)
+
+        self.assertEqual(sorted_fields, [
+            "user__first_name",
+            "created_on",
+            "full_transfer_history",
+            "custom_fields",
+        ])
+
+    def test_unknown_fields_go_to_end(self):
+        fields = ["user__first_name", "some_unknown_field"]
+        sorted_fields = self.viewset._sort_fields_by_priority(fields)
+
+        self.assertEqual(sorted_fields[0], "user__first_name")
+        self.assertEqual(sorted_fields[-1], "some_unknown_field")
+
+    def test_full_transfer_history_has_priority(self):
+        fields = ["urn", "full_transfer_history", "contact__name"]
+        sorted_fields = self.viewset._sort_fields_by_priority(fields)
+
+        self.assertLess(
+            sorted_fields.index("full_transfer_history"),
+            sorted_fields.index("contact__name"),
+        )
+        self.assertLess(
+            sorted_fields.index("full_transfer_history"),
+            sorted_fields.index("urn"),
+        )
