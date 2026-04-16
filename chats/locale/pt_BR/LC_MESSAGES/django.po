@@ -1308,18 +1308,18 @@ msgstr ""
 "Por favor, tente novamente mais tarde ou entre em contato com o suporte."
 
 #: chats/apps/rooms/templates/rooms/emails/base.html:26
-msgid "2026 © VTEX CX Platform. All rights reserved."
-msgstr "2026 © VTEX CX Platform. Todos os direitos reservados."
+msgid "All rights reserved."
+msgstr "Todos os direitos reservados."
 
 #: chats/apps/rooms/templates/rooms/emails/base.html:30
 msgid ""
 "You are receiving this mail because you registered in VTEX CX Platform. This "
-"also shows that you agree to our Terms of use and Privacy Policies. If you "
-"no longer want to receive mails from use, click the unsubscribe link below "
-"to unsubscribe."
+"also shows that you agree to our Terms of use and Privacy Policies. If you no "
+"longer want to receive mails from use, click the unsubscribe link below to "
+"unsubscribe."
 msgstr ""
-"Você está recebendo este e-mail porque se registrou na VTEX CX Platform. "
-"Isso também mostra que você concorda com nossos Termos de uso e Políticas de "
+"Você está recebendo este e-mail porque se registrou na VTEX CX Platform. Isso "
+"também mostra que você concorda com nossos Termos de uso e Políticas de "
 "privacidade. Se não quiser mais receber e-mails, clique no link de "
 "cancelamento de assinatura abaixo para cancelar."
 
@@ -1341,14 +1341,13 @@ msgstr "Cancelar inscrição"
 
 #: chats/apps/rooms/templates/rooms/emails/report_failed.html:16
 #: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:16
-msgid "Hi,"
-msgstr "Olá,"
+msgid "Hi, here is your data export"
+msgstr "Olá, aqui está sua exportação de dados"
 
 #: chats/apps/rooms/templates/rooms/emails/report_failed.html:31
 #, python-format
 msgid "Unable to generate export of %(project_name)s project data."
-msgstr ""
-"Não foi possível gerar a exportação de dados do projeto %(project_name)s."
+msgstr "Não foi possível gerar a exportação de dados do projeto %(project_name)s."
 
 #: chats/apps/rooms/templates/rooms/emails/report_failed.html:34
 msgid "Use the following information to report to support:"
@@ -1362,6 +1361,10 @@ msgid ""
 msgstr ""
 "A exportação de dados do projeto %(project_name)s está pronta. Clique no "
 "botão abaixo para baixá-la."
+
+#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:63
+msgid "Download report"
+msgstr "Baixar relatório"
 
 #: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:63
 msgid "Download report"
