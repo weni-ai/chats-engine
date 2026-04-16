@@ -2,6 +2,9 @@ from abc import ABC, abstractmethod
 import logging
 from typing import TYPE_CHECKING
 
+from django.conf import settings
+from weni.feature_flags.shortcuts import is_feature_active_for_attributes
+
 from chats.apps.ai_features.improve_user_message.choices import (
     ImprovedUserMessageTypeChoices,
     ImprovedUserMessageStatusChoices,
@@ -12,7 +15,9 @@ from chats.apps.ai_features.improve_user_message.models import (
 from chats.apps.ai_features.integrations.base_client import BaseAIPlatformClient
 from chats.apps.ai_features.integrations.dataclass import PromptMessage
 from chats.apps.ai_features.models import FeaturePrompt
+from chats.apps.feature_flags.exceptions import FeatureFlagInactiveError
 from chats.apps.msgs.models import Message
+from chats.apps.projects.models import Project
 
 if TYPE_CHECKING:
     from typing import Type
@@ -47,6 +52,7 @@ class BaseImproveUserMessageService(ABC):
         self,
         user_message_text: str,
         improvement_type: ImprovedUserMessageTypeChoices,
+        project: Project,
     ) -> str:
         raise NotImplementedError
 
@@ -109,10 +115,19 @@ class ImproveUserMessageService(BaseImproveUserMessageService):
         self,
         user_message_text: str,
         improvement_type: ImprovedUserMessageTypeChoices,
+        project: Project,
     ) -> str:
         """
         Generate an improved message.
         """
+        if not is_feature_active_for_attributes(
+            settings.IMPROVE_USER_MESSAGE_FEATURE_FLAG_KEY,
+            {"projectUUID": str(project.uuid)},
+        ):
+            raise FeatureFlagInactiveError(
+                "Feature flag is not active for this project"
+            )
+
         feature_prompt_config = self._get_improvement_feature_prompt_config(
             improvement_type
         )
