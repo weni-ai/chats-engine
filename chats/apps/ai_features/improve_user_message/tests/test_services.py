@@ -312,6 +312,58 @@ class GenerateImprovedMessageTests(TestCase):
             prompt_msgs_arg[1], PromptMessage(text="unclear text", should_cache=False)
         )
 
+    def test_includes_suffix_after_message_placeholder(self):
+        FeaturePrompt.objects.create(
+            feature="clarity",
+            model="test-model",
+            prompt="Improve this: {message}. Be concise and formal.",
+            settings={"temperature": 0.3},
+            version=1,
+        )
+        self.mock_client_instance.generate_text.return_value = "Improved text"
+
+        self.service.generate_improved_message(
+            user_message_text="some text",
+            improvement_type=ImprovedUserMessageTypeChoices.CLARITY,
+        )
+
+        call_args = self.mock_client_instance.generate_text.call_args
+        prompt_msgs_arg = call_args[0][1]
+
+        self.assertEqual(len(prompt_msgs_arg), 3)
+        self.assertEqual(
+            prompt_msgs_arg[0],
+            PromptMessage(text="Improve this: ", should_cache=True),
+        )
+        self.assertEqual(
+            prompt_msgs_arg[1],
+            PromptMessage(text="some text", should_cache=False),
+        )
+        self.assertEqual(
+            prompt_msgs_arg[2],
+            PromptMessage(text=". Be concise and formal.", should_cache=True),
+        )
+
+    def test_no_suffix_when_placeholder_is_at_end(self):
+        FeaturePrompt.objects.create(
+            feature="clarity",
+            model="test-model",
+            prompt="Improve this: {message}",
+            settings={"temperature": 0.3},
+            version=1,
+        )
+        self.mock_client_instance.generate_text.return_value = "Improved text"
+
+        self.service.generate_improved_message(
+            user_message_text="some text",
+            improvement_type=ImprovedUserMessageTypeChoices.CLARITY,
+        )
+
+        call_args = self.mock_client_instance.generate_text.call_args
+        prompt_msgs_arg = call_args[0][1]
+
+        self.assertEqual(len(prompt_msgs_arg), 2)
+
     def test_raises_when_prompt_missing_message_placeholder(self):
         FeaturePrompt.objects.create(
             feature="grammar_and_spelling",

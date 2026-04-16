@@ -125,12 +125,15 @@ class ImproveUserMessageService(BaseImproveUserMessageService):
         if message_placeholder_count > 1:
             raise ValueError("Prompt text must have exactly one {message} placeholder")
 
-        prompt_initial_context = prompt_text.split("{message}")[0]
+        prefix, suffix = prompt_text.split("{message}")
 
         prompt_msgs = [
-            PromptMessage(text=prompt_initial_context, should_cache=True),
+            PromptMessage(text=prefix, should_cache=True),
             PromptMessage(text=user_message_text, should_cache=False),
         ]
+
+        if suffix:
+            prompt_msgs.append(PromptMessage(text=suffix, should_cache=True))
 
         improved_message_text = self.integration_client_class(model_id).generate_text(
             feature_prompt_config.settings, prompt_msgs
