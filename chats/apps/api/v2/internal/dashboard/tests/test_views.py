@@ -12,11 +12,19 @@ USECASE_PATH = (
     "chats.apps.api.v2.internal.dashboard.usecases.agents"
     ".InternalDashboardAgentsUsecase.execute"
 )
+CUSTOM_STATUS_USECASE_PATH = (
+    "chats.apps.api.v2.internal.dashboard.usecases.custom_status_by_agent"
+    ".InternalDashboardCustomStatusByAgentUsecase.execute"
+)
 
 
 class BaseInternalDashboardViewsetV2Tests(APITestCase):
     def get_agent_metrics(self, project_uuid: str, filters: dict = {}):
         url = f"/v2/internal/dashboard/{project_uuid}/agent/"
+        return self.client.get(url, filters)
+
+    def get_custom_status_by_agent(self, project_uuid: str, filters: dict = {}):
+        url = f"/v2/internal/dashboard/{project_uuid}/custom-status-by-agent/"
         return self.client.get(url, filters)
 
 
@@ -25,6 +33,10 @@ class TestInternalDashboardViewsetV2AsAnonymousUser(
 ):
     def test_agent_metrics_returns_401(self):
         response = self.get_agent_metrics(uuid.uuid4())
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_custom_status_by_agent_returns_401(self):
+        response = self.get_custom_status_by_agent(uuid.uuid4())
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
@@ -116,3 +128,78 @@ class TestInternalDashboardViewsetV2AsAuthenticatedUser(
         self.assertFalse(results[0]["agent"]["is_deleted"])
         self.assertEqual(results[0]["closed"], 5)
         self.assertEqual(results[0]["opened"], 2)
+
+    def test_custom_status_by_agent_returns_403_without_internal_permission(self):
+        response = self.get_custom_status_by_agent(self.project.uuid)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    @with_internal_auth
+    @patch(CUSTOM_STATUS_USECASE_PATH)
+    def test_custom_status_by_agent_returns_404_for_nonexistent_project(
+        self, mock_execute
+    ):
+        response = self.get_custom_status_by_agent(uuid.uuid4(), self.valid_filters)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        mock_execute.assert_not_called()
+
+    @with_internal_auth
+    @patch(CUSTOM_STATUS_USECASE_PATH)
+    def test_custom_status_by_agent_returns_200(self, mock_execute):
+        mock_execute.return_value = []
+
+        response = self.get_custom_status_by_agent(
+            self.project.uuid, self.valid_filters
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("results", response.data)
+
+    @with_internal_auth
+    @patch(CUSTOM_STATUS_USECASE_PATH)
+    def test_custom_status_by_agent_calls_usecase_with_project_and_filters(
+        self, mock_execute
+    ):
+        mock_execute.return_value = []
+
+        self.get_custom_status_by_agent(self.project.uuid, self.valid_filters)
+
+        mock_execute.assert_called_once()
+        project_arg, filters_arg = mock_execute.call_args[0]
+        self.assertEqual(project_arg, self.project)
+        self.assertIsInstance(filters_arg, dict)
+        self.assertEqual(str(filters_arg["start_date"]), "2024-01-01")
+        self.assertEqual(str(filters_arg["end_date"]), "2024-01-31")
+        self.assertEqual(filters_arg["agent"], "agent@test.com")
+
+    @with_internal_auth
+    @patch(CUSTOM_STATUS_USECASE_PATH)
+    def test_custom_status_by_agent_returns_agent_object_with_is_deleted(
+        self, mock_execute
+    ):
+        agent = User.objects.create(
+            email="agent1@test.com",
+            first_name="Agent",
+            last_name="One",
+        )
+        agent.is_deleted = True
+        agent.custom_status = None
+
+        mock_execute.return_value = [agent]
+
+        response = self.get_custom_status_by_agent(
+            self.project.uuid, self.valid_filters
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data["results"]
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["agent"]["email"], "agent1@test.com")
+        self.assertEqual(results[0]["agent"]["name"], "Agent One")
+        self.assertTrue(results[0]["agent"]["is_deleted"])
+        self.assertIn("custom_status", results[0])
+        self.assertIn("link", results[0])
+        self.assertEqual(
+            results[0]["link"]["url"],
+            "chats:dashboard/view-mode/agent1@test.com",
+        )
+        self.assertEqual(results[0]["link"]["type"], "internal")
