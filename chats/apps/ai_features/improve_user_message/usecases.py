@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 
 from chats.apps.ai_features.improve_user_message.services import (
