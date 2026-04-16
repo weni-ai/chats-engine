@@ -296,7 +296,7 @@ class TestAITextImprovementViewAsAuthenticatedUser(APITestCase):
                 version=1,
                 defaults={
                     "model": "test-model",
-                    "prompt": f"Improve: {{message}}",
+                    "prompt": "Improve: {message}",
                     "settings": {"temperature": 0.5},
                 },
             )
