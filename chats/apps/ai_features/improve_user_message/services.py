@@ -3,6 +3,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from django.conf import settings
+from django.core.cache import cache
 from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
 from chats.apps.ai_features.improve_user_message.choices import (
@@ -97,6 +98,11 @@ class ImproveUserMessageService(BaseImproveUserMessageService):
             raise ValueError(f"Invalid improvement type: {improvement_type}")
 
         feature_name = FEATURE_PROMPT_IMPROVEMENT_TYPE_MAPPING[improvement_type]
+        cache_key = f"ai_features:improve_user_message:{feature_name}"
+
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
 
         feature_prompt = (
             FeaturePrompt.objects.filter(feature=feature_name)
@@ -108,6 +114,12 @@ class ImproveUserMessageService(BaseImproveUserMessageService):
             raise ValueError(
                 f"No feature prompt found for improvement type: {improvement_type}"
             )
+
+        cache.set(
+            cache_key,
+            feature_prompt,
+            settings.IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL,
+        )
 
         return feature_prompt
 

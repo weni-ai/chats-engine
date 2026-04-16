@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
-from django.test import TestCase
+from django.core.cache import cache
+from django.test import TestCase, override_settings
 
 from chats.apps.accounts.models import User
 from chats.apps.ai_features.improve_user_message.choices import (
@@ -188,6 +189,7 @@ class ImproveUserMessageServiceTests(TestCase):
 
 class GetImprovementFeaturePromptConfigTests(TestCase):
     def setUp(self):
+        cache.clear()
         self.service = ImproveUserMessageService(MagicMock())
 
     def test_returns_feature_prompt_for_valid_type(self):
@@ -257,6 +259,95 @@ class GetImprovementFeaturePromptConfigTests(TestCase):
             result = self.service._get_improvement_feature_prompt_config(choice)
             self.assertEqual(result.feature, feature_name)
 
+    def test_caches_feature_prompt(self):
+        FeaturePrompt.objects.create(
+            feature="grammar_and_spelling",
+            model="test-model",
+            prompt="Fix grammar: {message}",
+            version=1,
+        )
+
+        self.service._get_improvement_feature_prompt_config(
+            ImprovedUserMessageTypeChoices.GRAMMAR_AND_SPELLING
+        )
+
+        cached = cache.get("ai_features:improve_user_message:grammar_and_spelling")
+        self.assertIsNotNone(cached)
+        self.assertEqual(cached.feature, "grammar_and_spelling")
+
+    def test_returns_cached_prompt_without_hitting_db(self):
+        feature_prompt = FeaturePrompt.objects.create(
+            feature="clarity",
+            model="test-model",
+            prompt="Improve clarity: {message}",
+            version=1,
+        )
+
+        self.service._get_improvement_feature_prompt_config(
+            ImprovedUserMessageTypeChoices.CLARITY
+        )
+
+        FeaturePrompt.objects.all().delete()
+
+        result = self.service._get_improvement_feature_prompt_config(
+            ImprovedUserMessageTypeChoices.CLARITY
+        )
+        self.assertEqual(result.pk, feature_prompt.pk)
+
+    def test_does_not_cache_when_no_prompt_exists(self):
+        with self.assertRaises(ValueError):
+            self.service._get_improvement_feature_prompt_config(
+                ImprovedUserMessageTypeChoices.CLARITY
+            )
+
+        cached = cache.get("ai_features:improve_user_message:clarity")
+        self.assertIsNone(cached)
+
+    @override_settings(IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL=1)
+    def test_cache_uses_configured_ttl(self):
+        FeaturePrompt.objects.create(
+            feature="more_empathy",
+            model="test-model",
+            prompt="Add empathy: {message}",
+            version=1,
+        )
+
+        self.service._get_improvement_feature_prompt_config(
+            ImprovedUserMessageTypeChoices.MORE_EMPATHY
+        )
+
+        cached = cache.get("ai_features:improve_user_message:more_empathy")
+        self.assertIsNotNone(cached)
+
+    def test_cache_key_is_per_feature_name(self):
+        FeaturePrompt.objects.create(
+            feature="grammar_and_spelling",
+            model="model-a",
+            prompt="Fix: {message}",
+            version=1,
+        )
+        FeaturePrompt.objects.create(
+            feature="clarity",
+            model="model-b",
+            prompt="Clarify: {message}",
+            version=1,
+        )
+
+        self.service._get_improvement_feature_prompt_config(
+            ImprovedUserMessageTypeChoices.GRAMMAR_AND_SPELLING
+        )
+        self.service._get_improvement_feature_prompt_config(
+            ImprovedUserMessageTypeChoices.CLARITY
+        )
+
+        cached_grammar = cache.get(
+            "ai_features:improve_user_message:grammar_and_spelling"
+        )
+        cached_clarity = cache.get("ai_features:improve_user_message:clarity")
+
+        self.assertEqual(cached_grammar.model, "model-a")
+        self.assertEqual(cached_clarity.model, "model-b")
+
 
 @patch(
     "chats.apps.ai_features.improve_user_message.services.is_feature_active_for_attributes",
@@ -264,6 +355,7 @@ class GetImprovementFeaturePromptConfigTests(TestCase):
 )
 class GenerateImprovedMessageTests(TestCase):
     def setUp(self):
+        cache.clear()
         self.mock_client_class = MagicMock()
         self.mock_client_instance = MagicMock()
         self.mock_client_class.return_value = self.mock_client_instance
