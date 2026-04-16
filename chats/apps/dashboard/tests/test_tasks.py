@@ -7,6 +7,8 @@ from django.test import TestCase, override_settings
 from chats.apps.accounts.models import User
 from chats.apps.contacts.models import Contact
 from chats.apps.dashboard.models import ReportStatus
+from chats.apps.api.v1.dashboard.presenter import ModelFieldsPresenter
+from chats.apps.api.v1.dashboard.viewsets import ReportFieldsValidatorViewSet
 from chats.apps.dashboard.tasks import (
     _norm_file_type,
     _strip_tz,
@@ -89,12 +91,12 @@ class GenerateCustomFieldsReportTests(TestCase):
     def test_generate_report_success_xlsx(self, mock_viewset_class):
         mock_viewset = MagicMock()
         mock_viewset._generate_report_data.return_value = {
-            "rooms": {"data": [{"uuid": str(self.room.uuid), "is_active": False}]}
+            "rooms": {"data": [{"protocol": str(self.room.uuid), "is_active": False}]}
         }
         mock_viewset_class.return_value = mock_viewset
 
         fields_config = {
-            "rooms": {"fields": ["uuid", "is_active"]},
+            "rooms": {"fields": ["protocol", "is_active"]},
             "_file_type": "xlsx",
         }
 
@@ -113,12 +115,12 @@ class GenerateCustomFieldsReportTests(TestCase):
     def test_generate_report_success_csv(self, mock_viewset_class):
         mock_viewset = MagicMock()
         mock_viewset._generate_report_data.return_value = {
-            "rooms": {"data": [{"uuid": str(self.room.uuid), "is_active": False}]}
+            "rooms": {"data": [{"protocol": str(self.room.uuid), "is_active": False}]}
         }
         mock_viewset_class.return_value = mock_viewset
 
         fields_config = {
-            "rooms": {"fields": ["uuid", "is_active"]},
+            "rooms": {"fields": ["protocol", "is_active"]},
             "_file_type": "csv",
         }
 
@@ -139,7 +141,7 @@ class GenerateCustomFieldsReportTests(TestCase):
         mock_viewset._generate_report_data.side_effect = Exception("Test error")
         mock_viewset_class.return_value = mock_viewset
 
-        fields_config = {"rooms": {"fields": ["uuid"]}}
+        fields_config = {"rooms": {"fields": ["is_active"]}}
 
         with self.assertRaises(Exception):
             generate_custom_fields_report(
@@ -160,7 +162,7 @@ class GenerateCustomFieldsReportTests(TestCase):
         mock_viewset._generate_report_data.return_value = {"rooms": {"data": []}}
         mock_viewset_class.return_value = mock_viewset
 
-        fields_config = {"rooms": {"fields": ["uuid"]}}
+        fields_config = {"rooms": {"fields": ["is_active"]}}
 
         generate_custom_fields_report(
             self.project.uuid,
@@ -177,12 +179,12 @@ class GenerateCustomFieldsReportTests(TestCase):
     def test_generate_report_agent_status_logs(self, mock_viewset_class):
         mock_viewset = MagicMock()
         mock_viewset._generate_report_data.return_value = {
-            "agent_status_logs": {"data": [{"uuid": "123", "log_date": "2024-01-01"}]}
+            "agent_status_logs": {"data": [{"agent__email": "a@test.com", "log_date": "2024-01-01"}]}
         }
         mock_viewset_class.return_value = mock_viewset
 
         fields_config = {
-            "agent_status_logs": {"fields": ["uuid", "log_date"]},
+            "agent_status_logs": {"fields": ["agent__email", "log_date"]},
             "_file_type": "xlsx",
         }
 
@@ -229,7 +231,7 @@ class ProcessPendingReportsTests(TestCase):
             project=self.project,
             user=self.user,
             status="pending",
-            fields_config={"rooms": {"fields": ["uuid"]}, "type": "xlsx"},
+            fields_config={"rooms": {"fields": ["is_active"]}, "type": "xlsx"},
         )
 
         mock_storage = MagicMock()
@@ -239,8 +241,8 @@ class ProcessPendingReportsTests(TestCase):
         mock_viewset = MagicMock()
         mock_qs = MagicMock()
         mock_qs.count.return_value = 1
-        mock_qs.__iter__ = lambda self: iter([{"uuid": "test-uuid"}])
-        mock_qs.__getitem__ = lambda self, key: [{"uuid": "test-uuid"}]
+        mock_qs.__iter__ = lambda self: iter([{"is_active": False}])
+        mock_qs.__getitem__ = lambda self, key: [{"is_active": False}]
         mock_viewset._process_model_fields.return_value = {"queryset": mock_qs}
         mock_viewset_class.return_value = mock_viewset
 
@@ -257,7 +259,7 @@ class ProcessPendingReportsTests(TestCase):
             project=self.project,
             user=self.user,
             status="pending",
-            fields_config={"rooms": {"fields": ["uuid"]}, "type": "csv"},
+            fields_config={"rooms": {"fields": ["is_active"]}, "type": "csv"},
         )
 
         mock_storage = MagicMock()
@@ -267,8 +269,8 @@ class ProcessPendingReportsTests(TestCase):
         mock_viewset = MagicMock()
         mock_qs = MagicMock()
         mock_qs.count.return_value = 1
-        mock_qs.__iter__ = lambda self: iter([{"uuid": "test-uuid"}])
-        mock_qs.__getitem__ = lambda self, key: [{"uuid": "test-uuid"}]
+        mock_qs.__iter__ = lambda self: iter([{"is_active": False}])
+        mock_qs.__getitem__ = lambda self, key: [{"is_active": False}]
         mock_viewset._process_model_fields.return_value = {"queryset": mock_qs}
         mock_viewset_class.return_value = mock_viewset
 
@@ -287,7 +289,7 @@ class ProcessPendingReportsTests(TestCase):
             project=self.project,
             user=self.user,
             status="pending",
-            fields_config={"rooms": {"fields": ["uuid"]}},
+            fields_config={"rooms": {"fields": ["is_active"]}},
         )
 
         mock_storage = MagicMock()
@@ -314,7 +316,7 @@ class ProcessPendingReportsTests(TestCase):
             project=self.project,
             user=self.user,
             status="pending",
-            fields_config={"rooms": {"fields": ["uuid"]}, "type": "xlsx"},
+            fields_config={"rooms": {"fields": ["is_active"]}, "type": "xlsx"},
         )
 
         mock_storage = MagicMock()
@@ -343,7 +345,7 @@ class ProcessPendingReportsTests(TestCase):
             user=self.user,
             status="pending",
             fields_config={
-                "agent_status_logs": {"fields": ["uuid", "log_date"]},
+                "agent_status_logs": {"fields": ["agent__email", "log_date"]},
                 "type": "xlsx",
             },
         )
@@ -356,10 +358,10 @@ class ProcessPendingReportsTests(TestCase):
         mock_qs = MagicMock()
         mock_qs.count.return_value = 1
         mock_qs.__iter__ = lambda self: iter(
-            [{"uuid": "123", "log_date": "2024-01-01"}]
+            [{"agent__email": "a@test.com", "log_date": "2024-01-01"}]
         )
         mock_qs.__getitem__ = lambda self, key: [
-            {"uuid": "123", "log_date": "2024-01-01"}
+            {"agent__email": "a@test.com", "log_date": "2024-01-01"}
         ]
         mock_viewset._process_model_fields.return_value = {"queryset": mock_qs}
         mock_viewset_class.return_value = mock_viewset
@@ -416,7 +418,7 @@ class ProcessPendingReportsTests(TestCase):
             project=self.project,
             user=self.user,
             status="pending",
-            fields_config={"rooms": {"fields": ["uuid"]}, "type": "xlsx"},
+            fields_config={"rooms": {"fields": ["is_active"]}, "type": "xlsx"},
         )
 
         mock_storage = MagicMock()
@@ -427,10 +429,10 @@ class ProcessPendingReportsTests(TestCase):
         mock_qs = MagicMock()
         mock_qs.count.return_value = 5000
         mock_qs.__iter__ = lambda self: iter(
-            [{"uuid": f"uuid-{i}"} for i in range(100)]
+            [{"is_active": False} for i in range(100)]
         )
         mock_qs.__getitem__ = lambda self, key: [
-            {"uuid": f"uuid-{i}"} for i in range(100)
+            {"is_active": False} for i in range(100)
         ]
         mock_viewset._process_model_fields.return_value = {"queryset": mock_qs}
         mock_viewset_class.return_value = mock_viewset
@@ -439,3 +441,105 @@ class ProcessPendingReportsTests(TestCase):
 
         report_status.refresh_from_db()
         self.assertEqual(report_status.status, "ready")
+
+
+class ModelFieldsPresenterTests(TestCase):
+    def test_rooms_fields_contains_expected_keys(self):
+        models_info = ModelFieldsPresenter.get_models_info()
+        rooms_fields = models_info["rooms"]
+
+        expected_fields = {
+            "user__first_name",
+            "user__last_name",
+            "user__email",
+            "queue__sector__name",
+            "queue__name",
+            "is_active",
+            "protocol",
+            "tags",
+            "created_on",
+            "ended_at",
+            "full_transfer_history",
+            "contact__name",
+            "contact__uuid",
+            "urn",
+            "custom_fields",
+            "metric__waiting_time",
+            "metric__first_response_time",
+            "metric__message_response_time",
+            "metric__interaction_time",
+        }
+        self.assertEqual(set(rooms_fields.keys()), expected_fields)
+
+    def test_rooms_fields_does_not_contain_removed_keys(self):
+        models_info = ModelFieldsPresenter.get_models_info()
+        rooms_fields = models_info["rooms"]
+
+        self.assertNotIn("uuid", rooms_fields)
+        self.assertNotIn("transfer_history", rooms_fields)
+
+    def test_rooms_fields_uses_full_transfer_history(self):
+        models_info = ModelFieldsPresenter.get_models_info()
+        rooms_fields = models_info["rooms"]
+
+        self.assertIn("full_transfer_history", rooms_fields)
+        self.assertEqual(rooms_fields["full_transfer_history"]["type"], "JSONField")
+
+    def test_agent_status_logs_contains_expected_keys(self):
+        models_info = ModelFieldsPresenter.get_models_info()
+        agent_fields = models_info["agent_status_logs"]
+
+        expected_fields = {
+            "agent__email",
+            "agent__first_name",
+            "agent__last_name",
+            "project__name",
+            "project__uuid",
+            "log_date",
+            "created_on",
+        }
+        self.assertEqual(set(agent_fields.keys()), expected_fields)
+
+    def test_agent_status_logs_does_not_contain_removed_keys(self):
+        models_info = ModelFieldsPresenter.get_models_info()
+        agent_fields = models_info["agent_status_logs"]
+
+        self.assertNotIn("uuid", agent_fields)
+        self.assertNotIn("status_changes", agent_fields)
+        self.assertNotIn("modified_on", agent_fields)
+
+
+class SortFieldsByPriorityTests(TestCase):
+    def setUp(self):
+        self.viewset = ReportFieldsValidatorViewSet()
+
+    def test_sorts_rooms_fields_in_correct_order(self):
+        fields = ["custom_fields", "created_on", "user__first_name", "full_transfer_history"]
+        sorted_fields = self.viewset._sort_fields_by_priority(fields)
+
+        self.assertEqual(sorted_fields, [
+            "user__first_name",
+            "created_on",
+            "full_transfer_history",
+            "custom_fields",
+        ])
+
+    def test_unknown_fields_go_to_end(self):
+        fields = ["user__first_name", "some_unknown_field"]
+        sorted_fields = self.viewset._sort_fields_by_priority(fields)
+
+        self.assertEqual(sorted_fields[0], "user__first_name")
+        self.assertEqual(sorted_fields[-1], "some_unknown_field")
+
+    def test_full_transfer_history_has_priority(self):
+        fields = ["urn", "full_transfer_history", "contact__name"]
+        sorted_fields = self.viewset._sort_fields_by_priority(fields)
+
+        self.assertLess(
+            sorted_fields.index("full_transfer_history"),
+            sorted_fields.index("contact__name"),
+        )
+        self.assertLess(
+            sorted_fields.index("full_transfer_history"),
+            sorted_fields.index("urn"),
+        )
