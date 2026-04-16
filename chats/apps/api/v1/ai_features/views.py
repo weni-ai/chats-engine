@@ -12,6 +12,7 @@ from chats.apps.ai_features.improve_user_message.services import (
     ImproveUserMessageService,
 )
 from chats.apps.ai_features.integrations.factories import AIModelPlatformClientFactory
+from chats.apps.api.authentication.permissions import ProjectUUIDRequestBodyPermission
 from chats.apps.api.v1.ai_features.serializers import (
     AITextImprovementRequestSerializer,
 )
@@ -45,7 +46,7 @@ class HistorySummaryFeedbackTagsView(LanguageViewMixin, APIView):
 
 
 class AITextImprovementView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, ProjectUUIDRequestBodyPermission]
 
     def post(self, request):
         serializer = AITextImprovementRequestSerializer(data=request.data)
@@ -53,15 +54,7 @@ class AITextImprovementView(APIView):
 
         text = serializer.validated_data["text"]
         improvement_type = serializer.validated_data["type"]
-        project_uuid = serializer.validated_data["project_uuid"]
-
-        try:
-            project = Project.objects.get(uuid=project_uuid)
-        except Project.DoesNotExist:
-            return Response(
-                {"detail": _("Project not found.")},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        project = request.project
 
         integration_client_class = AIModelPlatformClientFactory.get_client_class(
             "bedrock"

@@ -15,6 +15,7 @@ from chats.apps.ai_features.improve_user_message.choices import (
 )
 from chats.apps.ai_features.models import FeaturePrompt
 from chats.apps.projects.models import Project
+from chats.apps.projects.models.models import ProjectPermission
 
 
 class BaseHistorySummaryFeedbackTagsViewTests(APITestCase):
@@ -146,6 +147,11 @@ class TestAITextImprovementViewAsAuthenticatedUser(APITestCase):
         self.user = User.objects.create(email="test@test.com")
         self.client.force_authenticate(user=self.user)
         self.project = Project.objects.create(name="Test Project")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=self.user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
         self.url = reverse("ai_text_improvement")
 
     def _post(self, data):
@@ -216,7 +222,7 @@ class TestAITextImprovementViewAsAuthenticatedUser(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_returns_404_for_nonexistent_project(self, _mock_get_client):
+    def test_returns_403_for_nonexistent_project(self, _mock_get_client):
         response = self._post(
             {
                 "text": "hello wrold",
@@ -224,7 +230,18 @@ class TestAITextImprovementViewAsAuthenticatedUser(APITestCase):
                 "project_uuid": "00000000-0000-0000-0000-000000000000",
             }
         )
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_returns_403_when_user_has_no_project_permission(self, _mock_get_client):
+        other_project = Project.objects.create(name="Other Project")
+        response = self._post(
+            {
+                "text": "hello wrold",
+                "type": "GRAMMAR_AND_SPELLING",
+                "project_uuid": str(other_project.uuid),
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     @patch(
         "chats.apps.ai_features.improve_user_message.services.is_feature_active_for_attributes",
