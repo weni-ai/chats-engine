@@ -52,7 +52,6 @@ class HistorySummaryService:
         """
         Generate a summary of the history of a room.
         """
-        print("Generating summary for room %s", room.uuid)
         feature_prompt = self.get_prompt()
 
         model_id = feature_prompt.model
