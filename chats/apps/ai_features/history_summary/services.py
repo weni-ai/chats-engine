@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
     from chats.apps.rooms.models import Room
     from chats.apps.ai_features.history_summary.models import HistorySummary
+    from chats.apps.msgs.models import Message
 
 
 logger = logging.getLogger(__name__)
