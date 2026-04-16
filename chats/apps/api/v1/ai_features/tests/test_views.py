@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from django.conf import settings
 from django.urls import reverse
@@ -13,7 +13,9 @@ from chats.apps.ai_features.history_summary.enums import HistorySummaryFeedbackT
 from chats.apps.ai_features.improve_user_message.choices import (
     ImprovedUserMessageTypeChoices,
 )
+from chats.apps.feature_flags.exceptions import FeatureFlagInactiveError
 from chats.apps.projects.models import Project
+from chats.apps.projects.models.models import ProjectPermission
 
 
 class BaseHistorySummaryFeedbackTagsViewTests(APITestCase):
@@ -137,37 +139,24 @@ class TestAITextImprovementViewAsAnonymousUser(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
-@patch(
-    "chats.apps.api.v1.ai_features.views.AIModelPlatformClientFactory.get_client_class"
-)
+@patch("chats.apps.api.v1.ai_features.views.ImproveUserMessageUseCase")
 class TestAITextImprovementViewAsAuthenticatedUser(APITestCase):
     def setUp(self):
         self.user = User.objects.create(email="test@test.com")
         self.client.force_authenticate(user=self.user)
         self.project = Project.objects.create(name="Test Project")
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=self.user,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
         self.url = reverse("ai_text_improvement")
 
     def _post(self, data):
         return self.client.post(self.url, data, format="json")
 
-    @patch(
-        "chats.apps.ai_features.improve_user_message.services.is_feature_active_for_attributes",
-        return_value=True,
-    )
-    def test_returns_improved_text(self, _mock_ff, mock_get_client):
-        mock_client_instance = MagicMock()
-        mock_client_instance.generate_text.return_value = "hello world"
-        mock_get_client.return_value = MagicMock(return_value=mock_client_instance)
-
-        from chats.apps.ai_features.models import FeaturePrompt
-
-        FeaturePrompt.objects.create(
-            feature="grammar_and_spelling",
-            model="test-model",
-            prompt="Fix: {message}",
-            settings={"temperature": 0.5},
-            version=1,
-        )
+    def test_returns_improved_text(self, mock_use_case_cls):
+        mock_use_case_cls.return_value.execute.return_value = "hello world"
 
         response = self._post(
             {
@@ -180,7 +169,24 @@ class TestAITextImprovementViewAsAuthenticatedUser(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["text"], "hello world")
 
-    def test_returns_400_when_text_is_missing(self, _mock_get_client):
+    def test_calls_use_case_with_correct_params(self, mock_use_case_cls):
+        mock_use_case_cls.return_value.execute.return_value = "improved"
+
+        self._post(
+            {
+                "text": "hello wrold",
+                "type": "GRAMMAR_AND_SPELLING",
+                "project_uuid": str(self.project.uuid),
+            }
+        )
+
+        mock_use_case_cls.return_value.execute.assert_called_once_with(
+            text="hello wrold",
+            improvement_type="GRAMMAR_AND_SPELLING",
+            project=self.project,
+        )
+
+    def test_returns_400_when_text_is_missing(self, _mock_use_case_cls):
         response = self._post(
             {
                 "type": "GRAMMAR_AND_SPELLING",
@@ -189,7 +195,7 @@ class TestAITextImprovementViewAsAuthenticatedUser(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_returns_400_when_type_is_missing(self, _mock_get_client):
+    def test_returns_400_when_type_is_missing(self, _mock_use_case_cls):
         response = self._post(
             {
                 "text": "hello wrold",
@@ -198,7 +204,7 @@ class TestAITextImprovementViewAsAuthenticatedUser(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_returns_400_when_project_uuid_is_missing(self, _mock_get_client):
+    def test_returns_400_when_project_uuid_is_missing(self, _mock_use_case_cls):
         response = self._post(
             {
                 "text": "hello wrold",
@@ -207,7 +213,7 @@ class TestAITextImprovementViewAsAuthenticatedUser(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_returns_400_for_invalid_type(self, _mock_get_client):
+    def test_returns_400_for_invalid_type(self, _mock_use_case_cls):
         response = self._post(
             {
                 "text": "hello wrold",
@@ -217,7 +223,7 @@ class TestAITextImprovementViewAsAuthenticatedUser(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    def test_returns_404_for_nonexistent_project(self, _mock_get_client):
+    def test_returns_403_for_nonexistent_project(self, _mock_use_case_cls):
         response = self._post(
             {
                 "text": "hello wrold",
@@ -225,15 +231,22 @@ class TestAITextImprovementViewAsAuthenticatedUser(APITestCase):
                 "project_uuid": "00000000-0000-0000-0000-000000000000",
             }
         )
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    @patch(
-        "chats.apps.ai_features.improve_user_message.services.is_feature_active_for_attributes",
-        return_value=False,
-    )
-    def test_returns_403_when_feature_flag_is_inactive(
-        self, _mock_ff, _mock_get_client
-    ):
+    def test_returns_403_when_user_has_no_project_permission(self, _mock_use_case_cls):
+        other_project = Project.objects.create(name="Other Project")
+        response = self._post(
+            {
+                "text": "hello wrold",
+                "type": "GRAMMAR_AND_SPELLING",
+                "project_uuid": str(other_project.uuid),
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_returns_403_when_feature_flag_is_inactive(self, mock_use_case_cls):
+        mock_use_case_cls.return_value.execute.side_effect = FeatureFlagInactiveError()
+
         response = self._post(
             {
                 "text": "hello wrold",
@@ -243,26 +256,8 @@ class TestAITextImprovementViewAsAuthenticatedUser(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    @patch(
-        "chats.apps.ai_features.improve_user_message.services.is_feature_active_for_attributes",
-        return_value=True,
-    )
-    def test_returns_400_when_service_raises_value_error(
-        self, _mock_ff, mock_get_client
-    ):
-        mock_client_instance = MagicMock()
-        mock_client_instance.generate_text.side_effect = ValueError("prompt error")
-        mock_get_client.return_value = MagicMock(return_value=mock_client_instance)
-
-        from chats.apps.ai_features.models import FeaturePrompt
-
-        FeaturePrompt.objects.create(
-            feature="grammar_and_spelling",
-            model="test-model",
-            prompt="Fix: {message}",
-            settings={"temperature": 0.5},
-            version=1,
-        )
+    def test_returns_400_when_use_case_raises_value_error(self, mock_use_case_cls):
+        mock_use_case_cls.return_value.execute.side_effect = ValueError("prompt error")
 
         response = self._post(
             {
@@ -273,34 +268,10 @@ class TestAITextImprovementViewAsAuthenticatedUser(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
-    @patch(
-        "chats.apps.ai_features.improve_user_message.services.is_feature_active_for_attributes",
-        return_value=True,
-    )
-    def test_accepts_all_valid_improvement_types(self, _mock_ff, mock_get_client):
-        mock_client_instance = MagicMock()
-        mock_client_instance.generate_text.return_value = "improved"
-        mock_get_client.return_value = MagicMock(return_value=mock_client_instance)
-
-        from chats.apps.ai_features.models import FeaturePrompt
+    def test_accepts_all_valid_improvement_types(self, mock_use_case_cls):
+        mock_use_case_cls.return_value.execute.return_value = "improved"
 
         for choice in ImprovedUserMessageTypeChoices:
-            feature_name = {
-                ImprovedUserMessageTypeChoices.GRAMMAR_AND_SPELLING: "grammar_and_spelling",
-                ImprovedUserMessageTypeChoices.MORE_EMPATHY: "more_empathy",
-                ImprovedUserMessageTypeChoices.CLARITY: "clarity",
-            }[choice]
-
-            FeaturePrompt.objects.get_or_create(
-                feature=feature_name,
-                version=1,
-                defaults={
-                    "model": "test-model",
-                    "prompt": "Improve: {message}",
-                    "settings": {"temperature": 0.5},
-                },
-            )
-
             response = self._post(
                 {
                     "text": "some text",

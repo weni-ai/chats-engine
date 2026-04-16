@@ -8,15 +8,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from chats.apps.ai_features.history_summary.enums import HistorySummaryFeedbackTags
-from chats.apps.ai_features.improve_user_message.services import (
-    ImproveUserMessageService,
+from chats.apps.ai_features.improve_user_message.usecases import (
+    ImproveUserMessageUseCase,
 )
-from chats.apps.ai_features.integrations.factories import AIModelPlatformClientFactory
+from chats.apps.api.authentication.permissions import ProjectUUIDRequestBodyPermission
 from chats.apps.api.v1.ai_features.serializers import (
     AITextImprovementRequestSerializer,
 )
 from chats.apps.feature_flags.exceptions import FeatureFlagInactiveError
-from chats.apps.projects.models import Project
 from chats.core.mixins import LanguageViewMixin
 
 logger = logging.getLogger(__name__)
@@ -45,33 +44,19 @@ class HistorySummaryFeedbackTagsView(LanguageViewMixin, APIView):
 
 
 class AITextImprovementView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, ProjectUUIDRequestBodyPermission]
 
     def post(self, request):
         serializer = AITextImprovementRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        text = serializer.validated_data["text"]
-        improvement_type = serializer.validated_data["type"]
-        project_uuid = serializer.validated_data["project_uuid"]
+        project = request.project
+        use_case = ImproveUserMessageUseCase()
 
         try:
-            project = Project.objects.get(uuid=project_uuid)
-        except Project.DoesNotExist:
-            return Response(
-                {"detail": _("Project not found.")},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        integration_client_class = AIModelPlatformClientFactory.get_client_class(
-            "bedrock"
-        )
-        service = ImproveUserMessageService(integration_client_class)
-
-        try:
-            improved_text = service.generate_improved_message(
-                user_message_text=text,
-                improvement_type=improvement_type,
+            improved_text = use_case.execute(
+                text=serializer.validated_data["text"],
+                improvement_type=serializer.validated_data["type"],
                 project=project,
             )
         except FeatureFlagInactiveError:
