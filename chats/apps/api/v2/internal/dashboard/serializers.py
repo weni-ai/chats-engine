@@ -7,8 +7,8 @@ from chats.apps.projects.models.models import CustomStatusType
 
 
 class InternalDashboardQueryParamsSerializer(serializers.Serializer):
-    start_date = serializers.CharField(required=False)
-    end_date = serializers.CharField(required=False)
+    start_date = serializers.DateField(required=False)
+    end_date = serializers.DateField(required=False)
     agent = serializers.CharField(required=False)
     sector = serializers.ListField(child=serializers.CharField(), required=False)
     tag = serializers.ListField(child=serializers.CharField(), required=False)
