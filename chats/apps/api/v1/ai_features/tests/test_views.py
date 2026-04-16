@@ -13,6 +13,7 @@ from chats.apps.ai_features.history_summary.enums import HistorySummaryFeedbackT
 from chats.apps.ai_features.improve_user_message.choices import (
     ImprovedUserMessageTypeChoices,
 )
+from chats.apps.ai_features.models import FeaturePrompt
 from chats.apps.projects.models import Project
 
 
@@ -159,8 +160,6 @@ class TestAITextImprovementViewAsAuthenticatedUser(APITestCase):
         mock_client_instance.generate_text.return_value = "hello world"
         mock_get_client.return_value = MagicMock(return_value=mock_client_instance)
 
-        from chats.apps.ai_features.models import FeaturePrompt
-
         FeaturePrompt.objects.create(
             feature="grammar_and_spelling",
             model="test-model",
@@ -254,8 +253,6 @@ class TestAITextImprovementViewAsAuthenticatedUser(APITestCase):
         mock_client_instance.generate_text.side_effect = ValueError("prompt error")
         mock_get_client.return_value = MagicMock(return_value=mock_client_instance)
 
-        from chats.apps.ai_features.models import FeaturePrompt
-
         FeaturePrompt.objects.create(
             feature="grammar_and_spelling",
             model="test-model",
@@ -281,8 +278,6 @@ class TestAITextImprovementViewAsAuthenticatedUser(APITestCase):
         mock_client_instance = MagicMock()
         mock_client_instance.generate_text.return_value = "improved"
         mock_get_client.return_value = MagicMock(return_value=mock_client_instance)
-
-        from chats.apps.ai_features.models import FeaturePrompt
 
         for choice in ImprovedUserMessageTypeChoices:
             feature_name = {
