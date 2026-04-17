@@ -117,7 +117,7 @@ class HistorySummaryService:
                     room.uuid,
                     reason,
                 )
-            if summary_text.strip() == "":
+            elif summary_text.strip() == "":
                 history_summary.update_status(HistorySummaryStatus.UNAVAILABLE)
                 logger.error(
                     "A summary could not be generated for room %s. The AI returned an empty summary.",
