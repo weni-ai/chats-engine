@@ -64,10 +64,10 @@ class AITextImprovementView(APIView):
                 {"detail": _("Feature not available for this project.")},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        except ValueError as exc:
+        except ValueError:
             logger.exception("Error generating improved message")
             return Response(
-                {"detail": str(exc)},
+                {"detail": "Error generating improved message"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
