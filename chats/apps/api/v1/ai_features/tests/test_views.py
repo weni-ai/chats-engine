@@ -267,6 +267,9 @@ class TestAITextImprovementViewAsAuthenticatedUser(APITestCase):
             }
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["detail"], "Error generating improved message"
+        )
 
     def test_accepts_all_valid_improvement_types(self, mock_use_case_cls):
         mock_use_case_cls.return_value.execute.return_value = "improved"
