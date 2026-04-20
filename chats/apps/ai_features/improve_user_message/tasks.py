@@ -35,7 +35,7 @@ def register_message_improvement_task(
         )
         return
 
-    service = ImproveUserMessageService()
+    service = ImproveUserMessageService(integration_client_class=None)
     service.register_message_improvement(
         message=message,
         improvement_type=improvement_type,
