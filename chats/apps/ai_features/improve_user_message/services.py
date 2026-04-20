@@ -55,4 +55,6 @@ class ImproveUserMessageService(BaseImproveUserMessageService):
             message=message,
             type=improvement_type,
             status=status,
+            room=message.room,
+            project=message.room.queue.sector.project,
         )
