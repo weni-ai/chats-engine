@@ -45,6 +45,12 @@ class MessageImprovementStatus(BaseModel):
     class Meta:
         verbose_name = _("Message Improvement Status")
         verbose_name_plural = _("Message Improvement Statuses")
+        indexes = [
+            models.Index(
+                fields=["project", "type"],
+                name="idx_improv_project_type",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.message.uuid} - {self.status} - {self.type}"
