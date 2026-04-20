@@ -14,6 +14,7 @@ from chats.apps.sectors.models import (
     SectorHoliday,
     SectorTag,
 )
+from chats.core.models import AuditableMixin
 
 # ---------------------------------------------------------------------------
 # AuditableMixin — created_by / modified_by
@@ -383,9 +384,6 @@ class AuditableMixinGetProjectTests(TestCase):
 
     def test_model_without_project_raises_attribute_error(self):
         """Ensures AttributeError is raised for models without a project attribute."""
-        from chats.core.models import AuditableMixin
-        from django.db import models as dj_models
-
         class NoProjectModel(AuditableMixin):
             class Meta:
                 app_label = "core"
