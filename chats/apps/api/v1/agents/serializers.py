@@ -35,15 +35,38 @@ class AllAgentsAgentSerializer(serializers.ModelSerializer):
 
         return sectors_by_uuid
 
+    def _resolve_status(self, obj):
+        """
+        Resolves the displayed status:
+          - name of the active custom status (pause), when any is active and isn't "in-service"
+          - "offline" when ProjectPermission.status is OFFLINE
+          - "online" otherwise
+        """
+        pause_name = getattr(obj, "active_pause_name", None)
+        if pause_name:
+            return pause_name
+        if obj.status == ProjectPermission.STATUS_OFFLINE:
+            return "offline"
+        return "online"
+
     def to_representation(self, obj):
         user = obj.user
         name = f"{user.first_name} {user.last_name}".strip() if user else ""
 
         sectors_by_uuid = self._build_sectors(obj)
+        sector_chats_total_limit = sum(
+            entry["sector"].rooms_limit for entry in sectors_by_uuid.values()
+        )
+
+        # total falls back to the sector sum when no custom limit is configured
+        chats_limit = ChatsLimitSerializer(obj).data
+        if not chats_limit["active"] or chats_limit["total"] is None:
+            chats_limit["total"] = sector_chats_total_limit
 
         return {
             "name": name,
-            "chats_limit": ChatsLimitSerializer(obj).data,
+            "status": self._resolve_status(obj),
+            "chats_limit": chats_limit,
             "email": user.email if user else "",
             "sector": [
                 {
@@ -52,9 +75,7 @@ class AllAgentsAgentSerializer(serializers.ModelSerializer):
                 }
                 for entry in sectors_by_uuid.values()
             ],
-            "sector_chats_total_limit": sum(
-                entry["sector"].rooms_limit for entry in sectors_by_uuid.values()
-            ),
+            "sector_chats_total_limit": sector_chats_total_limit,
         }
 
 

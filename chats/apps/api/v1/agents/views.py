@@ -5,6 +5,7 @@ from django.db.models import (
     IntegerField,
     OuterRef,
     Prefetch,
+    Subquery,
     Value,
     When,
 )
@@ -86,6 +87,16 @@ class AllAgentsView(generics.ListAPIView):
         project = get_object_or_404(Project, uuid=self.kwargs["project_uuid"])
         _get_manager_permission(self.request, project)
 
+        active_pause_name = (
+            CustomStatus.objects.filter(
+                user_id=OuterRef("user_id"),
+                project=OuterRef("project"),
+                is_active=True,
+            )
+            .exclude(status_type__name__iexact="in-service")
+            .values("status_type__name")[:1]
+        )
+
         return (
             ProjectPermission.objects.filter(
                 project=project,
@@ -97,7 +108,10 @@ class AllAgentsView(generics.ListAPIView):
                 "sector_authorizations__sector",
                 "queue_authorizations__queue__sector",
             )
-            .annotate(status_order=_status_order_annotation())
+            .annotate(
+                status_order=_status_order_annotation(),
+                active_pause_name=Subquery(active_pause_name),
+            )
             .order_by("status_order", "user__first_name", "user__last_name")
         )
 

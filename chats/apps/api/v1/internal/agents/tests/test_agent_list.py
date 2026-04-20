@@ -626,3 +626,216 @@ class AgentListResponseStructureTests(TestCase):
         agent = self._agent_data(response, self.agent_user.email)
         # Agent has 2 queues in Support but rooms_limit=5 counted once
         self.assertEqual(agent["sector_chats_total_limit"], 8)
+
+    # ------------------------------------------------------------------
+    # Case 42
+    # ------------------------------------------------------------------
+
+    def test_chats_limit_total_falls_back_to_sector_sum_when_no_custom_limit(self):
+        """When no custom limit is configured, chats_limit.total returns the sector sum."""
+        response = self._list()
+
+        agent = self._agent_data(response, self.agent_user.email)
+        self.assertFalse(agent["chats_limit"]["active"])
+        # Support (5) + Sales (3) = 8 — same as sector_chats_total_limit
+        self.assertEqual(agent["chats_limit"]["total"], 8)
+        self.assertEqual(
+            agent["chats_limit"]["total"], agent["sector_chats_total_limit"]
+        )
+
+    # ------------------------------------------------------------------
+    # Case 43
+    # ------------------------------------------------------------------
+
+    def test_chats_limit_total_falls_back_when_active_but_total_is_null(self):
+        """If is_custom_limit_active=True but custom_rooms_limit is None, falls back to sector sum."""
+        self.agent_perm.is_custom_limit_active = True
+        self.agent_perm.custom_rooms_limit = None
+        self.agent_perm.save(
+            update_fields=["is_custom_limit_active", "custom_rooms_limit"]
+        )
+
+        response = self._list()
+
+        agent = self._agent_data(response, self.agent_user.email)
+        self.assertTrue(agent["chats_limit"]["active"])
+        self.assertEqual(agent["chats_limit"]["total"], 8)
+
+    # ------------------------------------------------------------------
+    # Case 44
+    # ------------------------------------------------------------------
+
+    def test_chats_limit_total_is_zero_when_no_custom_and_no_sectors(self):
+        """Agent without custom limit and without sectors returns total=0 (sum of empty set)."""
+        lonely_user = User.objects.create_user(
+            email="lonely-limit@test.com", password="x", first_name="Lonely"
+        )
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=lonely_user,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status=ProjectPermission.STATUS_ONLINE,
+        )
+
+        response = self._list()
+
+        agent = self._agent_data(response, lonely_user.email)
+        self.assertFalse(agent["chats_limit"]["active"])
+        self.assertEqual(agent["chats_limit"]["total"], 0)
+
+
+# ===========================================================================
+# ENGAGE-7672 — Status field: "online" | "offline" | pause name
+# ===========================================================================
+
+
+class AgentListStatusFieldTests(TestCase):
+    """Validates the `status` field returned for each agent."""
+
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.project = Project.objects.create(name="Test Project", timezone="UTC")
+        self.manager = _make_manager(self.project)
+
+    def _list(self):
+        view = AllAgentsView.as_view()
+        request = self.factory.get(f"/project/{self.project.pk}/all_agents/")
+        force_authenticate(request, user=self.manager)
+        return view(request, project_uuid=str(self.project.pk))
+
+    def _agent_data(self, response, email):
+        results = response.data.get("results", response.data)
+        return next(
+            item["agent"] for item in results if item["agent"]["email"] == email
+        )
+
+    # ------------------------------------------------------------------
+    # Case 45
+    # ------------------------------------------------------------------
+
+    def test_status_is_online_for_online_agent_without_pause(self):
+        """An ONLINE agent without any active pause returns status='online'."""
+        user = _make_agent(
+            self.project, "online@test.com", "Ana", ProjectPermission.STATUS_ONLINE
+        )
+
+        response = self._list()
+
+        agent = self._agent_data(response, user.email)
+        self.assertEqual(agent["status"], "online")
+
+    # ------------------------------------------------------------------
+    # Case 46
+    # ------------------------------------------------------------------
+
+    def test_status_is_offline_for_offline_agent(self):
+        """An OFFLINE agent returns status='offline'."""
+        user = _make_agent(
+            self.project,
+            "offline@test.com",
+            "Bob",
+            ProjectPermission.STATUS_OFFLINE,
+        )
+
+        response = self._list()
+
+        agent = self._agent_data(response, user.email)
+        self.assertEqual(agent["status"], "offline")
+
+    # ------------------------------------------------------------------
+    # Case 47
+    # ------------------------------------------------------------------
+
+    def test_status_returns_pause_name_for_paused_agent(self):
+        """An agent on pause returns the pause name in the status field."""
+        user = _make_agent(
+            self.project, "paused@test.com", "Carla", ProjectPermission.STATUS_ONLINE
+        )
+        _put_on_pause(user, self.project, pause_name="Lunch")
+
+        response = self._list()
+
+        agent = self._agent_data(response, user.email)
+        self.assertEqual(agent["status"], "Lunch")
+
+    # ------------------------------------------------------------------
+    # Case 48
+    # ------------------------------------------------------------------
+
+    def test_status_pause_wins_over_online(self):
+        """Pause name takes precedence over ONLINE status."""
+        user = _make_agent(
+            self.project, "paused@test.com", "Dan", ProjectPermission.STATUS_ONLINE
+        )
+        _put_on_pause(user, self.project, pause_name="Break")
+
+        response = self._list()
+
+        agent = self._agent_data(response, user.email)
+        self.assertEqual(agent["status"], "Break")
+        self.assertNotEqual(agent["status"], "online")
+
+    # ------------------------------------------------------------------
+    # Case 49
+    # ------------------------------------------------------------------
+
+    def test_status_ignores_in_service_custom_status(self):
+        """CustomStatus 'in-service' does NOT appear as status — falls back to online/offline."""
+        user = _make_agent(
+            self.project,
+            "in-service@test.com",
+            "Eve",
+            ProjectPermission.STATUS_ONLINE,
+        )
+        _put_on_pause(user, self.project, pause_name="in-service")
+
+        response = self._list()
+
+        agent = self._agent_data(response, user.email)
+        self.assertEqual(agent["status"], "online")
+
+    # ------------------------------------------------------------------
+    # Case 50
+    # ------------------------------------------------------------------
+
+    def test_status_in_service_is_case_insensitive(self):
+        """The 'in-service' exclusion is case-insensitive."""
+        user = _make_agent(
+            self.project,
+            "in-service-upper@test.com",
+            "Frank",
+            ProjectPermission.STATUS_ONLINE,
+        )
+        _put_on_pause(user, self.project, pause_name="In-Service")
+
+        response = self._list()
+
+        agent = self._agent_data(response, user.email)
+        self.assertEqual(agent["status"], "online")
+
+    # ------------------------------------------------------------------
+    # Case 51
+    # ------------------------------------------------------------------
+
+    def test_status_field_present_for_all_agents(self):
+        """All agents in the response include the status field."""
+        _make_agent(
+            self.project, "online@test.com", "Ana", ProjectPermission.STATUS_ONLINE
+        )
+        _make_agent(
+            self.project,
+            "offline@test.com",
+            "Bob",
+            ProjectPermission.STATUS_OFFLINE,
+        )
+        paused = _make_agent(
+            self.project, "paused@test.com", "Carla", ProjectPermission.STATUS_ONLINE
+        )
+        _put_on_pause(paused, self.project, pause_name="Lunch")
+
+        response = self._list()
+
+        results = response.data.get("results", response.data)
+        for item in results:
+            self.assertIn("status", item["agent"])
+            self.assertIsNotNone(item["agent"]["status"])
