@@ -10,27 +10,84 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('rooms', '0029_room_automatic_message_sent_at'),
-        ('projects', '0033_projectpermission_is_deleted'),
-        ('msgs', '0017_alter_messagemedia_media_file'),
+        ("rooms", "0029_room_automatic_message_sent_at"),
+        ("projects", "0036_projectpermission_is_deleted"),
+        ("msgs", "0017_alter_messagemedia_media_file"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='MessageImprovementStatus',
+            name="MessageImprovementStatus",
             fields=[
-                ('uuid', models.UUIDField(default=uuid.uuid4, primary_key=True, serialize=False)),
-                ('created_on', models.DateTimeField(auto_now_add=True, verbose_name='Created on')),
-                ('modified_on', models.DateTimeField(auto_now=True, verbose_name='Modified on')),
-                ('status', models.CharField(choices=[('USED', 'Used'), ('DISCARDED', 'Discarded'), ('EDITED', 'Edited')], max_length=20, verbose_name='Status')),
-                ('type', models.CharField(choices=[('GRAMMAR_AND_SPELLING', 'Grammar and spelling'), ('MORE_EMPATHY', 'More empathy'), ('CLARITY', 'Clarity')], max_length=20, verbose_name='Type')),
-                ('message', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='improved_user_message_status', to='msgs.message', verbose_name='Message')),
-                ('project', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='improved_user_message_status', to='projects.project', verbose_name='Project')),
-                ('room', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='improved_user_message_status', to='rooms.room', verbose_name='Room')),
+                (
+                    "uuid",
+                    models.UUIDField(
+                        default=uuid.uuid4, primary_key=True, serialize=False
+                    ),
+                ),
+                (
+                    "created_on",
+                    models.DateTimeField(auto_now_add=True, verbose_name="Created on"),
+                ),
+                (
+                    "modified_on",
+                    models.DateTimeField(auto_now=True, verbose_name="Modified on"),
+                ),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[
+                            ("USED", "Used"),
+                            ("DISCARDED", "Discarded"),
+                            ("EDITED", "Edited"),
+                        ],
+                        max_length=20,
+                        verbose_name="Status",
+                    ),
+                ),
+                (
+                    "type",
+                    models.CharField(
+                        choices=[
+                            ("GRAMMAR_AND_SPELLING", "Grammar and spelling"),
+                            ("MORE_EMPATHY", "More empathy"),
+                            ("CLARITY", "Clarity"),
+                        ],
+                        max_length=20,
+                        verbose_name="Type",
+                    ),
+                ),
+                (
+                    "message",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="improved_user_message_status",
+                        to="msgs.message",
+                        verbose_name="Message",
+                    ),
+                ),
+                (
+                    "project",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="improved_user_message_status",
+                        to="projects.project",
+                        verbose_name="Project",
+                    ),
+                ),
+                (
+                    "room",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="improved_user_message_status",
+                        to="rooms.room",
+                        verbose_name="Room",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Message Improvement Status',
-                'verbose_name_plural': 'Message Improvement Statuses',
+                "verbose_name": "Message Improvement Status",
+                "verbose_name_plural": "Message Improvement Statuses",
             },
         ),
     ]
