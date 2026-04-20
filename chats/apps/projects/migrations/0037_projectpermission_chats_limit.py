@@ -4,7 +4,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("projects", "0033_projectpermission_is_deleted"),
+        ("projects", "0036_projectpermission_is_deleted"),
     ]
 
     operations = [
