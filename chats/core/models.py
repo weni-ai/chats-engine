@@ -116,8 +116,20 @@ class AuditableMixin(models.Model):
     Tracks who created, last modified, and deleted each record.
     Fields are populated explicitly in views:
         serializer.save(created_by=request.user, modified_by=request.user)
-    Audit is only persisted if the AUDIT_LOG_FEATURE_FLAG_KEY flag is enabled
-    for the record's project.
+
+    Audit persistence is gated by the AUDIT_LOG_FEATURE_FLAG_KEY flag for the
+    record's project:
+        - Flag ON: audit values provided by the caller are persisted.
+        - Flag OFF on create: audit values are dropped (fields stay NULL).
+        - Flag OFF on update: audit values provided by the caller are ignored
+          and the original values loaded from the database are restored, so
+          that historical audit data is never erased just because the flag
+          was toggled off after the record existed.
+
+    If the record has no project available (e.g. QuickMessage without sector),
+    the flag cannot be evaluated and the mixin behaves as if the flag was OFF
+    (fail-closed). If the flag service itself is unreachable or raises, the
+    mixin fails open and keeps the caller-provided values.
     """
 
     created_by = models.ForeignKey(
@@ -151,6 +163,15 @@ class AuditableMixin(models.Model):
     class Meta:
         abstract = True
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._snapshot_audit_ids()
+
+    def _snapshot_audit_ids(self):
+        self._audit_original_created_by_id = self.created_by_id
+        self._audit_original_modified_by_id = self.modified_by_id
+        self._audit_original_deleted_by_id = self.deleted_by_id
+
     def _get_project(self):
         """
         Returns the project associated with this instance.
@@ -164,17 +185,29 @@ class AuditableMixin(models.Model):
             )
         return project
 
+    def _is_audit_flag_active(self):
+        try:
+            project = self._get_project()
+        except AttributeError:
+            return False
+        try:
+            return is_feature_active_for_attributes(
+                settings.AUDIT_LOG_FEATURE_FLAG_KEY,
+                {"projectUUID": str(project.uuid)},
+            )
+        except Exception:
+            return True
+
     def save(self, *args, **kwargs):
-        if self.created_by_id or self.modified_by_id or self.deleted_by_id:
-            try:
-                project = self._get_project()
-                if not is_feature_active_for_attributes(
-                    settings.AUDIT_LOG_FEATURE_FLAG_KEY,
-                    {"projectUUID": str(project.uuid)},
-                ):
-                    self.created_by = None
-                    self.modified_by = None
-                    self.deleted_by = None
-            except Exception:
-                pass
+        if not self._is_audit_flag_active():
+            if self._state.adding:
+                self.created_by = None
+                self.modified_by = None
+                self.deleted_by = None
+            else:
+                self.created_by_id = self._audit_original_created_by_id
+                self.modified_by_id = self._audit_original_modified_by_id
+                self.deleted_by_id = self._audit_original_deleted_by_id
+
         super().save(*args, **kwargs)
+        self._snapshot_audit_ids()
