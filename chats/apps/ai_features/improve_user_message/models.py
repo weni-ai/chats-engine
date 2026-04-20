@@ -19,6 +19,18 @@ class MessageImprovementStatus(BaseModel):
         on_delete=models.CASCADE,
         related_name="improved_user_message_status",
     )
+    room = models.ForeignKey(
+        "rooms.Room",
+        verbose_name=_("Room"),
+        on_delete=models.CASCADE,
+        related_name="improved_user_message_status",
+    )
+    project = models.ForeignKey(
+        "projects.Project",
+        verbose_name=_("Project"),
+        on_delete=models.CASCADE,
+        related_name="improved_user_message_status",
+    )
     status = models.CharField(
         _("Status"),
         max_length=20,
