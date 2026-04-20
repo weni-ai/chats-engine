@@ -1,393 +1,326 @@
 import datetime
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from django.test import TestCase
 
 from chats.apps.accounts.models import User
-from chats.apps.projects.models import Project, ProjectPermission
-from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.projects.models import Project
 from chats.apps.quickmessages.models import QuickMessage
-from chats.apps.sectors.models import (
-    GroupSector,
-    Sector,
-    SectorAuthorization,
-    SectorHoliday,
-    SectorTag,
-)
-from chats.core.models import AuditableMixin
+from chats.apps.sectors.models import Sector, SectorHoliday
+from chats.core.audit import apply_audit_fields, is_audit_active
+
 
 # ---------------------------------------------------------------------------
-# AuditableMixin — created_by / modified_by
+# AuditableMixin — FK columns
 # ---------------------------------------------------------------------------
 
 
-class AuditableMixinCreateUpdateTests(TestCase):
+class AuditableMixinFieldsTests(TestCase):
+    """
+    The mixin only declares the FK columns. These tests make sure the columns
+    are persisted when a caller sets them explicitly on the instance.
+    """
+
     def setUp(self):
-        patcher = patch(
-            "chats.core.models.is_feature_active_for_attributes", return_value=True
-        )
-        patcher.start()
-        self.addCleanup(patcher.stop)
         self.user = User.objects.create_user(email="audit@test.com", password="x")
         self.other_user = User.objects.create_user(email="other@test.com", password="x")
         self.project = Project.objects.create(name="Audit Project", timezone="UTC")
 
-    def _make_sector(self, name="Sector Audit", created_by=None, modified_by=None):
+    def _make_sector(self, **kwargs):
         return Sector.objects.create(
-            name=name,
+            name=kwargs.pop("name", "Sector Audit"),
             project=self.project,
             rooms_limit=5,
             work_start="08:00",
             work_end="18:00",
-            created_by=created_by,
-            modified_by=modified_by,
+            **kwargs,
         )
 
-    def test_created_by_is_set_on_creation(self):
+    def test_created_by_is_persisted_when_set_on_create(self):
         sector = self._make_sector(created_by=self.user, modified_by=self.user)
+        sector.refresh_from_db()
         self.assertEqual(sector.created_by, self.user)
-
-    def test_modified_by_is_set_on_creation(self):
-        sector = self._make_sector(created_by=self.user, modified_by=self.user)
         self.assertEqual(sector.modified_by, self.user)
+
+    def test_audit_fields_default_to_null(self):
+        sector = self._make_sector()
+        self.assertIsNone(sector.created_by)
+        self.assertIsNone(sector.modified_by)
+        self.assertIsNone(sector.deleted_by)
 
     def test_modified_by_is_updated_on_save(self):
         sector = self._make_sector(created_by=self.user, modified_by=self.user)
-
-        sector.rooms_limit = 10
         sector.modified_by = self.other_user
         sector.save()
-
         sector.refresh_from_db()
         self.assertEqual(sector.modified_by, self.other_user)
-
-    def test_created_by_is_not_overwritten_on_update(self):
-        sector = self._make_sector(created_by=self.user, modified_by=self.user)
-
-        sector.rooms_limit = 10
-        sector.modified_by = self.other_user
-        sector.save()
-
-        sector.refresh_from_db()
         self.assertEqual(sector.created_by, self.user)
 
-    def test_fields_are_null_when_not_provided(self):
-        sector = self._make_sector("No User Sector")
-        self.assertIsNone(sector.created_by)
-        self.assertIsNone(sector.modified_by)
-
-
-# ---------------------------------------------------------------------------
-# AuditableMixin — deleted_by (soft delete)
-# ---------------------------------------------------------------------------
-
-
-class AuditableMixinSoftDeleteTests(TestCase):
-    def setUp(self):
-        patcher = patch(
-            "chats.core.models.is_feature_active_for_attributes", return_value=True
-        )
-        patcher.start()
-        self.addCleanup(patcher.stop)
-        self.user = User.objects.create_user(email="deleter@test.com", password="x")
-        self.project = Project.objects.create(name="Delete Project", timezone="UTC")
-        self.sector = Sector.objects.create(
-            name="Sector To Delete",
-            project=self.project,
-            rooms_limit=5,
-            work_start="08:00",
-            work_end="18:00",
-        )
-
-    def test_deleted_by_is_set_on_soft_delete(self):
-        self.sector.deleted_by = self.user
-        self.sector.modified_by = self.user
-        self.sector.is_deleted = True
-        self.sector.save()
-
-        self.sector.refresh_from_db()
-        self.assertEqual(self.sector.deleted_by, self.user)
-
-    def test_deleted_by_is_not_set_when_is_deleted_is_false(self):
-        self.sector.modified_by = self.user
-        self.sector.rooms_limit = 10
-        self.sector.save()
-
-        self.sector.refresh_from_db()
-        self.assertIsNone(self.sector.deleted_by)
-
-    def test_deleted_by_is_null_when_not_provided(self):
-        self.sector.is_deleted = True
-        self.sector.save()
-
-        self.sector.refresh_from_db()
-        self.assertIsNone(self.sector.deleted_by)
-
-    def test_deleted_by_is_not_overwritten_if_already_set(self):
-        first_user = User.objects.create_user(email="first@test.com", password="x")
-        second_user = User.objects.create_user(email="second@test.com", password="x")
-
-        self.sector.deleted_by = first_user
-        self.sector.is_deleted = True
-        self.sector.save()
-
-        self.sector.modified_by = second_user
-        self.sector.save()
-
-        self.sector.refresh_from_db()
-        self.assertEqual(self.sector.deleted_by, first_user)
-
-    def test_deleted_by_is_set_via_sector_holiday_soft_delete(self):
-        """Covers the SectorHoliday.delete() override path with explicit user."""
+    def test_deleted_by_is_persisted_via_sector_holiday_delete(self):
+        sector = self._make_sector()
         holiday = SectorHoliday.objects.create(
-            sector=self.sector,
+            sector=sector,
             date=datetime.date(2025, 12, 25),
             day_type=SectorHoliday.CLOSED,
         )
         holiday.deleted_by = self.user
         holiday.modified_by = self.user
         holiday.delete()
-
         holiday.refresh_from_db()
         self.assertEqual(holiday.deleted_by, self.user)
+        self.assertEqual(holiday.modified_by, self.user)
 
 
 # ---------------------------------------------------------------------------
-# AuditableMixin — feature flag gating (OFF / unreachable)
+# is_audit_active helper
 # ---------------------------------------------------------------------------
 
 
-class AuditableMixinFlagOffTests(TestCase):
-    """
-    With the audit feature flag OFF, the mixin must:
-    - Drop caller-provided audit values on create (fields stay NULL).
-    - Restore original DB values on update (historical data is preserved).
-    """
-
+class IsAuditActiveTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(email="ff@test.com", password="x")
-        self.other_user = User.objects.create_user(email="ff2@test.com", password="x")
-        self.project = Project.objects.create(name="Flag Project", timezone="UTC")
+        self.user = User.objects.create_user(email="h@test.com", password="x")
+        self.project = Project.objects.create(name="H Project", timezone="UTC")
 
-    def _make_sector_with_flag(self, flag_value, **kwargs):
-        with patch(
-            "chats.core.models.is_feature_active_for_attributes",
-            return_value=flag_value,
-        ):
-            return Sector.objects.create(
-                name=kwargs.pop("name", "Flag Sector"),
-                project=self.project,
-                rooms_limit=5,
-                work_start="08:00",
-                work_end="18:00",
-                **kwargs,
-            )
+    def _request(self, user=None):
+        request = MagicMock()
+        request.user = user if user is not None else self.user
+        return request
 
-    def test_created_by_is_dropped_on_create_when_flag_off(self):
-        sector = self._make_sector_with_flag(
-            False, created_by=self.user, modified_by=self.user
-        )
-        sector.refresh_from_db()
-        self.assertIsNone(sector.created_by)
-        self.assertIsNone(sector.modified_by)
+    def test_returns_false_when_project_is_none(self):
+        self.assertFalse(is_audit_active(self._request(), None))
 
-    def test_created_by_is_preserved_on_update_when_flag_toggles_off(self):
-        """Regression: flag toggling off after creation must NOT erase history."""
-        sector = self._make_sector_with_flag(
-            True, created_by=self.user, modified_by=self.user
-        )
+    def test_returns_false_when_request_is_none(self):
+        self.assertFalse(is_audit_active(None, self.project))
 
-        with patch(
-            "chats.core.models.is_feature_active_for_attributes", return_value=False
-        ):
-            sector.rooms_limit = 10
-            sector.modified_by = self.other_user
-            sector.save()
+    def test_returns_false_when_user_is_not_authenticated(self):
+        anon = MagicMock()
+        anon.is_authenticated = False
+        self.assertFalse(is_audit_active(self._request(user=anon), self.project))
 
-        sector.refresh_from_db()
-        self.assertEqual(sector.created_by, self.user)
+    @patch("chats.core.audit.is_feature_active", return_value=True)
+    def test_returns_true_when_flag_active(self, _):
+        self.assertTrue(is_audit_active(self._request(), self.project))
 
-    def test_modified_by_is_not_updated_when_flag_off(self):
-        sector = self._make_sector_with_flag(
-            True, created_by=self.user, modified_by=self.user
-        )
+    @patch("chats.core.audit.is_feature_active", return_value=False)
+    def test_returns_false_when_flag_inactive(self, _):
+        self.assertFalse(is_audit_active(self._request(), self.project))
 
-        with patch(
-            "chats.core.models.is_feature_active_for_attributes", return_value=False
-        ):
-            sector.rooms_limit = 20
-            sector.modified_by = self.other_user
-            sector.save()
-
-        sector.refresh_from_db()
-        self.assertEqual(sector.modified_by, self.user)
-
-    def test_deleted_by_is_not_written_on_soft_delete_when_flag_off(self):
-        sector = self._make_sector_with_flag(
-            True, created_by=self.user, modified_by=self.user
-        )
-
-        with patch(
-            "chats.core.models.is_feature_active_for_attributes", return_value=False
-        ):
-            sector.deleted_by = self.other_user
-            sector.is_deleted = True
-            sector.save()
-
-        sector.refresh_from_db()
-        self.assertIsNone(sector.deleted_by)
-        self.assertTrue(sector.is_deleted)
-
-    def test_caller_values_are_kept_when_flag_service_raises(self):
-        """Fail-open behavior: unreachable flag service must not erase data."""
-        with patch(
-            "chats.core.models.is_feature_active_for_attributes",
-            side_effect=RuntimeError("flag service down"),
-        ):
-            sector = Sector.objects.create(
-                name="Fail Open Sector",
-                project=self.project,
-                rooms_limit=5,
-                work_start="08:00",
-                work_end="18:00",
-                created_by=self.user,
-                modified_by=self.user,
-            )
-
-        sector.refresh_from_db()
-        self.assertEqual(sector.created_by, self.user)
-        self.assertEqual(sector.modified_by, self.user)
-
-    def test_audit_is_dropped_when_project_is_unavailable(self):
-        """
-        Fail-closed when no project context is available to evaluate the flag
-        (e.g. QuickMessage without sector). The flag service must not even be
-        consulted, and audit fields must stay NULL on create.
-        """
-        with patch(
-            "chats.core.models.is_feature_active_for_attributes"
-        ) as mock_flag:
-            qm = QuickMessage.objects.create(
-                user=self.user,
-                shortcut="/oi",
-                text="Olá",
-                created_by=self.user,
-                modified_by=self.user,
-            )
-
-        mock_flag.assert_not_called()
-        qm.refresh_from_db()
-        self.assertIsNone(qm.created_by)
-        self.assertIsNone(qm.modified_by)
-
-    def test_audit_is_written_for_quick_message_with_sector_when_flag_on(self):
-        """Positive control for the QuickMessage path: with sector + flag ON, audit persists."""
-        sector = self._make_sector_with_flag(True)
-
-        with patch(
-            "chats.core.models.is_feature_active_for_attributes", return_value=True
-        ):
-            qm = QuickMessage.objects.create(
-                user=self.user,
-                shortcut="/oi",
-                text="Olá",
-                sector=sector,
-                created_by=self.user,
-                modified_by=self.user,
-            )
-
-        qm.refresh_from_db()
-        self.assertEqual(qm.created_by, self.user)
-        self.assertEqual(qm.modified_by, self.user)
+    @patch(
+        "chats.core.audit.is_feature_active",
+        side_effect=RuntimeError("flag service down"),
+    )
+    def test_fails_open_when_flag_service_raises(self, _):
+        self.assertTrue(is_audit_active(self._request(), self.project))
 
 
 # ---------------------------------------------------------------------------
-# AuditableMixin._get_project — all models
+# apply_audit_fields helper (used by viewset direct-save paths)
 # ---------------------------------------------------------------------------
 
 
-class AuditableMixinGetProjectTests(TestCase):
+class ApplyAuditFieldsTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(email="proj@test.com", password="x")
-        self.project = Project.objects.create(name="GP Project", timezone="UTC")
-        self.permission = ProjectPermission.objects.create(
-            project=self.project,
-            user=self.user,
-            role=ProjectPermission.ROLE_ATTENDANT,
-        )
+        self.user = User.objects.create_user(email="a@test.com", password="x")
+        self.project = Project.objects.create(name="A Project", timezone="UTC")
         self.sector = Sector.objects.create(
-            name="GP Sector",
+            name="A Sector",
             project=self.project,
             rooms_limit=5,
             work_start="08:00",
             work_end="18:00",
         )
-        self.queue = Queue.objects.create(name="GP Queue", sector=self.sector)
 
-    def test_sector_returns_project(self):
-        self.assertEqual(self.sector._get_project(), self.project)
+    def _request(self):
+        request = MagicMock()
+        request.user = self.user
+        return request
 
-    def test_sector_authorization_returns_project(self):
-        auth = SectorAuthorization.objects.create(
-            sector=self.sector,
-            permission=self.permission,
-            role=SectorAuthorization.ROLE_MANAGER,
+    @patch("chats.core.audit.is_feature_active", return_value=True)
+    def test_sets_modified_by_when_flag_on(self, _):
+        apply_audit_fields(self.sector, self._request(), self.project)
+        self.assertEqual(self.sector.modified_by, self.user)
+        self.assertIsNone(self.sector.deleted_by)
+
+    @patch("chats.core.audit.is_feature_active", return_value=True)
+    def test_sets_deleted_by_when_on_delete_is_true(self, _):
+        apply_audit_fields(
+            self.sector, self._request(), self.project, on_delete=True
         )
-        self.assertEqual(auth._get_project(), self.project)
+        self.assertEqual(self.sector.modified_by, self.user)
+        self.assertEqual(self.sector.deleted_by, self.user)
 
-    def test_sector_tag_returns_project(self):
-        tag = SectorTag.objects.create(name="Tag GP", sector=self.sector)
-        self.assertEqual(tag._get_project(), self.project)
-
-    def test_sector_holiday_returns_project(self):
-        holiday = SectorHoliday.objects.create(
-            sector=self.sector,
-            date=datetime.date(2025, 6, 12),
-            day_type=SectorHoliday.CLOSED,
+    @patch("chats.core.audit.is_feature_active", return_value=False)
+    def test_does_nothing_when_flag_off(self, _):
+        apply_audit_fields(
+            self.sector, self._request(), self.project, on_delete=True
         )
-        self.assertEqual(holiday._get_project(), self.project)
+        self.assertIsNone(self.sector.modified_by)
+        self.assertIsNone(self.sector.deleted_by)
 
-    def test_group_sector_returns_project(self):
-        group = GroupSector.objects.create(
-            name="GP Group", project=self.project, rooms_limit=5
+    def test_does_nothing_when_project_is_none(self):
+        apply_audit_fields(self.sector, self._request(), None, on_delete=True)
+        self.assertIsNone(self.sector.modified_by)
+        self.assertIsNone(self.sector.deleted_by)
+
+
+# ---------------------------------------------------------------------------
+# AuditableModelSerializer (flag gating in the serializer layer)
+# ---------------------------------------------------------------------------
+
+
+class AuditableModelSerializerTests(TestCase):
+    """
+    Exercise the serializer base class by using SectorSerializer, which now
+    inherits AuditableModelSerializer.
+    """
+
+    def setUp(self):
+        from chats.apps.api.v1.sectors.serializers import SectorSerializer
+
+        self.serializer_class = SectorSerializer
+        self.user = User.objects.create_user(email="s@test.com", password="x")
+        self.other_user = User.objects.create_user(email="s2@test.com", password="x")
+        self.project = Project.objects.create(name="S Project", timezone="UTC")
+
+    def _request(self, user=None):
+        request = MagicMock()
+        request.user = user if user is not None else self.user
+        return request
+
+    def _payload(self, **overrides):
+        data = {
+            "name": "S Sector",
+            "project": str(self.project.uuid),
+            "rooms_limit": 5,
+            "work_start": "08:00",
+            "work_end": "18:00",
+        }
+        data.update(overrides)
+        return data
+
+    def _sector_from_db(self):
+        return Sector.objects.get(project=self.project)
+
+    @patch("chats.core.audit.is_feature_active", return_value=True)
+    def test_audit_persists_when_flag_on(self, _):
+        serializer = self.serializer_class(
+            data=self._payload(),
+            context={"request": self._request()},
         )
-        self.assertEqual(group._get_project(), self.project)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(created_by=self.user, modified_by=self.user)
 
-    def test_queue_returns_project(self):
-        self.assertEqual(self.queue._get_project(), self.project)
+        sector = self._sector_from_db()
+        self.assertEqual(sector.created_by, self.user)
+        self.assertEqual(sector.modified_by, self.user)
 
-    def test_queue_authorization_returns_project(self):
-        auth = QueueAuthorization.objects.create(
-            queue=self.queue,
-            permission=self.permission,
-            role=QueueAuthorization.ROLE_AGENT,
+    @patch("chats.core.audit.is_feature_active", return_value=False)
+    def test_audit_dropped_on_create_when_flag_off(self, _):
+        serializer = self.serializer_class(
+            data=self._payload(),
+            context={"request": self._request()},
         )
-        self.assertEqual(auth._get_project(), self.project)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(created_by=self.user, modified_by=self.user)
 
-    def test_quick_message_with_sector_returns_project(self):
-        qm = QuickMessage.objects.create(
+        sector = self._sector_from_db()
+        self.assertIsNone(sector.created_by)
+        self.assertIsNone(sector.modified_by)
+
+    @patch("chats.core.audit.is_feature_active", return_value=True)
+    def test_history_preserved_on_update_when_flag_toggles_off(self, mock_flag):
+        create_serializer = self.serializer_class(
+            data=self._payload(),
+            context={"request": self._request()},
+        )
+        create_serializer.is_valid(raise_exception=True)
+        create_serializer.save(created_by=self.user, modified_by=self.user)
+        sector = self._sector_from_db()
+
+        mock_flag.return_value = False
+
+        from chats.apps.api.v1.sectors.serializers import SectorUpdateSerializer
+
+        update_serializer = SectorUpdateSerializer(
+            instance=sector,
+            data={"rooms_limit": 10},
+            partial=True,
+            context={"request": self._request(user=self.other_user)},
+        )
+        update_serializer.is_valid(raise_exception=True)
+        update_serializer.save(modified_by=self.other_user)
+
+        sector.refresh_from_db()
+        self.assertEqual(sector.created_by, self.user)
+        self.assertEqual(sector.modified_by, self.user)
+        self.assertEqual(sector.rooms_limit, 10)
+
+
+# ---------------------------------------------------------------------------
+# QuickMessage fallback: no sector → no project → flag treated as off
+# ---------------------------------------------------------------------------
+
+
+class QuickMessageAuditTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(email="qm@test.com", password="x")
+        self.project = Project.objects.create(name="QM Project", timezone="UTC")
+        self.sector = Sector.objects.create(
+            name="QM Sector",
+            project=self.project,
+            rooms_limit=5,
+            work_start="08:00",
+            work_end="18:00",
+        )
+
+    def _request(self):
+        request = MagicMock()
+        request.user = self.user
+        return request
+
+    def test_audit_is_skipped_when_quick_message_has_no_sector(self):
+        """
+        Without a sector we cannot resolve a project to evaluate the flag,
+        so the serializer must behave as if the flag was off.
+        """
+        from chats.apps.api.v1.quickmessages.serializers import QuickMessageSerializer
+
+        with patch("chats.core.audit.is_feature_active") as mock_flag:
+            serializer = QuickMessageSerializer(
+                data={"shortcut": "/oi", "text": "Olá"},
+                context={"request": self._request()},
+            )
+            serializer.is_valid(raise_exception=True)
+            serializer.save(
+                user=self.user,
+                created_by=self.user,
+                modified_by=self.user,
+            )
+
+        mock_flag.assert_not_called()
+        qm = QuickMessage.objects.get(shortcut="/oi")
+        self.assertIsNone(qm.created_by)
+        self.assertIsNone(qm.modified_by)
+
+    @patch("chats.core.audit.is_feature_active", return_value=True)
+    def test_audit_is_written_for_quick_message_with_sector(self, _):
+        from chats.apps.api.v1.quickmessages.serializers import QuickMessageSerializer
+
+        serializer = QuickMessageSerializer(
+            data={
+                "shortcut": "/oi",
+                "text": "Olá",
+                "sector": str(self.sector.uuid),
+            },
+            context={"request": self._request()},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save(
             user=self.user,
-            shortcut="/oi",
-            text="Olá",
-            sector=self.sector,
+            created_by=self.user,
+            modified_by=self.user,
         )
-        self.assertEqual(qm._get_project(), self.project)
 
-    def test_quick_message_without_sector_raises_attribute_error(self):
-        qm = QuickMessage.objects.create(
-            user=self.user,
-            shortcut="/oi2",
-            text="Olá",
-        )
-        with self.assertRaises(AttributeError):
-            qm._get_project()
-
-    def test_model_without_project_raises_attribute_error(self):
-        """Ensures AttributeError is raised for models without a project attribute."""
-        class NoProjectModel(AuditableMixin):
-            class Meta:
-                app_label = "core"
-
-        instance = NoProjectModel.__new__(NoProjectModel)
-        with self.assertRaises(AttributeError):
-            instance._get_project()
+        qm = QuickMessage.objects.get(shortcut="/oi")
+        self.assertEqual(qm.created_by, self.user)
+        self.assertEqual(qm.modified_by, self.user)

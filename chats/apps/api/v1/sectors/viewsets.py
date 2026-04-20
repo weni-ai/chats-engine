@@ -31,6 +31,7 @@ from chats.apps.sectors.models import (
     SectorTag,
 )
 from chats.apps.sectors.utils import get_country_from_timezone, get_country_holidays
+from chats.core.audit import apply_audit_fields
 
 
 class SectorViewset(viewsets.ModelViewSet):
@@ -145,8 +146,9 @@ class SectorViewset(viewsets.ModelViewSet):
             "user_email": self.request.query_params.get("user_email"),
         }
 
-        instance.deleted_by = self.request.user
-        instance.modified_by = self.request.user
+        apply_audit_fields(
+            instance, self.request, instance.project, on_delete=True
+        )
 
         if not settings.USE_WENI_FLOWS:
             instance.delete()
@@ -288,8 +290,9 @@ class SectorTagsViewset(viewsets.ModelViewSet):
         serializer.save(modified_by=self.request.user)
 
     def perform_destroy(self, instance):
-        instance.deleted_by = self.request.user
-        instance.modified_by = self.request.user
+        apply_audit_fields(
+            instance, self.request, instance.sector.project, on_delete=True
+        )
         instance.delete()
 
 
@@ -453,8 +456,9 @@ class SectorHolidayViewSet(viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         instance.is_deleted = True
-        instance.deleted_by = request.user
-        instance.modified_by = request.user
+        apply_audit_fields(
+            instance, request, instance.sector.project, on_delete=True
+        )
         instance.save()
         return Response(status=status.HTTP_204_NO_CONTENT)
 

@@ -21,6 +21,7 @@ from chats.apps.sectors.usecases import (
     RemoveSectorFromGroupSectorUseCase,
     UpdateAgentQueueAuthorizationsUseCase,
 )
+from chats.core.audit import apply_audit_fields
 
 
 class GroupSectorViewset(viewsets.ModelViewSet):
@@ -55,8 +56,9 @@ class GroupSectorViewset(viewsets.ModelViewSet):
             RemoveSectorFromGroupSectorUseCase(
                 sector_uuid=sector.uuid, group_sector=instance
             ).execute()
-        instance.deleted_by = self.request.user
-        instance.modified_by = self.request.user
+        apply_audit_fields(
+            instance, self.request, instance.project, on_delete=True
+        )
         instance.delete()
 
     @action(

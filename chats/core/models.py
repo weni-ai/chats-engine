@@ -4,7 +4,6 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
 from chats.core.managers import SoftDeletableManager
 from chats.utils.websockets import send_channels_group
@@ -113,23 +112,19 @@ class BaseIntegrationConfigurableModel(models.Model):
 
 class AuditableMixin(models.Model):
     """
-    Tracks who created, last modified, and deleted each record.
-    Fields are populated explicitly in views:
-        serializer.save(created_by=request.user, modified_by=request.user)
+    Adds ``created_by`` / ``modified_by`` / ``deleted_by`` columns to a model.
 
-    Audit persistence is gated by the AUDIT_LOG_FEATURE_FLAG_KEY flag for the
-    record's project:
-        - Flag ON: audit values provided by the caller are persisted.
-        - Flag OFF on create: audit values are dropped (fields stay NULL).
-        - Flag OFF on update: audit values provided by the caller are ignored
-          and the original values loaded from the database are restored, so
-          that historical audit data is never erased just because the flag
-          was toggled off after the record existed.
+    Populating these fields is the caller's responsibility:
+      - API paths go through ``AuditableModelSerializer`` in
+        ``chats.core.serializers``, which gates the fields on the audit
+        feature flag.
+      - Direct-save paths (viewset ``perform_destroy`` or custom actions
+        that mutate the instance without a serializer) should use
+        ``apply_audit_fields`` from ``chats.core.audit``.
 
-    If the record has no project available (e.g. QuickMessage without sector),
-    the flag cannot be evaluated and the mixin behaves as if the flag was OFF
-    (fail-closed). If the flag service itself is unreachable or raises, the
-    mixin fails open and keeps the caller-provided values.
+    The mixin itself does not check the feature flag — it only declares the
+    columns. Whoever sets the attributes is the one that decides whether to
+    record audit data.
     """
 
     created_by = models.ForeignKey(
@@ -162,52 +157,3 @@ class AuditableMixin(models.Model):
 
     class Meta:
         abstract = True
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._snapshot_audit_ids()
-
-    def _snapshot_audit_ids(self):
-        self._audit_original_created_by_id = self.created_by_id
-        self._audit_original_modified_by_id = self.modified_by_id
-        self._audit_original_deleted_by_id = self.deleted_by_id
-
-    def _get_project(self):
-        """
-        Returns the project associated with this instance.
-        Models using this mixin must define a `project` attribute or property.
-        """
-        project = getattr(self, "project", None)
-        if project is None:
-            raise AttributeError(
-                f"{self.__class__.__name__} must define a `project` attribute or property "
-                "to use AuditableMixin."
-            )
-        return project
-
-    def _is_audit_flag_active(self):
-        try:
-            project = self._get_project()
-        except AttributeError:
-            return False
-        try:
-            return is_feature_active_for_attributes(
-                settings.AUDIT_LOG_FEATURE_FLAG_KEY,
-                {"projectUUID": str(project.uuid)},
-            )
-        except Exception:
-            return True
-
-    def save(self, *args, **kwargs):
-        if not self._is_audit_flag_active():
-            if self._state.adding:
-                self.created_by = None
-                self.modified_by = None
-                self.deleted_by = None
-            else:
-                self.created_by_id = self._audit_original_created_by_id
-                self.modified_by_id = self._audit_original_modified_by_id
-                self.deleted_by_id = self._audit_original_deleted_by_id
-
-        super().save(*args, **kwargs)
-        self._snapshot_audit_ids()
