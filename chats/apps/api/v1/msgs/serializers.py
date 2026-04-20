@@ -3,6 +3,7 @@ import logging
 
 import magic
 from django.conf import settings
+from django.db import transaction
 from pydub import AudioSegment
 from rest_framework import exceptions, serializers
 
@@ -307,10 +308,16 @@ class MessageSerializer(BaseMessageSerializer):
         msg = super().create(validated_data)
 
         if ai_text_improvement:
-            register_message_improvement_task.delay(
-                message_uuid=str(msg.uuid),
-                improvement_type=ai_text_improvement["type"],
-                status=ai_text_improvement["status"],
+            transaction.on_commit(
+                lambda message_uuid=str(msg.uuid),
+                       improvement_type=ai_text_improvement["type"],
+                       status=ai_text_improvement["status"]: (
+                    register_message_improvement_task.delay(
+                        message_uuid=message_uuid,
+                        improvement_type=improvement_type,
+                        status=status,
+                    )
+                )
             )
 
         return msg
