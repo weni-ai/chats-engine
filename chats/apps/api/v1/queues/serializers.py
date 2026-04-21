@@ -127,12 +127,6 @@ class QueueUpdateSerializer(AuditableModelSerializer):
 
         extra_kwargs = {field: {"required": False} for field in fields}
 
-    def _get_audit_project(self):
-        if self.instance is not None:
-            return self.instance.sector.project
-        sector = (self.validated_data or {}).get("sector")
-        return sector.project if sector else None
-
 
 class QueueReadOnlyListSerializer(serializers.ModelSerializer):
     agents = serializers.SerializerMethodField()
@@ -190,12 +184,6 @@ class QueueAuthorizationUpdateSerializer(AuditableModelSerializer):
         fields = "__all__"
 
         extra_kwargs = {field: {"required": False} for field in fields}
-
-    def _get_audit_project(self):
-        if self.instance is not None:
-            return self.instance.queue.sector.project
-        queue = (self.validated_data or {}).get("queue")
-        return queue.sector.project if queue else None
 
 
 class QueueAuthorizationReadOnlyListSerializer(serializers.ModelSerializer):

@@ -1,7 +1,7 @@
 import datetime
 from unittest.mock import MagicMock, patch
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from chats.apps.accounts.models import User
 from chats.apps.projects.models import Project
@@ -324,3 +324,107 @@ class QuickMessageAuditTests(TestCase):
         qm = QuickMessage.objects.get(shortcut="/oi")
         self.assertEqual(qm.created_by, self.user)
         self.assertEqual(qm.modified_by, self.user)
+
+
+# ---------------------------------------------------------------------------
+# Viewset direct-save paths (perform_destroy via apply_audit_fields)
+# ---------------------------------------------------------------------------
+
+
+class ViewsetDirectSaveAuditTests(TestCase):
+    """
+    Exercise perform_destroy / custom-action paths that call
+    ``apply_audit_fields`` from chats.core.audit. These do not go through a
+    serializer, so they must honour the feature flag directly.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(email="vw@test.com", password="x")
+        self.project = Project.objects.create(name="VW Project", timezone="UTC")
+        self.sector = Sector.objects.create(
+            name="VW Sector",
+            project=self.project,
+            rooms_limit=5,
+            work_start="08:00",
+            work_end="18:00",
+        )
+
+    def _request(self):
+        request = MagicMock()
+        request.user = self.user
+        request.query_params = {}
+        return request
+
+    def _sector_viewset(self):
+        from chats.apps.api.v1.sectors.viewsets import SectorViewset
+
+        viewset = SectorViewset()
+        viewset.request = self._request()
+        return viewset
+
+    @override_settings(USE_WENI_FLOWS=False)
+    @patch("chats.core.audit.is_feature_active", return_value=True)
+    def test_sector_perform_destroy_records_deleted_by_when_flag_on(self, _):
+        self._sector_viewset().perform_destroy(self.sector)
+
+        self.sector.refresh_from_db()
+        self.assertTrue(self.sector.is_deleted)
+        self.assertEqual(self.sector.deleted_by, self.user)
+        self.assertEqual(self.sector.modified_by, self.user)
+
+    @override_settings(USE_WENI_FLOWS=False)
+    @patch("chats.core.audit.is_feature_active", return_value=False)
+    def test_sector_perform_destroy_skips_audit_when_flag_off(self, _):
+        self._sector_viewset().perform_destroy(self.sector)
+
+        self.sector.refresh_from_db()
+        self.assertTrue(self.sector.is_deleted)
+        self.assertIsNone(self.sector.deleted_by)
+        self.assertIsNone(self.sector.modified_by)
+
+    @patch("chats.core.audit.is_feature_active", return_value=True)
+    def test_sector_tag_perform_destroy_records_deleted_by_when_flag_on(self, _):
+        from chats.apps.api.v1.sectors.viewsets import SectorTagsViewset
+        from chats.apps.sectors.models import SectorTag
+
+        tag = SectorTag.objects.create(name="Tag", sector=self.sector)
+        viewset = SectorTagsViewset()
+        viewset.request = self._request()
+        viewset.perform_destroy(tag)
+
+        tag.refresh_from_db()
+        self.assertTrue(tag.is_deleted)
+        self.assertEqual(tag.deleted_by, self.user)
+        self.assertEqual(tag.modified_by, self.user)
+
+    @patch("chats.core.audit.is_feature_active", return_value=False)
+    def test_sector_tag_perform_destroy_skips_audit_when_flag_off(self, _):
+        from chats.apps.api.v1.sectors.viewsets import SectorTagsViewset
+        from chats.apps.sectors.models import SectorTag
+
+        tag = SectorTag.objects.create(name="Tag", sector=self.sector)
+        viewset = SectorTagsViewset()
+        viewset.request = self._request()
+        viewset.perform_destroy(tag)
+
+        tag.refresh_from_db()
+        self.assertTrue(tag.is_deleted)
+        self.assertIsNone(tag.deleted_by)
+        self.assertIsNone(tag.modified_by)
+
+    @patch("chats.core.audit.is_feature_active", return_value=True)
+    def test_group_sector_perform_destroy_records_deleted_by_when_flag_on(self, _):
+        from chats.apps.api.v1.groups_sectors.viewsets import GroupSectorViewset
+        from chats.apps.sectors.models import GroupSector
+
+        group = GroupSector.objects.create(
+            name="Group", project=self.project, rooms_limit=5
+        )
+        viewset = GroupSectorViewset()
+        viewset.request = self._request()
+        viewset.perform_destroy(group)
+
+        group.refresh_from_db()
+        self.assertTrue(group.is_deleted)
+        self.assertEqual(group.deleted_by, self.user)
+        self.assertEqual(group.modified_by, self.user)
