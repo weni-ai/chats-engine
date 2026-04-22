@@ -13,7 +13,9 @@ from chats.apps.rooms.models import Room
 class RoomInternalListSerializerV2(serializers.ModelSerializer):
     contact = serializers.CharField(source="contact.name")
     agent = serializers.SerializerMethodField()
-    user_email = serializers.EmailField(source="user.email", default=None, read_only=True)
+    user_email = serializers.EmailField(
+        source="user.email", default=None, read_only=True
+    )
     tags = TagSimpleSerializer(many=True, required=False)
     sector = serializers.SerializerMethodField()
     queue = serializers.SerializerMethodField()
@@ -83,18 +85,30 @@ class RoomInternalListSerializerV2(serializers.ModelSerializer):
         if not queue or not queue.sector_id:
             return None
         sector = queue.sector
+        is_deleted = sector.is_deleted
+        name = sector.name
+
+        if is_deleted:
+            name = name.split("_is_deleted_")[0]
+
         return {
-            "name": sector.name,
-            "is_deleted": sector.is_deleted,
+            "name": name,
+            "is_deleted": is_deleted,
         }
 
     def get_queue(self, obj: Room) -> Optional[dict]:
         queue = obj.queue
         if not queue:
             return None
+        is_deleted = queue.is_deleted
+        name = queue.name
+
+        if is_deleted:
+            name = name.split("_is_deleted_")[0]
+
         return {
-            "name": queue.name,
-            "is_deleted": queue.is_deleted,
+            "name": name,
+            "is_deleted": is_deleted,
         }
 
     def get_link(self, obj: Room) -> dict:
