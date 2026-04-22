@@ -19,7 +19,7 @@ class ContactViewset(viewsets.ReadOnlyModelViewSet):
     ]
     filterset_class = ContactFilter
     permission_classes = [permissions.IsAuthenticated]
-    search_fields = ["name", "rooms__urn"]
+    search_fields = ["name", "rooms__urn", "email", "document"]
     ordering = ["-last_ended_at"]
 
     def get_queryset(self):

@@ -30,6 +30,8 @@ class HistoryRoomViewset(ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
     search_fields = [
         "contact__name",
+        "contact__email",
+        "contact__document",
         "urn",
         "user__first_name",
         "user__last_name",

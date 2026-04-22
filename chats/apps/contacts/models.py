@@ -15,6 +15,9 @@ class Contact(BaseModel):
     email = models.EmailField(
         _("email"), unique=False, help_text=_("Contact email"), blank=True, null=True
     )
+    document = models.CharField(
+        _("document"), max_length=50, blank=True, null=True
+    )
     status = models.CharField(_("status"), max_length=30, blank=True)
     phone = models.CharField(_("phone"), max_length=30, blank=True)
 
