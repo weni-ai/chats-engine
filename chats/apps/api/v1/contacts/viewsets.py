@@ -4,6 +4,7 @@ from rest_framework import filters, permissions, viewsets
 from chats.apps.api.v1.contacts.filters import ContactFilter
 from chats.apps.api.v1.contacts.serializers import ContactViewsetSerializer
 from chats.apps.contacts.models import Contact
+from chats.core.filters import DocumentAwareSearchFilter
 
 
 class ContactViewset(viewsets.ReadOnlyModelViewSet):
@@ -14,7 +15,7 @@ class ContactViewset(viewsets.ReadOnlyModelViewSet):
     serializer_class = ContactViewsetSerializer
     filter_backends = [
         DjangoFilterBackend,
-        filters.SearchFilter,
+        DocumentAwareSearchFilter,
         filters.OrderingFilter,
     ]
     filterset_class = ContactFilter

@@ -1,3 +1,5 @@
+import re
+
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -5,6 +7,12 @@ from django.utils.translation import gettext_lazy as _
 from chats.core.models import BaseModel
 
 Q = models.Q
+
+
+def normalize_document(value):
+    if not value:
+        return value
+    return re.sub(r"[^A-Za-z0-9]", "", value).upper()
 
 
 class Contact(BaseModel):
@@ -52,6 +60,10 @@ class Contact(BaseModel):
                 name="unique_contact_external_id",
             ),
         ]
+
+    def save(self, *args, **kwargs):
+        self.document = normalize_document(self.document)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return str(self.name)

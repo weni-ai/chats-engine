@@ -5,6 +5,8 @@ from chats.apps.accounts.models import User
 from chats.apps.contacts.models import Contact
 from chats.apps.history.filters.rooms_filter import (
     filter_history_rooms_queryset_by_project_permission,
+    get_history_rooms_queryset_by_contact,
+    get_related_contact_ids,
 )
 from chats.apps.projects.models.models import Project, ProjectPermission
 from chats.apps.rooms.models import Room
@@ -199,3 +201,185 @@ class TestHistoryRoomFilter(TestCase):
         )
 
         self.assertIn(room, queryset)
+
+
+class TestGetRelatedContactIds(TestCase):
+    """
+    Core logic that unifies Contacts by email or document, used by the
+    history feature to concatenate conversations from different Contact
+    rows (e.g. web chat users with rotating URNs).
+    """
+
+    def test_returns_only_self_when_no_email_and_no_document(self):
+        contact = Contact.objects.create(name="John")
+        related = list(get_related_contact_ids(contact))
+        self.assertEqual(related, [contact.pk])
+
+    def test_matches_contacts_with_same_email(self):
+        target = Contact.objects.create(name="A", email="shared@x.com")
+        other = Contact.objects.create(name="B", email="shared@x.com")
+        Contact.objects.create(name="C", email="different@x.com")
+
+        related = set(get_related_contact_ids(target))
+        self.assertEqual(related, {target.pk, other.pk})
+
+    def test_email_match_is_case_insensitive(self):
+        target = Contact.objects.create(name="A", email="Shared@X.com")
+        other = Contact.objects.create(name="B", email="shared@x.com")
+
+        related = set(get_related_contact_ids(target))
+        self.assertIn(other.pk, related)
+
+    def test_matches_contacts_with_same_document(self):
+        target = Contact.objects.create(name="A", document="12345678900")
+        other = Contact.objects.create(name="B", document="12345678900")
+        Contact.objects.create(name="C", document="99999999900")
+
+        related = set(get_related_contact_ids(target))
+        self.assertEqual(related, {target.pk, other.pk})
+
+    def test_document_match_uses_normalized_value(self):
+        """
+        Contacts saved with different formattings share the same
+        normalized document in DB, so they should be grouped together.
+        """
+        target = Contact.objects.create(name="A", document="123.456.789-00")
+        other = Contact.objects.create(name="B", document="12345678900")
+
+        related = set(get_related_contact_ids(target))
+        self.assertIn(other.pk, related)
+
+    def test_matches_by_email_or_document(self):
+        target = Contact.objects.create(
+            name="A", email="shared@x.com", document="111"
+        )
+        by_email = Contact.objects.create(name="B", email="shared@x.com")
+        by_document = Contact.objects.create(name="C", document="111")
+        Contact.objects.create(name="D", email="other@x.com", document="222")
+
+        related = set(get_related_contact_ids(target))
+        self.assertEqual(related, {target.pk, by_email.pk, by_document.pk})
+
+    def test_ignores_empty_email(self):
+        target = Contact.objects.create(name="A", email="")
+        Contact.objects.create(name="B", email="")
+
+        related = set(get_related_contact_ids(target))
+        self.assertEqual(related, {target.pk})
+
+    def test_ignores_empty_document(self):
+        target = Contact.objects.create(name="A", document="")
+        Contact.objects.create(name="B", document="")
+
+        related = set(get_related_contact_ids(target))
+        self.assertEqual(related, {target.pk})
+
+
+class TestGetHistoryRoomsQuerysetByContact(TestCase):
+    """
+    Covers the full history-by-contact lookup that powers `has_history`
+    and the history endpoint.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create(email="agent@test.com")
+        self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
+        ProjectPermission.objects.create(
+            user=self.user,
+            project=self.project,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+
+    def _closed_room(self, contact):
+        return Room.objects.create(
+            contact=contact,
+            queue=self.queue,
+            is_active=False,
+            ended_at=timezone.now(),
+        )
+
+    def test_includes_rooms_from_same_contact(self):
+        contact = Contact.objects.create(name="Joao")
+        room = self._closed_room(contact)
+
+        qs = get_history_rooms_queryset_by_contact(
+            contact, self.user, self.project
+        )
+        self.assertIn(room, qs)
+
+    def test_includes_rooms_from_other_contacts_with_same_document(self):
+        """
+        Main scenario from the epic: web chat sessions use different URNs
+        but the same CPF.
+        """
+        session_1 = Contact.objects.create(
+            name="Joao", external_id="ws-1", document="123.456.789-00"
+        )
+        session_2 = Contact.objects.create(
+            name="Joao", external_id="ws-2", document="12345678900"
+        )
+        room_1 = self._closed_room(session_1)
+        room_2 = self._closed_room(session_2)
+
+        qs = get_history_rooms_queryset_by_contact(
+            session_2, self.user, self.project
+        )
+        self.assertIn(room_1, qs)
+        self.assertIn(room_2, qs)
+
+    def test_includes_rooms_from_other_contacts_with_same_email(self):
+        session_1 = Contact.objects.create(
+            name="Maria", external_id="ws-1", email="maria@x.com"
+        )
+        session_2 = Contact.objects.create(
+            name="Maria", external_id="ws-2", email="maria@x.com"
+        )
+        room_1 = self._closed_room(session_1)
+
+        qs = get_history_rooms_queryset_by_contact(
+            session_2, self.user, self.project
+        )
+        self.assertIn(room_1, qs)
+
+    def test_excludes_rooms_from_contacts_without_matching_email_or_document(self):
+        target = Contact.objects.create(
+            name="Joao", email="joao@x.com", document="111"
+        )
+        unrelated = Contact.objects.create(
+            name="Other", email="other@x.com", document="222"
+        )
+        unrelated_room = self._closed_room(unrelated)
+
+        qs = get_history_rooms_queryset_by_contact(
+            target, self.user, self.project
+        )
+        self.assertNotIn(unrelated_room, qs)
+
+    def test_excludes_active_rooms(self):
+        contact = Contact.objects.create(name="Joao", document="111")
+        active = Room.objects.create(
+            contact=contact, queue=self.queue, is_active=True
+        )
+
+        qs = get_history_rooms_queryset_by_contact(
+            contact, self.user, self.project
+        )
+        self.assertNotIn(active, qs)
+
+    def test_returns_empty_when_user_has_no_permission_in_project(self):
+        contact = Contact.objects.create(name="Joao")
+        self._closed_room(contact)
+        other_project = Project.objects.create(name="Other Project")
+
+        qs = get_history_rooms_queryset_by_contact(
+            contact, self.user, other_project
+        )
+        self.assertFalse(qs.exists())

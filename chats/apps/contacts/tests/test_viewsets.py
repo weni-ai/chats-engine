@@ -109,6 +109,80 @@ class TestContactsViewsets(BaseAPIChatsTestCase):
             self.assertEqual(action.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
 
+class TestContactsSearchFields(BaseAPIChatsTestCase):
+    """
+    Validates that `ContactViewset.search_fields` accepts email/document
+    and that document lookups ignore punctuation via DocumentAwareSearchFilter.
+    """
+
+    def _search(self, term):
+        url = reverse("contact-list")
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.admin_token.key)
+        return self.client.get(
+            url,
+            format="json",
+            data={"project": str(self.project.uuid), "search": term},
+        )
+
+    def setUp(self):
+        super().setUp()
+        self.deactivate_rooms()
+
+        self.contact.email = "john.doe@tokstok.com"
+        self.contact.document = "123.456.789-00"
+        self.contact.save()
+
+        self.contact_2.email = "mary@example.com"
+        self.contact_2.document = "98765432100"
+        self.contact_2.save()
+
+    def test_search_by_exact_email_returns_matching_contact(self):
+        response = self._search("john.doe@tokstok.com")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        uuids = [r["uuid"] for r in response.json()["results"]]
+        self.assertIn(str(self.contact.uuid), uuids)
+        self.assertNotIn(str(self.contact_2.uuid), uuids)
+
+    def test_search_by_partial_email_returns_matching_contact(self):
+        response = self._search("tokstok")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        uuids = [r["uuid"] for r in response.json()["results"]]
+        self.assertIn(str(self.contact.uuid), uuids)
+        self.assertNotIn(str(self.contact_2.uuid), uuids)
+
+    def test_search_by_document_without_formatting(self):
+        response = self._search("12345678900")
+        uuids = [r["uuid"] for r in response.json()["results"]]
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn(str(self.contact.uuid), uuids)
+        self.assertNotIn(str(self.contact_2.uuid), uuids)
+
+    def test_search_by_document_with_dashes(self):
+        response = self._search("123-456-789-00")
+        uuids = [r["uuid"] for r in response.json()["results"]]
+        self.assertIn(str(self.contact.uuid), uuids)
+
+    def test_search_by_document_with_dots(self):
+        response = self._search("123.456.789.00")
+        uuids = [r["uuid"] for r in response.json()["results"]]
+        self.assertIn(str(self.contact.uuid), uuids)
+
+    def test_search_by_document_with_spaces(self):
+        response = self._search("123 456 789 00")
+        uuids = [r["uuid"] for r in response.json()["results"]]
+        self.assertIn(str(self.contact.uuid), uuids)
+
+    def test_search_by_name_still_works(self):
+        response = self._search(self.contact.name)
+        uuids = [r["uuid"] for r in response.json()["results"]]
+        self.assertIn(str(self.contact.uuid), uuids)
+
+    def test_search_with_unrelated_term_returns_empty(self):
+        response = self._search("notfound-xyz-9999")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get("count"), 0)
+
+
 class TestContactSerializer(APITestCase):
     def test_correct_contact_serialization(self):
         """

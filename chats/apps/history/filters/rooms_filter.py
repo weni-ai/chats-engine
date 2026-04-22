@@ -12,6 +12,24 @@ from chats.apps.accounts.models import User
 from chats.apps.projects.models import Project
 
 
+def get_related_contact_ids(contact: Contact) -> QuerySet:
+    """
+    Returns the primary keys of every Contact that should be treated as
+    the same person as `contact`, matching by external_id, email or
+    document (ignoring empty values).
+
+    Used by the history feature to unify conversations from different
+    Contact rows that share email or document (e.g. a web chat user that
+    gets a new URN on every session but sends the same CPF).
+    """
+    filters = Q(pk=contact.pk)
+    if contact.email:
+        filters |= Q(email__iexact=contact.email)
+    if contact.document:
+        filters |= Q(document=contact.document)
+    return Contact.objects.filter(filters).values_list("pk", flat=True)
+
+
 def filter_history_rooms_queryset_by_project_permission(
     queryset: QuerySet[Room],
     user_permission: ProjectPermission,
@@ -51,7 +69,9 @@ def get_history_rooms_queryset_by_contact(
     ).first()
 
     base_queryset = Room.objects.filter(
-        contact=contact, is_active=False, ended_at__isnull=False
+        contact_id__in=get_related_contact_ids(contact),
+        is_active=False,
+        ended_at__isnull=False,
     )
 
     if not user_permission:
@@ -68,8 +88,8 @@ class HistoryRoomFilter(filters.FilterSet):
         fields = []
 
     contact = filters.CharFilter(
-        field_name="contact__external_id",
         required=False,
+        method="filter_contact",
         help_text=_("Contact's External ID"),
     )
 
@@ -126,3 +146,20 @@ class HistoryRoomFilter(filters.FilterSet):
 
         values = value.split(",")
         return queryset.filter(tags__name__in=values).distinct()
+
+    def filter_contact(self, queryset, name, value):
+        """
+        Expands the `?contact=<external_id>` lookup to also include rooms
+        from any Contact that shares email or document with the one
+        identified by the given external_id. Falls back to the simple
+        external_id filter when no matching Contact is found, preserving
+        the previous behavior.
+        """
+        if not value:
+            return queryset
+
+        contact = Contact.objects.filter(external_id=value).first()
+        if not contact:
+            return queryset.filter(contact__external_id=value)
+
+        return queryset.filter(contact_id__in=get_related_contact_ids(contact))

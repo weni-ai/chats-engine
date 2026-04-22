@@ -157,3 +157,158 @@ class TestHistoryRoomViewsets(BaseAPIChatsTestCase):
 
         for action in actions:
             self.assertEqual(action.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+
+class TestHistoryRoomSearchFields(BaseAPIChatsTestCase):
+    """
+    Validates that `HistoryRoomViewset.search_fields` accepts
+    contact email/document and that document lookups ignore punctuation.
+    """
+
+    def _search(self, term):
+        url = reverse("history_room-list")
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.admin_token.key)
+        return self.client.get(
+            url,
+            format="json",
+            data={"project": str(self.project.uuid), "search": term},
+        )
+
+    def setUp(self):
+        super().setUp()
+        self.deactivate_rooms()
+
+        self.contact.email = "john.doe@tokstok.com"
+        self.contact.document = "123.456.789-00"
+        self.contact.save()
+
+        self.contact_2.email = "mary@example.com"
+        self.contact_2.document = "98765432100"
+        self.contact_2.save()
+
+    def test_search_by_contact_email(self):
+        response = self._search("john.doe@tokstok.com")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        uuids = [r["uuid"] for r in response.json()["results"]]
+        self.assertIn(str(self.room_1.uuid), uuids)
+        self.assertNotIn(str(self.room_2.uuid), uuids)
+
+    def test_search_by_contact_document_without_formatting(self):
+        response = self._search("12345678900")
+        uuids = [r["uuid"] for r in response.json()["results"]]
+        self.assertIn(str(self.room_1.uuid), uuids)
+        self.assertNotIn(str(self.room_2.uuid), uuids)
+
+    def test_search_by_contact_document_with_dashes(self):
+        response = self._search("123-456-789-00")
+        uuids = [r["uuid"] for r in response.json()["results"]]
+        self.assertIn(str(self.room_1.uuid), uuids)
+
+    def test_search_by_contact_document_with_dots(self):
+        response = self._search("123.456.789.00")
+        uuids = [r["uuid"] for r in response.json()["results"]]
+        self.assertIn(str(self.room_1.uuid), uuids)
+
+    def test_search_by_contact_document_with_spaces(self):
+        response = self._search("123 456 789 00")
+        uuids = [r["uuid"] for r in response.json()["results"]]
+        self.assertIn(str(self.room_1.uuid), uuids)
+
+    def test_search_by_contact_name_still_works(self):
+        response = self._search(self.contact.name)
+        uuids = [r["uuid"] for r in response.json()["results"]]
+        self.assertIn(str(self.room_1.uuid), uuids)
+
+    def test_search_with_unrelated_term_returns_empty(self):
+        response = self._search("notfound-xyz-9999")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get("count"), 0)
+
+
+class TestHistoryRoomContactFilterUnification(BaseAPIChatsTestCase):
+    """
+    Validates the epic requirement: `GET /history?contact=<external_id>`
+    must return rooms from any Contact that shares email or document
+    with the contact identified by the external_id.
+    """
+
+    def _list(self, contact_external_id):
+        url = reverse("history_room-list")
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.admin_token.key)
+        return self.client.get(
+            url,
+            format="json",
+            data={
+                "project": str(self.project.uuid),
+                "contact": contact_external_id,
+            },
+        )
+
+    def setUp(self):
+        super().setUp()
+        self.deactivate_rooms()
+
+    def test_unifies_history_by_document(self):
+        """
+        Simulates the web chat scenario: two sessions of the same person
+        (same document, different URN/external_id).
+        """
+        self.contact.external_id = "ws-001"
+        self.contact.document = "12345678900"
+        self.contact.save()
+
+        self.contact_2.external_id = "ws-002"
+        self.contact_2.document = "123.456.789-00"  # same CPF, different format
+        self.contact_2.queue = self.queue_1  # ensure admin can see it
+        self.contact_2.save()
+
+        # rooms already exist from BaseAPIChatsTestCase; deactivate_rooms()
+        # closed them, and both rooms belong to the admin's project
+        response = self._list("ws-002")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        uuids = [r["uuid"] for r in response.json()["results"]]
+        self.assertIn(str(self.room_1.uuid), uuids)
+        self.assertIn(str(self.room_2.uuid), uuids)
+
+    def test_unifies_history_by_email(self):
+        self.contact.external_id = "ws-001"
+        self.contact.email = "joao@tokstok.com"
+        self.contact.save()
+
+        self.contact_2.external_id = "ws-002"
+        self.contact_2.email = "joao@tokstok.com"
+        self.contact_2.save()
+
+        response = self._list("ws-002")
+
+        uuids = [r["uuid"] for r in response.json()["results"]]
+        self.assertIn(str(self.room_1.uuid), uuids)
+        self.assertIn(str(self.room_2.uuid), uuids)
+
+    def test_does_not_unify_when_email_and_document_differ(self):
+        self.contact.external_id = "ws-001"
+        self.contact.email = "a@x.com"
+        self.contact.document = "111"
+        self.contact.save()
+
+        self.contact_2.external_id = "ws-002"
+        self.contact_2.email = "b@x.com"
+        self.contact_2.document = "222"
+        self.contact_2.save()
+
+        response = self._list("ws-002")
+
+        uuids = [r["uuid"] for r in response.json()["results"]]
+        self.assertIn(str(self.room_2.uuid), uuids)
+        self.assertNotIn(str(self.room_1.uuid), uuids)
+
+    def test_falls_back_to_external_id_when_contact_not_found(self):
+        """
+        When the external_id does not match any Contact, keep the legacy
+        behavior of filtering by `contact__external_id`.
+        """
+        response = self._list("does-not-exist")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get("count"), 0)
