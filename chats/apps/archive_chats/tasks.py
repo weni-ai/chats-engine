@@ -28,8 +28,10 @@ def start_archive_rooms_messages():
     now = datetime.now(timezone.utc)
     limit_date = now - rdelta(years=1)
 
-    rooms_query = Room.objects.filter(is_active=False, ended_at__lt=limit_date).exclude(
-        archived_conversations__status=ArchiveConversationsJobStatus.FINISHED
+    rooms_query = (
+        Room.objects.filter(is_active=False, ended_at__lt=limit_date)
+        .exclude(archived_conversations__status=ArchiveConversationsJobStatus.FINISHED)
+        .exclude(archived_conversations__job__started_at__date=now.date())
     )
 
     if not settings.ARCHIVE_CHATS_IS_ACTIVE_FOR_ALL_PROJECTS:
@@ -47,15 +49,28 @@ def start_archive_rooms_messages():
         rooms_query = rooms_query.filter(queue__sector__project__in=projects)
 
     rooms = rooms_query.order_by("ended_at")[: settings.ARCHIVE_CHATS_MAX_ROOMS]
+    rooms_count = rooms_query.count()
 
     expiration_dt = calculate_archive_task_expiration_dt(
         settings.ARCHIVE_CHATS_MAX_HOUR
     )
 
+    logger.info(
+        f"[start_archive_rooms_messages] Starting archive {rooms_count} rooms with job {job.uuid}"
+    )
+    logger.info(f"[start_archive_rooms_messages] Expiration date: {expiration_dt}")
+
+    async_applied_count = 0
+
     for room in rooms:
         archive_room_messages.apply_async(
             args=[room.uuid, job.uuid], expires=expiration_dt
         )
+        async_applied_count += 1
+
+    logger.info(
+        f"[start_archive_rooms_messages] Applied {async_applied_count} async tasks"
+    )
 
 
 @shared_task(queue="archive-chats")
