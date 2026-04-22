@@ -299,6 +299,15 @@ LOGGING["handlers"]["console"] = {
     "formatter": "verbose",
 }
 
+# Silence "Unknown feature ..." warnings emitted by the growthbook SDK when a
+# feature flag is not provisioned in the environment. These are expected
+# during tests and for flags that are still rolling out.
+LOGGING.setdefault("loggers", {})["growthbook.core"] = {
+    "level": "ERROR",
+    "handlers": ["console"],
+    "propagate": False,
+}
+
 
 # Elastic APM
 

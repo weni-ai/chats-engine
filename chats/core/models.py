@@ -4,7 +4,6 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
 from chats.core.managers import SoftDeletableManager
 from chats.utils.websockets import send_channels_group
@@ -113,11 +112,19 @@ class BaseIntegrationConfigurableModel(models.Model):
 
 class AuditableMixin(models.Model):
     """
-    Tracks who created, last modified, and deleted each record.
-    Fields are populated explicitly in views:
-        serializer.save(created_by=request.user, modified_by=request.user)
-    Audit is only persisted if the AUDIT_LOG_FEATURE_FLAG_KEY flag is enabled
-    for the record's project.
+    Adds ``created_by`` / ``modified_by`` / ``deleted_by`` columns to a model.
+
+    Populating these fields is the caller's responsibility:
+      - API paths go through ``AuditableModelSerializer`` in
+        ``chats.core.serializers``, which gates the fields on the audit
+        feature flag.
+      - Direct-save paths (viewset ``perform_destroy`` or custom actions
+        that mutate the instance without a serializer) should use
+        ``apply_audit_fields`` from ``chats.core.audit``.
+
+    The mixin itself does not check the feature flag — it only declares the
+    columns. Whoever sets the attributes is the one that decides whether to
+    record audit data.
     """
 
     created_by = models.ForeignKey(
@@ -150,31 +157,3 @@ class AuditableMixin(models.Model):
 
     class Meta:
         abstract = True
-
-    def _get_project(self):
-        """
-        Returns the project associated with this instance.
-        Models using this mixin must define a `project` attribute or property.
-        """
-        project = getattr(self, "project", None)
-        if project is None:
-            raise AttributeError(
-                f"{self.__class__.__name__} must define a `project` attribute or property "
-                "to use AuditableMixin."
-            )
-        return project
-
-    def save(self, *args, **kwargs):
-        if self.created_by_id or self.modified_by_id or self.deleted_by_id:
-            try:
-                project = self._get_project()
-                if not is_feature_active_for_attributes(
-                    settings.AUDIT_LOG_FEATURE_FLAG_KEY,
-                    {"projectUUID": str(project.uuid)},
-                ):
-                    self.created_by = None
-                    self.modified_by = None
-                    self.deleted_by = None
-            except Exception:
-                pass
-        super().save(*args, **kwargs)

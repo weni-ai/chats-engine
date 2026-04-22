@@ -12,6 +12,7 @@ from chats.apps.api.v1.internal.sectors.serializers import (
 from chats.apps.api.v1.sectors import serializers as sector_serializers
 from chats.apps.api.v1.sectors.filters import SectorFilter
 from chats.apps.sectors.models import Sector, SectorAuthorization, SectorTag
+from chats.core.audit import apply_audit_fields
 
 
 class SectorInternalViewset(viewsets.ModelViewSet):
@@ -54,8 +55,9 @@ class SectorInternalViewset(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         instance.is_deleted = True
-        instance.deleted_by = self.request.user
-        instance.modified_by = self.request.user
+        apply_audit_fields(
+            instance, self.request, instance.project, on_delete=True
+        )
         instance.save()
 
     @action(detail=True, methods=["get"], url_path="required-tags")
@@ -112,6 +114,7 @@ class SectorTagsViewset(viewsets.ModelViewSet):
         serializer.save(modified_by=self.request.user)
 
     def perform_destroy(self, instance):
-        instance.deleted_by = self.request.user
-        instance.modified_by = self.request.user
+        apply_audit_fields(
+            instance, self.request, instance.sector.project, on_delete=True
+        )
         instance.delete()

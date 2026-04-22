@@ -34,6 +34,7 @@ from chats.apps.sectors.models import Sector, SectorGroupSector
 from chats.apps.sectors.usecases.group_sector_authorization import (
     QueueGroupSectorAuthorizationCreationUseCase,
 )
+from chats.core.audit import apply_audit_fields
 from chats.core.cache_utils import get_user_id_by_email_cached
 
 from .serializers import (
@@ -292,8 +293,9 @@ class QueueViewset(ModelViewSet):
             "project_uuid": str(project_uuid),
         }
 
-        instance.deleted_by = self.request.user
-        instance.modified_by = self.request.user
+        apply_audit_fields(
+            instance, self.request, instance.sector.project, on_delete=True
+        )
 
         if not settings.USE_WENI_FLOWS:
             instance.delete()
@@ -572,7 +574,9 @@ class QueueAuthorizationViewset(ModelViewSet):
         role = request.data.get("role")
 
         queue_permission.role = role
-        queue_permission.modified_by = request.user
+        apply_audit_fields(
+            queue_permission, request, queue_permission.queue.sector.project
+        )
         queue_permission.save()
 
         serializer_data = queue_serializers.QueueAuthorizationUpdateSerializer(

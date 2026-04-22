@@ -12,6 +12,7 @@ from chats.apps.sectors.models import (
     SectorHoliday,
     SectorTag,
 )
+from chats.core.serializers import AuditableModelSerializer
 
 User = get_user_model()
 
@@ -72,7 +73,7 @@ class SectorAutomaticMessageSerializer(serializers.ModelSerializer):
         fields = ["is_active", "text"]
 
 
-class SectorSerializer(serializers.ModelSerializer):
+class SectorSerializer(AuditableModelSerializer):
     automatic_message = serializers.JSONField(required=False)
     is_csat_enabled = serializers.BooleanField(required=False, allow_null=False)
 
@@ -176,7 +177,7 @@ class SectorSerializer(serializers.ModelSerializer):
         return data
 
 
-class SectorUpdateSerializer(serializers.ModelSerializer):
+class SectorUpdateSerializer(AuditableModelSerializer):
     automatic_message = serializers.JSONField(required=False)
     is_csat_enabled = serializers.BooleanField(required=False, allow_null=False)
 
@@ -333,10 +334,16 @@ class SectorWSSerializer(serializers.ModelSerializer):
 # Sector Authorization Serializers
 
 
-class SectorAuthorizationSerializer(serializers.ModelSerializer):
+class SectorAuthorizationSerializer(AuditableModelSerializer):
     class Meta:
         model = SectorAuthorization
         fields = "__all__"
+
+    def _get_audit_project(self):
+        if self.instance is not None:
+            return self.instance.sector.project
+        sector = (self.validated_data or {}).get("sector")
+        return sector.project if sector else None
 
 
 class SectorAuthorizationReadOnlySerializer(serializers.ModelSerializer):
@@ -364,11 +371,17 @@ class SectorAuthorizationWSSerializer(serializers.ModelSerializer):
 # Sector Tags Serializer
 
 
-class SectorTagSerializer(serializers.ModelSerializer):
+class SectorTagSerializer(AuditableModelSerializer):
     class Meta:
         model = SectorTag
         fields = "__all__"
         extra_kwargs = {"sector": {"required": False}}
+
+    def _get_audit_project(self):
+        if self.instance is not None:
+            return self.instance.sector.project
+        sector = (self.validated_data or {}).get("sector")
+        return sector.project if sector else None
 
     def validate(self, data):
         """
@@ -426,7 +439,7 @@ class SectorAgentsSerializer(serializers.ModelSerializer):
         ]
 
 
-class SectorHolidaySerializer(serializers.ModelSerializer):
+class SectorHolidaySerializer(AuditableModelSerializer):
     """
     Serializer to manage configurable holidays and special days by sector
     """
@@ -449,6 +462,12 @@ class SectorHolidaySerializer(serializers.ModelSerializer):
             "its_custom",
         ]
         read_only_fields = ["uuid", "created_on", "modified_on"]
+
+    def _get_audit_project(self):
+        if self.instance is not None:
+            return self.instance.sector.project
+        sector = (self.validated_data or {}).get("sector")
+        return sector.project if sector else None
 
     def validate(self, data):
         """
