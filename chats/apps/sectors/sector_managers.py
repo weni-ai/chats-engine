@@ -17,3 +17,11 @@ class SectorAuthorizationManager(models.Manager):
             return super().get_queryset()
 
         return super().get_queryset().filter(permission__is_deleted=False)
+
+
+class SectorTagManager(SoftDeletableManager):
+    def get_queryset(self):
+        if self.include_deleted:
+            return super().get_queryset()
+
+        return super().get_queryset().filter(sector__is_deleted=False)
