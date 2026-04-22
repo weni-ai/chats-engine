@@ -17,7 +17,7 @@ from chats.apps.queues.utils import start_queue_priority_routing
 from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
 from chats.utils.websockets import send_channels_group
 
-from .sector_managers import SectorAuthorizationManager, SectorManager
+from .sector_managers import SectorAuthorizationManager, SectorManager, SectorTagManager
 
 User = get_user_model()
 
@@ -343,7 +343,7 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         self.queues.filter(is_deleted=False).update(
             is_deleted=True, name=Concat(F("name"), Value(deleted_sufix))
         )
-        self.tags.filter(is_deleted=False).update(
+        SectorTag.all_objects.filter(sector=self, is_deleted=False).update(
             is_deleted=True, name=Concat(F("name"), Value(deleted_sufix))
         )
 
@@ -434,6 +434,9 @@ class SectorTag(BaseSoftDeleteModel, BaseModel):
         related_name="tags",
         on_delete=models.CASCADE,
     )
+
+    objects = SectorTagManager()
+    all_objects = SectorTagManager(include_deleted=True)
 
     def get_permission(self, user):
         try:
