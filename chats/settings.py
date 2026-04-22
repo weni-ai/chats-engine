@@ -271,6 +271,9 @@ REST_FRAMEWORK = {
         "external_hour": env.str("EXTERNAL_HOUR_LIMIT", default="30000/hour"),
         "external_anon": env.str("EXTERNAL_ANON_LIMIT", default="100/hour"),
         "external_critical": env.str("EXTERNAL_CRITICAL_LIMIT", default="1000/minute"),
+        "ai_text_improvement": env.str(
+            "AI_TEXT_IMPROVEMENT_LIMIT", default="20/minute"
+        ),
         "user": env.str("DEFAULT_USER_LIMIT", default="20000/hour"),
         "anon": env.str("DEFAULT_ANON_LIMIT", default="1000/hour"),
     },

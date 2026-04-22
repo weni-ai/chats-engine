@@ -310,9 +310,9 @@ class MessageSerializer(BaseMessageSerializer):
 
         if ai_text_improvement:
             transaction.on_commit(
-                lambda message_uuid=str(msg.uuid),
-                       improvement_type=ai_text_improvement["type"],
-                       status=ai_text_improvement["status"]: (
+                lambda message_uuid=str(msg.uuid), improvement_type=ai_text_improvement[
+                    "type"
+                ], status=ai_text_improvement["status"]: (
                     register_message_improvement_task.delay(
                         message_uuid=message_uuid,
                         improvement_type=improvement_type,
