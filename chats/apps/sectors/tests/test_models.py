@@ -423,7 +423,9 @@ class WorkingHoursValidatorHolidayTests(TestCase):
         )
 
     @patch("chats.apps.sectors.utils.CacheClient")
-    def test_configurable_holiday_custom_hours_inside_window_passes(self, MockCacheClient):
+    def test_configurable_holiday_custom_hours_inside_window_passes(
+        self, MockCacheClient
+    ):
         """Configurable holiday with custom hours allows contact within the window."""
         MockCacheClient.return_value = _FakeCache()
         SectorHoliday.objects.create(
@@ -510,7 +512,11 @@ class WorkingHoursValidatorHolidayTests(TestCase):
                         "monday": {"start": "08:00", "end": "17:00"},
                     },
                     "static_holidays": {
-                        "2025-01-06": {"closed": False, "start": "08:00", "end": "12:00"},
+                        "2025-01-06": {
+                            "closed": False,
+                            "start": "08:00",
+                            "end": "12:00",
+                        },
                     },
                 }
             },
@@ -536,7 +542,11 @@ class WorkingHoursValidatorHolidayTests(TestCase):
                         "monday": {"start": "08:00", "end": "17:00"},
                     },
                     "static_holidays": {
-                        "2025-01-06": {"closed": False, "start": "14:00", "end": "18:00"},
+                        "2025-01-06": {
+                            "closed": False,
+                            "start": "14:00",
+                            "end": "18:00",
+                        },
                     },
                 }
             },
@@ -605,3 +615,58 @@ class SectorRequiredTagsTests(TransactionTestCase):
         self.sector.refresh_from_db()
 
         self.assertFalse(self.sector.required_tags)
+
+
+class SectorDeleteCascadeTests(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(
+            name="Cascade Project",
+            room_routing_type=RoomRoutingType.QUEUE_PRIORITY,
+        )
+        self.sector = Sector.objects.create(
+            name="Cascade Sector",
+            project=self.project,
+            rooms_limit=1,
+        )
+        self.queue = Queue.objects.create(
+            name="Cascade Queue",
+            sector=self.sector,
+        )
+        self.tag_a = SectorTag.objects.create(name="Tag A", sector=self.sector)
+        self.tag_b = SectorTag.objects.create(name="Tag B", sector=self.sector)
+
+    def test_tags_are_soft_deleted_when_sector_is_deleted(self):
+        self.sector.delete()
+
+        self.tag_a.refresh_from_db()
+        self.tag_b.refresh_from_db()
+
+        self.assertTrue(self.tag_a.is_deleted)
+        self.assertTrue(self.tag_b.is_deleted)
+
+    def test_tags_names_receive_deleted_suffix_when_sector_is_deleted(self):
+        self.sector.delete()
+
+        self.tag_a.refresh_from_db()
+        self.tag_b.refresh_from_db()
+
+        self.assertTrue(self.tag_a.name.startswith("Tag A_is_deleted_"))
+        self.assertTrue(self.tag_b.name.startswith("Tag B_is_deleted_"))
+
+    def test_queues_are_soft_deleted_when_sector_is_deleted(self):
+        self.sector.delete()
+
+        self.queue.refresh_from_db()
+
+        self.assertTrue(self.queue.is_deleted)
+        self.assertTrue(self.queue.name.startswith("Cascade Queue_is_deleted_"))
+
+    def test_already_deleted_tags_are_not_affected(self):
+        self.tag_a.delete()
+        self.tag_a.refresh_from_db()
+        original_name = self.tag_a.name
+
+        self.sector.delete()
+        self.tag_a.refresh_from_db()
+
+        self.assertEqual(self.tag_a.name, original_name)

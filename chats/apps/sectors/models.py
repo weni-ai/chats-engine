@@ -339,8 +339,12 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
 
     def delete(self):
         super().delete()
+        deleted_sufix = self.deleted_sufix()
         self.queues.filter(is_deleted=False).update(
-            is_deleted=True, name=Concat(F("name"), Value(self.deleted_sufix()))
+            is_deleted=True, name=Concat(F("name"), Value(deleted_sufix))
+        )
+        self.tags.filter(is_deleted=False).update(
+            is_deleted=True, name=Concat(F("name"), Value(deleted_sufix))
         )
 
 
