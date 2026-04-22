@@ -15,6 +15,7 @@ from chats.apps.api.authentication.permissions import ProjectUUIDRequestBodyPerm
 from chats.apps.api.v1.ai_features.serializers import (
     AITextImprovementRequestSerializer,
 )
+from chats.apps.api.v1.ai_features.throttling import AITextImprovementThrottle
 from chats.apps.feature_flags.exceptions import FeatureFlagInactiveError
 from chats.core.mixins import LanguageViewMixin
 
@@ -45,6 +46,7 @@ class HistorySummaryFeedbackTagsView(LanguageViewMixin, APIView):
 
 class AITextImprovementView(APIView):
     permission_classes = [IsAuthenticated, ProjectUUIDRequestBodyPermission]
+    throttle_classes = [AITextImprovementThrottle]
 
     def post(self, request):
         serializer = AITextImprovementRequestSerializer(data=request.data)
