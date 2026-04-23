@@ -6,13 +6,15 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
+from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import CursorPagination, LimitOffsetPagination
 from rest_framework.response import Response
-from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 from sentry_sdk import capture_exception
+from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
 from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
@@ -106,6 +108,11 @@ def add_user_or_queue_to_room(instance: Room, request):
     return instance
 
 
+@method_decorator(name="update", decorator=swagger_auto_schema(auto_schema=None))
+@method_decorator(
+    name="partial_update", decorator=swagger_auto_schema(auto_schema=None)
+)
+@method_decorator(name="destroy", decorator=swagger_auto_schema(auto_schema=None))
 class RoomFlowViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing rooms (tickets) via external API.
@@ -162,14 +169,17 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
 
         return qs.filter(queue__sector__project=project)
 
+    @swagger_auto_schema(auto_schema=None)
     def list(self, request, *args, **kwargs):
         """List all rooms accessible via external API."""
         return super().list(request, *args, **kwargs)
 
+    @swagger_auto_schema(auto_schema=None)
     def retrieve(self, request, *args, **kwargs):
         """Retrieve details of a specific room by UUID."""
         return super().retrieve(request, *args, **kwargs)
 
+    @swagger_auto_schema(methods=["put", "patch"], auto_schema=None)
     @action(detail=True, methods=["PUT", "PATCH"], url_name="close")
     def close(
         self, request, *args, **kwargs
@@ -200,6 +210,7 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
             start_queue_priority_routing(instance.queue)
         return Response(serialized_data.data, status=status.HTTP_200_OK)
 
+    @swagger_auto_schema(auto_schema=None)
     @action(detail=True, methods=["POST"])
     def history(self, request, uuid=None):
         """
@@ -226,23 +237,27 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         serializer = RoomFlowSerializer()
         serializer.process_message_history(room, messages_data)
 
-        if (
-            room.queue.sector.project.has_chats_summary
-            and room.messages.filter(
-                Q(user__isnull=False) | Q(contact__isnull=False)
-            ).exists()
-        ):
+        if room.queue.sector.project.has_chats_summary:
             if not (
                 history_summary := HistorySummary.objects.filter(
                     room=room, status=HistorySummaryStatus.PENDING
                 ).first()
             ):
                 history_summary = HistorySummary.objects.create(room=room)
+                generate_history_summary.apply_async(
+                    args=[history_summary.uuid],
+                    countdown=settings.HISTORY_SUMMARY_GENERATION_DELAY,
+                )
 
-            generate_history_summary.delay(history_summary.uuid)
+                cancel_history_summary_generation.apply_async(
+                    args=[history_summary.uuid],
+                    countdown=settings.HISTORY_SUMMARY_CANCELLATION_DELAY
+                    + settings.HISTORY_SUMMARY_GENERATION_DELAY,
+                )
 
         return Response(status=status.HTTP_201_CREATED)
 
+    @swagger_auto_schema(auto_schema=None)
     def create(self, request, *args, **kwargs):
         """Create a new room (ticket) for a contact in a queue or sector."""
         try:
@@ -319,15 +334,16 @@ class RoomFlowViewSet(viewsets.ModelViewSet):
         if room.queue.sector.project.has_chats_summary:
             history_summary = HistorySummary.objects.create(room=room)
 
-            if room.messages.filter(
-                Q(user__isnull=False) | Q(contact__isnull=False)
-            ).exists():
-                generate_history_summary.delay(history_summary.uuid)
+            generate_history_summary.apply_async(
+                args=[history_summary.uuid],
+                countdown=settings.HISTORY_SUMMARY_GENERATION_DELAY,
+            )
 
-            else:
-                cancel_history_summary_generation.apply_async(
-                    args=[history_summary.uuid], countdown=30
-                )  # 30 seconds delay
+            cancel_history_summary_generation.apply_async(
+                args=[history_summary.uuid],
+                countdown=settings.HISTORY_SUMMARY_CANCELLATION_DELAY
+                + settings.HISTORY_SUMMARY_GENERATION_DELAY,
+            )
 
     def perform_update(self, serializer):
         serializer.save()
@@ -356,6 +372,7 @@ class RoomUserExternalViewSet(viewsets.ViewSet):
     ]
     authentication_classes = [ProjectAdminAuthentication]
 
+    @swagger_auto_schema(auto_schema=None)
     def partial_update(self, request, pk=None):
         """Assign an agent to a queued room by ticket ID."""
         if pk is None:
@@ -468,6 +485,7 @@ class CustomFieldsUserExternalViewSet(viewsets.ViewSet):
         ExternalHourRateThrottle,
     ]
 
+    @swagger_auto_schema(auto_schema=None)
     def partial_update(self, request, pk=None):
         """Update custom fields for a room by contact external ID."""
         custom_fields_update = request.data
