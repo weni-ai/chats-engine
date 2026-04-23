@@ -28,12 +28,12 @@ class RoomFilter(filters.FilterSet):
     sector = filters.ModelMultipleChoiceFilter(
         required=False,
         field_name="queue__sector",
-        queryset=Sector.objects.all(),
+        queryset=Sector.all_objects.all(),
     )
     queue = filters.ModelMultipleChoiceFilter(
         required=False,
         field_name="queue",
-        queryset=Queue.objects.all(),
+        queryset=Queue.all_objects.all(),
     )
     agent = filters.CharFilter(
         field_name="user",
