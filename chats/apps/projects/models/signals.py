@@ -45,6 +45,9 @@ def handle_permission_soft_delete(sender, instance, **kwargs):
     if not getattr(instance, "_was_soft_deleted", False):
         return
 
+    if instance.user is None:
+        return
+
     requeue_agent_rooms_task.delay(
         str(instance.user.email),
         str(instance.project.uuid),
