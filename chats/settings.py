@@ -504,7 +504,7 @@ CELERY_BEAT_SCHEDULE = {
     },
     "start-archive-rooms-messages": {
         "task": "start_archive_rooms_messages",
-        "schedule": crontab(hour=0, minute=0),
+        "schedule": crontab(hour="0-4", minute=0),
     },
 }
 
@@ -744,6 +744,9 @@ DENORMALIZED_MESSAGE_FIELDS_FLAG_KEY = env.str(
     "DENORMALIZED_MESSAGE_FIELDS_FLAG_KEY",
     default="weniChatsDenormalizedMessageFields",
 )
+AUDIT_LOG_FEATURE_FLAG_KEY = env.str(
+    "AUDIT_LOG_FEATURE_FLAG_KEY", default="weniChatsAuditLog"
+)
 
 AUDIT_LOG_FEATURE_FLAG_KEY = env.str(
     "AUDIT_LOG_FEATURE_FLAG_KEY", default="weniChatsAuditLog"
@@ -764,7 +767,7 @@ ROOM_24H_VALID_CACHE_TTL = env.int(
 INTERNAL_API_TOKEN = env.str("INTERNAL_API_TOKEN")
 
 # Archive chats
-ARCHIVE_CHATS_MAX_ROOMS = env.int("ARCHIVE_CHATS_MAX_ROOMS", default=10000)
+ARCHIVE_CHATS_MAX_ROOMS = env.int("ARCHIVE_CHATS_MAX_ROOMS", default=5000)
 ARCHIVE_CHATS_MAX_HOUR = env.str("ARCHIVE_CHATS_MAX_HOUR", default="08:59")  # UTC-0
 ARCHIVE_CHATS_PROJECTS_LIST_FEATURE_FLAG_KEY = env.str(
     "ARCHIVE_CHATS_PROJECTS_LIST_FEATURE_FLAG_KEY",

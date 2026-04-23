@@ -31,7 +31,6 @@ from chats.apps.api.v1.sectors.filters import (
 from chats.apps.projects.models import Project
 from chats.apps.projects.models.models import ProjectPermission
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
-from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import (
     Sector,
     SectorAuthorization,
@@ -40,8 +39,6 @@ from chats.apps.sectors.models import (
 )
 from chats.apps.sectors.utils import get_country_from_timezone, get_country_holidays
 from chats.core.audit import apply_audit_fields
-
-logger = logging.getLogger(__name__)
 
 
 @method_decorator(name="create", decorator=swagger_auto_schema(auto_schema=None))
@@ -61,7 +58,7 @@ class SectorViewset(viewsets.ModelViewSet):
 
     def get_permissions(self):
         permission_classes = self.permission_classes
-        if self.action in ["list", "rooms_count"]:
+        if self.action == "list":
             permission_classes = [IsAuthenticated]
         elif self.action in ["create", "destroy"]:
             permission_classes = (IsAuthenticated, IsProjectAdmin)
@@ -149,127 +146,6 @@ class SectorViewset(viewsets.ModelViewSet):
                 )
         return super().update(request, *args, **kwargs)
 
-    def _close_active_rooms(self, instance):
-        rooms = Room.objects.filter(
-            queue__sector=instance,
-            is_active=True,
-        )
-        if not rooms.exists():
-            return None
-
-        service = BulkCloseService()
-        result = service.close(
-            rooms=rooms,
-            end_by="sector_deleted",
-        )
-
-        if result.success_count == 0 and result.failed_count > 0:
-            raise exceptions.APIException(
-                detail=(
-                    f"Failed to close all {result.failed_count} active rooms "
-                    f"for sector {instance.uuid}. Deletion aborted."
-                ),
-            )
-
-        if result.failed_count > 0:
-            logger.warning(
-                "[SECTOR_DELETE] Partial room closure for sector %s: "
-                "%d succeeded, %d failed",
-                instance.uuid,
-                result.success_count,
-                result.failed_count,
-            )
-
-        return result
-
-    def _transfer_active_rooms(self, instance, target_queue):
-        rooms = Room.objects.filter(
-            queue__sector=instance,
-            is_active=True,
-        )
-        if not rooms.exists():
-            return None
-
-        service = BulkTransferService()
-        return service.transfer(
-            rooms=rooms,
-            user_request=self.request.user,
-            queue=target_queue,
-        )
-
-    def _validate_transfer_queue(self, instance, transfer_to_queue_uuid):
-        try:
-            target_queue = Queue.objects.select_related("sector__project").get(
-                uuid=transfer_to_queue_uuid
-            )
-        except Queue.DoesNotExist:
-            return None, Response(
-                {"detail": f"Target queue {transfer_to_queue_uuid} not found"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        if target_queue.sector_id == instance.pk:
-            return None, Response(
-                {
-                    "detail": (
-                        "Cannot transfer rooms to a queue that belongs "
-                        "to the sector being deleted"
-                    )
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if target_queue.sector.project_id != instance.project_id:
-            return None, Response(
-                {"detail": "Target queue must belong to the same project"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        return target_queue, None
-
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-
-        transfer_to_queue_uuid = request.query_params.get("transfer_to_queue")
-        end_all_chats = (
-            request.query_params.get("end_all_chats", "").lower() == "true"
-        )
-
-        if transfer_to_queue_uuid and end_all_chats:
-            return Response(
-                {"detail": "Cannot use both 'transfer_to_queue' and 'end_all_chats'"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if transfer_to_queue_uuid:
-            target_queue, error_response = self._validate_transfer_queue(
-                instance, transfer_to_queue_uuid
-            )
-            if error_response:
-                return error_response
-
-            result = self._transfer_active_rooms(instance, target_queue)
-
-            if result and result.failed_count > 0:
-                return Response(
-                    {
-                        "detail": "Failed to transfer all rooms. Deletion aborted.",
-                        "transfer": result.to_dict(),
-                    },
-                    status=status.HTTP_409_CONFLICT,
-                )
-
-            self.perform_destroy(instance)
-            return Response(
-                {
-                    "is_deleted": True,
-                    "transfer": result.to_dict() if result else None,
-                },
-                status=status.HTTP_200_OK,
-            )
-
-        self.perform_destroy(instance)
-        return Response(status=status.HTTP_204_NO_CONTENT)
     def perform_update(self, serializer):
         serializer.save(modified_by=self.request.user)
 
@@ -333,16 +209,6 @@ class SectorViewset(viewsets.ModelViewSet):
                 .count()
             )
         return Response({"sector_count": sector_count}, status=status.HTTP_200_OK)
-
-    @action(detail=True, methods=["GET"], url_path="rooms_count")
-    def rooms_count(self, request, *args, **kwargs):
-        instance = self.get_object()
-        queryset = Room.objects.filter(queue__sector=instance, is_active=True)
-        waiting = queryset.filter(user__isnull=True).count()
-        in_service = queryset.filter(user__isnull=False).count()
-        return Response(
-            {"waiting": waiting, "in_service": in_service}, status=status.HTTP_200_OK
-        )
 
     @action(detail=True, methods=["POST"])
     def authorization(self, request, *args, **kwargs):

@@ -11,6 +11,12 @@ from chats.apps.api.v1.agents.views import (
     AllAgentsView,
     UpdateQueuePermissionsView,
 )
+from chats.apps.api.v1.archive_chats.views import GetArchivedMediaView
+from chats.apps.api.v1.rooms.viewsets import RoomsCountView, RoomsReportViewSet
+from chats.apps.api.v1.dashboard.viewsets import (
+    ModelFieldsViewSet,
+    ReportFieldsValidatorViewSet,
+)
 from chats.apps.api.v1.ai_features.views import (
     AITextImprovementView,
     HistorySummaryFeedbackTagsView,
@@ -53,6 +59,7 @@ urlpatterns = [
         name="audio_transcription_feedback",
     ),
     path("rooms/report/", RoomsReportViewSet.as_view(), name="rooms_report"),
+    path("rooms_count/", RoomsCountView.as_view(), name="rooms-count"),
     path("model-fields/", ModelFieldsViewSet.as_view(), name="model-fields"),
     path("chats/report/", ReportFieldsValidatorViewSet.as_view(), name="chats-report"),
     path(

@@ -6,6 +6,7 @@ from django.db import transaction
 from django.db.models import (
     BooleanField,
     Case,
+    Count,
     DateTimeField,
     OuterRef,
     Q,
@@ -65,6 +66,7 @@ from chats.apps.api.v1.rooms.serializers import (
     RoomMessageStatusSerializer,
     RoomNoteSerializer,
     RoomSerializer,
+    RoomsCountQueryParamsSerializer,
     RoomsReportSerializer,
     RoomTagSerializer,
     TransferRoomSerializer,
@@ -1467,3 +1469,39 @@ class RoomNoteViewSet(
         note.notify_websocket("delete")
 
         return super().destroy(request, *args, **kwargs)
+
+
+class RoomsCountView(APIView):
+    """
+    Return active room counts for a given sector or queue.
+
+    Query params (exactly one is required):
+        - sector: Sector UUID
+        - queue: Queue UUID
+
+    Response: {"waiting": N, "in_service": M}
+        - waiting: active rooms with no agent assigned
+        - in_service: active rooms assigned to an agent
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request, *args, **kwargs) -> Response:
+        params = RoomsCountQueryParamsSerializer(data=request.query_params)
+        params.is_valid(raise_exception=True)
+
+        sector = params.validated_data.get("sector")
+        queue = params.validated_data.get("queue")
+
+        queryset = Room.objects.filter(is_active=True)
+        if queue:
+            queryset = queryset.filter(queue=queue)
+        else:
+            queryset = queryset.filter(queue__sector=sector)
+
+        counts = queryset.aggregate(
+            waiting=Count("pk", filter=Q(user__isnull=True)),
+            in_service=Count("pk", filter=Q(user__isnull=False)),
+        )
+
+        return Response(counts, status=status.HTTP_200_OK)
