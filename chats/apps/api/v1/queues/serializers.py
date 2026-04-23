@@ -6,6 +6,7 @@ from weni.feature_flags.shortcuts import is_feature_active
 from django.conf import settings
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.core.serializers import AuditableModelSerializer
 
 User = get_user_model()
 
@@ -19,7 +20,7 @@ class QueueLimitSerializer(serializers.Serializer):
     is_active = serializers.BooleanField(required=False, allow_null=True)
 
 
-class QueueSerializer(serializers.ModelSerializer):
+class QueueSerializer(AuditableModelSerializer):
 
     sector_name = serializers.CharField(source="sector.name", read_only=True)
     required_tags = serializers.BooleanField(
@@ -42,6 +43,12 @@ class QueueSerializer(serializers.ModelSerializer):
             "default_message",
             "sector",
         ]
+
+    def _get_audit_project(self):
+        if self.instance is not None:
+            return self.instance.sector.project
+        sector = (self.validated_data or {}).get("sector")
+        return sector.project if sector else None
 
     def validate(self, data):
         """
@@ -113,7 +120,7 @@ class QueueSimpleSerializer(serializers.ModelSerializer):
         fields = ["uuid", "name"]
 
 
-class QueueUpdateSerializer(serializers.ModelSerializer):
+class QueueUpdateSerializer(AuditableModelSerializer):
     class Meta:
         model = Queue
         fields = "__all__"
@@ -144,12 +151,18 @@ class QueueReadOnlyListSerializer(serializers.ModelSerializer):
         return queue.agent_count
 
 
-class QueueAuthorizationSerializer(serializers.ModelSerializer):
+class QueueAuthorizationSerializer(AuditableModelSerializer):
     queue_name = serializers.CharField(source="queue.name", read_only=True)
 
     class Meta:
         model = QueueAuthorization
         fields = "__all__"
+
+    def _get_audit_project(self):
+        if self.instance is not None:
+            return self.instance.queue.sector.project
+        queue = (self.validated_data or {}).get("queue")
+        return queue.sector.project if queue else None
 
     def validate(self, data):
         """
@@ -165,7 +178,7 @@ class QueueAuthorizationSerializer(serializers.ModelSerializer):
         return data
 
 
-class QueueAuthorizationUpdateSerializer(serializers.ModelSerializer):
+class QueueAuthorizationUpdateSerializer(AuditableModelSerializer):
     class Meta:
         model = QueueAuthorization
         fields = "__all__"
@@ -206,8 +219,11 @@ class QueueAgentsSerializer(serializers.ModelSerializer):
     def get_status(self, obj):
         project = self.context.get("project")
         if project:
-            project_permission = obj.project_permissions.get(project=project)
-            if project_permission.status == "ONLINE":
+            project_permission = obj.project_permissions.filter(project=project)
+            if (
+                project_permission.exists()
+                and project_permission.first().status == "ONLINE"
+            ):
                 return "online"
         return "offline"
 

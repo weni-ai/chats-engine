@@ -41,7 +41,7 @@ class AudioTranscriptionService:
             "parameters": [
                 {
                     "name": "audio_url",
-                    "value": media.url,
+                    "value": media.final_media_url,
                 }
             ],
             "sessionAttributes": {},

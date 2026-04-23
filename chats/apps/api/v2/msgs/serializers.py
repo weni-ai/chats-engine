@@ -44,7 +44,7 @@ class MessageMediaSimpleSerializer(serializers.ModelSerializer):
         ref_name = "V2MessageMediaSimpleSerializer"
 
     def get_url(self, media: MessageMedia):
-        return media.url
+        return media.public_url
 
     def get_transcription(self, media: MessageMedia):
         """
@@ -140,7 +140,7 @@ class MessageSerializerV2(serializers.ModelSerializer):
                         {
                             "content_type": media.content_type,
                             "message": str(media.message.uuid),
-                            "url": media.url,
+                            "url": media.public_url,
                             "created_on": media.created_on,
                         }
                     )

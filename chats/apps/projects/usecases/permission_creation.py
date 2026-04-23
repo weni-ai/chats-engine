@@ -35,6 +35,7 @@ class ProjectPermissionCreationUseCase:
         project_permission.project = project
         project_permission.user = user
         project_permission.role = role_value
+        project_permission.is_deleted = False
         project_permission.save()
 
     def create_permission(self, project_permission_dto: ProjectPermissionDTO):
@@ -42,8 +43,10 @@ class ProjectPermissionCreationUseCase:
         role_value = self.role_mapping()
         project = self.get_project()
 
-        project_permission, created = ProjectPermission.objects.get_or_create(
-            project=project, user=user, defaults={"role": role_value}
+        project_permission, created = ProjectPermission.all_objects.get_or_create(
+            project=project,
+            user=user,
+            defaults={"role": role_value, "is_deleted": False},
         )
 
         if not created:

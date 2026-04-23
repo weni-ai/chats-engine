@@ -15,6 +15,7 @@ from pathlib import Path
 
 import environ
 import sentry_sdk
+from celery.schedules import crontab
 from django.utils.log import DEFAULT_LOGGING
 from sentry_sdk.integrations.django import DjangoIntegration
 
@@ -71,6 +72,7 @@ INSTALLED_APPS = [
     "chats.apps.ai_features",
     "chats.apps.ai_features.history_summary",
     "chats.apps.ai_features.audio_transcription",
+    "chats.apps.ai_features.improve_user_message",
     "chats.apps.feature_flags",
     "chats.apps.feedbacks",
     "chats.apps.csat",
@@ -99,6 +101,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "chats.core.middleware.InternalErrorHandlerMiddleware",
     "django_prometheus.middleware.PrometheusAfterMiddleware",
 ]
 
@@ -265,6 +268,9 @@ REST_FRAMEWORK = {
         "external_hour": env.str("EXTERNAL_HOUR_LIMIT", default="30000/hour"),
         "external_anon": env.str("EXTERNAL_ANON_LIMIT", default="100/hour"),
         "external_critical": env.str("EXTERNAL_CRITICAL_LIMIT", default="1000/minute"),
+        "ai_text_improvement": env.str(
+            "AI_TEXT_IMPROVEMENT_LIMIT", default="20/minute"
+        ),
         "user": env.str("DEFAULT_USER_LIMIT", default="20000/hour"),
         "anon": env.str("DEFAULT_ANON_LIMIT", default="1000/hour"),
     },
@@ -288,6 +294,15 @@ LOGGING["handlers"]["console"] = {
     "level": "DEBUG",
     "class": "logging.StreamHandler",
     "formatter": "verbose",
+}
+
+# Silence "Unknown feature ..." warnings emitted by the growthbook SDK when a
+# feature flag is not provisioned in the environment. These are expected
+# during tests and for flags that are still rolling out.
+LOGGING.setdefault("loggers", {})["growthbook.core"] = {
+    "level": "ERROR",
+    "handlers": ["console"],
+    "propagate": False,
 }
 
 
@@ -362,6 +377,9 @@ USE_CONNECT_V2 = env.bool("USE_CONNECT_V2", default=False)
 
 INTEGRATIONS_API_URL = env.str("INTEGRATIONS_API_URL", default="")
 FLOWS_API_URL = env.str("FLOWS_API_URL", default="")
+NEXUS_API_URL = env.str("NEXUS_API_URL", default="")
+NEXUS_SETTINGS_CACHE_TTL = env.int("NEXUS_SETTINGS_CACHE_TTL", default=300)
+NEXUS_SETTINGS_CACHE_ENABLED = env.bool("NEXUS_SETTINGS_CACHE_ENABLED", default=True)
 USE_WENI_FLOWS = env.bool("USE_WENI_FLOWS", default=False)
 FLOWS_TICKETER_TYPE = env.str("FLOWS_TICKETER_TYPE", default="wenichats")
 FLOWS_AUTH_TOKEN_RETRIES = env.int(
@@ -480,7 +498,11 @@ CELERY_BEAT_SCHEDULE = {
     "process-pending-reports": {
         "task": "process_pending_reports",
         "schedule": 20.0,
-    }
+    },
+    "start-archive-rooms-messages": {
+        "task": "start_archive_rooms_messages",
+        "schedule": crontab(hour="0-4", minute=0),
+    },
 }
 
 # Disable report emails unless explicitly enabled
@@ -579,6 +601,13 @@ AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS = env.bool(
 
 AI_FEATURES_PROMPTS_API_SECRET = env.str("AI_FEATURES_PROMPTS_API_SECRET")
 
+HISTORY_SUMMARY_GENERATION_DELAY = env.int(
+    "HISTORY_SUMMARY_GENERATION_DELAY", default=3
+)
+HISTORY_SUMMARY_CANCELLATION_DELAY = env.int(
+    "HISTORY_SUMMARY_CANCELLATION_DELAY", default=30
+)
+
 # Pin rooms
 MAX_ROOM_PINS_LIMIT = env.int("MAX_ROOM_PINS_LIMIT", default=3)
 
@@ -597,6 +626,10 @@ BULK_CLOSE_MAX_ROOMS = env.int("BULK_CLOSE_MAX_ROOMS", default=200)
 # Bulk Take Settings
 BULK_TAKE_BATCH_SIZE = env.int("BULK_TAKE_BATCH_SIZE", default=50)
 BULK_TAKE_MAX_ROOMS = env.int("BULK_TAKE_MAX_ROOMS", default=200)
+
+# Bulk Transfer Settings
+BULK_TRANSFER_BATCH_SIZE = env.int("BULK_TRANSFER_BATCH_SIZE", default=50)
+BULK_TRANSFER_MAX_ROOMS = env.int("BULK_TRANSFER_MAX_ROOMS", default=200)
 
 # Message Status Consumer Settings
 MESSAGE_STATUS_MAX_RETRIES = env.int("MESSAGE_STATUS_MAX_RETRIES", default=3)
@@ -671,6 +704,9 @@ WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY = env.str(
     "WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY",
     default="weniChatsBackEndReturn24hValidOnRoomsList",
 )
+AUDIT_LOG_FEATURE_FLAG_KEY = env.str(
+    "AUDIT_LOG_FEATURE_FLAG_KEY", default="weniChatsAuditLog"
+)
 
 
 # USER CACHE
@@ -683,6 +719,17 @@ ROOM_24H_VALID_CACHE_TTL = env.int(
     "ROOM_24H_VALID_CACHE_TTL", default=0
 )  # 0 means no cache
 
+
+# Archive chats
+ARCHIVE_CHATS_MAX_ROOMS = env.int("ARCHIVE_CHATS_MAX_ROOMS", default=5000)
+ARCHIVE_CHATS_MAX_HOUR = env.str("ARCHIVE_CHATS_MAX_HOUR", default="08:59")  # UTC-0
+ARCHIVE_CHATS_PROJECTS_LIST_FEATURE_FLAG_KEY = env.str(
+    "ARCHIVE_CHATS_PROJECTS_LIST_FEATURE_FLAG_KEY",
+    default="weniChatsArchiveChatsProjectsList",
+)
+ARCHIVE_CHATS_IS_ACTIVE_FOR_ALL_PROJECTS = env.bool(
+    "ARCHIVE_CHATS_IS_ACTIVE_FOR_ALL_PROJECTS", default=False
+)
 
 # Internal API Token
 INTERNAL_API_TOKEN = env.str("INTERNAL_API_TOKEN")
@@ -706,4 +753,19 @@ ROOMS_EXTERNAL_API_QUERYSET_FILTER_FLAG_KEY = env.str(
     default="weniChatsRoomsExternalApiQuerySetFilter",
 )
 
+# Flows Media URL
+USE_FLOWS_MEDIA_URL_FEATURE_FLAG_KEY = env.str(
+    "USE_FLOWS_MEDIA_URL_FEATURE_FLAG_KEY",
+    default="weniChatsUseFlowsMediaUrl",
+)
+
 FLOWS_BASE_URL = env.str("FLOWS_BASE_URL", default="https://flows.weni.ai")
+
+# Improve User Message
+IMPROVE_USER_MESSAGE_FEATURE_FLAG_KEY = env.str(
+    "IMPROVE_USER_MESSAGE_FEATURE_FLAG_KEY",
+    default="weniChatsAITextImprovement",
+)
+IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL = env.int(
+    "IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL", default=30
+)

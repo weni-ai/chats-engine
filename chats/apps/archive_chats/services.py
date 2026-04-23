@@ -1,18 +1,20 @@
 from abc import ABC, abstractmethod
-import io
 import json
 import logging
+import tempfile
 from urllib.parse import urlparse
 
 import boto3
-from typing import List
+from typing import Iterable, List
+from uuid import UUID
 from django.core.exceptions import ValidationError
 from django.urls import reverse
 from django.utils import timezone
-from django.core.files.base import ContentFile
+from django.core.files.base import File
 from sentry_sdk import capture_exception
 from django.conf import settings
 from django.db import transaction
+from weni.feature_flags.services import FeatureFlagsService
 
 
 from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
@@ -42,11 +44,15 @@ class BaseArchiveChatsService(ABC):
     @abstractmethod
     def process_messages(
         self, room_archived_conversation: RoomArchivedConversation
-    ) -> List[ArchiveMessageSerializer]:
+    ) -> Iterable[dict]:
         pass
 
     @abstractmethod
-    def upload_messages_file(self, messages: List[dict]) -> None:
+    def upload_messages_file(
+        self,
+        room_archived_conversation: RoomArchivedConversation,
+        messages: Iterable[dict],
+    ) -> None:
         pass
 
     @abstractmethod
@@ -81,22 +87,44 @@ class ArchiveChatsService(BaseArchiveChatsService):
             f"[ArchiveChatsService] Archiving room history for room {room.uuid} with job {job.uuid}"
         )
 
-        room_archived_conversation = RoomArchivedConversation.objects.create(
-            job=job,
-            room=room,
-            status=ArchiveConversationsJobStatus.PENDING,
-        )
-        logger.info(
-            f"[ArchiveChatsService] Room archived conversation created: "
-            f"{room_archived_conversation.uuid} with status "
-            f"{room_archived_conversation.status} for room {room.uuid} "
-            f"and job {job.uuid}"
+        room_archived_conversation = self._get_or_create_room_archived_conversation(
+            room, job
         )
 
+        if room_archived_conversation.status == ArchiveConversationsJobStatus.FINISHED:
+            logger.info(
+                f"[ArchiveChatsService] Room {room.uuid} is already archived "
+                f"(conversation {room_archived_conversation.uuid}), skipping"
+            )
+            return room_archived_conversation
+
         try:
-            messages_data = self.process_messages(room_archived_conversation)
-            self.upload_messages_file(room_archived_conversation, messages_data)
-            self.delete_room_messages(room_archived_conversation)
+            if self._needs_processing_and_upload(room_archived_conversation):
+                messages_data = self.process_messages(room_archived_conversation)
+                self.upload_messages_file(room_archived_conversation, messages_data)
+            else:
+                logger.info(
+                    f"[ArchiveChatsService] Skipping message processing and upload "
+                    f"for room {room.uuid} - file already uploaded"
+                )
+
+            room_archived_conversation.refresh_from_db()
+
+            if self._needs_message_deletion(room_archived_conversation):
+                if (
+                    room_archived_conversation.status
+                    != ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED
+                ):
+                    room_archived_conversation.status = (
+                        ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED
+                    )
+                    room_archived_conversation.save(update_fields=["status"])
+                self.delete_room_messages(room_archived_conversation)
+            else:
+                logger.info(
+                    f"[ArchiveChatsService] Skipping message deletion "
+                    f"for room {room.uuid} - messages already deleted"
+                )
 
             room_archived_conversation.refresh_from_db()
             room_archived_conversation.status = ArchiveConversationsJobStatus.FINISHED
@@ -116,9 +144,68 @@ class ArchiveChatsService(BaseArchiveChatsService):
 
         return room_archived_conversation
 
+    def _get_or_create_room_archived_conversation(
+        self, room: Room, job: ArchiveConversationsJob
+    ) -> RoomArchivedConversation:
+        existing = RoomArchivedConversation.objects.filter(room=room).first()
+
+        if existing:
+            if existing.status != ArchiveConversationsJobStatus.FINISHED:
+                logger.info(
+                    f"[ArchiveChatsService] Resuming room archived conversation "
+                    f"{existing.uuid} with status {existing.status} "
+                    f"for room {room.uuid} and job {job.uuid}"
+                )
+                existing.job = job
+                existing.save(update_fields=["job"])
+            return existing
+
+        room_archived_conversation = RoomArchivedConversation.objects.create(
+            job=job,
+            room=room,
+            status=ArchiveConversationsJobStatus.PENDING,
+        )
+        logger.info(
+            f"[ArchiveChatsService] Room archived conversation created: "
+            f"{room_archived_conversation.uuid} with status "
+            f"{room_archived_conversation.status} for room {room.uuid} "
+            f"and job {job.uuid}"
+        )
+        return room_archived_conversation
+
+    def _needs_processing_and_upload(
+        self, room_archived_conversation: RoomArchivedConversation
+    ) -> bool:
+        status = room_archived_conversation.status
+        if status in {
+            ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED,
+            ArchiveConversationsJobStatus.DELETING_MESSAGES_FROM_DB,
+            ArchiveConversationsJobStatus.MESSAGES_DELETED_FROM_DB,
+        }:
+            return False
+        if (
+            status == ArchiveConversationsJobStatus.FAILED
+            and room_archived_conversation.file
+        ):
+            return False
+        return True
+
+    def _needs_message_deletion(
+        self, room_archived_conversation: RoomArchivedConversation
+    ) -> bool:
+        status = room_archived_conversation.status
+        if status == ArchiveConversationsJobStatus.MESSAGES_DELETED_FROM_DB:
+            return False
+        if (
+            status == ArchiveConversationsJobStatus.FAILED
+            and room_archived_conversation.messages_deleted_at
+        ):
+            return False
+        return True
+
     def process_messages(
         self, room_archived_conversation: RoomArchivedConversation
-    ) -> List[ArchiveMessageSerializer]:
+    ) -> Iterable[dict]:
         room = room_archived_conversation.room
 
         room_archived_conversation.status = (
@@ -135,10 +222,12 @@ class ArchiveChatsService(BaseArchiveChatsService):
             f"with archived conversation {room_archived_conversation.uuid}"
         )
 
-        messages_data: List[ArchiveMessageSerializer] = []
+        return self._iter_messages(room)
+
+    def _iter_messages(self, room: Room) -> Iterable[dict]:
         messages = Message.objects.filter(room=room).order_by("created_on")
 
-        for message in messages:
+        for message in messages.iterator():
             message_context = {"media": []}
             if message.medias.exists():
                 for media in message.medias.all():  # noqa
@@ -152,57 +241,47 @@ class ArchiveChatsService(BaseArchiveChatsService):
                     if url:
                         message_context["media"].append(media_data)
 
-            messages_data.append(
-                ArchiveMessageSerializer(message, context=message_context).data
-            )
-
-        room_archived_conversation.status = (
-            ArchiveConversationsJobStatus.MESSAGES_PROCESSED
-        )
-        room_archived_conversation.save(update_fields=["status"])
-
-        return messages_data
+            yield ArchiveMessageSerializer(message, context=message_context).data
 
     def upload_messages_file(
         self,
         room_archived_conversation: RoomArchivedConversation,
-        messages: List[dict],
+        messages: Iterable[dict],
     ) -> None:
 
         if (
             room_archived_conversation.status
-            != ArchiveConversationsJobStatus.MESSAGES_PROCESSED
+            != ArchiveConversationsJobStatus.PROCESSING_MESSAGES
         ):
             raise ValidationError(
-                f"Room archived conversation {room_archived_conversation.uuid} is not in messages processed status"
+                f"Room archived conversation {room_archived_conversation.uuid} is not in processing messages status"
             )
 
-        room_archived_conversation.status = (
-            ArchiveConversationsJobStatus.UPLOADING_MESSAGES_FILE
-        )
-        room_archived_conversation.save(update_fields=["status"])
+        with tempfile.SpooledTemporaryFile(max_size=5 * 1024 * 1024) as tmp:
+            for message in messages:
+                tmp.write(
+                    json.dumps(message, ensure_ascii=False).encode("utf-8")
+                )
+                tmp.write(b"\n")
 
-        logger.info(
-            f"[ArchiveChatsService] Room archived conversation status updated to "
-            f"{room_archived_conversation.status} for room {room_archived_conversation.room.uuid} "
-            f"with archived conversation {room_archived_conversation.uuid}"
-        )
+            room_archived_conversation.status = (
+                ArchiveConversationsJobStatus.UPLOADING_MESSAGES_FILE
+            )
+            room_archived_conversation.save(update_fields=["status"])
 
-        file_object = io.BytesIO()
+            logger.info(
+                f"[ArchiveChatsService] Room archived conversation status updated to "
+                f"{room_archived_conversation.status} for room {room_archived_conversation.room.uuid} "
+                f"with archived conversation {room_archived_conversation.uuid}"
+            )
 
-        for message in messages:
-            file_object.write(json.dumps(message, ensure_ascii=False).encode("utf-8"))
-            file_object.write(b"\n")
+            tmp.seek(0)
 
-        file_object.seek(0)
-
-        filename = "messages.jsonl"
-
-        room_archived_conversation.file.save(
-            filename,
-            ContentFile(file_object.read()),
-            save=True,
-        )
+            room_archived_conversation.file.save(
+                "messages.jsonl",
+                File(tmp),
+                save=True,
+            )
 
         room_archived_conversation.status = (
             ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED
@@ -299,3 +378,30 @@ class ArchiveChatsService(BaseArchiveChatsService):
         )
 
         return room_archived_conversation
+
+    def get_projects(self) -> List[UUID]:
+        feature_flags_service = FeatureFlagsService()
+        feature_flag_key = settings.ARCHIVE_CHATS_PROJECTS_LIST_FEATURE_FLAG_KEY
+        features = feature_flags_service.get_features()
+
+        projects_list_feature_flag = features.get(feature_flag_key)
+
+        if not projects_list_feature_flag:
+            return []
+
+        try:
+            projects_list = projects_list_feature_flag["rules"][0]["condition"][
+                "projectUUID"
+            ]["$in"]
+        except Exception as e:
+            event_id = capture_exception(e)
+
+            logger.error(
+                "[ArchiveChatsService] Error getting projects list from feature flag "
+                f"{feature_flag_key}: {e} with event id {event_id}",
+                exc_info=True,
+            )
+
+            return []
+
+        return projects_list

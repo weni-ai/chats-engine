@@ -2,9 +2,10 @@ from rest_framework import serializers
 
 from chats.apps.api.v1.sectors.serializers import SectorSerializer
 from chats.apps.sectors.models import GroupSector, GroupSectorAuthorization
+from chats.core.serializers import AuditableModelSerializer
 
 
-class GroupSectorSerializer(serializers.ModelSerializer):
+class GroupSectorSerializer(AuditableModelSerializer):
     sectors = serializers.SerializerMethodField()
 
     class Meta:
@@ -30,7 +31,7 @@ class GroupSectorListSerializer(serializers.ModelSerializer):
         ]
 
 
-class GroupSectorUpdateSerializer(serializers.ModelSerializer):
+class GroupSectorUpdateSerializer(AuditableModelSerializer):
     class Meta:
         model = GroupSector
         fields = ["name", "rooms_limit"]

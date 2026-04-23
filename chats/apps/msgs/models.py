@@ -1,13 +1,17 @@
 import json
 import logging
 
+import requests
 import sentry_sdk
 from django.conf import settings
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from rest_framework.exceptions import ValidationError
+from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
+from sentry_sdk import capture_exception
+from chats.apps.core.integrations.aws.s3.helpers import get_object_key
 from chats.core.models import BaseModelWithManualCreatedOn, BaseModel
 from chats.core.requests import get_request_session_with_retries
 
@@ -248,6 +252,65 @@ class MessageMedia(BaseModelWithManualCreatedOn):
         except AttributeError:
             return ""
         return url
+
+    @property
+    def is_flows_media_url_feature_active(self):
+        """
+        Check if the use flows media url feature flag is active.
+        """
+        try:
+            project_uuid = self.message.room.queue.sector.project.uuid
+            use_flows_media_url = is_feature_active_for_attributes(
+                settings.USE_FLOWS_MEDIA_URL_FEATURE_FLAG_KEY,
+                {
+                    "projectUUID": str(project_uuid),
+                },
+            )
+        except Exception as e:
+            capture_exception(e)
+            logger.error(
+                f"Error checking if use flows media url feature flag is active: {e}"
+            )
+            return False
+
+        return use_flows_media_url
+
+    @property
+    def public_url(self):
+        """
+        Get the public media url.
+        """
+        if self.media_file:
+            return self.media_file.url
+
+        if self.is_flows_media_url_feature_active:
+            return self.get_flows_media_url(self.url)
+        else:
+            return self.url
+
+    @property
+    def final_media_url(self):
+        """
+        Get the final media url after following redirects.
+        """
+        if self.media_file:
+            return self.media_file.url
+
+        if self.is_flows_media_url_feature_active:
+            try:
+                response = requests.head(self.url, allow_redirects=True)
+                return response.url
+            except Exception as e:
+                capture_exception(e)
+                logger.error(f"Error getting final media url: {e}")
+                return self.url
+        else:
+            return self.url
+
+    def get_flows_media_url(self, original_url: str):
+        object_key = get_object_key(original_url)
+
+        return f"{settings.FLOWS_BASE_URL}/api/v2/internals/media/download/{object_key}"
 
     def get_authorization(self, user):
         return self.room.get_authorization(user)
