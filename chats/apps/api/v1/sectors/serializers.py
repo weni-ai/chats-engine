@@ -2,7 +2,10 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
-from weni.feature_flags.shortcuts import is_feature_active
+from weni.feature_flags.shortcuts import (
+    is_feature_active,
+    is_feature_active_for_attributes,
+)
 
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.projects.models.models import Project
@@ -48,6 +51,37 @@ def validate_is_csat_enabled(project: Project, value: bool, context: dict) -> bo
             },
             code="csat_feature_flag_is_off",
         )
+    return value
+
+
+def validate_custom_csat_flow_uuid(
+    project: Project, value, current_value=None
+):
+    """
+    Validate if the custom CSAT flow feature is enabled for the sector.
+    When the feature is off, only allow clearing an already-set value.
+    """
+    if is_feature_active_for_attributes(
+        settings.CUSTOM_CSAT_FLOW_FEATURE_FLAG_KEY,
+        {"projectUUID": str(project.uuid)},
+    ):
+        return value
+
+    if current_value is not None and not value:
+        return value
+
+    if value:
+        raise serializers.ValidationError(
+            {
+                "custom_csat_flow_uuid": [
+                    _(
+                        "The custom CSAT flow feature is not available for this sector"
+                    )
+                ]
+            },
+            code="custom_csat_flow_feature_flag_is_off",
+        )
+
     return value
 
 
@@ -125,6 +159,17 @@ class SectorSerializer(serializers.ModelSerializer):
             and (is_csat_enabled := data.get("is_csat_enabled", None)) is not None
         ):
             validate_is_csat_enabled(project, is_csat_enabled, self.context)
+
+        if project and "custom_csat_flow_uuid" in data:
+            validate_custom_csat_flow_uuid(
+                project,
+                data.get("custom_csat_flow_uuid"),
+                current_value=(
+                    getattr(self.instance, "custom_csat_flow_uuid", None)
+                    if self.instance
+                    else None
+                ),
+            )
 
         config = data.get("config", {})
         if "secondary_project" in config:
@@ -217,6 +262,13 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
         project = self.instance.project
 
         validate_is_csat_enabled(project, attrs.get("is_csat_enabled"), self.context)
+
+        if "custom_csat_flow_uuid" in attrs:
+            validate_custom_csat_flow_uuid(
+                project,
+                attrs.get("custom_csat_flow_uuid"),
+                current_value=self.instance.custom_csat_flow_uuid,
+            )
 
         config = attrs.get("config", {})
         if "secondary_project" in config:
