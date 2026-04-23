@@ -178,6 +178,7 @@ class SectorViewset(viewsets.ModelViewSet):
             )
 
         return result
+
     def perform_update(self, serializer):
         serializer.save(modified_by=self.request.user)
 
