@@ -20,6 +20,7 @@ from chats.apps.csat.models import (
     CSAT_FLOW_CACHE_TTL,
     CSATFlowProjectConfig,
 )
+from chats.apps.sectors.models import Sector
 from chats.core.cache import BaseCacheClient
 from chats.apps.api.authentication.token import JWTTokenGenerator
 
@@ -28,7 +29,11 @@ logger = logging.getLogger(__name__)
 
 class BaseCSATService(ABC):
     @abstractmethod
-    def get_flow_uuid(self, project_uuid: UUID) -> UUID:
+    def get_flow_uuid_from_project(self, project_uuid: UUID) -> UUID:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_flow_uuid(self, sector: Sector) -> UUID:
         raise NotImplementedError
 
     @abstractmethod
@@ -47,7 +52,7 @@ class CSATFlowService(BaseCSATService):
         self.cache_client = cache_client
         self.token_generator = token_generator
 
-    def get_flow_uuid(self, project_uuid: UUID) -> UUID:
+    def get_flow_uuid_from_project(self, project_uuid: UUID) -> UUID:
         cache_key = CSAT_FLOW_CACHE_KEY.format(project_uuid=str(project_uuid))
 
         try:
@@ -74,6 +79,12 @@ class CSATFlowService(BaseCSATService):
         self.cache_client.set(cache_key, str(flow_uuid), CSAT_FLOW_CACHE_TTL)
 
         return flow_uuid
+
+    def get_flow_uuid(self, sector: Sector) -> UUID:
+        if sector.custom_csat_flow_uuid:
+            return sector.custom_csat_flow_uuid
+
+        return self.get_flow_uuid_from_project(sector.project.uuid)
 
     def start_csat_flow(self, room: Room) -> None:
         if room.is_active:
