@@ -63,6 +63,7 @@ class SectorAutomaticMessageSerializer(serializers.ModelSerializer):
 class SectorSerializer(serializers.ModelSerializer):
     automatic_message = serializers.JSONField(required=False)
     is_csat_enabled = serializers.BooleanField(required=False, allow_null=False)
+    custom_csat_flow_uuid = serializers.UUIDField(required=False, allow_null=True)
 
     class Meta:
         model = Sector
@@ -84,6 +85,7 @@ class SectorSerializer(serializers.ModelSerializer):
             "is_csat_enabled",
             "required_tags",
             "secondary_project",
+            "custom_csat_flow_uuid",
         ]
         extra_kwargs = {
             "work_start": {"required": False, "allow_null": True},
@@ -167,6 +169,7 @@ class SectorSerializer(serializers.ModelSerializer):
 class SectorUpdateSerializer(serializers.ModelSerializer):
     automatic_message = serializers.JSONField(required=False)
     is_csat_enabled = serializers.BooleanField(required=False, allow_null=False)
+    custom_csat_flow_uuid = serializers.UUIDField(required=False, allow_null=True)
 
     class Meta:
         model = Sector
@@ -184,6 +187,7 @@ class SectorUpdateSerializer(serializers.ModelSerializer):
             "is_csat_enabled",
             "required_tags",
             "secondary_project",
+            "custom_csat_flow_uuid",
         ]
         extra_kwargs = {field: {"required": False} for field in fields}
 
@@ -297,6 +301,7 @@ class SectorReadOnlyRetrieveSerializer(serializers.ModelSerializer):
             "automatic_message",
             "is_csat_enabled",
             "required_tags",
+            "custom_csat_flow_uuid",
         ]
 
     def get_automatic_message(self, sector: Sector):

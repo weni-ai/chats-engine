@@ -276,6 +276,77 @@ class SectorTests(APITestCase):
         self.sector.refresh_from_db()
         self.assertFalse(self.sector.required_tags)
 
+    def test_create_sector_with_custom_csat_flow_uuid(self):
+        custom_flow_uuid = str(uuid.uuid4())
+        url = reverse("sector-list")
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        data = {
+            "name": "CSAT Sector",
+            "rooms_limit": 3,
+            "work_start": "09:00",
+            "work_end": "18:00",
+            "project": str(self.project.pk),
+            "custom_csat_flow_uuid": custom_flow_uuid,
+        }
+        response = self.client.post(url, data=data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["custom_csat_flow_uuid"], custom_flow_uuid)
+
+    def test_create_sector_without_custom_csat_flow_uuid(self):
+        url = reverse("sector-list")
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        data = {
+            "name": "No CSAT Sector",
+            "rooms_limit": 3,
+            "work_start": "09:00",
+            "work_end": "18:00",
+            "project": str(self.project.pk),
+        }
+        response = self.client.post(url, data=data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(response.data["custom_csat_flow_uuid"])
+
+    def test_update_sector_custom_csat_flow_uuid(self):
+        custom_flow_uuid = str(uuid.uuid4())
+        url = reverse("sector-detail", args=[self.sector.pk])
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = self.client.patch(
+            url,
+            data={"custom_csat_flow_uuid": custom_flow_uuid},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["custom_csat_flow_uuid"], custom_flow_uuid)
+        self.sector.refresh_from_db()
+        self.assertEqual(str(self.sector.custom_csat_flow_uuid), custom_flow_uuid)
+
+    def test_clear_sector_custom_csat_flow_uuid(self):
+        self.sector.custom_csat_flow_uuid = uuid.uuid4()
+        self.sector.save(update_fields=["custom_csat_flow_uuid"])
+
+        url = reverse("sector-detail", args=[self.sector.pk])
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = self.client.patch(
+            url,
+            data={"custom_csat_flow_uuid": None},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data["custom_csat_flow_uuid"])
+        self.sector.refresh_from_db()
+        self.assertIsNone(self.sector.custom_csat_flow_uuid)
+
+    def test_retrieve_sector_includes_custom_csat_flow_uuid(self):
+        custom_flow_uuid = uuid.uuid4()
+        self.sector.custom_csat_flow_uuid = custom_flow_uuid
+        self.sector.save(update_fields=["custom_csat_flow_uuid"])
+
+        url = reverse("sector-detail", args=[self.sector.pk])
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["custom_csat_flow_uuid"], str(custom_flow_uuid))
+
 
 class RoomsExternalTests(APITestCase):
     fixtures = ["chats/fixtures/fixture_app.json"]
