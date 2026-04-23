@@ -35,6 +35,7 @@ from chats.apps.sectors.usecases.group_sector_authorization import (
 )
 from chats.core.audit import apply_audit_fields
 from chats.core.cache_utils import get_user_id_by_email_cached
+from chats.apps.rooms.models import Room
 
 from .serializers import (
     QueueAgentsSerializer,
