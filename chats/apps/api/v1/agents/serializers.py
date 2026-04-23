@@ -20,18 +20,25 @@ class AllAgentsAgentSerializer(serializers.ModelSerializer):
         fields = []
 
     def _build_sectors(self, permission):
+        """
+        Builds the sector/queue map for the agent.
+
+        Only includes sectors in which the agent has at least one active queue
+        authorization. Deleted sectors and queues are ignored.
+        """
         sectors_by_uuid = {}
 
-        for sector_auth in permission.sector_authorizations.all():
-            sector = sector_auth.sector
-            if sector.pk not in sectors_by_uuid:
-                sectors_by_uuid[sector.pk] = {"sector": sector, "queue_names": set()}
-
         for queue_auth in permission.queue_authorizations.all():
-            sector = queue_auth.queue.sector
-            if sector.pk not in sectors_by_uuid:
-                sectors_by_uuid[sector.pk] = {"sector": sector, "queue_names": set()}
-            sectors_by_uuid[sector.pk]["queue_names"].add(queue_auth.queue.name)
+            queue = queue_auth.queue
+            sector = queue.sector
+
+            if queue.is_deleted or sector.is_deleted:
+                continue
+
+            entry = sectors_by_uuid.setdefault(
+                sector.pk, {"sector": sector, "queue_names": set()}
+            )
+            entry["queue_names"].add(queue.name)
 
         return sectors_by_uuid
 
