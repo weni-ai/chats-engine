@@ -1,3 +1,18 @@
+# 3.55.1
+# Add
+  - Support for running archive chats task more than once per day
+# Fix
+  - Archive chats scheduling and configuration
+
+# 3.55.0
+# Add
+  - AI-powered message improvement feature with models, service, use case, and endpoint
+  - Internal error handling middleware for better error logging
+
+# 3.54.6
+# Fix
+  - Handle empty summary case in history summary service
+
 # 3.54.5
 # Fix
  - Empty history summary
