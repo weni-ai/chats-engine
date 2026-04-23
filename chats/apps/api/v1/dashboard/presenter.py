@@ -328,7 +328,6 @@ class ModelFieldsPresenter:
                 "required": False,
                 "related_model": "queues.queue",
             },
-            "uuid": {"type": "UUIDField", "required": True},
             "is_active": {"type": "BooleanField", "required": True},
             "protocol": {"type": "TextField", "required": False},
             "tags": {
@@ -338,7 +337,7 @@ class ModelFieldsPresenter:
             },
             "created_on": {"type": "DateTimeField", "required": True},
             "ended_at": {"type": "DateTimeField", "required": False},
-            "transfer_history": {"type": "JSONField", "required": False},
+            "full_transfer_history": {"type": "JSONField", "required": False},
             "contact__name": {
                 "type": "CharField",
                 "required": False,
@@ -374,7 +373,6 @@ class ModelFieldsPresenter:
 
         # Define all available fields for agent status logs export
         agent_status_logs_fields = {
-            "uuid": {"type": "UUIDField", "required": True},
             "agent__email": {
                 "type": "EmailField",
                 "required": False,
@@ -401,9 +399,7 @@ class ModelFieldsPresenter:
                 "related_model": "projects.project",
             },
             "log_date": {"type": "DateField", "required": True},
-            "status_changes": {"type": "JSONField", "required": True},
             "created_on": {"type": "DateTimeField", "required": True},
-            "modified_on": {"type": "DateTimeField", "required": True},
         }
 
         models_info = {

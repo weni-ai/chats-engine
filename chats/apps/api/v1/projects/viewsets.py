@@ -6,6 +6,7 @@ from django.db.models import CharField, Value
 from django.db.models.functions import Concat
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import decorators, filters, mixins, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import LimitOffsetPagination
@@ -151,6 +152,7 @@ class ProjectViewset(
 
         return Response({"deleted": True}, status.HTTP_200_OK)
 
+    @swagger_auto_schema(auto_schema=None)
     @action(detail=True, methods=["GET"], url_name="can_trigger_flows")
     def can_trigger_flows(self, request, *args, **kwargs):
         """(Deprecated) Tell whether the user can trigger flows in this project."""
@@ -161,6 +163,7 @@ class ProjectViewset(
 
         return Response({"can_trigger_flows": can_trigger_flows}, status.HTTP_200_OK)
 
+    @swagger_auto_schema(auto_schema=None)
     @action(detail=True, methods=["GET"], url_name="list_access")
     def list_access(self, request, *args, **kwargs):
         """Return feature flags describing what the requester can do in this project."""
@@ -176,6 +179,7 @@ class ProjectViewset(
 
         return Response(context, status.HTTP_200_OK)
 
+    @swagger_auto_schema(auto_schema=None)
     @action(detail=True, methods=["GET"], url_name="contacts")
     def list_contacts(self, request, *args, **kwargs):
         """Return the contact catalog from Weni Flows, respecting cursor pagination."""
@@ -187,6 +191,7 @@ class ProjectViewset(
 
         return Response(contact_list, status.HTTP_200_OK)
 
+    @swagger_auto_schema(auto_schema=None)
     @action(detail=True, methods=["POST"], url_name="create_contact")
     def create_contacts(self, request, *args, **kwargs):
         """Create a new contact upstream after validating the payload locally."""
@@ -215,6 +220,7 @@ class ProjectViewset(
         )
         return Response(contact_response_data, response_status)
 
+    @swagger_auto_schema(auto_schema=None)
     @action(detail=True, methods=["PUT"], url_name="edit_contact")
     def edit_contact(self, request, *args, **kwargs):
         """Update an existing contact in Weni Flows using the provided payload."""
@@ -243,6 +249,7 @@ class ProjectViewset(
         )
         return Response(contact_response_data, response_status)
 
+    @swagger_auto_schema(auto_schema=None)
     @action(detail=True, methods=["GET"], url_name="groups")
     def list_groups(self, request, *args, **kwargs):
         """Return the Flow groups available to the project."""
@@ -255,6 +262,7 @@ class ProjectViewset(
 
         return Response(contact_list, status.HTTP_200_OK)
 
+    @swagger_auto_schema(auto_schema=None)
     @action(detail=True, methods=["GET"], url_name="flows")
     def list_flows(self, request, *args, **kwargs):
         """Return the Flow catalog for this project."""
@@ -265,6 +273,7 @@ class ProjectViewset(
 
         return Response(flow_list, status.HTTP_200_OK)
 
+    @swagger_auto_schema(auto_schema=None)
     @action(detail=True, methods=["GET"], url_name="flows")
     def retrieve_flow_definitions(self, request, *args, **kwargs):
         """Return the raw definition of the selected Flow UUID."""
@@ -295,6 +304,7 @@ class ProjectViewset(
 
         flow_start.references.bulk_create(instances)
 
+    @swagger_auto_schema(auto_schema=None)
     @action(
         detail=True,
         methods=["POST"],
@@ -361,6 +371,7 @@ class ProjectViewset(
             room.notify_room("update")
         return Response(flow_start, status.HTTP_200_OK)
 
+    @swagger_auto_schema(auto_schema=None)
     @action(detail=False, methods=["GET"], url_name="verify-flow-start")
     def retrieve_flow_warning(self, request, *args, **kwargs):
         """Tell whether the contact already has an active room and who is handling it."""
@@ -408,6 +419,7 @@ class ProjectViewset(
 
         return Response(flows_start_verify, status.HTTP_200_OK)
 
+    @swagger_auto_schema(auto_schema=None)
     @action(
         detail=True,
         methods=["GET"],
@@ -510,6 +522,7 @@ class ProjectViewset(
             status=status.HTTP_200_OK,
         )
 
+    @swagger_auto_schema(auto_schema=None)
     @action(detail=False, methods=["POST"], url_name="integrate_sectors")
     def integrate_sectors(self, request, *args, **kwargs):
         """Trigger ticketer/topic integration for the provided project UUID."""
