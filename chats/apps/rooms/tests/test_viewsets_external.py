@@ -456,6 +456,55 @@ class RoomsQueuePriorityExternalTests(APITestCase):
             self.queue.uuid,
         )
 
+    @patch("chats.apps.api.v1.external.rooms.serializers.start_queue_priority_routing")
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    def test_create_room_with_queue_priority_when_agent_fails_capacity_recheck(
+        self,
+        mock_get_room,
+        mock_start_queue_priority_routing,
+    ):
+        """
+        Queue is empty and there is an ONLINE agent, but the agent is already
+        at/above the sector rooms limit. The last-moment capacity recheck must
+        block the assignment: the room stays unassigned and routing is
+        triggered to retry later.
+        """
+        mock_get_room.return_value = None
+        mock_start_queue_priority_routing.return_value = None
+
+        user = User.objects.create(email="overloaded@email.com")
+        permission = self.project.permissions.create(user=user, status="ONLINE")
+        self.queue.authorizations.create(permission=permission, role=1)
+
+        # sector.rooms_limit == 1 (from setUp); pre-populate above the limit
+        for i in range(2):
+            Room.objects.create(
+                queue=self.queue,
+                contact=Contact.objects.create(external_id=f"overloaded-{i}"),
+                user=user,
+                is_active=True,
+            )
+
+        # Force get_available_agent to return the overloaded agent even though
+        # available_agents' annotate filter would normally exclude him. This
+        # simulates a race between the annotate query and Room.save().
+        with patch.object(Queue, "get_available_agent", return_value=user):
+            data = {
+                "queue_uuid": str(self.queue.uuid),
+                "contact": {
+                    "external_id": "new-contact-001",
+                    "name": "kallil",
+                    "email": "kallil@email.com",
+                    "phone": "+5511985543332",
+                    "custom_fields": {},
+                },
+            }
+            response = self.create_room(data)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(response.data.get("user"))
+        mock_start_queue_priority_routing.assert_called_once_with(self.queue)
+
 
 class RoomsFlowStartExternalTests(APITestCase):
     fixtures = ["chats/fixtures/fixture_app.json"]

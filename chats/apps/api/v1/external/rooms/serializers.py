@@ -21,6 +21,9 @@ from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.msgs.models import Message, MessageMedia
 from chats.apps.projects.models.models import FlowStart, Project
 from chats.apps.queues.models import Queue
+from chats.apps.queues.usecases.can_agent_receive_room import (
+    CanAgentReceiveRoomUseCase,
+)
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import close_room
@@ -118,8 +121,21 @@ def get_room_user(
 
         if current_queue_size == 0:
             # If the queue is empty, the available user with the least number
-            # of rooms will be selected, if any.
-            return queue.get_available_agent()
+            # of rooms will be selected, if any, subject to a last-moment
+            # capacity recheck to close the race with concurrent assignments.
+            agent = queue.get_available_agent()
+            if agent is None:
+                return None
+
+            capacity = CanAgentReceiveRoomUseCase(queue).execute(agent)
+            if capacity.can_receive:
+                return agent
+
+            # Agent was picked but failed the recheck: leave the room in the
+            # queue and trigger routing so it is retried on the next
+            # opportunity.
+            start_queue_priority_routing(queue)
+            return None
 
         logger.info(
             "Calling start_queue_priority_routing for queue %s from get_room_user because the queue is not empty",
@@ -135,8 +151,14 @@ def get_room_user(
     if queue.rooms.filter(is_active=True, user__isnull=True).exists():
         return None
 
-    # General room routing type
-    return queue.get_available_agent()
+    # General room routing type. The last-moment capacity recheck is applied
+    # as well; if the picked agent fails it, the room stays unassigned.
+    agent = queue.get_available_agent()
+    if agent is None:
+        return None
+
+    capacity = CanAgentReceiveRoomUseCase(queue).execute(agent)
+    return agent if capacity.can_receive else None
 
 
 class RoomListSerializer(serializers.ModelSerializer):
