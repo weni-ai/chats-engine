@@ -84,20 +84,26 @@ class CSATFlowService(BaseCSATService):
         if sector.custom_csat_flow_uuid:
             return sector.custom_csat_flow_uuid
 
-        return self.get_flow_uuid_from_project(sector.project.uuid)
+        project_uuid = self.get_project_uuid(sector)
+        return self.get_flow_uuid_from_project(project_uuid)
+
+    def get_project_uuid(self, sector: Sector) -> UUID:
+        secondary_project_config = sector.secondary_project or {}
+        secondary_project_uuid = secondary_project_config.get("uuid")
+        project_uuid = secondary_project_uuid or sector.project.uuid
+
+        return project_uuid
 
     def start_csat_flow(self, room: Room) -> None:
         if room.is_active:
             raise ValidationError("Room is active")
 
         sector = room.queue.sector
-        secondary_project_config = sector.secondary_project or {}
-        secondary_project_uuid = secondary_project_config.get("uuid")
-        project_uuid = secondary_project_uuid or room.project.uuid
+        project_uuid = self.get_project_uuid(sector)
 
         project = Project.objects.get(uuid=project_uuid)
 
-        flow_uuid = self.get_flow_uuid(project_uuid)
+        flow_uuid = self.get_flow_uuid(sector)
         token = self.token_generator.generate_token(
             {"project": str(room.project.uuid), "room": str(room.uuid)}
         )
