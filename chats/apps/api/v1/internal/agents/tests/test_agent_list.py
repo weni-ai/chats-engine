@@ -839,3 +839,304 @@ class AgentListStatusFieldTests(TestCase):
         for item in results:
             self.assertIn("status", item["agent"])
             self.assertIsNotNone(item["agent"]["status"])
+
+
+# ===========================================================================
+# Agent list filters — multi-value support (comma-separated)
+# ===========================================================================
+
+
+class AgentListMultiValueFilterTests(TestCase):
+    """Validates that all filters accept multiple comma-separated values."""
+
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.project = Project.objects.create(name="Test Project", timezone="UTC")
+        self.manager = _make_manager(self.project)
+
+        self.sector_a = self.project.sectors.create(
+            name="Sector A", rooms_limit=5, work_start="08:00", work_end="18:00"
+        )
+        self.sector_b = self.project.sectors.create(
+            name="Sector B", rooms_limit=5, work_start="08:00", work_end="18:00"
+        )
+        self.sector_c = self.project.sectors.create(
+            name="Sector C", rooms_limit=5, work_start="08:00", work_end="18:00"
+        )
+        self.queue_a = self.sector_a.queues.create(name="Queue A")
+        self.queue_b = self.sector_b.queues.create(name="Queue B")
+        self.queue_c = self.sector_c.queues.create(name="Queue C")
+
+        self.user_a = _make_agent(
+            self.project, "agent.a@test.com", "Ana", ProjectPermission.STATUS_ONLINE
+        )
+        self.user_b = _make_agent(
+            self.project, "agent.b@test.com", "Bob", ProjectPermission.STATUS_OFFLINE
+        )
+        self.user_c = _make_agent(
+            self.project, "agent.c@test.com", "Carla", ProjectPermission.STATUS_ONLINE
+        )
+
+        for user, queue in [
+            (self.user_a, self.queue_a),
+            (self.user_b, self.queue_b),
+            (self.user_c, self.queue_c),
+        ]:
+            QueueAuthorization.objects.create(
+                permission=ProjectPermission.objects.get(user=user, project=self.project),
+                queue=queue,
+                role=QueueAuthorization.ROLE_AGENT,
+            )
+
+    def _list(self, extra_params=None):
+        view = AllAgentsView.as_view()
+        request = self.factory.get(
+            f"/project/{self.project.pk}/all_agents/",
+            extra_params or {},
+        )
+        force_authenticate(request, user=self.manager)
+        request.resolver_match = type(
+            "ResolverMatch", (), {"kwargs": {"project_uuid": str(self.project.pk)}}
+        )()
+        return view(request, project_uuid=str(self.project.pk))
+
+    def _emails(self, response):
+        results = response.data.get("results", response.data)
+        return {item["agent"]["email"] for item in results}
+
+    def test_filter_status_accepts_multiple_values(self):
+        """status=online,offline returns both online and offline agents."""
+        response = self._list({"status": "online,offline"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        emails = self._emails(response)
+        self.assertIn(self.user_a.email, emails)
+        self.assertIn(self.user_b.email, emails)
+        self.assertIn(self.user_c.email, emails)
+
+    def test_filter_queue_accepts_multiple_uuids(self):
+        """queue=uuid1,uuid2 returns agents from either queue."""
+        response = self._list(
+            {"queue": f"{self.queue_a.pk},{self.queue_b.pk}"}
+        )
+
+        emails = self._emails(response)
+        self.assertIn(self.user_a.email, emails)
+        self.assertIn(self.user_b.email, emails)
+        self.assertNotIn(self.user_c.email, emails)
+
+    def test_filter_sector_accepts_multiple_uuids(self):
+        """sector=uuid1,uuid2 returns agents from either sector."""
+        response = self._list(
+            {"sector": f"{self.sector_a.pk},{self.sector_c.pk}"}
+        )
+
+        emails = self._emails(response)
+        self.assertIn(self.user_a.email, emails)
+        self.assertIn(self.user_c.email, emails)
+        self.assertNotIn(self.user_b.email, emails)
+
+    def test_filter_agent_accepts_multiple_values(self):
+        """agent=a,c matches agents whose emails contain either token."""
+        response = self._list({"agent": "agent.a,agent.c"})
+
+        emails = self._emails(response)
+        self.assertIn(self.user_a.email, emails)
+        self.assertIn(self.user_c.email, emails)
+        self.assertNotIn(self.user_b.email, emails)
+
+    def test_filter_custom_status_accepts_multiple_values(self):
+        """custom_status=Lunch,Break returns agents on either pause."""
+        _put_on_pause(self.user_a, self.project, pause_name="Lunch")
+        _put_on_pause(self.user_c, self.project, pause_name="Break")
+
+        response = self._list({"custom_status": "Lunch,Break"})
+
+        emails = self._emails(response)
+        self.assertIn(self.user_a.email, emails)
+        self.assertIn(self.user_c.email, emails)
+        self.assertNotIn(self.user_b.email, emails)
+
+
+# ===========================================================================
+# Bug fix — sectors without active queue authorizations should not appear
+# Also: deleted sectors and queues should not appear
+# ===========================================================================
+
+
+class AgentListSectorVisibilityTests(TestCase):
+    """
+    Validates that the `sector` array only contains sectors in which the
+    agent has at least one active queue authorization, and that deleted
+    sectors/queues are filtered out.
+    """
+
+    def setUp(self):
+        self.factory = APIRequestFactory()
+        self.project = Project.objects.create(name="Test Project", timezone="UTC")
+        self.manager = _make_manager(self.project)
+
+        self.agent_user = User.objects.create_user(
+            email="agent@test.com", password="x", first_name="Ana"
+        )
+        self.permission = ProjectPermission.objects.create(
+            project=self.project,
+            user=self.agent_user,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status=ProjectPermission.STATUS_ONLINE,
+        )
+
+    def _list(self):
+        view = AllAgentsView.as_view()
+        request = self.factory.get(f"/project/{self.project.pk}/all_agents/")
+        force_authenticate(request, user=self.manager)
+        return view(request, project_uuid=str(self.project.pk))
+
+    def _agent_data(self, response):
+        results = response.data.get("results", response.data)
+        return next(
+            item["agent"] for item in results
+            if item["agent"]["email"] == self.agent_user.email
+        )
+
+    def test_sector_with_no_queue_auth_is_not_returned(self):
+        """A sector where the agent has only SectorAuthorization (no QueueAuthorization) is hidden."""
+        from chats.apps.sectors.models import SectorAuthorization
+
+        empty_sector = self.project.sectors.create(
+            name="Empty Sector", rooms_limit=5, work_start="08:00", work_end="18:00"
+        )
+        SectorAuthorization.objects.create(
+            permission=self.permission, sector=empty_sector, role=1
+        )
+
+        response = self._list()
+
+        agent = self._agent_data(response)
+        sector_names = {s["name"] for s in agent["sector"]}
+        self.assertNotIn("Empty Sector", sector_names)
+
+    def test_deleted_sector_is_not_returned(self):
+        """A sector flagged as deleted does not appear, even if agent has queue auth there."""
+        deleted_sector = self.project.sectors.create(
+            name="Deleted Sector",
+            rooms_limit=5,
+            work_start="08:00",
+            work_end="18:00",
+        )
+        deleted_queue = deleted_sector.queues.create(name="Deleted Queue")
+        QueueAuthorization.objects.create(
+            permission=self.permission,
+            queue=deleted_queue,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        active_sector = self.project.sectors.create(
+            name="Active Sector",
+            rooms_limit=5,
+            work_start="08:00",
+            work_end="18:00",
+        )
+        active_queue = active_sector.queues.create(name="Active Queue")
+        QueueAuthorization.objects.create(
+            permission=self.permission,
+            queue=active_queue,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        deleted_sector.is_deleted = True
+        deleted_sector.save(update_fields=["is_deleted"])
+
+        response = self._list()
+
+        agent = self._agent_data(response)
+        sector_names = {s["name"] for s in agent["sector"]}
+        self.assertNotIn("Deleted Sector", sector_names)
+        self.assertIn("Active Sector", sector_names)
+
+    def test_deleted_queue_is_not_returned_inside_sector(self):
+        """A deleted queue does not show up in its sector's queue list."""
+        sector = self.project.sectors.create(
+            name="Sector", rooms_limit=5, work_start="08:00", work_end="18:00"
+        )
+        active_queue = sector.queues.create(name="Active Queue")
+        deleted_queue = sector.queues.create(name="Deleted Queue")
+        QueueAuthorization.objects.create(
+            permission=self.permission,
+            queue=active_queue,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+        QueueAuthorization.objects.create(
+            permission=self.permission,
+            queue=deleted_queue,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        deleted_queue.is_deleted = True
+        deleted_queue.save(update_fields=["is_deleted"])
+
+        response = self._list()
+
+        agent = self._agent_data(response)
+        sector_entry = next(s for s in agent["sector"] if s["name"] == "Sector")
+        self.assertIn("Active Queue", sector_entry["queues"])
+        self.assertNotIn("Deleted Queue", sector_entry["queues"])
+
+    def test_sector_with_only_deleted_queues_is_not_returned(self):
+        """A sector whose only queues are deleted is hidden from the response."""
+        sector = self.project.sectors.create(
+            name="Only Deleted",
+            rooms_limit=5,
+            work_start="08:00",
+            work_end="18:00",
+        )
+        deleted_queue = sector.queues.create(name="Gone")
+        QueueAuthorization.objects.create(
+            permission=self.permission,
+            queue=deleted_queue,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+        deleted_queue.is_deleted = True
+        deleted_queue.save(update_fields=["is_deleted"])
+
+        response = self._list()
+
+        agent = self._agent_data(response)
+        sector_names = {s["name"] for s in agent["sector"]}
+        self.assertNotIn("Only Deleted", sector_names)
+
+    def test_sector_chats_total_limit_excludes_hidden_sectors(self):
+        """sector_chats_total_limit sums only visible (non-deleted, with active queues) sectors."""
+        visible_sector = self.project.sectors.create(
+            name="Visible",
+            rooms_limit=7,
+            work_start="08:00",
+            work_end="18:00",
+        )
+        visible_queue = visible_sector.queues.create(name="Queue")
+        QueueAuthorization.objects.create(
+            permission=self.permission,
+            queue=visible_queue,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        # Another sector with deleted queue → should not count
+        hidden_sector = self.project.sectors.create(
+            name="Hidden",
+            rooms_limit=100,
+            work_start="08:00",
+            work_end="18:00",
+        )
+        hidden_queue = hidden_sector.queues.create(name="Dead Queue")
+        QueueAuthorization.objects.create(
+            permission=self.permission,
+            queue=hidden_queue,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+        hidden_queue.is_deleted = True
+        hidden_queue.save(update_fields=["is_deleted"])
+
+        response = self._list()
+
+        agent = self._agent_data(response)
+        self.assertEqual(agent["sector_chats_total_limit"], 7)

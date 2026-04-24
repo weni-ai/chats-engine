@@ -9,6 +9,7 @@ from chats.apps.ai_features.audio_transcription.views import (
 from chats.apps.api.v1.agents.views import (
     AgentQueuePermissionsView,
     AllAgentsView,
+    SectorsQueuesView,
     UpdateQueuePermissionsView,
 )
 from chats.apps.api.v1.archive_chats.views import GetArchivedMediaView
@@ -91,6 +92,11 @@ urlpatterns = [
         "project/<uuid:project_uuid>/all_agents/",
         AllAgentsView.as_view(),
         name="all_agents",
+    ),
+    path(
+        "project/<uuid:project_uuid>/sectors/queues/",
+        SectorsQueuesView.as_view(),
+        name="sectors_queues",
     ),
     path(
         "agent/queue_permissions/",

@@ -97,6 +97,11 @@ class AllAgentsView(generics.ListAPIView):
             .values("status_type__name")[:1]
         )
 
+        active_queue_auths = QueueAuthorization.objects.filter(
+            queue__is_deleted=False,
+            queue__sector__is_deleted=False,
+        ).select_related("queue__sector")
+
         return (
             ProjectPermission.objects.filter(
                 project=project,
@@ -105,8 +110,7 @@ class AllAgentsView(generics.ListAPIView):
             )
             .select_related("user")
             .prefetch_related(
-                "sector_authorizations__sector",
-                "queue_authorizations__queue__sector",
+                Prefetch("queue_authorizations", queryset=active_queue_auths),
             )
             .annotate(
                 status_order=_status_order_annotation(),
@@ -252,3 +256,60 @@ class UpdateQueuePermissionsView(APIView):
                     )
 
         return Response(status=status.HTTP_200_OK)
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/project/{project_uuid}/sectors/queues/?sectors=uuid1,uuid2
+# ---------------------------------------------------------------------------
+
+
+class SectorsQueuesView(APIView):
+    """
+    Returns queues grouped by sector for the given sector UUIDs.
+
+    Query params:
+        sectors — comma-separated list of sector UUIDs (required)
+
+    Without the `sectors` query param, an empty list is returned.
+    Deleted sectors and queues are ignored.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, project_uuid):
+        project = get_object_or_404(Project, uuid=project_uuid)
+        _get_manager_permission(request, project)
+
+        raw = request.query_params.get("sectors", "").strip()
+        sector_uuids = [token for token in (s.strip() for s in raw.split(",")) if token]
+
+        if not sector_uuids:
+            return Response({"results": []})
+
+        sectors = (
+            project.sectors.filter(
+                is_deleted=False,
+                uuid__in=sector_uuids,
+            )
+            .prefetch_related(
+                Prefetch(
+                    "queues",
+                    queryset=Queue.objects.filter(is_deleted=False).order_by("name"),
+                )
+            )
+            .order_by("name")
+        )
+
+        data = [
+            {
+                "uuid": str(sector.uuid),
+                "name": sector.name,
+                "queues": [
+                    {"uuid": str(queue.uuid), "name": queue.name}
+                    for queue in sector.queues.all()
+                ],
+            }
+            for sector in sectors
+        ]
+
+        return Response({"results": data})
