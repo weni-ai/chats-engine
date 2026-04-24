@@ -21,6 +21,7 @@ from chats.apps.sectors.usecases import (
     RemoveSectorFromGroupSectorUseCase,
     UpdateAgentQueueAuthorizationsUseCase,
 )
+from chats.core.audit import apply_audit_fields
 
 
 class GroupSectorViewset(viewsets.ModelViewSet):
@@ -45,13 +46,19 @@ class GroupSectorViewset(viewsets.ModelViewSet):
 
     @transaction.atomic
     def perform_create(self, serializer):
-        serializer.save()
+        serializer.save(created_by=self.request.user, modified_by=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(modified_by=self.request.user)
 
     def perform_destroy(self, instance):
         for sector in instance.sectors.all():
             RemoveSectorFromGroupSectorUseCase(
                 sector_uuid=sector.uuid, group_sector=instance
             ).execute()
+        apply_audit_fields(
+            instance, self.request, instance.project, on_delete=True
+        )
         instance.delete()
 
     @action(
