@@ -265,16 +265,25 @@ class UpdateQueuePermissionsView(APIView):
 
 class SectorsQueuesView(APIView):
     """
-    Returns queues grouped by sector for the given sector UUIDs.
+    Returns queues grouped by sector for the given project.
 
     Query params:
-        sectors — comma-separated list of sector UUIDs (required)
+        sectors — comma-separated list of sector UUIDs (optional)
+        limit   — page size (LimitOffsetPagination)
+        offset  — page offset (LimitOffsetPagination)
 
-    Without the `sectors` query param, an empty list is returned.
+    When `sectors` is omitted, all sectors of the project are returned.
     Deleted sectors and queues are ignored.
     """
 
     permission_classes = [IsAuthenticated]
+    pagination_class = LimitOffsetPagination
+
+    @property
+    def paginator(self):
+        if not hasattr(self, "_paginator"):
+            self._paginator = self.pagination_class()
+        return self._paginator
 
     def get(self, request, project_uuid):
         project = get_object_or_404(Project, uuid=project_uuid)
@@ -283,22 +292,18 @@ class SectorsQueuesView(APIView):
         raw = request.query_params.get("sectors", "").strip()
         sector_uuids = [token for token in (s.strip() for s in raw.split(",")) if token]
 
-        if not sector_uuids:
-            return Response({"results": []})
+        sectors_qs = project.sectors.filter(is_deleted=False)
+        if sector_uuids:
+            sectors_qs = sectors_qs.filter(uuid__in=sector_uuids)
 
-        sectors = (
-            project.sectors.filter(
-                is_deleted=False,
-                uuid__in=sector_uuids,
+        sectors_qs = sectors_qs.prefetch_related(
+            Prefetch(
+                "queues",
+                queryset=Queue.objects.filter(is_deleted=False).order_by("name"),
             )
-            .prefetch_related(
-                Prefetch(
-                    "queues",
-                    queryset=Queue.objects.filter(is_deleted=False).order_by("name"),
-                )
-            )
-            .order_by("name")
-        )
+        ).order_by("name")
+
+        page = self.paginator.paginate_queryset(sectors_qs, request, view=self)
 
         data = [
             {
@@ -309,7 +314,7 @@ class SectorsQueuesView(APIView):
                     for queue in sector.queues.all()
                 ],
             }
-            for sector in sectors
+            for sector in page
         ]
 
-        return Response({"results": data})
+        return self.paginator.get_paginated_response(data)

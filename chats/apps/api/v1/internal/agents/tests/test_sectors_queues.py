@@ -80,19 +80,61 @@ class SectorsQueuesViewTests(TestCase):
         self.assertIn("uuid", queue)
         self.assertIn("name", queue)
 
-    def test_without_sectors_param_returns_empty_list(self):
-        """When no `sectors` query param is provided, results is an empty list."""
+    def test_without_sectors_param_returns_all_project_sectors(self):
+        """When no `sectors` query param is provided, all project sectors are returned."""
         response = self._get()
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data, {"results": []})
+        sector_names = {r["name"] for r in response.data["results"]}
+        self.assertEqual(sector_names, {"Sector A", "Sector B"})
 
-    def test_empty_sectors_param_returns_empty_list(self):
-        """An empty `sectors` query param returns an empty list."""
+        sector_a_payload = next(
+            r for r in response.data["results"] if r["name"] == "Sector A"
+        )
+        queue_names = {q["name"] for q in sector_a_payload["queues"]}
+        self.assertEqual(queue_names, {"Queue A1", "Queue A2"})
+
+    def test_empty_sectors_param_returns_all_project_sectors(self):
+        """An empty `sectors` query param behaves the same as omitting it."""
         response = self._get(sectors="")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data, {"results": []})
+        sector_names = {r["name"] for r in response.data["results"]}
+        self.assertEqual(sector_names, {"Sector A", "Sector B"})
+
+    def test_response_exposes_limit_offset_pagination_fields(self):
+        """Response follows LimitOffsetPagination format: count, next, previous, results."""
+        response = self._get()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("count", response.data)
+        self.assertIn("next", response.data)
+        self.assertIn("previous", response.data)
+        self.assertIn("results", response.data)
+        self.assertEqual(response.data["count"], 2)
+
+    def test_pagination_with_limit_and_offset(self):
+        """`limit` and `offset` query params paginate the sectors list."""
+        view = SectorsQueuesView.as_view()
+        url = f"/project/{self.project.pk}/sectors/queues/"
+        request = self.factory.get(url, {"limit": 1, "offset": 0})
+        force_authenticate(request, user=self.manager)
+        response = view(request, project_uuid=str(self.project.pk))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertIsNotNone(response.data["next"])
+        self.assertEqual(response.data["results"][0]["name"], "Sector A")
+
+        request = self.factory.get(url, {"limit": 1, "offset": 1})
+        force_authenticate(request, user=self.manager)
+        response = view(request, project_uuid=str(self.project.pk))
+
+        self.assertEqual(response.data["count"], 2)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(response.data["results"][0]["name"], "Sector B")
+        self.assertIsNone(response.data["next"])
 
     def test_deleted_sector_is_ignored(self):
         """Deleted sectors are not returned, even when explicitly requested."""
