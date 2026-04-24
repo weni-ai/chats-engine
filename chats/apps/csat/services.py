@@ -20,6 +20,7 @@ from chats.apps.csat.models import (
     CSAT_FLOW_CACHE_TTL,
     CSATFlowProjectConfig,
 )
+from chats.apps.sectors.models import Sector
 from chats.core.cache import BaseCacheClient
 from chats.apps.api.authentication.token import JWTTokenGenerator
 
@@ -28,7 +29,11 @@ logger = logging.getLogger(__name__)
 
 class BaseCSATService(ABC):
     @abstractmethod
-    def get_flow_uuid(self, project_uuid: UUID) -> UUID:
+    def get_flow_uuid_from_project(self, project_uuid: UUID) -> UUID:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_flow_uuid(self, sector: Sector) -> UUID:
         raise NotImplementedError
 
     @abstractmethod
@@ -47,7 +52,7 @@ class CSATFlowService(BaseCSATService):
         self.cache_client = cache_client
         self.token_generator = token_generator
 
-    def get_flow_uuid(self, project_uuid: UUID) -> UUID:
+    def get_flow_uuid_from_project(self, project_uuid: UUID) -> UUID:
         cache_key = CSAT_FLOW_CACHE_KEY.format(project_uuid=str(project_uuid))
 
         try:
@@ -75,6 +80,20 @@ class CSATFlowService(BaseCSATService):
 
         return flow_uuid
 
+    def get_flow_uuid(self, sector: Sector) -> UUID:
+        if sector.custom_csat_flow_uuid:
+            return sector.custom_csat_flow_uuid
+
+        project_uuid = self.get_project_uuid(sector)
+        return self.get_flow_uuid_from_project(project_uuid)
+
+    def get_project_uuid(self, sector: Sector) -> UUID:
+        secondary_project_config = sector.secondary_project or {}
+        secondary_project_uuid = secondary_project_config.get("uuid")
+        project_uuid = secondary_project_uuid or sector.project.uuid
+
+        return project_uuid
+
     def start_csat_flow(self, room: Room) -> None:
         print(
             f"🔍 DEBUG CSATFlowService.start_csat_flow(): Starting CSAT flow for room {room.uuid}"
@@ -86,13 +105,11 @@ class CSATFlowService(BaseCSATService):
             raise ValidationError("Room is active")
 
         sector = room.queue.sector
-        secondary_project_config = sector.secondary_project or {}
-        secondary_project_uuid = secondary_project_config.get("uuid")
-        project_uuid = secondary_project_uuid or room.project.uuid
+        project_uuid = self.get_project_uuid(sector)
 
         project = Project.objects.get(uuid=project_uuid)
 
-        flow_uuid = self.get_flow_uuid(project_uuid)
+        flow_uuid = self.get_flow_uuid(sector)
         token = self.token_generator.generate_token(
             {"project": str(room.project.uuid), "room": str(room.uuid)}
         )

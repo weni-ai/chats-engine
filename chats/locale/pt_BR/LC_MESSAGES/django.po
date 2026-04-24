@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-04-14 09:57-0300\n"
+"POT-Creation-Date: 2026-04-23 11:47-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -83,7 +83,7 @@ msgstr "usuários"
 #: chats/apps/ai_features/history_summary/models.py:63
 #: chats/apps/discussions/models/discussion_user.py:17
 #: chats/apps/projects/models/models.py:493 chats/apps/queues/models.py:299
-#: chats/apps/sectors/models.py:359
+#: chats/apps/sectors/models.py:365
 msgid "User"
 msgstr "Usuário"
 
@@ -130,16 +130,12 @@ msgstr "Não carregou"
 
 #: chats/apps/ai_features/audio_transcription/models.py:44
 #: chats/apps/ai_features/audio_transcription/models.py:105
-#, fuzzy
-#| msgid "Incorrect transcription"
 msgid "Audio Transcription"
-msgstr "Transcrição incorreta"
+msgstr "Transcrição de Áudio"
 
 #: chats/apps/ai_features/audio_transcription/models.py:45
-#, fuzzy
-#| msgid "Incorrect transcription"
 msgid "Audio Transcriptions"
-msgstr "Transcrição incorreta"
+msgstr "Transcrições de Áudio"
 
 #: chats/apps/ai_features/audio_transcription/models.py:115
 #: chats/apps/ai_features/history_summary/models.py:67
@@ -155,20 +151,20 @@ msgstr "Texto"
 
 #: chats/apps/ai_features/audio_transcription/models.py:120
 msgid "Audio Transcription Feedback"
-msgstr ""
+msgstr "Feedback de Transcrição de Áudio"
 
 #: chats/apps/ai_features/audio_transcription/models.py:121
 msgid "Audio Transcription Feedbacks"
-msgstr ""
+msgstr "Feedbacks de Transcrição de Áudio"
 
 #: chats/apps/ai_features/audio_transcription/views.py:59
 #: chats/apps/ai_features/audio_transcription/views.py:149
 msgid "No audio media found in this message."
-msgstr ""
+msgstr "Nenhum áudio encontrado nesta mensagem."
 
 #: chats/apps/ai_features/audio_transcription/views.py:71
 msgid "Cannot transcribe audio from closed rooms."
-msgstr ""
+msgstr "Não é possível transcrever áudio de salas fechadas."
 
 #: chats/apps/ai_features/audio_transcription/views.py:83
 #, python-format
@@ -176,10 +172,12 @@ msgid ""
 "Audio duration exceeds the maximum allowed (%(max)s seconds). Audio "
 "duration: %(duration)s seconds."
 msgstr ""
+"A duração do áudio excede o máximo permitido (%(max)s segundos). Duração "
+"do áudio: %(duration)s segundos."
 
 #: chats/apps/ai_features/audio_transcription/views.py:162
 msgid "Transcription not found for this message."
-msgstr ""
+msgstr "Transcrição não encontrada para esta mensagem."
 
 #: chats/apps/ai_features/history_summary/enums.py:10
 msgid "Incorrect summary"
@@ -226,6 +224,67 @@ msgstr "Feedback do Resumo do Histórico"
 msgid "History Summary Feedbacks"
 msgstr "Feedbacks do Resumo do Histórico"
 
+#: chats/apps/ai_features/improve_user_message/choices.py:8
+msgid "Used"
+msgstr "Utilizado"
+
+#: chats/apps/ai_features/improve_user_message/choices.py:9
+msgid "Discarded"
+msgstr "Descartado"
+
+#: chats/apps/ai_features/improve_user_message/choices.py:10
+msgid "Edited"
+msgstr "Editado"
+
+#: chats/apps/ai_features/improve_user_message/choices.py:16
+msgid "Grammar and spelling"
+msgstr "Gramática e ortografia"
+
+#: chats/apps/ai_features/improve_user_message/choices.py:17
+msgid "More empathy"
+msgstr "Mais empatia"
+
+#: chats/apps/ai_features/improve_user_message/choices.py:18
+msgid "Clarity"
+msgstr "Clareza"
+
+#: chats/apps/ai_features/improve_user_message/models.py:18
+msgid "Message"
+msgstr "Mensagem"
+
+#: chats/apps/ai_features/improve_user_message/models.py:24
+#: chats/apps/archive_chats/models.py:62 chats/apps/csat/models.py:17
+#: chats/apps/discussions/models/discussion.py:23
+#: chats/apps/rooms/models.py:266
+msgid "Room"
+msgstr "Sala"
+
+#: chats/apps/ai_features/improve_user_message/models.py:30
+#: chats/apps/csat/models.py:46 chats/apps/feature_version/models.py:10
+#: chats/apps/projects/models/models.py:104
+#: chats/apps/projects/models/models.py:321
+#: chats/apps/projects/models/models.py:548 chats/apps/sectors/models.py:31
+#: chats/apps/sectors/models.py:503
+msgid "Project"
+msgstr "Projeto"
+
+#: chats/apps/ai_features/improve_user_message/models.py:35
+#: chats/apps/archive_chats/models.py:48
+msgid "Status"
+msgstr "Status"
+
+#: chats/apps/ai_features/improve_user_message/models.py:40
+msgid "Type"
+msgstr "Tipo"
+
+#: chats/apps/ai_features/improve_user_message/models.py:46
+msgid "Message Improvement Status"
+msgstr "Status de Melhoria da Mensagem"
+
+#: chats/apps/ai_features/improve_user_message/models.py:47
+msgid "Message Improvement Statuses"
+msgstr "Status de Melhorias da Mensagem"
+
 #: chats/apps/ai_features/models.py:12
 msgid "Feature"
 msgstr "Recurso"
@@ -253,6 +312,10 @@ msgstr "Prompt de Recurso de IA"
 #: chats/apps/ai_features/models.py:22
 msgid "AI Feature Prompts"
 msgstr "Prompts de Recursos de IA"
+
+#: chats/apps/api/v1/ai_features/views.py:66
+msgid "Feature not available for this project."
+msgstr "Recurso não disponível para este projeto."
 
 #: chats/apps/api/v1/contacts/filters.py:20
 #: chats/apps/api/v1/external/msgs/filters.py:30
@@ -286,11 +349,11 @@ msgstr "Sala encerrada em"
 
 #: chats/apps/api/v1/external/agents/filters.py:16
 msgid "Filter by queue UUID"
-msgstr ""
+msgstr "Filtrar por UUID da fila"
 
 #: chats/apps/api/v1/external/agents/filters.py:23
 msgid "Filter by sector UUID"
-msgstr ""
+msgstr "Filtrar por UUID do setor"
 
 #: chats/apps/api/v1/external/msgs/filters.py:16
 #: chats/apps/api/v1/msgs/filters.py:18 chats/apps/api/v1/msgs/filters.py:74
@@ -370,7 +433,7 @@ msgstr "Esta fila já existe."
 
 #: chats/apps/api/v1/queues/serializers.py:97
 msgid "Queue limit feature is not active."
-msgstr ""
+msgstr "A funcionalidade de limite de fila não está ativa."
 
 #: chats/apps/api/v1/queues/serializers.py:163
 msgid "you cant add a user two times in same queue."
@@ -391,10 +454,9 @@ msgid "At least one room is required"
 msgstr "Pelo menos uma sala é necessária"
 
 #: chats/apps/api/v1/rooms/serializers.py:652
-#, fuzzy, python-format
-#| msgid "Cannot take more than %(max_rooms)s rooms at once"
+#, python-format
 msgid "Cannot transfer more than %(max_rooms)s rooms at once"
-msgstr "Não é possível assumir mais de %(max_rooms)s salas de uma vez"
+msgstr "Não é possível transferir mais de %(max_rooms)s salas de uma vez"
 
 #: chats/apps/api/v1/rooms/serializers.py:657
 #: chats/apps/api/v1/rooms/serializers.py:694
@@ -402,16 +464,12 @@ msgid "Duplicate room UUIDs found"
 msgstr "UUIDs de sala duplicados encontrados"
 
 #: chats/apps/api/v1/rooms/serializers.py:664
-#, fuzzy
-#| msgid "At least one room is required"
 msgid "At least one of user_email or queue_uuid is required"
-msgstr "Pelo menos uma sala é necessária"
+msgstr "É necessário pelo menos user_email ou queue_uuid"
 
 #: chats/apps/api/v1/rooms/serializers.py:673
-#, fuzzy
-#| msgid "No active queue found for provided sector_uuid"
 msgid "No active rooms found with the provided UUIDs"
-msgstr "Nenhuma fila ativa encontrada para o sector_uuid fornecido"
+msgstr "Nenhuma sala ativa encontrada com os UUIDs fornecidos"
 
 #: chats/apps/api/v1/rooms/serializers.py:689
 #, python-format
@@ -424,7 +482,7 @@ msgstr "Nenhuma sala disponível encontrada na fila"
 
 #: chats/apps/api/v1/rooms/viewsets.py:408
 msgid "Agents cannot close queued rooms in this sector."
-msgstr ""
+msgstr "Agentes não podem fechar salas em fila neste setor."
 
 #: chats/apps/api/v1/rooms/viewsets.py:650
 msgid "Room is not queued"
@@ -442,47 +500,51 @@ msgstr "ID do Projeto"
 msgid "Queue's UUID"
 msgstr "UUID da Fila"
 
-#: chats/apps/api/v1/sectors/serializers.py:46
+#: chats/apps/api/v1/sectors/serializers.py:49
 msgid "The CSAT feature is not available for this sector"
 msgstr "A funcionalidade CSAT não está disponível para este setor."
 
-#: chats/apps/api/v1/sectors/serializers.py:108
+#: chats/apps/api/v1/sectors/serializers.py:78
+msgid "The custom CSAT flow feature is not available for this sector"
+msgstr ""
+"A funcionalidade de fluxo CSAT personalizado não está disponível para este "
+"setor."
+
+#: chats/apps/api/v1/sectors/serializers.py:144
 msgid "work_end date must be greater than work_start date."
 msgstr ""
 "A data de fim de trabalho deve ser maior que a data de início de trabalho."
 
-#: chats/apps/api/v1/sectors/serializers.py:147
-#: chats/apps/api/v1/sectors/serializers.py:153
-#: chats/apps/api/v1/sectors/serializers.py:233
+#: chats/apps/api/v1/sectors/serializers.py:194
+#: chats/apps/api/v1/sectors/serializers.py:200
+#: chats/apps/api/v1/sectors/serializers.py:289
 msgid "Sector must have at least one tag to require tags."
 msgstr "O setor deve ter pelo menos uma tag para exigir tags."
 
-#: chats/apps/api/v1/sectors/serializers.py:370
-#: chats/apps/api/v1/sectors/serializers.py:377
+#: chats/apps/api/v1/sectors/serializers.py:427
+#: chats/apps/api/v1/sectors/serializers.py:434
 msgid "This tag already exists."
 msgstr "Esta tag já existe."
 
-#: chats/apps/api/v1/sectors/serializers.py:452
+#: chats/apps/api/v1/sectors/serializers.py:509
 msgid "Closed days should not have start_time or end_time"
 msgstr "Dias fechados não devem ter horário de início ou fim"
 
-#: chats/apps/api/v1/sectors/serializers.py:460
+#: chats/apps/api/v1/sectors/serializers.py:517
 msgid "Custom hours days must have both start_time and end_time"
 msgstr "Dias com horário personalizado devem ter horário de início e fim"
 
-#: chats/apps/api/v1/sectors/serializers.py:466
+#: chats/apps/api/v1/sectors/serializers.py:523
 msgid "End time must be greater than start time"
 msgstr "O horário de fim deve ser maior que o horário de início"
 
 #: chats/apps/archive_chats/models.py:16 chats/apps/archive_chats/models.py:40
-#, fuzzy
-#| msgid "Flow UUID"
 msgid "UUID"
-msgstr "UUID do fluxo"
+msgstr "UUID"
 
 #: chats/apps/archive_chats/models.py:18
 msgid "The UUID of the job"
-msgstr ""
+msgstr "O UUID do job"
 
 #: chats/apps/archive_chats/models.py:24
 msgid "Started at"
@@ -501,14 +563,8 @@ msgid "Archive Conversations Jobs"
 msgstr "Jobs de Arquivamento de Conversas"
 
 #: chats/apps/archive_chats/models.py:42
-#, fuzzy
-#| msgid "The job that archived the conversation"
 msgid "The UUID of the room archived conversation"
-msgstr "O job que arquivou a conversa"
-
-#: chats/apps/archive_chats/models.py:48
-msgid "Status"
-msgstr "Status"
+msgstr "O UUID da conversa arquivada da sala"
 
 #: chats/apps/archive_chats/models.py:55
 msgid "Job"
@@ -517,12 +573,6 @@ msgstr "Job"
 #: chats/apps/archive_chats/models.py:58
 msgid "The job that archived the conversation"
 msgstr "O job que arquivou a conversa"
-
-#: chats/apps/archive_chats/models.py:62 chats/apps/csat/models.py:17
-#: chats/apps/discussions/models/discussion.py:23
-#: chats/apps/rooms/models.py:266
-msgid "Room"
-msgstr "Sala"
 
 #: chats/apps/archive_chats/models.py:65
 msgid "The room that was archived"
@@ -637,14 +687,6 @@ msgstr "Enquete CSAT"
 #: chats/apps/csat/models.py:29
 msgid "CSAT Surveys"
 msgstr "Enquetes CSAT"
-
-#: chats/apps/csat/models.py:46 chats/apps/feature_version/models.py:10
-#: chats/apps/projects/models/models.py:104
-#: chats/apps/projects/models/models.py:321
-#: chats/apps/projects/models/models.py:548 chats/apps/sectors/models.py:31
-#: chats/apps/sectors/models.py:497
-msgid "Project"
-msgstr "Projeto"
 
 #: chats/apps/csat/models.py:50
 msgid "Flow UUID"
@@ -791,7 +833,7 @@ msgstr "Discussão"
 
 #: chats/apps/discussions/models/discussion_user.py:26
 #: chats/apps/projects/models/models.py:335 chats/apps/queues/models.py:294
-#: chats/apps/sectors/models.py:370 chats/apps/sectors/models.py:547
+#: chats/apps/sectors/models.py:376 chats/apps/sectors/models.py:553
 msgid "role"
 msgstr "papel"
 
@@ -909,7 +951,7 @@ msgid "Projects"
 msgstr "Projetos"
 
 #: chats/apps/projects/models/models.py:302 chats/apps/queues/models.py:283
-#: chats/apps/sectors/models.py:352 chats/apps/sectors/models.py:532
+#: chats/apps/sectors/models.py:358 chats/apps/sectors/models.py:538
 msgid "not set"
 msgstr "não definido"
 
@@ -942,14 +984,12 @@ msgid "Is it the first access of user?"
 msgstr "É o primeiro acesso do usuário?"
 
 #: chats/apps/projects/models/models.py:347
-#, fuzzy
-#| msgid "Was it seen?"
 msgid "Last seen"
-msgstr "Foi visto?"
+msgstr "Visto por último"
 
 #: chats/apps/projects/models/models.py:350
 msgid "Last time the agent sent a ping (heartbeat)"
-msgstr ""
+msgstr "Última vez que o agente enviou um ping (heartbeat)"
 
 #: chats/apps/projects/models/models.py:357
 msgid "Project Permission"
@@ -1021,7 +1061,7 @@ msgstr "Tempo de status personalizado"
 
 #: chats/apps/projects/models/models.py:716
 #: chats/apps/projects/models/models.py:745 chats/apps/queues/models.py:284
-#: chats/apps/sectors/models.py:534
+#: chats/apps/sectors/models.py:540
 msgid "agent"
 msgstr "agente"
 
@@ -1062,8 +1102,8 @@ msgstr "Registros de Status do Agente"
 msgid "sector"
 msgstr "setor"
 
-#: chats/apps/queues/models.py:33 chats/apps/sectors/models.py:426
-#: chats/apps/sectors/models.py:494
+#: chats/apps/queues/models.py:33 chats/apps/sectors/models.py:432
+#: chats/apps/sectors/models.py:500
 msgid "Name"
 msgstr "Nome"
 
@@ -1073,13 +1113,11 @@ msgstr "Mensagem padrão da fila"
 
 #: chats/apps/queues/models.py:37
 msgid "Limit"
-msgstr ""
+msgstr "Limite"
 
 #: chats/apps/queues/models.py:38
-#, fuzzy
-#| msgid "Is active?"
 msgid "Is limit active?"
-msgstr "Está ativo?"
+msgstr "O limite está ativo?"
 
 #: chats/apps/queues/models.py:44
 msgid "Sector Queue"
@@ -1146,10 +1184,8 @@ msgid "Ended by"
 msgstr "Encerrado por"
 
 #: chats/apps/rooms/models.py:94
-#, fuzzy
-#| msgid "Closed"
 msgid "closed by"
-msgstr "Fechado"
+msgstr "fechado por"
 
 #: chats/apps/rooms/models.py:100
 msgid "is active?"
@@ -1200,46 +1236,32 @@ msgid "Last unread message at"
 msgstr "Última mensagem não lida em"
 
 #: chats/apps/rooms/models.py:136
-#, fuzzy
-#| msgid "Room interaction time"
 msgid "Last interaction"
-msgstr "Tempo de interação da sala"
+msgstr "Última interação"
 
 #: chats/apps/rooms/models.py:140
-#, fuzzy
-#| msgid "message"
 msgid "Last message"
-msgstr "mensagem"
+msgstr "Última mensagem"
 
 #: chats/apps/rooms/models.py:147
-#, fuzzy
-#| msgid "automatic message text"
 msgid "Last message text"
-msgstr "texto da mensagem automática"
+msgstr "Texto da última mensagem"
 
 #: chats/apps/rooms/models.py:151
-#, fuzzy
-#| msgid "Last unread message at"
 msgid "Last message user"
-msgstr "Última mensagem não lida em"
+msgstr "Última mensagem do usuário"
 
 #: chats/apps/rooms/models.py:159
-#, fuzzy
-#| msgid "Last unread message at"
 msgid "Last message contact"
-msgstr "Última mensagem não lida em"
+msgstr "Última mensagem do contato"
 
 #: chats/apps/rooms/models.py:166
-#, fuzzy
-#| msgid "message metadata"
 msgid "Last message media"
-msgstr "metadados da mensagem"
+msgstr "Mídia da última mensagem"
 
 #: chats/apps/rooms/models.py:172
-#, fuzzy
-#| msgid "automatic message text"
 msgid "Automatic message sent at"
-msgstr "texto da mensagem automática"
+msgstr "Mensagem automática enviada em"
 
 #: chats/apps/rooms/models.py:267
 msgid "Rooms"
@@ -1314,12 +1336,12 @@ msgstr "Todos os direitos reservados."
 #: chats/apps/rooms/templates/rooms/emails/base.html:30
 msgid ""
 "You are receiving this mail because you registered in VTEX CX Platform. This "
-"also shows that you agree to our Terms of use and Privacy Policies. If you no "
-"longer want to receive mails from use, click the unsubscribe link below to "
-"unsubscribe."
+"also shows that you agree to our Terms of use and Privacy Policies. If you "
+"no longer want to receive mails from use, click the unsubscribe link below "
+"to unsubscribe."
 msgstr ""
-"Você está recebendo este e-mail porque se registrou na VTEX CX Platform. Isso "
-"também mostra que você concorda com nossos Termos de uso e Políticas de "
+"Você está recebendo este e-mail porque se registrou na VTEX CX Platform. "
+"Isso também mostra que você concorda com nossos Termos de uso e Políticas de "
 "privacidade. Se não quiser mais receber e-mails, clique no link de "
 "cancelamento de assinatura abaixo para cancelar."
 
@@ -1347,7 +1369,8 @@ msgstr "Olá, aqui está sua exportação de dados"
 #: chats/apps/rooms/templates/rooms/emails/report_failed.html:31
 #, python-format
 msgid "Unable to generate export of %(project_name)s project data."
-msgstr "Não foi possível gerar a exportação de dados do projeto %(project_name)s."
+msgstr ""
+"Não foi possível gerar a exportação de dados do projeto %(project_name)s."
 
 #: chats/apps/rooms/templates/rooms/emails/report_failed.html:34
 msgid "Use the following information to report to support:"
@@ -1366,10 +1389,6 @@ msgstr ""
 msgid "Download report"
 msgstr "Baixar relatório"
 
-#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:63
-msgid "Download report"
-msgstr "Baixar relatório"
-
 #: chats/apps/sectors/models.py:36
 msgid "Secondary Project"
 msgstr "Projeto Secundário"
@@ -1378,7 +1397,7 @@ msgstr "Projeto Secundário"
 msgid "Secondary project configuration for integrated ticketers"
 msgstr "Configuração do projeto secundário para integradores de tickets"
 
-#: chats/apps/sectors/models.py:41 chats/apps/sectors/models.py:507
+#: chats/apps/sectors/models.py:41 chats/apps/sectors/models.py:513
 msgid "Rooms limit per employee"
 msgstr "Limite de salas por funcionário"
 
@@ -1428,120 +1447,128 @@ msgstr "a mensagem automática está ativa?"
 msgid "is CSAT enabled?"
 msgstr "CSAT está habilitado?"
 
-#: chats/apps/sectors/models.py:73
+#: chats/apps/sectors/models.py:74
+msgid "custom CSAT flow UUID"
+msgstr "UUID do fluxo CSAT personalizado"
+
+#: chats/apps/sectors/models.py:77
+msgid "The UUID of the custom CSAT flow"
+msgstr "O UUID do fluxo CSAT personalizado"
+
+#: chats/apps/sectors/models.py:79
 msgid "required tags?"
 msgstr "tags obrigatórias?"
 
-#: chats/apps/sectors/models.py:81 chats/apps/sectors/models.py:366
-#: chats/apps/sectors/models.py:429 chats/apps/sectors/models.py:594
+#: chats/apps/sectors/models.py:87 chats/apps/sectors/models.py:372
+#: chats/apps/sectors/models.py:435 chats/apps/sectors/models.py:600
 msgid "Sector"
 msgstr "Setor"
 
-#: chats/apps/sectors/models.py:82
+#: chats/apps/sectors/models.py:88
 msgid "Sectors"
 msgstr "Setores"
 
-#: chats/apps/sectors/models.py:353 chats/apps/sectors/models.py:533
+#: chats/apps/sectors/models.py:359 chats/apps/sectors/models.py:539
 msgid "manager"
 msgstr "gerente"
 
-#: chats/apps/sectors/models.py:377
+#: chats/apps/sectors/models.py:383
 msgid "Sector Authorization"
 msgstr "Autorização de Setor"
 
-#: chats/apps/sectors/models.py:378
+#: chats/apps/sectors/models.py:384
 msgid "Sector Authorizations"
 msgstr "Autorizações de Setor"
 
-#: chats/apps/sectors/models.py:441
+#: chats/apps/sectors/models.py:447
 msgid "Sector Tag"
 msgstr "Tag de Setor"
 
-#: chats/apps/sectors/models.py:442
+#: chats/apps/sectors/models.py:448
 msgid "Sector Tags"
 msgstr "Tags de Setor"
 
-#: chats/apps/sectors/models.py:480
+#: chats/apps/sectors/models.py:486
 msgid "Sector Group Sector"
 msgstr "Setor do Grupo de Setores"
 
-#: chats/apps/sectors/models.py:481
+#: chats/apps/sectors/models.py:487
 msgid "Sector Group Sectors"
 msgstr "Setores do Grupo de Setores"
 
-#: chats/apps/sectors/models.py:510
+#: chats/apps/sectors/models.py:516
 msgid "Group Sector"
 msgstr "Grupo de Setores"
 
-#: chats/apps/sectors/models.py:511
+#: chats/apps/sectors/models.py:517
 msgid "Group Sectors"
 msgstr "Grupos de Setores"
 
-#: chats/apps/sectors/models.py:551
+#: chats/apps/sectors/models.py:557
 msgid "Group Sector Authorization"
 msgstr "Autorização de Grupo de Setores"
 
-#: chats/apps/sectors/models.py:552
+#: chats/apps/sectors/models.py:558
 msgid "Group Sector Authorizations"
 msgstr "Autorizações de Grupo de Setores"
 
-#: chats/apps/sectors/models.py:588
+#: chats/apps/sectors/models.py:594
 msgid "Closed"
 msgstr "Fechado"
 
-#: chats/apps/sectors/models.py:589
+#: chats/apps/sectors/models.py:595
 msgid "Custom Hours"
 msgstr "Horário Personalizado"
 
-#: chats/apps/sectors/models.py:598
+#: chats/apps/sectors/models.py:604
 msgid "Date"
 msgstr "Data"
 
-#: chats/apps/sectors/models.py:600
+#: chats/apps/sectors/models.py:606
 msgid "End Date"
 msgstr "Data de Fim"
 
-#: chats/apps/sectors/models.py:603
+#: chats/apps/sectors/models.py:609
 msgid "End date for holiday range"
 msgstr "Data de fim para o intervalo de feriados"
 
-#: chats/apps/sectors/models.py:606
+#: chats/apps/sectors/models.py:612
 msgid "Day Type"
 msgstr "Tipo de Dia"
 
-#: chats/apps/sectors/models.py:609
+#: chats/apps/sectors/models.py:615
 msgid "Start Time"
 msgstr "Horário de Início"
 
-#: chats/apps/sectors/models.py:612 chats/apps/sectors/models.py:618
+#: chats/apps/sectors/models.py:618 chats/apps/sectors/models.py:624
 msgid "Leave empty if day is closed"
 msgstr "Deixe vazio se o dia estiver fechado"
 
-#: chats/apps/sectors/models.py:615
+#: chats/apps/sectors/models.py:621
 msgid "End Time"
 msgstr "Horário de Fim"
 
-#: chats/apps/sectors/models.py:621
+#: chats/apps/sectors/models.py:627
 msgid "Description"
 msgstr "Descrição"
 
-#: chats/apps/sectors/models.py:624
+#: chats/apps/sectors/models.py:630
 msgid "Holiday name or reason for special hours"
 msgstr "Nome do feriado ou motivo de horário especial"
 
-#: chats/apps/sectors/models.py:626
+#: chats/apps/sectors/models.py:632
 msgid "Is Custom"
 msgstr "É Personalizado"
 
-#: chats/apps/sectors/models.py:627
+#: chats/apps/sectors/models.py:633
 msgid "Repeat Annually"
 msgstr "Repetir Anualmente"
 
-#: chats/apps/sectors/models.py:630
+#: chats/apps/sectors/models.py:636
 msgid "Sector Holiday"
 msgstr "Feriado do Setor"
 
-#: chats/apps/sectors/models.py:631
+#: chats/apps/sectors/models.py:637
 msgid "Sector Holidays"
 msgstr "Feriados do Setor"
 
@@ -1579,9 +1606,6 @@ msgstr "configuração para usar na integração do projeto"
 
 #~ msgid "Sector's ID"
 #~ msgstr "ID do Setor"
-
-#~ msgid "This feature is not available for this project."
-#~ msgstr "Este recurso não está disponível para este projeto."
 
 #~ msgid "The date and time when the conversation was archived"
 #~ msgstr "A data e hora quando a conversa foi arquivada"
