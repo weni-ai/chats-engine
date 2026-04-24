@@ -93,6 +93,9 @@ class BulkTransferService:
                 requested_by=user_request,
             )
 
+            room.add_transfer_to_history(feedback_queue)
+            room.add_transfer_to_history(feedback_user)
+
             create_room_feedback_message(
                 room,
                 feedback_queue,
@@ -151,6 +154,8 @@ class BulkTransferService:
             )
             start_queue_priority_routing(room.queue)
 
+            room.add_transfer_to_history(feedback_user)
+
             create_room_feedback_message(
                 room,
                 feedback_user,
@@ -190,6 +195,8 @@ class BulkTransferService:
             room.user = None
             room.queue = queue
             room.save()
+
+            room.add_transfer_to_history(feedback)
 
             create_room_feedback_message(
                 room,
@@ -278,6 +285,9 @@ class BulkTransferService:
             requested_by=user_request,
         )
 
+        room.add_transfer_to_history(feedback_queue)
+        room.add_transfer_to_history(feedback_user)
+
         create_room_feedback_message(
             room,
             feedback_queue,
@@ -320,6 +330,8 @@ class BulkTransferService:
             metrics.queued_count += 1
             metrics.save()
 
+        room.add_transfer_to_history(feedback_user)
+
         create_room_feedback_message(
             room,
             feedback_user,
@@ -356,6 +368,8 @@ class BulkTransferService:
         room.user = None
         room.queue = queue
         room.save()
+
+        room.add_transfer_to_history(feedback)
 
         create_room_feedback_message(
             room,
