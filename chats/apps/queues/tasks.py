@@ -27,7 +27,7 @@ def route_queue_rooms(queue_uuid: UUID):
         settings.ROUTE_QUEUE_COOLDOWN_FEATURE_FLAG_KEY,
         {"projectUUID": str(queue.sector.project.uuid)},
     )
-    lock_key = f"route_queue_rooms_lock:{queue_uuid}"
+    lock_key = f"route_queue_rooms_lock:{queue.sector.uuid}"
     pending_key = f"route_queue_rooms_pending:{queue_uuid}"
     if cooldown_feature_flag_active:
         acquired = cache.add(
@@ -56,5 +56,4 @@ def route_queue_rooms(queue_uuid: UUID):
     finally:
         if cooldown_feature_flag_active:
             cache.delete(lock_key)
-            cache.delete(pending_key)
     return True
