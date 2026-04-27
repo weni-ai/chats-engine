@@ -108,12 +108,52 @@ class SectorTests(APITestCase):
             "work_start": "11:00",
             "work_end": "19:30",
             "project": str(self.project.pk),
+            "user": self.manager_user.email,
         }
         response = client.post(url, data=data)
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["automatic_message"]["is_active"], False)
         self.assertIsNone(response.data["automatic_message"]["text"])
+
+    def test_create_sector_without_user_returns_400(self):
+        url = reverse("sector-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        data = {
+            "name": "Finances",
+            "rooms_limit": 3,
+            "work_start": "11:00",
+            "work_end": "19:30",
+            "project": str(self.project.pk),
+        }
+        response = client.post(url, data=data)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("user", response.data)
+        self.assertFalse(
+            Sector.objects.filter(project=self.project, name="Finances").exists()
+        )
+
+    def test_create_sector_with_user_without_project_permission_returns_400(self):
+        url = reverse("sector-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        data = {
+            "name": "Finances",
+            "rooms_limit": 3,
+            "work_start": "11:00",
+            "work_end": "19:30",
+            "project": str(self.project.pk),
+            "user": "stranger@example.com",
+        }
+        response = client.post(url, data=data)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("user", response.data)
+        self.assertFalse(
+            Sector.objects.filter(project=self.project, name="Finances").exists()
+        )
 
     @patch("chats.apps.api.v1.sectors.serializers.is_feature_active")
     def test_create_sector_with_right_project_token_and_automatic_message_active(
@@ -133,6 +173,7 @@ class SectorTests(APITestCase):
             "work_start": "11:00",
             "work_end": "19:30",
             "project": str(self.project.pk),
+            "user": self.manager_user.email,
             "automatic_message": {
                 "is_active": True,
                 "text": "Hello, how can I help you?",
@@ -477,6 +518,7 @@ class SectorTicketerCreationTests(APITestCase):
             "work_end": "18:00",
             "project": str(self.principal_project.uuid),
             "secondary_project": {"uuid": str(self.secondary_project.uuid)},
+            "user": self.user.email,
         }
 
         response = self.client.post(url, data=data, format="json")
@@ -520,6 +562,7 @@ class SectorTicketerCreationTests(APITestCase):
             "work_start": "08:00",
             "work_end": "18:00",
             "project": str(self.normal_project.uuid),
+            "user": self.user.email,
         }
 
         response = self.client.post(url, data=data, format="json")
@@ -558,6 +601,7 @@ class SectorTicketerCreationTests(APITestCase):
             "work_end": "18:00",
             "project": str(self.principal_project.uuid),
             "secondary_project": {"uuid": str(self.secondary_project.uuid)},
+            "user": self.user.email,
         }
 
         response = self.client.post(url, data=data, format="json")
