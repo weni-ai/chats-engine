@@ -74,7 +74,7 @@ class AllAgentsView(generics.ListAPIView):
     Lists all attendant agents of a project with ordering and filters.
 
     Ordering: ONLINE → pause (active custom status) → OFFLINE, then alphabetical.
-    Filters: status, custom_status, agent (email), sector, queue.
+    Filters: status (online, offline, or custom pause name), agent (email), sector, queue.
     """
 
     permission_classes = [IsAuthenticated]

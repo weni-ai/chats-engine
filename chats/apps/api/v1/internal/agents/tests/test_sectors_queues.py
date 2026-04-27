@@ -117,6 +117,7 @@ class SectorsQueuesViewTests(TestCase):
         """`limit` and `offset` query params paginate the sectors list."""
         view = SectorsQueuesView.as_view()
         url = f"/project/{self.project.pk}/sectors/queues/"
+
         request = self.factory.get(url, {"limit": 1, "offset": 0})
         force_authenticate(request, user=self.manager)
         response = view(request, project_uuid=str(self.project.pk))
