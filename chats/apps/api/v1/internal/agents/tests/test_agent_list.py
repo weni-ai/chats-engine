@@ -216,7 +216,7 @@ class AgentListOrderingTests(TestCase):
 
 # ===========================================================================
 # ENGAGE-7556 — Agent list filters
-# Filters: status, custom_status, agent (email), sector, queue
+# Filters: status (online, offline, or custom pause name), agent (email), sector, queue
 # ===========================================================================
 
 
@@ -305,14 +305,45 @@ class AgentListFilterTests(TestCase):
     # Case 26b
     # ------------------------------------------------------------------
 
-    def test_filter_by_custom_status_returns_paused_agents(self):
-        """Filter custom_status=Lunch returns only agents currently on that pause."""
-        _put_on_pause(self.online_user, self.project, "Lunch")
+    def test_filter_status_accepts_custom_pause_name(self):
+        """Filter status=<custom pause name> returns only agents currently on that pause."""
+        _put_on_pause(self.online_user, self.project, "Pré-pausa")
 
-        response = self._list({"custom_status": "Lunch"})
+        response = self._list({"status": "Pré-pausa"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        emails = self._emails(response)
+        self.assertEqual(emails, {self.online_user.email})
+
+    def test_filter_status_combines_online_and_custom_pause(self):
+        """status=online,Pré-pausa returns ONLINE agents (without pause) plus agents on that pause."""
+        paused_user = User.objects.create_user(
+            email="paused@test.com", password="x", first_name="Paused"
+        )
+        ProjectPermission.objects.create(
+            project=self.project,
+            user=paused_user,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status=ProjectPermission.STATUS_ONLINE,
+        )
+        _put_on_pause(paused_user, self.project, "Pré-pausa")
+
+        response = self._list({"status": "online,Pré-pausa"})
 
         emails = self._emails(response)
         self.assertIn(self.online_user.email, emails)
+        self.assertIn(paused_user.email, emails)
+        self.assertNotIn(self.offline_user.email, emails)
+
+    def test_filter_status_custom_name_scoped_to_project(self):
+        """Custom pause status filter does not match active pauses from other projects."""
+        other_project = Project.objects.create(name="Other", timezone="UTC")
+        _put_on_pause(self.online_user, other_project, "Pré-pausa")
+
+        response = self._list({"status": "Pré-pausa"})
+
+        emails = self._emails(response)
+        self.assertNotIn(self.online_user.email, emails)
         self.assertNotIn(self.offline_user.email, emails)
 
     # ------------------------------------------------------------------
@@ -945,12 +976,12 @@ class AgentListMultiValueFilterTests(TestCase):
         self.assertIn(self.user_c.email, emails)
         self.assertNotIn(self.user_b.email, emails)
 
-    def test_filter_custom_status_accepts_multiple_values(self):
-        """custom_status=Lunch,Break returns agents on either pause."""
+    def test_filter_status_accepts_multiple_custom_pause_names(self):
+        """status=Lunch,Break returns agents on either pause."""
         _put_on_pause(self.user_a, self.project, pause_name="Lunch")
         _put_on_pause(self.user_c, self.project, pause_name="Break")
 
-        response = self._list({"custom_status": "Lunch,Break"})
+        response = self._list({"status": "Lunch,Break"})
 
         emails = self._emails(response)
         self.assertIn(self.user_a.email, emails)

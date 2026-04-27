@@ -15,7 +15,6 @@ class CharInFilter(filters.BaseInFilter, filters.CharFilter):
 
 class AllAgentsFilter(filters.FilterSet):
     status = CharInFilter(method="filter_status")
-    custom_status = CharInFilter(method="filter_custom_status")
     agent = CharInFilter(method="filter_agent")
     sector = UUIDInFilter(method="filter_sector")
     queue = UUIDInFilter(method="filter_queue")
@@ -36,30 +35,44 @@ class AllAgentsFilter(filters.FilterSet):
         if not values:
             return queryset
 
-        normalized = {v.lower() for v in values if v}
-        qs = queryset.annotate(_on_pause=Exists(self._active_pause_qs()))
+        has_online = False
+        has_offline = False
+        custom_names = []
+        for value in values:
+            if not value:
+                continue
+            lowered = value.lower()
+            if lowered == "online":
+                has_online = True
+            elif lowered == "offline":
+                has_offline = True
+            else:
+                custom_names.append(value)
 
+        qs = queryset
         condition = Q()
-        if "online" in normalized:
+
+        if has_online:
+            qs = qs.annotate(_on_pause=Exists(self._active_pause_qs()))
             condition |= Q(status=ProjectPermission.STATUS_ONLINE, _on_pause=False)
-        if "offline" in normalized:
+
+        if has_offline:
             condition |= Q(status=ProjectPermission.STATUS_OFFLINE)
+
+        if custom_names:
+            custom_subquery = CustomStatus.objects.filter(
+                user_id=OuterRef("user_id"),
+                project=OuterRef("project"),
+                is_active=True,
+                status_type__name__in=custom_names,
+            )
+            qs = qs.annotate(_has_custom_status=Exists(custom_subquery))
+            condition |= Q(_has_custom_status=True)
 
         if not condition:
             return queryset
 
         return qs.filter(condition)
-
-    def filter_custom_status(self, queryset, name, values):
-        if not values:
-            return queryset
-
-        project_uuid = self.request.resolver_match.kwargs.get("project_uuid")
-        return queryset.filter(
-            user__user_custom_status__is_active=True,
-            user__user_custom_status__status_type__name__in=values,
-            user__user_custom_status__project__uuid=project_uuid,
-        ).distinct()
 
     def filter_agent(self, queryset, name, values):
         if not values:
