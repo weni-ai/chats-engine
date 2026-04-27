@@ -1,3 +1,4 @@
+import time
 from datetime import datetime, timezone
 from uuid import UUID
 from celery import shared_task
@@ -63,6 +64,8 @@ def start_archive_rooms_messages():
 
     async_applied_count = 0
 
+    loop_start = time.monotonic()
+
     for room in rooms:
         archive_room_messages.apply_async(
             args=[room.uuid, job.uuid], expires=expiration_dt
@@ -74,8 +77,10 @@ def start_archive_rooms_messages():
                 f"[start_archive_rooms_messages] Dispatched {async_applied_count}/{rooms_count} tasks"
             )
 
+    loop_elapsed = time.monotonic() - loop_start
+
     logger.info(
-        f"[start_archive_rooms_messages] Applied {async_applied_count} async tasks"
+        f"[start_archive_rooms_messages] Applied {async_applied_count} async tasks in {loop_elapsed:.2f}s"
     )
 
 
