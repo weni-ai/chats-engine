@@ -50,8 +50,10 @@ def start_archive_rooms_messages():
 
         rooms_query = rooms_query.filter(queue__sector__project__in=projects)
 
-    rooms = rooms_query.order_by("ended_at")[: settings.ARCHIVE_CHATS_MAX_ROOMS]
-    rooms_count = rooms_query.count()
+    room_uuids = rooms_query.order_by("ended_at").values_list("uuid", flat=True)[
+        : settings.ARCHIVE_CHATS_MAX_ROOMS
+    ]
+    rooms_count = len(room_uuids)
 
     expiration_dt = calculate_archive_task_expiration_dt(
         settings.ARCHIVE_CHATS_MAX_HOUR
@@ -66,9 +68,9 @@ def start_archive_rooms_messages():
 
     loop_start = time.monotonic()
 
-    for room in rooms:
+    for room_uuid in room_uuids:
         archive_room_messages.apply_async(
-            args=[room.uuid, job.uuid], expires=expiration_dt
+            args=[room_uuid, job.uuid], expires=expiration_dt
         )
         async_applied_count += 1
 
