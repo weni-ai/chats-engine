@@ -15,7 +15,8 @@ from chats.apps.archive_chats.services import ArchiveChatsService
 logger = logging.getLogger(__name__)
 
 
-@shared_task(name="start_archive_rooms_messages", queue="archive-chats")
+# TODO: Move to a dedicated "archive-chats-scheduler" queue
+@shared_task(name="start_archive_rooms_messages")
 def start_archive_rooms_messages():
     """
     This task is used to archive the messages of the rooms that were created more than 1 year ago.
@@ -67,6 +68,11 @@ def start_archive_rooms_messages():
             args=[room.uuid, job.uuid], expires=expiration_dt
         )
         async_applied_count += 1
+
+        if async_applied_count % 1000 == 0:
+            logger.info(
+                f"[start_archive_rooms_messages] Dispatched {async_applied_count}/{rooms_count} tasks"
+            )
 
     logger.info(
         f"[start_archive_rooms_messages] Applied {async_applied_count} async tasks"
