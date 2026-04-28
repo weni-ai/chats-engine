@@ -99,14 +99,12 @@ def _create_pending_records(room_uuids, job):
         return
 
     existing_room_ids = set(
-        RoomArchivedConversation.objects.filter(
-            room_id__in=room_uuids
-        ).values_list("room_id", flat=True)
+        RoomArchivedConversation.objects.filter(room_id__in=room_uuids).values_list(
+            "room_id", flat=True
+        )
     )
 
-    RoomArchivedConversation.objects.filter(
-        room_id__in=existing_room_ids
-    ).exclude(
+    RoomArchivedConversation.objects.filter(room_id__in=existing_room_ids).exclude(
         status=ArchiveConversationsJobStatus.FINISHED
     ).update(job=job)
 
@@ -121,7 +119,7 @@ def _create_pending_records(room_uuids, job):
                 )
                 for uid in new_room_ids
             ],
-            batch_size=2000,
+            batch_size=settings.ARCHIVE_CHATS_BULK_CREATE_PENDING_BATCH_SIZE,
         )
 
     logger.info(
