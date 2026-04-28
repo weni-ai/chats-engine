@@ -37,6 +37,18 @@ class RoomMessageStatusSerializer(serializers.Serializer):
     )
 
 
+class RoomsCountQueryParamsSerializer(serializers.Serializer):
+    sector = serializers.UUIDField(required=False)
+    queue = serializers.UUIDField(required=False)
+
+    def validate(self, data: dict) -> dict:
+        if bool(data.get("sector")) == bool(data.get("queue")):
+            raise serializers.ValidationError(
+                "Provide exactly one of 'sector' or 'queue'."
+            )
+        return data
+
+
 class RoomSerializer(serializers.ModelSerializer):
     user = UserSerializer(many=False, read_only=True)
     contact = ContactRelationsSerializer(many=False, read_only=True)
