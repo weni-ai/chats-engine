@@ -84,7 +84,8 @@ class QueueTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["uuid"], str(self.queue_1.pk))
 
-    def test_create_queue_with_manager_token(self):
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=False)
+    def test_create_queue_with_manager_token(self, mock_is_feature_active):
         """
         Verify if the create endpoint for queue its working correctly.
         """
