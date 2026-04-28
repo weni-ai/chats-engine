@@ -12,7 +12,7 @@ User = get_user_model()
 
 class AddUserToDiscussionUseCase:
     def execute(self, discussion: Discussion, user_email: str, from_user) -> dict:
-        user = User.objects.get(email=user_email)
+        user = User.objects.get(email=user_email.lower())
 
         if discussion.is_added_user(user):
             raise ValidationError(
