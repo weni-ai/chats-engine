@@ -117,7 +117,9 @@ def _create_pending_records(room_uuids, job):
             batch_size=settings.ARCHIVE_CHATS_BULK_CREATE_PENDING_BATCH_SIZE,
         )
 
-    logger.info(f"[start_archive_rooms_messages] Created/updated {len(room_uuids)}")
+    logger.info(
+        f"[start_archive_rooms_messages] Created {len(new_room_ids)} archived conversations rows"
+    )
 
 
 def _dispatch_sequential(room_uuids, job_uuid, expiration_dt, rooms_count):
