@@ -188,7 +188,10 @@ class CreateDiscussionUserViewActionTests(APITestCase):
         response = self._add_agent(self.admin_token, self.agent_user.email)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("already added", response.json()[0])
+        self.assertEqual(
+            response.json()["error"][0],
+            f"User {self.agent_user.email} is already added to this discussion",
+        )
         self.assertEqual(
             DiscussionUser.objects.filter(
                 discussion=self.discussion, permission=self.agent_perm

@@ -93,7 +93,10 @@ class AddUserToDiscussionUseCaseTests(TestCase):
                 self.discussion, self.agent_user.email, self.creator_user
             )
 
-        self.assertIn("already added", str(ctx.exception.detail))
+        self.assertEqual(
+            ctx.exception.detail["error"][0],
+            f"User {self.agent_user.email} is already added to this discussion",
+        )
 
     @override_settings(DISCUSSION_AGENTS_LIMIT=10)
     def test_execute_raises_when_user_email_not_found(self, _mock_ws):
