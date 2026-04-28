@@ -14,7 +14,7 @@ from model_utils import FieldTracker
 from chats.apps.csat.flows.definitions.flow import CSAT_FLOW_VERSION
 from chats.apps.csat.models import CSATFlowProjectConfig
 from chats.apps.queues.utils import start_queue_priority_routing
-from chats.core.models import BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
+from chats.core.models import AuditableMixin, BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
 from chats.utils.websockets import send_channels_group
 
 from .sector_managers import SectorAuthorizationManager, SectorManager
@@ -24,7 +24,7 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
-class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
+class Sector(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
     name = models.CharField(_("name"), max_length=120)
     project = models.ForeignKey(
         "projects.Project",
@@ -344,7 +344,7 @@ class Sector(BaseSoftDeleteModel, BaseConfigurableModel, BaseModel):
         )
 
 
-class SectorAuthorization(BaseModel):
+class SectorAuthorization(AuditableMixin, BaseModel):
     ROLE_NOT_SETTED = 0
     ROLE_MANAGER = 1
 
@@ -422,7 +422,7 @@ class SectorAuthorization(BaseModel):
         return self.sector.project
 
 
-class SectorTag(BaseSoftDeleteModel, BaseModel):
+class SectorTag(AuditableMixin, BaseSoftDeleteModel, BaseModel):
     name = models.CharField(_("Name"), max_length=120)
     sector = models.ForeignKey(
         "sectors.Sector",
@@ -490,7 +490,7 @@ class SectorGroupSector(BaseModel):
         return f"{self.sector_group.name} - {self.sector.name}"
 
 
-class GroupSector(BaseModel, BaseSoftDeleteModel):
+class GroupSector(AuditableMixin, BaseModel, BaseSoftDeleteModel):
     name = models.CharField(_("Name"), max_length=120)
     project = models.ForeignKey(
         "projects.Project",
@@ -575,7 +575,7 @@ class GroupSectorAuthorization(BaseModel):
             return None
 
 
-class SectorHoliday(BaseSoftDeleteModel, BaseModel):
+class SectorHoliday(AuditableMixin, BaseSoftDeleteModel, BaseModel):
     """
     Model to store holidays and configurable special days by sector
     (feriados locais, folgas específicas, etc.)
@@ -704,5 +704,10 @@ class SectorHoliday(BaseSoftDeleteModel, BaseModel):
 
     def delete(self, *args, **kwargs):
         self.is_deleted = True
-        super().save(update_fields=["is_deleted"])
+        update_fields = ["is_deleted"]
+        if self.deleted_by_id:
+            update_fields.append("deleted_by")
+        if self.modified_by_id:
+            update_fields.append("modified_by")
+        super().save(update_fields=update_fields)
         self._invalidate_cache()

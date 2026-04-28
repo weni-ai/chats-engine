@@ -1,21 +1,25 @@
+import time
 from datetime import datetime, timezone
+from itertools import islice
 from uuid import UUID
-from celery import shared_task
+
+import logging
+
+from celery import group, shared_task
+from dateutil.relativedelta import relativedelta as rdelta
+from django.conf import settings
+
 from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
 from chats.apps.archive_chats.expiration import calculate_archive_task_expiration_dt
-from chats.apps.rooms.models import Room
-from django.conf import settings
-import logging
-from dateutil.relativedelta import relativedelta as rdelta
-
-
 from chats.apps.archive_chats.models import ArchiveConversationsJob
 from chats.apps.archive_chats.services import ArchiveChatsService
+from chats.apps.rooms.models import Room
 
 logger = logging.getLogger(__name__)
 
 
-@shared_task(name="start_archive_rooms_messages", queue="archive-chats")
+# TODO: Move to a dedicated "archive-chats-scheduler" queue
+@shared_task(name="start_archive_rooms_messages")
 def start_archive_rooms_messages():
     """
     This task is used to archive the messages of the rooms that were created more than 1 year ago.
@@ -48,8 +52,10 @@ def start_archive_rooms_messages():
 
         rooms_query = rooms_query.filter(queue__sector__project__in=projects)
 
-    rooms = rooms_query.order_by("ended_at")[: settings.ARCHIVE_CHATS_MAX_ROOMS]
-    rooms_count = rooms.count()
+    room_uuids = rooms_query.order_by("ended_at").values_list("uuid", flat=True)[
+        : settings.ARCHIVE_CHATS_MAX_ROOMS
+    ]
+    rooms_count = len(room_uuids)
 
     expiration_dt = calculate_archive_task_expiration_dt(
         settings.ARCHIVE_CHATS_MAX_HOUR
@@ -60,17 +66,59 @@ def start_archive_rooms_messages():
     )
     logger.info(f"[start_archive_rooms_messages] Expiration date: {expiration_dt}")
 
-    async_applied_count = 0
+    loop_start = time.monotonic()
 
-    for room in rooms:
-        archive_room_messages.apply_async(
-            args=[room.uuid, job.uuid], expires=expiration_dt
+    if settings.ARCHIVE_CHATS_USE_BATCH_DISPATCH:
+        dispatched = _dispatch_batched(room_uuids, job.uuid, expiration_dt, rooms_count)
+    else:
+        dispatched = _dispatch_sequential(
+            room_uuids, job.uuid, expiration_dt, rooms_count
         )
-        async_applied_count += 1
+
+    loop_elapsed = time.monotonic() - loop_start
 
     logger.info(
-        f"[start_archive_rooms_messages] Applied {async_applied_count} async tasks"
+        f"[start_archive_rooms_messages] Applied {dispatched} async tasks in {loop_elapsed:.2f}s"
     )
+
+
+def _dispatch_sequential(room_uuids, job_uuid, expiration_dt, rooms_count):
+    dispatched = 0
+    for room_uuid in room_uuids:
+        archive_room_messages.apply_async(
+            args=[room_uuid, job_uuid], expires=expiration_dt
+        )
+        dispatched += 1
+        if dispatched % 1000 == 0:
+            logger.info(
+                f"[start_archive_rooms_messages] Dispatched {dispatched}/{rooms_count} tasks"
+            )
+    return dispatched
+
+
+def _chunked(iterable, size):
+    it = iter(iterable)
+    while True:
+        chunk = list(islice(it, size))
+        if not chunk:
+            break
+        yield chunk
+
+
+def _dispatch_batched(room_uuids, job_uuid, expiration_dt, rooms_count):
+    batch_size = settings.ARCHIVE_CHATS_BATCH_SIZE
+    dispatched = 0
+    for batch in _chunked(room_uuids, batch_size):
+        sigs = [
+            archive_room_messages.s(room_uuid, job_uuid).set(expires=expiration_dt)
+            for room_uuid in batch
+        ]
+        group(sigs).apply_async()
+        dispatched += len(batch)
+        logger.info(
+            f"[start_archive_rooms_messages] Dispatched {dispatched}/{rooms_count} tasks"
+        )
+    return dispatched
 
 
 @shared_task(queue="archive-chats")

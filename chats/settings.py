@@ -12,10 +12,10 @@ https://docs.djangoproject.com/en/4.0/ref/settings/
 
 import os
 from pathlib import Path
-from celery.schedules import crontab
 
 import environ
 import sentry_sdk
+from celery.schedules import crontab
 from django.utils.log import DEFAULT_LOGGING
 from sentry_sdk.integrations.django import DjangoIntegration
 
@@ -294,6 +294,15 @@ LOGGING["handlers"]["console"] = {
     "level": "DEBUG",
     "class": "logging.StreamHandler",
     "formatter": "verbose",
+}
+
+# Silence "Unknown feature ..." warnings emitted by the growthbook SDK when a
+# feature flag is not provisioned in the environment. These are expected
+# during tests and for flags that are still rolling out.
+LOGGING.setdefault("loggers", {})["growthbook.core"] = {
+    "level": "ERROR",
+    "handlers": ["console"],
+    "propagate": False,
 }
 
 
@@ -695,6 +704,9 @@ WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY = env.str(
     "WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY",
     default="weniChatsBackEndReturn24hValidOnRoomsList",
 )
+AUDIT_LOG_FEATURE_FLAG_KEY = env.str(
+    "AUDIT_LOG_FEATURE_FLAG_KEY", default="weniChatsAuditLog"
+)
 
 
 # USER CACHE
@@ -718,6 +730,10 @@ ARCHIVE_CHATS_PROJECTS_LIST_FEATURE_FLAG_KEY = env.str(
 ARCHIVE_CHATS_IS_ACTIVE_FOR_ALL_PROJECTS = env.bool(
     "ARCHIVE_CHATS_IS_ACTIVE_FOR_ALL_PROJECTS", default=False
 )
+ARCHIVE_CHATS_USE_BATCH_DISPATCH = env.bool(
+    "ARCHIVE_CHATS_USE_BATCH_DISPATCH", default=False
+)
+ARCHIVE_CHATS_BATCH_SIZE = env.int("ARCHIVE_CHATS_BATCH_SIZE", default=500)
 
 # Internal API Token
 INTERNAL_API_TOKEN = env.str("INTERNAL_API_TOKEN")

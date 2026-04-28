@@ -7,6 +7,7 @@ from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.api.v1.queues import serializers as queue_serializers
 from chats.apps.api.v1.queues.filters import QueueFilter
 from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.core.audit import apply_audit_fields
 
 
 class QueueInternalViewset(viewsets.ModelViewSet):
@@ -40,18 +41,17 @@ class QueueInternalViewset(viewsets.ModelViewSet):
         )
 
     def perform_create(self, serializer):
-        serializer.save()
+        serializer.save(created_by=self.request.user, modified_by=self.request.user)
 
     def perform_update(self, serializer):
-        serializer.save()
+        serializer.save(modified_by=self.request.user)
 
     def perform_destroy(self, instance):
         instance.is_deleted = True
-        instance.save()
-        return Response(
-            {"is_deleted": True},
-            status.HTTP_200_OK,
+        apply_audit_fields(
+            instance, self.request, instance.sector.project, on_delete=True
         )
+        instance.save()
 
 
 class QueueAuthInternalViewset(viewsets.ModelViewSet):
@@ -82,15 +82,17 @@ class QueueAuthInternalViewset(viewsets.ModelViewSet):
         )
 
     def perform_create(self, serializer):
-        serializer.save()
+        serializer.save(created_by=self.request.user, modified_by=self.request.user)
 
     def perform_update(self, serializer):
-        serializer.save()
+        serializer.save(modified_by=self.request.user)
 
     def perform_destroy(self, instance):
         instance.is_deleted = True
-        instance.save()
-        return Response(
-            {"is_deleted": True},
-            status.HTTP_200_OK,
+        apply_audit_fields(
+            instance,
+            self.request,
+            instance.queue.sector.project,
+            on_delete=True,
         )
+        instance.save()
