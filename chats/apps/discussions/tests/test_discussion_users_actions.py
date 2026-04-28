@@ -189,7 +189,7 @@ class CreateDiscussionUserViewActionTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(
-            response.json()["error"][0],
+            response.json()["error"],
             f"User {self.agent_user.email} is already added to this discussion",
         )
         self.assertEqual(

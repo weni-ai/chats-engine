@@ -94,7 +94,7 @@ class AddUserToDiscussionUseCaseTests(TestCase):
             )
 
         self.assertEqual(
-            ctx.exception.detail["error"][0],
+            ctx.exception.detail["error"],
             f"User {self.agent_user.email} is already added to this discussion",
         )
 
