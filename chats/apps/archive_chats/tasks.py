@@ -35,7 +35,7 @@ def start_archive_rooms_messages():
     rooms_query = (
         Room.objects.filter(is_active=False, ended_at__lt=limit_date)
         .exclude(archived_conversations__status=ArchiveConversationsJobStatus.FINISHED)
-        .exclude(archived_conversations__job__started_at__date=now.date())
+        .exclude(archived_conversations__job__started_at__gte=now - rdelta(hours=24))
     )
 
     if not settings.ARCHIVE_CHATS_IS_ACTIVE_FOR_ALL_PROJECTS:
