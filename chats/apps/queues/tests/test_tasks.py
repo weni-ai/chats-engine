@@ -13,7 +13,6 @@ from chats.apps.projects.models.models import (
 )
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.queues.tasks import route_queue_rooms, route_sector_rooms
-from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
 
 
