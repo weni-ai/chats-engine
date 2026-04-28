@@ -8,6 +8,9 @@ from django.utils import timezone
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
 from chats.apps.queues.models import LAST_SEEN_THRESHOLD_SECONDS
+from chats.apps.queues.usecases.can_agent_receive_room import (
+    CanAgentReceiveRoomUseCase,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +115,13 @@ class QueueRouterService:
                     agent.email,
                     room.uuid,
                 )
+                continue
+
+            # Last-moment capacity recheck to close the race between
+            # get_available_agent() and room.save(), where concurrent
+            # assignments could push the agent above the sector's limit.
+            capacity = CanAgentReceiveRoomUseCase(self.queue).execute(agent)
+            if not capacity.can_receive:
                 continue
 
             old_user_assigned_at = room.user_assigned_at
