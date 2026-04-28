@@ -67,9 +67,6 @@ class DiscussionFiltersAndViewsTests(TestCase):
         )
         self.assertFalse(f.qs.exists())
 
-    @patch(
-        "chats.apps.discussions.views._discussion_user_actions.get_user_id_by_email_cached"
-    )
     @override_settings(DISCUSSION_AGENTS_LIMIT=10)
     def test_add_agents_resolves_user_and_creates(self, mock_cache):
         mock_cache.return_value = self.agent.pk
