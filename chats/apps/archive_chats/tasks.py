@@ -11,7 +11,10 @@ from django.conf import settings
 
 from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
 from chats.apps.archive_chats.expiration import calculate_archive_task_expiration_dt
-from chats.apps.archive_chats.models import ArchiveConversationsJob
+from chats.apps.archive_chats.models import (
+    ArchiveConversationsJob,
+    RoomArchivedConversation,
+)
 from chats.apps.archive_chats.services import ArchiveChatsService
 from chats.apps.rooms.models import Room
 
@@ -35,7 +38,7 @@ def start_archive_rooms_messages():
     rooms_query = (
         Room.objects.filter(is_active=False, ended_at__lt=limit_date)
         .exclude(archived_conversations__status=ArchiveConversationsJobStatus.FINISHED)
-        .exclude(archived_conversations__job__started_at__date=now.date())
+        .exclude(archived_conversations__job__started_at__gte=now - rdelta(hours=24))
     )
 
     if not settings.ARCHIVE_CHATS_IS_ACTIVE_FOR_ALL_PROJECTS:
@@ -52,9 +55,11 @@ def start_archive_rooms_messages():
 
         rooms_query = rooms_query.filter(queue__sector__project__in=projects)
 
-    room_uuids = rooms_query.order_by("ended_at").values_list("uuid", flat=True)[
-        : settings.ARCHIVE_CHATS_MAX_ROOMS
-    ]
+    room_uuids = list(
+        rooms_query.order_by("ended_at").values_list("uuid", flat=True)[
+            : settings.ARCHIVE_CHATS_MAX_ROOMS
+        ]
+    )
     rooms_count = len(room_uuids)
 
     expiration_dt = calculate_archive_task_expiration_dt(
@@ -66,17 +71,54 @@ def start_archive_rooms_messages():
     )
     logger.info(f"[start_archive_rooms_messages] Expiration date: {expiration_dt}")
 
+    _create_pending_records(room_uuids, job)
+
     loop_start = time.monotonic()
 
     if settings.ARCHIVE_CHATS_USE_BATCH_DISPATCH:
         dispatched = _dispatch_batched(room_uuids, job.uuid, expiration_dt, rooms_count)
     else:
-        dispatched = _dispatch_sequential(room_uuids, job.uuid, expiration_dt, rooms_count)
+        dispatched = _dispatch_sequential(
+            room_uuids, job.uuid, expiration_dt, rooms_count
+        )
 
     loop_elapsed = time.monotonic() - loop_start
 
     logger.info(
         f"[start_archive_rooms_messages] Applied {dispatched} async tasks in {loop_elapsed:.2f}s"
+    )
+
+
+def _create_pending_records(room_uuids, job):
+    """
+    Bulk-create PENDING RoomArchivedConversation records at dispatch time so
+    subsequent scheduler runs exclude already-queued rooms via the 24-hour
+    job filter.
+    """
+    if not room_uuids:
+        return
+
+    new_room_ids = (
+        Room.objects.filter(uuid__in=room_uuids)
+        .exclude(archived_conversations__isnull=False)
+        .values_list("uuid", flat=True)
+    )
+
+    if new_room_ids:
+        RoomArchivedConversation.objects.bulk_create(
+            [
+                RoomArchivedConversation(
+                    room_id=room_id,
+                    job=job,
+                    status=ArchiveConversationsJobStatus.PENDING,
+                )
+                for room_id in new_room_ids
+            ],
+            batch_size=settings.ARCHIVE_CHATS_BULK_CREATE_PENDING_BATCH_SIZE,
+        )
+
+    logger.info(
+        f"[start_archive_rooms_messages] Created {len(new_room_ids)} archived conversations rows"
     )
 
 
