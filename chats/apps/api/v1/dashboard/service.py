@@ -266,6 +266,8 @@ class TimeMetricsService:
 
         rooms_filter = (
             Q(queue__sector__project=project)
+            & Q(queue__is_deleted=False)
+            & Q(queue__sector__is_deleted=False)
             & Q(is_active=False)
             & Q(ended_at__gte=filters.start_date)
             & Q(ended_at__lte=filters.end_date)

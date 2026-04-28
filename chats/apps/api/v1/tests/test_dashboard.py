@@ -1,8 +1,9 @@
-import time
 import uuid
+from datetime import datetime, timedelta, timezone as dt_timezone
 from unittest.mock import patch
 
 from django.urls import reverse
+from freezegun import freeze_time
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
@@ -69,109 +70,123 @@ class DashboardTests(APITestCase):
         """
         Verify if the interaction_time of a room metric its calculated correctly.
         """
-        url = reverse("external_rooms-list")
-        client = self.client
-        client.credentials(
-            HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380"
-        )
+        initial = datetime(2024, 1, 1, 12, 0, 0, tzinfo=dt_timezone.utc)
+        with freeze_time(initial) as frozen:
+            url = reverse("external_rooms-list")
+            client = self.client
+            client.credentials(
+                HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380"
+            )
 
-        data = {
-            "queue_uuid": "f341417b-5143-4469-a99d-f141a0676bd4",
-            "contact": {
-                "external_id": str(uuid.uuid4()),
-                "name": "Test Contact",
-                "email": "test@example.com",
-                "phone": "+1234567890",
-                "custom_fields": {},
-            },
-        }
+            data = {
+                "queue_uuid": "f341417b-5143-4469-a99d-f141a0676bd4",
+                "contact": {
+                    "external_id": str(uuid.uuid4()),
+                    "name": "Test Contact",
+                    "email": "test@example.com",
+                    "phone": "+1234567890",
+                    "custom_fields": {},
+                },
+            }
 
-        response = client.post(url, data=data, format="json")
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            response = client.post(url, data=data, format="json")
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        room_created = Room.objects.get(uuid=response.data["uuid"])
-        room_created.user = self.manager_user
-        room_created.save()
+            room_created = Room.objects.get(uuid=response.data["uuid"])
+            room_created.user = self.manager_user
+            room_created.save()
 
-        time.sleep(3)
+            frozen.move_to(initial + timedelta(seconds=3))
 
-        url_close = f"/v1/room/{room_created.uuid}/close/"
-        close_client = self.client
-        close_client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
-        data_close = {"tags": []}
-        client.patch(url_close, data=data_close, format="json")
+            url_close = f"/v1/room/{room_created.uuid}/close/"
+            close_client = self.client
+            close_client.credentials(
+                HTTP_AUTHORIZATION="Token " + self.login_token.key
+            )
+            data_close = {"tags": []}
+            client.patch(url_close, data=data_close, format="json")
 
-        room_closed = Room.objects.get(queue_id=data["queue_uuid"])
-        metric = RoomMetrics.objects.get(room=room_closed)
+            room_closed = Room.objects.get(queue_id=data["queue_uuid"])
+            metric = RoomMetrics.objects.get(room=room_closed)
 
-        self.assertEqual(metric.interaction_time, 3)
+            self.assertEqual(metric.interaction_time, 3)
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
     def test_message_response_time_metric_calc(self, mock_is_attending):
         """
         Verify if the message_response_time of a room metric its calculated correctly.
         """
-        url = reverse("external_rooms-list")
-        client = self.client
-        client.credentials(
-            HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380"
-        )
+        initial = datetime(2024, 1, 1, 12, 0, 0, tzinfo=dt_timezone.utc)
+        with freeze_time(initial) as frozen:
+            url = reverse("external_rooms-list")
+            client = self.client
+            client.credentials(
+                HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380"
+            )
 
-        data = {
-            "queue_uuid": "f341417b-5143-4469-a99d-f141a0676bd4",
-            "contact": {
-                "external_id": str(uuid.uuid4()),
-                "name": "Test Message Response",
-                "email": "test@example.com",
-                "phone": "+1234567890",
-                "custom_fields": {},
-            },
-        }
+            data = {
+                "queue_uuid": "f341417b-5143-4469-a99d-f141a0676bd4",
+                "contact": {
+                    "external_id": str(uuid.uuid4()),
+                    "name": "Test Message Response",
+                    "email": "test@example.com",
+                    "phone": "+1234567890",
+                    "custom_fields": {},
+                },
+            }
 
-        response = client.post(url, data=data, format="json")
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+            response = client.post(url, data=data, format="json")
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        room_created = Room.objects.get(uuid=response.data["uuid"])
-        room_created.user = self.manager_user
-        room_created.save()
+            room_created = Room.objects.get(uuid=response.data["uuid"])
+            room_created.user = self.manager_user
+            room_created.save()
 
-        msg_contact_client = self.client
-        msg_contact_client.credentials(
-            HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380"
-        )
-        url_contact_message = "/v1/external/msgs/"
+            msg_contact_client = self.client
+            msg_contact_client.credentials(
+                HTTP_AUTHORIZATION="Bearer f3ce543e-d77e-4508-9140-15c95752a380"
+            )
+            url_contact_message = "/v1/external/msgs/"
 
-        message_data = {
-            "room": str(room_created.uuid),
-            "text": "teste criação",
-            "direction": "incoming",
-            "attachments": [],
-        }
-        msg_contact_client.post(url_contact_message, data=message_data, format="json")
+            message_data = {
+                "room": str(room_created.uuid),
+                "text": "teste criação",
+                "direction": "incoming",
+                "attachments": [],
+            }
+            msg_contact_client.post(
+                url_contact_message, data=message_data, format="json"
+            )
 
-        time.sleep(3)
+            frozen.move_to(initial + timedelta(seconds=3))
 
-        msg_user_client = self.client
-        msg_user_client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
-        url_user_message = "/v1/msg/"
+            msg_user_client = self.client
+            msg_user_client.credentials(
+                HTTP_AUTHORIZATION="Token " + self.login_token.key
+            )
+            url_user_message = "/v1/msg/"
 
-        message_user_data = {
-            "room": str(room_created.pk),
-            "user_email": str(self.manager_user),
-            "text": "teste criação resposta",
-        }
-        msg_user_client.post(url_user_message, data=message_user_data, format="json")
+            message_user_data = {
+                "room": str(room_created.pk),
+                "user_email": str(self.manager_user),
+                "text": "teste criação resposta",
+            }
+            msg_user_client.post(
+                url_user_message, data=message_user_data, format="json"
+            )
 
-        url_close = f"/v1/room/{room_created.uuid}/close/"
-        close_client = self.client
-        close_client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
-        data_close = {"tags": []}
-        client.patch(url_close, data=data_close, format="json")
+            url_close = f"/v1/room/{room_created.uuid}/close/"
+            close_client = self.client
+            close_client.credentials(
+                HTTP_AUTHORIZATION="Token " + self.login_token.key
+            )
+            data_close = {"tags": []}
+            client.patch(url_close, data=data_close, format="json")
 
-        room_closed = Room.objects.get(queue_id=data["queue_uuid"])
-        metric = RoomMetrics.objects.get(room=room_closed)
+            room_closed = Room.objects.get(queue_id=data["queue_uuid"])
+            metric = RoomMetrics.objects.get(room=room_closed)
 
-        self.assertEqual(metric.message_response_time, 3)
+            self.assertEqual(metric.message_response_time, 3)
 
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
     def test_waiting_time_metric_calc(self, mock_is_attending):

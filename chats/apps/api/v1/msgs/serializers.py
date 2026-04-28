@@ -3,6 +3,7 @@ import logging
 
 import magic
 from django.conf import settings
+from django.db import transaction
 from pydub import AudioSegment
 from rest_framework import exceptions, serializers
 
@@ -11,7 +12,14 @@ from chats.apps.api.v1.contacts.serializers import ContactSerializer
 from chats.apps.msgs.models import ChatMessageReplyIndex
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
+from chats.apps.ai_features.improve_user_message.choices import (
+    ImprovedUserMessageStatusChoices,
+    ImprovedUserMessageTypeChoices,
+)
 from chats.apps.rooms.models import RoomNote
+from chats.apps.ai_features.improve_user_message.tasks import (
+    register_message_improvement_task,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -253,12 +261,20 @@ class MessageAndMediaSerializer(serializers.ModelSerializer):
         return media
 
 
+class AITextImprovementSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=ImprovedUserMessageStatusChoices.choices)
+    type = serializers.ChoiceField(choices=ImprovedUserMessageTypeChoices.choices)
+
+
 class MessageSerializer(BaseMessageSerializer):
     """Serializer for the messages endpoint"""
 
     media = MessageMediaSimpleSerializer(many=True, required=False)
     replied_message = serializers.SerializerMethodField(read_only=True)
     internal_note = serializers.SerializerMethodField(read_only=True)
+    ai_text_improvement = AITextImprovementSerializer(
+        write_only=True, required=False, allow_null=True
+    )
 
     class Meta:
         model = ChatMessage
@@ -278,6 +294,7 @@ class MessageSerializer(BaseMessageSerializer):
             "is_delivered",
             "internal_note",
             "is_automatic_message",
+            "ai_text_improvement",
         ]
         read_only_fields = [
             "uuid",
@@ -285,6 +302,25 @@ class MessageSerializer(BaseMessageSerializer):
             "created_on",
             "contact",
         ]
+
+    def create(self, validated_data):
+        ai_text_improvement = validated_data.pop("ai_text_improvement", None)
+        msg = super().create(validated_data)
+
+        if ai_text_improvement:
+            transaction.on_commit(
+                lambda message_uuid=str(msg.uuid), improvement_type=ai_text_improvement[
+                    "type"
+                ], status=ai_text_improvement["status"]: (
+                    register_message_improvement_task.delay(
+                        message_uuid=message_uuid,
+                        improvement_type=improvement_type,
+                        status=status,
+                    )
+                )
+            )
+
+        return msg
 
     def get_replied_message(self, obj):
         if obj.metadata is None or obj.metadata == {}:
