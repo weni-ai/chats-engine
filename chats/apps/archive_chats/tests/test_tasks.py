@@ -12,6 +12,7 @@ from chats.apps.archive_chats.models import (
 )
 from chats.apps.archive_chats.services import ArchiveChatsService
 from chats.apps.archive_chats.tasks import (
+    _create_pending_records,
     archive_room_messages,
     start_archive_rooms_messages,
 )
@@ -257,6 +258,79 @@ class TestStartArchiveRoomsMessages(TestCase):
         )
 
         assert mock_archive_room_messages_apply_async.call_count == len(rooms)
+
+
+class TestCreatePendingRecords(TestCase):
+    @override_settings(ARCHIVE_CHATS_BULK_CREATE_PENDING_BATCH_SIZE=100)
+    def test_creates_pending_records_for_new_rooms(self):
+        job = ArchiveConversationsJob.objects.create(started_at=timezone.now())
+        rooms = [
+            Room.objects.create(
+                is_active=False,
+                ended_at=timezone.now() - rdelta(years=1),
+            )
+            for _ in range(3)
+        ]
+        room_uuids = [room.uuid for room in rooms]
+
+        _create_pending_records(room_uuids, job)
+
+        records = RoomArchivedConversation.objects.filter(room__in=rooms)
+        assert records.count() == 3
+        for record in records:
+            assert record.job == job
+            assert record.status == ArchiveConversationsJobStatus.PENDING
+
+    def test_does_nothing_for_empty_list(self):
+        job = ArchiveConversationsJob.objects.create(started_at=timezone.now())
+
+        _create_pending_records([], job)
+
+        assert RoomArchivedConversation.objects.count() == 0
+
+    @override_settings(ARCHIVE_CHATS_BULK_CREATE_PENDING_BATCH_SIZE=100)
+    def test_skips_rooms_that_already_have_archived_conversations(self):
+        job = ArchiveConversationsJob.objects.create(started_at=timezone.now())
+
+        existing_room = Room.objects.create(
+            is_active=False,
+            ended_at=timezone.now() - rdelta(years=1),
+        )
+        RoomArchivedConversation.objects.create(
+            room=existing_room,
+            job=job,
+            status=ArchiveConversationsJobStatus.FINISHED,
+        )
+
+        new_room = Room.objects.create(
+            is_active=False,
+            ended_at=timezone.now() - rdelta(years=1),
+        )
+
+        _create_pending_records([existing_room.uuid, new_room.uuid], job)
+
+        assert RoomArchivedConversation.objects.filter(
+            room=new_room,
+            status=ArchiveConversationsJobStatus.PENDING,
+        ).exists()
+        assert RoomArchivedConversation.objects.filter(room=existing_room).count() == 1
+
+    @override_settings(ARCHIVE_CHATS_BULK_CREATE_PENDING_BATCH_SIZE=100)
+    def test_does_not_create_records_when_all_rooms_already_archived(self):
+        job = ArchiveConversationsJob.objects.create(started_at=timezone.now())
+        room = Room.objects.create(
+            is_active=False,
+            ended_at=timezone.now() - rdelta(years=1),
+        )
+        RoomArchivedConversation.objects.create(
+            room=room,
+            job=job,
+            status=ArchiveConversationsJobStatus.PENDING,
+        )
+
+        _create_pending_records([room.uuid], job)
+
+        assert RoomArchivedConversation.objects.count() == 1
 
 
 class TestArchiveRoomMessages(TestCase):
