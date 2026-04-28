@@ -11,7 +11,10 @@ from django.conf import settings
 
 from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
 from chats.apps.archive_chats.expiration import calculate_archive_task_expiration_dt
-from chats.apps.archive_chats.models import ArchiveConversationsJob
+from chats.apps.archive_chats.models import (
+    ArchiveConversationsJob,
+    RoomArchivedConversation,
+)
 from chats.apps.archive_chats.services import ArchiveChatsService
 from chats.apps.rooms.models import Room
 
@@ -52,9 +55,11 @@ def start_archive_rooms_messages():
 
         rooms_query = rooms_query.filter(queue__sector__project__in=projects)
 
-    room_uuids = rooms_query.order_by("ended_at").values_list("uuid", flat=True)[
-        : settings.ARCHIVE_CHATS_MAX_ROOMS
-    ]
+    room_uuids = list(
+        rooms_query.order_by("ended_at").values_list("uuid", flat=True)[
+            : settings.ARCHIVE_CHATS_MAX_ROOMS
+        ]
+    )
     rooms_count = len(room_uuids)
 
     expiration_dt = calculate_archive_task_expiration_dt(
@@ -65,6 +70,8 @@ def start_archive_rooms_messages():
         f"[start_archive_rooms_messages] Starting archive {rooms_count} rooms with job {job.uuid}"
     )
     logger.info(f"[start_archive_rooms_messages] Expiration date: {expiration_dt}")
+
+    _create_pending_records(room_uuids, job)
 
     loop_start = time.monotonic()
 
@@ -79,6 +86,47 @@ def start_archive_rooms_messages():
 
     logger.info(
         f"[start_archive_rooms_messages] Applied {dispatched} async tasks in {loop_elapsed:.2f}s"
+    )
+
+
+def _create_pending_records(room_uuids, job):
+    """
+    Bulk-create PENDING RoomArchivedConversation records at dispatch time so
+    subsequent scheduler runs exclude already-queued rooms via the 24-hour
+    job filter.
+    """
+    if not room_uuids:
+        return
+
+    existing_room_ids = set(
+        RoomArchivedConversation.objects.filter(
+            room_id__in=room_uuids
+        ).values_list("room_id", flat=True)
+    )
+
+    RoomArchivedConversation.objects.filter(
+        room_id__in=existing_room_ids
+    ).exclude(
+        status=ArchiveConversationsJobStatus.FINISHED
+    ).update(job=job)
+
+    new_room_ids = [uid for uid in room_uuids if uid not in existing_room_ids]
+    if new_room_ids:
+        RoomArchivedConversation.objects.bulk_create(
+            [
+                RoomArchivedConversation(
+                    room_id=uid,
+                    job=job,
+                    status=ArchiveConversationsJobStatus.PENDING,
+                )
+                for uid in new_room_ids
+            ],
+            batch_size=2000,
+        )
+
+    logger.info(
+        f"[start_archive_rooms_messages] Created/updated {len(room_uuids)} "
+        f"pending records ({len(new_room_ids)} new, {len(existing_room_ids)} existing)"
     )
 
 
