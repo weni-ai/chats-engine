@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 from rest_framework.exceptions import ValidationError
@@ -74,9 +74,7 @@ class AddUserToDiscussionUseCaseTests(TestCase):
 
     @override_settings(DISCUSSION_AGENTS_LIMIT=10)
     def test_execute_creates_feedback_message(self, _mock_ws):
-        self.usecase.execute(
-            self.discussion, self.agent_user.email, self.creator_user
-        )
+        self.usecase.execute(self.discussion, self.agent_user.email, self.creator_user)
 
         feedback_msg = self.discussion.messages.filter(user__isnull=True).first()
         self.assertIsNotNone(feedback_msg)
@@ -95,7 +93,10 @@ class AddUserToDiscussionUseCaseTests(TestCase):
                 self.discussion, self.agent_user.email, self.creator_user
             )
 
-        self.assertIn("already added", str(ctx.exception.detail))
+        self.assertEqual(
+            ctx.exception.detail["error"],
+            f"User {self.agent_user.email} is already added to this discussion",
+        )
 
     @override_settings(DISCUSSION_AGENTS_LIMIT=10)
     def test_execute_raises_when_user_email_not_found(self, _mock_ws):
@@ -113,20 +114,14 @@ class AddUserToDiscussionUseCaseTests(TestCase):
 
     @override_settings(DISCUSSION_AGENTS_LIMIT=10)
     def test_execute_raises_when_from_user_has_no_project_permission(self, _mock_ws):
-        from_user = User.objects.create(
-            email="noperm@test.com", first_name="NoPerm"
-        )
+        from_user = User.objects.create(email="noperm@test.com", first_name="NoPerm")
 
         with self.assertRaises(ValidationError):
-            self.usecase.execute(
-                self.discussion, self.agent_user.email, from_user
-            )
+            self.usecase.execute(self.discussion, self.agent_user.email, from_user)
 
     @override_settings(DISCUSSION_AGENTS_LIMIT=10)
     def test_execute_does_not_duplicate_discussion_user(self, _mock_ws):
-        self.usecase.execute(
-            self.discussion, self.agent_user.email, self.creator_user
-        )
+        self.usecase.execute(self.discussion, self.agent_user.email, self.creator_user)
 
         self.assertEqual(
             DiscussionUser.objects.filter(

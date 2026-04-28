@@ -16,7 +16,7 @@ class AddUserToDiscussionUseCase:
 
         if discussion.is_added_user(user):
             raise ValidationError(
-                f"User {user_email} is already added to this discussion"
+                {"error": f"User {user_email} is already added to this discussion"}
             )
 
         try:
@@ -24,7 +24,7 @@ class AddUserToDiscussionUseCase:
                 from_user=from_user, to_user=user
             )
         except UserProjectPermissionNotFound as e:
-            raise ValidationError(e)
+            raise ValidationError({"error": str(e)})
 
         feedback = {"user": added_agent.user.first_name}
         create_discussion_feedback_message(discussion, feedback, "da")
