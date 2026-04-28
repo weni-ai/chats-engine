@@ -68,8 +68,7 @@ class DiscussionFiltersAndViewsTests(TestCase):
         self.assertFalse(f.qs.exists())
 
     @override_settings(DISCUSSION_AGENTS_LIMIT=10)
-    def test_add_agents_resolves_user_and_creates(self, mock_cache):
-        mock_cache.return_value = self.agent.pk
+    def test_add_agents_resolves_user_and_creates(self):
         view = DummyView()
         view._obj = self.discussion
 
