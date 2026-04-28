@@ -98,34 +98,26 @@ def _create_pending_records(room_uuids, job):
     if not room_uuids:
         return
 
-    existing_room_ids = set(
-        RoomArchivedConversation.objects.filter(room_id__in=room_uuids).values_list(
-            "room_id", flat=True
-        )
+    new_room_ids = (
+        Room.objects.filter(uuid__in=room_uuids)
+        .exclude(archived_conversations__isnull=False)
+        .values_list("uuid", flat=True)
     )
 
-    RoomArchivedConversation.objects.filter(room_id__in=existing_room_ids).exclude(
-        status=ArchiveConversationsJobStatus.FINISHED
-    ).update(job=job)
-
-    new_room_ids = [uid for uid in room_uuids if uid not in existing_room_ids]
     if new_room_ids:
         RoomArchivedConversation.objects.bulk_create(
             [
                 RoomArchivedConversation(
-                    room_id=uid,
+                    room_id=room_id,
                     job=job,
                     status=ArchiveConversationsJobStatus.PENDING,
                 )
-                for uid in new_room_ids
+                for room_id in new_room_ids
             ],
             batch_size=settings.ARCHIVE_CHATS_BULK_CREATE_PENDING_BATCH_SIZE,
         )
 
-    logger.info(
-        f"[start_archive_rooms_messages] Created/updated {len(room_uuids)} "
-        f"pending records ({len(new_room_ids)} new, {len(existing_room_ids)} existing)"
-    )
+    logger.info(f"[start_archive_rooms_messages] Created/updated {len(room_uuids)}")
 
 
 def _dispatch_sequential(room_uuids, job_uuid, expiration_dt, rooms_count):
