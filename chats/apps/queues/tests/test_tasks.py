@@ -144,7 +144,7 @@ class RouteQueueRoomsCooldownTestCase(TestCase):
         cache.clear()
 
     def _lock_key(self, queue):
-        return f"route_queue_rooms_lock:{queue.sector.uuid}"
+        return f"route_queue_rooms_lock:{queue.uuid}"
 
     @patch(FEATURE_FLAG_PATH, return_value=True)
     @patch("chats.apps.queues.tasks.QueueRouterService")

@@ -17,6 +17,10 @@ def get_route_lock_key_for_sector(sector_uuid: UUID):
     return f"route_queue_rooms_lock:{sector_uuid}"
 
 
+def get_route_lock_key_for_queue(queue_uuid: UUID):
+    return f"route_queue_rooms_lock:{queue_uuid}"
+
+
 def get_route_pending_key_for_queue(queue_uuid: UUID):
     return f"route_queue_rooms_pending:{queue_uuid}"
 
@@ -39,7 +43,7 @@ def route_queue_rooms(queue_uuid: UUID):
         settings.ROUTE_QUEUE_COOLDOWN_FEATURE_FLAG_KEY,
         {"projectUUID": str(queue.sector.project.uuid)},
     )
-    lock_key = get_route_lock_key_for_sector(queue.sector.uuid)
+    lock_key = get_route_lock_key_for_queue(queue.uuid)
     pending_key = get_route_pending_key_for_queue(queue_uuid)
     if cooldown_feature_flag_active:
         acquired = cache.add(
