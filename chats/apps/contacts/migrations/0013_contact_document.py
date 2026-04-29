@@ -5,7 +5,7 @@ from django.utils.translation import gettext_lazy as _
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("contacts", "0011_unique_contact_external_id"),
+        ("contacts", "0012_unique_contact_external_id"),
     ]
 
     operations = [
