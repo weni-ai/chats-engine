@@ -92,3 +92,86 @@ class DocumentAwareSearchFilterTests(TestCase):
         view = _FakeView(["rooms__contact__document"])
         qs = backend.filter_queryset(request, Contact.objects.all(), view)
         self.assertEqual(list(qs.values_list("uuid", flat=True)), [])
+
+
+class DocumentAwareSearchFilterCommaOrTests(TestCase):
+    """
+    Validates the comma-as-OR semantics of DocumentAwareSearchFilter:
+    `?search=a,b,c` returns rows matching any of the three terms.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.joao = Contact.objects.create(
+            name="Joao",
+            email="joao@tokstok.com",
+            document="123.456.789-00",
+            external_id="ws-001",
+        )
+        cls.maria = Contact.objects.create(
+            name="Maria",
+            email="maria@example.com",
+            document="98765432100",
+            external_id="ws-002",
+        )
+        cls.outro = Contact.objects.create(
+            name="Outro",
+            email="outro@example.com",
+            document="11111111111",
+            external_id="ws-003",
+        )
+
+    def _filter(self, search_fields, term):
+        backend = DocumentAwareSearchFilter()
+        request = Request(APIRequestFactory().get("/", {"search": term}))
+        view = _FakeView(search_fields)
+        return backend.filter_queryset(request, Contact.objects.all(), view)
+
+    def test_comma_separates_groups_with_or_semantics(self):
+        qs = self._filter(
+            ["name", "email", "document", "external_id"],
+            "ws-002,joao@tokstok.com,12345678900",
+        )
+        self.assertIn(self.joao, qs)
+        self.assertIn(self.maria, qs)
+        self.assertNotIn(self.outro, qs)
+
+    def test_comma_with_normalized_document_term(self):
+        qs = self._filter(["document", "name"], "123-456-789-00,Maria")
+        self.assertIn(self.joao, qs)
+        self.assertIn(self.maria, qs)
+        self.assertNotIn(self.outro, qs)
+
+    def test_whitespace_inside_group_keeps_and_semantics(self):
+        Contact.objects.create(name="Joao Silva", email="joao.silva@x.com")
+        only_one_term = self._filter(["name"], "Joao")
+        and_query = self._filter(["name"], "Joao Silva")
+        self.assertGreater(only_one_term.count(), and_query.count())
+        self.assertTrue(
+            and_query.filter(name="Joao Silva").exists(),
+            "AND search must match the row whose name contains both terms",
+        )
+
+    def test_mixed_groups_or_between_groups_and_inside_group(self):
+        Contact.objects.create(name="Joao Silva", document="22222222222")
+        qs = self._filter(["name", "document"], "Joao Silva,98765432100")
+        names = list(qs.values_list("name", flat=True))
+        self.assertIn("Joao Silva", names)
+        self.assertIn("Maria", names)
+        self.assertNotIn("Outro", names)
+
+    def test_empty_groups_are_ignored(self):
+        qs = self._filter(["name"], ",,Maria,,")
+        self.assertIn(self.maria, qs)
+        self.assertNotIn(self.joao, qs)
+        self.assertNotIn(self.outro, qs)
+
+    def test_only_commas_returns_unfiltered_queryset(self):
+        qs = self._filter(["name"], ",,,")
+        self.assertEqual(qs.count(), Contact.objects.count())
+
+    def test_single_term_without_comma_keeps_legacy_behavior(self):
+        qs = self._filter(["document"], "12345678900")
+        self.assertIn(self.joao, qs)
+        self.assertNotIn(self.maria, qs)
+        self.assertNotIn(self.outro, qs)
