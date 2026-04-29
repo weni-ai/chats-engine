@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from django.conf import settings
 from django.db.models.functions import Coalesce
 from django.utils import timezone
-from weni.feature_flags import is_feature_active_for_attributes
+from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
