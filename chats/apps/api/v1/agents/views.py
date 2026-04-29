@@ -5,6 +5,7 @@ from django.db.models import (
     IntegerField,
     OuterRef,
     Prefetch,
+    Q,
     Subquery,
     Value,
     When,
@@ -105,9 +106,16 @@ class AllAgentsView(generics.ListAPIView):
         return (
             ProjectPermission.objects.filter(
                 project=project,
-                role=ProjectPermission.ROLE_ATTENDANT,
                 is_deleted=False,
             )
+            .filter(
+                Q(role=ProjectPermission.ROLE_ATTENDANT)
+                | Q(
+                    queue_authorizations__queue__is_deleted=False,
+                    queue_authorizations__queue__sector__is_deleted=False,
+                )
+            )
+            .distinct()
             .select_related("user")
             .prefetch_related(
                 Prefetch("queue_authorizations", queryset=active_queue_auths),
