@@ -407,3 +407,110 @@ class RaceConditionTestCase(TestCase):
             self.agent.email,
             room.uuid,
         )
+
+
+class CapacityRecheckRaceConditionTestCase(TestCase):
+    """
+    Tests for capacity recheck protection in route_rooms.
+
+    Validates that when an agent reaches or exceeds the sector rooms limit
+    between get_available_agent() and room.save(), the room is NOT assigned.
+    """
+
+    def setUp(self):
+        self.project = Project.objects.create(
+            name="Test Project Capacity",
+            room_routing_type=RoomRoutingType.QUEUE_PRIORITY,
+        )
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=2,
+            work_start=time(hour=0, minute=0),
+            work_end=time(hour=23, minute=59),
+        )
+        self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
+
+        self.agent = User.objects.create(email="capacity@example.com")
+        permission = ProjectPermission.objects.create(
+            project=self.project,
+            user=self.agent,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status="ONLINE",
+            last_seen=timezone.now(),
+        )
+        QueueAuthorization.objects.create(
+            queue=self.queue,
+            permission=permission,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+    @patch("chats.apps.queues.services.is_feature_active_for_attributes", return_value=True)
+    @patch("chats.apps.queues.services.logger")
+    def test_room_not_assigned_when_agent_reaches_limit_during_routing(
+        self, mock_logger, mock_flag
+    ):
+        """
+        Race condition: agent is picked by get_available_agent() but other
+        concurrent requests bring his active rooms up to the limit
+        before route_rooms calls room.save().
+        """
+        room = Room.objects.create(queue=self.queue, user=None)
+        service = QueueRouterService(self.queue)
+
+        original_get_available_agent = self.queue.get_available_agent
+
+        def get_available_agent_and_fill_up():
+            agent = original_get_available_agent()
+            if agent:
+                for _ in range(self.sector.rooms_limit):
+                    Room.objects.create(
+                        queue=self.queue, user=agent, is_active=True
+                    )
+            return agent
+
+        with patch.object(
+            self.queue,
+            "get_available_agent",
+            side_effect=get_available_agent_and_fill_up,
+        ):
+            service.route_rooms()
+
+        room.refresh_from_db()
+        self.assertIsNone(room.user)
+
+    @patch("chats.apps.queues.services.is_feature_active_for_attributes", return_value=True)
+    @patch("chats.apps.queues.services.logger")
+    def test_room_not_assigned_when_agent_already_above_limit(self, mock_logger, mock_flag):
+        """
+        Agent that somehow is already above the sector limit must not
+        receive another room (this is the exact scenario observed in prod).
+        """
+        for _ in range(self.sector.rooms_limit + 2):
+            Room.objects.create(
+                queue=self.queue, user=self.agent, is_active=True
+            )
+
+        room = Room.objects.create(queue=self.queue, user=None)
+        service = QueueRouterService(self.queue)
+
+        with patch.object(
+            self.queue, "get_available_agent", return_value=self.agent
+        ):
+            service.route_rooms()
+
+        room.refresh_from_db()
+        self.assertIsNone(room.user)
+
+    @patch("chats.apps.queues.services.logger")
+    def test_room_assigned_when_agent_stays_below_limit(self, mock_logger):
+        """
+        Happy path: agent remains below limit during routing, room is assigned.
+        """
+        room = Room.objects.create(queue=self.queue, user=None)
+        service = QueueRouterService(self.queue)
+
+        service.route_rooms()
+
+        room.refresh_from_db()
+        self.assertEqual(room.user, self.agent)
