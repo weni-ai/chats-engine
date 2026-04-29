@@ -439,7 +439,9 @@ class AgentRepository:
 
         return agents_query
 
-    def _get_agents_query(self, filters: Filters, project: Project, include_removed: bool = False):
+    def _get_agents_query(
+        self, filters: Filters, project: Project, include_removed: bool = False
+    ):
         if include_removed:
             agents = self.model.filter(
                 Q(project_permissions__project=project)
@@ -461,8 +463,10 @@ class AgentRepository:
             agents = agents.filter(email=filters.agent)
 
         if filters.queue:
+            if not isinstance(filters.queue, list):
+                filters.queue = [filters.queue]
             agents = agents.filter(
-                project_permissions__queue_authorizations__queue=filters.queue
+                project_permissions__queue_authorizations__queue__in=filters.queue
             )
         elif filters.sector:
             agents = agents.filter(
