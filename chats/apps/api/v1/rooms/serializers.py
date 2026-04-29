@@ -270,6 +270,8 @@ class ListRoomSerializer(serializers.ModelSerializer):
             "uuid": room.contact.uuid,
             "name": room.contact.name,
             "external_id": room.contact.external_id,
+            "email": room.contact.email,
+            "document": room.contact.document,
         }
 
     def get_can_edit_custom_fields(self, room: Room):

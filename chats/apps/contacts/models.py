@@ -1,3 +1,5 @@
+import re
+
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -7,6 +9,12 @@ from chats.core.models import BaseModel
 Q = models.Q
 
 
+def normalize_document(value):
+    if not value:
+        return value
+    return re.sub(r"[^A-Za-z0-9]", "", value).upper()
+
+
 class Contact(BaseModel):
     external_id = models.CharField(
         _("External ID"), max_length=200, blank=True, null=True
@@ -14,6 +22,9 @@ class Contact(BaseModel):
     name = models.CharField(_("first name"), max_length=200, blank=True)
     email = models.EmailField(
         _("email"), unique=False, help_text=_("Contact email"), blank=True, null=True
+    )
+    document = models.CharField(
+        _("document"), max_length=50, blank=True, null=True
     )
     status = models.CharField(_("status"), max_length=30, blank=True)
     phone = models.CharField(_("phone"), max_length=30, blank=True)
@@ -41,6 +52,16 @@ class Contact(BaseModel):
                 name="contact_name_idx",
                 condition=models.Q(name__isnull=False),
             ),
+            models.Index(
+                fields=["document"],
+                name="contact_document_idx",
+                condition=models.Q(document__isnull=False),
+            ),
+            models.Index(
+                fields=["email"],
+                name="contact_email_idx",
+                condition=models.Q(email__isnull=False),
+            ),
         ]
         constraints = [
             models.UniqueConstraint(
@@ -49,6 +70,10 @@ class Contact(BaseModel):
                 name="unique_contact_external_id",
             ),
         ]
+
+    def save(self, *args, **kwargs):
+        self.document = normalize_document(self.document)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return str(self.name)
