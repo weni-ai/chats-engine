@@ -98,4 +98,6 @@ class ContactSimpleSerializer(ContactSerializer):
             "uuid",
             "name",
             "external_id",
+            "email",
+            "document",
         ]

@@ -1,4 +1,5 @@
 from django.test import TestCase
+from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
 
 from chats.apps.contacts.models import Contact
@@ -27,7 +28,7 @@ class DocumentAwareSearchFilterTests(TestCase):
 
     def _filter(self, search_fields, term):
         backend = DocumentAwareSearchFilter()
-        request = APIRequestFactory().get("/", {"search": term})
+        request = Request(APIRequestFactory().get("/", {"search": term}))
         view = _FakeView(search_fields)
         return backend.filter_queryset(request, Contact.objects.all(), view)
 
@@ -87,7 +88,7 @@ class DocumentAwareSearchFilterTests(TestCase):
         `document`.
         """
         backend = DocumentAwareSearchFilter()
-        request = APIRequestFactory().get("/", {"search": "123-456-789-00"})
+        request = Request(APIRequestFactory().get("/", {"search": "123-456-789-00"}))
         view = _FakeView(["rooms__contact__document"])
         qs = backend.filter_queryset(request, Contact.objects.all(), view)
         self.assertEqual(list(qs.values_list("uuid", flat=True)), [])

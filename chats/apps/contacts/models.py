@@ -52,6 +52,16 @@ class Contact(BaseModel):
                 name="contact_name_idx",
                 condition=models.Q(name__isnull=False),
             ),
+            models.Index(
+                fields=["document"],
+                name="contact_document_idx",
+                condition=models.Q(document__isnull=False),
+            ),
+            models.Index(
+                fields=["email"],
+                name="contact_email_idx",
+                condition=models.Q(email__isnull=False),
+            ),
         ]
         constraints = [
             models.UniqueConstraint(
