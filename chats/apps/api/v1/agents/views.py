@@ -47,8 +47,8 @@ def _status_order_annotation():
     """
     Annotates a ProjectPermission queryset with a numeric ordering key:
       0 = ONLINE without any active pause
-      1 = any status with an active custom pause
-      2 = OFFLINE
+      1 = OFFLINE without any active pause
+      2 = any status with an active custom pause
     """
     active_pause = CustomStatus.objects.filter(
         user_id=OuterRef("user_id"),
@@ -57,10 +57,10 @@ def _status_order_annotation():
     ).exclude(status_type__name__iexact="in-service")
 
     return Case(
-        When(status=ProjectPermission.STATUS_OFFLINE, then=Value(2)),
-        When(Exists(active_pause), then=Value(1)),
+        When(Exists(active_pause), then=Value(2)),
+        When(status=ProjectPermission.STATUS_OFFLINE, then=Value(1)),
         When(status=ProjectPermission.STATUS_ONLINE, then=Value(0)),
-        default=Value(2),
+        default=Value(1),
         output_field=IntegerField(),
     )
 
