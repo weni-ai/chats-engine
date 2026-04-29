@@ -127,6 +127,13 @@ def get_room_user(
             if agent is None:
                 return None
 
+            if not is_feature_active(
+                settings.AGENT_CAPACITY_RECHECK_FEATURE_FLAG_KEY,
+                None,
+                str(project.uuid),
+            ):
+                return agent
+
             capacity = CanAgentReceiveRoomUseCase(queue).execute(agent)
             if capacity.can_receive:
                 return agent
@@ -156,6 +163,13 @@ def get_room_user(
     agent = queue.get_available_agent()
     if agent is None:
         return None
+
+    if not is_feature_active(
+        settings.AGENT_CAPACITY_RECHECK_FEATURE_FLAG_KEY,
+        None,
+        str(project.uuid),
+    ):
+        return agent
 
     capacity = CanAgentReceiveRoomUseCase(queue).execute(agent)
     return agent if capacity.can_receive else None
