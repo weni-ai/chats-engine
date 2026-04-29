@@ -57,7 +57,9 @@ class AllAgentsFilter(filters.FilterSet):
             condition |= Q(status=ProjectPermission.STATUS_ONLINE, _on_pause=False)
 
         if has_offline:
-            condition |= Q(status=ProjectPermission.STATUS_OFFLINE)
+            if not has_online:
+                qs = qs.annotate(_on_pause=Exists(self._active_pause_qs()))
+            condition |= Q(status=ProjectPermission.STATUS_OFFLINE, _on_pause=False)
 
         if custom_names:
             custom_subquery = CustomStatus.objects.filter(
