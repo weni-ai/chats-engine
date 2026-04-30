@@ -79,6 +79,7 @@ INSTALLED_APPS = [
     "chats.apps.archive_chats",
     # third party apps
     "weni.feature_flags",  # weni-commons feature flags
+    "weni.eda.django.eda_app",
     "channels",
     "drf_yasg",
     "django_filters",
@@ -522,6 +523,9 @@ CELERY_BEAT_MAX_LOOP_INTERVAL = 10
 # Event Driven Architecture configurations
 
 USE_EDA = env.bool("USE_EDA", default=False)
+
+# TODO: Remove this once we permanently migrate to Weni EDA
+USE_WENI_EDA_FOR_PROJECTS = env.bool("USE_WENI_EDA_FOR_PROJECTS", default=False)
 
 if USE_EDA:
     EDA_CONNECTION_BACKEND = "chats.apps.event_driven.backends.PyAMQPConnectionBackend"
