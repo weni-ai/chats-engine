@@ -60,7 +60,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip poetry
+          pip install --upgrade pip
+          pip install poetry==1.8.5
           poetry config virtualenvs.create false --local
           poetry install
 
