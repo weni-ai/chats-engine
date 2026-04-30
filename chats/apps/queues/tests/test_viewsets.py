@@ -96,9 +96,41 @@ class QueueTests(APITestCase):
         data = {
             "name": "queue created by test",
             "sector": str(self.sector.pk),
+            "user": self.admin_user.email,
         }
         response = client.post(url, data=data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_create_queue_without_user_returns_400(self):
+        url = reverse("queue-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.admin_token.key)
+        data = {
+            "name": "queue without user",
+            "sector": str(self.sector.pk),
+        }
+        response = client.post(url, data=data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("user", response.data)
+        self.assertFalse(
+            Queue.objects.filter(sector=self.sector, name="queue without user").exists()
+        )
+
+    def test_create_queue_with_user_without_project_permission_returns_400(self):
+        url = reverse("queue-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.admin_token.key)
+        data = {
+            "name": "queue with stranger",
+            "sector": str(self.sector.pk),
+            "user": "stranger@example.com",
+        }
+        response = client.post(url, data=data)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("user", response.data)
+        self.assertFalse(
+            Queue.objects.filter(sector=self.sector, name="queue with stranger").exists()
+        )
 
     def test_update_queue_with_manager_token(self):
         """
@@ -238,6 +270,7 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
             {
                 "name": "Testing",
                 "sector": str(self.sector.pk),
+                "user": self.user.email,
                 "queue_limit": {
                     "is_active": True,
                     "limit": 10,
@@ -261,6 +294,7 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
             {
                 "name": "Testing",
                 "sector": str(self.sector.pk),
+                "user": self.user.email,
                 "queue_limit": {
                     "is_active": True,
                     "limit": 10,
@@ -281,6 +315,7 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
             {
                 "name": "Testing",
                 "sector": str(self.sector.pk),
+                "user": self.user.email,
                 "queue_limit": {
                     "is_active": True,
                     "limit": "invalid",
@@ -298,6 +333,7 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
             {
                 "name": "Testing",
                 "sector": str(self.sector.pk),
+                "user": self.user.email,
             }
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)

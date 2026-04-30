@@ -89,6 +89,8 @@ class QueueViewset(ModelViewSet):
     def get_serializer_class(self):
         if self.action == "list":
             return queue_serializers.QueueReadOnlyListSerializer
+        if self.action == "create":
+            return queue_serializers.QueueCreateSerializer
         return super().get_serializer_class()
 
     def perform_create(self, serializer):

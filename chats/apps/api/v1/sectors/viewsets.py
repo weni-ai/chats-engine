@@ -77,6 +77,8 @@ class SectorViewset(viewsets.ModelViewSet):
             return sector_serializers.SectorReadOnlyRetrieveSerializer
         elif self.action in ["update", "partial_update"]:
             return sector_serializers.SectorUpdateSerializer
+        elif self.action == "create":
+            return sector_serializers.SectorCreateSerializer
 
         return super().get_serializer_class()
 

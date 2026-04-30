@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from weni.feature_flags.shortcuts import is_feature_active
@@ -163,6 +164,49 @@ class SectorSerializer(AuditableModelSerializer):
         data = _apply_sector_config_defaults(instance, data)
 
         return data
+
+
+class SectorCreateSerializer(SectorSerializer):
+    """
+    Serializer used by the public v1 endpoint to create a sector.
+
+    Requires the email of a user with permission in the project so the sector
+    is always created together with at least one manager. Without this, the
+    sector would be left without any `SectorAuthorization` and only project
+    admins could edit it afterwards (the bug reported when the front fails
+    to load the user and skips the second authorization request).
+    """
+
+    user = serializers.EmailField(write_only=True, required=True)
+
+    class Meta(SectorSerializer.Meta):
+        fields = SectorSerializer.Meta.fields + ["user"]
+
+    def validate_user(self, value: str) -> str:
+        if not value:
+            raise serializers.ValidationError(
+                _("Sector manager email is required"),
+                code="manager_required",
+            )
+        return value
+
+    def create(self, validated_data: dict) -> Sector:
+        user_email = validated_data.pop("user")
+        project = validated_data.get("project")
+
+        permission = project.get_permission(user_email) if project else None
+        if permission is None:
+            raise serializers.ValidationError(
+                {"user": _("User has no permission in this project")},
+                code="manager_without_project_permission",
+            )
+
+        with transaction.atomic():
+            sector = super().create(validated_data)
+            sector.set_user_authorization(
+                permission, role=SectorAuthorization.ROLE_MANAGER
+            )
+        return sector
 
 
 class SectorUpdateSerializer(AuditableModelSerializer):

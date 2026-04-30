@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from weni.feature_flags.shortcuts import is_feature_active
@@ -112,6 +113,50 @@ class QueueSerializer(AuditableModelSerializer):
                 data["queue_limit"] = queue_limit.get("limit")
 
         return data
+
+
+class QueueCreateSerializer(QueueSerializer):
+    """
+    Serializer used by the public v1 endpoint to create a queue.
+
+    Requires the email of a user with permission in the project so the queue
+    is always created together with at least one agent. Without this, the
+    queue would be left without any `QueueAuthorization` and only project
+    admins / sector managers could edit it afterwards (the bug reported when
+    the front fails to load the user and skips the second authorization
+    request).
+    """
+
+    user = serializers.EmailField(write_only=True, required=True)
+
+    class Meta(QueueSerializer.Meta):
+        fields = QueueSerializer.Meta.fields + ["user"]
+
+    def validate_user(self, value: str) -> str:
+        if not value:
+            raise serializers.ValidationError(
+                _("Queue agent email is required"),
+                code="agent_required",
+            )
+        return value
+
+    def create(self, validated_data: dict) -> Queue:
+        user_email = validated_data.pop("user")
+        sector = validated_data.get("sector")
+
+        permission = sector.get_permission(user_email) if sector else None
+        if permission is None:
+            raise serializers.ValidationError(
+                {"user": _("User has no permission in this project")},
+                code="agent_without_project_permission",
+            )
+
+        with transaction.atomic():
+            queue = super().create(validated_data)
+            queue.set_user_authorization(
+                permission, role=QueueAuthorization.ROLE_AGENT
+            )
+        return queue
 
 
 class QueueSimpleSerializer(serializers.ModelSerializer):
