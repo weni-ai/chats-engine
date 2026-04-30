@@ -19,7 +19,7 @@ description = ""
 authors = ["helllllllder <heldergsds@gmail.com>"]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.10"
 Django = "4.0.4"
 Pillow = "^9.1.1"
 channels = "3.0.5"
@@ -51,6 +51,7 @@ pydub = "^0.25.1"
 python-magic = "^0.4.27"
 pylint = "v2.8.3"
 pandas = "^2.0.1"
+numpy = "<2"
 openpyxl = "^3.1.2"
 XlsxWriter = "^3.1.0"
 django-redis = "^5.2.0"
@@ -69,6 +70,7 @@ xlsxwriter = "^3.2.5"
 daphne = "^3.0.0"
 pyjwt = "2.9.0"
 weni-commons = "^1.1.2"
+weni-eda = "^0.1.1"
 
 [tool.poetry.dev-dependencies]
 freezegun = "^1.5.5"
