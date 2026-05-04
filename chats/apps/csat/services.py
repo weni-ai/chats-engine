@@ -42,6 +42,10 @@ class BaseCSATService(ABC):
 
 
 class CSATFlowService(BaseCSATService):
+    CUSTOM_FLOW_NOT_FOUND_EMAIL_CACHE_KEY = (
+        "csat:custom_flow_not_found_email_sent:{project_uuid}"
+    )
+
     def __init__(
         self,
         flows_client: FlowRESTClient,
@@ -108,6 +112,11 @@ class CSATFlowService(BaseCSATService):
             {"project": str(room.project.uuid), "room": str(room.uuid)}
         )
 
+        is_custom_flow = (
+            sector.custom_csat_flow_uuid is not None
+            and sector.custom_csat_flow_uuid == flow_uuid
+        )
+
         webhook_url = f"{settings.CHATS_BASE_URL}/v1/internal/csat/"
 
         data = {
@@ -120,7 +129,32 @@ class CSATFlowService(BaseCSATService):
             },
         }
 
-        return self.flows_client.start_flow(project, data)
+        status_code, response = self.flows_client.start_flow(project, data)
+        if not status.is_success(status_code):
+            try:
+                flow_error: str = response.get("flow", [""])[0]
+            except (KeyError, IndexError):
+                flow_error = ""
+
+            if (
+                is_custom_flow
+                and status_code == 400
+                and "no such object" in flow_error.lower()
+            ):
+                # Sending emails to admins in the main project
+                self.send_custom_flow_not_found_email(sector.project)
+            else:
+                logger.error(
+                    "[CSAT FLOW SERVICE] Failed to start CSAT flow [%s]: %s",
+                    status_code,
+                    response,
+                )
+                capture_message(
+                    f"Failed to start CSAT flow [{status_code}]: {response}",
+                    level="error",
+                )
+
+        return response
 
     def create_csat_flow(self, project: Project):
         version = CSAT_FLOW_VERSION
@@ -283,3 +317,30 @@ class CSATFlowService(BaseCSATService):
         )
 
         return is_updated
+
+    def send_custom_flow_not_found_email(self, project: Project):
+        from chats.apps.csat.tasks import send_custom_flow_not_found_email
+
+        cache_key = self.CUSTOM_FLOW_NOT_FOUND_EMAIL_CACHE_KEY.format(
+            project_uuid=str(project.uuid)
+        )
+
+        if self.cache_client.get(cache_key):
+            logger.info(
+                "[CSAT FLOW SERVICE] Custom flow not found email already sent for project %s (%s)",
+                project.name,
+                project.uuid,
+            )
+            return
+
+        send_custom_flow_not_found_email.delay(project.uuid)
+
+        logger.info(
+            "[CSAT FLOW SERVICE] Custom flow not found email scheduled for project %s (%s)",
+            project.name,
+            project.uuid,
+        )
+
+        self.cache_client.set(
+            cache_key, "1", ex=settings.CUSTOM_FLOW_NOT_FOUND_EMAIL_COOLDOWN
+        )
