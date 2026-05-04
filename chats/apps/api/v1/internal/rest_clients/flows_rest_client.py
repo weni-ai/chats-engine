@@ -281,7 +281,7 @@ class FlowRESTClient(
             raise
         return flows
 
-    def start_flow(self, project, data):
+    def start_flow(self, project, data) -> tuple[int, dict]:
         response = retry_request_and_refresh_flows_auth_token(
             project=project,
             request_method=requests.post,
@@ -290,7 +290,7 @@ class FlowRESTClient(
             headers=self.project_headers(project.flows_authorization),
         )
         try:
-            return response.json()
+            return response.status_code, response.json()
         except ValueError as e:
             LOGGER.error(
                 "Failed to parse JSON response from start_flow: %s. Response content: %s",

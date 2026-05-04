@@ -359,14 +359,17 @@ class ProjectViewset(
         chats_flow_start = project.flowstarts.create(**flow_start_data)
         self._create_flow_start_instances(data, chats_flow_start)
 
-        flow_start = FlowRESTClient().start_flow(project, data)
+        status_code, flow_start = FlowRESTClient().start_flow(project, data)
         chats_flow_start.external_id = flow_start.get("uuid")
         chats_flow_start.name = flow_start.get("flow").get("name")
         chats_flow_start.save()
         feedback = {"name": chats_flow_start.name}
         if chats_flow_start.room:
             create_room_feedback_message(
-                room, feedback, method=RoomFeedbackMethods.FLOW_START, requested_by=request.user
+                room,
+                feedback,
+                method=RoomFeedbackMethods.FLOW_START,
+                requested_by=request.user,
             )
             room.notify_room("update")
         return Response(flow_start, status.HTTP_200_OK)

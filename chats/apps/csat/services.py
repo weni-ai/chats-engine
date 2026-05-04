@@ -108,6 +108,11 @@ class CSATFlowService(BaseCSATService):
             {"project": str(room.project.uuid), "room": str(room.uuid)}
         )
 
+        is_custom_flow = (
+            sector.custom_csat_flow_uuid is not None
+            and sector.custom_csat_flow_uuid == flow_uuid
+        )
+
         webhook_url = f"{settings.CHATS_BASE_URL}/v1/internal/csat/"
 
         data = {
@@ -120,7 +125,32 @@ class CSATFlowService(BaseCSATService):
             },
         }
 
-        return self.flows_client.start_flow(project, data)
+        status_code, response = self.flows_client.start_flow(project, data)
+        if not status.is_success(status_code):
+            try:
+                flow_error: str = response.get("flow", [""])[0]
+            except (KeyError, IndexError):
+                flow_error = ""
+
+            if (
+                is_custom_flow
+                and status_code == 400
+                and "no such object" in flow_error.lower()
+            ):
+                # TODO: Call send email logic
+                pass
+            else:
+                logger.error(
+                    "[CSAT FLOW SERVICE] Failed to start CSAT flow [%s]: %s",
+                    status_code,
+                    response,
+                )
+                capture_message(
+                    f"Failed to start CSAT flow [{status_code}]: {response}",
+                    level="error",
+                )
+
+        return response
 
     def create_csat_flow(self, project: Project):
         version = CSAT_FLOW_VERSION
