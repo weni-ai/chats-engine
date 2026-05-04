@@ -25,6 +25,7 @@ from chats.apps.api.v1.agents.serializers import (
     AllAgentsSerializer,
     UpdateQueuePermissionsSerializer,
 )
+from chats.apps.api.v1.permissions import AnySectorManagerPermission
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.projects.models.models import CustomStatus
 from chats.apps.queues.models import Queue, QueueAuthorization
@@ -45,20 +46,16 @@ def _get_manager_permission(request, project):
 
 def _status_order_annotation():
     """
-    Annotates a ProjectPermission queryset with a numeric ordering key:
+    Returns a Case/When expression producing the ordering key for the
+    AllAgentsView queryset. Requires the `active_pause_name` annotation
+    (Subquery) to already be present on the queryset:
       0 = ONLINE without any active pause
-      1 = any status with an active custom pause
+      1 = active custom pause (any status)
       2 = OFFLINE
     """
-    active_pause = CustomStatus.objects.filter(
-        user_id=OuterRef("user_id"),
-        project=OuterRef("project"),
-        is_active=True,
-    ).exclude(status_type__name__iexact="in-service")
-
     return Case(
+        When(active_pause_name__isnull=False, then=Value(1)),
         When(status=ProjectPermission.STATUS_OFFLINE, then=Value(2)),
-        When(Exists(active_pause), then=Value(1)),
         When(status=ProjectPermission.STATUS_ONLINE, then=Value(0)),
         default=Value(2),
         output_field=IntegerField(),
@@ -103,27 +100,26 @@ class AllAgentsView(generics.ListAPIView):
             queue__sector__is_deleted=False,
         ).select_related("queue__sector")
 
+        has_active_queue_auth = QueueAuthorization.objects.filter(
+            permission=OuterRef("pk"),
+            queue__is_deleted=False,
+            queue__sector__is_deleted=False,
+        )
+
         return (
             ProjectPermission.objects.filter(
                 project=project,
                 is_deleted=False,
             )
             .filter(
-                Q(role=ProjectPermission.ROLE_ATTENDANT)
-                | Q(
-                    queue_authorizations__queue__is_deleted=False,
-                    queue_authorizations__queue__sector__is_deleted=False,
-                )
+                Q(role=ProjectPermission.ROLE_ATTENDANT) | Exists(has_active_queue_auth)
             )
-            .distinct()
             .select_related("user")
             .prefetch_related(
                 Prefetch("queue_authorizations", queryset=active_queue_auths),
             )
-            .annotate(
-                status_order=_status_order_annotation(),
-                active_pause_name=Subquery(active_pause_name),
-            )
+            .annotate(active_pause_name=Subquery(active_pause_name))
+            .annotate(status_order=_status_order_annotation())
             .order_by("status_order", "user__first_name", "user__last_name")
         )
 
@@ -146,7 +142,7 @@ class AgentQueuePermissionsView(APIView):
         project — UUID of the project
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, AnySectorManagerPermission]
 
     def get(self, request):
         agent_email = request.query_params.get("agent")
@@ -159,7 +155,6 @@ class AgentQueuePermissionsView(APIView):
             )
 
         project = get_object_or_404(Project, uuid=project_uuid)
-        _get_manager_permission(request, project)
 
         agent_permission = get_object_or_404(
             ProjectPermission,
@@ -198,7 +193,7 @@ class UpdateQueuePermissionsView(APIView):
         project     — UUID of the project
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, AnySectorManagerPermission]
 
     def post(self, request):
         serializer = UpdateQueuePermissionsSerializer(data=request.data)
@@ -206,7 +201,6 @@ class UpdateQueuePermissionsView(APIView):
         data = serializer.validated_data
 
         project = get_object_or_404(Project, uuid=data["project"])
-        _get_manager_permission(request, project)
 
         agent_emails = list(set(data["agents"]))  # deduplicate
         to_add = data.get("to_add", [])
