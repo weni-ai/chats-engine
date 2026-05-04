@@ -1,6 +1,6 @@
 import logging
 from collections import defaultdict
-
+from typing import List
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
@@ -38,7 +38,7 @@ class NotifyAdminsAboutNotFoundCSATFlow:
         for language, recipient_emails in emails_by_language.items():
             self._send_email(language, recipient_emails)
 
-    def _send_email(self, language: str, recipient_emails: list[str]):
+    def _send_email(self, language: str, recipient_emails: List[str]):
         with translation.override(language):
             context = {
                 "project_name": self.project.name,
