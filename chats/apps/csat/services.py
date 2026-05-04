@@ -137,8 +137,7 @@ class CSATFlowService(BaseCSATService):
                 and status_code == 400
                 and "no such object" in flow_error.lower()
             ):
-                # TODO: Call send email logic
-                pass
+                self.send_custom_flow_not_found_email(project)
             else:
                 logger.error(
                     "[CSAT FLOW SERVICE] Failed to start CSAT flow [%s]: %s",
@@ -313,3 +312,8 @@ class CSATFlowService(BaseCSATService):
         )
 
         return is_updated
+
+    def send_custom_flow_not_found_email(self, project: Project):
+        # TODO: Implement this method
+        # TODO: Attention, verify if it is a secondary project
+        pass
