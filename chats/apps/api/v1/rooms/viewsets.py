@@ -1596,8 +1596,8 @@ class RoomsCountByQueueView(APIView):
 
         queues_qs = (
             queues_qs.select_related("sector")
-            .annotate(queued_rooms_count=Count("rooms", filter=queued_filter))
-            .annotate(in_service_rooms_count=in_service_annotation)
+            .annotate(annotated_queued_rooms_count=Count("rooms", filter=queued_filter))
+            .annotate(annotated_in_service_rooms_count=in_service_annotation)
             .order_by("sector__name", "sector__uuid", "name")
         )
 
@@ -1608,8 +1608,8 @@ class RoomsCountByQueueView(APIView):
                     {
                         "uuid": str(queue.uuid),
                         "name": queue.name,
-                        "queued_rooms_count": queue.queued_rooms_count,
-                        "in_service_rooms_count": queue.in_service_rooms_count,
+                        "queued_rooms_count": queue.annotated_queued_rooms_count,
+                        "in_service_rooms_count": queue.annotated_in_service_rooms_count,
                     }
                     for queue in group
                 ],
