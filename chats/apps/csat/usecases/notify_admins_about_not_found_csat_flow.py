@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
@@ -29,14 +30,15 @@ class NotifyAdminsAboutNotFoundCSATFlow:
             )
             return
 
-        admin_emails = list(admins.values_list("email", flat=True))
-        language = (
-            admins.filter(language__isnull=False)
-            .exclude(language="")
-            .values_list("language", flat=True)
-            .first()
-        ) or settings.DEFAULT_LANGUAGE
+        emails_by_language = defaultdict(list)
+        for email, language in admins.values_list("email", "language"):
+            lang = language if language else settings.DEFAULT_LANGUAGE
+            emails_by_language[lang].append(email)
 
+        for language, recipient_emails in emails_by_language.items():
+            self._send_email(language, recipient_emails)
+
+    def _send_email(self, language: str, recipient_emails: list[str]):
         with translation.override(language):
             context = {
                 "project_name": self.project.name,
@@ -60,14 +62,14 @@ class NotifyAdminsAboutNotFoundCSATFlow:
                 subject=subject,
                 body=text_content,
                 from_email=settings.DEFAULT_FROM_EMAIL,
-                to=admin_emails,
+                to=recipient_emails,
             )
             email.attach_alternative(html_content, "text/html")
             email.send(fail_silently=False)
 
             logger.info(
                 "[CSAT FLOW SERVICE] Custom flow not found email sent to %s for project %s (%s)",
-                admin_emails,
+                recipient_emails,
                 self.project.name,
                 self.project.uuid,
             )
