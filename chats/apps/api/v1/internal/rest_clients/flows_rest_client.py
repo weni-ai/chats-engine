@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Callable, TYPE_CHECKING
+from typing import Callable, Tuple, TYPE_CHECKING
 
 import requests
 from django.conf import settings
@@ -281,7 +281,7 @@ class FlowRESTClient(
             raise
         return flows
 
-    def start_flow(self, project, data) -> tuple[int, dict]:
+    def start_flow(self, project, data) -> Tuple[int, dict]:
         response = retry_request_and_refresh_flows_auth_token(
             project=project,
             request_method=requests.post,
