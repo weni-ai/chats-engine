@@ -1,7 +1,7 @@
 from datetime import timedelta
-import time
 
 from django.test import TestCase
+from freezegun import freeze_time
 
 from chats.apps.accounts.models import User
 from chats.apps.contacts.models import Contact
@@ -189,58 +189,46 @@ class CalculateWaitingTimeTests(TestCase):
         )
 
     def test_last_queue_waiting_time_when_user_is_assigned(self):
+        base = self.room.added_to_queue_at
+
         self.assertEqual(
-            self.room.added_to_queue_at.strftime("%Y-%m-%d %H:%M:%S"),
+            base.strftime("%Y-%m-%d %H:%M:%S"),
             self.room.created_on.strftime("%Y-%m-%d %H:%M:%S"),
         )
 
-        time.sleep(1)
-        # Room spent 1 second in the queue
+        with freeze_time(base + timedelta(seconds=1)) as frozen:
+            self.room.user = self.user
+            self.room.save()
+            self.room.refresh_from_db()
 
-        self.room.user = self.user
-        self.room.save()
+            self.assertEqual(
+                self.room.added_to_queue_at.strftime("%Y-%m-%d %H:%M:%S"),
+                self.room.created_on.strftime("%Y-%m-%d %H:%M:%S"),
+            )
 
-        self.room.refresh_from_db()
+            waiting_time = calculate_last_queue_waiting_time(self.room)
+            self.assertEqual(waiting_time, 1)
 
-        self.assertEqual(
-            self.room.added_to_queue_at.strftime("%Y-%m-%d %H:%M:%S"),
-            self.room.created_on.strftime("%Y-%m-%d %H:%M:%S"),
-        )
+            self.room.user = None
+            self.room.save()
+            self.room.refresh_from_db()
 
-        waiting_time = calculate_last_queue_waiting_time(self.room)
+            frozen.move_to(base + timedelta(seconds=3))
 
-        # Assert that the waiting time is 1 second
-        self.assertEqual(waiting_time, 1)
+            waiting_time = calculate_last_queue_waiting_time(self.room)
+            self.assertEqual(waiting_time, 2)
 
-        self.room.user = None
-        self.room.save()
+            frozen.move_to(base + timedelta(seconds=4))
 
-        time.sleep(2)
-        # Room spent 2 seconds in the queue
+            self.room.user = self.user
+            self.room.save()
+            self.room.refresh_from_db()
 
-        self.room.refresh_from_db()
-
-        waiting_time = calculate_last_queue_waiting_time(self.room)
-
-        # Assert that the waiting time is 2 seconds
-        self.assertEqual(waiting_time, 2)
-
-        # One more second before user is assigned
-        time.sleep(1)
-
-        self.room.user = self.user
-        self.room.save()
-
-        self.room.refresh_from_db()
-
-        waiting_time = calculate_last_queue_waiting_time(self.room)
-
-        # Assert that the waiting time is 3 seconds
-        self.assertEqual(waiting_time, 3)
+            waiting_time = calculate_last_queue_waiting_time(self.room)
+            self.assertEqual(waiting_time, 3)
 
     def test_last_queue_waiting_time_when_room_is_ended_and_user_is_not_assigned(self):
-        # Room spent 1 second in the queue
-        time.sleep(1)
-        waiting_time = calculate_last_queue_waiting_time(self.room)
-
+        end_time = self.room.added_to_queue_at + timedelta(seconds=1)
+        with freeze_time(end_time):
+            waiting_time = calculate_last_queue_waiting_time(self.room)
         self.assertEqual(waiting_time, 1)

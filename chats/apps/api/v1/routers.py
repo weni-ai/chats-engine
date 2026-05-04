@@ -7,6 +7,9 @@ from chats.apps.api.v1.external.agents.viewsets import (
     AgentFlowViewset,
     ExternalAgentsStatusViewSet,
 )
+from chats.apps.api.v1.external.dashboard.viewsets import (
+    ExternalFinishedRoomsStatusViewSet,
+)
 from chats.apps.api.v1.external.msgs.viewsets import MessageFlowViewset
 from chats.apps.api.v1.external.queues.viewsets import QueueFlowViewset
 from chats.apps.api.v1.external.rooms.viewsets import (
@@ -231,6 +234,11 @@ router.register(
     "external/agents_status",
     ExternalAgentsStatusViewSet,
     basename="external_agents_status",
+)
+router.register(
+    "external/dashboard",
+    ExternalFinishedRoomsStatusViewSet,
+    basename="external_dashboard",
 )
 
 router.register("sector_holiday", SectorHolidayViewSet, basename="sector_holiday")

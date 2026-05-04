@@ -6,6 +6,7 @@ from django.db import transaction
 from django.db.models import (
     BooleanField,
     Case,
+    Count,
     DateTimeField,
     Exists,
     OuterRef,
@@ -18,6 +19,7 @@ from django.utils import timezone
 from django.utils.timezone import make_aware
 from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import filters, mixins, permissions, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
@@ -62,6 +64,7 @@ from chats.apps.api.v1.rooms.serializers import (
     RoomMessageStatusSerializer,
     RoomNoteSerializer,
     RoomSerializer,
+    RoomsCountQueryParamsSerializer,
     RoomsReportSerializer,
     RoomTagSerializer,
     TransferRoomSerializer,
@@ -573,6 +576,7 @@ class RoomViewset(
             status=completion_response.status_code, data=completion_response.json()
         )
 
+    @swagger_auto_schema(auto_schema=None)
     @action(
         detail=True,
         methods=["PATCH"],
@@ -732,7 +736,9 @@ class RoomViewset(
             )
 
             for room_uuid in skipped_rooms:
-                result.add_failure(room_uuid, f"Room {room_uuid}: not found or not active")
+                result.add_failure(
+                    room_uuid, f"Room {room_uuid}: not found or not active"
+                )
 
             logger.info(
                 f"Bulk transfer completed by {request.user.email}: "
@@ -783,9 +789,7 @@ class RoomViewset(
         url_name="bulk_take",
     )
     def bulk_take(self, request, pk=None):
-        serializer = BulkTakeSerializer(
-            data=request.data, context={"request": request}
-        )
+        serializer = BulkTakeSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
 
         rooms = serializer.validated_data["rooms"]
@@ -796,7 +800,10 @@ class RoomViewset(
             result = service.take(rooms=rooms, user=request.user)
 
             for room_uuid in skipped_rooms:
-                result.add_failure(room_uuid, f"Room {room_uuid}: not found, not active, or already assigned")
+                result.add_failure(
+                    room_uuid,
+                    f"Room {room_uuid}: not found, not active, or already assigned",
+                )
 
             logger.info(
                 f"Bulk take completed by {request.user.email}: "
@@ -881,8 +888,7 @@ class RoomViewset(
         }
         """
         serializer = BulkCloseSerializer(
-            data=request.data,
-            context={"request": request}
+            data=request.data, context={"request": request}
         )
         serializer.is_valid(raise_exception=True)
 
@@ -899,19 +905,16 @@ class RoomViewset(
         }
 
         # Fetch active rooms with optimized query
-        rooms = Room.objects.filter(
-            uuid__in=room_uuids,
-            is_active=True
-        ).select_related(
-            "queue__sector__project",
-            "user",
-            "closed_by"
-        ).prefetch_related("tags")
+        rooms = (
+            Room.objects.filter(uuid__in=room_uuids, is_active=True)
+            .select_related("queue__sector__project", "user", "closed_by")
+            .prefetch_related("tags")
+        )
 
         if not rooms.exists():
             return Response(
                 {"error": "No active rooms found with the provided UUIDs"},
-                status=status.HTTP_404_NOT_FOUND
+                status=status.HTTP_404_NOT_FOUND,
             )
 
         # Initialize service and close rooms
@@ -922,7 +925,7 @@ class RoomViewset(
                 rooms=rooms,
                 room_tags_map=room_tags_map,
                 end_by=end_by,
-                closed_by=closed_by
+                closed_by=closed_by,
             )
 
             logger.info(
@@ -947,7 +950,7 @@ class RoomViewset(
             response_data = {
                 "success": result.success_count > 0,
                 "message": message,
-                **result.to_dict()
+                **result.to_dict(),
             }
 
             return Response(response_data, status=response_status)
@@ -955,7 +958,7 @@ class RoomViewset(
         except Exception as e:
             logger.error(
                 f"Bulk close error for user {request.user.email}: {str(e)}",
-                exc_info=True
+                exc_info=True,
             )
             event_id = capture_exception(e)
             return Response(
@@ -964,9 +967,9 @@ class RoomViewset(
                     "error": f"Failed to close rooms. Event ID: {event_id}",
                     "success_count": 0,
                     "failed_count": 0,
-                    "total_processed": 0
+                    "total_processed": 0,
                 },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     @action(detail=False, methods=["get"], url_path="human-service-count")
@@ -1040,11 +1043,23 @@ class RoomViewset(
         """
         room = self.get_object()
 
-        history_summary = (
-            HistorySummary.objects.filter(room=room).order_by("created_on").last()
+        history_summaries = HistorySummary.objects.filter(room=room).order_by(
+            "modified_on"
         )
 
-        if not history_summary:
+        if pending_or_processing_history_summary := history_summaries.filter(
+            status__in=[HistorySummaryStatus.PENDING, HistorySummaryStatus.PROCESSING]
+        ).last():
+            serializer = RoomHistorySummarySerializer(
+                pending_or_processing_history_summary, context={"request": request}
+            )
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        done_history_summary = history_summaries.filter(
+            status=HistorySummaryStatus.DONE, summary__gt=""
+        ).last()
+
+        if not done_history_summary:
             return Response(
                 {
                     "status": HistorySummaryStatus.UNAVAILABLE,
@@ -1055,7 +1070,7 @@ class RoomViewset(
             )
 
         serializer = RoomHistorySummarySerializer(
-            history_summary, context={"request": request}
+            done_history_summary, context={"request": request}
         )
 
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -1410,3 +1425,39 @@ class RoomNoteViewSet(
         note.notify_websocket("delete")
 
         return super().destroy(request, *args, **kwargs)
+
+
+class RoomsCountView(APIView):
+    """
+    Return active room counts for a given sector or queue.
+
+    Query params (exactly one is required):
+        - sector: Sector UUID
+        - queue: Queue UUID
+
+    Response: {"waiting": N, "in_service": M}
+        - waiting: active rooms with no agent assigned
+        - in_service: active rooms assigned to an agent
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request, *args, **kwargs) -> Response:
+        params = RoomsCountQueryParamsSerializer(data=request.query_params)
+        params.is_valid(raise_exception=True)
+
+        sector = params.validated_data.get("sector")
+        queue = params.validated_data.get("queue")
+
+        queryset = Room.objects.filter(is_active=True)
+        if queue:
+            queryset = queryset.filter(queue=queue)
+        else:
+            queryset = queryset.filter(queue__sector=sector)
+
+        counts = queryset.aggregate(
+            waiting=Count("pk", filter=Q(user__isnull=True)),
+            in_service=Count("pk", filter=Q(user__isnull=False)),
+        )
+
+        return Response(counts, status=status.HTTP_200_OK)

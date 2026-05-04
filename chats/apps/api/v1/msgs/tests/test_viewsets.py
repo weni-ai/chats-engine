@@ -210,3 +210,119 @@ class TestMessageViewsetCreate(APITestCase):
         self.assertIsNotNone(self.room.last_message)
         self.assertEqual(self.room.last_message_text, "Hello from agent")
         self.assertEqual(self.room.last_message_user, self.user)
+
+    @patch(
+        "chats.apps.ai_features.improve_user_message.tasks"
+        ".register_message_improvement_task.delay"
+    )
+    def test_create_message_with_ai_text_improvement(self, mock_task_delay):
+        """Test that ai_text_improvement triggers the improvement task."""
+        url = reverse("message-list")
+        data = {
+            "room": str(self.room.uuid),
+            "user_email": self.user.email,
+            "text": "Hello from agent",
+            "ai_text_improvement": {
+                "status": "USED",
+                "type": "GRAMMAR_AND_SPELLING",
+            },
+        }
+
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        mock_task_delay.assert_called_once_with(
+            message_uuid=response.data["uuid"],
+            improvement_type="GRAMMAR_AND_SPELLING",
+            status="USED",
+        )
+
+    @patch(
+        "chats.apps.ai_features.improve_user_message.tasks"
+        ".register_message_improvement_task.delay"
+    )
+    def test_create_message_without_ai_text_improvement(self, mock_task_delay):
+        """Test that omitting ai_text_improvement does not trigger the task."""
+        url = reverse("message-list")
+        data = {
+            "room": str(self.room.uuid),
+            "user_email": self.user.email,
+            "text": "Hello from agent",
+        }
+
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        mock_task_delay.assert_not_called()
+
+    def test_create_message_with_invalid_ai_text_improvement_status(self):
+        """Test that an invalid status in ai_text_improvement returns 400."""
+        url = reverse("message-list")
+        data = {
+            "room": str(self.room.uuid),
+            "user_email": self.user.email,
+            "text": "Hello from agent",
+            "ai_text_improvement": {
+                "status": "INVALID_STATUS",
+                "type": "GRAMMAR_AND_SPELLING",
+            },
+        }
+
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("ai_text_improvement", response.data)
+
+    def test_create_message_with_invalid_ai_text_improvement_type(self):
+        """Test that an invalid type in ai_text_improvement returns 400."""
+        url = reverse("message-list")
+        data = {
+            "room": str(self.room.uuid),
+            "user_email": self.user.email,
+            "text": "Hello from agent",
+            "ai_text_improvement": {
+                "status": "USED",
+                "type": "INVALID_TYPE",
+            },
+        }
+
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("ai_text_improvement", response.data)
+
+    @patch(
+        "chats.apps.ai_features.improve_user_message.tasks"
+        ".register_message_improvement_task.delay"
+    )
+    def test_create_message_with_null_ai_text_improvement(self, mock_task_delay):
+        """Test that sending ai_text_improvement as null creates the message without triggering the task."""
+        url = reverse("message-list")
+        data = {
+            "room": str(self.room.uuid),
+            "user_email": self.user.email,
+            "text": "Hello from agent",
+            "ai_text_improvement": None,
+        }
+
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        mock_task_delay.assert_not_called()
+
+    def test_create_message_with_incomplete_ai_text_improvement(self):
+        """Test that missing fields in ai_text_improvement returns 400."""
+        url = reverse("message-list")
+        data = {
+            "room": str(self.room.uuid),
+            "user_email": self.user.email,
+            "text": "Hello from agent",
+            "ai_text_improvement": {
+                "status": "USED",
+            },
+        }
+
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("ai_text_improvement", response.data)
