@@ -39,12 +39,19 @@ def route_queue_rooms(queue_uuid: UUID):
     if not queue:
         logger.info("[route_queue_rooms] Queue not found for UUID: %s", queue_uuid)
         return
-    cooldown_feature_flag_active = is_feature_active_for_attributes(
-        settings.ROUTE_QUEUE_COOLDOWN_FEATURE_FLAG_KEY,
-        {"projectUUID": str(queue.sector.project.uuid)},
-    )
+
+    try:
+        cooldown_feature_flag_active = is_feature_active_for_attributes(
+            settings.ROUTE_QUEUE_COOLDOWN_FEATURE_FLAG_KEY,
+            {"projectUUID": str(queue.sector.project.uuid)},
+        )
+    except Exception as e:
+        logger.error("[route_queue_rooms] Error checking cooldown feature flag: %s", e)
+        cooldown_feature_flag_active = False
+
     lock_key = get_route_lock_key_for_queue(queue.uuid)
     pending_key = get_route_pending_key_for_queue(queue_uuid)
+
     if cooldown_feature_flag_active:
         acquired = cache.add(
             lock_key, True, timeout=settings.ROUTE_QUEUE_COOLDOWN_MAX_TIME
