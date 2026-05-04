@@ -42,6 +42,10 @@ class BaseCSATService(ABC):
 
 
 class CSATFlowService(BaseCSATService):
+    CUSTOM_FLOW_NOT_FOUND_EMAIL_CACHE_KEY = (
+        "csat:custom_flow_not_found_email_sent:{project_uuid}"
+    )
+
     def __init__(
         self,
         flows_client: FlowRESTClient,
@@ -137,7 +141,8 @@ class CSATFlowService(BaseCSATService):
                 and status_code == 400
                 and "no such object" in flow_error.lower()
             ):
-                self.send_custom_flow_not_found_email(project)
+                # Sending emails to admins in the main project
+                self.send_custom_flow_not_found_email(sector.project)
             else:
                 logger.error(
                     "[CSAT FLOW SERVICE] Failed to start CSAT flow [%s]: %s",
@@ -314,6 +319,28 @@ class CSATFlowService(BaseCSATService):
         return is_updated
 
     def send_custom_flow_not_found_email(self, project: Project):
-        # TODO: Implement this method
-        # TODO: Attention, verify if it is a secondary project
-        pass
+        from chats.apps.csat.tasks import send_custom_flow_not_found_email
+
+        cache_key = self.CUSTOM_FLOW_NOT_FOUND_EMAIL_CACHE_KEY.format(
+            project_uuid=str(project.uuid)
+        )
+
+        if self.cache_client.get(cache_key):
+            logger.info(
+                "[CSAT FLOW SERVICE] Custom flow not found email already sent for project %s (%s)",
+                project.name,
+                project.uuid,
+            )
+            return
+
+        send_custom_flow_not_found_email.delay(project.uuid)
+
+        logger.info(
+            "[CSAT FLOW SERVICE] Custom flow not found email scheduled for project %s (%s)",
+            project.name,
+            project.uuid,
+        )
+
+        self.cache_client.set(
+            cache_key, "1", ex=settings.CUSTOM_FLOW_NOT_FOUND_EMAIL_COOLDOWN
+        )
