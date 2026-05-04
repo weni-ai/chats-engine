@@ -60,10 +60,17 @@ def start_queue_priority_routing_for_all_queues_in_project(project: Project):
         )
         return
 
-    cooldown_feature_flag_active = is_feature_active_for_attributes(
-        settings.ROUTE_QUEUE_COOLDOWN_FEATURE_FLAG_KEY,
-        {"projectUUID": str(project.uuid)},
-    )
+    try:
+        cooldown_feature_flag_active = is_feature_active_for_attributes(
+            settings.ROUTE_QUEUE_COOLDOWN_FEATURE_FLAG_KEY,
+            {"projectUUID": str(project.uuid)},
+        )
+    except Exception as e:
+        logger.error(
+            "[start_queue_priority_routing_for_all_queues_in_project] Error checking cooldown feature flag: %s",
+            e,
+        )
+        cooldown_feature_flag_active = False
 
     if cooldown_feature_flag_active:
         logger.info(
