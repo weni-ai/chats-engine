@@ -1,3 +1,55 @@
+# 3.56.2
+# Add
+  - Bulk creation of pending archived conversation records
+# Fix
+  - Archive task rooms count calculation and logging
+  - Room filtering logic in archive chats task
+
+# 3.56.1
+# Add
+  - Internal rooms list V2 with support for deleted sectors and queues
+
+# 3.56.0
+# Add
+  - Internal dashboard V2 for agent metrics
+  - Agent status V2 with custom status metrics
+  - Soft-deleted agents included in CSAT score calculations
+
+# 3.55.5
+# Add
+  - Room transfer functionality during queue and sector deletion
+  - Internal endpoint for counting rooms by sector and queue
+  - Room closure logic when queue or sector is deleted
+# Remove
+  - Time-sleep-based tests
+
+# 3.55.3
+# Fix
+  - Archive chats task dispatching
+# Add
+  - Batch dispatching and performance logging for archive chats task
+
+# 3.55.2
+# Add
+  - Audit logging for object creation, deletion, and editing
+# Remove
+  - Unused data in exports
+
+# 3.55.1
+# Add
+  - Support for running archive chats task more than once per day
+# Fix
+  - Archive chats scheduling and configuration
+
+# 3.55.0
+# Add
+  - AI-powered message improvement feature with models, service, use case, and endpoint
+  - Internal error handling middleware for better error logging
+
+# 3.54.6
+# Fix
+  - Handle empty summary case in history summary service
+
 # 3.54.5
 # Fix
  - Empty history summary
