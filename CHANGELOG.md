@@ -1,3 +1,10 @@
+# 3.57.0
+# Add
+  - Transfer history from bulk transfer
+  - User room count re-verification before routing assignment
+# Fix
+  - Agent status list filtering by queue
+
 # 3.56.2
 # Add
   - Bulk creation of pending archived conversation records
