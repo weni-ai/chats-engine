@@ -711,8 +711,7 @@ msgid ""
 "have been deleted or is no longer available."
 msgstr ""
 "Não foi possível iniciar o fluxo CSAT personalizado para o projeto "
-"%(project_name)s. O fluxo pode ter sido excluído ou seu identificador pode "
-"não está mais disponível."
+"%(project_name)s. O fluxo pode ter sido excluído ou não está mais disponível."
 
 #: chats/apps/csat/templates/csat/emails/custom_flow_not_found.html:34
 msgid ""
