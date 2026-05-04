@@ -57,8 +57,8 @@ class RoomsCountByQueueQueryParamsSerializer(serializers.Serializer):
 class QueueRoomsCountSerializer(serializers.Serializer):
     uuid = serializers.UUIDField()
     name = serializers.CharField()
-    queued_rooms_count = serializers.IntegerField()
-    in_service_rooms_count = serializers.IntegerField()
+    rooms_in_awaiting = serializers.IntegerField()
+    rooms_in_progress = serializers.IntegerField()
 
 
 class SectorRoomsCountSerializer(serializers.Serializer):

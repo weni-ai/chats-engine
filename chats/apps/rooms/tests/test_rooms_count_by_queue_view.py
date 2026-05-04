@@ -60,8 +60,8 @@ class RoomsCountByQueueViewBase(APITestCase):
             for queue in sector["queues"]:
                 result[queue["uuid"]] = {
                     "sector": sector["name"],
-                    "queued": queue["queued_rooms_count"],
-                    "in_service": queue["in_service_rooms_count"],
+                    "queued": queue["rooms_in_awaiting"],
+                    "in_service": queue["rooms_in_progress"],
                 }
         return result
 

@@ -1528,8 +1528,8 @@ class RoomsCountByQueueView(APIView):
                         {
                             "uuid": "<queue uuid>",
                             "name": "Queue name",
-                            "queued_rooms_count": <int>,
-                            "in_service_rooms_count": <int>
+                            "rooms_in_awaiting": <int>,
+                            "rooms_in_progress": <int>
                         }
                     ]
                 }
@@ -1540,7 +1540,7 @@ class RoomsCountByQueueView(APIView):
         - Manager (project admin or sector manager): sees every sector and
           queue of the project, with both counts populated.
         - Agent: sees only the queues they are authorized on, and
-          `in_service_rooms_count` is always 0.
+          `rooms_in_progress` is always 0.
 
     A "queued" room is an active room without an assigned agent that has
     already left the flow start phase (`is_active=True, user__isnull=True,
@@ -1608,8 +1608,8 @@ class RoomsCountByQueueView(APIView):
                     {
                         "uuid": str(queue.uuid),
                         "name": queue.name,
-                        "queued_rooms_count": queue.annotated_queued_rooms_count,
-                        "in_service_rooms_count": queue.annotated_in_service_rooms_count,
+                        "rooms_in_awaiting": queue.annotated_queued_rooms_count,
+                        "rooms_in_progress": queue.annotated_in_service_rooms_count,
                     }
                     for queue in group
                 ],
