@@ -1,0 +1,38 @@
+{% extends 'rooms/emails/base.html' %}
+{% load i18n %}
+
+{% block main-content %}
+<section style="width: 574px; margin: 50px auto;">
+  <div
+    style="
+      font-family: 'Lato', sans-serif;
+      font-weight: bold;
+      font-size: 20px;
+      line-height: 28px;
+      color: #262626;
+      margin-top: 24px;
+    "
+  >
+    {% trans 'Custom CSAT flow not found' %}
+  </div>
+
+  <div
+    style="
+      font-family: 'Lato', sans-serif;
+      font-style: normal;
+      font-weight: normal;
+      font-size: 16px;
+      line-height: 24px;
+      color: #808080;
+      margin-top: 24px;
+    "
+  >
+    <p style="margin-top: 24px; margin-bottom: 0;">
+      {% blocktrans with project_name=project_name %}Failed to start custom CSAT flow for project {{ project_name }}. The flow may have been deleted or is no longer available.{% endblocktrans %}
+    </p>
+    <p style="margin-top: 16px; margin-bottom: 0;">
+      {% trans 'Check the sector settings and update the CSAT flow configuration to resume satisfaction surveys.' %}
+    </p>
+  </div>
+</section>
+{% endblock %}

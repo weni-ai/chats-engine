@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Callable, TYPE_CHECKING
+from typing import Callable, Tuple, TYPE_CHECKING
 
 import requests
 from django.conf import settings
@@ -285,8 +285,7 @@ class FlowRESTClient(
             raise
         return flows
 
-    def start_flow(self, project, data):
-        print("data", data)
+    def start_flow(self, project, data) -> Tuple[int, dict]:
         response = retry_request_and_refresh_flows_auth_token(
             project=project,
             request_method=requests.post,
@@ -296,7 +295,7 @@ class FlowRESTClient(
         )
         print(f"🔍 DEBUG start_flow(): Response: {response.json()}")
         try:
-            return response.json()
+            return response.status_code, response.json()
         except ValueError as e:
             LOGGER.error(
                 "Failed to parse JSON response from start_flow: %s. Response content: %s",
