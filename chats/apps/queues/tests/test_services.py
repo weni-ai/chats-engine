@@ -445,9 +445,10 @@ class CapacityRecheckRaceConditionTestCase(TestCase):
             role=QueueAuthorization.ROLE_AGENT,
         )
 
+    @patch("chats.apps.queues.services.is_feature_active_for_attributes", return_value=True)
     @patch("chats.apps.queues.services.logger")
     def test_room_not_assigned_when_agent_reaches_limit_during_routing(
-        self, mock_logger
+        self, mock_logger, mock_flag
     ):
         """
         Race condition: agent is picked by get_available_agent() but other
@@ -478,8 +479,9 @@ class CapacityRecheckRaceConditionTestCase(TestCase):
         room.refresh_from_db()
         self.assertIsNone(room.user)
 
+    @patch("chats.apps.queues.services.is_feature_active_for_attributes", return_value=True)
     @patch("chats.apps.queues.services.logger")
-    def test_room_not_assigned_when_agent_already_above_limit(self, mock_logger):
+    def test_room_not_assigned_when_agent_already_above_limit(self, mock_logger, mock_flag):
         """
         Agent that somehow is already above the sector limit must not
         receive another room (this is the exact scenario observed in prod).

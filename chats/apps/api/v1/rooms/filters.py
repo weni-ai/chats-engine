@@ -11,6 +11,10 @@ from chats.apps.projects.models.models import ProjectPermission
 User = get_user_model()
 
 
+class UUIDInFilter(filters.BaseInFilter, filters.UUIDFilter):
+    pass
+
+
 class RoomFilter(filters.FilterSet):
     class Meta:
         model = Room
@@ -35,6 +39,18 @@ class RoomFilter(filters.FilterSet):
         required=False,
         method="filter_room_status",
         help_text=_("Room status"),
+    )
+
+    queues = UUIDInFilter(
+        field_name="queue__uuid",
+        lookup_expr="in",
+        help_text=_("Filter by multiple queue UUIDs (comma-separated)"),
+    )
+
+    sectors = UUIDInFilter(
+        field_name="queue__sector__uuid",
+        lookup_expr="in",
+        help_text=_("Filter by multiple sector UUIDs (comma-separated)"),
     )
 
     def filter_room_status(self, queryset, name, value):

@@ -457,12 +457,14 @@ class RoomsQueuePriorityExternalTests(APITestCase):
             self.queue.uuid,
         )
 
+    @patch("chats.apps.api.v1.external.rooms.serializers.is_feature_active", return_value=True)
     @patch("chats.apps.api.v1.external.rooms.serializers.start_queue_priority_routing")
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_room_with_queue_priority_when_agent_fails_capacity_recheck(
         self,
         mock_get_room,
         mock_start_queue_priority_routing,
+        mock_flag,
     ):
         """
         Queue is empty and there is an ONLINE agent, but the agent is already

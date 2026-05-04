@@ -821,6 +821,12 @@ USE_FLOWS_MEDIA_URL_FEATURE_FLAG_KEY = env.str(
 
 FLOWS_BASE_URL = env.str("FLOWS_BASE_URL", default="https://flows.weni.ai")
 
+# Agent Capacity Recheck
+AGENT_CAPACITY_RECHECK_FEATURE_FLAG_KEY = env.str(
+    "AGENT_CAPACITY_RECHECK_FEATURE_FLAG_KEY",
+    default="weniChatsAgentCapacityRecheck",
+)
+
 # Improve User Message
 IMPROVE_USER_MESSAGE_FEATURE_FLAG_KEY = env.str(
     "IMPROVE_USER_MESSAGE_FEATURE_FLAG_KEY",
