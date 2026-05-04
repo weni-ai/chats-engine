@@ -70,6 +70,12 @@ class Sector(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMod
         _("is automatic message active?"), default=False
     )
     is_csat_enabled = models.BooleanField(_("is CSAT enabled?"), default=False)
+    custom_csat_flow_uuid = models.UUIDField(
+        _("custom CSAT flow UUID"),
+        null=True,
+        blank=True,
+        help_text=_("The UUID of the custom CSAT flow"),
+    )
     required_tags = models.BooleanField(_("required tags?"), default=False)
 
     tracker = FieldTracker(fields=["rooms_limit", "is_csat_enabled"])
