@@ -11,7 +11,6 @@ from django.db.models import (
     Count,
     DateTimeField,
     Exists,
-    IntegerField,
     OuterRef,
     Q,
     Subquery,
@@ -1547,7 +1546,8 @@ class RoomsCountByQueueView(APIView):
         - Manager (project admin or sector manager): sees every sector and
           queue of the project, with both counts populated.
         - Agent: sees only the queues they are authorized on, and
-          `rooms_in_progress` is always 0.
+          `rooms_in_progress` only counts rooms assigned to the
+          requesting user.
 
     A "queued" room is an active room without an assigned agent that has
     already left the flow start phase (`is_active=True, user__isnull=True,
@@ -1588,17 +1588,19 @@ class RoomsCountByQueueView(APIView):
             rooms__is_waiting=False,
         )
 
-        in_service_annotation = (
-            Count(
-                "rooms",
-                filter=Q(
-                    rooms__is_active=True,
-                    rooms__user__isnull=False,
-                    rooms__is_waiting=False,
-                ),
+        in_service_annotation = Count(
+            "rooms",
+            filter=Q(
+                rooms__is_active=True,
+                rooms__is_waiting=False,
+                rooms__user__isnull=False,
             )
             if is_manager_view
-            else Value(0, output_field=IntegerField())
+            else Q(
+                rooms__is_active=True,
+                rooms__is_waiting=False,
+                rooms__user=request.user,
+            ),
         )
 
         queues_qs = (

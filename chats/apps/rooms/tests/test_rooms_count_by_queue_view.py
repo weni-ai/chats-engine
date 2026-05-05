@@ -229,9 +229,10 @@ class RoomsCountByQueueViewAgentTests(RoomsCountByQueueViewBase):
         flat = self._flatten(response.data)
         self.assertEqual(set(flat.keys()), {str(self.queue_a1.uuid)})
 
-    def test_agent_in_service_count_is_always_zero(self):
+    def test_agent_in_service_count_only_includes_own_rooms(self):
         self._create_room(self.queue_a1, user=self.attendant)
         self._create_room(self.queue_a1, user=self.attendant)
+        self._create_room(self.queue_a1, user=self.agent)
         self._create_room(self.queue_a1)
 
         response = self._get({"project": str(self.project.uuid)})
@@ -239,7 +240,7 @@ class RoomsCountByQueueViewAgentTests(RoomsCountByQueueViewBase):
 
         flat = self._flatten(response.data)
         self.assertEqual(flat[str(self.queue_a1.uuid)]["queued"], 1)
-        self.assertEqual(flat[str(self.queue_a1.uuid)]["in_service"], 0)
+        self.assertEqual(flat[str(self.queue_a1.uuid)]["in_service"], 2)
 
     def test_agent_without_queue_authorizations_returns_no_sectors(self):
         QueueAuthorization.objects.filter(
