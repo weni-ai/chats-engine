@@ -31,11 +31,12 @@ class DocumentAwareSearchFilter(SearchFilter):
                 value = normalize_document(term) if field.endswith("document") else term
                 if value:
                     field_qs.append(Q(**{self.construct_search(field): value}))
-            if field_qs:
-                conditions.append(reduce(operator.or_, field_qs))
-
-        if not conditions:
-            return queryset
+            if not field_qs:
+                # The user supplied a term, but after per-field normalization
+                # nothing remains to match against. Treat it as an explicit
+                # "no results" instead of silently dropping the filter.
+                return queryset.none()
+            conditions.append(reduce(operator.or_, field_qs))
 
         queryset = queryset.filter(reduce(operator.and_, conditions))
         if self.must_call_distinct(queryset, search_fields):
