@@ -484,6 +484,12 @@ class RoomViewset(
                 requested_by=self.request.user,
             )
 
+            create_room_feedback_message(
+                instance,
+                feedback,
+                method=RoomFeedbackMethods.ROOM_TRANSFER,
+                requested_by=self.request.user,
+            )
             instance.add_transfer_to_history(feedback)
 
         if queue:
@@ -505,18 +511,16 @@ class RoomViewset(
             room_metric.transfer_count += 1
             room_metric.save()
 
+            create_room_feedback_message(
+                instance,
+                feedback,
+                method=RoomFeedbackMethods.ROOM_TRANSFER,
+                requested_by=self.request.user,
+            )
+
             instance.add_transfer_to_history(feedback)
 
         instance.save()
-
-        # Create a message with the transfer data and Send to the room group
-        # TODO separate create message in a function
-        create_room_feedback_message(
-            instance,
-            feedback,
-            method=RoomFeedbackMethods.ROOM_TRANSFER,
-            requested_by=self.request.user,
-        )
 
         if old_user is None and user:  # queued > agent
             instance.notify_queue("update")
