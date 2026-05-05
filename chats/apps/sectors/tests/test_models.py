@@ -319,13 +319,13 @@ class SectorHolidayCacheInvalidationTests(TestCase):
         MockCacheClient.return_value = self.cache
         cache_key = f"holiday:{self.sector.uuid}:{self.monday_dt.date()}"
 
-        # Prime cache com "null" (sem feriado)
+        # Prime cache with "null" (no holiday)
         self.cache.set(cache_key, "null", ex=300)
 
-        # Primeiro check: sem feriado -> deve passar
+        # First check: no holiday → must pass
         self.validator.validate_working_hours(self.sector, self.monday_dt)
 
-        # Cria feriado (fechado) para a mesma data
+        # Create a closed holiday for the same date
         SectorHoliday.objects.create(
             sector=self.sector,
             date=self.monday_dt.date(),
@@ -333,33 +333,252 @@ class SectorHolidayCacheInvalidationTests(TestCase):
             description="New Holiday",
         )
 
-        # Esperado: invalidação de cache -> agora deve lançar
-        with self.assertRaises(ValidationError):
+        # Cache should be invalidated → must now raise with the holiday message
+        with self.assertRaises(ValidationError) as cm:
             self.validator.validate_working_hours(self.sector, self.monday_dt)
+        self.assertIn(
+            "Contact couldn't be started because today is a holiday",
+            str(cm.exception),
+        )
 
     @patch("chats.apps.sectors.utils.CacheClient")
     def test_cache_is_invalidated_on_delete(self, MockCacheClient):
         MockCacheClient.return_value = self.cache
         cache_key = f"holiday:{self.sector.uuid}:{self.monday_dt.date()}"
 
-        # Cria feriado e popula cache executando a validação uma vez
+        # Create a holiday and populate the cache by running the validation once
         holiday = SectorHoliday.objects.create(
             sector=self.sector,
             date=self.monday_dt.date(),
             day_type=SectorHoliday.CLOSED,
             description="Existing Holiday",
         )
-        # Este check deve lançar e também setar o cache
-        with self.assertRaises(ValidationError):
+        # Must raise with the holiday message and populate the cache
+        with self.assertRaises(ValidationError) as cm:
             self.validator.validate_working_hours(self.sector, self.monday_dt)
+        self.assertIn(
+            "Contact couldn't be started because today is a holiday",
+            str(cm.exception),
+        )
         self.assertIn(cache_key, self.cache.store)
 
-        # Soft delete
+        # Soft-delete the holiday
         holiday.is_deleted = True
         holiday.save(update_fields=["is_deleted"])
 
-        # Esperado: invalidação -> agora deve passar (sem feriado)
+        # Cache should be invalidated → must now pass (no active holiday)
         self.validator.validate_working_hours(self.sector, self.monday_dt)
+
+
+class WorkingHoursValidatorHolidayTests(TestCase):
+    """Unit tests for holiday-specific error messages in WorkingHoursValidator."""
+
+    def setUp(self):
+        self.project = Project.objects.create(
+            name="Holiday Validator Project",
+            room_routing_type=RoomRoutingType.QUEUE_PRIORITY,
+        )
+        self.sector = Sector.objects.create(
+            name="Holiday Validator Sector",
+            project=self.project,
+            rooms_limit=1,
+            working_day={
+                "working_hours": {
+                    "closed_weekdays": [],
+                    "schedules": {
+                        "monday": {"start": "08:00", "end": "17:00"},
+                        "tuesday": {"start": "08:00", "end": "17:00"},
+                        "wednesday": {"start": "08:00", "end": "17:00"},
+                        "thursday": {"start": "08:00", "end": "17:00"},
+                        "friday": {"start": "08:00", "end": "17:00"},
+                    },
+                }
+            },
+        )
+        self.validator = WorkingHoursValidator()
+        # Monday 2025-01-06 09:00 (within normal working hours)
+        self.monday_dt = datetime(2025, 1, 6, 9, 0, 0)
+
+    # -------------------------------------------------------------------------
+    # Configurable holidays (SectorHoliday from DB/cache)
+    # -------------------------------------------------------------------------
+
+    @patch("chats.apps.sectors.utils.CacheClient")
+    def test_configurable_holiday_closed_raises_holiday_message(self, MockCacheClient):
+        """Fully closed configurable holiday raises the holiday-specific message."""
+        MockCacheClient.return_value = _FakeCache()
+        SectorHoliday.objects.create(
+            sector=self.sector,
+            date=self.monday_dt.date(),
+            day_type=SectorHoliday.CLOSED,
+            description="National Day",
+        )
+
+        with self.assertRaises(ValidationError) as cm:
+            self.validator.validate_working_hours(self.sector, self.monday_dt)
+
+        self.assertIn(
+            "Contact couldn't be started because today is a holiday",
+            str(cm.exception),
+        )
+
+    @patch("chats.apps.sectors.utils.CacheClient")
+    def test_configurable_holiday_custom_hours_inside_window_passes(self, MockCacheClient):
+        """Configurable holiday with custom hours allows contact within the window."""
+        MockCacheClient.return_value = _FakeCache()
+        SectorHoliday.objects.create(
+            sector=self.sector,
+            date=self.monday_dt.date(),
+            day_type=SectorHoliday.CUSTOM_HOURS,
+            start_time=time(8, 0),
+            end_time=time(12, 0),
+            description="Half Day Holiday",
+        )
+
+        # 09:00 is within 08:00–12:00 → must NOT raise
+        self.validator.validate_working_hours(self.sector, self.monday_dt)
+
+    @patch("chats.apps.sectors.utils.CacheClient")
+    def test_configurable_holiday_custom_hours_outside_window_raises_holiday_hours_message(
+        self, MockCacheClient
+    ):
+        """Configurable holiday with custom hours blocks contact outside the window."""
+        MockCacheClient.return_value = _FakeCache()
+        SectorHoliday.objects.create(
+            sector=self.sector,
+            date=self.monday_dt.date(),
+            day_type=SectorHoliday.CUSTOM_HOURS,
+            start_time=time(14, 0),
+            end_time=time(18, 0),
+            description="Afternoon Holiday",
+        )
+
+        # 09:00 is outside 14:00–18:00 → must raise with holiday hours message
+        with self.assertRaises(ValidationError) as cm:
+            self.validator.validate_working_hours(self.sector, self.monday_dt)
+
+        self.assertIn(
+            "Contact couldn't be started outside the holiday working hours",
+            str(cm.exception),
+        )
+
+    # -------------------------------------------------------------------------
+    # Static holidays (in working_day["working_hours"]["static_holidays"])
+    # -------------------------------------------------------------------------
+
+    @patch("chats.apps.sectors.utils.CacheClient")
+    def test_static_holiday_closed_raises_holiday_message(self, MockCacheClient):
+        """Static holiday with closed=True raises the holiday-specific message."""
+        MockCacheClient.return_value = _FakeCache()
+        sector = Sector.objects.create(
+            name="Static Closed Holiday Sector",
+            project=self.project,
+            rooms_limit=1,
+            working_day={
+                "working_hours": {
+                    "closed_weekdays": [],
+                    "schedules": {
+                        "monday": {"start": "08:00", "end": "17:00"},
+                    },
+                    "static_holidays": {
+                        "2025-01-06": {"closed": True},
+                    },
+                }
+            },
+        )
+
+        with self.assertRaises(ValidationError) as cm:
+            self.validator.validate_working_hours(sector, self.monday_dt)
+
+        self.assertIn(
+            "Contact couldn't be started because today is a holiday",
+            str(cm.exception),
+        )
+
+    @patch("chats.apps.sectors.utils.CacheClient")
+    def test_static_holiday_custom_hours_inside_window_passes(self, MockCacheClient):
+        """Static holiday with custom hours allows contact within the window."""
+        MockCacheClient.return_value = _FakeCache()
+        sector = Sector.objects.create(
+            name="Static Custom Hours Holiday Sector",
+            project=self.project,
+            rooms_limit=1,
+            working_day={
+                "working_hours": {
+                    "closed_weekdays": [],
+                    "schedules": {
+                        "monday": {"start": "08:00", "end": "17:00"},
+                    },
+                    "static_holidays": {
+                        "2025-01-06": {"closed": False, "start": "08:00", "end": "12:00"},
+                    },
+                }
+            },
+        )
+
+        # 09:00 is within 08:00–12:00 → must NOT raise
+        self.validator.validate_working_hours(sector, self.monday_dt)
+
+    @patch("chats.apps.sectors.utils.CacheClient")
+    def test_static_holiday_custom_hours_outside_window_raises_holiday_hours_message(
+        self, MockCacheClient
+    ):
+        """Static holiday with custom hours blocks contact outside the window."""
+        MockCacheClient.return_value = _FakeCache()
+        sector = Sector.objects.create(
+            name="Static Outside Holiday Sector",
+            project=self.project,
+            rooms_limit=1,
+            working_day={
+                "working_hours": {
+                    "closed_weekdays": [],
+                    "schedules": {
+                        "monday": {"start": "08:00", "end": "17:00"},
+                    },
+                    "static_holidays": {
+                        "2025-01-06": {"closed": False, "start": "14:00", "end": "18:00"},
+                    },
+                }
+            },
+        )
+
+        # 09:00 is outside 14:00–18:00 → must raise with holiday hours message
+        with self.assertRaises(ValidationError) as cm:
+            self.validator.validate_working_hours(sector, self.monday_dt)
+
+        self.assertIn(
+            "Contact couldn't be started outside the holiday working hours",
+            str(cm.exception),
+        )
+
+    @patch("chats.apps.sectors.utils.CacheClient")
+    def test_static_holiday_recurring_annual_by_month_day(self, MockCacheClient):
+        """Recurring annual holiday (MM-DD key) raises the holiday-specific message."""
+        MockCacheClient.return_value = _FakeCache()
+        sector = Sector.objects.create(
+            name="Recurring Holiday Sector",
+            project=self.project,
+            rooms_limit=1,
+            working_day={
+                "working_hours": {
+                    "closed_weekdays": [],
+                    "schedules": {
+                        "monday": {"start": "08:00", "end": "17:00"},
+                    },
+                    "static_holidays": {
+                        "01-06": {"closed": True},
+                    },
+                }
+            },
+        )
+
+        with self.assertRaises(ValidationError) as cm:
+            self.validator.validate_working_hours(sector, self.monday_dt)
+
+        self.assertIn(
+            "Contact couldn't be started because today is a holiday",
+            str(cm.exception),
+        )
 
 
 class SectorRequiredTagsTests(TransactionTestCase):

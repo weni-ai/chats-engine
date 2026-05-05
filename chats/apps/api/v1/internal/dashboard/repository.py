@@ -3,6 +3,7 @@ from django.contrib.postgres.fields import JSONField
 from django.db.models import (
     QuerySet,
     Avg,
+    BooleanField,
     Case,
     Count,
     Exists,
@@ -38,7 +39,7 @@ class AgentRepository:
     def __init__(self):
         self.model = User.objects
 
-    def get_agents_data(self, filters: Filters, project):
+    def get_agents_data(self, filters: Filters, project, include_removed: bool = False):
         tz = project.timezone
         initial_datetime = (
             timezone.now()
@@ -50,6 +51,18 @@ class AgentRepository:
         opened_rooms = {}
 
         agents_filters = Q(project_permissions__project=project) & Q(is_active=True)
+
+        if include_removed:
+            agents_filters = (
+                Q(project_permissions__project=project)
+                | Exists(
+                    ProjectPermission.all_objects.filter(
+                        project=project,
+                        user_id=OuterRef("email"),
+                        is_deleted=True,
+                    )
+                )
+            ) & Q(is_active=True)
 
         if filters.queues:
             rooms_filter["rooms__queue__in"] = filters.queues
@@ -87,7 +100,12 @@ class AgentRepository:
         if filters.agent:
             rooms_filter["rooms__user"] = filters.agent
 
-        project_permission_subquery = ProjectPermission.objects.filter(
+        permission_manager = (
+            ProjectPermission.all_objects
+            if include_removed
+            else ProjectPermission.objects
+        )
+        project_permission_subquery = permission_manager.filter(
             project_id=project,
             user_id=OuterRef("email"),
         ).values("status")[:1]
@@ -182,11 +200,19 @@ class AgentRepository:
             ).exclude(status_type__name__iexact="in-service")
         )
 
+        permission_is_deleted_subquery = ~Exists(
+            ProjectPermission.objects.filter(
+                project=project,
+                user_id=OuterRef("email"),
+            )
+        )
+
         agents_query = (
             agents_query.filter(agents_filters)
             .annotate(
                 status=Subquery(project_permission_subquery),
                 has_active_custom_status=has_active_custom_status_subquery,
+                is_deleted=permission_is_deleted_subquery,
                 status_order=Case(
                     When(status="ONLINE", then=Value(1)),
                     When(
@@ -228,6 +254,17 @@ class AgentRepository:
             .distinct()
         )
 
+        if include_removed:
+            active_permission_exists = Exists(
+                ProjectPermission.objects.filter(
+                    project=project,
+                    user_id=OuterRef("email"),
+                )
+            )
+            agents_query = agents_query.filter(
+                active_permission_exists | Q(closed__gt=0) | Q(opened__gt=0)
+            )
+
         agents_query = agents_query.values(
             "first_name",
             "last_name",
@@ -235,6 +272,7 @@ class AgentRepository:
             "status",
             "status_order",
             "has_active_custom_status",
+            "is_deleted",
             "closed",
             "opened",
             "avg_first_response_time",
@@ -271,17 +309,17 @@ class AgentRepository:
         if filters.queue and filters.sector:
             rooms_filter["rooms__queue"] = filters.queue
             rooms_filter["rooms__queue__sector__in"] = filters.sector
-            agents_filter[
-                "project_permissions__queue_authorizations__queue"
-            ] = filters.queue
+            agents_filter["project_permissions__queue_authorizations__queue"] = (
+                filters.queue
+            )
             agents_filter[
                 "project_permissions__queue_authorizations__queue__sector__in"
             ] = filters.sector
         elif filters.queue:
             rooms_filter["rooms__queue"] = filters.queue
-            agents_filter[
-                "project_permissions__queue_authorizations__queue"
-            ] = filters.queue
+            agents_filter["project_permissions__queue_authorizations__queue"] = (
+                filters.queue
+            )
         elif filters.sector:
             rooms_filter["rooms__queue__sector__in"] = filters.sector
             agents_filter[
@@ -401,8 +439,22 @@ class AgentRepository:
 
         return agents_query
 
-    def _get_agents_query(self, filters: Filters, project: Project):
-        agents = self.model.filter(project_permissions__project=project)
+    def _get_agents_query(
+        self, filters: Filters, project: Project, include_removed: bool = False
+    ):
+        if include_removed:
+            agents = self.model.filter(
+                Q(project_permissions__project=project)
+                | Exists(
+                    ProjectPermission.all_objects.filter(
+                        project=project,
+                        user_id=OuterRef("email"),
+                        is_deleted=True,
+                    )
+                )
+            )
+        else:
+            agents = self.model.filter(project_permissions__project=project)
 
         if not filters.is_weni_admin:
             agents = agents.exclude(get_admin_domains_exclude_filter())
@@ -411,15 +463,17 @@ class AgentRepository:
             agents = agents.filter(email=filters.agent)
 
         if filters.queue:
+            if not isinstance(filters.queue, list):
+                filters.queue = [filters.queue]
             agents = agents.filter(
-                project_permissions__queue_authorizations__queue=filters.queue
+                project_permissions__queue_authorizations__queue__in=filters.queue
             )
         elif filters.sector:
             agents = agents.filter(
                 project_permissions__queue_authorizations__queue__sector__in=filters.sector
             )
 
-        return agents
+        return agents.distinct()
 
     def _get_custom_status_query(self, filters: Filters, project: Project):
         custom_status = CustomStatus.objects.filter(
@@ -460,9 +514,9 @@ class AgentRepository:
         return custom_status
 
     def get_agents_custom_status(
-        self, filters: Filters, project: Project
+        self, filters: Filters, project: Project, include_removed: bool = False
     ) -> QuerySet[User]:
-        agents = self._get_agents_query(filters, project)
+        agents = self._get_agents_query(filters, project, include_removed)
 
         custom_status_base_query = self._get_custom_status_query(filters, project)
 
@@ -480,10 +534,30 @@ class AgentRepository:
             output_field=JSONField(),
         )
 
-        agents = agents.annotate(
-            custom_status=custom_status_subquery,
-            agent=Concat(F("first_name"), Value(" "), F("last_name")),
-        )
+        annotations = {
+            "custom_status": custom_status_subquery,
+            "agent": Concat(F("first_name"), Value(" "), F("last_name")),
+        }
+
+        if include_removed:
+            annotations["is_deleted"] = ~Exists(
+                ProjectPermission.objects.filter(
+                    project=project,
+                    user_id=OuterRef("email"),
+                )
+            )
+
+        agents = agents.annotate(**annotations)
+
+        if include_removed:
+            active_permission_exists = Exists(
+                ProjectPermission.objects.filter(
+                    project=project,
+                    user_id=OuterRef("email"),
+                )
+            )
+            has_custom_status = Exists(custom_status_base_query)
+            agents = agents.filter(active_permission_exists | has_custom_status)
 
         ordering_fields = ["-agent", "agent"]
 
@@ -552,7 +626,19 @@ class AgentRepository:
         )
 
     def _get_csat_agents(self, filters: Filters, project: Project) -> QuerySet[User]:
-        agents = User.objects.filter(project_permissions__project=project)
+        agents = User.objects.filter(
+            email__in=ProjectPermission.all_objects.filter(project=project).values_list(
+                "user_id", flat=True
+            )
+        ).annotate(
+            is_deleted=Subquery(
+                ProjectPermission.all_objects.filter(
+                    project=project,
+                    user_id=OuterRef("email"),
+                ).values("is_deleted")[:1],
+                output_field=BooleanField(),
+            ),
+        )
 
         if not filters.is_weni_admin:
             agents = agents.exclude(get_admin_domains_exclude_filter())
@@ -611,7 +697,7 @@ class AgentRepository:
                 ),
                 Value(0.0),
             ),
-        )
+        ).exclude(is_deleted=True, rooms_count=0)
 
         return self._get_csat_general(filters, project), agents
 

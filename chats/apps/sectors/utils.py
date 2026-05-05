@@ -147,7 +147,11 @@ class WorkingHoursValidator:
         """
         if holiday_config.get("closed", True):
             raise ValidationError(
-                {"detail": _("Contact cannot be done outside working hours")}
+                {
+                    "detail": _(
+                        "Contact couldn't be started because today is a holiday"
+                    )
+                }
             )
 
         start_str = holiday_config.get("start")
@@ -159,7 +163,11 @@ class WorkingHoursValidator:
 
             if not (start_time <= current_time <= end_time):
                 raise ValidationError(
-                    {"detail": _("Contact cannot be done outside working hours")}
+                    {
+                        "detail": _(
+                            "Contact couldn't be started outside the holiday working hours"
+                        )
+                    }
                 )
 
     def _validate_holiday(self, holiday_data, current_time, created_on):
@@ -168,7 +176,11 @@ class WorkingHoursValidator:
         """
         if holiday_data["day_type"] == "closed":
             raise ValidationError(
-                {"detail": _("Contact cannot be done outside working hours")}
+                {
+                    "detail": _(
+                        "Contact couldn't be started because today is a holiday"
+                    )
+                }
             )
 
         start_str = holiday_data.get("start_time")
@@ -180,7 +192,11 @@ class WorkingHoursValidator:
 
             if not (start_time <= current_time <= end_time):
                 raise ValidationError(
-                    {"detail": _("Contact cannot be done outside working hours")}
+                    {
+                        "detail": _(
+                            "Contact couldn't be started outside the holiday working hours"
+                        )
+                    }
                 )
 
     def _validate_day_schedules_generic(self, day_cfg, current_time):

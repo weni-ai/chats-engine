@@ -1,4 +1,5 @@
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import viewsets
 
 from chats.apps.accounts.authentication.drf.authorization import (
@@ -44,10 +45,12 @@ class QueueFlowViewset(viewsets.ReadOnlyModelViewSet):
             return qs.none()
         return qs.filter(sector__project=permission.project)
 
+    @swagger_auto_schema(auto_schema=None)
     def list(self, request, *args, **kwargs):
         """List all active queues in the authenticated project."""
         return super().list(request, *args, **kwargs)
 
+    @swagger_auto_schema(auto_schema=None)
     def retrieve(self, request, *args, **kwargs):
         """Retrieve details of a specific queue by UUID."""
         return super().retrieve(request, *args, **kwargs)
