@@ -479,16 +479,18 @@ class RoomViewset(
             action = "transfer" if self.request.user.email != user else "pick"
             feedback = create_transfer_json(
                 action=action,
-                from_=old_instance.user or old_instance.queue,
+                from_=old_user or old_instance.queue,
                 to=instance.user,
                 requested_by=self.request.user,
             )
+
+            instance.add_transfer_to_history(feedback)
 
         if queue:
             # Create constraint to make queue not none
             feedback = create_transfer_json(
                 action="transfer",
-                from_=old_instance.user or old_instance.queue,
+                from_=old_user or old_instance.queue,
                 to=instance.queue,
                 requested_by=self.request.user,
             )
@@ -503,8 +505,9 @@ class RoomViewset(
             room_metric.transfer_count += 1
             room_metric.save()
 
+            instance.add_transfer_to_history(feedback)
+
         instance.save()
-        instance.add_transfer_to_history(feedback)
 
         # Create a message with the transfer data and Send to the room group
         # TODO separate create message in a function
