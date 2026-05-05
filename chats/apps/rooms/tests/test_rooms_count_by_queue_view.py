@@ -60,8 +60,8 @@ class RoomsCountByQueueViewBase(APITestCase):
             for queue in sector["queues"]:
                 result[queue["uuid"]] = {
                     "sector": sector["name"],
-                    "queued": queue["queued_rooms_count"],
-                    "in_service": queue["in_service_rooms_count"],
+                    "queued": queue["rooms_in_awaiting"],
+                    "in_service": queue["rooms_in_progress"],
                 }
         return result
 
@@ -121,11 +121,14 @@ class RoomsCountByQueueViewAdminTests(RoomsCountByQueueViewBase):
         self.assertEqual([s["name"] for s in sectors], ["A Sector", "B Sector"])
 
         flat = self._flatten(response.data)
-        self.assertEqual(set(flat.keys()), {
-            str(self.queue_a1.uuid),
-            str(self.queue_a2.uuid),
-            str(self.queue_b1.uuid),
-        })
+        self.assertEqual(
+            set(flat.keys()),
+            {
+                str(self.queue_a1.uuid),
+                str(self.queue_a2.uuid),
+                str(self.queue_b1.uuid),
+            },
+        )
         for queue_data in flat.values():
             self.assertEqual(queue_data["queued"], 0)
             self.assertEqual(queue_data["in_service"], 0)
@@ -229,9 +232,10 @@ class RoomsCountByQueueViewAgentTests(RoomsCountByQueueViewBase):
         flat = self._flatten(response.data)
         self.assertEqual(set(flat.keys()), {str(self.queue_a1.uuid)})
 
-    def test_agent_in_service_count_is_always_zero(self):
+    def test_agent_in_service_count_only_includes_own_rooms(self):
         self._create_room(self.queue_a1, user=self.attendant)
         self._create_room(self.queue_a1, user=self.attendant)
+        self._create_room(self.queue_a1, user=self.agent)
         self._create_room(self.queue_a1)
 
         response = self._get({"project": str(self.project.uuid)})
@@ -239,12 +243,10 @@ class RoomsCountByQueueViewAgentTests(RoomsCountByQueueViewBase):
 
         flat = self._flatten(response.data)
         self.assertEqual(flat[str(self.queue_a1.uuid)]["queued"], 1)
-        self.assertEqual(flat[str(self.queue_a1.uuid)]["in_service"], 0)
+        self.assertEqual(flat[str(self.queue_a1.uuid)]["in_service"], 2)
 
     def test_agent_without_queue_authorizations_returns_no_sectors(self):
-        QueueAuthorization.objects.filter(
-            permission=self.attendant_permission
-        ).delete()
+        QueueAuthorization.objects.filter(permission=self.attendant_permission).delete()
 
         response = self._get({"project": str(self.project.uuid)})
         self.assertEqual(response.status_code, status.HTTP_200_OK)

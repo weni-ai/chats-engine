@@ -3,19 +3,17 @@ from datetime import datetime, timedelta
 from itertools import groupby
 
 from django.conf import settings
-from django.db import transaction
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction
 from django.db.models import (
     BooleanField,
     Case,
     Count,
     DateTimeField,
     Exists,
-    IntegerField,
     OuterRef,
     Q,
     Subquery,
-    Value,
     When,
 )
 from django.shortcuts import get_object_or_404
@@ -67,10 +65,10 @@ from chats.apps.api.v1.rooms.serializers import (
     RoomInfoSerializer,
     RoomMessageStatusSerializer,
     RoomNoteSerializer,
-    RoomSerializer,
     RoomsCountByQueueQueryParamsSerializer,
     RoomsCountByQueueResponseSerializer,
     RoomsCountQueryParamsSerializer,
+    RoomSerializer,
     RoomsReportSerializer,
     RoomTagSerializer,
     TransferRoomSerializer,
@@ -1485,8 +1483,8 @@ class RoomsCountByQueueView(APIView):
                         {
                             "uuid": "<queue uuid>",
                             "name": "Queue name",
-                            "queued_rooms_count": <int>,
-                            "in_service_rooms_count": <int>
+                            "rooms_in_awaiting": <int>,
+                            "rooms_in_progress": <int>
                         }
                     ]
                 }
@@ -1497,7 +1495,8 @@ class RoomsCountByQueueView(APIView):
         - Manager (project admin or sector manager): sees every sector and
           queue of the project, with both counts populated.
         - Agent: sees only the queues they are authorized on, and
-          `in_service_rooms_count` is always 0.
+          `rooms_in_progress` only counts rooms assigned to the
+          requesting user.
 
     A "queued" room is an active room without an assigned agent that has
     already left the flow start phase (`is_active=True, user__isnull=True,
@@ -1520,9 +1519,7 @@ class RoomsCountByQueueView(APIView):
         except ObjectDoesNotExist:
             raise PermissionDenied()
 
-        is_manager_view = permission.is_admin or permission.is_manager(
-            any_sector=True
-        )
+        is_manager_view = permission.is_admin or permission.is_manager(any_sector=True)
 
         queues_qs = Queue.objects.filter(
             sector__project__uuid=project_uuid,
@@ -1538,23 +1535,25 @@ class RoomsCountByQueueView(APIView):
             rooms__is_waiting=False,
         )
 
-        in_service_annotation = (
-            Count(
-                "rooms",
-                filter=Q(
-                    rooms__is_active=True,
-                    rooms__user__isnull=False,
-                    rooms__is_waiting=False,
-                ),
+        in_service_annotation = Count(
+            "rooms",
+            filter=Q(
+                rooms__is_active=True,
+                rooms__is_waiting=False,
+                rooms__user__isnull=False,
             )
             if is_manager_view
-            else Value(0, output_field=IntegerField())
+            else Q(
+                rooms__is_active=True,
+                rooms__is_waiting=False,
+                rooms__user=request.user,
+            ),
         )
 
         queues_qs = (
             queues_qs.select_related("sector")
-            .annotate(queued_rooms_count=Count("rooms", filter=queued_filter))
-            .annotate(in_service_rooms_count=in_service_annotation)
+            .annotate(annotated_queued_rooms_count=Count("rooms", filter=queued_filter))
+            .annotate(annotated_in_service_rooms_count=in_service_annotation)
             .order_by("sector__name", "sector__uuid", "name")
         )
 
@@ -1565,8 +1564,8 @@ class RoomsCountByQueueView(APIView):
                     {
                         "uuid": str(queue.uuid),
                         "name": queue.name,
-                        "queued_rooms_count": queue.queued_rooms_count,
-                        "in_service_rooms_count": queue.in_service_rooms_count,
+                        "rooms_in_awaiting": queue.annotated_queued_rooms_count,
+                        "rooms_in_progress": queue.annotated_in_service_rooms_count,
                     }
                     for queue in group
                 ],
