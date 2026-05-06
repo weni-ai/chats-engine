@@ -109,6 +109,22 @@ class AnySectorManagerPermission(permissions.BasePermission):
             return False
 
 
+class ProjectAnyPermission(permissions.BasePermission):
+    """
+    Grant permission if the user has any ProjectPermission on the
+    project identified by the `project` query/data param.
+
+    Visibility of sectors, queues and counts is then handled
+    downstream by the view/service based on the permission's role.
+    """
+
+    def has_permission(self, request, view):
+        try:
+            return GetPermission(request).permission is not None
+        except AttributeError:
+            return False
+
+
 class IsQueueAgent(permissions.BasePermission):
     def has_permission(self, request, view):
         data = request.data or request.query_params

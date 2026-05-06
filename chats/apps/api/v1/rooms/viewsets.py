@@ -1494,8 +1494,9 @@ class RoomsCountByQueueView(APIView):
         }
 
     Access:
-        Restricted to project admins and sector managers. Attendants
-        receive 403.
+        Any user with a ProjectPermission on the project may call this
+        endpoint. The visibility of sectors, queues and counts depends
+        on the role (see `RoomsCountByQueueService` for the rules).
 
     View-mode (optional `email` query param):
         When provided, queue visibility follows the target user's
@@ -1511,7 +1512,7 @@ class RoomsCountByQueueView(APIView):
     assigned agent (`is_active=True, user__isnull=False, is_waiting=False`).
     """
 
-    permission_classes = [IsAuthenticated, api_permissions.AnySectorManagerPermission]
+    permission_classes = [IsAuthenticated, api_permissions.ProjectAnyPermission]
 
     def get(self, request: Request, *args, **kwargs) -> Response:
         params = RoomsCountByQueueQueryParamsSerializer(data=request.query_params)

@@ -226,13 +226,14 @@ class RoomsCountByQueueServiceWithTargetEmailTests(RoomsCountByQueueServiceTests
         flat = self._flatten(result)
         self.assertEqual(flat[str(self.queue_a1.uuid)]["in_service"], 1)
 
-    def test_target_email_admin_returns_global_counts(self):
+    def test_target_email_admin_filters_in_service_by_target_email(self):
         target = User.objects.create_user(email="admin_target@test.com")
         ProjectPermission.objects.create(
             user=target,
             project=self.project,
             role=ProjectPermission.ROLE_ADMIN,
         )
+        self._create_room(self.queue_a1, user=target)
         self._create_room(self.queue_a1, user=self.agent)
         self._create_room(self.queue_b1, user=self.agent)
 
@@ -251,8 +252,30 @@ class RoomsCountByQueueServiceWithTargetEmailTests(RoomsCountByQueueServiceTests
                 str(self.queue_b1.uuid),
             },
         )
+        self.assertEqual(flat[str(self.queue_a1.uuid)]["in_service"], 1)
+        self.assertEqual(flat[str(self.queue_b1.uuid)]["in_service"], 0)
         total_in_service = sum(q["in_service"] for q in flat.values())
-        self.assertEqual(total_in_service, 2)
+        self.assertEqual(total_in_service, 1)
+
+    def test_target_email_admin_zero_in_service_when_no_rooms(self):
+        target = User.objects.create_user(email="admin_target@test.com")
+        ProjectPermission.objects.create(
+            user=target,
+            project=self.project,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        self._create_room(self.queue_a1, user=self.agent)
+        self._create_room(self.queue_b1, user=self.agent)
+
+        result = self.service.get_counts(
+            project_uuid=self.project.uuid,
+            requesting_permission=self.requester_perm,
+            target_email=target.email,
+        )
+
+        flat = self._flatten(result)
+        total_in_service = sum(q["in_service"] for q in flat.values())
+        self.assertEqual(total_in_service, 0)
 
     def test_target_email_is_normalized_to_lowercase(self):
         target = User.objects.create_user(email="target@test.com")
