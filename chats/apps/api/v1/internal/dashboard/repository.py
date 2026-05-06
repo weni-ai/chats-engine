@@ -207,51 +207,52 @@ class AgentRepository:
             )
         )
 
-        agents_query = (
+        matching_emails = (
             agents_query.filter(agents_filters)
-            .annotate(
-                status=Subquery(project_permission_subquery),
-                has_active_custom_status=has_active_custom_status_subquery,
-                is_deleted=permission_is_deleted_subquery,
-                status_order=Case(
-                    When(status="ONLINE", then=Value(1)),
-                    When(
-                        Q(status="OFFLINE") & Q(has_active_custom_status=True),
-                        then=Value(2),
-                    ),
-                    When(status="OFFLINE", then=Value(3)),
-                    default=Value(3),
-                    output_field=IntegerField(),
-                ),
-                closed=Count(
-                    "rooms__uuid",
-                    distinct=True,
-                    filter=Q(**closed_rooms, **rooms_filter),
-                ),
-                opened=Count(
-                    "rooms__uuid",
-                    distinct=True,
-                    filter=Q(**opened_rooms, **rooms_filter),
-                ),
-                avg_first_response_time=Avg(
-                    "rooms__metric__first_response_time",
-                    filter=Q(**closed_rooms, **rooms_filter)
-                    & Q(rooms__metric__first_response_time__gt=0),
-                ),
-                avg_message_response_time=Avg(
-                    "rooms__metric__message_response_time",
-                    filter=Q(**closed_rooms, **rooms_filter)
-                    & Q(rooms__metric__message_response_time__gt=0),
-                ),
-                avg_interaction_time=Avg(
-                    "rooms__metric__interaction_time",
-                    filter=Q(**closed_rooms, **rooms_filter)
-                    & Q(rooms__metric__interaction_time__gt=0),
-                ),
-                custom_status=custom_status_subquery,
-                # time_in_service_order: cálculo desativado (código comentado acima)
-            )
+            .values_list("email", flat=True)
             .distinct()
+        )
+
+        agents_query = agents_query.filter(email__in=matching_emails).annotate(
+            status=Subquery(project_permission_subquery),
+            has_active_custom_status=has_active_custom_status_subquery,
+            is_deleted=permission_is_deleted_subquery,
+            status_order=Case(
+                When(status="ONLINE", then=Value(1)),
+                When(
+                    Q(status="OFFLINE") & Q(has_active_custom_status=True),
+                    then=Value(2),
+                ),
+                When(status="OFFLINE", then=Value(3)),
+                default=Value(3),
+                output_field=IntegerField(),
+            ),
+            closed=Count(
+                "rooms__uuid",
+                distinct=True,
+                filter=Q(**closed_rooms, **rooms_filter),
+            ),
+            opened=Count(
+                "rooms__uuid",
+                distinct=True,
+                filter=Q(**opened_rooms, **rooms_filter),
+            ),
+            avg_first_response_time=Avg(
+                "rooms__metric__first_response_time",
+                filter=Q(**closed_rooms, **rooms_filter)
+                & Q(rooms__metric__first_response_time__gt=0),
+            ),
+            avg_message_response_time=Avg(
+                "rooms__metric__message_response_time",
+                filter=Q(**closed_rooms, **rooms_filter)
+                & Q(rooms__metric__message_response_time__gt=0),
+            ),
+            avg_interaction_time=Avg(
+                "rooms__metric__interaction_time",
+                filter=Q(**closed_rooms, **rooms_filter)
+                & Q(rooms__metric__interaction_time__gt=0),
+            ),
+            custom_status=custom_status_subquery,
         )
 
         if include_removed:
