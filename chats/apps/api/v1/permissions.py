@@ -109,13 +109,17 @@ class AnySectorManagerPermission(permissions.BasePermission):
             return False
 
 
-class ProjectAnyPermission(permissions.BasePermission):
+class ProjectAccessPermission(permissions.BasePermission):
     """
-    Grant permission if the user has any ProjectPermission on the
-    project identified by the `project` query/data param.
+    Grant view-level permission if the user has any ProjectPermission on
+    the project identified by the `project` query/data param.
 
-    Visibility of sectors, queues and counts is then handled
-    downstream by the view/service based on the permission's role.
+    Visibility of sectors, queues and counts is then handled downstream
+    by the view/service based on the permission's role.
+
+    Note: the existing `ProjectAnyPermission` (above) only implements
+    `has_object_permission` and is used for object-level checks; this
+    class implements `has_permission` for query-param-driven endpoints.
     """
 
     def has_permission(self, request, view):

@@ -419,3 +419,39 @@ class RoomsCountByQueueViewTargetEmailTests(RoomsCountByQueueViewBase):
             }
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_email_param_for_user_without_project_permission_returns_404(self):
+        outsider = User.objects.create_user(email="outsider@test.com")
+
+        response = self._get(
+            {
+                "project": str(self.project.uuid),
+                "email": outsider.email,
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_email_param_for_unknown_user_returns_404(self):
+        response = self._get(
+            {
+                "project": str(self.project.uuid),
+                "email": "ghost@test.com",
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_empty_email_param_falls_back_to_request_user(self):
+        self._create_room(self.queue_a1, user=self.requester_admin)
+        self._create_room(self.queue_b1, user=self.agent)
+
+        response = self._get(
+            {
+                "project": str(self.project.uuid),
+                "email": "",
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        flat = self._flatten(response.data)
+        total_in_service = sum(q["in_service"] for q in flat.values())
+        self.assertEqual(total_in_service, 2)

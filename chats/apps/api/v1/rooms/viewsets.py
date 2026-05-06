@@ -80,7 +80,7 @@ from chats.apps.api.v1.rooms.services.rooms_count_by_queue_service import (
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
 from chats.apps.msgs.models import Message
-from chats.apps.projects.models.models import Project
+from chats.apps.projects.models.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.choices import RoomFeedbackMethods
@@ -1512,17 +1512,20 @@ class RoomsCountByQueueView(APIView):
     assigned agent (`is_active=True, user__isnull=False, is_waiting=False`).
     """
 
-    permission_classes = [IsAuthenticated, api_permissions.ProjectAnyPermission]
+    permission_classes = [IsAuthenticated, api_permissions.ProjectAccessPermission]
 
     def get(self, request: Request, *args, **kwargs) -> Response:
         params = RoomsCountByQueueQueryParamsSerializer(data=request.query_params)
         params.is_valid(raise_exception=True)
 
-        result = RoomsCountByQueueService().get_counts(
-            project_uuid=params.validated_data["project"],
-            requesting_permission=GetPermission(request).permission,
-            target_email=params.validated_data.get("email"),
-        )
+        try:
+            result = RoomsCountByQueueService().get_counts(
+                project_uuid=params.validated_data["project"],
+                requesting_permission=GetPermission(request).permission,
+                target_email=params.validated_data.get("email") or None,
+            )
+        except ProjectPermission.DoesNotExist:
+            raise NotFound("Target user has no permission on this project.")
 
         return Response(
             RoomsCountByQueueResponseSerializer(result).data,
