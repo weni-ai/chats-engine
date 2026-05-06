@@ -40,8 +40,12 @@ class InternalDashboardViewsetV2(viewsets.GenericViewSet):
         usecase = InternalDashboardAgentsUsecase()
         agents_data = usecase.execute(project, serializer.validated_data)
 
-        agents = DashboardAgentsSerializerV2(agents_data, many=True)
+        page = self.paginate_queryset(agents_data)
+        if page is not None:
+            agents = DashboardAgentsSerializerV2(page, many=True)
+            return self.get_paginated_response(agents.data)
 
+        agents = DashboardAgentsSerializerV2(agents_data, many=True)
         return Response({"results": agents.data}, status.HTTP_200_OK)
 
     @action(
