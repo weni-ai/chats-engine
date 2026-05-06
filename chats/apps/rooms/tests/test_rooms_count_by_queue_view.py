@@ -83,13 +83,9 @@ class RoomsCountByQueueViewAdminTests(RoomsCountByQueueViewBase):
         response = self._get({"project": str(self.project.uuid)})
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
-    def test_missing_project_returns_400(self):
+    def test_missing_project_returns_403(self):
         response = self._get({})
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_invalid_project_uuid_returns_400(self):
-        response = self._get({"project": "not-a-uuid"})
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_user_without_permission_returns_403(self):
         outsider = User.objects.create_user(email="outsider@test.com")
@@ -121,11 +117,14 @@ class RoomsCountByQueueViewAdminTests(RoomsCountByQueueViewBase):
         self.assertEqual([s["name"] for s in sectors], ["A Sector", "B Sector"])
 
         flat = self._flatten(response.data)
-        self.assertEqual(set(flat.keys()), {
-            str(self.queue_a1.uuid),
-            str(self.queue_a2.uuid),
-            str(self.queue_b1.uuid),
-        })
+        self.assertEqual(
+            set(flat.keys()),
+            {
+                str(self.queue_a1.uuid),
+                str(self.queue_a2.uuid),
+                str(self.queue_b1.uuid),
+            },
+        )
         for queue_data in flat.values():
             self.assertEqual(queue_data["queued"], 0)
             self.assertEqual(queue_data["in_service"], 0)
@@ -205,51 +204,28 @@ class RoomsCountByQueueViewAdminTests(RoomsCountByQueueViewBase):
         self.assertNotIn("Other Sector", sector_names)
 
 
-class RoomsCountByQueueViewAgentTests(RoomsCountByQueueViewBase):
-    def setUp(self):
-        super().setUp()
+class RoomsCountByQueueViewAttendantAccessTests(RoomsCountByQueueViewBase):
+    """
+    The endpoint is restricted to project admins and sector managers.
+    Plain attendants must receive 403.
+    """
 
-        self.attendant = User.objects.create_user(email="attendant@test.com")
-        self.attendant_permission = ProjectPermission.objects.create(
-            user=self.attendant,
+    def test_attendant_without_sector_authorization_returns_403(self):
+        attendant = User.objects.create_user(email="attendant@test.com")
+        attendant_permission = ProjectPermission.objects.create(
+            user=attendant,
             project=self.project,
             role=ProjectPermission.ROLE_ATTENDANT,
         )
         QueueAuthorization.objects.create(
-            permission=self.attendant_permission,
+            permission=attendant_permission,
             queue=self.queue_a1,
             role=QueueAuthorization.ROLE_AGENT,
         )
-        self._authenticate(self.attendant)
-
-    def test_agent_only_sees_authorized_queues(self):
-        response = self._get({"project": str(self.project.uuid)})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        flat = self._flatten(response.data)
-        self.assertEqual(set(flat.keys()), {str(self.queue_a1.uuid)})
-
-    def test_agent_in_service_count_only_includes_own_rooms(self):
-        self._create_room(self.queue_a1, user=self.attendant)
-        self._create_room(self.queue_a1, user=self.attendant)
-        self._create_room(self.queue_a1, user=self.agent)
-        self._create_room(self.queue_a1)
+        self._authenticate(attendant)
 
         response = self._get({"project": str(self.project.uuid)})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-        flat = self._flatten(response.data)
-        self.assertEqual(flat[str(self.queue_a1.uuid)]["queued"], 1)
-        self.assertEqual(flat[str(self.queue_a1.uuid)]["in_service"], 2)
-
-    def test_agent_without_queue_authorizations_returns_no_sectors(self):
-        QueueAuthorization.objects.filter(
-            permission=self.attendant_permission
-        ).delete()
-
-        response = self._get({"project": str(self.project.uuid)})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data, {"sectors": []})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
 class RoomsCountByQueueViewSectorManagerTests(RoomsCountByQueueViewBase):
@@ -279,3 +255,117 @@ class RoomsCountByQueueViewSectorManagerTests(RoomsCountByQueueViewBase):
         flat = self._flatten(response.data)
         self.assertEqual(flat[str(self.queue_a1.uuid)]["queued"], 1)
         self.assertEqual(flat[str(self.queue_a1.uuid)]["in_service"], 1)
+
+
+class RoomsCountByQueueViewTargetEmailTests(RoomsCountByQueueViewBase):
+    """
+    View-mode: when an `email` query param is provided, the counts and
+    visibility must reflect what that target user would see, not the
+    requester.
+    """
+
+    def setUp(self):
+        super().setUp()
+
+        self.requester_admin = User.objects.create_user(email="requester@test.com")
+        ProjectPermission.objects.create(
+            user=self.requester_admin,
+            project=self.project,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+
+        self.target_attendant = User.objects.create_user(email="target@test.com")
+        target_perm = ProjectPermission.objects.create(
+            user=self.target_attendant,
+            project=self.project,
+            role=ProjectPermission.ROLE_ATTENDANT,
+        )
+        QueueAuthorization.objects.create(
+            permission=target_perm,
+            queue=self.queue_a1,
+            role=QueueAuthorization.ROLE_AGENT,
+        )
+
+        self._authenticate(self.requester_admin)
+
+    def test_email_param_restricts_queues_to_target_attendant(self):
+        self._create_room(self.queue_a1)
+        self._create_room(self.queue_a2)
+        self._create_room(self.queue_b1)
+
+        response = self._get(
+            {
+                "project": str(self.project.uuid),
+                "email": self.target_attendant.email,
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        flat = self._flatten(response.data)
+        self.assertEqual(set(flat.keys()), {str(self.queue_a1.uuid)})
+
+    def test_email_param_in_service_only_counts_target_user_rooms(self):
+        self._create_room(self.queue_a1, user=self.target_attendant)
+        self._create_room(self.queue_a1, user=self.agent)
+
+        response = self._get(
+            {
+                "project": str(self.project.uuid),
+                "email": self.target_attendant.email,
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        flat = self._flatten(response.data)
+        self.assertEqual(flat[str(self.queue_a1.uuid)]["in_service"], 1)
+
+    def test_email_param_with_admin_target_returns_global_counts(self):
+        admin_target = User.objects.create_user(email="admin_target@test.com")
+        ProjectPermission.objects.create(
+            user=admin_target,
+            project=self.project,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+
+        self._create_room(self.queue_a1, user=self.agent)
+        self._create_room(self.queue_b1, user=self.agent)
+
+        response = self._get(
+            {
+                "project": str(self.project.uuid),
+                "email": admin_target.email,
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        flat = self._flatten(response.data)
+        self.assertEqual(
+            set(flat.keys()),
+            {
+                str(self.queue_a1.uuid),
+                str(self.queue_a2.uuid),
+                str(self.queue_b1.uuid),
+            },
+        )
+        total_in_service = sum(q["in_service"] for q in flat.values())
+        self.assertEqual(total_in_service, 2)
+
+    def test_no_email_uses_request_user(self):
+        self._create_room(self.queue_a1, user=self.requester_admin)
+        self._create_room(self.queue_b1, user=self.agent)
+
+        response = self._get({"project": str(self.project.uuid)})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        flat = self._flatten(response.data)
+        total_in_service = sum(q["in_service"] for q in flat.values())
+        self.assertEqual(total_in_service, 2)
+
+    def test_email_invalid_format_returns_400(self):
+        response = self._get(
+            {
+                "project": str(self.project.uuid),
+                "email": "not-an-email",
+            }
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
