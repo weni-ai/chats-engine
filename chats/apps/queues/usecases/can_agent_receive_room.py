@@ -28,24 +28,37 @@ class AgentCapacityResult:
 class CanAgentReceiveRoomUseCase:
     """
     Last-moment verification, performed right before assigning a room to an
-    agent, that the agent is still under the sector's rooms limit.
+    agent, that the agent is still under the applicable rooms limit.
 
     Closes a race condition between Queue.available_agents / get_available_agent()
     and Room.save() that actually materializes the assignment, where concurrent
-    assignments could push an agent above the sector's rooms limit.
+    assignments could push an agent above their limit.
 
-    Counting semantics mirror Queue.available_agents:
+    Counting and limit semantics mirror Queue.available_agents:
     - Scope: active rooms in the same sector as the queue.
-    - Limit: queue.limit (GroupSector.rooms_limit or Sector.rooms_limit).
+    - Limit: the agent's custom_rooms_limit when is_custom_limit_active=True
+      and custom_rooms_limit IS NOT NULL on their ProjectPermission, otherwise
+      queue.limit (GroupSector.rooms_limit or Sector.rooms_limit).
     """
 
     def __init__(self, queue: "Queue"):
         self.queue = queue
 
     def execute(self, agent: "User") -> AgentCapacityResult:
+        from chats.apps.projects.models.models import ProjectPermission
         from chats.apps.rooms.models import Room
 
-        limit = self.queue.limit
+        custom_limit = (
+            ProjectPermission.objects.filter(
+                user=agent,
+                project=self.queue.sector.project,
+                is_custom_limit_active=True,
+                custom_rooms_limit__isnull=False,
+            )
+            .values_list("custom_rooms_limit", flat=True)
+            .first()
+        )
+        limit = custom_limit if custom_limit is not None else self.queue.limit
 
         active_rooms_count = Room.objects.filter(
             user=agent,
