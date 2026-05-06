@@ -319,7 +319,7 @@ class RoomsCountByQueueViewTargetEmailTests(RoomsCountByQueueViewBase):
         flat = self._flatten(response.data)
         self.assertEqual(flat[str(self.queue_a1.uuid)]["in_service"], 1)
 
-    def test_email_param_with_admin_target_returns_global_counts(self):
+    def test_email_param_with_admin_target_filters_in_service_by_email(self):
         admin_target = User.objects.create_user(email="admin_target@test.com")
         ProjectPermission.objects.create(
             user=admin_target,
@@ -327,6 +327,7 @@ class RoomsCountByQueueViewTargetEmailTests(RoomsCountByQueueViewBase):
             role=ProjectPermission.ROLE_ADMIN,
         )
 
+        self._create_room(self.queue_a1, user=admin_target)
         self._create_room(self.queue_a1, user=self.agent)
         self._create_room(self.queue_b1, user=self.agent)
 
@@ -347,8 +348,33 @@ class RoomsCountByQueueViewTargetEmailTests(RoomsCountByQueueViewBase):
                 str(self.queue_b1.uuid),
             },
         )
+        self.assertEqual(flat[str(self.queue_a1.uuid)]["in_service"], 1)
+        self.assertEqual(flat[str(self.queue_b1.uuid)]["in_service"], 0)
         total_in_service = sum(q["in_service"] for q in flat.values())
-        self.assertEqual(total_in_service, 2)
+        self.assertEqual(total_in_service, 1)
+
+    def test_email_param_with_admin_target_zero_in_service_when_no_rooms(self):
+        admin_target = User.objects.create_user(email="admin_target@test.com")
+        ProjectPermission.objects.create(
+            user=admin_target,
+            project=self.project,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+
+        self._create_room(self.queue_a1, user=self.agent)
+        self._create_room(self.queue_b1, user=self.agent)
+
+        response = self._get(
+            {
+                "project": str(self.project.uuid),
+                "email": admin_target.email,
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        flat = self._flatten(response.data)
+        total_in_service = sum(q["in_service"] for q in flat.values())
+        self.assertEqual(total_in_service, 0)
 
     def test_no_email_uses_request_user(self):
         self._create_room(self.queue_a1, user=self.requester_admin)

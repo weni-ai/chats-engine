@@ -31,10 +31,15 @@ class RoomsCountByQueueService:
     `rooms_count/by_queue` endpoint, applying permission-aware filtering.
 
     Visibility rules:
-        - Manager target (project admin or sector manager): every sector
-          and queue of the project is included; counts are global.
-        - Agent target: only authorized queues; `rooms_in_progress` only
-          counts rooms assigned to the target user.
+        - No `email` provided and requester is admin or sector manager:
+          every sector and queue of the project is included; counts are
+          global.
+        - No `email` provided and requester is an agent: only authorized
+          queues; `rooms_in_progress` only counts rooms assigned to the
+          requester.
+        - `email` provided: queue visibility follows the target user's
+          authorizations and `rooms_in_progress` always counts only rooms
+          assigned to the target user, regardless of the target's role.
 
     A "queued" room is an active room without an assigned agent that
     has already left the flow start phase
@@ -51,13 +56,15 @@ class RoomsCountByQueueService:
         requesting_permission: ProjectPermission,
         target_email: Optional[str] = None,
     ) -> RoomsCountByQueueResult:
-        permission, in_service_user_filter = self._resolve_target(
+        permission, in_service_user_filter, has_target_email = self._resolve_target(
             project_uuid=project_uuid,
             requesting_permission=requesting_permission,
             target_email=target_email,
         )
 
-        is_manager_view = permission.is_admin or permission.is_manager(any_sector=True)
+        is_manager_view = not has_target_email and (
+            permission.is_admin or permission.is_manager(any_sector=True)
+        )
 
         queues_qs = self._build_queues_queryset(
             project_uuid=project_uuid,
@@ -79,6 +86,7 @@ class RoomsCountByQueueService:
             return (
                 requesting_permission,
                 Q(rooms__user=requesting_permission.user),
+                False,
             )
 
         normalized_email = target_email.lower()
@@ -86,7 +94,7 @@ class RoomsCountByQueueService:
             user_id=normalized_email,
             project__uuid=project_uuid,
         )
-        return permission, Q(rooms__user_id=normalized_email)
+        return permission, Q(rooms__user_id=normalized_email), True
 
     def _build_queues_queryset(
         self,

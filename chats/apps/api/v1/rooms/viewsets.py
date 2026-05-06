@@ -1498,8 +1498,12 @@ class RoomsCountByQueueView(APIView):
         receive 403.
 
     View-mode (optional `email` query param):
-        When provided, counts and visibility reflect what the target
-        user would see (see `RoomsCountByQueueService` for details).
+        When provided, queue visibility follows the target user's
+        authorizations and `rooms_in_progress` always counts only rooms
+        assigned to the target user, regardless of the target's role
+        (admin, manager, or agent). When omitted, the requester's role
+        is used (managers/admins see global counts; agents see only
+        their own).
 
     A "queued" room is an active room without an assigned agent that has
     already left the flow start phase (`is_active=True, user__isnull=True,
