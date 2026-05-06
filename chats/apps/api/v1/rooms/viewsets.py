@@ -1,9 +1,7 @@
 import logging
 from datetime import datetime, timedelta
-from itertools import groupby
 
 from django.conf import settings
-from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.db.models import (
     BooleanField,
@@ -76,6 +74,9 @@ from chats.apps.api.v1.rooms.serializers import (
 from chats.apps.api.v1.rooms.services.bulk_close_service import BulkCloseService
 from chats.apps.api.v1.rooms.services.bulk_take_service import BulkTakeService
 from chats.apps.api.v1.rooms.services.bulk_transfer_service import BulkTransferService
+from chats.apps.api.v1.rooms.services.rooms_count_by_queue_service import (
+    RoomsCountByQueueService,
+)
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
 from chats.apps.msgs.models import Message
@@ -99,6 +100,7 @@ from chats.apps.rooms.views import (
     update_flows_custom_fields,
 )
 from chats.apps.sectors.models import SectorTag
+from chats.core.permissions import GetPermission
 
 logger = logging.getLogger(__name__)
 
@@ -1491,12 +1493,13 @@ class RoomsCountByQueueView(APIView):
             ]
         }
 
-    Visibility rules:
-        - Manager (project admin or sector manager): sees every sector and
-          queue of the project, with both counts populated.
-        - Agent: sees only the queues they are authorized on, and
-          `rooms_in_progress` only counts rooms assigned to the
-          requesting user.
+    Access:
+        Restricted to project admins and sector managers. Attendants
+        receive 403.
+
+    View-mode (optional `email` query param):
+        When provided, counts and visibility reflect what the target
+        user would see (see `RoomsCountByQueueService` for details).
 
     A "queued" room is an active room without an assigned agent that has
     already left the flow start phase (`is_active=True, user__isnull=True,
@@ -1504,75 +1507,19 @@ class RoomsCountByQueueView(APIView):
     assigned agent (`is_active=True, user__isnull=False, is_waiting=False`).
     """
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, api_permissions.AnySectorManagerPermission]
 
     def get(self, request: Request, *args, **kwargs) -> Response:
         params = RoomsCountByQueueQueryParamsSerializer(data=request.query_params)
         params.is_valid(raise_exception=True)
 
-        project_uuid = params.validated_data["project"]
-
-        try:
-            permission = request.user.project_permissions.get(
-                project__uuid=project_uuid
-            )
-        except ObjectDoesNotExist:
-            raise PermissionDenied()
-
-        is_manager_view = permission.is_admin or permission.is_manager(any_sector=True)
-
-        queues_qs = Queue.objects.filter(
-            sector__project__uuid=project_uuid,
-            sector__is_deleted=False,
+        result = RoomsCountByQueueService().get_counts(
+            project_uuid=params.validated_data["project"],
+            requesting_permission=GetPermission(request).permission,
+            target_email=params.validated_data.get("email"),
         )
 
-        if not is_manager_view:
-            queues_qs = queues_qs.filter(uuid__in=permission.queue_ids)
-
-        queued_filter = Q(
-            rooms__is_active=True,
-            rooms__user__isnull=True,
-            rooms__is_waiting=False,
+        return Response(
+            RoomsCountByQueueResponseSerializer(result).data,
+            status=status.HTTP_200_OK,
         )
-
-        in_service_annotation = Count(
-            "rooms",
-            filter=Q(
-                rooms__is_active=True,
-                rooms__is_waiting=False,
-                rooms__user__isnull=False,
-            )
-            if is_manager_view
-            else Q(
-                rooms__is_active=True,
-                rooms__is_waiting=False,
-                rooms__user=request.user,
-            ),
-        )
-
-        queues_qs = (
-            queues_qs.select_related("sector")
-            .annotate(annotated_queued_rooms_count=Count("rooms", filter=queued_filter))
-            .annotate(annotated_in_service_rooms_count=in_service_annotation)
-            .order_by("sector__name", "sector__uuid", "name")
-        )
-
-        sectors = [
-            {
-                "name": sector.name,
-                "queues": [
-                    {
-                        "uuid": str(queue.uuid),
-                        "name": queue.name,
-                        "rooms_in_awaiting": queue.annotated_queued_rooms_count,
-                        "rooms_in_progress": queue.annotated_in_service_rooms_count,
-                    }
-                    for queue in group
-                ],
-            }
-            for sector, group in groupby(queues_qs, key=lambda q: q.sector)
-        ]
-
-        response = RoomsCountByQueueResponseSerializer({"sectors": sectors})
-
-        return Response(response.data, status=status.HTTP_200_OK)

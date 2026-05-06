@@ -51,6 +51,7 @@ class RoomsCountQueryParamsSerializer(serializers.Serializer):
 
 class RoomsCountByQueueQueryParamsSerializer(serializers.Serializer):
     project = serializers.UUIDField(required=True)
+    email = serializers.EmailField(required=False)
 
 
 class QueueRoomsCountSerializer(serializers.Serializer):
