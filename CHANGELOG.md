@@ -1,3 +1,8 @@
+# 3.57.1
+# Add
+  - Queue routing cooldown with retry logic
+  - Route sector rooms functionality
+
 # 3.57.0
 # Add
   - Transfer history from bulk transfer
