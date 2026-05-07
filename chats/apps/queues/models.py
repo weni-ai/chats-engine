@@ -12,7 +12,12 @@ from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
 from chats.apps.projects.models.models import CustomStatus
 from chats.apps.queues.dataclass import QueueLimit
-from chats.core.models import AuditableMixin, BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
+from chats.core.models import (
+    AuditableMixin,
+    BaseConfigurableModel,
+    BaseModel,
+    BaseSoftDeleteModel,
+)
 
 from .queue_managers import QueueAuthorizationManager, QueueManager
 
@@ -106,6 +111,16 @@ class Queue(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMode
         except Exception:
             return False
 
+    def _is_agents_management_feature_enabled(self) -> bool:
+        """Check if the agents management feature is enabled for this queue's project."""
+        try:
+            return is_feature_active_for_attributes(
+                settings.AGENTS_MANAGEMENT_FEATURE_FLAG_KEY,
+                {"projectUUID": str(self.sector.project.uuid)},
+            )
+        except Exception:
+            return False
+
     @property
     def online_agents(self):
         # Base filter: status must be ONLINE
@@ -146,31 +161,40 @@ class Queue(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMode
 
         rooms_count_filter = models.Q(rooms_active_filter & rooms_sector_filter)
 
-        # Agents with is_custom_limit_active=True use their own custom_rooms_limit;
-        # all others fall back to the sector rooms_limit.
-        custom_limit_subquery = ProjectPermission.objects.filter(
-            user_id=OuterRef("email"),
-            project=self.sector.project,
-            is_custom_limit_active=True,
-            custom_rooms_limit__isnull=False,
-        ).values("custom_rooms_limit")[:1]
+        if self._is_agents_management_feature_enabled():
+            # Agents with is_custom_limit_active=True use their own
+            # custom_rooms_limit; all others fall back to the sector rooms_limit.
+            custom_limit_subquery = ProjectPermission.objects.filter(
+                user_id=OuterRef("email"),
+                project=self.sector.project,
+                is_custom_limit_active=True,
+                custom_rooms_limit__isnull=False,
+            ).values("custom_rooms_limit")[:1]
 
-        online_agents = self.online_agents.annotate(
-            active_rooms_count=models.Count(
-                "rooms",
-                filter=rooms_count_filter,
-                distinct=True,
-            ),
-            _custom_limit=Subquery(custom_limit_subquery),
-            effective_limit=models.Case(
-                models.When(
-                    _custom_limit__isnull=False,
-                    then=models.F("_custom_limit"),
+            online_agents = self.online_agents.annotate(
+                active_rooms_count=models.Count(
+                    "rooms",
+                    filter=rooms_count_filter,
+                    distinct=True,
                 ),
-                default=models.Value(self.limit),
-                output_field=models.IntegerField(),
-            ),
-        ).filter(active_rooms_count__lt=models.F("effective_limit"))
+                _custom_limit=Subquery(custom_limit_subquery),
+                effective_limit=models.Case(
+                    models.When(
+                        _custom_limit__isnull=False,
+                        then=models.F("_custom_limit"),
+                    ),
+                    default=models.Value(self.limit),
+                    output_field=models.IntegerField(),
+                ),
+            ).filter(active_rooms_count__lt=models.F("effective_limit"))
+        else:
+            online_agents = self.online_agents.annotate(
+                active_rooms_count=models.Count(
+                    "rooms",
+                    filter=rooms_count_filter,
+                    distinct=True,
+                ),
+            ).filter(active_rooms_count__lt=self.limit)
 
         if routing_option == "general":
             rooms_day_closed_filter = models.Q(

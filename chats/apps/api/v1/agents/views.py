@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import transaction
 from django.db.models import (
     Case,
@@ -18,6 +19,7 @@ from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
 from chats.apps.api.v1.agents.filters import AllAgentsFilter
 from chats.apps.api.v1.agents.serializers import (
@@ -29,6 +31,15 @@ from chats.apps.api.v1.permissions import AnySectorManagerPermission
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.projects.models.models import CustomStatus
 from chats.apps.queues.models import Queue, QueueAuthorization
+
+
+def _check_agents_management_feature(project):
+    """Raises 403 if the agents management feature is not enabled for the project."""
+    if not is_feature_active_for_attributes(
+        settings.AGENTS_MANAGEMENT_FEATURE_FLAG_KEY,
+        {"projectUUID": str(project.uuid)},
+    ):
+        raise PermissionDenied("Feature not available for this project.")
 
 
 def _get_manager_permission(request, project):
@@ -83,6 +94,7 @@ class AllAgentsView(generics.ListAPIView):
 
     def get_queryset(self):
         project = get_object_or_404(Project, uuid=self.kwargs["project_uuid"])
+        _check_agents_management_feature(project)
         _get_manager_permission(self.request, project)
 
         active_pause_name = (
@@ -142,7 +154,7 @@ class AgentQueuePermissionsView(APIView):
         project — UUID of the project
     """
 
-    permission_classes = [IsAuthenticated, AnySectorManagerPermission]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         agent_email = request.query_params.get("agent")
@@ -155,6 +167,8 @@ class AgentQueuePermissionsView(APIView):
             )
 
         project = get_object_or_404(Project, uuid=project_uuid)
+        _check_agents_management_feature(project)
+        _get_manager_permission(request, project)
 
         agent_permission = get_object_or_404(
             ProjectPermission,
@@ -201,6 +215,7 @@ class UpdateQueuePermissionsView(APIView):
         data = serializer.validated_data
 
         project = get_object_or_404(Project, uuid=data["project"])
+        _check_agents_management_feature(project)
 
         agent_emails = list(set(data["agents"]))  # deduplicate
         to_add = data.get("to_add", [])
@@ -289,6 +304,7 @@ class SectorsQueuesView(APIView):
 
     def get(self, request, project_uuid):
         project = get_object_or_404(Project, uuid=project_uuid)
+        _check_agents_management_feature(project)
         _get_manager_permission(request, project)
 
         raw = request.query_params.get("sectors", "").strip()

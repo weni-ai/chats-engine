@@ -2,11 +2,25 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
+from django.conf import settings
+from weni.feature_flags.shortcuts import is_feature_active_for_attributes
+
 if TYPE_CHECKING:
     from chats.apps.accounts.models import User
     from chats.apps.queues.models import Queue
 
 logger = logging.getLogger(__name__)
+
+
+def _is_agents_management_feature_enabled(project_uuid) -> bool:
+    """Check if the agents management feature is enabled for the given project."""
+    try:
+        return is_feature_active_for_attributes(
+            settings.AGENTS_MANAGEMENT_FEATURE_FLAG_KEY,
+            {"projectUUID": str(project_uuid)},
+        )
+    except Exception:
+        return False
 
 
 @dataclass(frozen=True)
@@ -48,16 +62,20 @@ class CanAgentReceiveRoomUseCase:
         from chats.apps.projects.models.models import ProjectPermission
         from chats.apps.rooms.models import Room
 
-        custom_limit = (
-            ProjectPermission.objects.filter(
-                user=agent,
-                project=self.queue.sector.project,
-                is_custom_limit_active=True,
-                custom_rooms_limit__isnull=False,
+        project = self.queue.sector.project
+
+        custom_limit = None
+        if _is_agents_management_feature_enabled(project.uuid):
+            custom_limit = (
+                ProjectPermission.objects.filter(
+                    user=agent,
+                    project=project,
+                    is_custom_limit_active=True,
+                    custom_rooms_limit__isnull=False,
+                )
+                .values_list("custom_rooms_limit", flat=True)
+                .first()
             )
-            .values_list("custom_rooms_limit", flat=True)
-            .first()
-        )
         limit = custom_limit if custom_limit is not None else self.queue.limit
 
         active_rooms_count = Room.objects.filter(

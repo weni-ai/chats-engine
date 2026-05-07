@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, force_authenticate
@@ -23,6 +25,13 @@ def _make_manager(project):
 
 class SectorsQueuesViewTests(TestCase):
     def setUp(self):
+        feature_flag_patcher = patch(
+            "chats.apps.api.v1.agents.views.is_feature_active_for_attributes",
+            return_value=True,
+        )
+        feature_flag_patcher.start()
+        self.addCleanup(feature_flag_patcher.stop)
+
         self.factory = APIRequestFactory()
         self.project = Project.objects.create(name="Test Project", timezone="UTC")
         self.manager = _make_manager(self.project)
@@ -63,9 +72,7 @@ class SectorsQueuesViewTests(TestCase):
 
     def test_returns_queues_for_multiple_sectors(self):
         """Passing comma-separated UUIDs returns all requested sectors."""
-        response = self._get(
-            sectors=f"{self.sector_a.pk},{self.sector_b.pk}"
-        )
+        response = self._get(sectors=f"{self.sector_a.pk},{self.sector_b.pk}")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         results = response.data["results"]
@@ -142,9 +149,7 @@ class SectorsQueuesViewTests(TestCase):
         self.sector_a.is_deleted = True
         self.sector_a.save(update_fields=["is_deleted"])
 
-        response = self._get(
-            sectors=f"{self.sector_a.pk},{self.sector_b.pk}"
-        )
+        response = self._get(sectors=f"{self.sector_a.pk},{self.sector_b.pk}")
 
         sector_names = {r["name"] for r in response.data["results"]}
         self.assertNotIn("Sector A", sector_names)
@@ -172,9 +177,7 @@ class SectorsQueuesViewTests(TestCase):
             work_end="18:00",
         )
 
-        response = self._get(
-            sectors=f"{self.sector_a.pk},{other_sector.pk}"
-        )
+        response = self._get(sectors=f"{self.sector_a.pk},{other_sector.pk}")
 
         sector_names = {r["name"] for r in response.data["results"]}
         self.assertIn("Sector A", sector_names)

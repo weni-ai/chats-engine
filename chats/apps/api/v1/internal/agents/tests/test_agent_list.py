@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, force_authenticate
@@ -15,6 +17,16 @@ def _make_manager(project):
         project=project, user=user, role=ProjectPermission.ROLE_ADMIN
     )
     return user
+
+
+def _enable_agents_management_feature_flag(test_case):
+    """Mocks the agents management feature flag as enabled for the test case lifetime."""
+    patcher = patch(
+        "chats.apps.api.v1.agents.views.is_feature_active_for_attributes",
+        return_value=True,
+    )
+    patcher.start()
+    test_case.addCleanup(patcher.stop)
 
 
 def _make_agent(project, email, first_name, agent_status):
@@ -45,6 +57,8 @@ def _put_on_pause(user, project, pause_name="Lunch"):
 
 class AgentListOrderingTests(TestCase):
     def setUp(self):
+        _enable_agents_management_feature_flag(self)
+
         self.factory = APIRequestFactory()
         self.project = Project.objects.create(name="Test Project", timezone="UTC")
         self.manager = _make_manager(self.project)
@@ -121,7 +135,10 @@ class AgentListOrderingTests(TestCase):
 
         response = self._list()
 
-        emails = [item["agent"]["email"] for item in response.data.get("results", response.data)]
+        emails = [
+            item["agent"]["email"]
+            for item in response.data.get("results", response.data)
+        ]
 
         self.assertEqual(emails[0], online_user.email)
         self.assertEqual(emails[1], paused_user.email)
@@ -199,7 +216,10 @@ class AgentListOrderingTests(TestCase):
         )
 
         response = self._list()
-        emails = [item["agent"]["email"] for item in response.data.get("results", response.data)]
+        emails = [
+            item["agent"]["email"]
+            for item in response.data.get("results", response.data)
+        ]
         names = self._names(response)
 
         # Two ONLINE first (alphabetical)
@@ -222,6 +242,8 @@ class AgentListOrderingTests(TestCase):
 
 class AgentListFilterTests(TestCase):
     def setUp(self):
+        _enable_agents_management_feature_flag(self)
+
         self.factory = APIRequestFactory()
         self.project = Project.objects.create(name="Test Project", timezone="UTC")
         self.manager = _make_manager(self.project)
@@ -446,6 +468,8 @@ class AgentListResponseStructureTests(TestCase):
     """Validates the new response structure with sector details and sector_chats_total_limit."""
 
     def setUp(self):
+        _enable_agents_management_feature_flag(self)
+
         self.factory = APIRequestFactory()
         self.project = Project.objects.create(name="Test Project", timezone="UTC")
         self.manager = _make_manager(self.project)
@@ -493,7 +517,9 @@ class AgentListResponseStructureTests(TestCase):
 
     def _agent_data(self, response, email):
         results = response.data.get("results", response.data)
-        return next(item["agent"] for item in results if item["agent"]["email"] == email)
+        return next(
+            item["agent"] for item in results if item["agent"]["email"] == email
+        )
 
     # ------------------------------------------------------------------
     # Case 32
@@ -724,6 +750,8 @@ class AgentListStatusFieldTests(TestCase):
     """Validates the `status` field returned for each agent."""
 
     def setUp(self):
+        _enable_agents_management_feature_flag(self)
+
         self.factory = APIRequestFactory()
         self.project = Project.objects.create(name="Test Project", timezone="UTC")
         self.manager = _make_manager(self.project)
@@ -881,6 +909,8 @@ class AgentListMultiValueFilterTests(TestCase):
     """Validates that all filters accept multiple comma-separated values."""
 
     def setUp(self):
+        _enable_agents_management_feature_flag(self)
+
         self.factory = APIRequestFactory()
         self.project = Project.objects.create(name="Test Project", timezone="UTC")
         self.manager = _make_manager(self.project)
@@ -914,7 +944,9 @@ class AgentListMultiValueFilterTests(TestCase):
             (self.user_c, self.queue_c),
         ]:
             QueueAuthorization.objects.create(
-                permission=ProjectPermission.objects.get(user=user, project=self.project),
+                permission=ProjectPermission.objects.get(
+                    user=user, project=self.project
+                ),
                 queue=queue,
                 role=QueueAuthorization.ROLE_AGENT,
             )
@@ -947,9 +979,7 @@ class AgentListMultiValueFilterTests(TestCase):
 
     def test_filter_queue_accepts_multiple_uuids(self):
         """queue=uuid1,uuid2 returns agents from either queue."""
-        response = self._list(
-            {"queue": f"{self.queue_a.pk},{self.queue_b.pk}"}
-        )
+        response = self._list({"queue": f"{self.queue_a.pk},{self.queue_b.pk}"})
 
         emails = self._emails(response)
         self.assertIn(self.user_a.email, emails)
@@ -958,9 +988,7 @@ class AgentListMultiValueFilterTests(TestCase):
 
     def test_filter_sector_accepts_multiple_uuids(self):
         """sector=uuid1,uuid2 returns agents from either sector."""
-        response = self._list(
-            {"sector": f"{self.sector_a.pk},{self.sector_c.pk}"}
-        )
+        response = self._list({"sector": f"{self.sector_a.pk},{self.sector_c.pk}"})
 
         emails = self._emails(response)
         self.assertIn(self.user_a.email, emails)
@@ -1003,6 +1031,8 @@ class AgentListSectorVisibilityTests(TestCase):
     """
 
     def setUp(self):
+        _enable_agents_management_feature_flag(self)
+
         self.factory = APIRequestFactory()
         self.project = Project.objects.create(name="Test Project", timezone="UTC")
         self.manager = _make_manager(self.project)
@@ -1026,7 +1056,8 @@ class AgentListSectorVisibilityTests(TestCase):
     def _agent_data(self, response):
         results = response.data.get("results", response.data)
         return next(
-            item["agent"] for item in results
+            item["agent"]
+            for item in results
             if item["agent"]["email"] == self.agent_user.email
         )
 

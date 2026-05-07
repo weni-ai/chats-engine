@@ -167,6 +167,13 @@ class QueueAvailableAgentsCustomLimitTestCase(QueueSetUpMixin, TestCase):
 
     def setUp(self):
         super().setUp()
+        # Custom limit is gated by the agents management feature flag
+        feature_flag_patcher = patch(
+            "chats.apps.queues.models.Queue._is_agents_management_feature_enabled",
+            return_value=True,
+        )
+        feature_flag_patcher.start()
+        self.addCleanup(feature_flag_patcher.stop)
         # Both agents online; sector rooms_limit = 1
         self.agent_permission.status = "ONLINE"
         self.agent_permission.last_seen = timezone.now()

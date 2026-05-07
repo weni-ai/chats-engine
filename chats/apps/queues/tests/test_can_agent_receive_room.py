@@ -1,4 +1,5 @@
 from datetime import time
+from unittest.mock import patch
 
 from django.test import TestCase
 
@@ -161,6 +162,23 @@ class CanAgentReceiveRoomUseCaseCustomLimitTestCase(TestCase):
     """
 
     def setUp(self):
+        # Custom limit is gated by the agents management feature flag.
+        # Patches both layers (usecase + Queue.available_agents) since both
+        # are exercised in this test case.
+        usecase_patcher = patch(
+            "chats.apps.queues.usecases.can_agent_receive_room."
+            "_is_agents_management_feature_enabled",
+            return_value=True,
+        )
+        usecase_patcher.start()
+        self.addCleanup(usecase_patcher.stop)
+        queue_patcher = patch(
+            "chats.apps.queues.models.Queue._is_agents_management_feature_enabled",
+            return_value=True,
+        )
+        queue_patcher.start()
+        self.addCleanup(queue_patcher.stop)
+
         self.project = Project.objects.create(
             name="Test Project",
             room_routing_type=RoomRoutingType.QUEUE_PRIORITY,
