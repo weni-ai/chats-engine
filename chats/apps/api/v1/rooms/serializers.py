@@ -49,6 +49,27 @@ class RoomsCountQueryParamsSerializer(serializers.Serializer):
         return data
 
 
+class RoomsCountByQueueQueryParamsSerializer(serializers.Serializer):
+    project = serializers.UUIDField(required=True)
+    email = serializers.EmailField(required=False, allow_blank=True)
+
+
+class QueueRoomsCountSerializer(serializers.Serializer):
+    uuid = serializers.UUIDField()
+    name = serializers.CharField()
+    rooms_in_awaiting = serializers.IntegerField()
+    rooms_in_progress = serializers.IntegerField()
+
+
+class SectorRoomsCountSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    queues = QueueRoomsCountSerializer(many=True)
+
+
+class RoomsCountByQueueResponseSerializer(serializers.Serializer):
+    sectors = SectorRoomsCountSerializer(many=True)
+
+
 class RoomSerializer(serializers.ModelSerializer):
     user = UserSerializer(many=False, read_only=True)
     contact = ContactRelationsSerializer(many=False, read_only=True)

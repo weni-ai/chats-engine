@@ -1,14 +1,20 @@
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
+from weni.feature_flags.shortcuts import is_feature_active
 
+from chats.apps.projects.models.models import ProjectPermission
 from chats.apps.rooms.models import Room
 from chats.core.cache_utils import get_user_id_by_email_cached
-from chats.apps.projects.models.models import ProjectPermission
 
 User = get_user_model()
+
+
+class UUIDInFilter(filters.BaseInFilter, filters.UUIDFilter):
+    pass
 
 
 class RoomFilter(filters.FilterSet):
@@ -36,6 +42,56 @@ class RoomFilter(filters.FilterSet):
         method="filter_room_status",
         help_text=_("Room status"),
     )
+
+    queues = UUIDInFilter(
+        field_name="queue__uuid",
+        method="filter_queues",
+        help_text=_("Filter by multiple queue UUIDs (comma-separated)"),
+    )
+
+    sectors = UUIDInFilter(
+        field_name="queue__sector__uuid",
+        method="filter_sectors",
+        help_text=_("Filter by multiple sector UUIDs (comma-separated)"),
+    )
+
+    def _multi_filter_enabled(self) -> bool:
+        # Cache the flag check on the request so both `queues` and `sectors`
+        # share a single call per request.
+        cached = getattr(self.request, "_rooms_multi_filter_flag", None)
+        if cached is not None:
+            return cached
+
+        request_params = getattr(self.request, "query_params", None) or getattr(
+            self.request, "GET", {}
+        )
+        project = request_params.get("project")
+        user_email = getattr(getattr(self.request, "user", None), "email", None)
+
+        if not project or not user_email:
+            result = False
+        else:
+            try:
+                result = is_feature_active(
+                    settings.ROOMS_COUNT_BY_QUEUE_FEATURE_FLAG_KEY,
+                    user_email,
+                    str(project),
+                )
+            except Exception:
+                result = False
+
+        self.request._rooms_multi_filter_flag = result
+        return result
+
+    def filter_queues(self, queryset, name, value):
+        if not self._multi_filter_enabled():
+            return queryset
+        return queryset.filter(queue__uuid__in=value)
+
+    def filter_sectors(self, queryset, name, value):
+        if not self._multi_filter_enabled():
+            return queryset
+        return queryset.filter(queue__sector__uuid__in=value)
 
     def filter_room_status(self, queryset, name, value):
         if value == "ongoing":
