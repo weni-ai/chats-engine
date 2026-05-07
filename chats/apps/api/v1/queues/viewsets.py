@@ -2,9 +2,8 @@ import logging
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.db import transaction
-from django_filters.rest_framework import DjangoFilterBackend
 from django.utils.decorators import method_decorator
+from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import exceptions, filters, status
 from rest_framework.decorators import action
@@ -29,6 +28,7 @@ from chats.apps.core.internal_domains import (
 from chats.apps.projects.models.models import Project, ProjectPermission
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.queues.usecases.bulk_queue_creation import BulkQueueCreationUseCase
 from chats.apps.sectors.models import Sector, SectorGroupSector
 from chats.apps.sectors.usecases.group_sector_authorization import (
     QueueGroupSectorAuthorizationCreationUseCase,
@@ -49,7 +49,9 @@ User = get_user_model()
 
 @method_decorator(name="create", decorator=swagger_auto_schema(auto_schema=None))
 @method_decorator(name="update", decorator=swagger_auto_schema(auto_schema=None))
-@method_decorator(name="partial_update", decorator=swagger_auto_schema(auto_schema=None))
+@method_decorator(
+    name="partial_update", decorator=swagger_auto_schema(auto_schema=None)
+)
 @method_decorator(name="destroy", decorator=swagger_auto_schema(auto_schema=None))
 class QueueViewset(ModelViewSet):
     swagger_tag = "Queues"
@@ -234,9 +236,7 @@ class QueueViewset(ModelViewSet):
         instance = self.get_object()
 
         transfer_to_queue_uuid = request.query_params.get("transfer_to_queue")
-        end_all_chats = (
-            request.query_params.get("end_all_chats", "").lower() == "true"
-        )
+        end_all_chats = request.query_params.get("end_all_chats", "").lower() == "true"
 
         if transfer_to_queue_uuid and end_all_chats:
             return Response(
@@ -390,26 +390,6 @@ class QueueViewset(ModelViewSet):
 
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @staticmethod
-    def _create_queue_authorizations(queue, agent_emails, project):
-        if not agent_emails:
-            return
-        permissions = ProjectPermission.objects.filter(
-            project=project,
-            user__in=[email.lower() for email in agent_emails],
-            is_deleted=False,
-        )
-        QueueAuthorization.objects.bulk_create(
-            [
-                QueueAuthorization(
-                    queue=queue,
-                    permission=perm,
-                    role=QueueAuthorization.ROLE_AGENT,
-                )
-                for perm in permissions
-            ]
-        )
-
     @action(detail=False, methods=["POST"])
     def bulk_create(self, request, *args, **kwargs):
         serializer = queue_serializers.BulkQueueCreateSerializer(
@@ -417,86 +397,12 @@ class QueueViewset(ModelViewSet):
         )
         serializer.is_valid(raise_exception=True)
 
-        sector = serializer.validated_data["sector"]
-        queues_data = serializer.validated_data["queues"]
-
-        project = sector.project
-        has_group_sectors = SectorGroupSector.objects.filter(sector=sector).exists()
-        should_use_integration = (
-            project.config
-            and project.config.get("its_principal", False)
-            and sector.secondary_project
+        use_case = BulkQueueCreationUseCase(
+            sector=serializer.validated_data["sector"],
+            queues_data=serializer.validated_data["queues"],
+            user=request.user,
         )
-
-        created_queues = []
-
-        with transaction.atomic():
-            for queue_data in queues_data:
-                queue_limit_data = queue_data.pop("queue_limit", None)
-                agent_emails = queue_data.pop("agents", [])
-                queue = Queue.objects.create(
-                    sector=sector,
-                    name=queue_data["name"],
-                    default_message=queue_data.get("default_message"),
-                    config=queue_data.get("config"),
-                    queue_limit=queue_limit_data.get("limit")
-                    if queue_limit_data
-                    else None,
-                    is_queue_limit_active=queue_limit_data.get("is_active", False)
-                    if queue_limit_data
-                    else False,
-                )
-
-                self._create_queue_authorizations(queue, agent_emails, project)
-
-                if has_group_sectors:
-                    QueueGroupSectorAuthorizationCreationUseCase(queue).execute()
-
-                created_queues.append(queue)
-
-        if not settings.USE_WENI_FLOWS:
-            return Response(
-                queue_serializers.QueueSerializer(
-                    created_queues, many=True, context={"request": request}
-                ).data,
-                status=status.HTTP_201_CREATED,
-            )
-
-        flows_synced_queues = []
-        try:
-            for queue in created_queues:
-                if should_use_integration:
-                    IntegratedTicketers().integrate_individual_topic(
-                        project, sector.secondary_project
-                    )
-                else:
-                    flows_payload = {
-                        "uuid": str(queue.uuid),
-                        "name": queue.name,
-                        "sector_uuid": str(sector.uuid),
-                        "project_uuid": str(project.uuid),
-                    }
-                    flows_response = FlowRESTClient().create_queue(**flows_payload)
-                    if flows_response.status_code not in [
-                        status.HTTP_200_OK,
-                        status.HTTP_201_CREATED,
-                    ]:
-                        raise exceptions.APIException(
-                            detail=(
-                                f"[{flows_response.status_code}] Error posting the queue"
-                                f" on flows. Exception: {flows_response.content}"
-                            )
-                        )
-                    flows_synced_queues.append(queue)
-        except exceptions.APIException:
-            for registered_queue in flows_synced_queues:
-                FlowRESTClient().destroy_queue(
-                    uuid=str(registered_queue.uuid),
-                    sector_uuid=str(sector.uuid),
-                    project_uuid=str(project.uuid),
-                )
-            Queue.objects.filter(pk__in=[queue.pk for queue in created_queues]).delete()
-            raise
+        created_queues = use_case.execute()
 
         response_serializer = queue_serializers.QueueSerializer(
             created_queues, many=True, context={"request": request}

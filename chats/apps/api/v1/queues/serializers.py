@@ -20,6 +20,13 @@ class QueueLimitSerializer(serializers.Serializer):
     )
     is_active = serializers.BooleanField(required=False, allow_null=True)
 
+    def validate(self, data):
+        if data.get("is_active") is True and data.get("limit") is None:
+            raise serializers.ValidationError(
+                {"limit": _("Limit is required when queue limit is active.")}
+            )
+        return data
+
 
 class QueueSerializer(AuditableModelSerializer):
 
@@ -267,9 +274,31 @@ class BulkQueueCreateSerializer(serializers.Serializer):
         sector = data["sector"]
         queues = data["queues"]
 
+        request = self.context.get("request")
+        if request and not is_feature_active(
+            settings.QUEUE_BULK_CREATE_FEATURE_FLAG_KEY,
+            request.user.email,
+            str(sector.project.uuid),
+        ):
+            raise serializers.ValidationError(
+                {"detail": _("Bulk queue create feature is not active.")},
+                code="bulk_queue_create_feature_flag_is_off",
+            )
+
         if not queues:
             raise serializers.ValidationError(
                 {"queues": _("At least one queue is required.")}
+            )
+
+        max_items = settings.QUEUE_BULK_CREATE_MAX_ITEMS
+        if len(queues) > max_items:
+            raise serializers.ValidationError(
+                {
+                    "queues": _(
+                        "A maximum of %(max)d queues can be created per request."
+                    )
+                    % {"max": max_items}
+                }
             )
 
         queue_names = [queue_data["name"] for queue_data in queues]
@@ -280,9 +309,9 @@ class BulkQueueCreateSerializer(serializers.Serializer):
             )
 
         existing_names = list(
-            Queue.objects.filter(
-                sector=sector, name__in=queue_names, is_deleted=False
-            ).values_list("name", flat=True)
+            Queue.objects.filter(sector=sector, name__in=queue_names).values_list(
+                "name", flat=True
+            )
         )
         if existing_names:
             raise serializers.ValidationError(
@@ -291,7 +320,6 @@ class BulkQueueCreateSerializer(serializers.Serializer):
                 }
             )
 
-        request = self.context.get("request")
         if request:
             is_queue_limit_feature_active = is_feature_active(
                 settings.QUEUE_LIMIT_FEATURE_FLAG_KEY,
