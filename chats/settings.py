@@ -785,6 +785,12 @@ IMPROVE_USER_MESSAGE_FEATURE_FLAG_KEY = env.str(
     "IMPROVE_USER_MESSAGE_FEATURE_FLAG_KEY",
     default="weniChatsAITextImprovement",
 )
+
+# Agents Management (Quick Agent Setup)
+AGENTS_MANAGEMENT_FEATURE_FLAG_KEY = env.str(
+    "AGENTS_MANAGEMENT_FEATURE_FLAG_KEY",
+    default="weniChatsAgentsManagement",
+)
 IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL = env.int(
     "IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL", default=30
 )
