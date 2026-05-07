@@ -1,15 +1,6 @@
 from django.urls import include, path
 from weni.feature_flags.views import FeatureFlagsWebhookView
 
-from chats.apps.api.v1.archive_chats.views import GetArchivedMediaView
-from chats.apps.api.v1.rooms.viewsets import (
-    RoomsCountByQueueView,
-    RoomsCountView,
-    RoomsReportViewSet,
-)
-from chats.apps.api.v1.dashboard.viewsets import (
-    ModelFieldsViewSet,
-    ReportFieldsValidatorViewSet,
 from chats.apps.ai_features.audio_transcription.views import (
     AudioTranscriptionFeedbackTagsView,
     AudioTranscriptionFeedbackView,
@@ -33,7 +24,11 @@ from chats.apps.api.v1.dashboard.viewsets import (
 from chats.apps.api.v1.human_support.views import HumanSupportNexusSettingsView
 from chats.apps.api.v1.internal.agents.views import AgentDisconnectView
 from chats.apps.api.v1.internal.ai_features.views import FeaturePromptsView
-from chats.apps.api.v1.rooms.viewsets import RoomsCountView, RoomsReportViewSet
+from chats.apps.api.v1.rooms.viewsets import (
+    RoomsCountByQueueView,
+    RoomsCountView,
+    RoomsReportViewSet,
+)
 from chats.apps.api.v1.routers import router
 
 urlpatterns = [
