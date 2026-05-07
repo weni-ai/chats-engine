@@ -2,8 +2,8 @@ import logging
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django_filters.rest_framework import DjangoFilterBackend
 from django.utils.decorators import method_decorator
+from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import exceptions, filters, status
 from rest_framework.decorators import action
@@ -28,6 +28,7 @@ from chats.apps.core.internal_domains import (
 from chats.apps.projects.models.models import Project
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.queues.usecases.bulk_queue_creation import BulkQueueCreationUseCase
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorGroupSector
 from chats.apps.sectors.usecases.group_sector_authorization import (
@@ -48,7 +49,9 @@ User = get_user_model()
 
 @method_decorator(name="create", decorator=swagger_auto_schema(auto_schema=None))
 @method_decorator(name="update", decorator=swagger_auto_schema(auto_schema=None))
-@method_decorator(name="partial_update", decorator=swagger_auto_schema(auto_schema=None))
+@method_decorator(
+    name="partial_update", decorator=swagger_auto_schema(auto_schema=None)
+)
 @method_decorator(name="destroy", decorator=swagger_auto_schema(auto_schema=None))
 class QueueViewset(ModelViewSet):
     swagger_tag = "Queues"
@@ -236,9 +239,7 @@ class QueueViewset(ModelViewSet):
         instance = self.get_object()
 
         transfer_to_queue_uuid = request.query_params.get("transfer_to_queue")
-        end_all_chats = (
-            request.query_params.get("end_all_chats", "").lower() == "true"
-        )
+        end_all_chats = request.query_params.get("end_all_chats", "").lower() == "true"
 
         if transfer_to_queue_uuid and end_all_chats:
             return Response(
@@ -391,6 +392,25 @@ class QueueViewset(ModelViewSet):
         )
 
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["POST"])
+    def bulk_create(self, request, *args, **kwargs):
+        serializer = queue_serializers.BulkQueueCreateSerializer(
+            data=request.data, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+
+        use_case = BulkQueueCreationUseCase(
+            sector=serializer.validated_data["sector"],
+            queues_data=serializer.validated_data["queues"],
+            user=request.user,
+        )
+        created_queues = use_case.execute()
+
+        response_serializer = queue_serializers.QueueSerializer(
+            created_queues, many=True, context={"request": request}
+        )
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=["GET"])
     def list_queue_permissions(self, request, *args, **kwargs):

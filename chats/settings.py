@@ -754,6 +754,12 @@ VTEX_INTERNAL_DOMAINS = env.list(
 QUEUE_LIMIT_FEATURE_FLAG_KEY = env.str(
     "QUEUE_LIMIT_FEATURE_FLAG_KEY", default="weniChatsQueueLimit"
 )
+
+# Bulk Queue Create Settings
+QUEUE_BULK_CREATE_MAX_ITEMS = env.int("QUEUE_BULK_CREATE_MAX_ITEMS", default=50)
+QUEUE_BULK_CREATE_FEATURE_FLAG_KEY = env.str(
+    "QUEUE_BULK_CREATE_FEATURE_FLAG_KEY", default="weniChatsBulkQueueCreate"
+)
 # Rooms External API QuerySet filter feature flag
 ROOMS_EXTERNAL_API_QUERYSET_FILTER_FLAG_KEY = env.str(
     "ROOMS_EXTERNAL_API_QUERYSET_FILTER_FLAG_KEY",
