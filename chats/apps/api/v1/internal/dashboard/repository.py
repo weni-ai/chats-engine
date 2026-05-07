@@ -53,16 +53,10 @@ class AgentRepository:
         agents_filters = Q(project_permissions__project=project) & Q(is_active=True)
 
         if include_removed:
-            agents_filters = (
-                Q(project_permissions__project=project)
-                | Exists(
-                    ProjectPermission.all_objects.filter(
-                        project=project,
-                        user_id=OuterRef("email"),
-                        is_deleted=True,
-                    )
-                )
-            ) & Q(is_active=True)
+            all_project_user_emails = ProjectPermission.all_objects.filter(
+                project=project,
+            ).values("user_id")
+            agents_filters = Q(email__in=all_project_user_emails) & Q(is_active=True)
 
         if filters.queues:
             rooms_filter["rooms__queue__in"] = filters.queues
@@ -443,15 +437,11 @@ class AgentRepository:
         self, filters: Filters, project: Project, include_removed: bool = False
     ):
         if include_removed:
+            all_project_user_emails = ProjectPermission.all_objects.filter(
+                project=project,
+            ).values("user_id")
             agents = self.model.filter(
-                Q(project_permissions__project=project)
-                | Exists(
-                    ProjectPermission.all_objects.filter(
-                        project=project,
-                        user_id=OuterRef("email"),
-                        is_deleted=True,
-                    )
-                )
+                email__in=all_project_user_emails,
             )
         else:
             agents = self.model.filter(project_permissions__project=project)

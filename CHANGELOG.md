@@ -1,3 +1,26 @@
+# 3.57.3
+# Add
+  - Pagination for agents metrics in internal dashboard
+  - User addition to discussions with permission checks
+# Fix
+  - Transfer history handling when picking room from view mode
+
+# 3.57.2
+# Fix
+  - Agents list performance by simplifying agent filtering logic
+
+# 3.57.1
+# Add
+  - Queue routing cooldown with retry logic
+  - Route sector rooms functionality
+
+# 3.57.0
+# Add
+  - Transfer history from bulk transfer
+  - User room count re-verification before routing assignment
+# Fix
+  - Agent status list filtering by queue
+
 # 3.56.2
 # Add
   - Bulk creation of pending archived conversation records

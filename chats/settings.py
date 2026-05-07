@@ -758,6 +758,12 @@ VTEX_INTERNAL_DOMAINS = env.list(
 QUEUE_LIMIT_FEATURE_FLAG_KEY = env.str(
     "QUEUE_LIMIT_FEATURE_FLAG_KEY", default="weniChatsQueueLimit"
 )
+
+# Bulk Queue Create Settings
+QUEUE_BULK_CREATE_MAX_ITEMS = env.int("QUEUE_BULK_CREATE_MAX_ITEMS", default=50)
+QUEUE_BULK_CREATE_FEATURE_FLAG_KEY = env.str(
+    "QUEUE_BULK_CREATE_FEATURE_FLAG_KEY", default="weniChatsBulkQueueCreate"
+)
 # Rooms External API QuerySet filter feature flag
 ROOMS_EXTERNAL_API_QUERYSET_FILTER_FLAG_KEY = env.str(
     "ROOMS_EXTERNAL_API_QUERYSET_FILTER_FLAG_KEY",
@@ -783,6 +789,26 @@ IMPROVE_USER_MESSAGE_FEATURE_FLAG_KEY = env.str(
     "IMPROVE_USER_MESSAGE_FEATURE_FLAG_KEY",
     default="weniChatsAITextImprovement",
 )
+
+# Agents Management (Quick Agent Setup)
+AGENTS_MANAGEMENT_FEATURE_FLAG_KEY = env.str(
+    "AGENTS_MANAGEMENT_FEATURE_FLAG_KEY",
+    default="weniChatsAgentsManagement",
+)
 IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL = env.int(
     "IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL", default=30
+)
+
+# Route Queue Cooldown Feature Flag
+ROUTE_QUEUE_COOLDOWN_FEATURE_FLAG_KEY = env.str(
+    "ROUTE_QUEUE_COOLDOWN_FEATURE_FLAG_KEY",
+    default="weniChatsRouteQueueCooldown",
+)
+ROUTE_QUEUE_COOLDOWN_MAX_TIME = env.int(
+    "ROUTE_QUEUE_COOLDOWN_MAX_TIME",
+    default=30,
+)
+ROUTE_QUEUE_COOLDOWN_RETRY_DELAY = env.int(
+    "ROUTE_QUEUE_COOLDOWN_RETRY_DELAY",
+    default=2,
 )
