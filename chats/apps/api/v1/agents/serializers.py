@@ -124,7 +124,7 @@ class AgentQueuePermissionsSerializer(serializers.Serializer):
                     "name": queue.name,
                     "agent_in_queue": queue.pk in agent_queue_ids,
                 }
-                for queue in sector.queues.filter(is_deleted=False)
+                for queue in sector.queues.all()
             ]
             result.append({"sector": {"name": sector.name, "queues": queues}})
         return result
@@ -138,6 +138,13 @@ class AgentQueuePermissionsSerializer(serializers.Serializer):
 class ChatsLimitInputSerializer(serializers.Serializer):
     active = serializers.BooleanField(required=False, default=False)
     total = serializers.IntegerField(required=False, allow_null=True, default=None)
+
+    def validate(self, attrs):
+        if attrs.get("active") and attrs.get("total") is None:
+            raise serializers.ValidationError(
+                {"total": "total is required when active is true."}
+            )
+        return attrs
 
 
 class UpdateQueuePermissionsSerializer(serializers.Serializer):

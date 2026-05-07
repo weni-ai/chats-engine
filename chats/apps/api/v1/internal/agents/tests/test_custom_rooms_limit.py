@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, force_authenticate
@@ -18,6 +20,16 @@ def _make_manager(project):
     return user, perm
 
 
+def _enable_agents_management_feature_flag(test_case):
+    """Mocks the agents management feature flag as enabled for the test case lifetime."""
+    patcher = patch(
+        "chats.apps.api.v1.agents.views.is_feature_active_for_attributes",
+        return_value=True,
+    )
+    patcher.start()
+    test_case.addCleanup(patcher.stop)
+
+
 # ===========================================================================
 # ENGAGE-7554 — Individual attendance limit per agent (on ProjectPermission)
 #
@@ -31,6 +43,14 @@ class CustomRoomsLimitModelTests(TestCase):
     """Queue.available_agents respects per-agent custom limits stored on ProjectPermission."""
 
     def setUp(self):
+        # Custom limit is gated by the agents management feature flag
+        feature_flag_patcher = patch(
+            "chats.apps.queues.models.Queue._is_agents_management_feature_enabled",
+            return_value=True,
+        )
+        feature_flag_patcher.start()
+        self.addCleanup(feature_flag_patcher.stop)
+
         self.project = Project.objects.create(name="Test Project", timezone="UTC")
         # sector.rooms_limit = 2 is the baseline limit used across these tests
         self.sector = self.project.sectors.create(
@@ -95,6 +115,8 @@ class CustomRoomsLimitAPITests(TestCase):
     """API tests for the chats_limit field via update_queue_permissions."""
 
     def setUp(self):
+        _enable_agents_management_feature_flag(self)
+
         self.factory = APIRequestFactory()
 
         self.project = Project.objects.create(name="Test Project", timezone="UTC")

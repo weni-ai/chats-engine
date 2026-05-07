@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIRequestFactory, force_authenticate
@@ -20,6 +22,16 @@ def _make_manager(project):
     return user, perm
 
 
+def _enable_agents_management_feature_flag(test_case):
+    """Mocks the agents management feature flag as enabled for the test case lifetime."""
+    patcher = patch(
+        "chats.apps.api.v1.agents.views.is_feature_active_for_attributes",
+        return_value=True,
+    )
+    patcher.start()
+    test_case.addCleanup(patcher.stop)
+
+
 # ===========================================================================
 # ENGAGE-7558 — GET /v1/agent/queue_permissions/?agent={email}&project={uuid}
 # Returns all sectors/queues for an agent with agent_in_queue flag + chats_limit
@@ -28,6 +40,8 @@ def _make_manager(project):
 
 class AgentQueuePermissionsViewTests(TestCase):
     def setUp(self):
+        _enable_agents_management_feature_flag(self)
+
         self.factory = APIRequestFactory()
 
         self.project = Project.objects.create(name="Test Project", timezone="UTC")
@@ -175,6 +189,8 @@ class AgentQueuePermissionsViewTests(TestCase):
 
 class UpdateQueuePermissionsViewTests(TestCase):
     def setUp(self):
+        _enable_agents_management_feature_flag(self)
+
         self.factory = APIRequestFactory()
 
         self.project = Project.objects.create(name="Test Project", timezone="UTC")

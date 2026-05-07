@@ -1,4 +1,5 @@
-from django.db.models import Exists, OuterRef, Q
+from django.db.models import CharField, Exists, OuterRef, Q, Value
+from django.db.models.functions import Concat
 from django_filters import rest_framework as filters
 
 from chats.apps.projects.models import ProjectPermission
@@ -16,6 +17,7 @@ class CharInFilter(filters.BaseInFilter, filters.CharFilter):
 class AllAgentsFilter(filters.FilterSet):
     status = CharInFilter(method="filter_status")
     agent = CharInFilter(method="filter_agent")
+    name = CharInFilter(method="filter_name")
     sector = UUIDInFilter(method="filter_sector")
     queue = UUIDInFilter(method="filter_queue")
 
@@ -89,6 +91,31 @@ class AllAgentsFilter(filters.FilterSet):
             return queryset
 
         return queryset.filter(condition).distinct()
+
+    def filter_name(self, queryset, name, values):
+        if not values:
+            return queryset
+
+        condition = Q()
+        for value in values:
+            if value:
+                condition |= Q(_full_name__icontains=value)
+
+        if not condition:
+            return queryset
+
+        return (
+            queryset.annotate(
+                _full_name=Concat(
+                    "user__first_name",
+                    Value(" "),
+                    "user__last_name",
+                    output_field=CharField(),
+                )
+            )
+            .filter(condition)
+            .distinct()
+        )
 
     def filter_sector(self, queryset, name, values):
         if not values:
