@@ -1518,10 +1518,26 @@ class RoomsCountByQueueView(APIView):
         params = RoomsCountByQueueQueryParamsSerializer(data=request.query_params)
         params.is_valid(raise_exception=True)
 
+        project_uuid = params.validated_data["project"]
+
+        if not is_feature_active(
+            settings.ROOMS_COUNT_BY_QUEUE_FEATURE_FLAG_KEY,
+            request.user.email,
+            str(project_uuid),
+        ):
+            raise NotFound()
+
+        # Reuse the permission resolved by ProjectAccessPermission to avoid
+        # a second lookup on the same (user, project) pair.
+        requesting_permission = (
+            getattr(request, "_cached_project_permission", None)
+            or GetPermission(request).permission
+        )
+
         try:
             result = RoomsCountByQueueService().get_counts(
-                project_uuid=params.validated_data["project"],
-                requesting_permission=GetPermission(request).permission,
+                project_uuid=project_uuid,
+                requesting_permission=requesting_permission,
                 target_email=params.validated_data.get("email") or None,
             )
         except ProjectPermission.DoesNotExist:

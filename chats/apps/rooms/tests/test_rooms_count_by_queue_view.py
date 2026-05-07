@@ -1,4 +1,5 @@
 import uuid
+from unittest.mock import patch
 
 from django.urls import reverse
 from rest_framework import status
@@ -14,6 +15,15 @@ from chats.apps.sectors.models import Sector, SectorAuthorization
 
 class RoomsCountByQueueViewBase(APITestCase):
     def setUp(self):
+        # Enable the feature flag for all tests by default. Individual tests
+        # can disable it via `self._set_feature_flag(False)`.
+        flag_patcher = patch(
+            "chats.apps.api.v1.rooms.viewsets.is_feature_active",
+            return_value=True,
+        )
+        self._mock_feature_flag = flag_patcher.start()
+        self.addCleanup(flag_patcher.stop)
+
         self.url = reverse("rooms-count-by-queue")
 
         self.project = Project.objects.create(name="Test Project")
@@ -65,6 +75,9 @@ class RoomsCountByQueueViewBase(APITestCase):
                 }
         return result
 
+    def _set_feature_flag(self, value: bool) -> None:
+        self._mock_feature_flag.return_value = value
+
 
 class RoomsCountByQueueViewAdminTests(RoomsCountByQueueViewBase):
     def setUp(self):
@@ -83,9 +96,15 @@ class RoomsCountByQueueViewAdminTests(RoomsCountByQueueViewBase):
         response = self._get({"project": str(self.project.uuid)})
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
-    def test_missing_project_returns_403(self):
+    def test_missing_project_returns_400(self):
         response = self._get({})
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("project", response.data)
+
+    def test_disabled_feature_flag_returns_404(self):
+        self._set_feature_flag(False)
+        response = self._get({"project": str(self.project.uuid)})
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_user_without_permission_returns_403(self):
         outsider = User.objects.create_user(email="outsider@test.com")
@@ -279,6 +298,18 @@ class RoomsCountByQueueViewSectorManagerTests(RoomsCountByQueueViewBase):
         flat = self._flatten(response.data)
         self.assertEqual(flat[str(self.queue_a1.uuid)]["queued"], 1)
         self.assertEqual(flat[str(self.queue_a1.uuid)]["in_service"], 1)
+
+    def test_sector_manager_does_not_see_queues_from_other_sectors(self):
+        self._create_room(self.queue_a1)
+        self._create_room(self.queue_b1)
+
+        response = self._get({"project": str(self.project.uuid)})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        sector_names = [s["name"] for s in response.data["sectors"]]
+        self.assertEqual(sector_names, ["A Sector"])
+        flat = self._flatten(response.data)
+        self.assertNotIn(str(self.queue_b1.uuid), flat)
 
 
 class RoomsCountByQueueViewTargetEmailTests(RoomsCountByQueueViewBase):
