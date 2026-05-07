@@ -6,6 +6,7 @@ from django.db import IntegrityError, transaction
 from django.utils.translation import gettext_lazy as _
 from rest_framework import exceptions, status
 
+from chats.apps.accounts.models import User
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
@@ -39,9 +40,15 @@ class BulkQueueCreationUseCase:
       ``destroy_queue`` calls before re-raising the exception.
     """
 
-    def __init__(self, sector: Sector, queues_data: List[dict]):
+    def __init__(
+        self,
+        sector: Sector,
+        queues_data: List[dict],
+        user: User,
+    ):
         self.sector = sector
         self.queues_data = queues_data
+        self.user = user
         self.project = sector.project
         self.has_group_sectors = SectorGroupSector.objects.filter(
             sector=sector
@@ -60,7 +67,11 @@ class BulkQueueCreationUseCase:
             default_message=queue_data.get("default_message"),
             config=queue_data.get("config"),
             queue_limit=queue_limit_data.get("limit"),
-            is_queue_limit_active=queue_limit_data.get("is_active", False),
+            # Coerce explicit ``null`` from the serializer (which allows it)
+            # to ``False`` because the model column is NOT NULL.
+            is_queue_limit_active=bool(queue_limit_data.get("is_active")),
+            created_by=self.user,
+            modified_by=self.user,
         )
 
     def _create_queue_authorizations(
@@ -80,6 +91,8 @@ class BulkQueueCreationUseCase:
                     queue=queue,
                     permission=perm,
                     role=QueueAuthorization.ROLE_AGENT,
+                    created_by=self.user,
+                    modified_by=self.user,
                 )
                 for perm in permissions
             ]
@@ -138,10 +151,6 @@ class BulkQueueCreationUseCase:
             try:
                 created_queues = self._persist_queues()
             except IntegrityError as exc:
-                # Catches DB-level conflicts (e.g. unique_queue_name on a row
-                # that bypassed the serializer pre-validation, such as
-                # concurrent creates or rows with is_deleted=True that kept
-                # the original name) and surfaces them as 400 instead of 500.
                 raise exceptions.ValidationError(
                     {
                         "queues": _(
@@ -166,8 +175,6 @@ class BulkQueueCreationUseCase:
                     self._sync_queue_with_flows(queue)
                     synced_queues.append(queue)
             except exceptions.APIException:
-                # Compensate already-synced Flows queues; the DB rollback
-                # is handled automatically by the surrounding atomic block.
                 self._rollback_flows(synced_queues)
                 raise
 

@@ -1,6 +1,7 @@
 import uuid
 from unittest.mock import MagicMock, patch
 
+from django.conf import settings
 from django.test import override_settings
 from django.urls import reverse
 from rest_framework import status
@@ -20,6 +21,16 @@ def make_flows_response(status_code=201):
     mock.status_code = status_code
     mock.content = b""
     return mock
+
+
+def feature_flag_off_for(*disabled_keys):
+    """Return a side_effect that only turns OFF the given flag keys."""
+    disabled = set(disabled_keys)
+
+    def _side_effect(key, *args, **kwargs):
+        return key not in disabled
+
+    return _side_effect
 
 
 class TestBulkQueueCreateUnauthenticated(APITestCase):
@@ -57,6 +68,17 @@ class TestBulkQueueCreate(APITestCase):
         response = self.client.post(self._url(), data=self._payload(), format="json")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=False)
+    @with_project_permission()
+    def test_bulk_create_feature_flag_off_returns_400(self, mock_feature_flag):
+        response = self.client.post(self._url(), data=self._payload(), format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["detail"][0].code, "bulk_queue_create_feature_flag_is_off"
+        )
+        self.assertEqual(Queue.objects.filter(sector=self.sector).count(), 0)
+
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
     def test_empty_queues_list_returns_400(self, mock_feature_flag):
@@ -76,6 +98,18 @@ class TestBulkQueueCreate(APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @override_settings(QUEUE_BULK_CREATE_MAX_ITEMS=3)
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
+    @with_project_permission()
+    def test_more_than_max_items_returns_400(self, mock_feature_flag):
+        response = self.client.post(
+            self._url(),
+            data=self._payload(queues=[{"name": f"Fila {i}"} for i in range(4)]),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(Queue.objects.filter(sector=self.sector).count(), 0)
 
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
@@ -163,11 +197,14 @@ class TestBulkQueueCreate(APITestCase):
         self.assertEqual(queue.queue_limit, 0)
         self.assertTrue(queue.is_queue_limit_active)
 
-    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=False)
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active")
     @with_project_permission()
     def test_queue_limit_active_with_feature_flag_off_returns_400(
         self, mock_feature_flag
     ):
+        mock_feature_flag.side_effect = feature_flag_off_for(
+            settings.QUEUE_LIMIT_FEATURE_FLAG_KEY
+        )
         response = self.client.post(
             self._url(),
             data=self._payload(
@@ -182,11 +219,14 @@ class TestBulkQueueCreate(APITestCase):
             response.data["detail"][0].code, "queue_limit_feature_flag_is_off"
         )
 
-    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=False)
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active")
     @with_project_permission()
     def test_queue_limit_inactive_with_feature_flag_off_is_allowed(
         self, mock_feature_flag
     ):
+        mock_feature_flag.side_effect = feature_flag_off_for(
+            settings.QUEUE_LIMIT_FEATURE_FLAG_KEY
+        )
         with override_settings(USE_WENI_FLOWS=False):
             response = self.client.post(
                 self._url(),

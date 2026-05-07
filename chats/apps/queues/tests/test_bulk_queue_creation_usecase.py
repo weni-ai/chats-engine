@@ -29,25 +29,28 @@ class BulkQueueCreationUseCaseTests(TestCase):
             work_start=time(hour=9, minute=0),
             work_end=time(hour=18, minute=0),
         )
+        self.user = User.objects.create(email="manager@test.com")
 
     def _queues_data(self, queues=None):
         return queues or [{"name": "Fila 1"}, {"name": "Fila 2"}]
 
-    @override_settings(USE_WENI_FLOWS=False)
-    def test_persists_all_queues_in_db(self):
-        use_case = BulkQueueCreationUseCase(
-            sector=self.sector, queues_data=self._queues_data()
+    def _make_use_case(self, queues_data=None, sector=None):
+        return BulkQueueCreationUseCase(
+            sector=sector or self.sector,
+            queues_data=queues_data if queues_data is not None else self._queues_data(),
+            user=self.user,
         )
 
-        created = use_case.execute()
+    @override_settings(USE_WENI_FLOWS=False)
+    def test_persists_all_queues_in_db(self):
+        created = self._make_use_case().execute()
 
         self.assertEqual(len(created), 2)
         self.assertEqual(Queue.objects.filter(sector=self.sector).count(), 2)
 
     @override_settings(USE_WENI_FLOWS=False)
     def test_persists_optional_fields_correctly(self):
-        use_case = BulkQueueCreationUseCase(
-            sector=self.sector,
+        self._make_use_case(
             queues_data=[
                 {
                     "name": "Fila Completa",
@@ -56,9 +59,7 @@ class BulkQueueCreationUseCaseTests(TestCase):
                     "queue_limit": {"limit": 7, "is_active": True},
                 }
             ],
-        )
-
-        use_case.execute()
+        ).execute()
 
         queue = Queue.objects.get(sector=self.sector, name="Fila Completa")
         self.assertEqual(queue.default_message, "Olá")
@@ -73,11 +74,9 @@ class BulkQueueCreationUseCaseTests(TestCase):
             user=agent, project=self.project, role=ProjectPermission.ROLE_ATTENDANT
         )
 
-        use_case = BulkQueueCreationUseCase(
-            sector=self.sector,
+        self._make_use_case(
             queues_data=[{"name": "Fila 1", "agents": ["agent@test.com"]}],
-        )
-        use_case.execute()
+        ).execute()
 
         queue = Queue.objects.get(sector=self.sector, name="Fila 1")
         self.assertEqual(queue.authorizations.count(), 1)
@@ -95,16 +94,14 @@ class BulkQueueCreationUseCaseTests(TestCase):
             role=ProjectPermission.ROLE_ATTENDANT,
         )
 
-        use_case = BulkQueueCreationUseCase(
-            sector=self.sector,
+        self._make_use_case(
             queues_data=[
                 {
                     "name": "Fila 1",
                     "agents": ["with@test.com", "without@test.com"],
                 }
             ],
-        )
-        use_case.execute()
+        ).execute()
 
         queue = Queue.objects.get(sector=self.sector, name="Fila 1")
         self.assertEqual(queue.authorizations.count(), 1)
@@ -125,10 +122,7 @@ class BulkQueueCreationUseCaseTests(TestCase):
         )
         SectorGroupSector.objects.create(sector_group=group, sector=self.sector)
 
-        use_case = BulkQueueCreationUseCase(
-            sector=self.sector, queues_data=self._queues_data()
-        )
-        use_case.execute()
+        self._make_use_case().execute()
 
         self.assertEqual(mock_group_sector_uc.return_value.execute.call_count, 2)
 
@@ -140,10 +134,7 @@ class BulkQueueCreationUseCaseTests(TestCase):
     def test_does_not_run_group_sector_use_case_when_sector_is_standalone(
         self, mock_group_sector_uc
     ):
-        use_case = BulkQueueCreationUseCase(
-            sector=self.sector, queues_data=self._queues_data()
-        )
-        use_case.execute()
+        self._make_use_case().execute()
 
         mock_group_sector_uc.return_value.execute.assert_not_called()
 
@@ -152,10 +143,7 @@ class BulkQueueCreationUseCaseTests(TestCase):
     def test_calls_flows_create_queue_for_each_persisted_queue(self, mock_flows):
         mock_flows.return_value.create_queue.return_value = make_flows_response()
 
-        use_case = BulkQueueCreationUseCase(
-            sector=self.sector, queues_data=self._queues_data()
-        )
-        use_case.execute()
+        self._make_use_case().execute()
 
         self.assertEqual(mock_flows.return_value.create_queue.call_count, 2)
         for call in mock_flows.return_value.create_queue.call_args_list:
@@ -169,12 +157,8 @@ class BulkQueueCreationUseCaseTests(TestCase):
     ):
         mock_flows.return_value.create_queue.return_value = make_flows_response(500)
 
-        use_case = BulkQueueCreationUseCase(
-            sector=self.sector, queues_data=self._queues_data()
-        )
-
         with self.assertRaises(exceptions.APIException):
-            use_case.execute()
+            self._make_use_case().execute()
 
         self.assertEqual(Queue.objects.filter(sector=self.sector).count(), 0)
         mock_flows.return_value.destroy_queue.assert_not_called()
@@ -190,12 +174,8 @@ class BulkQueueCreationUseCaseTests(TestCase):
         ]
         mock_flows.return_value.destroy_queue.return_value = make_flows_response(200)
 
-        use_case = BulkQueueCreationUseCase(
-            sector=self.sector, queues_data=self._queues_data()
-        )
-
         with self.assertRaises(exceptions.APIException):
-            use_case.execute()
+            self._make_use_case().execute()
 
         self.assertEqual(Queue.objects.filter(sector=self.sector).count(), 0)
         self.assertEqual(mock_flows.return_value.destroy_queue.call_count, 1)
@@ -209,12 +189,8 @@ class BulkQueueCreationUseCaseTests(TestCase):
         ]
         mock_flows.return_value.destroy_queue.side_effect = Exception("network error")
 
-        use_case = BulkQueueCreationUseCase(
-            sector=self.sector, queues_data=self._queues_data()
-        )
-
         with self.assertRaises(exceptions.APIException):
-            use_case.execute()
+            self._make_use_case().execute()
 
         self.assertEqual(Queue.objects.filter(sector=self.sector).count(), 0)
 
@@ -228,10 +204,7 @@ class BulkQueueCreationUseCaseTests(TestCase):
         self.sector.secondary_project = {"uuid": str(uuid.uuid4())}
         self.sector.save(update_fields=["secondary_project"])
 
-        use_case = BulkQueueCreationUseCase(
-            sector=self.sector, queues_data=self._queues_data()
-        )
-        use_case.execute()
+        self._make_use_case().execute()
 
         mock_ticketers.return_value.integrate_individual_topic.assert_called_once_with(
             self.project, self.sector.secondary_project
@@ -243,13 +216,8 @@ class BulkQueueCreationUseCaseTests(TestCase):
             name="Fila Conflito", sector=self.sector, is_deleted=True
         )
 
-        use_case = BulkQueueCreationUseCase(
-            sector=self.sector,
-            queues_data=[{"name": "Fila Conflito"}],
-        )
-
         with self.assertRaises(exceptions.ValidationError):
-            use_case.execute()
+            self._make_use_case(queues_data=[{"name": "Fila Conflito"}]).execute()
 
         self.assertEqual(Queue.objects.filter(sector=self.sector).count(), 0)
 
@@ -263,9 +231,40 @@ class BulkQueueCreationUseCaseTests(TestCase):
         with patch(
             "chats.apps.queues.usecases.bulk_queue_creation.IntegratedTicketers"
         ) as mock_ticketers:
-            use_case = BulkQueueCreationUseCase(
-                sector=self.sector, queues_data=self._queues_data()
-            )
-            use_case.execute()
+            self._make_use_case().execute()
 
             mock_ticketers.return_value.integrate_individual_topic.assert_not_called()
+
+    @override_settings(USE_WENI_FLOWS=False)
+    def test_coerces_null_is_active_to_false(self):
+        # The serializer accepts ``is_active: null`` (allow_null=True), but
+        # ``Queue.is_queue_limit_active`` is a NOT NULL BooleanField, so the
+        # use case must coerce the explicit null to False before persisting.
+        self._make_use_case(
+            queues_data=[{"name": "Fila Null", "queue_limit": {"is_active": None}}],
+        ).execute()
+
+        queue = Queue.objects.get(sector=self.sector, name="Fila Null")
+        self.assertFalse(queue.is_queue_limit_active)
+        self.assertIsNone(queue.queue_limit)
+
+    @override_settings(USE_WENI_FLOWS=False)
+    def test_persists_audit_fields_with_caller_user(self):
+        agent = User.objects.create(email="agent@test.com")
+        ProjectPermission.objects.create(
+            user=agent,
+            project=self.project,
+            role=ProjectPermission.ROLE_ATTENDANT,
+        )
+
+        self._make_use_case(
+            queues_data=[{"name": "Fila Auditada", "agents": ["agent@test.com"]}],
+        ).execute()
+
+        queue = Queue.objects.get(sector=self.sector, name="Fila Auditada")
+        self.assertEqual(queue.created_by, self.user)
+        self.assertEqual(queue.modified_by, self.user)
+
+        auth = queue.authorizations.get(permission__user=agent)
+        self.assertEqual(auth.created_by, self.user)
+        self.assertEqual(auth.modified_by, self.user)
