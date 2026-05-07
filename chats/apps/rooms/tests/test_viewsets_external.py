@@ -230,9 +230,10 @@ class RoomsExternalTests(APITestCase):
         )
         self.assertEqual(response.data["contact"]["custom_fields"]["job"], "streamer")
 
+    @patch("chats.apps.api.v1.external.rooms.serializers.is_feature_active", return_value=False)
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
-    def test_is_anon_true_wont_save_urn(self, mock_get_room, mock_is_attending):
+    def test_is_anon_true_wont_save_urn(self, mock_get_room, mock_is_attending, _mock_flag):
         mock_get_room.return_value = None
         data = {
             "queue_uuid": str(self.queue_1.uuid),
@@ -456,7 +457,10 @@ class RoomsQueuePriorityExternalTests(APITestCase):
             self.queue.uuid,
         )
 
-    @patch("chats.apps.api.v1.external.rooms.serializers.is_feature_active", return_value=True)
+    @patch(
+        "chats.apps.api.v1.external.rooms.serializers.is_feature_active",
+        side_effect=lambda key, *a, **kw: key != settings.NEW_GET_ROOM_USER_FEATURE_FLAG_KEY,
+    )
     @patch("chats.apps.api.v1.external.rooms.serializers.start_queue_priority_routing")
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_room_with_queue_priority_when_agent_fails_capacity_recheck(
@@ -913,12 +917,13 @@ class RoomsExternalProtocolTests(APITestCase):
         room = Room.objects.get(uuid=response.data["uuid"])
         self.assertEqual(room.protocol, "PROTO_CUSTOM")
 
+    @patch("chats.apps.api.v1.external.rooms.serializers.is_feature_active", return_value=False)
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     @patch(
         "chats.apps.accounts.authentication.drf.backends.WeniOIDCAuthenticationBackend.get_userinfo"
     )
     def test_protocol_absent_in_body_uses_custom(
-        self, mock_get_userinfo, mock_get_room
+        self, mock_get_userinfo, mock_get_room, _mock_flag
     ):
         mock_get_userinfo.return_value = {"sub": "test_user"}
         mock_get_room.return_value = None
