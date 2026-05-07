@@ -1,3 +1,14 @@
+# 3.57.3
+# Add
+  - Pagination for agents metrics in internal dashboard
+  - User addition to discussions with permission checks
+# Fix
+  - Transfer history handling when picking room from view mode
+
+# 3.57.2
+# Fix
+  - Agents list performance by simplifying agent filtering logic
+
 # 3.57.1
 # Add
   - Queue routing cooldown with retry logic
