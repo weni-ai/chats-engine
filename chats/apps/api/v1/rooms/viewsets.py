@@ -81,7 +81,7 @@ from chats.apps.api.v1.rooms.services.rooms_count_by_queue_service import (
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
 from chats.apps.msgs.models import Message
-from chats.apps.projects.models.models import Project
+from chats.apps.projects.models.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.choices import RoomFeedbackMethods
@@ -1544,8 +1544,9 @@ class RoomsCountByQueueView(APIView):
         }
 
     Access:
-        Restricted to project admins and sector managers. Attendants
-        receive 403.
+        Any user with a ProjectPermission on the project may call this
+        endpoint. The visibility of sectors, queues and counts depends
+        on the role (see `RoomsCountByQueueService` for the rules).
 
     View-mode (optional `email` query param):
         When provided, queue visibility follows the target user's
@@ -1561,17 +1562,36 @@ class RoomsCountByQueueView(APIView):
     assigned agent (`is_active=True, user__isnull=False, is_waiting=False`).
     """
 
-    permission_classes = [IsAuthenticated, api_permissions.AnySectorManagerPermission]
+    permission_classes = [IsAuthenticated, api_permissions.ProjectAccessPermission]
 
     def get(self, request: Request, *args, **kwargs) -> Response:
         params = RoomsCountByQueueQueryParamsSerializer(data=request.query_params)
         params.is_valid(raise_exception=True)
 
-        result = RoomsCountByQueueService().get_counts(
-            project_uuid=params.validated_data["project"],
-            requesting_permission=GetPermission(request).permission,
-            target_email=params.validated_data.get("email"),
+        project_uuid = params.validated_data["project"]
+
+        if not is_feature_active(
+            settings.ROOMS_COUNT_BY_QUEUE_FEATURE_FLAG_KEY,
+            request.user.email,
+            str(project_uuid),
+        ):
+            raise NotFound()
+
+        # Reuse the permission resolved by ProjectAccessPermission to avoid
+        # a second lookup on the same (user, project) pair.
+        requesting_permission = (
+            getattr(request, "_cached_project_permission", None)
+            or GetPermission(request).permission
         )
+
+        try:
+            result = RoomsCountByQueueService().get_counts(
+                project_uuid=project_uuid,
+                requesting_permission=requesting_permission,
+                target_email=params.validated_data.get("email") or None,
+            )
+        except ProjectPermission.DoesNotExist:
+            raise NotFound("Target user has no permission on this project.")
 
         return Response(
             RoomsCountByQueueResponseSerializer(result).data,

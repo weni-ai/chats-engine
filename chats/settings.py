@@ -753,6 +753,10 @@ DENORMALIZED_MESSAGE_FIELDS_FLAG_KEY = env.str(
 AUDIT_LOG_FEATURE_FLAG_KEY = env.str(
     "AUDIT_LOG_FEATURE_FLAG_KEY", default="weniChatsAuditLog"
 )
+ROOMS_COUNT_BY_QUEUE_FEATURE_FLAG_KEY = env.str(
+    "ROOMS_COUNT_BY_QUEUE_FEATURE_FLAG_KEY",
+    default="weniChatsRoomsCountByQueue",
+)
 
 AUDIT_LOG_FEATURE_FLAG_KEY = env.str(
     "AUDIT_LOG_FEATURE_FLAG_KEY", default="weniChatsAuditLog"

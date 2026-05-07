@@ -226,13 +226,14 @@ class RoomsCountByQueueServiceWithTargetEmailTests(RoomsCountByQueueServiceTests
         flat = self._flatten(result)
         self.assertEqual(flat[str(self.queue_a1.uuid)]["in_service"], 1)
 
-    def test_target_email_admin_returns_global_counts(self):
+    def test_target_email_admin_filters_in_service_by_target_email(self):
         target = User.objects.create_user(email="admin_target@test.com")
         ProjectPermission.objects.create(
             user=target,
             project=self.project,
             role=ProjectPermission.ROLE_ADMIN,
         )
+        self._create_room(self.queue_a1, user=target)
         self._create_room(self.queue_a1, user=self.agent)
         self._create_room(self.queue_b1, user=self.agent)
 
@@ -251,8 +252,30 @@ class RoomsCountByQueueServiceWithTargetEmailTests(RoomsCountByQueueServiceTests
                 str(self.queue_b1.uuid),
             },
         )
+        self.assertEqual(flat[str(self.queue_a1.uuid)]["in_service"], 1)
+        self.assertEqual(flat[str(self.queue_b1.uuid)]["in_service"], 0)
         total_in_service = sum(q["in_service"] for q in flat.values())
-        self.assertEqual(total_in_service, 2)
+        self.assertEqual(total_in_service, 1)
+
+    def test_target_email_admin_zero_in_service_when_no_rooms(self):
+        target = User.objects.create_user(email="admin_target@test.com")
+        ProjectPermission.objects.create(
+            user=target,
+            project=self.project,
+            role=ProjectPermission.ROLE_ADMIN,
+        )
+        self._create_room(self.queue_a1, user=self.agent)
+        self._create_room(self.queue_b1, user=self.agent)
+
+        result = self.service.get_counts(
+            project_uuid=self.project.uuid,
+            requesting_permission=self.requester_perm,
+            target_email=target.email,
+        )
+
+        flat = self._flatten(result)
+        total_in_service = sum(q["in_service"] for q in flat.values())
+        self.assertEqual(total_in_service, 0)
 
     def test_target_email_is_normalized_to_lowercase(self):
         target = User.objects.create_user(email="target@test.com")
@@ -360,30 +383,55 @@ class RoomsCountByQueueServiceFilteringTests(RoomsCountByQueueServiceTestsBase):
 
 class RoomsCountByQueueServiceManagerTests(RoomsCountByQueueServiceTestsBase):
     """
-    A sector manager (project attendant + sector authorization) is treated
-    as manager view.
+    A sector manager (project attendant + sector authorization on a sector)
+    sees only queues from the sectors they manage, but `in_service` counts
+    every assigned room in those queues (global, not filtered by user).
     """
 
-    def test_sector_manager_is_treated_as_manager_view(self):
-        manager = User.objects.create_user(email="manager@test.com")
-        manager_perm = ProjectPermission.objects.create(
-            user=manager,
+    def setUp(self):
+        super().setUp()
+        self.manager = User.objects.create_user(email="manager@test.com")
+        self.manager_perm = ProjectPermission.objects.create(
+            user=self.manager,
             project=self.project,
             role=ProjectPermission.ROLE_ATTENDANT,
         )
         SectorAuthorization.objects.create(
-            permission=manager_perm,
+            permission=self.manager_perm,
             sector=self.sector_a,
             role=SectorAuthorization.ROLE_MANAGER,
         )
+
+    def test_sector_manager_counts_in_service_globally_in_managed_queues(self):
         self._create_room(self.queue_a1)
         self._create_room(self.queue_a1, user=self.agent)
 
         result = self.service.get_counts(
             project_uuid=self.project.uuid,
-            requesting_permission=manager_perm,
+            requesting_permission=self.manager_perm,
         )
 
         flat = self._flatten(result)
         self.assertEqual(flat[str(self.queue_a1.uuid)]["queued"], 1)
+        # `self.agent` is a different user from `self.manager`, but the
+        # manager still sees the room as in_service because the count is
+        # global within the queues they manage.
         self.assertEqual(flat[str(self.queue_a1.uuid)]["in_service"], 1)
+
+    def test_sector_manager_only_sees_queues_from_managed_sectors(self):
+        self._create_room(self.queue_a1)
+        self._create_room(self.queue_b1)
+
+        result = self.service.get_counts(
+            project_uuid=self.project.uuid,
+            requesting_permission=self.manager_perm,
+        )
+
+        flat = self._flatten(result)
+        sector_names = [s["name"] for s in result["sectors"]]
+        self.assertEqual(sector_names, ["A Sector"])
+        self.assertEqual(
+            set(flat.keys()),
+            {str(self.queue_a1.uuid), str(self.queue_a2.uuid)},
+        )
+        self.assertNotIn(str(self.queue_b1.uuid), flat)

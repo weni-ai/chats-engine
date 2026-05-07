@@ -31,9 +31,12 @@ class RoomsCountByQueueService:
     `rooms_count/by_queue` endpoint, applying permission-aware filtering.
 
     Visibility rules:
-        - No `email` provided and requester is admin or sector manager:
-          every sector and queue of the project is included; counts are
-          global.
+        - No `email` provided and requester is admin: every sector and
+          queue of the project is included; counts are global.
+        - No `email` provided and requester is a sector manager: only
+          queues from sectors they manage are included; `rooms_in_progress`
+          counts every assigned room in those queues (global, not filtered
+          by the manager's user).
         - No `email` provided and requester is an agent: only authorized
           queues; `rooms_in_progress` only counts rooms assigned to the
           requester.
@@ -62,14 +65,23 @@ class RoomsCountByQueueService:
             target_email=target_email,
         )
 
-        is_manager_view = not has_target_email and (
+        # Only project admins see every queue of the project; sector
+        # managers are restricted to queues from sectors they manage
+        # (handled via `permission.queue_ids`).
+        show_all_project_queues = not has_target_email and permission.is_admin
+
+        # Both admins and sector managers count `in_service` globally
+        # across the queues they can see. Plain agents and email-targeted
+        # views only count rooms assigned to that user.
+        count_in_service_globally = not has_target_email and (
             permission.is_admin or permission.is_manager(any_sector=True)
         )
 
         queues_qs = self._build_queues_queryset(
             project_uuid=project_uuid,
             permission=permission,
-            is_manager_view=is_manager_view,
+            show_all_project_queues=show_all_project_queues,
+            count_in_service_globally=count_in_service_globally,
             in_service_user_filter=in_service_user_filter,
         )
 
@@ -101,14 +113,15 @@ class RoomsCountByQueueService:
         *,
         project_uuid: UUID,
         permission: ProjectPermission,
-        is_manager_view: bool,
+        show_all_project_queues: bool,
+        count_in_service_globally: bool,
         in_service_user_filter: Q,
     ) -> QuerySet[Queue]:
         queues_qs = Queue.objects.filter(
             sector__project__uuid=project_uuid,
             sector__is_deleted=False,
         )
-        if not is_manager_view:
+        if not show_all_project_queues:
             queues_qs = queues_qs.filter(uuid__in=permission.queue_ids)
 
         queued_filter = Q(
@@ -122,7 +135,7 @@ class RoomsCountByQueueService:
                 rooms__is_waiting=False,
                 rooms__user__isnull=False,
             )
-            if is_manager_view
+            if count_in_service_globally
             else Q(rooms__is_active=True, rooms__is_waiting=False)
             & in_service_user_filter
         )
