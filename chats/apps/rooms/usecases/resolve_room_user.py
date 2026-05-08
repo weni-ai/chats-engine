@@ -78,7 +78,8 @@ class ResolveRoomUserUseCase:
             return None
 
         logger.info(
-            "Calling start_queue_priority_routing for queue %s from ResolveRoomUserUseCase because the queue is not empty",
+            "Calling start_queue_priority_routing for queue %s from"
+            " ResolveRoomUserUseCase because the queue is not empty",
             self.queue.uuid,
         )
         start_queue_priority_routing(self.queue)
