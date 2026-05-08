@@ -856,6 +856,11 @@ ROUTE_QUEUE_COOLDOWN_FEATURE_FLAG_KEY = env.str(
     "ROUTE_QUEUE_COOLDOWN_FEATURE_FLAG_KEY",
     default="weniChatsRouteQueueCooldown",
 )
+
+NEW_GET_ROOM_USER_FEATURE_FLAG_KEY = env.str(
+    "CHATS_NEW_GET_ROOM_USER_FEATURE_FLAG_KEY",
+    default="weniChatsNewGetRoomUser",
+)
 ROUTE_QUEUE_COOLDOWN_MAX_TIME = env.int(
     "ROUTE_QUEUE_COOLDOWN_MAX_TIME",
     default=30,

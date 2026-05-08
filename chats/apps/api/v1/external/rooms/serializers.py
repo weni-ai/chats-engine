@@ -22,6 +22,7 @@ from chats.apps.queues.models import Queue
 from chats.apps.queues.usecases.can_agent_receive_room import (
     CanAgentReceiveRoomUseCase,
 )
+from chats.apps.rooms.usecases.resolve_room_user import ResolveRoomUserUseCase
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import close_room
@@ -90,6 +91,8 @@ def get_last_flow_start(
     return last_flow_start
 
 
+# TODO: Remove get_room_user once ResolveRoomUserUseCase is fully rolled out
+#  and the weniChatsNewGetRoomUser feature flag is removed.
 def get_room_user(
     contact: Contact,
     queue: Queue,
@@ -557,9 +560,20 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         last_flow_start = get_last_flow_start(contact, groups, project, flow_uuid)
 
-        validated_data["user"] = get_room_user(
-            contact, queue, user, created, project, last_flow_start
-        )
+        # TODO: Remove this feature flag check and the get_room_user fallback
+        #  once ResolveRoomUserUseCase is fully rolled out.
+        if is_feature_active(
+            settings.NEW_GET_ROOM_USER_FEATURE_FLAG_KEY,
+            None,
+            str(project.uuid),
+        ):
+            validated_data["user"] = ResolveRoomUserUseCase(queue, project).execute(
+                contact, user, created, last_flow_start
+            )
+        else:
+            validated_data["user"] = get_room_user(
+                contact, queue, user, created, project, last_flow_start
+            )
 
         has_room_after_flow_start = False
 
