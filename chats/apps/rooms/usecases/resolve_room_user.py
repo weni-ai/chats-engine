@@ -59,6 +59,9 @@ class ResolveRoomUserUseCase:
         ).count()
 
         if current_queue_size == 0:
+            # If the queue is empty, the available user with the least number
+            # of rooms will be selected, if any, subject to a last-moment
+            # capacity recheck to close the race with concurrent assignments.
             agent = self.queue.get_available_agent()
             if agent is None:
                 return None
@@ -74,6 +77,9 @@ class ResolveRoomUserUseCase:
             if capacity.can_receive:
                 return agent
 
+            # Agent was picked but failed the recheck: leave the room in the
+            # queue and trigger routing so it is retried on the next
+            # opportunity.
             start_queue_priority_routing(self.queue)
             return None
 
@@ -84,12 +90,18 @@ class ResolveRoomUserUseCase:
         )
         start_queue_priority_routing(self.queue)
 
+        # If the queue is not empty, the room must stay in the queue, so that
+        # when an agent becomes available, the first room in the queue will be
+        # assigned to them. This logic is not done here.
         return None
 
     def _resolve_general(self) -> Optional["User"]:
         if self.queue.rooms.filter(is_active=True, user__isnull=True).exists():
             return None
 
+        # General room routing type. The last-moment capacity recheck is
+        # applied as well; if the picked agent fails it, the room stays
+        # unassigned.
         agent = self.queue.get_available_agent()
         if agent is None:
             return None
