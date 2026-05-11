@@ -26,12 +26,12 @@ class ProjectSerializer(serializers.ModelSerializer):
             "config",
             "org",
             "room_routing_type",
-            "is_copilot_active",
+            "is_chats_summary_enabled",
         ]
         read_only_fields = [
             "timezone",
             "room_routing_type",
-            "is_copilot_active",
+            "is_chats_summary_enabled",
         ]
 
     def get_config(self, project: Project):

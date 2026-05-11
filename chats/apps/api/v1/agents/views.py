@@ -124,8 +124,7 @@ class AllAgentsView(generics.ListAPIView):
                 is_deleted=False,
             )
             .filter(
-                Q(role=ProjectPermission.ROLE_ATTENDANT)
-                | Exists(has_active_queue_auth)
+                Q(role=ProjectPermission.ROLE_ATTENDANT) | Exists(has_active_queue_auth)
             )
             .select_related("user")
             .prefetch_related(
@@ -155,7 +154,7 @@ class AgentQueuePermissionsView(APIView):
         project — UUID of the project
     """
 
-    permission_classes = [IsAuthenticated, AnySectorManagerPermission]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
         agent_email = request.query_params.get("agent")

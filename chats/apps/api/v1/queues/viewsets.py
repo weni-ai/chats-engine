@@ -29,6 +29,7 @@ from chats.apps.projects.models.models import Project, ProjectPermission
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.queues.usecases.bulk_queue_creation import BulkQueueCreationUseCase
+from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorGroupSector
 from chats.apps.sectors.usecases.group_sector_authorization import (
     QueueGroupSectorAuthorizationCreationUseCase,
@@ -124,7 +125,10 @@ class QueueViewset(ModelViewSet):
                 "project_uuid": str(instance.sector.project.uuid),
             }
             response = FlowRESTClient().create_queue(**content)
-            if response.status_code not in [status.HTTP_200_OK, status.HTTP_201_CREATED]:
+            if response.status_code not in [
+                status.HTTP_200_OK,
+                status.HTTP_201_CREATED,
+            ]:
                 instance.delete()
                 raise exceptions.APIException(
                     detail=f"[{response.status_code}] Error posting the queue on flows. Exception: {response.content}"
