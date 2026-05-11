@@ -268,15 +268,12 @@ class Project(BaseConfigurableModel, BaseModel):
         Checks if the chat summary feature is enabled for this project.
 
         The feature is enabled if:
-        1. `settings.AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS` is True, or
-        2. The project-specific configuration "has_chats_summary" is True.
+        1. `Project.is_chats_summary_enabled` is True, or
 
         Returns:
             bool: True if chat summary is enabled, False otherwise.
         """
-        return settings.AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS or self.get_config(
-            "has_chats_summary", False
-        )
+        return self.is_chats_summary_enabled
 
     def is_admin(self, user):
         return self.permissions.filter(
