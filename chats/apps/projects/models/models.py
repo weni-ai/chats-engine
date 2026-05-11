@@ -100,6 +100,11 @@ class Project(BaseConfigurableModel, BaseModel):
             "Whether to route rooms using the queue priority or general routing"
         ),
     )
+    is_chats_summary_enabled = models.BooleanField(
+        _("Is chats summary enabled?"),
+        default=True,
+        help_text=_("Whether to enable the chats summary feature for this project"),
+    )
 
     class Meta:
         verbose_name = _("Project")
