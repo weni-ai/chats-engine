@@ -91,3 +91,41 @@ class TestListChannels(TestCase):
 
         called_params = mock_get.call_args.kwargs["params"]
         self.assertNotIn("exclude_wpp_demo", called_params)
+
+    @patch("chats.apps.api.v1.internal.rest_clients.connect_rest_client.requests.get")
+    def test_list_channels_with_additional_query_params(self, mock_get, _mock_token):
+        mock_get.return_value = MagicMock(status_code=200)
+
+        response = self.client_rest.list_channels(
+            project_uuid=self.project_uuid,
+            channel_type="whatsapp",
+            is_active=True,
+            name="my-channel",
+        )
+
+        mock_get.assert_called_once_with(
+            url=f"{CONNECT_BASE_URL}/v2/projects/channels",
+            headers=self.client_rest.headers,
+            params={
+                "project_uuid": str(self.project_uuid),
+                "channel_type": "whatsapp",
+                "is_active": True,
+                "name": "my-channel",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+
+    @patch("chats.apps.api.v1.internal.rest_clients.connect_rest_client.requests.get")
+    def test_list_channels_omits_none_kwargs(self, mock_get, _mock_token):
+        mock_get.return_value = MagicMock(status_code=200)
+
+        self.client_rest.list_channels(
+            project_uuid=self.project_uuid,
+            channel_type="whatsapp",
+            is_active=None,
+            name="my-channel",
+        )
+
+        called_params = mock_get.call_args.kwargs["params"]
+        self.assertNotIn("is_active", called_params)
+        self.assertIn("name", called_params)
