@@ -1,14 +1,16 @@
+from django.contrib.postgres.operations import AddIndexConcurrently
 from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
+    atomic = False
 
     dependencies = [
         ("contacts", "0012_contact_document"),
     ]
 
     operations = [
-        migrations.AddIndex(
+        AddIndexConcurrently(
             model_name="contact",
             index=models.Index(
                 condition=models.Q(("document__isnull", False)),
@@ -16,7 +18,7 @@ class Migration(migrations.Migration):
                 name="contact_document_idx",
             ),
         ),
-        migrations.AddIndex(
+        AddIndexConcurrently(
             model_name="contact",
             index=models.Index(
                 condition=models.Q(("email__isnull", False)),
