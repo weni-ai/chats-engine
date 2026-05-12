@@ -21,6 +21,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
+from chats.apps.accounts.models import User
+from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.agents.filters import AllAgentsFilter
 from chats.apps.api.v1.agents.serializers import (
     AgentQueuePermissionsSerializer,
@@ -273,6 +275,47 @@ class UpdateQueuePermissionsView(APIView):
                     )
 
         return Response(status=status.HTTP_200_OK)
+
+
+# ---------------------------------------------------------------------------
+# GET /v1/project/{project_uuid}/agents/
+# ---------------------------------------------------------------------------
+
+
+class ProjectAgentsListView(generics.ListAPIView):
+    """
+    Lists all agents of a project eligible to appear in filters.
+
+    Returns one entry per user (no duplicates) for:
+      - Attendants (role=2), regardless of queue assignment
+      - Any role with at least one active queue authorization (e.g. admins in a queue)
+    """
+
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserSerializer
+
+    def get_queryset(self):
+        project = get_object_or_404(Project, uuid=self.kwargs["project_uuid"])
+        _get_manager_permission(self.request, project)
+
+        has_active_queue_auth = QueueAuthorization.objects.filter(
+            permission=OuterRef("pk"),
+            queue__is_deleted=False,
+            queue__sector__is_deleted=False,
+        )
+
+        user_ids = (
+            ProjectPermission.objects.filter(
+                project=project,
+                is_deleted=False,
+            )
+            .filter(
+                Q(role=ProjectPermission.ROLE_ATTENDANT) | Exists(has_active_queue_auth)
+            )
+            .values_list("user_id", flat=True)
+        )
+
+        return User.objects.filter(id__in=user_ids).order_by("first_name", "last_name")
 
 
 # ---------------------------------------------------------------------------
