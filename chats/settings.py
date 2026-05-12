@@ -819,3 +819,6 @@ META_GRAPH_API_BASE_HOST_URL = env.str(
     "META_GRAPH_API_BASE_HOST_URL", default="https://graph.facebook.com"
 )
 WHATSAPP_API_ACCESS_TOKEN = env.str("WHATSAPP_API_ACCESS_TOKEN", default="")
+
+# Flows Templates
+FLOWS_TEMPLATES_MAX_PAGES = env.int("FLOWS_TEMPLATES_MAX_PAGES", default=10)
