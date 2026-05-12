@@ -2,6 +2,7 @@ import logging
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db.models.functions import Lower
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
@@ -446,7 +447,14 @@ class QueueViewset(ModelViewSet):
 
 class QueueAuthorizationViewset(ModelViewSet):
     swagger_tag = "Queues"
-    queryset = QueueAuthorization.objects.all()
+    queryset = (
+        QueueAuthorization.objects.all()
+        .select_related("permission__user")
+        .order_by(
+            Lower("permission__user__first_name"),
+            Lower("permission__user__last_name"),
+        )
+    )
     serializer_class = queue_serializers.QueueAuthorizationSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_class = QueueAuthorizationFilter
