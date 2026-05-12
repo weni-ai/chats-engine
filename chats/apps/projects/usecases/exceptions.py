@@ -28,3 +28,7 @@ class InvalidFeatureVersion(Exception):
 
 class FlowTemplateNotFound(Exception):
     pass
+
+
+class FlowTemplateChannelsNotFound(Exception):
+    pass

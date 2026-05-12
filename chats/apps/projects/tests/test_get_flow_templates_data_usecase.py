@@ -6,7 +6,10 @@ from django.test import TestCase
 
 from chats.apps.projects.models import Project
 from chats.apps.projects.dataclass import FlowTemplatesData
-from chats.apps.projects.usecases.exceptions import FlowTemplateNotFound
+from chats.apps.projects.usecases.exceptions import (
+    FlowTemplateChannelsNotFound,
+    FlowTemplateNotFound,
+)
 from chats.apps.projects.usecases.flow_templates import GetFlowTemplatesDataUseCase
 
 
@@ -131,7 +134,6 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
 
         self.assertEqual(result, FlowTemplatesData(uuid=self.flow_uuid, templates=[]))
         self.mock_flows_templates_usecase.execute.assert_not_called()
-        self.mock_channels_usecase.execute.assert_not_called()
         self.mock_meta_client.get_templates_list.assert_not_called()
 
     def test_flow_with_single_template_returns_meta_data(self):
@@ -385,3 +387,15 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
         result = self.use_case._extract_templates_from_definition(definition)
 
         self.assertEqual(result, [])
+
+    def test_no_template_channels_found_raises_exception(self):
+        definition = self._make_definition_with_template(
+            self.template_uuid, self.template_name
+        )
+        self.mock_flows_client.retrieve_flow_definitions.return_value = definition
+
+        self.mock_flows_templates_usecase.execute.return_value = None
+        self.mock_channels_usecase.execute.return_value = []
+
+        with self.assertRaises(FlowTemplateChannelsNotFound):
+            self.use_case.execute(flow_uuid=self.flow_uuid)

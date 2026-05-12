@@ -10,7 +10,10 @@ from chats.apps.projects.dataclass import (
     FlowTemplatesData,
 )
 from chats.apps.projects.models import Project
-from chats.apps.projects.usecases.exceptions import FlowTemplateNotFound
+from chats.apps.projects.usecases.exceptions import (
+    FlowTemplateChannelsNotFound,
+    FlowTemplateNotFound,
+)
 from chats.apps.projects.usecases.flows_templates import FlowsTemplatesUseCase
 from chats.apps.projects.usecases.get_project_channels_info import (
     GetProjectChannelsInfoUseCase,
@@ -59,42 +62,33 @@ class GetFlowTemplatesDataUseCase:
 
         return templates_info
 
-    def _get_template_channels(self, templates_info):
+    def _get_template_channels(self, template_info):
+        template = self.flows_templates_usecase.execute(
+            name=template_info["name"], uuid=template_info["uuid"]
+        )
+        if not template:
+            return []
+
         channels = []
-
-        for template_info in templates_info:
-            template = self.flows_templates_usecase.execute(
-                name=template_info["name"], uuid=template_info["uuid"]
-            )
-            if not template:
-                continue
-
-            for translation in template.get("translations", []):
-                channel = translation.get("channel")
-                if channel and channel.get("uuid"):
-                    channels.append(
-                        FlowTemplateChannel(
-                            uuid=channel["uuid"],
-                            name=channel.get("name", ""),
-                            template_name=template_info["name"],
-                        )
+        for translation in template.get("translations", []):
+            channel = translation.get("channel")
+            if channel and channel.get("uuid"):
+                channels.append(
+                    FlowTemplateChannel(
+                        uuid=channel["uuid"],
+                        name=channel.get("name", ""),
+                        template_name=template_info["name"],
                     )
+                )
 
         return channels
 
-    def _resolve_waba_ids(self, template_channels, project_channels):
-        channel_map = {
-            ch["uuid"]: ch.get("config", {}).get("wa_waba_id")
-            for ch in project_channels
-        }
-
-        waba_pairs = set()
+    def _resolve_waba_id(self, template_channels, project_channels_map):
         for template_channel in template_channels:
-            waba_id = channel_map.get(template_channel.uuid)
+            waba_id = project_channels_map.get(template_channel.uuid)
             if waba_id:
-                waba_pairs.add((waba_id, template_channel.template_name))
-
-        return waba_pairs
+                return waba_id
+        return None
 
     def _fetch_meta_template(self, waba_id, template_name):
         response = self.meta_client.get_templates_list(
@@ -124,17 +118,38 @@ class GetFlowTemplatesDataUseCase:
         if not templates_info:
             return FlowTemplatesData(uuid=flow_uuid, templates=[])
 
-        template_channels = self._get_template_channels(templates_info)
-
-        if not template_channels:
-            return FlowTemplatesData(uuid=flow_uuid, templates=[])
-
         project_channels = self.channels_usecase.execute()
-        waba_pairs = self._resolve_waba_ids(template_channels, project_channels)
+        project_channels_map = {
+            ch["uuid"]: ch.get("config", {}).get("wa_waba_id")
+            for ch in project_channels
+        }
 
         flow_templates = []
-        for waba_id, template_name in waba_pairs:
-            meta_template = self._fetch_meta_template(waba_id, template_name)
+        fetched_waba_template_pairs = set()
+
+        for template_info in templates_info:
+            template_channels = self._get_template_channels(template_info)
+
+            if not template_channels:
+                raise FlowTemplateChannelsNotFound(
+                    f"No channels found for template '{template_info['name']}' "
+                    f"in flow '{flow_uuid}'"
+                )
+
+            waba_id = self._resolve_waba_id(
+                template_channels, project_channels_map
+            )
+            if not waba_id:
+                continue
+
+            pair = (waba_id, template_info["name"])
+            if pair in fetched_waba_template_pairs:
+                continue
+            fetched_waba_template_pairs.add(pair)
+
+            meta_template = self._fetch_meta_template(
+                waba_id, template_info["name"]
+            )
             flow_templates.append(
                 FlowTemplate(
                     id=meta_template["id"],
