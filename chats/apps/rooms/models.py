@@ -732,6 +732,8 @@ class Room(BaseModel, BaseConfigurableModel):
         """
         Adds a transfer to the full transfer history.
         """
+        if self.full_transfer_history is None:
+            self.full_transfer_history = []
         self.full_transfer_history.append(transfer)
         self.transfer_history = transfer  # legacy
         self.save(update_fields=["full_transfer_history", "transfer_history"])

@@ -1,5 +1,6 @@
 import uuid
 
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -10,12 +11,15 @@ from chats.utils.websockets import send_channels_group
 
 class WebSocketsNotifiableMixin:
     @property
-    def serialized_ws_data(self) -> dict: ...
+    def serialized_ws_data(self) -> dict:
+        ...
 
     @property
-    def notification_groups(self) -> list: ...
+    def notification_groups(self) -> list:
+        ...
 
-    def get_action(self, action: str) -> str: ...
+    def get_action(self, action: str) -> str:
+        ...
 
     def notify(self, action: str, groups: list = [], content: dict = {}) -> None:
         if "." not in action:
@@ -43,7 +47,7 @@ class BaseModel(models.Model):
 
     @property
     def edited(self) -> bool:
-        return bool(self.modified_by)
+        return hasattr(self, "modified_by") and bool(self.modified_by)
 
 
 class BaseModelWithManualCreatedOn(BaseModel):
@@ -100,6 +104,55 @@ class BaseConfigurableModel(models.Model):
 class BaseIntegrationConfigurableModel(models.Model):
     integration_config = models.JSONField(
         _("config to use in project integration"), blank=True, null=True, default=dict
+    )
+
+    class Meta:
+        abstract = True
+
+
+class AuditableMixin(models.Model):
+    """
+    Adds ``created_by`` / ``modified_by`` / ``deleted_by`` columns to a model.
+
+    Populating these fields is the caller's responsibility:
+      - API paths go through ``AuditableModelSerializer`` in
+        ``chats.core.serializers``, which gates the fields on the audit
+        feature flag.
+      - Direct-save paths (viewset ``perform_destroy`` or custom actions
+        that mutate the instance without a serializer) should use
+        ``apply_audit_fields`` from ``chats.core.audit``.
+
+    The mixin itself does not check the feature flag — it only declares the
+    columns. Whoever sets the attributes is the one that decides whether to
+    record audit data.
+    """
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="+",
+        on_delete=models.SET_NULL,
+        verbose_name=_("Created by"),
+    )
+    modified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="+",
+        on_delete=models.SET_NULL,
+        verbose_name=_("Modified by"),
+    )
+    deleted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="+",
+        on_delete=models.SET_NULL,
+        verbose_name=_("Deleted by"),
     )
 
     class Meta:

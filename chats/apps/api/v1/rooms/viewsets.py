@@ -6,6 +6,7 @@ from django.db import transaction
 from django.db.models import (
     BooleanField,
     Case,
+    Count,
     DateTimeField,
     Exists,
     OuterRef,
@@ -62,6 +63,9 @@ from chats.apps.api.v1.rooms.serializers import (
     RoomInfoSerializer,
     RoomMessageStatusSerializer,
     RoomNoteSerializer,
+    RoomsCountByQueueQueryParamsSerializer,
+    RoomsCountByQueueResponseSerializer,
+    RoomsCountQueryParamsSerializer,
     RoomSerializer,
     RoomsReportSerializer,
     RoomTagSerializer,
@@ -70,10 +74,13 @@ from chats.apps.api.v1.rooms.serializers import (
 from chats.apps.api.v1.rooms.services.bulk_close_service import BulkCloseService
 from chats.apps.api.v1.rooms.services.bulk_take_service import BulkTakeService
 from chats.apps.api.v1.rooms.services.bulk_transfer_service import BulkTransferService
+from chats.apps.api.v1.rooms.services.rooms_count_by_queue_service import (
+    RoomsCountByQueueService,
+)
 from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
 from chats.apps.msgs.models import Message
-from chats.apps.projects.models.models import Project
+from chats.apps.projects.models.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.choices import RoomFeedbackMethods
@@ -93,6 +100,7 @@ from chats.apps.rooms.views import (
     update_flows_custom_fields,
 )
 from chats.apps.sectors.models import SectorTag
+from chats.core.permissions import GetPermission
 
 logger = logging.getLogger(__name__)
 
@@ -477,16 +485,24 @@ class RoomViewset(
             action = "transfer" if self.request.user.email != user else "pick"
             feedback = create_transfer_json(
                 action=action,
-                from_=old_instance.user or old_instance.queue,
+                from_=old_user or old_instance.queue,
                 to=instance.user,
                 requested_by=self.request.user,
             )
+
+            create_room_feedback_message(
+                instance,
+                feedback,
+                method=RoomFeedbackMethods.ROOM_TRANSFER,
+                requested_by=self.request.user,
+            )
+            instance.add_transfer_to_history(feedback)
 
         if queue:
             # Create constraint to make queue not none
             feedback = create_transfer_json(
                 action="transfer",
-                from_=old_instance.user or old_instance.queue,
+                from_=old_user or old_instance.queue,
                 to=instance.queue,
                 requested_by=self.request.user,
             )
@@ -501,17 +517,16 @@ class RoomViewset(
             room_metric.transfer_count += 1
             room_metric.save()
 
-        instance.save()
-        instance.add_transfer_to_history(feedback)
+            create_room_feedback_message(
+                instance,
+                feedback,
+                method=RoomFeedbackMethods.ROOM_TRANSFER,
+                requested_by=self.request.user,
+            )
 
-        # Create a message with the transfer data and Send to the room group
-        # TODO separate create message in a function
-        create_room_feedback_message(
-            instance,
-            feedback,
-            method=RoomFeedbackMethods.ROOM_TRANSFER,
-            requested_by=self.request.user,
-        )
+            instance.add_transfer_to_history(feedback)
+
+        instance.save()
 
         if old_user is None and user:  # queued > agent
             instance.notify_queue("update")
@@ -734,7 +749,9 @@ class RoomViewset(
             )
 
             for room_uuid in skipped_rooms:
-                result.add_failure(room_uuid, f"Room {room_uuid}: not found or not active")
+                result.add_failure(
+                    room_uuid, f"Room {room_uuid}: not found or not active"
+                )
 
             logger.info(
                 f"Bulk transfer completed by {request.user.email}: "
@@ -785,9 +802,7 @@ class RoomViewset(
         url_name="bulk_take",
     )
     def bulk_take(self, request, pk=None):
-        serializer = BulkTakeSerializer(
-            data=request.data, context={"request": request}
-        )
+        serializer = BulkTakeSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
 
         rooms = serializer.validated_data["rooms"]
@@ -798,7 +813,10 @@ class RoomViewset(
             result = service.take(rooms=rooms, user=request.user)
 
             for room_uuid in skipped_rooms:
-                result.add_failure(room_uuid, f"Room {room_uuid}: not found, not active, or already assigned")
+                result.add_failure(
+                    room_uuid,
+                    f"Room {room_uuid}: not found, not active, or already assigned",
+                )
 
             logger.info(
                 f"Bulk take completed by {request.user.email}: "
@@ -883,8 +901,7 @@ class RoomViewset(
         }
         """
         serializer = BulkCloseSerializer(
-            data=request.data,
-            context={"request": request}
+            data=request.data, context={"request": request}
         )
         serializer.is_valid(raise_exception=True)
 
@@ -901,19 +918,16 @@ class RoomViewset(
         }
 
         # Fetch active rooms with optimized query
-        rooms = Room.objects.filter(
-            uuid__in=room_uuids,
-            is_active=True
-        ).select_related(
-            "queue__sector__project",
-            "user",
-            "closed_by"
-        ).prefetch_related("tags")
+        rooms = (
+            Room.objects.filter(uuid__in=room_uuids, is_active=True)
+            .select_related("queue__sector__project", "user", "closed_by")
+            .prefetch_related("tags")
+        )
 
         if not rooms.exists():
             return Response(
                 {"error": "No active rooms found with the provided UUIDs"},
-                status=status.HTTP_404_NOT_FOUND
+                status=status.HTTP_404_NOT_FOUND,
             )
 
         # Initialize service and close rooms
@@ -924,7 +938,7 @@ class RoomViewset(
                 rooms=rooms,
                 room_tags_map=room_tags_map,
                 end_by=end_by,
-                closed_by=closed_by
+                closed_by=closed_by,
             )
 
             logger.info(
@@ -949,7 +963,7 @@ class RoomViewset(
             response_data = {
                 "success": result.success_count > 0,
                 "message": message,
-                **result.to_dict()
+                **result.to_dict(),
             }
 
             return Response(response_data, status=response_status)
@@ -957,7 +971,7 @@ class RoomViewset(
         except Exception as e:
             logger.error(
                 f"Bulk close error for user {request.user.email}: {str(e)}",
-                exc_info=True
+                exc_info=True,
             )
             event_id = capture_exception(e)
             return Response(
@@ -966,9 +980,9 @@ class RoomViewset(
                     "error": f"Failed to close rooms. Event ID: {event_id}",
                     "success_count": 0,
                     "failed_count": 0,
-                    "total_processed": 0
+                    "total_processed": 0,
                 },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     @action(detail=False, methods=["get"], url_path="human-service-count")
@@ -1042,11 +1056,23 @@ class RoomViewset(
         """
         room = self.get_object()
 
-        history_summary = (
-            HistorySummary.objects.filter(room=room).order_by("created_on").last()
+        history_summaries = HistorySummary.objects.filter(room=room).order_by(
+            "modified_on"
         )
 
-        if not history_summary:
+        if pending_or_processing_history_summary := history_summaries.filter(
+            status__in=[HistorySummaryStatus.PENDING, HistorySummaryStatus.PROCESSING]
+        ).last():
+            serializer = RoomHistorySummarySerializer(
+                pending_or_processing_history_summary, context={"request": request}
+            )
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        done_history_summary = history_summaries.filter(
+            status=HistorySummaryStatus.DONE, summary__gt=""
+        ).last()
+
+        if not done_history_summary:
             return Response(
                 {
                     "status": HistorySummaryStatus.UNAVAILABLE,
@@ -1057,7 +1083,7 @@ class RoomViewset(
             )
 
         serializer = RoomHistorySummarySerializer(
-            history_summary, context={"request": request}
+            done_history_summary, context={"request": request}
         )
 
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -1412,3 +1438,119 @@ class RoomNoteViewSet(
         note.notify_websocket("delete")
 
         return super().destroy(request, *args, **kwargs)
+
+
+class RoomsCountView(APIView):
+    """
+    Return active room counts for a given sector or queue.
+
+    Query params (exactly one is required):
+        - sector: Sector UUID
+        - queue: Queue UUID
+
+    Response: {"waiting": N, "in_service": M}
+        - waiting: active rooms with no agent assigned
+        - in_service: active rooms assigned to an agent
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request: Request, *args, **kwargs) -> Response:
+        params = RoomsCountQueryParamsSerializer(data=request.query_params)
+        params.is_valid(raise_exception=True)
+
+        sector = params.validated_data.get("sector")
+        queue = params.validated_data.get("queue")
+
+        queryset = Room.objects.filter(is_active=True)
+        if queue:
+            queryset = queryset.filter(queue=queue)
+        else:
+            queryset = queryset.filter(queue__sector=sector)
+
+        counts = queryset.aggregate(
+            waiting=Count("pk", filter=Q(user__isnull=True)),
+            in_service=Count("pk", filter=Q(user__isnull=False)),
+        )
+
+        return Response(counts, status=status.HTTP_200_OK)
+
+
+class RoomsCountByQueueView(APIView):
+    """
+    Return active room counts grouped by sector and queue for a project.
+
+    Query params:
+        - project: Project UUID (required)
+
+    Response shape:
+        {
+            "sectors": [
+                {
+                    "name": "Sector name",
+                    "queues": [
+                        {
+                            "uuid": "<queue uuid>",
+                            "name": "Queue name",
+                            "rooms_in_awaiting": <int>,
+                            "rooms_in_progress": <int>
+                        }
+                    ]
+                }
+            ]
+        }
+
+    Access:
+        Any user with a ProjectPermission on the project may call this
+        endpoint. The visibility of sectors, queues and counts depends
+        on the role (see `RoomsCountByQueueService` for the rules).
+
+    View-mode (optional `email` query param):
+        When provided, queue visibility follows the target user's
+        authorizations and `rooms_in_progress` always counts only rooms
+        assigned to the target user, regardless of the target's role
+        (admin, manager, or agent). When omitted, the requester's role
+        is used (managers/admins see global counts; agents see only
+        their own).
+
+    A "queued" room is an active room without an assigned agent that has
+    already left the flow start phase (`is_active=True, user__isnull=True,
+    is_waiting=False`). An "in service" room is an active room with an
+    assigned agent (`is_active=True, user__isnull=False, is_waiting=False`).
+    """
+
+    permission_classes = [IsAuthenticated, api_permissions.ProjectAccessPermission]
+
+    def get(self, request: Request, *args, **kwargs) -> Response:
+        params = RoomsCountByQueueQueryParamsSerializer(data=request.query_params)
+        params.is_valid(raise_exception=True)
+
+        project_uuid = params.validated_data["project"]
+
+        if not is_feature_active(
+            settings.ROOMS_COUNT_BY_QUEUE_FEATURE_FLAG_KEY,
+            request.user.email,
+            str(project_uuid),
+        ):
+            raise NotFound()
+
+        # Reuse the permission resolved by ProjectAccessPermission to avoid
+        # a second lookup on the same (user, project) pair.
+        requesting_permission = (
+            getattr(request, "_cached_project_permission", None)
+            or GetPermission(request).permission
+        )
+
+        try:
+            result = RoomsCountByQueueService().get_counts(
+                project_uuid=project_uuid,
+                requesting_permission=requesting_permission,
+                target_email=params.validated_data.get("email") or None,
+            )
+        except ProjectPermission.DoesNotExist:
+            raise NotFound("Target user has no permission on this project.")
+
+        return Response(
+            RoomsCountByQueueResponseSerializer(result).data,
+            status=status.HTTP_200_OK,
+        )
