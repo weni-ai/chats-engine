@@ -12,6 +12,9 @@ from chats.apps.rooms.exceptions import (
 )
 
 
+CLIENT_PATH = "chats.apps.api.v1.internal.rest_clients.flows_rest_client"
+
+
 def _build_response(status_code: int, payload=None, raise_on_json: bool = False):
     response = MagicMock()
     response.status_code = status_code
@@ -23,20 +26,20 @@ def _build_response(status_code: int, payload=None, raise_on_json: bool = False)
     return response
 
 
+def _build_project(token: str = "project-token"):
+    project = MagicMock()
+    project.flows_authorization = token
+    return project
+
+
 @override_settings(FLOWS_API_URL="https://flows.test")
 class GetTicketerBySectorTests(TestCase):
     def setUp(self):
-        patcher = patch.object(
-            FlowRESTClient, "headers", new={"Authorization": "Bearer test"}
-        )
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        self.project = _build_project()
 
-    @patch(
-        "chats.apps.api.v1.internal.rest_clients.flows_rest_client.requests.get"
-    )
-    def test_returns_uuid_from_first_result(self, mock_get):
-        mock_get.return_value = _build_response(
+    @patch(f"{CLIENT_PATH}.retry_request_and_refresh_flows_auth_token")
+    def test_returns_uuid_from_first_result(self, mock_retry):
+        mock_retry.return_value = _build_response(
             200,
             {
                 "results": [
@@ -48,143 +51,121 @@ class GetTicketerBySectorTests(TestCase):
 
         client = FlowRESTClient()
 
-        result = client.get_ticketer_by_sector("sector-uuid")
+        result = client.get_ticketer_by_sector(self.project, "sector-uuid")
 
         self.assertEqual(result, "ticketer-uuid-1")
+        call_kwargs = mock_retry.call_args.kwargs
+        self.assertEqual(call_kwargs["project"], self.project)
+        self.assertEqual(call_kwargs["request_method"], requests.get)
         self.assertEqual(
-            mock_get.call_args.args[0],
+            call_kwargs["url"],
             "https://flows.test/api/v2/ticketers.json",
         )
+        self.assertEqual(call_kwargs["params"], {"sector_uuid": "sector-uuid"})
         self.assertEqual(
-            mock_get.call_args.kwargs["params"],
-            {"sector_uuid": "sector-uuid"},
-        )
-        self.assertIn("Authorization", mock_get.call_args.kwargs["headers"])
-        self.assertEqual(
-            mock_get.call_args.kwargs["headers"]["Accept"],
-            "application/json",
+            call_kwargs["headers"]["Authorization"], "Token project-token"
         )
 
-    @patch(
-        "chats.apps.api.v1.internal.rest_clients.flows_rest_client.requests.get"
-    )
-    def test_raises_when_results_are_empty(self, mock_get):
-        mock_get.return_value = _build_response(200, {"results": []})
+    @patch(f"{CLIENT_PATH}.retry_request_and_refresh_flows_auth_token")
+    def test_raises_when_results_are_empty(self, mock_retry):
+        mock_retry.return_value = _build_response(200, {"results": []})
 
         client = FlowRESTClient()
 
         with self.assertRaises(FlowsTicketerNotFoundError):
-            client.get_ticketer_by_sector("sector-uuid")
+            client.get_ticketer_by_sector(self.project, "sector-uuid")
 
-    @patch(
-        "chats.apps.api.v1.internal.rest_clients.flows_rest_client.requests.get"
-    )
-    def test_raises_on_non_200_status(self, mock_get):
-        mock_get.return_value = _build_response(500, {"detail": "boom"})
+    @patch(f"{CLIENT_PATH}.retry_request_and_refresh_flows_auth_token")
+    def test_raises_on_non_200_status(self, mock_retry):
+        mock_retry.return_value = _build_response(500, {"detail": "boom"})
 
         client = FlowRESTClient()
 
         with self.assertRaises(FlowsTicketerNotFoundError):
-            client.get_ticketer_by_sector("sector-uuid")
+            client.get_ticketer_by_sector(self.project, "sector-uuid")
 
-    @patch(
-        "chats.apps.api.v1.internal.rest_clients.flows_rest_client.requests.get"
-    )
-    def test_raises_on_invalid_json(self, mock_get):
-        mock_get.return_value = _build_response(200, raise_on_json=True)
+    @patch(f"{CLIENT_PATH}.retry_request_and_refresh_flows_auth_token")
+    def test_raises_on_invalid_json(self, mock_retry):
+        mock_retry.return_value = _build_response(200, raise_on_json=True)
 
         client = FlowRESTClient()
 
         with self.assertRaises(FlowsTicketerNotFoundError):
-            client.get_ticketer_by_sector("sector-uuid")
+            client.get_ticketer_by_sector(self.project, "sector-uuid")
 
-    @patch(
-        "chats.apps.api.v1.internal.rest_clients.flows_rest_client.requests.get"
-    )
-    def test_raises_on_request_exception(self, mock_get):
-        mock_get.side_effect = requests.ConnectionError("network down")
+    @patch(f"{CLIENT_PATH}.retry_request_and_refresh_flows_auth_token")
+    def test_raises_on_request_exception(self, mock_retry):
+        mock_retry.side_effect = requests.ConnectionError("network down")
 
         client = FlowRESTClient()
 
         with self.assertRaises(FlowsTicketerNotFoundError):
-            client.get_ticketer_by_sector("sector-uuid")
+            client.get_ticketer_by_sector(self.project, "sector-uuid")
 
-    @patch(
-        "chats.apps.api.v1.internal.rest_clients.flows_rest_client.requests.get"
-    )
-    def test_raises_when_first_result_has_no_uuid(self, mock_get):
-        mock_get.return_value = _build_response(
+    @patch(f"{CLIENT_PATH}.retry_request_and_refresh_flows_auth_token")
+    def test_raises_when_first_result_has_no_uuid(self, mock_retry):
+        mock_retry.return_value = _build_response(
             200, {"results": [{"name": "T1"}]}
         )
 
         client = FlowRESTClient()
 
         with self.assertRaises(FlowsTicketerNotFoundError):
-            client.get_ticketer_by_sector("sector-uuid")
+            client.get_ticketer_by_sector(self.project, "sector-uuid")
 
 
 @override_settings(FLOWS_API_URL="https://flows.test")
 class ChangeTicketerTests(TestCase):
     def setUp(self):
-        patcher = patch.object(
-            FlowRESTClient, "headers", new={"Authorization": "Bearer test"}
-        )
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        self.project = _build_project()
 
-    @patch(
-        "chats.apps.api.v1.internal.rest_clients.flows_rest_client."
-        "get_request_session_with_retries"
-    )
-    def test_posts_change_ticketer_payload(self, mock_session_factory):
-        session = MagicMock()
-        session.post.return_value = _build_response(200, {})
-        mock_session_factory.return_value = session
+    @patch(f"{CLIENT_PATH}.retry_request_and_refresh_flows_auth_token")
+    def test_posts_change_ticketer_payload(self, mock_retry):
+        mock_retry.return_value = _build_response(200, {})
 
         client = FlowRESTClient()
 
         client.change_ticketer(
+            project=self.project,
             ticket_uuids=["ticket-1", "ticket-2"],
             ticketer_uuid="ticketer-1",
         )
 
-        url = session.post.call_args.args[0]
-        self.assertEqual(url, "https://flows.test/api/v2/ticket_actions.json")
-        body_kwarg = session.post.call_args.kwargs["data"]
-        self.assertIn('"action": "change_ticketer"', body_kwarg)
-        self.assertIn('"ticketer": "ticketer-1"', body_kwarg)
-        self.assertIn('"ticket-1"', body_kwarg)
-        self.assertIn('"ticket-2"', body_kwarg)
-        headers = session.post.call_args.kwargs["headers"]
-        self.assertEqual(headers["Accept"], "application/json")
-        self.assertIn("Authorization", headers)
+        call_kwargs = mock_retry.call_args.kwargs
+        self.assertEqual(call_kwargs["project"], self.project)
+        self.assertEqual(call_kwargs["request_method"], requests.post)
+        self.assertEqual(
+            call_kwargs["url"],
+            "https://flows.test/api/v2/ticket_actions.json",
+        )
+        self.assertEqual(
+            call_kwargs["json"],
+            {
+                "tickets": ["ticket-1", "ticket-2"],
+                "action": "change_ticketer",
+                "ticketer": "ticketer-1",
+            },
+        )
+        self.assertEqual(
+            call_kwargs["headers"]["Authorization"], "Token project-token"
+        )
 
-    @patch(
-        "chats.apps.api.v1.internal.rest_clients.flows_rest_client."
-        "get_request_session_with_retries"
-    )
-    def test_raises_on_non_2xx_response(self, mock_session_factory):
-        session = MagicMock()
-        session.post.return_value = _build_response(400, {"detail": "bad"})
-        mock_session_factory.return_value = session
+    @patch(f"{CLIENT_PATH}.retry_request_and_refresh_flows_auth_token")
+    def test_raises_on_non_2xx_response(self, mock_retry):
+        mock_retry.return_value = _build_response(400, {"detail": "bad"})
 
         client = FlowRESTClient()
 
         with self.assertRaises(FlowsChangeTicketerError) as ctx:
-            client.change_ticketer(["t-1"], "ticketer-1")
+            client.change_ticketer(self.project, ["t-1"], "ticketer-1")
 
         self.assertEqual(ctx.exception.status_code, 400)
 
-    @patch(
-        "chats.apps.api.v1.internal.rest_clients.flows_rest_client."
-        "get_request_session_with_retries"
-    )
-    def test_raises_on_request_exception(self, mock_session_factory):
-        session = MagicMock()
-        session.post.side_effect = requests.ConnectionError("boom")
-        mock_session_factory.return_value = session
+    @patch(f"{CLIENT_PATH}.retry_request_and_refresh_flows_auth_token")
+    def test_raises_on_request_exception(self, mock_retry):
+        mock_retry.side_effect = requests.ConnectionError("boom")
 
         client = FlowRESTClient()
 
         with self.assertRaises(FlowsChangeTicketerError):
-            client.change_ticketer(["t-1"], "ticketer-1")
+            client.change_ticketer(self.project, ["t-1"], "ticketer-1")

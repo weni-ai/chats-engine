@@ -83,9 +83,10 @@ class ChangeTicketerForRoomTests(TestCase):
         change_ticketer_for_room(self.room, str(self.sector_b.uuid))
 
         client.get_ticketer_by_sector.assert_called_once_with(
-            str(self.sector_b.uuid)
+            self.project, str(self.sector_b.uuid)
         )
         client.change_ticketer.assert_called_once_with(
+            project=self.project,
             ticket_uuids=[str(self.room.ticket_uuid)],
             ticketer_uuid="ticketer-uuid",
         )
