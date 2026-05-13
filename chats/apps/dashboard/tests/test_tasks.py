@@ -543,3 +543,96 @@ class SortFieldsByPriorityTests(TestCase):
             sorted_fields.index("full_transfer_history"),
             sorted_fields.index("urn"),
         )
+
+
+class ApplyRootFiltersTests(TestCase):
+    def setUp(self):
+        self.viewset = ReportFieldsValidatorViewSet()
+
+    def test_propagates_dates_to_rooms(self):
+        fields_config = {
+            "start_date": "2026-04-14",
+            "end_date": "2026-05-13",
+            "rooms": {"fields": ["is_active"]},
+        }
+        self.viewset._apply_root_filters_to_rooms(fields_config, dict(fields_config))
+
+        self.assertEqual(fields_config["rooms"]["start_date"], "2026-04-14")
+        self.assertEqual(fields_config["rooms"]["end_date"], "2026-05-13")
+        self.assertNotIn("start_date", fields_config)
+        self.assertNotIn("end_date", fields_config)
+
+    def test_propagates_dates_to_agent_status_logs(self):
+        fields_config = {
+            "start_date": "2026-04-14",
+            "end_date": "2026-05-13",
+            "agent_status_logs": {"fields": ["agent__email", "log_date"]},
+        }
+        self.viewset._apply_root_filters_to_rooms(fields_config, dict(fields_config))
+
+        self.assertEqual(
+            fields_config["agent_status_logs"]["start_date"], "2026-04-14"
+        )
+        self.assertEqual(
+            fields_config["agent_status_logs"]["end_date"], "2026-05-13"
+        )
+        self.assertNotIn("start_date", fields_config)
+        self.assertNotIn("end_date", fields_config)
+
+    def test_propagates_dates_to_both_models(self):
+        fields_config = {
+            "start_date": "2026-04-14",
+            "end_date": "2026-05-13",
+            "rooms": {"fields": ["is_active"]},
+            "agent_status_logs": {"fields": ["agent__email"]},
+        }
+        self.viewset._apply_root_filters_to_rooms(fields_config, dict(fields_config))
+
+        self.assertEqual(fields_config["rooms"]["start_date"], "2026-04-14")
+        self.assertEqual(fields_config["rooms"]["end_date"], "2026-05-13")
+        self.assertEqual(
+            fields_config["agent_status_logs"]["start_date"], "2026-04-14"
+        )
+        self.assertEqual(
+            fields_config["agent_status_logs"]["end_date"], "2026-05-13"
+        )
+
+    def test_does_not_overwrite_existing_nested_dates(self):
+        fields_config = {
+            "start_date": "2026-04-14",
+            "end_date": "2026-05-13",
+            "agent_status_logs": {
+                "fields": ["agent__email"],
+                "start_date": "2026-01-01",
+                "end_date": "2026-01-31",
+            },
+        }
+        self.viewset._apply_root_filters_to_rooms(fields_config, dict(fields_config))
+
+        self.assertEqual(
+            fields_config["agent_status_logs"]["start_date"], "2026-01-01"
+        )
+        self.assertEqual(
+            fields_config["agent_status_logs"]["end_date"], "2026-01-31"
+        )
+
+    def test_propagates_root_agents_to_agent_status_logs(self):
+        fields_config = {
+            "agents": ["uuid-1", "uuid-2"],
+            "agent_status_logs": {"fields": ["agent__email"]},
+        }
+        request_data = {"agents": ["uuid-1", "uuid-2"]}
+        self.viewset._apply_root_filters_to_rooms(fields_config, request_data)
+
+        self.assertEqual(
+            fields_config["agent_status_logs"]["agents"], ["uuid-1", "uuid-2"]
+        )
+
+    def test_no_dates_in_root_leaves_nested_untouched(self):
+        fields_config = {
+            "agent_status_logs": {"fields": ["agent__email"]},
+        }
+        self.viewset._apply_root_filters_to_rooms(fields_config, dict(fields_config))
+
+        self.assertNotIn("start_date", fields_config["agent_status_logs"])
+        self.assertNotIn("end_date", fields_config["agent_status_logs"])
