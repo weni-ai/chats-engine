@@ -1,3 +1,23 @@
+# 3.60.0
+# Add
+  - Chats summary enabled flag exposed in project serializer
+  - Simplified has_chats_summary logic using project-level flag
+
+# 3.59.0
+# Add
+  - Chats summary enabled field in Project model
+
+# 3.58.1
+# Fix
+  - URL error in merge
+
+# 3.58.0
+# Add
+  - Room queue filters
+  - Agent control endpoint
+  - Bulk creation for queues
+  - Soft deletion of tags when deleting sectors
+
 # 3.57.3
 # Add
   - Pagination for agents metrics in internal dashboard

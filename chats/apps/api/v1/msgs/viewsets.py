@@ -9,7 +9,11 @@ from rest_framework.response import Response
 
 from chats.apps.api.pagination import CustomCursorPagination
 from chats.apps.api.v1.msgs.filters import MessageFilter, MessageMediaFilter
-from chats.apps.api.v1.msgs.permissions import MessageMediaPermission, MessagePermission
+from chats.apps.api.v1.msgs.permissions import (
+    MessageMediaPermission,
+    MessagePermission,
+    RestrictOfflineAgents,
+)
 from chats.apps.api.v1.msgs.serializers import (
     MessageAndMediaSerializer,
     MessageMediaSerializer,
@@ -33,7 +37,7 @@ class MessageViewset(
     serializer_class = MessageSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = MessageFilter
-    permission_classes = [IsAuthenticated, MessagePermission]
+    permission_classes = [IsAuthenticated, MessagePermission, RestrictOfflineAgents]
     lookup_field = "uuid"
 
     pagination_class = CustomCursorPagination

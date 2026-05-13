@@ -5,6 +5,8 @@ from django.utils.translation import gettext_lazy as _
 
 from chats.apps.rooms.models import Room
 
+RESTRICT_OFFLINE_AGENTS = "restrict_offline_agents"
+
 
 class MessagePermission(permissions.BasePermission):
     def has_permission(self, request, view):
@@ -102,3 +104,27 @@ class MessageMediaPermission(permissions.BasePermission):
             return False
 
         return obj.message.room.user == request.user
+
+
+class RestrictOfflineAgents(permissions.BasePermission):
+    def has_permission(self, request, view):
+        if view.action != "create":
+            return True
+
+        room_uuid = request.query_params.get("room")
+        if not room_uuid:
+            return True
+
+        room = (
+            Room.objects.filter(uuid=room_uuid)
+            .select_related("queue__sector__project")
+            .first()
+        )
+        if not room or not room.queue:
+            return True
+
+        project = room.queue.sector.project
+        if not project.get_config(RESTRICT_OFFLINE_AGENTS, False):
+            return True
+
+        return room.queue.online_agents.filter(pk=request.user.pk).exists()
