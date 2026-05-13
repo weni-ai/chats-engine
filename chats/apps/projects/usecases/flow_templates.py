@@ -59,8 +59,9 @@ class GetFlowTemplatesDataUseCase:
 
                     seen_uuids.add(template_uuid)
 
+                    prefix_len = len(self.TRIGGER_PARAMS_PREFIX)
                     variables = [
-                        var.removeprefix(self.TRIGGER_PARAMS_PREFIX)
+                        var[prefix_len:]
                         for var in templating.get("variables", [])
                         if var.startswith(self.TRIGGER_PARAMS_PREFIX)
                     ]
