@@ -34,6 +34,8 @@ class GetFlowTemplatesDataUseCase:
         project = Project.objects.get(uuid=self.project_uuid)
         return self.flows_client.retrieve_flow_definitions(project, flow_uuid)
 
+    TRIGGER_PARAMS_PREFIX = "@trigger.params."
+
     def _extract_templates_from_definition(self, definition):
         seen_uuids = set()
         templates_info = []
@@ -56,8 +58,19 @@ class GetFlowTemplatesDataUseCase:
                         continue
 
                     seen_uuids.add(template_uuid)
+
+                    variables = [
+                        var.removeprefix(self.TRIGGER_PARAMS_PREFIX)
+                        for var in templating.get("variables", [])
+                        if var.startswith(self.TRIGGER_PARAMS_PREFIX)
+                    ]
+
                     templates_info.append(
-                        {"uuid": template_uuid, "name": template_name}
+                        {
+                            "uuid": template_uuid,
+                            "name": template_name,
+                            "variables": variables,
+                        }
                     )
 
         return templates_info
@@ -124,9 +137,6 @@ class GetFlowTemplatesDataUseCase:
             for ch in project_channels
         }
 
-        flow_templates = []
-        fetched_waba_template_pairs = set()
-
         for template_info in templates_info:
             template_channels = self._get_template_channels(template_info)
 
@@ -142,20 +152,17 @@ class GetFlowTemplatesDataUseCase:
             if not waba_id:
                 continue
 
-            pair = (waba_id, template_info["name"])
-            if pair in fetched_waba_template_pairs:
-                continue
-            fetched_waba_template_pairs.add(pair)
-
             meta_template = self._fetch_meta_template(
                 waba_id, template_info["name"]
             )
-            flow_templates.append(
-                FlowTemplate(
-                    id=meta_template["id"],
-                    name=meta_template["name"],
-                    data=meta_template,
-                )
+            flow_template = FlowTemplate(
+                id=meta_template["id"],
+                name=meta_template["name"],
+                data=meta_template,
+                variables=template_info.get("variables", []),
+            )
+            return FlowTemplatesData(
+                uuid=flow_uuid, templates=[flow_template]
             )
 
-        return FlowTemplatesData(uuid=flow_uuid, templates=flow_templates)
+        return FlowTemplatesData(uuid=flow_uuid, templates=[])

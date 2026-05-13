@@ -15,6 +15,7 @@ class FlowTemplate:
     id: str
     name: str
     data: dict
+    variables: List[str] = field(default_factory=list)
 
 
 @dataclass

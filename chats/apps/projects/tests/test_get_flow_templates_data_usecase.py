@@ -37,7 +37,17 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
         self.channel_uuid = str(uuid.uuid4())
         self.waba_id = "111222333444"
 
-    def _make_definition_with_template(self, template_uuid, template_name):
+    def _make_definition_with_template(
+        self,
+        template_uuid,
+        template_name,
+        variables=None,
+    ):
+        if variables is None:
+            variables = [
+                "@trigger.params.contactname",
+                "@trigger.params.agentname",
+            ]
         return {
             "flows": [
                 {
@@ -55,7 +65,7 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
                                             "uuid": template_uuid,
                                             "name": template_name,
                                         },
-                                        "variables": ["var1"],
+                                        "variables": variables,
                                     },
                                 }
                             ],
@@ -162,6 +172,9 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
         self.assertEqual(result.templates[0].id, meta_template["id"])
         self.assertEqual(result.templates[0].name, meta_template["name"])
         self.assertEqual(result.templates[0].data, meta_template)
+        self.assertEqual(
+            result.templates[0].variables, ["contactname", "agentname"]
+        )
 
     def test_flow_with_multiple_templates_deduplicates_by_uuid(self):
         definition = {
@@ -181,7 +194,9 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
                                             "uuid": self.template_uuid,
                                             "name": self.template_name,
                                         },
-                                        "variables": ["var1"],
+                                        "variables": [
+                                            "@trigger.params.contactname",
+                                        ],
                                     },
                                 }
                             ],
@@ -199,7 +214,9 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
                                             "uuid": self.template_uuid,
                                             "name": self.template_name,
                                         },
-                                        "variables": ["var2"],
+                                        "variables": [
+                                            "@trigger.params.agentname",
+                                        ],
                                     },
                                 }
                             ],
@@ -229,9 +246,8 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
             name=self.template_name, uuid=self.template_uuid
         )
 
-    def test_multiple_channels_same_waba_id_single_meta_call(self):
+    def test_execute_returns_only_first_valid_template(self):
         channel_uuid_1 = str(uuid.uuid4())
-        channel_uuid_2 = str(uuid.uuid4())
         template_uuid_1 = str(uuid.uuid4())
         template_uuid_2 = str(uuid.uuid4())
 
@@ -252,7 +268,9 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
                                             "uuid": template_uuid_1,
                                             "name": self.template_name,
                                         },
-                                        "variables": [],
+                                        "variables": [
+                                            "@trigger.params.contactname",
+                                        ],
                                     },
                                 }
                             ],
@@ -268,9 +286,11 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
                                         "uuid": str(uuid.uuid4()),
                                         "template": {
                                             "uuid": template_uuid_2,
-                                            "name": self.template_name,
+                                            "name": "other_template",
                                         },
-                                        "variables": [],
+                                        "variables": [
+                                            "@trigger.params.url",
+                                        ],
                                     },
                                 }
                             ],
@@ -281,34 +301,20 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
         }
         self.mock_flows_client.retrieve_flow_definitions.return_value = definition
 
-        self.mock_flows_templates_usecase.execute.side_effect = [
-            {
-                "uuid": template_uuid_1,
-                "name": self.template_name,
-                "translations": [
-                    {
-                        "language": "por",
-                        "status": "approved",
-                        "channel": {"uuid": channel_uuid_1, "name": "Channel 1"},
-                    }
-                ],
-            },
-            {
-                "uuid": template_uuid_2,
-                "name": self.template_name,
-                "translations": [
-                    {
-                        "language": "por",
-                        "status": "approved",
-                        "channel": {"uuid": channel_uuid_2, "name": "Channel 2"},
-                    }
-                ],
-            },
-        ]
+        self.mock_flows_templates_usecase.execute.return_value = {
+            "uuid": template_uuid_1,
+            "name": self.template_name,
+            "translations": [
+                {
+                    "language": "por",
+                    "status": "approved",
+                    "channel": {"uuid": channel_uuid_1, "name": "Channel 1"},
+                }
+            ],
+        }
 
         self.mock_channels_usecase.execute.return_value = [
             self._make_project_channel(channel_uuid_1, self.waba_id),
-            self._make_project_channel(channel_uuid_2, self.waba_id),
         ]
 
         meta_template = self._make_meta_template()
@@ -318,10 +324,12 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
 
         result = self.use_case.execute(flow_uuid=self.flow_uuid)
 
+        self.assertEqual(len(result.templates), 1)
+        self.assertEqual(result.templates[0].id, meta_template["id"])
         self.mock_meta_client.get_templates_list.assert_called_once_with(
             waba_id=self.waba_id, name=self.template_name
         )
-        self.assertEqual(len(result.templates), 1)
+        self.mock_flows_templates_usecase.execute.assert_called_once()
 
     def test_template_not_found_in_meta_raises_exception(self):
         definition = self._make_definition_with_template(
@@ -380,6 +388,9 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["uuid"], self.template_uuid)
         self.assertEqual(result[0]["name"], self.template_name)
+        self.assertEqual(
+            result[0]["variables"], ["contactname", "agentname"]
+        )
 
     def test_extract_templates_ignores_actions_without_templating(self):
         definition = self._make_definition_without_template()
@@ -387,6 +398,23 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
         result = self.use_case._extract_templates_from_definition(definition)
 
         self.assertEqual(result, [])
+
+    def test_extract_templates_filters_only_trigger_params_variables(self):
+        definition = self._make_definition_with_template(
+            self.template_uuid,
+            self.template_name,
+            variables=[
+                "@trigger.params.contactname",
+                "@(title(contact.name))",
+                "@results.vendedor",
+                "@trigger.params.url",
+            ],
+        )
+
+        result = self.use_case._extract_templates_from_definition(definition)
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["variables"], ["contactname", "url"])
 
     def test_no_template_channels_found_raises_exception(self):
         definition = self._make_definition_with_template(
