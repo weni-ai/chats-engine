@@ -12,6 +12,7 @@ from chats.apps.api.v1.agents.views import (
     SectorsQueuesView,
     UpdateQueuePermissionsView,
 )
+from chats.apps.api.v1.projects.views import FlowTemplatesView
 from chats.apps.api.v1.ai_features.views import (
     AITextImprovementView,
     HistorySummaryFeedbackTagsView,
@@ -100,6 +101,11 @@ urlpatterns = [
         "project/<uuid:project_uuid>/sectors/queues/",
         SectorsQueuesView.as_view(),
         name="sectors_queues",
+    ),
+    path(
+        "project/<uuid:project_uuid>/flow_templates/",
+        FlowTemplatesView.as_view(),
+        name="flow_templates",
     ),
     path(
         "agent/queue_permissions/",
