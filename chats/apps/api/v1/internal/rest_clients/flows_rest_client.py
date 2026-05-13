@@ -326,28 +326,30 @@ class FlowRESTClient(
             headers=self.headers,
         )
 
-    def get_ticketer_by_sector(self, sector_uuid: str) -> str:
+    def get_ticketer_by_sector(self, project, sector_uuid: str) -> str:
         """
         Discover the Flows ticketer UUID associated with a given sector_uuid.
 
-        Calls GET /api/v2/ticketers.json?sector_uuid=<uuid>. Expects the
-        standard Flows/RapidPro paginated payload (`{"results": [...]}`) and
-        returns the `uuid` field of the first result.
+        Calls GET /api/v2/ticketers.json?sector_uuid=<uuid> using the
+        project-scoped Flows token (`Authorization: Token <project_token>`),
+        with auto-refresh on 401/403. Expects the standard Flows/RapidPro
+        paginated payload (`{"results": [...]}`) and returns the `uuid` field
+        of the first result.
 
         Raises:
             FlowsTicketerNotFoundError: if the request fails or no ticketer
                 is returned for the given sector_uuid.
         """
         url = f"{self.base_url}/api/v2/ticketers.json"
-
-        headers = {**self.headers, "Accept": "application/json"}
+        headers = self.project_headers(project.flows_authorization)
 
         try:
-            response = requests.get(
-                url,
-                params={"sector_uuid": str(sector_uuid)},
+            response = retry_request_and_refresh_flows_auth_token(
+                project=project,
+                request_method=requests.get,
                 headers=headers,
-                timeout=30,
+                url=url,
+                params={"sector_uuid": str(sector_uuid)},
             )
         except requests.RequestException as exc:
             raise FlowsTicketerNotFoundError(
@@ -393,17 +395,20 @@ class FlowRESTClient(
 
         return ticketer_uuid
 
-    def change_ticketer(self, ticket_uuids: list, ticketer_uuid: str):
+    def change_ticketer(self, project, ticket_uuids: list, ticketer_uuid: str):
         """
         Move tickets to another ticketer in Flows via ticket_actions.
 
-        Calls POST /api/v2/ticket_actions.json with body:
+        Calls POST /api/v2/ticket_actions.json using the project-scoped Flows
+        token (`Authorization: Token <project_token>`), with auto-refresh on
+        401/403. Body:
             {"tickets": [...], "action": "change_ticketer", "ticketer": "..."}
 
         Raises:
             FlowsChangeTicketerError: if the response status is not 2xx.
         """
         url = f"{self.base_url}/api/v2/ticket_actions.json"
+        headers = self.project_headers(project.flows_authorization)
 
         body = {
             "tickets": [str(uuid) for uuid in ticket_uuids],
@@ -411,16 +416,13 @@ class FlowRESTClient(
             "ticketer": str(ticketer_uuid),
         }
 
-        request_session = get_request_session_with_retries(
-            status_forcelist=[429, 500, 502, 503, 504], method_whitelist=["POST"]
-        )
-
         try:
-            response = request_session.post(
-                url,
-                data=json.dumps(body, cls=DjangoJSONEncoder),
-                headers={**self.headers, "Accept": "application/json"},
-                timeout=30,
+            response = retry_request_and_refresh_flows_auth_token(
+                project=project,
+                request_method=requests.post,
+                headers=headers,
+                url=url,
+                json=body,
             )
         except requests.RequestException as exc:
             raise FlowsChangeTicketerError(
