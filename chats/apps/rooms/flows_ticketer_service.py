@@ -55,11 +55,25 @@ def change_ticketer_for_room(
     if current_sector_uuid == destination_sector_uuid:
         return
 
+    project = (
+        room.queue.sector.project
+        if room.queue and room.queue.sector
+        else None
+    )
+    if project is None:
+        logger.error(
+            "[CHANGE_TICKETER] Cannot resolve project for room %s "
+            "(ticket=%s); skipping Flows ticketer update",
+            room.uuid,
+            room.ticket_uuid,
+        )
+        return
+
     flows_client = FlowRESTClient()
 
     try:
         ticketer_uuid = flows_client.get_ticketer_by_sector(
-            destination_sector_uuid
+            project, destination_sector_uuid
         )
     except FlowsTicketerNotFoundError as exc:
         logger.error(
@@ -75,6 +89,7 @@ def change_ticketer_for_room(
 
     try:
         flows_client.change_ticketer(
+            project=project,
             ticket_uuids=[str(room.ticket_uuid)],
             ticketer_uuid=ticketer_uuid,
         )
