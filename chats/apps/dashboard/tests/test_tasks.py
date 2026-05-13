@@ -496,6 +496,7 @@ class ModelFieldsPresenterTests(TestCase):
             "project__name",
             "project__uuid",
             "log_date",
+            "status_changes",
             "created_on",
         }
         self.assertEqual(set(agent_fields.keys()), expected_fields)
@@ -505,7 +506,6 @@ class ModelFieldsPresenterTests(TestCase):
         agent_fields = models_info["agent_status_logs"]
 
         self.assertNotIn("uuid", agent_fields)
-        self.assertNotIn("status_changes", agent_fields)
         self.assertNotIn("modified_on", agent_fields)
 
 
