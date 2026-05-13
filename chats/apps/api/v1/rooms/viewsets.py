@@ -86,9 +86,12 @@ from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.exceptions import (
+    FlowsChangeTicketerError,
+    FlowsTicketerNotFoundError,
     MaxPinRoomLimitReachedError,
     RoomIsNotActiveError,
 )
+from chats.apps.rooms.flows_ticketer_service import change_ticketer_for_room
 from chats.apps.rooms.models import Room, RoomNote, RoomPin
 from chats.apps.rooms.services import RoomsReportService
 from chats.apps.rooms.tasks import generate_rooms_report
@@ -443,15 +446,45 @@ class RoomViewset(
         serializer.save()
         serializer.instance.notify_queue("create")
 
+    @transaction.atomic
     def perform_update(self, serializer):
         # TODO Separate this into smaller methods
         old_instance = serializer.instance
         old_user = old_instance.user
         old_user = old_instance.user
+        old_sector_uuid = (
+            str(old_instance.queue.sector.uuid)
+            if old_instance.queue and old_instance.queue.sector
+            else None
+        )
 
         user = self.request.data.get("user_email")
         queue = self.request.data.get("queue_uuid")
         serializer.save()
+
+        if queue:
+            instance = serializer.instance
+            new_sector_uuid = (
+                str(instance.queue.sector.uuid)
+                if instance.queue and instance.queue.sector
+                else None
+            )
+            if new_sector_uuid and new_sector_uuid != old_sector_uuid:
+                try:
+                    change_ticketer_for_room(instance, new_sector_uuid)
+                except (
+                    FlowsTicketerNotFoundError,
+                    FlowsChangeTicketerError,
+                ) as exc:
+                    raise ValidationError(
+                        {
+                            "detail": (
+                                "Could not update the ticketer in Flows. "
+                                "The room transfer was not applied."
+                            ),
+                            "error": str(exc),
+                        }
+                    ) from exc
 
         if not (user or queue):
             return None
