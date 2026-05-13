@@ -51,8 +51,6 @@ class GetTicketerBySectorTests(TestCase):
         result = client.get_ticketer_by_sector("sector-uuid")
 
         self.assertEqual(result, "ticketer-uuid-1")
-        called_url, _ = mock_get.call_args[0], mock_get.call_args[1]
-        # Validate that request was made to /api/v2/ticketers.json with sector_uuid param
         self.assertEqual(
             mock_get.call_args.args[0],
             "https://flows.test/api/v2/ticketers.json",
