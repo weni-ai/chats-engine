@@ -81,38 +81,9 @@ class QueueSerializer(AuditableModelSerializer):
                         {"detail": _("This queue already exists.")}
                     )
 
-        if self.instance:
-            sector = self.instance.sector
-
-        else:
-            sector = data.get("sector")
-
-        project_uuid = str(sector.project.uuid)
-
-        is_queue_limit_feature_active = is_feature_active(
-            settings.QUEUE_LIMIT_FEATURE_FLAG_KEY,
-            self.context.get("request").user.email,
-            project_uuid,
-        )
-
         queue_limit = data.pop("queue_limit_info", None)
 
         if queue_limit and isinstance(queue_limit, dict):
-            if (
-                not is_queue_limit_feature_active
-                and "is_active" in queue_limit
-                and queue_limit.get("is_active") is True
-                and (
-                    self.instance
-                    and self.instance.is_queue_limit_active is False
-                    or not self.instance
-                )
-            ):
-                raise serializers.ValidationError(
-                    {"detail": _("Queue limit feature is not active.")},
-                    code="queue_limit_feature_flag_is_off",
-                )
-
             if "is_active" in queue_limit:
                 data["is_queue_limit_active"] = queue_limit.get("is_active")
 

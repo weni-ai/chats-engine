@@ -398,6 +398,7 @@ class ModelFieldsPresenter:
                 "related_model": "projects.project",
             },
             "log_date": {"type": "DateField", "required": True},
+            "status_changes": {"type": "JSONField", "required": False},
             "created_on": {"type": "DateTimeField", "required": True},
         }
 
