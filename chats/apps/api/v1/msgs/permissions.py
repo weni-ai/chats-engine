@@ -111,7 +111,7 @@ class RestrictOfflineAgents(permissions.BasePermission):
         if view.action != "create":
             return True
 
-        room_uuid = request.query_params.get("room")
+        room_uuid = request.data.get("room")
         if not room_uuid:
             return True
 
