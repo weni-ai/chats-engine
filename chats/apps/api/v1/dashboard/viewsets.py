@@ -15,7 +15,6 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from chats.apps.core.filters import get_filters_from_query_params
 from chats.apps.api.v1.dashboard.presenter import get_export_data
 from chats.apps.api.v1.dashboard.repository import (
     ORMRoomsDataRepository,
@@ -27,6 +26,7 @@ from chats.apps.api.v1.dashboard.serializers import (
     DashboardRoomSerializer,
     DashboardSectorSerializer,
 )
+from chats.apps.core.filters import get_filters_from_query_params
 from chats.apps.dashboard.models import ReportStatus
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.rooms.models import Room
@@ -880,10 +880,7 @@ class ReportFieldsValidatorViewSet(APIView):
                 and "start_date" not in fields_config["agent_status_logs"]
             ):
                 fields_config["agent_status_logs"]["start_date"] = root_start_date
-            if (
-                root_end_date
-                and "end_date" not in fields_config["agent_status_logs"]
-            ):
+            if root_end_date and "end_date" not in fields_config["agent_status_logs"]:
                 fields_config["agent_status_logs"]["end_date"] = root_end_date
 
         root_agents = request_data.get("agents") or request_data.get("agent")
@@ -931,6 +928,7 @@ class ReportFieldsValidatorViewSet(APIView):
 
         active_exists = ReportStatus.objects.filter(
             project=project,
+            report_type=ReportStatus.REPORT_TYPE_CUSTOM_DASHBOARD,
             status__in=["pending", "processing"],
         ).exists()
 
@@ -991,7 +989,9 @@ class ReportFieldsValidatorViewSet(APIView):
 
         current_report = (
             ReportStatus.objects.filter(
-                project=project, status__in=["pending", "in_progress"]
+                project=project,
+                report_type=ReportStatus.REPORT_TYPE_CUSTOM_DASHBOARD,
+                status__in=["pending", "in_progress"],
             )
             .order_by("created_on")
             .last()
