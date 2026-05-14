@@ -229,7 +229,7 @@ class TestRestrictOfflineAgents(TestCase):
         )
 
     def test_allows_when_config_disabled(self):
-        request = self.factory.post(f"/api/v1/msgs/?room={self.room.uuid}")
+        request = self.factory.post("/api/v1/msgs/", {"room": str(self.room.uuid)})
         force_authenticate(request, user=self.user)
         request = Request(request)
         view = mock.Mock(action="create")
@@ -241,7 +241,7 @@ class TestRestrictOfflineAgents(TestCase):
         self.project.config = {"restrict_offline_agents": True}
         self.project.save(update_fields=["config"])
 
-        request = self.factory.post(f"/api/v1/msgs/?room={self.room.uuid}")
+        request = self.factory.post("/api/v1/msgs/", {"room": str(self.room.uuid)})
         force_authenticate(request, user=self.user)
         request = Request(request)
         view = mock.Mock(action="create")
@@ -255,7 +255,7 @@ class TestRestrictOfflineAgents(TestCase):
         self.project_permission.status = "OFFLINE"
         self.project_permission.save(update_fields=["status"])
 
-        request = self.factory.post(f"/api/v1/msgs/?room={self.room.uuid}")
+        request = self.factory.post("/api/v1/msgs/", {"room": str(self.room.uuid)})
         force_authenticate(request, user=self.user)
         request = Request(request)
         view = mock.Mock(action="create")
