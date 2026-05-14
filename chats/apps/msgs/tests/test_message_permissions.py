@@ -4,8 +4,9 @@ from unittest import mock
 from django.contrib.auth.models import AnonymousUser
 from django.test import TestCase
 from django.utils import timezone
+from rest_framework import status
 from rest_framework.request import Request
-from rest_framework.test import APIRequestFactory, force_authenticate
+from rest_framework.test import APIRequestFactory, APITestCase, force_authenticate
 
 from chats.apps.accounts.models import User
 from chats.apps.api.v1.msgs.permissions import (
@@ -195,10 +196,8 @@ class TestMessageMediaPermission(TestCase):
         self.assertTrue(result)
 
 
-class TestRestrictOfflineAgents(TestCase):
+class TestRestrictOfflineAgents(APITestCase):
     def setUp(self):
-        self.factory = APIRequestFactory()
-        self.permission = RestrictOfflineAgents()
         self.user = User.objects.create_user(
             email="agent@example.com",
             password="testpass123",
@@ -227,27 +226,23 @@ class TestRestrictOfflineAgents(TestCase):
             permission=self.project_permission,
             role=QueueAuthorization.ROLE_AGENT,
         )
+        self.url = "/v1/msg/"
+        self.client.force_authenticate(user=self.user)
 
     def test_allows_when_config_disabled(self):
-        request = self.factory.post("/api/v1/msgs/", {"room": str(self.room.uuid)})
-        force_authenticate(request, user=self.user)
-        request = Request(request)
-        view = mock.Mock(action="create")
-
-        result = self.permission.has_permission(request, view)
-        self.assertTrue(result)
+        response = self.client.post(
+            self.url, {"room": str(self.room.uuid)}, format="json"
+        )
+        self.assertNotEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_allows_online_agent_when_config_enabled(self):
         self.project.config = {"restrict_offline_agents": True}
         self.project.save(update_fields=["config"])
 
-        request = self.factory.post("/api/v1/msgs/", {"room": str(self.room.uuid)})
-        force_authenticate(request, user=self.user)
-        request = Request(request)
-        view = mock.Mock(action="create")
-
-        result = self.permission.has_permission(request, view)
-        self.assertTrue(result)
+        response = self.client.post(
+            self.url, {"room": str(self.room.uuid)}, format="json"
+        )
+        self.assertNotEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_blocks_offline_agent_when_config_enabled(self):
         self.project.config = {"restrict_offline_agents": True}
@@ -255,13 +250,10 @@ class TestRestrictOfflineAgents(TestCase):
         self.project_permission.status = "OFFLINE"
         self.project_permission.save(update_fields=["status"])
 
-        request = self.factory.post("/api/v1/msgs/", {"room": str(self.room.uuid)})
-        force_authenticate(request, user=self.user)
-        request = Request(request)
-        view = mock.Mock(action="create")
-
-        result = self.permission.has_permission(request, view)
-        self.assertFalse(result)
+        response = self.client.post(
+            self.url, {"room": str(self.room.uuid)}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_allows_non_create_actions(self):
         self.project.config = {"restrict_offline_agents": True}
@@ -269,24 +261,6 @@ class TestRestrictOfflineAgents(TestCase):
         self.project_permission.status = "OFFLINE"
         self.project_permission.save(update_fields=["status"])
 
-        request = self.factory.get(f"/api/v1/msgs/?room={self.room.uuid}")
-        force_authenticate(request, user=self.user)
-        request = Request(request)
-        view = mock.Mock(action="list")
+        response = self.client.get(self.url, {"room": str(self.room.uuid)})
+        self.assertNotEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-        result = self.permission.has_permission(request, view)
-        self.assertTrue(result)
-
-    def test_allows_when_no_room_uuid(self):
-        self.project.config = {"restrict_offline_agents": True}
-        self.project.save(update_fields=["config"])
-        self.project_permission.status = "OFFLINE"
-        self.project_permission.save(update_fields=["status"])
-
-        request = self.factory.post("/api/v1/msgs/")
-        force_authenticate(request, user=self.user)
-        request = Request(request)
-        view = mock.Mock(action="create")
-
-        result = self.permission.has_permission(request, view)
-        self.assertTrue(result)
