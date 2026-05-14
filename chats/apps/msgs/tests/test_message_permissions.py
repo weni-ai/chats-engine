@@ -12,7 +12,6 @@ from chats.apps.accounts.models import User
 from chats.apps.api.v1.msgs.permissions import (
     MessageMediaPermission,
     MessagePermission,
-    RestrictOfflineAgents,
 )
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue, QueueAuthorization
@@ -263,4 +262,3 @@ class TestRestrictOfflineAgents(APITestCase):
 
         response = self.client.get(self.url, {"room": str(self.room.uuid)})
         self.assertNotEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
