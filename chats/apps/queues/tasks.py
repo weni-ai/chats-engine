@@ -3,7 +3,6 @@ from uuid import UUID
 
 from django.conf import settings
 from django.core.cache import cache
-from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
 from chats.apps.queues.models import Queue
 from chats.apps.queues.services import QueueRouterService
@@ -40,46 +39,36 @@ def route_queue_rooms(queue_uuid: UUID):
         logger.info("[route_queue_rooms] Queue not found for UUID: %s", queue_uuid)
         return
 
-    try:
-        cooldown_feature_flag_active = is_feature_active_for_attributes(
-            settings.ROUTE_QUEUE_COOLDOWN_FEATURE_FLAG_KEY,
-            {"projectUUID": str(queue.sector.project.uuid)},
-        )
-    except Exception as e:
-        logger.error("[route_queue_rooms] Error checking cooldown feature flag: %s", e)
-        cooldown_feature_flag_active = False
-
     lock_key = get_route_lock_key_for_queue(queue.uuid)
     pending_key = get_route_pending_key_for_queue(queue_uuid)
 
-    if cooldown_feature_flag_active:
-        acquired = cache.add(
-            lock_key, True, timeout=settings.ROUTE_QUEUE_COOLDOWN_MAX_TIME
+    acquired = cache.add(
+        lock_key, True, timeout=settings.ROUTE_QUEUE_COOLDOWN_MAX_TIME
+    )
+    if not acquired:
+        logger.info(
+            "[route_queue_rooms] Route queue rooms cooldown is active for queue %s. "
+            "Skipping routing for now.",
+            queue.uuid,
         )
-        if not acquired:
+        already_pending = not cache.add(
+            pending_key, True, timeout=settings.ROUTE_QUEUE_COOLDOWN_RETRY_DELAY
+        )
+        if not already_pending:
+            route_queue_rooms.apply_async(
+                args=[queue_uuid],
+                countdown=settings.ROUTE_QUEUE_COOLDOWN_RETRY_DELAY,
+            )
             logger.info(
-                "[route_queue_rooms] Route queue rooms cooldown is active for queue %s. "
-                "Skipping routing for now.",
+                "[route_queue_rooms] Scheduled deferred route_queue_rooms for queue %s",
                 queue.uuid,
             )
-            already_pending = not cache.add(
-                pending_key, True, timeout=settings.ROUTE_QUEUE_COOLDOWN_RETRY_DELAY
-            )
-            if not already_pending:
-                route_queue_rooms.apply_async(
-                    args=[queue_uuid],
-                    countdown=settings.ROUTE_QUEUE_COOLDOWN_RETRY_DELAY,
-                )
-                logger.info(
-                    "[route_queue_rooms] Scheduled deferred route_queue_rooms for queue %s",
-                    queue.uuid,
-                )
-            return False
+        return False
+
     try:
         QueueRouterService(queue).route_rooms()
     finally:
-        if cooldown_feature_flag_active:
-            cache.delete(lock_key)
+        cache.delete(lock_key)
     return True
 
 
