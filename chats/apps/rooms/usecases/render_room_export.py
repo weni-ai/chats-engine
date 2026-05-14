@@ -7,7 +7,7 @@ responsibility of the caller, kept out of here so the renderer stays
 deterministic and side-effect free.
 """
 
-from typing import Iterable
+from typing import Dict, Iterable, Set
 
 from django.template.loader import render_to_string
 
@@ -28,7 +28,7 @@ class RenderRoomExport:
     def __init__(self, template_name: str = DEFAULT_TEMPLATE):
         self.template_name = template_name
 
-    def execute(self, data: dict, types: Iterable[str]) -> dict[str, bytes]:
+    def execute(self, data: dict, types: Iterable[str]) -> Dict[str, bytes]:
         normalized = self._normalize_types(types)
         output: dict[str, bytes] = {}
 
@@ -40,7 +40,7 @@ class RenderRoomExport:
 
         return output
 
-    def _normalize_types(self, types: Iterable[str]) -> set[str]:
+    def _normalize_types(self, types: Iterable[str]) -> Set[str]:
         if not types:
             raise UnsupportedExportFormatError("At least one export format is required")
 
