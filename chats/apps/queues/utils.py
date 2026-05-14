@@ -3,8 +3,6 @@ from typing import TYPE_CHECKING
 
 from django.conf import settings
 
-from weni.feature_flags.shortcuts import is_feature_active_for_attributes
-
 from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.queues.tasks import route_queue_rooms, route_sector_rooms
@@ -48,9 +46,8 @@ def start_queue_priority_routing_for_all_queues_in_project(project: Project):
     """
     Start routing rooms for all queues in a project, if the project is configured to use priority routing.
 
-    When the cooldown feature flag is active, routes are grouped by sector
-    so that all queues in a sector are routed under a single lock acquisition,
-    preventing accidental queue prioritization.
+    Routes are grouped by sector so that all queues in a sector are routed
+    under a single lock acquisition, preventing accidental queue prioritization.
     """
     if not project.use_queue_priority_routing:
         logger.info(
@@ -60,60 +57,24 @@ def start_queue_priority_routing_for_all_queues_in_project(project: Project):
         )
         return
 
-    try:
-        cooldown_feature_flag_active = is_feature_active_for_attributes(
-            settings.ROUTE_QUEUE_COOLDOWN_FEATURE_FLAG_KEY,
-            {"projectUUID": str(project.uuid)},
-        )
-    except Exception as e:
-        logger.error(
-            "[start_queue_priority_routing_for_all_queues_in_project] Error checking cooldown feature flag: %s",
-            e,
-        )
-        cooldown_feature_flag_active = False
-
-    if cooldown_feature_flag_active:
-        logger.info(
-            "[start_queue_priority_routing_for_all_queues_in_project] "
-            "Cooldown feature flag is active for project %s",
-            project.uuid,
-        )
-        sector_uuids = (
-            Queue.objects.filter(sector__project=project)
-            .values_list("sector__uuid", flat=True)
-            .distinct()
-        )
-
-        logger.info(
-            "[start_queue_priority_routing_for_all_queues_in_project] "
-            "Started routing rooms by sector for project %s (%d sectors)",
-            project.uuid,
-            len(sector_uuids),
-        )
-
-        for sector_uuid in sector_uuids:
-            if settings.USE_CELERY:
-                route_sector_rooms.delay(sector_uuid)
-            else:
-                route_sector_rooms(sector_uuid)
-        return
+    sector_uuids = (
+        Queue.objects.filter(sector__project=project)
+        .values_list("sector__uuid", flat=True)
+        .distinct()
+    )
 
     logger.info(
         "[start_queue_priority_routing_for_all_queues_in_project] "
-        "Cooldown feature flag is not active for project %s",
+        "Started routing rooms by sector for project %s (%d sectors)",
         project.uuid,
+        len(sector_uuids),
     )
 
-    queues = Queue.objects.filter(sector__project=project)
-
-    logger.info(
-        "[start_queue_priority_routing_for_all_queues_in_project] "
-        "Started routing rooms for all queues in project %s",
-        project.uuid,
-    )
-
-    for queue in queues:
-        start_queue_priority_routing(queue)
+    for sector_uuid in sector_uuids:
+        if settings.USE_CELERY:
+            route_sector_rooms.delay(sector_uuid)
+        else:
+            route_sector_rooms(sector_uuid)
 
 
 def create_room_assigned_from_queue_feedback(room: "Room", user: "User"):

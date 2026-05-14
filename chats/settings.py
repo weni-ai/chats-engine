@@ -798,12 +798,6 @@ IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL = env.int(
     "IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL", default=30
 )
 
-# Route Queue Cooldown Feature Flag
-ROUTE_QUEUE_COOLDOWN_FEATURE_FLAG_KEY = env.str(
-    "ROUTE_QUEUE_COOLDOWN_FEATURE_FLAG_KEY",
-    default="weniChatsRouteQueueCooldown",
-)
-
 NEW_GET_ROOM_USER_FEATURE_FLAG_KEY = env.str(
     "CHATS_NEW_GET_ROOM_USER_FEATURE_FLAG_KEY",
     default="weniChatsNewGetRoomUser",
