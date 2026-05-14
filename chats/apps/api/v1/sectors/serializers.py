@@ -7,6 +7,7 @@ from weni.feature_flags.shortcuts import (
 )
 
 from chats.apps.api.v1.accounts.serializers import UserSerializer
+from chats.apps.projects.models import Project
 from chats.apps.sectors.models import (
     Sector,
     SectorAuthorization,
