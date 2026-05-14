@@ -189,9 +189,8 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
-    def test_retrieve_queue_with_project_permission(self, mock_is_feature_active):
+    def test_retrieve_queue_with_project_permission(self):
         response = self.retrieve_queue(self.queue.pk)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -211,10 +210,8 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data.get("results")), 0)
 
-    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
-    def test_list_queues_with_project_permission(self, mock_is_feature_active):
-        mock_is_feature_active.return_value = True
+    def test_list_queues_with_project_permission(self):
         response = self.list_queues()
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -231,10 +228,8 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
         self.assertIn("limit", queue_limit_info)
         self.assertEqual(queue_limit_info.get("limit"), None)
 
-    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
-    def test_create_queue(self, mock_is_feature_active):
-        mock_is_feature_active.return_value = True
+    def test_create_queue(self):
         response = self.create_queue(
             {
                 "name": "Testing",
@@ -252,32 +247,8 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
         self.assertEqual(response.data.get("queue_limit").get("is_active"), True)
         self.assertEqual(response.data.get("queue_limit").get("limit"), 10)
 
-    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=False)
     @with_project_permission()
-    def test_create_queue_with_queue_limit_feature_flag_is_off(
-        self, mock_is_feature_active
-    ):
-        mock_is_feature_active.return_value = False
-        response = self.create_queue(
-            {
-                "name": "Testing",
-                "sector": str(self.sector.pk),
-                "queue_limit": {
-                    "is_active": True,
-                    "limit": 10,
-                },
-            }
-        )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
-            response.data["detail"][0].code,
-            "queue_limit_feature_flag_is_off",
-        )
-
-    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
-    @with_project_permission()
-    def test_create_queue_with_invalid_queue_limit(self, mock_is_feature_active):
-        mock_is_feature_active.return_value = True
+    def test_create_queue_with_invalid_queue_limit(self):
         response = self.create_queue(
             {
                 "name": "Testing",
@@ -291,10 +262,8 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(response.data["queue_limit"]["limit"][0].code, "invalid")
 
-    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
-    def test_create_queue_without_queue_limit(self, mock_is_feature_active):
-        mock_is_feature_active.return_value = True
+    def test_create_queue_without_queue_limit(self):
         response = self.create_queue(
             {
                 "name": "Testing",
@@ -306,10 +275,8 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
             dict(response.data.get("queue_limit")), {"is_active": False, "limit": None}
         )
 
-    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
-    def test_update_queue(self, mock_is_feature_active):
-        mock_is_feature_active.return_value = True
+    def test_update_queue(self):
         payload = {
             "name": "Testing",
             "queue_limit": {
@@ -334,50 +301,8 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
             payload.get("queue_limit").get("is_active"),
         )
 
-    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=False)
     @with_project_permission()
-    def test_update_queue_with_queue_limit_feature_flag_is_off(
-        self, mock_is_feature_active
-    ):
-        mock_is_feature_active.return_value = False
-        response = self.update_queue(
-            self.queue.pk,
-            {
-                "name": "Testing",
-                "queue_limit": {
-                    "is_active": True,
-                    "limit": 10,
-                },
-            },
-        )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
-            response.data["detail"][0].code,
-            "queue_limit_feature_flag_is_off",
-        )
-
-    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=False)
-    @with_project_permission()
-    def test_update_queue_with_queue_limit_feature_flag_is_off_and_queue_limit_is_false(
-        self, mock_is_feature_active
-    ):
-        mock_is_feature_active.return_value = False
-        response = self.update_queue(
-            self.queue.pk,
-            {
-                "name": "Testing",
-                "queue_limit": {
-                    "is_active": False,
-                    "limit": 10,
-                },
-            },
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
-    @with_project_permission()
-    def test_update_queue_without_queue_limit(self, mock_is_feature_active):
-        mock_is_feature_active.return_value = True
+    def test_update_queue_without_queue_limit(self):
         response = self.update_queue(
             self.queue.pk,
             {
@@ -620,12 +545,8 @@ class QueueEndAllChatsTests(APITestCase):
             work_end="18:00",
         )
         self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
-        self.contact = Contact.objects.create(
-            external_id="ext-q1", name="Contact Q1"
-        )
-        self.contact_2 = Contact.objects.create(
-            external_id="ext-q2", name="Contact Q2"
-        )
+        self.contact = Contact.objects.create(external_id="ext-q1", name="Contact Q1")
+        self.contact_2 = Contact.objects.create(external_id="ext-q2", name="Contact Q2")
 
         self.user = User.objects.create(email="admin@endall-queue.test")
         self.agent = User.objects.create(email="agent@endall-queue.test")
@@ -685,9 +606,7 @@ class QueueEndAllChatsTests(APITestCase):
 
     @with_project_permission()
     def test_delete_queue_with_flag_only_closes_rooms_in_that_queue(self):
-        other_queue = Queue.objects.create(
-            name="Other Queue", sector=self.sector
-        )
+        other_queue = Queue.objects.create(name="Other Queue", sector=self.sector)
         room_target = Room.objects.create(
             contact=self.contact,
             queue=self.queue,
@@ -847,9 +766,7 @@ class QueueTransferOnDeleteTests(APITestCase):
             work_start="09:00",
             work_end="18:00",
         )
-        other_queue = Queue.objects.create(
-            name="Other Queue", sector=other_sector
-        )
+        other_queue = Queue.objects.create(name="Other Queue", sector=other_sector)
         response = self._delete_queue(
             self.queue.uuid, transfer_to_queue=other_queue.uuid
         )

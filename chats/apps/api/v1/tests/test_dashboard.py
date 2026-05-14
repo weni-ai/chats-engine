@@ -36,8 +36,9 @@ class DashboardTests(APITestCase):
         cls.patcher.stop()
         super().tearDownClass()
 
+    @patch("chats.apps.api.v1.external.rooms.serializers.is_feature_active", return_value=False)
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
-    def test_create_room_metrics(self, mock_is_attending):
+    def test_create_room_metrics(self, mock_is_attending, _mock_flag):
         """
         Verify if the room metric its created when a room is created.
         """

@@ -1,9 +1,10 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.filters import OrderingFilter, SearchFilter
+from rest_framework.filters import OrderingFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from chats.apps.rooms.models import Room
+from chats.core.filters import DocumentAwareSearchFilter
 
 from ..filters.rooms_filter import HistoryRoomFilter
 from ..serializers.rooms import (
@@ -23,13 +24,15 @@ class HistoryRoomViewset(ReadOnlyModelViewSet):
     serializer_class = RoomHistorySerializer
     filter_backends = [
         DjangoFilterBackend,
-        SearchFilter,
+        DocumentAwareSearchFilter,
         OrderingFilter,
     ]
     filterset_class = HistoryRoomFilter
     permission_classes = [IsAuthenticated]
     search_fields = [
         "contact__name",
+        "contact__email",
+        "contact__document",
         "urn",
         "user__first_name",
         "user__last_name",

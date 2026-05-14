@@ -872,6 +872,20 @@ class ReportFieldsValidatorViewSet(APIView):
             if root_end_date and "end_date" not in fields_config["rooms"]:
                 fields_config["rooms"]["end_date"] = root_end_date
 
+        if "agent_status_logs" in fields_config and isinstance(
+            fields_config["agent_status_logs"], dict
+        ):
+            if (
+                root_start_date
+                and "start_date" not in fields_config["agent_status_logs"]
+            ):
+                fields_config["agent_status_logs"]["start_date"] = root_start_date
+            if (
+                root_end_date
+                and "end_date" not in fields_config["agent_status_logs"]
+            ):
+                fields_config["agent_status_logs"]["end_date"] = root_end_date
+
         root_agents = request_data.get("agents") or request_data.get("agent")
         root_tags = request_data.get("tags") or request_data.get("tag")
         if "rooms" in fields_config:
@@ -881,6 +895,12 @@ class ReportFieldsValidatorViewSet(APIView):
                 fields_config["rooms"]["agents"] = root_agents
             if root_tags is not None:
                 fields_config["rooms"]["tags"] = root_tags
+
+        if "agent_status_logs" in fields_config:
+            if not isinstance(fields_config["agent_status_logs"], dict):
+                fields_config["agent_status_logs"] = {}
+            if root_agents is not None:
+                fields_config["agent_status_logs"]["agents"] = root_agents
 
     def _filter_valid_models(self, fields_config):
         available_fields = ModelFieldsPresenter.get_models_info()

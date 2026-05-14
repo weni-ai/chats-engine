@@ -1,3 +1,12 @@
+# 3.60.1
+# Add
+  - Status change log to data exporter
+  - New filters for contacts in history
+  - Room user resolution use case with feature flag
+# Remove
+  - CSAT feature flag checks from sector serializers
+  - Wait limit feature flag and related checks
+
 # 3.60.0
 # Add
   - Chats summary enabled flag exposed in project serializer
