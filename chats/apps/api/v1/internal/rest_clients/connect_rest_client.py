@@ -1,3 +1,5 @@
+from uuid import UUID
+
 import requests
 from django.conf import settings
 
@@ -37,4 +39,25 @@ class ConnectRESTClient(InternalAuthentication):
             params=params,
         )
 
+        return response
+
+    def list_channels(
+        self,
+        project_uuid: UUID,
+        channel_type: str,
+        exclude_wpp_demo: bool = None,
+        **kwargs,
+    ):
+        params = {"project_uuid": str(project_uuid), "channel_type": channel_type}
+        if exclude_wpp_demo is not None:
+            params["exclude_wpp_demo"] = exclude_wpp_demo
+        params.update(
+            {key: value for key, value in kwargs.items() if value is not None}
+        )
+
+        response = requests.get(
+            url=f"{self.base_url}/v2/projects/channels",
+            headers=self.headers,
+            params=params,
+        )
         return response
