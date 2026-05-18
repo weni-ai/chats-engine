@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 class MetaGraphAPIClient:
     base_host_url = settings.META_GRAPH_API_BASE_HOST_URL
+    api_version = settings.META_GRAPH_API_VERSION
     access_token = settings.WHATSAPP_API_ACCESS_TOKEN
 
     @property
@@ -31,7 +32,7 @@ class MetaGraphAPIClient:
         language: Optional[str] = None,
         category: Optional[str] = None,
     ):
-        url = f"{self.base_host_url}/v21.0/{waba_id}/message_templates"
+        url = f"{self.base_host_url}/{self.api_version}/{waba_id}/message_templates"
 
         params = {
             filter_name: filter_value
