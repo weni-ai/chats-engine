@@ -5,7 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 from rest_framework import exceptions
 
-from chats.apps.contacts.models import Contact
+from chats.apps.contacts.models import Contact, normalize_document
 from chats.apps.rooms.models import Room
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.accounts.models import User
@@ -89,8 +89,27 @@ class HistoryRoomFilter(filters.FilterSet):
 
     contact = filters.CharFilter(
         required=False,
-        method="filter_contact",
+        method="filter_contact_identifiers",
         help_text=_("Contact's External ID"),
+    )
+
+    email = filters.CharFilter(
+        required=False,
+        method="filter_contact_identifiers",
+        help_text=_(
+            "Contact's email. Combined with `contact` and `document` to unify "
+            "the history of the same person across channels."
+        ),
+    )
+
+    document = filters.CharFilter(
+        required=False,
+        method="filter_contact_identifiers",
+        help_text=_(
+            "Contact's document (e.g. CPF). Punctuation is ignored. Combined "
+            "with `contact` and `email` to unify the history of the same "
+            "person across channels."
+        ),
     )
 
     project = filters.CharFilter(
@@ -147,19 +166,65 @@ class HistoryRoomFilter(filters.FilterSet):
         values = value.split(",")
         return queryset.filter(tags__name__in=values).distinct()
 
-    def filter_contact(self, queryset, name, value):
+    def filter_contact_identifiers(self, queryset, name, value):
         """
-        Expands the `?contact=<external_id>` lookup to also include rooms
-        from any Contact that shares email or document with the one
-        identified by the given external_id. Falls back to the simple
-        external_id filter when no matching Contact is found, preserving
-        the previous behavior.
+        Unified handler for `contact`, `email` and `document` query params.
+
+        Each of the three filters routes to this method; the actual lookup is
+        applied once per request by reading every relevant value from the
+        cleaned form data. This is what powers the "Ver histórico" button:
+        the frontend sends the contact's external_id, email and document
+        (whichever are available) and the backend returns rooms from every
+        Contact that matches any of those identifiers — even when the same
+        person has multiple Contact rows (e.g. WhatsApp + Telegram + web
+        chat sessions with rotating URNs).
         """
-        if not value:
+        if getattr(self, "_contact_identifiers_applied", False):
+            return queryset
+        self._contact_identifiers_applied = True
+
+        cleaned = getattr(self.form, "cleaned_data", {}) or {}
+        external_id = (cleaned.get("contact") or "").strip()
+        email = (cleaned.get("email") or "").strip()
+        document = normalize_document((cleaned.get("document") or "").strip())
+
+        contact_filters = []
+        if external_id:
+            contact_filters.append(Q(external_id=external_id))
+        if email:
+            contact_filters.append(Q(email__iexact=email))
+        if document:
+            contact_filters.append(Q(document=document))
+
+        if not contact_filters:
             return queryset
 
-        contact = Contact.objects.filter(external_id=value).first()
-        if not contact:
-            return queryset.filter(contact__external_id=value)
+        combined = contact_filters[0]
+        for extra in contact_filters[1:]:
+            combined |= extra
 
-        return queryset.filter(contact_id__in=get_related_contact_ids(contact))
+        seed_contacts = list(Contact.objects.filter(combined))
+
+        if not seed_contacts:
+            # Legacy fallback: when only `contact` is provided and no Contact
+            # matches the external_id, keep the previous behavior of filtering
+            # rooms by `contact__external_id` (returns zero rooms in practice,
+            # but preserves the pre-existing contract).
+            if external_id and not email and not document:
+                return queryset.filter(contact__external_id=external_id)
+            return queryset.none()
+
+        # Expansion: include other Contacts that share email/document with
+        # any of the seeds, so we cover cases where only one identifier was
+        # provided but the underlying Contact has more identifiers stored.
+        expansion = Q(pk__in=[c.pk for c in seed_contacts])
+        for seed_email in {c.email for c in seed_contacts if c.email}:
+            expansion |= Q(email__iexact=seed_email)
+        seed_documents = {c.document for c in seed_contacts if c.document}
+        if seed_documents:
+            expansion |= Q(document__in=seed_documents)
+
+        related_pks = set(
+            Contact.objects.filter(expansion).values_list("pk", flat=True)
+        )
+        return queryset.filter(contact_id__in=related_pks)

@@ -312,3 +312,271 @@ class TestHistoryRoomContactFilterUnification(BaseAPIChatsTestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json().get("count"), 0)
+
+
+class TestHistoryRoomIdentifierFilters(BaseAPIChatsTestCase):
+    """
+    Validates the `?contact=`, `?email=` and `?document=` filters used by
+    the "Ver histórico" button. The frontend sends whichever identifiers
+    are available on the current room's contact and the backend unifies
+    history across every Contact that matches any of them.
+    """
+
+    def _list(self, **params):
+        url = reverse("history_room-list")
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.admin_token.key)
+        data = {"project": str(self.project.uuid)}
+        data.update(params)
+        return self.client.get(url, format="json", data=data)
+
+    def setUp(self):
+        super().setUp()
+        self.deactivate_rooms()
+
+    def _set_contacts(
+        self,
+        *,
+        c1_external_id=None,
+        c1_email=None,
+        c1_document=None,
+        c2_external_id=None,
+        c2_email=None,
+        c2_document=None,
+    ):
+        if c1_external_id is not None:
+            self.contact.external_id = c1_external_id
+        if c1_email is not None:
+            self.contact.email = c1_email
+        if c1_document is not None:
+            self.contact.document = c1_document
+        self.contact.save()
+
+        if c2_external_id is not None:
+            self.contact_2.external_id = c2_external_id
+        if c2_email is not None:
+            self.contact_2.email = c2_email
+        if c2_document is not None:
+            self.contact_2.document = c2_document
+        self.contact_2.save()
+
+    def _uuids(self, response):
+        return [r["uuid"] for r in response.json()["results"]]
+
+    def test_email_only_unifies_history(self):
+        """Scenario: WhatsApp + Telegram users with same email."""
+        self._set_contacts(
+            c1_external_id="wpp-001",
+            c1_email="kallil@gmail.com",
+            c2_external_id="tg-002",
+            c2_email="kallil@gmail.com",
+        )
+
+        response = self._list(email="kallil@gmail.com")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        uuids = self._uuids(response)
+        self.assertIn(str(self.room_1.uuid), uuids)
+        self.assertIn(str(self.room_2.uuid), uuids)
+
+    def test_email_match_is_case_insensitive(self):
+        self._set_contacts(
+            c1_email="kallil@gmail.com",
+            c2_email="kallil@gmail.com",
+        )
+
+        response = self._list(email="KALLIL@Gmail.COM")
+
+        uuids = self._uuids(response)
+        self.assertIn(str(self.room_1.uuid), uuids)
+        self.assertIn(str(self.room_2.uuid), uuids)
+
+    def test_document_only_unifies_history(self):
+        self._set_contacts(
+            c1_external_id="wpp-001",
+            c1_document="12345678900",
+            c2_external_id="tg-002",
+            c2_document="123.456.789-00",
+        )
+
+        response = self._list(document="12345678900")
+
+        uuids = self._uuids(response)
+        self.assertIn(str(self.room_1.uuid), uuids)
+        self.assertIn(str(self.room_2.uuid), uuids)
+
+    def test_document_ignores_punctuation_in_query(self):
+        self._set_contacts(
+            c1_document="12345678900",
+            c2_document="12345678900",
+        )
+
+        response = self._list(document="123.456.789-00")
+
+        uuids = self._uuids(response)
+        self.assertIn(str(self.room_1.uuid), uuids)
+        self.assertIn(str(self.room_2.uuid), uuids)
+
+    def test_contact_and_email_combined_returns_union(self):
+        """
+        Sends both the original external_id (WhatsApp) and an email shared
+        with another Contact (Telegram). Both rooms should come back even
+        though no single identifier covers both Contacts on its own.
+        """
+        self._set_contacts(
+            c1_external_id="wpp-001",
+            c1_email="kallil@gmail.com",
+            c2_external_id="tg-002",
+            c2_email="kallil@gmail.com",
+        )
+
+        response = self._list(contact="wpp-001", email="kallil@gmail.com")
+
+        uuids = self._uuids(response)
+        self.assertIn(str(self.room_1.uuid), uuids)
+        self.assertIn(str(self.room_2.uuid), uuids)
+
+    def test_all_three_identifiers_combined(self):
+        self._set_contacts(
+            c1_external_id="wpp-001",
+            c1_email="kallil@gmail.com",
+            c1_document="12345678900",
+            c2_external_id="tg-002",
+            c2_email="kallil@gmail.com",
+            c2_document="98765432100",
+        )
+
+        response = self._list(
+            contact="wpp-001",
+            email="kallil@gmail.com",
+            document="12345678900",
+        )
+
+        uuids = self._uuids(response)
+        self.assertIn(str(self.room_1.uuid), uuids)
+        self.assertIn(str(self.room_2.uuid), uuids)
+
+    def test_email_only_does_not_match_other_contacts(self):
+        self._set_contacts(
+            c1_email="joao@x.com",
+            c2_email="maria@x.com",
+        )
+
+        response = self._list(email="joao@x.com")
+
+        uuids = self._uuids(response)
+        self.assertIn(str(self.room_1.uuid), uuids)
+        self.assertNotIn(str(self.room_2.uuid), uuids)
+
+    def test_document_only_does_not_match_other_contacts(self):
+        self._set_contacts(
+            c1_document="111",
+            c2_document="222",
+        )
+
+        response = self._list(document="111")
+
+        uuids = self._uuids(response)
+        self.assertIn(str(self.room_1.uuid), uuids)
+        self.assertNotIn(str(self.room_2.uuid), uuids)
+
+    def test_no_match_for_any_identifier_returns_empty(self):
+        response = self._list(
+            contact="unknown",
+            email="unknown@x.com",
+            document="00000000000",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get("count"), 0)
+
+    def test_contact_with_email_but_no_document_unifies_via_email(self):
+        """
+        Contact A has only email, Contact B has the same email but also a
+        document. Sending Contact A's external_id should still unify them.
+        """
+        self._set_contacts(
+            c1_external_id="wpp-001",
+            c1_email="kallil@gmail.com",
+            c1_document="",
+            c2_external_id="tg-002",
+            c2_email="kallil@gmail.com",
+            c2_document="12345678900",
+        )
+
+        response = self._list(contact="wpp-001")
+
+        uuids = self._uuids(response)
+        self.assertIn(str(self.room_1.uuid), uuids)
+        self.assertIn(str(self.room_2.uuid), uuids)
+
+    def test_contact_with_document_but_no_email_unifies_via_document(self):
+        self._set_contacts(
+            c1_external_id="wpp-001",
+            c1_email="",
+            c1_document="12345678900",
+            c2_external_id="tg-002",
+            c2_email="someoneelse@gmail.com",
+            c2_document="12345678900",
+        )
+
+        response = self._list(contact="wpp-001")
+
+        uuids = self._uuids(response)
+        self.assertIn(str(self.room_1.uuid), uuids)
+        self.assertIn(str(self.room_2.uuid), uuids)
+
+    def test_combined_with_sector_filter(self):
+        """
+        Other filters (sector, tag, ended_at) must still apply on top of
+        the unified contact set.
+        """
+        self._set_contacts(
+            c1_email="kallil@gmail.com",
+            c2_email="kallil@gmail.com",
+        )
+
+        response = self._list(
+            email="kallil@gmail.com",
+            sector=str(self.sector_1.uuid),
+        )
+
+        uuids = self._uuids(response)
+        self.assertIn(str(self.room_1.uuid), uuids)
+        self.assertIn(str(self.room_2.uuid), uuids)
+        # room_3 belongs to sector_2 and must be filtered out even if
+        # contact_3 shared the email (not the case here, but the assertion
+        # documents the intended scoping).
+        self.assertNotIn(str(self.room_3.uuid), uuids)
+
+    def test_combined_with_search_filter(self):
+        """
+        `email` unifies the contact set; `search` then refines within it.
+        """
+        self._set_contacts(
+            c1_email="kallil@gmail.com",
+            c2_email="kallil@gmail.com",
+        )
+
+        response = self._list(
+            email="kallil@gmail.com",
+            search=self.contact.name,
+        )
+
+        uuids = self._uuids(response)
+        self.assertIn(str(self.room_1.uuid), uuids)
+        self.assertNotIn(str(self.room_2.uuid), uuids)
+
+    def test_legacy_contact_param_still_unifies(self):
+        """Ensures backward compatibility with the existing `?contact=` flow."""
+        self._set_contacts(
+            c1_external_id="wpp-001",
+            c1_email="kallil@gmail.com",
+            c2_external_id="tg-002",
+            c2_email="kallil@gmail.com",
+        )
+
+        response = self._list(contact="wpp-001")
+
+        uuids = self._uuids(response)
+        self.assertIn(str(self.room_1.uuid), uuids)
+        self.assertIn(str(self.room_2.uuid), uuids)
