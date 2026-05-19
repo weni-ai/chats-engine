@@ -486,3 +486,24 @@ class FlowRESTClient(
         )
 
         return response
+
+    def get_templates(self, project, **kwargs):
+        params = {
+            key: value for key, value in kwargs.items() if value is not None
+        }
+        response = retry_request_and_refresh_flows_auth_token(
+            project=project,
+            request_method=requests.get,
+            headers=self.project_headers(project.flows_authorization),
+            params=params,
+            url=f"{self.base_url}/api/v2/templates.json",
+        )
+        try:
+            return response.json()
+        except ValueError as e:
+            LOGGER.error(
+                "Failed to parse JSON response from get_templates: %s. Response content: %s",
+                str(e),
+                response.content,
+            )
+            raise

@@ -872,4 +872,8 @@ ROUTE_QUEUE_COOLDOWN_RETRY_DELAY = env.int(
 META_GRAPH_API_BASE_HOST_URL = env.str(
     "META_GRAPH_API_BASE_HOST_URL", default="https://graph.facebook.com"
 )
+META_GRAPH_API_VERSION = env.str("META_GRAPH_API_VERSION", default="v21.0")
 WHATSAPP_API_ACCESS_TOKEN = env.str("WHATSAPP_API_ACCESS_TOKEN", default="")
+
+# Flows Templates
+FLOWS_TEMPLATES_MAX_PAGES = env.int("FLOWS_TEMPLATES_MAX_PAGES", default=10)
