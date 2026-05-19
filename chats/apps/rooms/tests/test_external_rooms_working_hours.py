@@ -71,12 +71,11 @@ class ExternalRoomsWorkingHoursTests(APITestCase):
         resp = self._create(payload)
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
-    @patch("chats.apps.api.v1.external.rooms.serializers.is_feature_active", return_value=False)
     @patch(
         "chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room",
         return_value=None,
     )
-    def test_allows_inside_working_hours_weekday(self, _mock_billing, _mock_flag):
+    def test_allows_inside_working_hours_weekday(self, _mock_billing):
         # Quinta-feira 2025-08-21 10:00 -03:00 (dentro do horário)
         payload = self._base_payload()
         payload["contact"]["external_id"] = "00000000-0000-0000-0000-000000000002"
