@@ -16,9 +16,6 @@ from chats.apps.queues.tasks import route_queue_rooms, route_sector_rooms
 from chats.apps.sectors.models import Sector
 
 
-FEATURE_FLAG_PATH = "chats.apps.queues.tasks.is_feature_active_for_attributes"
-
-
 class RouteQueueRoomsTaskTestCase(TestCase):
     def setUp(self):
         self.project = Project.objects.create(
@@ -69,11 +66,8 @@ class RouteQueueRoomsTaskTestCase(TestCase):
             "[route_queue_rooms] Queue not found for UUID: %s", fake_uuid
         )
 
-    @patch(FEATURE_FLAG_PATH, return_value=False)
     @patch("chats.apps.queues.tasks.QueueRouterService")
-    def test_routes_without_cooldown_when_feature_flag_is_off(
-        self, mock_service_cls, mock_ff
-    ):
+    def test_acquires_lock_and_routes(self, mock_service_cls):
         mock_service = MagicMock()
         mock_service_cls.return_value = mock_service
 
@@ -82,22 +76,8 @@ class RouteQueueRoomsTaskTestCase(TestCase):
         self.assertTrue(result)
         mock_service.route_rooms.assert_called_once()
 
-    @patch(FEATURE_FLAG_PATH, return_value=True)
     @patch("chats.apps.queues.tasks.QueueRouterService")
-    def test_acquires_lock_and_routes_when_cooldown_is_active(
-        self, mock_service_cls, mock_ff
-    ):
-        mock_service = MagicMock()
-        mock_service_cls.return_value = mock_service
-
-        result = route_queue_rooms(self.queue.uuid)
-
-        self.assertTrue(result)
-        mock_service.route_rooms.assert_called_once()
-
-    @patch(FEATURE_FLAG_PATH, return_value=True)
-    @patch("chats.apps.queues.tasks.QueueRouterService")
-    def test_clears_lock_after_routing(self, mock_service_cls, mock_ff):
+    def test_clears_lock_after_routing(self, mock_service_cls):
         mock_service = MagicMock()
         mock_service_cls.return_value = mock_service
 
@@ -106,9 +86,8 @@ class RouteQueueRoomsTaskTestCase(TestCase):
         lock_key = f"route_queue_rooms_lock:{self.sector.uuid}"
         self.assertIsNone(cache.get(lock_key))
 
-    @patch(FEATURE_FLAG_PATH, return_value=True)
     @patch("chats.apps.queues.tasks.QueueRouterService")
-    def test_clears_lock_even_when_routing_raises(self, mock_service_cls, mock_ff):
+    def test_clears_lock_even_when_routing_raises(self, mock_service_cls):
         mock_service = MagicMock()
         mock_service.route_rooms.side_effect = Exception("boom")
         mock_service_cls.return_value = mock_service
@@ -146,11 +125,10 @@ class RouteQueueRoomsCooldownTestCase(TestCase):
     def _lock_key(self, queue):
         return f"route_queue_rooms_lock:{queue.uuid}"
 
-    @patch(FEATURE_FLAG_PATH, return_value=True)
     @patch("chats.apps.queues.tasks.QueueRouterService")
     @patch("chats.apps.queues.tasks.route_queue_rooms.apply_async")
     def test_rejected_call_schedules_deferred_retry(
-        self, mock_apply_async, mock_service_cls, mock_ff
+        self, mock_apply_async, mock_service_cls
     ):
         cache.set(self._lock_key(self.queue), True, timeout=30)
 
@@ -163,11 +141,10 @@ class RouteQueueRoomsCooldownTestCase(TestCase):
             countdown=2,
         )
 
-    @patch(FEATURE_FLAG_PATH, return_value=True)
     @patch("chats.apps.queues.tasks.QueueRouterService")
     @patch("chats.apps.queues.tasks.route_queue_rooms.apply_async")
     def test_second_rejected_call_does_not_schedule_duplicate_retry(
-        self, mock_apply_async, mock_service_cls, mock_ff
+        self, mock_apply_async, mock_service_cls
     ):
         cache.set(self._lock_key(self.queue), True, timeout=30)
 
@@ -179,11 +156,10 @@ class RouteQueueRoomsCooldownTestCase(TestCase):
         mock_service_cls.assert_not_called()
         mock_apply_async.assert_called_once()
 
-    @patch(FEATURE_FLAG_PATH, return_value=True)
     @patch("chats.apps.queues.tasks.QueueRouterService")
     @patch("chats.apps.queues.tasks.route_queue_rooms.apply_async")
     def test_multiple_rejected_calls_schedule_only_one_retry(
-        self, mock_apply_async, mock_service_cls, mock_ff
+        self, mock_apply_async, mock_service_cls
     ):
         cache.set(self._lock_key(self.queue), True, timeout=30)
 
@@ -192,11 +168,10 @@ class RouteQueueRoomsCooldownTestCase(TestCase):
 
         mock_apply_async.assert_called_once()
 
-    @patch(FEATURE_FLAG_PATH, return_value=True)
     @patch("chats.apps.queues.tasks.QueueRouterService")
     @patch("chats.apps.queues.tasks.route_queue_rooms.apply_async")
     def test_lock_is_cleared_after_successful_routing(
-        self, mock_apply_async, mock_service_cls, mock_ff
+        self, mock_apply_async, mock_service_cls
     ):
         mock_service = MagicMock()
         mock_service_cls.return_value = mock_service
@@ -205,12 +180,11 @@ class RouteQueueRoomsCooldownTestCase(TestCase):
 
         self.assertIsNone(cache.get(self._lock_key(self.queue)))
 
-    @patch(FEATURE_FLAG_PATH, return_value=True)
     @patch("chats.apps.queues.tasks.QueueRouterService")
     @patch("chats.apps.queues.tasks.route_queue_rooms.apply_async")
     @patch("chats.apps.queues.tasks.logger")
     def test_logs_when_cooldown_rejects_and_schedules_retry(
-        self, mock_logger, mock_apply_async, mock_service_cls, mock_ff
+        self, mock_logger, mock_apply_async, mock_service_cls
     ):
         cache.set(self._lock_key(self.queue), True, timeout=30)
 
@@ -227,11 +201,10 @@ class RouteQueueRoomsCooldownTestCase(TestCase):
         )
 
     @override_settings(ROUTE_QUEUE_COOLDOWN_RETRY_DELAY=5)
-    @patch(FEATURE_FLAG_PATH, return_value=True)
     @patch("chats.apps.queues.tasks.QueueRouterService")
     @patch("chats.apps.queues.tasks.route_queue_rooms.apply_async")
     def test_retry_uses_configured_delay(
-        self, mock_apply_async, mock_service_cls, mock_ff
+        self, mock_apply_async, mock_service_cls
     ):
         cache.set(self._lock_key(self.queue), True, timeout=30)
 
@@ -242,11 +215,10 @@ class RouteQueueRoomsCooldownTestCase(TestCase):
             countdown=5,
         )
 
-    @patch(FEATURE_FLAG_PATH, return_value=True)
     @patch("chats.apps.queues.tasks.QueueRouterService")
     @patch("chats.apps.queues.tasks.route_queue_rooms.apply_async")
     def test_different_sectors_have_independent_locks(
-        self, mock_apply_async, mock_service_cls, mock_ff
+        self, mock_apply_async, mock_service_cls
     ):
         other_sector = Sector.objects.create(
             name="Other Sector",
@@ -272,11 +244,10 @@ class RouteQueueRoomsCooldownTestCase(TestCase):
         self.assertTrue(result_unlocked)
         mock_service.route_rooms.assert_called_once()
 
-    @patch(FEATURE_FLAG_PATH, return_value=True)
     @patch("chats.apps.queues.tasks.QueueRouterService")
     @patch("chats.apps.queues.tasks.route_queue_rooms.apply_async")
     def test_new_retry_can_be_scheduled_after_successful_routing_clears_lock(
-        self, mock_apply_async, mock_service_cls, mock_ff
+        self, mock_apply_async, mock_service_cls
     ):
         mock_service = MagicMock()
         mock_service_cls.return_value = mock_service
