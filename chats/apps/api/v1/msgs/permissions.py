@@ -3,6 +3,7 @@ from rest_framework import permissions
 from rest_framework.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
+from chats.apps.projects.models import ProjectPermission
 from chats.apps.rooms.models import Room
 
 
@@ -22,7 +23,10 @@ class MessagePermission(permissions.BasePermission):
             if room.user == user:
                 return True
             project = room.queue.sector.project
-            permission = user.project_permissions.get(project=project)
+            try:
+                permission = user.project_permissions.get(project=project)
+            except ProjectPermission.DoesNotExist:
+                return False
         else:
             project_uuid = request.query_params.get("project")
 

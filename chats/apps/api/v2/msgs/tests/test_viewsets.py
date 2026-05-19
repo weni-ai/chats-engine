@@ -216,8 +216,7 @@ class TestMessageViewSetV2AsAuthenticatedUser(BaseTestMessageViewSetV2):
         self.client.force_authenticate(user=other_user)
 
         response = self.list({"room": str(self.room.uuid)})
-        # TODO: This should be a 403, fix in the view
-        self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_list_messages_with_media(self):
         """Tests listing messages with media array"""
