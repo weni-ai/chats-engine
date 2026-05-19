@@ -49,6 +49,11 @@ from chats.apps.projects.models import (
     Project,
     ProjectPermission,
 )
+from chats.apps.projects.usecases.exceptions import (
+    FlowTemplateChannelsNotFound,
+    FlowTemplateNotFound,
+)
+from chats.apps.projects.usecases.flow_templates import GetFlowTemplatesDataUseCase
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.projects.usecases.status_service import InServiceStatusService
 from chats.apps.queues.utils import (
@@ -285,6 +290,51 @@ class ProjectViewset(
         )
 
         return Response(flow_definitions, status.HTTP_200_OK)
+
+    @swagger_auto_schema(auto_schema=None)
+    @action(detail=True, methods=["GET"], url_name="flow_templates")
+    def flow_templates(self, request, *args, **kwargs):
+        flow_uuid = request.query_params.get("flow")
+
+        if not flow_uuid:
+            return Response(
+                {"detail": "The 'flow' query param is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        project = self.get_object()
+        usecase = GetFlowTemplatesDataUseCase(project.uuid)
+
+        try:
+            result = usecase.execute(flow_uuid)
+        except (FlowTemplateNotFound, FlowTemplateChannelsNotFound) as exc:
+            logger.warning(
+                "Flow templates retrieval failed: project=%s flow=%s error=%s",
+                project.uuid,
+                flow_uuid,
+                exc,
+            )
+            return Response(
+                {"detail": str(exc)},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        templates = [
+            {
+                "variables": template.variables,
+                "data": template.data,
+            }
+            for template in result.templates
+        ]
+
+        return Response(
+            {
+                "flow_uuid": str(result.uuid),
+                "total_template_qty": len(templates),
+                "templates": templates,
+            },
+            status=status.HTTP_200_OK,
+        )
 
     def _create_flow_start_instances(self, data, flow_start):
         groups = data.get("groups", [])
