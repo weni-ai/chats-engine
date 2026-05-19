@@ -253,6 +253,11 @@ class TestRestrictOfflineAgents(APITestCase):
             self.url, {"room": str(self.room.uuid)}, format="json"
         )
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data["error_code"], "agent_offline")
+        self.assertEqual(
+            response.data["error_message"],
+            "Offline agents cannot send messages in this project",
+        )
 
     def test_allows_non_create_actions(self):
         self.project.config = {"restrict_offline_agents": True}
