@@ -54,7 +54,7 @@ class HistorySummaryFeedback(BaseModel):
 
     history_summary = models.ForeignKey(
         HistorySummary,
-        verbose_name=_("History Summary"),
+        verbose_name=_("History summary"),
         on_delete=models.CASCADE,
         related_name="feedbacks",
     )
@@ -70,7 +70,7 @@ class HistorySummaryFeedback(BaseModel):
 
     class Meta:
         verbose_name = _("History summary feedback")
-        verbose_name_plural = _("History summary feedbacks")
+        verbose_name_plural = _("History summary feedback")
         constraints = [
             models.UniqueConstraint(
                 fields=["history_summary", "user"],

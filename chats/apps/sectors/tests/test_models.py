@@ -337,7 +337,7 @@ class SectorHolidayCacheInvalidationTests(TestCase):
         with self.assertRaises(ValidationError) as cm:
             self.validator.validate_working_hours(self.sector, self.monday_dt)
         self.assertIn(
-            "Contact couldn't be started because today is a holiday",
+            "Contact can't be done because today is a holiday",
             str(cm.exception),
         )
 
@@ -357,7 +357,7 @@ class SectorHolidayCacheInvalidationTests(TestCase):
         with self.assertRaises(ValidationError) as cm:
             self.validator.validate_working_hours(self.sector, self.monday_dt)
         self.assertIn(
-            "Contact couldn't be started because today is a holiday",
+            "Contact can't be done because today is a holiday",
             str(cm.exception),
         )
         self.assertIn(cache_key, self.cache.store)
@@ -418,7 +418,7 @@ class WorkingHoursValidatorHolidayTests(TestCase):
             self.validator.validate_working_hours(self.sector, self.monday_dt)
 
         self.assertIn(
-            "Contact couldn't be started because today is a holiday",
+            "Contact can't be done because today is a holiday",
             str(cm.exception),
         )
 
@@ -460,7 +460,7 @@ class WorkingHoursValidatorHolidayTests(TestCase):
             self.validator.validate_working_hours(self.sector, self.monday_dt)
 
         self.assertIn(
-            "Contact couldn't be started outside the holiday working hours",
+            "Contact can't be done outside working hours",
             str(cm.exception),
         )
 
@@ -493,7 +493,7 @@ class WorkingHoursValidatorHolidayTests(TestCase):
             self.validator.validate_working_hours(sector, self.monday_dt)
 
         self.assertIn(
-            "Contact couldn't be started because today is a holiday",
+            "Contact can't be done outside working hours",
             str(cm.exception),
         )
 
@@ -557,7 +557,7 @@ class WorkingHoursValidatorHolidayTests(TestCase):
             self.validator.validate_working_hours(sector, self.monday_dt)
 
         self.assertIn(
-            "Contact couldn't be started outside the holiday working hours",
+            "Contact can't be done outside holiday working hours",
             str(cm.exception),
         )
 
@@ -586,7 +586,7 @@ class WorkingHoursValidatorHolidayTests(TestCase):
             self.validator.validate_working_hours(sector, self.monday_dt)
 
         self.assertIn(
-            "Contact couldn't be started because today is a holiday",
+            "Contact can't be done outside working hours",
             str(cm.exception),
         )
 

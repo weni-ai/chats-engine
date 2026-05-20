@@ -18,7 +18,7 @@ class DiscussionFilter(filters.FilterSet):
 
     search = filters.CharFilter(
         method="filter_search",
-        help_text=_("Filter discussions by subject or contact's name"),
+        help_text=_("Filter discussions by subject or contact name"),
     )
 
     project = filters.CharFilter(

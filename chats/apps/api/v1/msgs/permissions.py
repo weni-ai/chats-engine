@@ -67,7 +67,7 @@ class MessageMediaPermission(permissions.BasePermission):
                 raise ValidationError(
                     {
                         "error": [
-                            _("Either room or project query parameter is required")
+                            _("Either the room or the project query parameter is required")
                         ]
                     },
                     code="required",

@@ -24,12 +24,12 @@ class ArchiveConversationsJob(models.Model):
         _("Started at"),
         null=True,
         blank=True,
-        help_text=_("The date and time when the job started"),
+        help_text=_("The date and time the job started"),
     )
 
     class Meta:
-        verbose_name = _("Archive Conversations Job")
-        verbose_name_plural = _("Archive Conversations Jobs")
+        verbose_name = _("Archive conversation job")
+        verbose_name_plural = _("Archive conversation jobs")
 
     def __str__(self):
         return f"Archive Conversations Job {self.uuid} - {self.started_at}"
@@ -55,57 +55,57 @@ class RoomArchivedConversation(models.Model):
         verbose_name=_("Job"),
         on_delete=models.CASCADE,
         related_name="room_archived_conversations",
-        help_text=_("The job that archived the conversation"),
+        help_text=_("Job that archived the conversation"),
     )
     room = models.ForeignKey(
         Room,
         verbose_name=_("Room"),
         on_delete=models.CASCADE,
         related_name="archived_conversations",
-        help_text=_("The room that was archived"),
+        help_text=_("Archived room"),
     )
     file = models.FileField(
         verbose_name=_("File"),
         upload_to=upload_to,
-        help_text=_("The file that contains the archived conversation"),
+        help_text=_("File containing the archived conversation"),
         max_length=255,
     )
     archive_process_started_at = models.DateTimeField(
-        verbose_name=_("Archive process started at"),
+        verbose_name=_("Archiving started at"),
         null=True,
         blank=True,
-        help_text=_("The date and time when the archive process started"),
+        help_text=_("Date and time the archive process started"),
     )
     messages_deleted_at = models.DateTimeField(
         verbose_name=_("Messages deleted at"),
         null=True,
         blank=True,
         help_text=_(
-            "The date and time when the messages were deleted from the database"
+            "Date and time the messages were deleted from the database"
         ),
     )
     archive_process_finished_at = models.DateTimeField(
-        verbose_name=_("Archive process finished at"),
+        verbose_name=_("Archiving finished at"),
         null=True,
         blank=True,
-        help_text=_("The date and time when the archive process was finished"),
+        help_text=_("Date and time the archive process was completed"),
     )
     failed_at = models.DateTimeField(
         verbose_name=_("Failed at"),
         null=True,
         blank=True,
-        help_text=_("The date and time when the archive process failed"),
+        help_text=_("Date and time the archive process failed"),
     )
     errors = models.JSONField(
         verbose_name=_("Errors"),
         null=True,
         blank=True,
-        help_text=_("The errors that occurred during the archive process"),
+        help_text=_("Errors that occurred during archiving"),
     )
 
     class Meta:
-        verbose_name = _("Room Archived Conversation")
-        verbose_name_plural = _("Room Archived Conversations")
+        verbose_name = _("Archived room conversation")
+        verbose_name_plural = _("Archived room conversations")
         constraints = [
             models.UniqueConstraint(
                 fields=["room"],

@@ -90,7 +90,7 @@ class HistoryRoomFilter(filters.FilterSet):
     contact = filters.CharFilter(
         required=False,
         method="filter_contact",
-        help_text=_("Contact's External ID"),
+        help_text=_("Contact external ID"),
     )
 
     project = filters.CharFilter(

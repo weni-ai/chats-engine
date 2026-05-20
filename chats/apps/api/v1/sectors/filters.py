@@ -15,7 +15,7 @@ class SectorFilter(filters.FilterSet):
         field_name="project",
         required=True,
         method="filter_project",
-        help_text=_("Project's ID"),
+        help_text=_("Project ID"),
     )
 
     def filter_project(self, queryset, name, value):
@@ -53,7 +53,7 @@ class SectorAuthorizationFilter(filters.FilterSet):
         field_name="status",
         required=False,
         method="filter_status",
-        help_text=_("User Status"),
+        help_text=_("User status"),
     )
 
     def filter_sector(self, queryset, name, value):
@@ -79,7 +79,7 @@ class SectorTagFilter(filters.FilterSet):
         field_name="queue",
         required=False,
         method="filter_queue",
-        help_text=_("Queue's UUID"),
+        help_text=_("Queue UUID"),
     )
 
     def filter_sector(self, queryset, name, value):

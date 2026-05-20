@@ -75,7 +75,7 @@ class ProjectAdminAuthentication(TokenAuthentication):
             )
             return (authorization.user_email, authorization)
         except ProjectPermission.DoesNotExist:
-            raise exceptions.AuthenticationFailed(_("Invalid token."))
+            raise exceptions.AuthenticationFailed(_("Invalid token"))
 
     def authenticate_credentials(self, key):
         if not self.cache_token:

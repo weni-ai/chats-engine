@@ -591,7 +591,7 @@ class RoomsFlowStartExternalTests(APITestCase):
         self.assertIn(
             response.json().get("detail"),
             {
-                "The contact already have an open room in the project",
+                "The contact already has an open room in the project",
                 "The contact already have an open room in the especified queue",
             },
         )
