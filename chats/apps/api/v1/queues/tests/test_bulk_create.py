@@ -283,7 +283,6 @@ class TestBulkQueueCreate(APITestCase):
             "queues": [
                 {
                     "name": "Fila Completa",
-                    "default_message": "Olá!",
                     "config": {"key": "value"},
                     "queue_limit": {"limit": 10, "is_active": True},
                 }
@@ -295,7 +294,7 @@ class TestBulkQueueCreate(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
         queue = Queue.objects.get(sector=self.sector, name="Fila Completa")
-        self.assertEqual(queue.default_message, "Olá!")
+        self.assertEqual(queue.config, {"key": "value"})
         self.assertEqual(queue.queue_limit, 10)
         self.assertEqual(queue.is_queue_limit_active, True)
 

@@ -186,6 +186,212 @@ class SectorTests(APITestCase):
         self.assertTrue(self.sector.is_automatic_message_active)
         self.assertEqual(self.sector.automatic_message_text, text)
 
+    def test_retrieve_sector_returns_default_automatic_message_queue(self):
+        """
+        Sectors not yet configured should return the queue automatic message
+        feature as inactive and empty.
+        """
+        url = reverse("sector-detail", args=[self.sector.pk])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["automatic_message_queue"]["is_active"], False)
+        self.assertIsNone(response.data["automatic_message_queue"]["text"])
+
+    def test_retrieve_sector_returns_configured_automatic_message_queue(self):
+        """
+        Sectors with the queue automatic message configured should expose the
+        text and active flag on retrieve.
+        """
+        self.sector.is_automatic_message_queue_active = True
+        self.sector.automatic_message_queue_text = "Aguarde, em breve te atenderemos"
+        self.sector.save(
+            update_fields=[
+                "is_automatic_message_queue_active",
+                "automatic_message_queue_text",
+            ]
+        )
+        url = reverse("sector-detail", args=[self.sector.pk])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["automatic_message_queue"]["is_active"], True)
+        self.assertEqual(
+            response.data["automatic_message_queue"]["text"],
+            "Aguarde, em breve te atenderemos",
+        )
+
+    def test_create_sector_with_automatic_message_queue(self):
+        """
+        Sector creation must accept and persist the automatic_message_queue
+        contract sent by the front.
+        """
+        url = reverse("sector-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        data = {
+            "name": "Finances Queue Msg",
+            "rooms_limit": 3,
+            "work_start": "11:00",
+            "work_end": "19:30",
+            "project": str(self.project.pk),
+            "automatic_message_queue": {
+                "is_active": True,
+                "text": "Aguarde, em breve te atenderemos",
+            },
+        }
+
+        response = client.post(url, data=data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["automatic_message_queue"]["is_active"], True)
+        self.assertEqual(
+            response.data["automatic_message_queue"]["text"],
+            "Aguarde, em breve te atenderemos",
+        )
+
+        created_sector = Sector.objects.get(uuid=response.data["uuid"])
+        self.assertTrue(created_sector.is_automatic_message_queue_active)
+        self.assertEqual(
+            created_sector.automatic_message_queue_text,
+            "Aguarde, em breve te atenderemos",
+        )
+
+    def test_update_sector_automatic_message_queue(self):
+        """
+        PATCH on sector must persist the automatic_message_queue payload.
+        """
+        url = reverse("sector-detail", args=[self.sector.pk])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        text = "Aguarde, em breve te atenderemos"
+        response = client.patch(
+            url,
+            data={
+                "automatic_message_queue": {
+                    "is_active": True,
+                    "text": text,
+                },
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["automatic_message_queue"]["is_active"], True)
+        self.assertEqual(response.data["automatic_message_queue"]["text"], text)
+
+        self.sector.refresh_from_db()
+        self.assertTrue(self.sector.is_automatic_message_queue_active)
+        self.assertEqual(self.sector.automatic_message_queue_text, text)
+
+    def test_update_sector_can_disable_automatic_message_queue_without_losing_text(
+        self,
+    ):
+        """
+        Disabling the flag must keep the text intact to allow re-enabling later.
+        """
+        self.sector.is_automatic_message_queue_active = True
+        self.sector.automatic_message_queue_text = "Aguarde"
+        self.sector.save(
+            update_fields=[
+                "is_automatic_message_queue_active",
+                "automatic_message_queue_text",
+            ]
+        )
+        url = reverse("sector-detail", args=[self.sector.pk])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = client.patch(
+            url,
+            data={
+                "automatic_message_queue": {
+                    "is_active": False,
+                    "text": "Aguarde",
+                },
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.sector.refresh_from_db()
+        self.assertFalse(self.sector.is_automatic_message_queue_active)
+        self.assertEqual(self.sector.automatic_message_queue_text, "Aguarde")
+
+    def test_create_sector_with_automatic_message_queue_active_without_text_returns_400(
+        self,
+    ):
+        """
+        is_active=True with empty text must return 400 to prevent silent
+        configurations that never fire.
+        """
+        url = reverse("sector-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        data = {
+            "name": "Finances Empty",
+            "rooms_limit": 3,
+            "work_start": "11:00",
+            "work_end": "19:30",
+            "project": str(self.project.pk),
+            "automatic_message_queue": {
+                "is_active": True,
+                "text": "",
+            },
+        }
+
+        response = client.post(url, data=data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("automatic_message_queue", response.data)
+
+    def test_update_sector_automatic_message_queue_active_without_text_returns_400(
+        self,
+    ):
+        """
+        PATCH with is_active=True and empty text must return 400.
+        """
+        url = reverse("sector-detail", args=[self.sector.pk])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = client.patch(
+            url,
+            data={
+                "automatic_message_queue": {
+                    "is_active": True,
+                    "text": "",
+                },
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("automatic_message_queue", response.data)
+
+    def test_update_sector_activates_without_text_uses_existing_text(self):
+        """
+        PATCH sending only is_active=True (without text) should keep the
+        existing text on the sector instead of clearing it.
+        """
+        self.sector.is_automatic_message_queue_active = False
+        self.sector.automatic_message_queue_text = "Aguarde"
+        self.sector.save(
+            update_fields=[
+                "is_automatic_message_queue_active",
+                "automatic_message_queue_text",
+            ]
+        )
+        url = reverse("sector-detail", args=[self.sector.pk])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = client.patch(
+            url,
+            data={"automatic_message_queue": {"is_active": True}},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.sector.refresh_from_db()
+        self.assertTrue(self.sector.is_automatic_message_queue_active)
+        self.assertEqual(self.sector.automatic_message_queue_text, "Aguarde")
+
     def test_delete_sector_with_right_project_token(self):
         """
         Verify if the endpoint for delete sector is working with correctly.
