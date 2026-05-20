@@ -46,7 +46,7 @@ class SectorAuthorizationFilter(filters.FilterSet):
         field_name="sector",
         required=False,
         method="filter_sector",
-        help_text=_("Sector's UUID"),
+        help_text=_("Department UUID"),
     )
 
     status = filters.CharFilter(
@@ -72,7 +72,7 @@ class SectorTagFilter(filters.FilterSet):
         field_name="sector",
         required=False,
         method="filter_sector",
-        help_text=_("Sector's UUID"),
+        help_text=_("Department UUID"),
     )
 
     queue = filters.CharFilter(

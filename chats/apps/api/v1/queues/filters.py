@@ -29,7 +29,7 @@ class QueueAuthorizationFilter(filters.FilterSet):
         field_name="queue",
         required=True,
         method="filter_queue",
-        help_text=_("queue's ID"),
+        help_text=_("Queue ID"),
     )
 
     status = filters.CharFilter(

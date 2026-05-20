@@ -25,7 +25,7 @@ class DiscussionFilter(filters.FilterSet):
         field_name="project",
         required=True,
         method="filter_project",
-        help_text=_("Projects's UUID"),
+        help_text=_("Project UUID"),
     )
 
     def filter_search(self, queryset, name, value):

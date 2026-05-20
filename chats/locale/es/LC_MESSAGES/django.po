@@ -35,7 +35,7 @@ msgstr ""
 "inválidos."
 
 #: chats/apps/accounts/authentication/drf/authorization.py:77
-msgid "Invalid token."
+msgid "Invalid token"
 msgstr "Token inválido."
 
 #: chats/apps/accounts/models.py:68 chats/apps/contacts/models.py:14

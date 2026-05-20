@@ -97,19 +97,19 @@ class HistoryRoomFilter(filters.FilterSet):
         field_name="project",
         required=True,
         method="filter_project",
-        help_text=_("Projects's UUID"),
+        help_text=_("Project UUID"),
     )
 
     sector = filters.CharFilter(
         field_name="queue__sector__uuid",
         required=False,
-        help_text=_("Sector's UUID"),
+        help_text=_("Department UUID"),
     )
 
     tag = filters.CharFilter(
         required=False,
         method="filter_tags",
-        help_text=_("Room Tags"),
+        help_text=_("Room tags"),
     )
     created_on = filters.DateFromToRangeFilter(
         field_name="created_on",
