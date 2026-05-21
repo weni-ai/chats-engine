@@ -1,11 +1,10 @@
 [run]
 omit =
-    *migrations/*
+    */migrations/*
     debug_*.py
-    *site-packages/*
+    */site-packages/*
     manage.py
-    marketplace/settings.py
-    *tests/*
+    */tests/*
     */chats/apps/api/v1/internal/rest_clients/*
     chats/settings.py
 
