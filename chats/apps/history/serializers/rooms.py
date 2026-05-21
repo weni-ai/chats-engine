@@ -12,7 +12,7 @@ from chats.apps.sectors.models import SectorTag
 class ContactOptimizedSerializer(serializers.ModelSerializer):
     class Meta:
         model = Contact
-        fields = ["uuid", "name", "external_id"]
+        fields = ["uuid", "name", "external_id", "email", "document"]
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

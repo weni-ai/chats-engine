@@ -2,8 +2,8 @@ import logging
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django_filters.rest_framework import DjangoFilterBackend
 from django.utils.decorators import method_decorator
+from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import exceptions, filters, status
 from rest_framework.decorators import action
@@ -19,6 +19,8 @@ from chats.apps.api.v1.permissions import (
 )
 from chats.apps.api.v1.queues import serializers as queue_serializers
 from chats.apps.api.v1.queues.filters import QueueAuthorizationFilter, QueueFilter
+from chats.apps.api.v1.rooms.services.bulk_close_service import BulkCloseService
+from chats.apps.api.v1.rooms.services.bulk_transfer_service import BulkTransferService
 from chats.apps.core.internal_domains import (
     exclude_vtex_internal_domains,
     is_vtex_internal_domain,
@@ -26,6 +28,8 @@ from chats.apps.core.internal_domains import (
 from chats.apps.projects.models.models import Project
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.queues.usecases.bulk_queue_creation import BulkQueueCreationUseCase
+from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorGroupSector
 from chats.apps.sectors.usecases.group_sector_authorization import (
     QueueGroupSectorAuthorizationCreationUseCase,
@@ -45,7 +49,9 @@ User = get_user_model()
 
 @method_decorator(name="create", decorator=swagger_auto_schema(auto_schema=None))
 @method_decorator(name="update", decorator=swagger_auto_schema(auto_schema=None))
-@method_decorator(name="partial_update", decorator=swagger_auto_schema(auto_schema=None))
+@method_decorator(
+    name="partial_update", decorator=swagger_auto_schema(auto_schema=None)
+)
 @method_decorator(name="destroy", decorator=swagger_auto_schema(auto_schema=None))
 class QueueViewset(ModelViewSet):
     swagger_tag = "Queues"
@@ -156,7 +162,129 @@ class QueueViewset(ModelViewSet):
 
         return instance
 
+    def _close_active_rooms(self, instance):
+        rooms = Room.objects.filter(
+            queue=instance,
+            is_active=True,
+        )
+        if not rooms.exists():
+            return None
+
+        service = BulkCloseService()
+        result = service.close(
+            rooms=rooms,
+            end_by="queue_deleted",
+        )
+
+        if result.success_count == 0 and result.failed_count > 0:
+            raise exceptions.APIException(
+                detail=(
+                    f"Failed to close all {result.failed_count} active rooms "
+                    f"for queue {instance.uuid}. Deletion aborted."
+                ),
+            )
+
+        if result.failed_count > 0:
+            LOGGER.warning(
+                "[QUEUE_DELETE] Partial room closure for queue %s: "
+                "%d succeeded, %d failed",
+                instance.uuid,
+                result.success_count,
+                result.failed_count,
+            )
+
+        return result
+
+    def _transfer_active_rooms(self, instance, target_queue):
+        rooms = Room.objects.filter(
+            queue=instance,
+            is_active=True,
+        )
+        if not rooms.exists():
+            return None
+
+        service = BulkTransferService()
+        return service.transfer(
+            rooms=rooms,
+            user_request=self.request.user,
+            queue=target_queue,
+        )
+
+    def _validate_transfer_queue(self, instance, transfer_to_queue_uuid):
+        try:
+            target_queue = Queue.objects.select_related("sector__project").get(
+                uuid=transfer_to_queue_uuid
+            )
+        except Queue.DoesNotExist:
+            return None, Response(
+                {"detail": f"Target queue {transfer_to_queue_uuid} not found"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if target_queue.uuid == instance.uuid:
+            return None, Response(
+                {"detail": "Cannot transfer rooms to the same queue being deleted"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if target_queue.sector.project_id != instance.sector.project_id:
+            return None, Response(
+                {"detail": "Target queue must belong to the same project"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return target_queue, None
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        transfer_to_queue_uuid = request.query_params.get("transfer_to_queue")
+        end_all_chats = request.query_params.get("end_all_chats", "").lower() == "true"
+
+        if transfer_to_queue_uuid and end_all_chats:
+            return Response(
+                {"detail": "Cannot use both 'transfer_to_queue' and 'end_all_chats'"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if transfer_to_queue_uuid:
+            target_queue, error_response = self._validate_transfer_queue(
+                instance, transfer_to_queue_uuid
+            )
+            if error_response:
+                return error_response
+
+            result = self._transfer_active_rooms(instance, target_queue)
+
+            if result and result.failed_count > 0:
+                return Response(
+                    {
+                        "detail": "Failed to transfer all rooms. Deletion aborted.",
+                        "transfer": result.to_dict(),
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+
+            self.perform_destroy(instance)
+            return Response(
+                {
+                    "is_deleted": True,
+                    "transfer": result.to_dict() if result else None,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
     def perform_destroy(self, instance):
+        end_all_chats = (
+            self.request.query_params.get("end_all_chats", "").lower() == "true"
+        )
+
+        if end_all_chats:
+            self._close_active_rooms(instance)
+
         secondary_project_config = instance.sector.secondary_project or {}
         secondary_project_uuid = secondary_project_config.get("uuid")
 
@@ -264,6 +392,25 @@ class QueueViewset(ModelViewSet):
         )
 
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["POST"])
+    def bulk_create(self, request, *args, **kwargs):
+        serializer = queue_serializers.BulkQueueCreateSerializer(
+            data=request.data, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+
+        use_case = BulkQueueCreationUseCase(
+            sector=serializer.validated_data["sector"],
+            queues_data=serializer.validated_data["queues"],
+            user=request.user,
+        )
+        created_queues = use_case.execute()
+
+        response_serializer = queue_serializers.QueueSerializer(
+            created_queues, many=True, context={"request": request}
+        )
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=["GET"])
     def list_queue_permissions(self, request, *args, **kwargs):

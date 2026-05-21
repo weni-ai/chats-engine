@@ -37,6 +37,39 @@ class RoomMessageStatusSerializer(serializers.Serializer):
     )
 
 
+class RoomsCountQueryParamsSerializer(serializers.Serializer):
+    sector = serializers.UUIDField(required=False)
+    queue = serializers.UUIDField(required=False)
+
+    def validate(self, data: dict) -> dict:
+        if bool(data.get("sector")) == bool(data.get("queue")):
+            raise serializers.ValidationError(
+                "Provide exactly one of 'sector' or 'queue'."
+            )
+        return data
+
+
+class RoomsCountByQueueQueryParamsSerializer(serializers.Serializer):
+    project = serializers.UUIDField(required=True)
+    email = serializers.EmailField(required=False, allow_blank=True)
+
+
+class QueueRoomsCountSerializer(serializers.Serializer):
+    uuid = serializers.UUIDField()
+    name = serializers.CharField()
+    rooms_in_awaiting = serializers.IntegerField()
+    rooms_in_progress = serializers.IntegerField()
+
+
+class SectorRoomsCountSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    queues = QueueRoomsCountSerializer(many=True)
+
+
+class RoomsCountByQueueResponseSerializer(serializers.Serializer):
+    sectors = SectorRoomsCountSerializer(many=True)
+
+
 class RoomSerializer(serializers.ModelSerializer):
     user = UserSerializer(many=False, read_only=True)
     contact = ContactRelationsSerializer(many=False, read_only=True)
@@ -252,6 +285,8 @@ class ListRoomSerializer(serializers.ModelSerializer):
             "uuid": room.contact.uuid,
             "name": room.contact.name,
             "external_id": room.contact.external_id,
+            "email": room.contact.email,
+            "document": room.contact.document,
         }
 
     def get_can_edit_custom_fields(self, room: Room):

@@ -34,8 +34,10 @@ class IsProjectAdmin(permissions.BasePermission):
 class IsSectorManager(permissions.BasePermission):
     def has_permission(self, request, view):
         data = request.data or request.query_params
-        if view.action in ["list", "create"]:
+        if view.action in ["list", "create", "bulk_create"]:
             permission = GetPermission(request).permission
+            if permission is None:
+                return False
             kwargs = {"sector": data.get("sector"), "queue": data.get("queue")}
             return permission.is_manager(**kwargs)
 
@@ -107,6 +109,42 @@ class AnySectorManagerPermission(permissions.BasePermission):
             return GetPermission(request).permission.is_manager(any_sector=True)
         except AttributeError:
             return False
+
+
+class ProjectAccessPermission(permissions.BasePermission):
+    """
+    Grant view-level permission if the user has any ProjectPermission on
+    the project identified by the `project` query/data param.
+
+    Visibility of sectors, queues and counts is then handled downstream
+    by the view/service based on the permission's role.
+
+    Side effect: caches the resolved permission on the request as
+    `_cached_project_permission` so views can reuse it without issuing a
+    second query.
+
+    Note: the existing `ProjectAnyPermission` (above) only implements
+    `has_object_permission` and is used for object-level checks; this
+    class implements `has_permission` for query-param-driven endpoints.
+    """
+
+    def has_permission(self, request, view):
+        data = request.data or request.query_params
+        if not data.get("project"):
+            raise ValidationError(
+                {"project": ["This field is required"]}, code="required"
+            )
+
+        try:
+            permission = GetPermission(request).permission
+        except (AttributeError, ProjectPermission.DoesNotExist):
+            return False
+
+        if permission is None:
+            return False
+
+        request._cached_project_permission = permission
+        return True
 
 
 class IsQueueAgent(permissions.BasePermission):

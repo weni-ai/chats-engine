@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
+from chats.apps.discussions.exceptions import UserProjectPermissionNotFound
 from chats.core.models import BaseModel, BaseSoftDeleteModel, WebSocketsNotifiableMixin
 
 
@@ -136,6 +137,16 @@ class Discussion(BaseSoftDeleteModel, BaseModel, WebSocketsNotifiableMixin):
     def create_discussion_user(self, from_user, to_user, role=None):
         from_permission = self.get_permission(user=from_user)
         to_permission = self.get_permission(user=to_user)
+
+        for user, permission in [
+            (from_user, from_permission),
+            (to_user, to_permission),
+        ]:
+            if not permission:
+                raise UserProjectPermissionNotFound(
+                    f"User {user.email} not found in the project"
+                )
+
         discussion_user = None
 
         if (from_permission and to_permission) and self.can_add_user(from_permission):

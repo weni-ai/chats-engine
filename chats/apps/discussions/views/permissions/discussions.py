@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AnonymousUser
 from rest_framework import permissions
 
+from chats.apps.discussions.models.discussion import Discussion
 from chats.apps.rooms.models import Room
 
 
@@ -57,3 +58,15 @@ class CanManageDiscussion(permissions.BasePermission):
 
         except AttributeError:
             return obj.can_retrieve(request.user)
+
+
+class CanAddAgentToDiscussion(permissions.BasePermission):
+    def has_permission(self, request, view):
+        if isinstance(request.user, AnonymousUser):
+            return False
+        if view.action == "add_agents":
+            return True
+        return super().has_permission(request, view)
+
+    def has_object_permission(self, request, view, obj: Discussion) -> bool:
+        return obj.can_add_user(request.user)

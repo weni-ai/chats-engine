@@ -1,5 +1,5 @@
 import uuid
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, MagicMock, patch
 
 from django.urls import reverse
 from rest_framework import status
@@ -12,6 +12,8 @@ from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorTag
+
+from chats.apps.projects.tests.decorators import with_project_permission
 
 
 class SectorTests(APITestCase):
@@ -115,15 +117,12 @@ class SectorTests(APITestCase):
         self.assertEqual(response.data["automatic_message"]["is_active"], False)
         self.assertIsNone(response.data["automatic_message"]["text"])
 
-    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active")
     def test_create_sector_with_right_project_token_and_automatic_message_active(
         self,
-        mock_is_feature_active,
     ):
         """
         Verify if the endpoint for create in sector is working with correctly.
         """
-        mock_is_feature_active.return_value = True
         url = reverse("sector-list")
         client = self.client
         client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
@@ -159,12 +158,10 @@ class SectorTests(APITestCase):
         sector = Sector.objects.get(pk="21aecf8c-0c73-4059-ba82-4343e0cc627c")
         self.assertEqual("sector 2 updated", sector.name)
 
-    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active")
-    def test_update_sector_automatic_message(self, mock_is_feature_active):
+    def test_update_sector_automatic_message(self):
         """
         Verify if the endpoint for update in sector is working with correctly.
         """
-        mock_is_feature_active.return_value = True
         self.sector.is_automatic_message_active = False
         self.sector.save(update_fields=["is_automatic_message_active"])
         url = reverse("sector-detail", args=[self.sector.pk])
@@ -199,34 +196,10 @@ class SectorTests(APITestCase):
         response = client.delete(url)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
-    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active")
-    def test_update_sector_csat_enabled_when_feature_flag_is_off(
-        self, mock_is_feature_active
-    ):
+    def test_update_sector_csat_enabled(self):
         """
         Verify if the endpoint for update in sector is working with correctly.
         """
-        mock_is_feature_active.return_value = False
-        url = reverse("sector-detail", args=[self.sector.pk])
-        client = self.client
-        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
-        response = client.patch(url, data={"is_csat_enabled": True})
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
-            response.data["is_csat_enabled"][0].code,
-            "csat_feature_flag_is_off",
-        )
-        self.sector.refresh_from_db()
-        self.assertFalse(self.sector.is_csat_enabled)
-
-    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active")
-    def test_update_sector_csat_enabled_when_feature_flag_is_on(
-        self, mock_is_feature_active
-    ):
-        """
-        Verify if the endpoint for update in sector is working with correctly.
-        """
-        mock_is_feature_active.return_value = True
         url = reverse("sector-detail", args=[self.sector.pk])
         client = self.client
         client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
@@ -435,9 +408,10 @@ class RoomsExternalTests(APITestCase):
     def setUp(self) -> None:
         self.queue_1 = Queue.objects.get(uuid="f2519480-7e58-4fc4-9894-9ab1769e29cf")
 
+    @patch("chats.apps.api.v1.external.rooms.viewsets.is_feature_active_for_attributes", return_value=False)
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
-    def test_create_external_room(self, mock_get_room, mock_is_attending):
+    def test_create_external_room(self, mock_get_room, mock_is_attending, _mock_flag):
         mock_get_room.return_value = None
         url = reverse("external_rooms-list")
         client = self.client
@@ -457,10 +431,11 @@ class RoomsExternalTests(APITestCase):
         response = client.post(url, data=data, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
+    @patch("chats.apps.api.v1.external.rooms.viewsets.is_feature_active_for_attributes", return_value=False)
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_external_room_with_external_uuid(
-        self, mock_get_room, mock_is_attending
+        self, mock_get_room, mock_is_attending, _mock_flag
     ):
         mock_get_room.return_value = None
         url = reverse("external_rooms-list")
@@ -487,10 +462,11 @@ class RoomsExternalTests(APITestCase):
             "aec9f84e-3dcd-11ed-b878-0242ac190012",
         )
 
+    @patch("chats.apps.api.v1.external.rooms.viewsets.is_feature_active_for_attributes", return_value=False)
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_external_room_editing_contact(
-        self, mock_get_room, mock_is_attending
+        self, mock_get_room, mock_is_attending, _mock_flag
     ):
         mock_get_room.return_value = None
         url = reverse("external_rooms-list")
@@ -716,3 +692,318 @@ class SectorTicketerCreationTests(APITestCase):
 
         self.assertEqual(mock_create_ticketer.call_count, 0)
         self.assertEqual(mock_integrate_individual.call_count, 1)
+
+
+class SectorEndAllChatsTests(APITestCase):
+
+    def setUp(self):
+        self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            project=self.project,
+            name="Test Sector",
+            rooms_limit=5,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
+        self.queue_2 = Queue.objects.create(
+            name="Test Queue 2", sector=self.sector
+        )
+        self.contact = Contact.objects.create(
+            external_id="ext-1", name="Contact 1"
+        )
+        self.contact_2 = Contact.objects.create(
+            external_id="ext-2", name="Contact 2"
+        )
+
+        self.user = User.objects.create(email="admin@endall.test")
+        self.agent = User.objects.create(email="agent@endall.test")
+        self.client.force_authenticate(user=self.user)
+
+    def _delete_sector(self, sector_uuid, end_all_chats=False):
+        url = reverse("sector-detail", args=[sector_uuid])
+        if end_all_chats:
+            url += "?end_all_chats=true"
+        return self.client.delete(url)
+
+    @with_project_permission()
+    def test_delete_sector_without_flag_does_not_close_rooms(self):
+        room = Room.objects.create(
+            contact=self.contact,
+            queue=self.queue,
+            user=self.agent,
+            is_active=True,
+        )
+        response = self._delete_sector(self.sector.uuid)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        room.refresh_from_db()
+        self.assertTrue(room.is_active)
+
+    @with_project_permission()
+    def test_delete_sector_with_flag_closes_ongoing_rooms(self):
+        room = Room.objects.create(
+            contact=self.contact,
+            queue=self.queue,
+            user=self.agent,
+            is_active=True,
+        )
+        response = self._delete_sector(self.sector.uuid, end_all_chats=True)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        room.refresh_from_db()
+        self.assertFalse(room.is_active)
+        self.assertEqual(room.ended_by, "sector_deleted")
+
+    @with_project_permission()
+    def test_delete_sector_with_flag_closes_waiting_rooms(self):
+        room = Room.objects.create(
+            contact=self.contact,
+            queue=self.queue,
+            user=None,
+            is_active=True,
+        )
+        response = self._delete_sector(self.sector.uuid, end_all_chats=True)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        room.refresh_from_db()
+        self.assertFalse(room.is_active)
+
+    @with_project_permission()
+    def test_delete_sector_with_flag_closes_rooms_across_all_queues(self):
+        room_q1 = Room.objects.create(
+            contact=self.contact,
+            queue=self.queue,
+            user=self.agent,
+            is_active=True,
+        )
+        room_q2 = Room.objects.create(
+            contact=self.contact_2,
+            queue=self.queue_2,
+            user=None,
+            is_active=True,
+        )
+        response = self._delete_sector(self.sector.uuid, end_all_chats=True)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        room_q1.refresh_from_db()
+        room_q2.refresh_from_db()
+        self.assertFalse(room_q1.is_active)
+        self.assertFalse(room_q2.is_active)
+
+    @with_project_permission()
+    def test_delete_sector_with_flag_no_active_rooms_succeeds(self):
+        response = self._delete_sector(self.sector.uuid, end_all_chats=True)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Sector.objects.filter(uuid=self.sector.uuid).exists())
+
+    @with_project_permission()
+    def test_delete_sector_with_flag_skips_already_closed_rooms(self):
+        closed_room = Room.objects.create(
+            contact=self.contact,
+            queue=self.queue,
+            user=self.agent,
+            is_active=False,
+        )
+        active_room = Room.objects.create(
+            contact=self.contact_2,
+            queue=self.queue,
+            user=None,
+            is_active=True,
+        )
+        response = self._delete_sector(self.sector.uuid, end_all_chats=True)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        active_room.refresh_from_db()
+        self.assertFalse(active_room.is_active)
+        closed_room.refresh_from_db()
+        self.assertFalse(closed_room.is_active)
+
+
+class SectorTransferOnDeleteTests(APITestCase):
+
+    def setUp(self):
+        self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            project=self.project,
+            name="Sector To Delete",
+            rooms_limit=5,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue_1 = Queue.objects.create(
+            name="Queue 1", sector=self.sector
+        )
+        self.queue_2 = Queue.objects.create(
+            name="Queue 2", sector=self.sector
+        )
+
+        self.other_sector = Sector.objects.create(
+            project=self.project,
+            name="Other Sector",
+            rooms_limit=5,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.target_queue = Queue.objects.create(
+            name="Target Queue", sector=self.other_sector
+        )
+
+        self.contact = Contact.objects.create(
+            external_id="ext-transfer-s1", name="Contact ST1"
+        )
+        self.contact_2 = Contact.objects.create(
+            external_id="ext-transfer-s2", name="Contact ST2"
+        )
+        self.contact_3 = Contact.objects.create(
+            external_id="ext-transfer-s3", name="Contact ST3"
+        )
+
+        self.user = User.objects.create(email="admin@transfer-sector.test")
+        self.agent = User.objects.create(email="agent@transfer-sector.test")
+        self.client.force_authenticate(user=self.user)
+
+    def _delete_sector(
+        self, sector_uuid, transfer_to_queue=None, end_all_chats=False
+    ):
+        url = reverse("sector-detail", args=[sector_uuid])
+        params = []
+        if transfer_to_queue:
+            params.append(f"transfer_to_queue={transfer_to_queue}")
+        if end_all_chats:
+            params.append("end_all_chats=true")
+        if params:
+            url += "?" + "&".join(params)
+        return self.client.delete(url)
+
+    @with_project_permission()
+    def test_transfer_succeeds_and_sector_is_deleted(self):
+        room = Room.objects.create(
+            contact=self.contact,
+            queue=self.queue_1,
+            user=self.agent,
+            is_active=True,
+        )
+        response = self._delete_sector(
+            self.sector.uuid, transfer_to_queue=self.target_queue.uuid
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["is_deleted"])
+        self.assertIsNotNone(response.data["transfer"])
+        self.assertEqual(response.data["transfer"]["success_count"], 1)
+        self.assertEqual(response.data["transfer"]["failed_count"], 0)
+
+        room.refresh_from_db()
+        self.assertEqual(room.queue, self.target_queue)
+        self.assertTrue(room.is_active)
+        self.assertFalse(Sector.objects.filter(uuid=self.sector.uuid).exists())
+
+    @with_project_permission()
+    def test_transfer_failure_aborts_deletion(self):
+        room = Room.objects.create(
+            contact=self.contact,
+            queue=self.queue_1,
+            user=self.agent,
+            is_active=True,
+        )
+        with patch(
+            "chats.apps.api.v1.sectors.viewsets.BulkTransferService.transfer"
+        ) as mock_transfer:
+            mock_result = MagicMock()
+            mock_result.failed_count = 1
+            mock_result.success_count = 0
+            mock_result.to_dict.return_value = {
+                "success_count": 0,
+                "failed_count": 1,
+                "total_processed": 1,
+                "errors": ["Room failed"],
+                "failed_rooms": [str(room.uuid)],
+                "has_more_errors": False,
+            }
+            mock_transfer.return_value = mock_result
+
+            response = self._delete_sector(
+                self.sector.uuid, transfer_to_queue=self.target_queue.uuid
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertIn("transfer", response.data)
+        self.assertEqual(response.data["transfer"]["failed_count"], 1)
+        self.assertTrue(Sector.objects.filter(uuid=self.sector.uuid).exists())
+
+    @with_project_permission()
+    def test_target_queue_belongs_to_sector_being_deleted(self):
+        response = self._delete_sector(
+            self.sector.uuid, transfer_to_queue=self.queue_1.uuid
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(Sector.objects.filter(uuid=self.sector.uuid).exists())
+
+    @with_project_permission()
+    def test_target_queue_not_found(self):
+        response = self._delete_sector(
+            self.sector.uuid, transfer_to_queue=str(uuid.uuid4())
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertTrue(Sector.objects.filter(uuid=self.sector.uuid).exists())
+
+    @with_project_permission()
+    def test_target_queue_in_different_project(self):
+        other_project = Project.objects.create(name="Other Project")
+        other_sector = Sector.objects.create(
+            project=other_project,
+            name="Other Sector Foreign",
+            rooms_limit=5,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        foreign_queue = Queue.objects.create(
+            name="Foreign Queue", sector=other_sector
+        )
+        response = self._delete_sector(
+            self.sector.uuid, transfer_to_queue=foreign_queue.uuid
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(Sector.objects.filter(uuid=self.sector.uuid).exists())
+
+    @with_project_permission()
+    def test_transfer_and_end_all_chats_are_mutually_exclusive(self):
+        response = self._delete_sector(
+            self.sector.uuid,
+            transfer_to_queue=self.target_queue.uuid,
+            end_all_chats=True,
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertTrue(Sector.objects.filter(uuid=self.sector.uuid).exists())
+
+    @with_project_permission()
+    def test_transfer_no_active_rooms_deletes_sector(self):
+        response = self._delete_sector(
+            self.sector.uuid, transfer_to_queue=self.target_queue.uuid
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["is_deleted"])
+        self.assertIsNone(response.data["transfer"])
+        self.assertFalse(Sector.objects.filter(uuid=self.sector.uuid).exists())
+
+    @with_project_permission()
+    def test_transfer_rooms_across_multiple_queues_in_sector(self):
+        room_q1 = Room.objects.create(
+            contact=self.contact,
+            queue=self.queue_1,
+            user=self.agent,
+            is_active=True,
+        )
+        room_q2 = Room.objects.create(
+            contact=self.contact_2,
+            queue=self.queue_2,
+            user=None,
+            is_active=True,
+        )
+        response = self._delete_sector(
+            self.sector.uuid, transfer_to_queue=self.target_queue.uuid
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["transfer"]["success_count"], 2)
+
+        room_q1.refresh_from_db()
+        room_q2.refresh_from_db()
+        self.assertEqual(room_q1.queue, self.target_queue)
+        self.assertEqual(room_q2.queue, self.target_queue)
+        self.assertTrue(room_q1.is_active)
+        self.assertTrue(room_q2.is_active)

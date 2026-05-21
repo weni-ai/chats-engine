@@ -1,5 +1,5 @@
 from datetime import time
-from unittest.mock import call, patch
+from unittest.mock import patch
 from django.test import TestCase
 
 from chats.apps.projects.models.models import Project, RoomRoutingType
@@ -105,26 +105,25 @@ class StartQueuePriorityRoutingForAllQueuesInProjectTestCase(TestCase):
                 )
                 self.queues.append(queue)
 
-    @patch("chats.apps.queues.utils.logger")
-    @patch("chats.apps.queues.utils.route_queue_rooms")
+    @patch("chats.apps.queues.utils.route_sector_rooms")
     @patch("chats.apps.queues.utils.settings.USE_CELERY", False)
     def test_start_queue_priority_routing_for_all_queues_in_project(
         self,
-        mock_route_queue_rooms,
-        mock_logger,
+        mock_route_sector_rooms,
     ):
-        mock_route_queue_rooms.return_value = None
+        mock_route_sector_rooms.return_value = None
 
         start_queue_priority_routing_for_all_queues_in_project(self.project)
 
-        mock_logger.info.assert_any_call(
-            "Started routing rooms for all queues in project %s",
-            self.project.uuid,
+        sector_uuids_called = [
+            c.args[0] for c in mock_route_sector_rooms.call_args_list
+        ]
+        expected_sector_uuids = list(
+            Queue.objects.filter(sector__project=self.project)
+            .values_list("sector__uuid", flat=True)
+            .distinct()
         )
-
-        mock_route_queue_rooms.assert_has_calls(
-            [call(queue.uuid) for queue in self.queues]
-        )
+        self.assertEqual(sorted(sector_uuids_called), sorted(expected_sector_uuids))
 
     @patch("chats.apps.queues.utils.logger")
     @patch("chats.apps.queues.utils.route_queue_rooms")
@@ -142,7 +141,80 @@ class StartQueuePriorityRoutingForAllQueuesInProjectTestCase(TestCase):
         start_queue_priority_routing_for_all_queues_in_project(self.project)
 
         mock_logger.info.assert_any_call(
-            "Skipping start_queue_priority_routing_for_all_queues_in_project for project %s "
+            "[start_queue_priority_routing_for_all_queues_in_project] Skipping routing for project %s "
             "because it is not configured to use priority routing",
             self.project.uuid,
+        )
+
+    @patch("chats.apps.queues.utils.route_sector_rooms")
+    @patch("chats.apps.queues.utils.settings.USE_CELERY", False)
+    def test_routes_by_sector_sync(
+        self,
+        mock_route_sector_rooms,
+    ):
+        mock_route_sector_rooms.return_value = None
+
+        start_queue_priority_routing_for_all_queues_in_project(self.project)
+
+        sector_uuids_called = [
+            c.args[0] for c in mock_route_sector_rooms.call_args_list
+        ]
+        expected_sector_uuids = list(
+            Queue.objects.filter(sector__project=self.project)
+            .values_list("sector__uuid", flat=True)
+            .distinct()
+        )
+        self.assertEqual(sorted(sector_uuids_called), sorted(expected_sector_uuids))
+
+    @patch("chats.apps.queues.utils.route_sector_rooms")
+    @patch("chats.apps.queues.utils.settings.USE_CELERY", True)
+    def test_routes_by_sector_async(
+        self,
+        mock_route_sector_rooms,
+    ):
+        mock_route_sector_rooms.delay.return_value = None
+
+        start_queue_priority_routing_for_all_queues_in_project(self.project)
+
+        sector_uuids_called = [
+            c.args[0] for c in mock_route_sector_rooms.delay.call_args_list
+        ]
+        expected_sector_uuids = list(
+            Queue.objects.filter(sector__project=self.project)
+            .values_list("sector__uuid", flat=True)
+            .distinct()
+        )
+        self.assertEqual(sorted(sector_uuids_called), sorted(expected_sector_uuids))
+
+    @patch("chats.apps.queues.utils.route_sector_rooms")
+    @patch("chats.apps.queues.utils.route_queue_rooms")
+    @patch("chats.apps.queues.utils.settings.USE_CELERY", False)
+    def test_does_not_call_per_queue_routing(
+        self,
+        mock_route_queue_rooms,
+        mock_route_sector_rooms,
+    ):
+        mock_route_sector_rooms.return_value = None
+
+        start_queue_priority_routing_for_all_queues_in_project(self.project)
+
+        mock_route_queue_rooms.assert_not_called()
+
+    @patch("chats.apps.queues.utils.logger")
+    @patch("chats.apps.queues.utils.route_sector_rooms")
+    @patch("chats.apps.queues.utils.settings.USE_CELERY", False)
+    def test_logs_sector_count(
+        self,
+        mock_route_sector_rooms,
+        mock_logger,
+    ):
+        mock_route_sector_rooms.return_value = None
+
+        start_queue_priority_routing_for_all_queues_in_project(self.project)
+
+        mock_logger.info.assert_any_call(
+            "[start_queue_priority_routing_for_all_queues_in_project] "
+            "Started routing rooms by sector for project %s (%d sectors)",
+            self.project.uuid,
+            3,
         )

@@ -1,4 +1,3 @@
-import time
 import uuid
 from unittest.mock import patch
 
@@ -8,6 +7,7 @@ from django.db import IntegrityError
 from django.test import TransactionTestCase, override_settings
 from django.utils import timezone
 from django.utils.timezone import timedelta
+from freezegun import freeze_time
 from rest_framework.test import APITestCase
 
 from chats.apps.accounts.models import User
@@ -217,35 +217,35 @@ class TestRoomModel(TransactionTestCase):
 
     def test_add_to_queue_at_field(self):
         user = User.objects.create(email="a@user.com")
-        room = Room.objects.create(queue=self.queue)
+        base = timezone.now()
 
-        added_to_queue_at = room.added_to_queue_at
+        with freeze_time(base) as frozen:
+            room = Room.objects.create(queue=self.queue)
+            added_to_queue_at = room.added_to_queue_at
 
-        self.assertEqual(
-            added_to_queue_at.strftime("%Y-%m-%d %H:%M:%S"),
-            room.created_on.strftime("%Y-%m-%d %H:%M:%S"),
-        )
+            self.assertEqual(
+                added_to_queue_at.strftime("%Y-%m-%d %H:%M:%S"),
+                room.created_on.strftime("%Y-%m-%d %H:%M:%S"),
+            )
 
-        time.sleep(1)
+            frozen.move_to(base + timedelta(seconds=1))
 
-        room.user = user
-        room.save()
+            room.user = user
+            room.save()
+            room.refresh_from_db()
 
-        room.refresh_from_db()
+            # added_to_queue_at should not change
+            self.assertEqual(room.added_to_queue_at, added_to_queue_at)
 
-        # added_to_queue_at should not change
-        self.assertEqual(room.added_to_queue_at, added_to_queue_at)
+            frozen.move_to(base + timedelta(seconds=2))
 
-        time.sleep(1)
+            room.user = None
+            room.save()
+            room.refresh_from_db()
 
-        room.user = None
-        room.save()
-
-        room.refresh_from_db()
-
-        # added_to_queue_at should change when user is removed
-        # as, in practice, the room is added to the queue
-        self.assertNotEqual(room.added_to_queue_at, added_to_queue_at)
+            # added_to_queue_at should change when user is removed
+            # as, in practice, the room is added to the queue
+            self.assertNotEqual(room.added_to_queue_at, added_to_queue_at)
 
     def test_add_transfer_to_history(self):
         user = User.objects.create(email="a@user.com")

@@ -65,3 +65,7 @@ class DiscussionDetailSerializer(serializers.ModelSerializer):
             "contact",
             "created_on",
         ]
+
+
+class AddAgentToDiscussionSerializer(serializers.Serializer):
+    user_email = serializers.EmailField(required=True, allow_blank=False)
