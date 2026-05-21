@@ -304,6 +304,54 @@ class ProjectViewset(
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # STAGING-ONLY
+        mock_response = {
+            "flow_uuid": "7099478d-0d1e-4e7b-b606-6ae7313c43cd",
+            "total_template_qty": 1,
+            "templates": [
+                {
+                    "variables": ["nomecontato", "nomeatendente", "pdflink"],
+                    "data": {
+                        "name": "orcamento",
+                        "parameter_format": "POSITIONAL",
+                        "components": [
+                            {
+                                "type": "HEADER",
+                                "format": "TEXT",
+                                "text": "Seu orçamento está pronto!",
+                            },
+                            {
+                                "type": "BODY",
+                                "text": "Olá {{1}}, tudo bem? Me chamo {{2}} e estou aqui está o link do orçamento: {{3}}",
+                                "example": {
+                                    "body_text": [
+                                        [
+                                            "Marcus",
+                                            "Kallil",
+                                            "https://example.local/file.pdf",
+                                        ]
+                                    ]
+                                },
+                            },
+                            {"type": "FOOTER", "text": "Teste"},
+                            {
+                                "type": "BUTTONS",
+                                "buttons": [
+                                    {"type": "QUICK_REPLY", "text": "Preciso de ajuda"}
+                                ],
+                            },
+                        ],
+                        "language": "pt_BR",
+                        "status": "APPROVED",
+                        "category": "MARKETING",
+                        "is_primary_device_delivery_only": False,
+                        "id": "1405633441367678",
+                    },
+                }
+            ],
+        }
+        return Response(mock_response)
+
         project = self.get_object()
         usecase = GetFlowTemplatesDataUseCase(project.uuid)
 
@@ -771,9 +819,10 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                 in_service_status.save(update_fields=["is_active", "break_time"])
 
             serializer.save(user=user)
-            
+
             # Log status change
             from chats.apps.projects.tasks import log_agent_status_change
+
             log_agent_status_change.delay(
                 agent_email=user.email,
                 project_uuid=str(project.uuid),
@@ -862,9 +911,10 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                         raise serializers.ValidationError(
                             {"status": "Can't update user status in project."}
                         )
-                    
+
                     # Log status change
                     from chats.apps.projects.tasks import log_agent_status_change
+
                     log_agent_status_change.delay(
                         agent_email=instance.user.email,
                         project_uuid=str(instance.status_type.project.uuid),
