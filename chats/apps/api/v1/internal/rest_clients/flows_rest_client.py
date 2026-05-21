@@ -237,7 +237,7 @@ class FlowRESTClient(
         )
         return response
 
-    def list_flows(self, project, cursor: str = ""):
+    def list_flows(self, project, cursor: str = "", verify_chats_tag: bool = True):
         response = retry_request_and_refresh_flows_auth_token(
             project=project,
             request_method=requests.get,
@@ -255,12 +255,13 @@ class FlowRESTClient(
             raise
         flows["next"] = get_cursor(flows.get("next") or "")
         flows["previous"] = get_cursor(flows.get("previous") or "")
-        results = flows["results"]
-        flows["results"] = [
-            flow
-            for flow in results
-            if flow["labels"] != [] and check_flows_labels(flow["labels"])
-        ]
+        if verify_chats_tag:
+            results = flows["results"]
+            flows["results"] = [
+                flow
+                for flow in results
+                if flow["labels"] != [] and check_flows_labels(flow["labels"])
+            ]
         return flows
 
     def retrieve_flow_definitions(self, project, flow_uuid):
@@ -357,9 +358,7 @@ class FlowRESTClient(
         return response
 
     def get_templates(self, project, **kwargs):
-        params = {
-            key: value for key, value in kwargs.items() if value is not None
-        }
+        params = {key: value for key, value in kwargs.items() if value is not None}
         response = retry_request_and_refresh_flows_auth_token(
             project=project,
             request_method=requests.get,
