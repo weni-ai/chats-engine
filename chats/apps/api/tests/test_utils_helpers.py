@@ -5,7 +5,6 @@ from django.test import TestCase
 from django.utils import timezone
 from rest_framework.authtoken.models import Token
 
-from chats.apps.accounts.models import User
 from chats.apps.api.utils import (
     calculate_in_service_time,
     create_contact,
@@ -59,9 +58,7 @@ class TestCreateMessage(_BaseHelpersTestCase):
 
     def test_creates_message_and_updates_room_last_message_when_text(self):
         room = Room.objects.create(queue=self.queue, contact=self.contact)
-        message = create_message(
-            "hello", room=room, user=None, contact=self.contact
-        )
+        message = create_message("hello", room=room, user=None, contact=self.contact)
         self.assertIsNotNone(message)
         self.assertEqual(message.text, "hello")
         self.assertEqual(message.room, room)
@@ -152,9 +149,7 @@ class TestCreateReplyIndex(_BaseHelpersTestCase):
     def test_returns_none_when_no_external_id(self):
         msg = self._make_message(external_id=None)
         self.assertIsNone(create_reply_index(msg))
-        self.assertFalse(
-            ChatMessageReplyIndex.objects.filter(message=msg).exists()
-        )
+        self.assertFalse(ChatMessageReplyIndex.objects.filter(message=msg).exists())
 
     def test_creates_index_when_none_exists(self):
         msg = self._make_message(external_id="ext-1")
@@ -167,9 +162,7 @@ class TestCreateReplyIndex(_BaseHelpersTestCase):
 
     def test_updates_index_when_already_present(self):
         first_msg = self._make_message(external_id="ext-2")
-        ChatMessageReplyIndex.objects.create(
-            external_id="ext-2", message=first_msg
-        )
+        ChatMessageReplyIndex.objects.create(external_id="ext-2", message=first_msg)
         # Use a fresh contact for the second room to avoid the unique constraint
         new_msg = self._make_message(external_id="ext-2")
         create_reply_index(new_msg)
@@ -221,17 +214,13 @@ class TestCalculateInServiceTime(TestCase):
                 "created_on": created_on,
             }
         ]
-        self.assertEqual(
-            calculate_in_service_time(statuses, user_status="OFFLINE"), 0
-        )
+        self.assertEqual(calculate_in_service_time(statuses, user_status="OFFLINE"), 0)
 
     def test_skips_status_without_created_on(self):
         statuses = [
             {"status_type": "In-Service", "is_active": True, "created_on": None}
         ]
-        self.assertEqual(
-            calculate_in_service_time(statuses, user_status="ONLINE"), 0
-        )
+        self.assertEqual(calculate_in_service_time(statuses, user_status="ONLINE"), 0)
 
     def test_skips_status_with_invalid_created_on(self):
         statuses = [
@@ -241,6 +230,4 @@ class TestCalculateInServiceTime(TestCase):
                 "created_on": "not-a-date",
             }
         ]
-        self.assertEqual(
-            calculate_in_service_time(statuses, user_status="ONLINE"), 0
-        )
+        self.assertEqual(calculate_in_service_time(statuses, user_status="ONLINE"), 0)
