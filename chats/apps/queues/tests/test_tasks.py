@@ -203,9 +203,7 @@ class RouteQueueRoomsCooldownTestCase(TestCase):
     @override_settings(ROUTE_QUEUE_COOLDOWN_RETRY_DELAY=5)
     @patch("chats.apps.queues.tasks.QueueRouterService")
     @patch("chats.apps.queues.tasks.route_queue_rooms.apply_async")
-    def test_retry_uses_configured_delay(
-        self, mock_apply_async, mock_service_cls
-    ):
+    def test_retry_uses_configured_delay(self, mock_apply_async, mock_service_cls):
         cache.set(self._lock_key(self.queue), True, timeout=30)
 
         route_queue_rooms(self.queue.uuid)
