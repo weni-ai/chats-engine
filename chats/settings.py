@@ -679,6 +679,9 @@ CSAT_FLOW_UPDATE_RETRIES = env.int("CSAT_FLOW_UPDATE_RETRIES", default=5)
 CSAT_FLOW_UPDATE_EXPIRATION_TIME = env.int(
     "CSAT_FLOW_UPDATE_EXPIRATION_TIME", default=24 * 60  # 3 hours
 )  # In minutes
+CUSTOM_FLOW_NOT_FOUND_EMAIL_COOLDOWN = env.int(
+    "CUSTOM_FLOW_NOT_FOUND_EMAIL_COOLDOWN", default=60 * 60 * 24  # 24 hours
+)
 
 CHATS_BASE_URL = env.str("CHATS_BASE_URL", default="http://localhost:8000")
 
