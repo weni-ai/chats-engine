@@ -276,6 +276,10 @@ class Room(BaseModel, BaseConfigurableModel):
         ]
         indexes = [
             models.Index(fields=["project_uuid"]),
+            models.Index(
+                fields=["is_active", "is_inactive", "is_waiting", "last_interaction"],
+                name="rooms_inactivity_idx",
+            ),
         ]
 
     def save(self, *args, **kwargs) -> None:
@@ -810,6 +814,11 @@ class Room(BaseModel, BaseConfigurableModel):
                 | Q(last_interaction__isnull=True)
             ),
         ).update(**update_fields)
+
+        if self.is_inactive and contact is not None:
+            from chats.apps.rooms.usecases.inactivity import InactivityService
+
+            InactivityService().reset_inactivity(self)
 
     def start_csat_flow(self):
         """
