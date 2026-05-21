@@ -5,7 +5,7 @@ from django.conf import settings
 
 from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
-from chats.apps.queues.tasks import route_queue_rooms
+from chats.apps.queues.tasks import route_queue_rooms, route_sector_rooms
 from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.utils import create_transfer_json
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from chats.apps.rooms.models import Room
-    from chats.apps.users.models import User
+    from chats.apps.accounts.models import User
 
 
 def start_queue_priority_routing(queue: Queue):
@@ -45,24 +45,36 @@ def start_queue_priority_routing(queue: Queue):
 def start_queue_priority_routing_for_all_queues_in_project(project: Project):
     """
     Start routing rooms for all queues in a project, if the project is configured to use priority routing.
+
+    Routes are grouped by sector so that all queues in a sector are routed
+    under a single lock acquisition, preventing accidental queue prioritization.
     """
     if not project.use_queue_priority_routing:
         logger.info(
-            "Skipping start_queue_priority_routing_for_all_queues_in_project for project %s "
+            "[start_queue_priority_routing_for_all_queues_in_project] Skipping routing for project %s "
             "because it is not configured to use priority routing",
             project.uuid,
         )
         return
 
-    queues = Queue.objects.filter(sector__project=project)
-
-    logger.info(
-        "Started routing rooms for all queues in project %s",
-        project.uuid,
+    sector_uuids = (
+        Queue.objects.filter(sector__project=project)
+        .values_list("sector__uuid", flat=True)
+        .distinct()
     )
 
-    for queue in queues:
-        start_queue_priority_routing(queue)
+    logger.info(
+        "[start_queue_priority_routing_for_all_queues_in_project] "
+        "Started routing rooms by sector for project %s (%d sectors)",
+        project.uuid,
+        len(sector_uuids),
+    )
+
+    for sector_uuid in sector_uuids:
+        if settings.USE_CELERY:
+            route_sector_rooms.delay(sector_uuid)
+        else:
+            route_sector_rooms(sector_uuid)
 
 
 def create_room_assigned_from_queue_feedback(room: "Room", user: "User"):

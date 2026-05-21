@@ -28,6 +28,7 @@ from chats.apps.api.v1.dashboard.serializers import (
     DashboardSectorSerializer,
 )
 from chats.apps.dashboard.models import ReportStatus
+from chats.apps.dashboard.usecases import GetReportStatusUseCase
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.rooms.models import Room
 from chats.core.storages import ExcelStorage
@@ -872,6 +873,20 @@ class ReportFieldsValidatorViewSet(APIView):
             if root_end_date and "end_date" not in fields_config["rooms"]:
                 fields_config["rooms"]["end_date"] = root_end_date
 
+        if "agent_status_logs" in fields_config and isinstance(
+            fields_config["agent_status_logs"], dict
+        ):
+            if (
+                root_start_date
+                and "start_date" not in fields_config["agent_status_logs"]
+            ):
+                fields_config["agent_status_logs"]["start_date"] = root_start_date
+            if (
+                root_end_date
+                and "end_date" not in fields_config["agent_status_logs"]
+            ):
+                fields_config["agent_status_logs"]["end_date"] = root_end_date
+
         root_agents = request_data.get("agents") or request_data.get("agent")
         root_tags = request_data.get("tags") or request_data.get("tag")
         if "rooms" in fields_config:
@@ -881,6 +896,12 @@ class ReportFieldsValidatorViewSet(APIView):
                 fields_config["rooms"]["agents"] = root_agents
             if root_tags is not None:
                 fields_config["rooms"]["tags"] = root_tags
+
+        if "agent_status_logs" in fields_config:
+            if not isinstance(fields_config["agent_status_logs"], dict):
+                fields_config["agent_status_logs"] = {}
+            if root_agents is not None:
+                fields_config["agent_status_logs"]["agents"] = root_agents
 
     def _filter_valid_models(self, fields_config):
         available_fields = ModelFieldsPresenter.get_models_info()
@@ -968,30 +989,6 @@ class ReportFieldsValidatorViewSet(APIView):
             raise ValidationError({"project_uuid": "This field is required."})
 
         project = get_object_or_404(Project, uuid=project_uuid)
+        data = GetReportStatusUseCase().execute(project)
 
-        current_report = (
-            ReportStatus.objects.filter(
-                project=project, status__in=["pending", "in_progress"]
-            )
-            .order_by("created_on")
-            .last()
-        )
-
-        if not current_report:
-            return Response(
-                {
-                    "status": "ready",
-                    "email": None,
-                    "report_uuid": None,
-                },
-                status=status.HTTP_200_OK,
-            )
-
-        return Response(
-            {
-                "status": current_report.status,
-                "email": current_report.user.email,
-                "report_uuid": str(current_report.uuid),
-            },
-            status=status.HTTP_200_OK,
-        )
+        return Response(data, status=status.HTTP_200_OK)

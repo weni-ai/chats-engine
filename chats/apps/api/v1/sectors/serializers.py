@@ -1,14 +1,12 @@
-from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from weni.feature_flags.shortcuts import (
-    is_feature_active,
     is_feature_active_for_attributes,
 )
 
 from chats.apps.api.v1.accounts.serializers import UserSerializer
-from chats.apps.projects.models.models import Project
 from chats.apps.sectors.models import (
     Sector,
     SectorAuthorization,
@@ -16,6 +14,7 @@ from chats.apps.sectors.models import (
     SectorTag,
 )
 from chats.core.serializers import AuditableModelSerializer
+from chats.apps.projects.models import Project
 
 User = get_user_model()
 
@@ -33,31 +32,7 @@ def _apply_sector_config_defaults(instance: Sector, data: dict) -> dict:
     return data
 
 
-def validate_is_csat_enabled(project: Project, value: bool, context: dict) -> bool:
-    """
-    Validate if the CSAT feature is enabled for the sector.
-    """
-    request = context.get("request")
-    user = getattr(request, "user", None)
-    project = project
-
-    if value is True and not is_feature_active(
-        settings.CSAT_FEATURE_FLAG_KEY, user.email, str(project.uuid)
-    ):
-        raise serializers.ValidationError(
-            {
-                "is_csat_enabled": [
-                    _("The CSAT feature is not available for this sector")
-                ]
-            },
-            code="csat_feature_flag_is_off",
-        )
-    return value
-
-
-def validate_custom_csat_flow_uuid(
-    project: Project, value, current_value=None
-):
+def validate_custom_csat_flow_uuid(project: Project, value, current_value=None):
     """
     Validate if the custom CSAT flow feature is enabled for the sector.
     When the feature is off, only allow clearing an already-set value.
@@ -75,9 +50,7 @@ def validate_custom_csat_flow_uuid(
         raise serializers.ValidationError(
             {
                 "custom_csat_flow_uuid": [
-                    _(
-                        "The custom CSAT flow feature is not available for this sector"
-                    )
+                    _("The custom CSAT flow feature is not available for this sector")
                 ]
             },
             code="custom_csat_flow_feature_flag_is_off",
@@ -154,12 +127,6 @@ class SectorSerializer(AuditableModelSerializer):
             data["automatic_message_text"] = automatic_message.get("text")
 
         project = self.instance.project if self.instance else data.get("project")
-
-        if (
-            project
-            and (is_csat_enabled := data.get("is_csat_enabled", None)) is not None
-        ):
-            validate_is_csat_enabled(project, is_csat_enabled, self.context)
 
         if project and "custom_csat_flow_uuid" in data:
             validate_custom_csat_flow_uuid(
@@ -249,8 +216,6 @@ class SectorUpdateSerializer(AuditableModelSerializer):
         return sector
 
     def validate(self, attrs: dict):
-        project = self.instance.project
-
         automatic_message = attrs.get("automatic_message", None)
 
         if automatic_message is not None:
@@ -261,8 +226,6 @@ class SectorUpdateSerializer(AuditableModelSerializer):
             attrs["automatic_message_text"] = automatic_message.get("text")
 
         project = self.instance.project
-
-        validate_is_csat_enabled(project, attrs.get("is_csat_enabled"), self.context)
 
         if "custom_csat_flow_uuid" in attrs:
             validate_custom_csat_flow_uuid(

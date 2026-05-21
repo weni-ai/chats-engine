@@ -2,13 +2,11 @@ import logging
 from typing import Dict, List, Optional
 
 import pendulum
-from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from weni.feature_flags.shortcuts import is_feature_active
 from rest_framework.exceptions import PermissionDenied
 
 from chats.apps.accounts.models import User
@@ -21,7 +19,7 @@ from chats.apps.dashboard.models import RoomMetrics
 from chats.apps.msgs.models import Message, MessageMedia
 from chats.apps.projects.models.models import FlowStart, Project
 from chats.apps.queues.models import Queue
-from chats.apps.queues.utils import start_queue_priority_routing
+from chats.apps.rooms.usecases.resolve_room_user import ResolveRoomUserUseCase
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import close_room
 from chats.apps.sectors.utils import working_hours_validator
@@ -85,58 +83,6 @@ def get_last_flow_start(
     )
 
     return last_flow_start
-
-
-def get_room_user(
-    contact: Contact,
-    queue: Queue,
-    user: User,
-    is_created: bool,
-    project: Project,
-    last_flow_start: Optional[FlowStart] = None,
-):
-    if last_flow_start:
-        if is_created is True or not contact.rooms.filter(
-            queue__sector__project=project, created_on__gt=last_flow_start.created_on
-        ):
-            if last_flow_start.permission.status == "ONLINE":
-                return last_flow_start.permission.user
-
-    # User linked to the contact
-    if not is_created:
-        linked_user = contact.get_linked_user(project)
-        if linked_user is not None and linked_user.is_online:
-            return linked_user.user
-
-    if user and project.permissions.filter(user=user, status="ONLINE").exists():
-        return user
-
-    if project.use_queue_priority_routing:
-        current_queue_size = queue.rooms.filter(
-            is_active=True, user__isnull=True
-        ).count()
-
-        if current_queue_size == 0:
-            # If the queue is empty, the available user with the least number
-            # of rooms will be selected, if any.
-            return queue.get_available_agent()
-
-        logger.info(
-            "Calling start_queue_priority_routing for queue %s from get_room_user because the queue is not empty",
-            queue.uuid,
-        )
-        start_queue_priority_routing(queue)
-
-        # If the queue is not empty, the room must stay in the queue,
-        # so that, when a agent becomes available, the first room in the queue
-        # will be assigned to the them. This logic is not done here.
-        return None
-
-    if queue.rooms.filter(is_active=True, user__isnull=True).exists():
-        return None
-
-    # General room routing type
-    return queue.get_available_agent()
 
 
 class RoomListSerializer(serializers.ModelSerializer):
@@ -433,23 +379,13 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         is_limit_active_for_queue = queue.queue_limit_info.is_active
 
         if is_limit_active_for_queue:
-            # Only check if the feature flag is enabled and make all the other validations
-            # if the queue limit for this particular queue is active
-            is_queue_limit_feature_active = is_feature_active(
-                settings.QUEUE_LIMIT_FEATURE_FLAG_KEY,
-                None,
-                str(queue.sector.project.uuid),
-            )
             queue_limit = (
                 queue.queue_limit_info.limit
                 if isinstance(queue.queue_limit_info.limit, int)
                 else 0
             )
 
-            if (
-                is_queue_limit_feature_active
-                and queue.queued_rooms_count >= queue_limit
-            ):
+            if queue.queued_rooms_count >= queue_limit:
                 raise PermissionDenied(
                     {
                         "error": "human_support_queue_limit_reached",
@@ -519,8 +455,8 @@ class RoomFlowSerializer(serializers.ModelSerializer):
 
         last_flow_start = get_last_flow_start(contact, groups, project, flow_uuid)
 
-        validated_data["user"] = get_room_user(
-            contact, queue, user, created, project, last_flow_start
+        validated_data["user"] = ResolveRoomUserUseCase(queue, project).execute(
+            contact, user, created, last_flow_start
         )
 
         has_room_after_flow_start = False

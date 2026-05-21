@@ -1,3 +1,126 @@
+# 3.62.0
+# Add
+  - Report status caching and invalidation
+# Fix
+  - Message permissions for missing project permissions
+# Remove
+  - Deprecated get_room_user function and related feature flag checks
+  - Cooldown feature flag checks from routing logic
+
+# 3.61.1
+# Add
+  - Flow templates endpoint in project viewset
+
+# 3.61.0
+# Add
+  - Meta Graph API client for retrieving WhatsApp templates
+  - Flow templates use case with pagination and variable support
+  - Channel listing from Connect REST client
+
+# 3.60.1
+# Add
+  - Status change log to data exporter
+  - New filters for contacts in history
+  - Room user resolution use case with feature flag
+# Remove
+  - CSAT feature flag checks from sector serializers
+  - Wait limit feature flag and related checks
+
+# 3.60.0
+# Add
+  - Chats summary enabled flag exposed in project serializer
+  - Simplified has_chats_summary logic using project-level flag
+
+# 3.59.0
+# Add
+  - Chats summary enabled field in Project model
+
+# 3.58.1
+# Fix
+  - URL error in merge
+
+# 3.58.0
+# Add
+  - Room queue filters
+  - Agent control endpoint
+  - Bulk creation for queues
+  - Soft deletion of tags when deleting sectors
+
+# 3.57.3
+# Add
+  - Pagination for agents metrics in internal dashboard
+  - User addition to discussions with permission checks
+# Fix
+  - Transfer history handling when picking room from view mode
+
+# 3.57.2
+# Fix
+  - Agents list performance by simplifying agent filtering logic
+
+# 3.57.1
+# Add
+  - Queue routing cooldown with retry logic
+  - Route sector rooms functionality
+
+# 3.57.0
+# Add
+  - Transfer history from bulk transfer
+  - User room count re-verification before routing assignment
+# Fix
+  - Agent status list filtering by queue
+
+# 3.56.2
+# Add
+  - Bulk creation of pending archived conversation records
+# Fix
+  - Archive task rooms count calculation and logging
+  - Room filtering logic in archive chats task
+
+# 3.56.1
+# Add
+  - Internal rooms list V2 with support for deleted sectors and queues
+
+# 3.56.0
+# Add
+  - Internal dashboard V2 for agent metrics
+  - Agent status V2 with custom status metrics
+  - Soft-deleted agents included in CSAT score calculations
+
+# 3.55.5
+# Add
+  - Room transfer functionality during queue and sector deletion
+  - Internal endpoint for counting rooms by sector and queue
+  - Room closure logic when queue or sector is deleted
+# Remove
+  - Time-sleep-based tests
+
+# 3.55.3
+# Fix
+  - Archive chats task dispatching
+# Add
+  - Batch dispatching and performance logging for archive chats task
+
+# 3.55.2
+# Add
+  - Audit logging for object creation, deletion, and editing
+# Remove
+  - Unused data in exports
+
+# 3.55.1
+# Add
+  - Support for running archive chats task more than once per day
+# Fix
+  - Archive chats scheduling and configuration
+
+# 3.55.0
+# Add
+  - AI-powered message improvement feature with models, service, use case, and endpoint
+  - Internal error handling middleware for better error logging
+
+# 3.54.6
+# Fix
+  - Handle empty summary case in history summary service
+
 # 3.54.5
 # Fix
  - Empty history summary

@@ -2,9 +2,9 @@ import uuid
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from chats.apps.api.v1.internal.agents.views import AgentDisconnectView
@@ -98,7 +98,10 @@ class AgentDisconnectViewTests(TestCase):
             project=self.project, user=self.admin, role=ProjectPermission.ROLE_ADMIN
         )
         self.agent_perm = ProjectPermission.objects.create(
-            project=self.project, user=self.agent, role=ProjectPermission.ROLE_ATTENDANT
+            project=self.project,
+            user=self.agent,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status=ProjectPermission.STATUS_ONLINE,
         )
 
     def _call_view(self, data, user):
@@ -111,10 +114,11 @@ class AgentDisconnectViewTests(TestCase):
         "chats.apps.api.v1.internal.agents.views.send_channels_group", return_value=None
     )
     def test_success_admin_disconnects_agent(self, _mock_ws):
-        response = self._call_view(
-            {"project_uuid": str(self.project.uuid), "agent": self.agent.email},
-            self.admin,
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self._call_view(
+                {"project_uuid": str(self.project.uuid), "agent": self.agent.email},
+                self.admin,
+            )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         # target set to OFFLINE
         self.agent_perm.refresh_from_db()

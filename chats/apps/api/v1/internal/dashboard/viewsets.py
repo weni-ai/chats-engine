@@ -2,6 +2,7 @@ from django.db.models import Count, Exists, OuterRef, Q, Subquery
 
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
 
 from chats.apps.api.v1.dashboard.dto import (
@@ -113,8 +114,14 @@ class InternalDashboardViewset(viewsets.GenericViewSet):
         if has_filter:
             agents_data = agents_data.filter(combined_q)
 
-        agents = DashboardAgentsSerializer(agents_data, many=True)
+        paginator = LimitOffsetPagination()
+        paginated_data = paginator.paginate_queryset(agents_data, request)
 
+        if paginated_data is not None:
+            agents = DashboardAgentsSerializer(paginated_data, many=True)
+            return paginator.get_paginated_response(agents.data)
+
+        agents = DashboardAgentsSerializer(agents_data, many=True)
         return Response({"results": agents.data}, status.HTTP_200_OK)
 
     @action(

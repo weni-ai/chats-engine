@@ -325,8 +325,8 @@ class RoomsQueuePriorityExternalTests(APITestCase):
 
         return client.post(url, data=data, format="json")
 
-    @patch("chats.apps.api.v1.external.rooms.serializers.start_queue_priority_routing")
-    @patch("chats.apps.api.v1.external.rooms.serializers.logger")
+    @patch("chats.apps.rooms.usecases.resolve_room_user.start_queue_priority_routing")
+    @patch("chats.apps.rooms.usecases.resolve_room_user.logger")
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_room_with_queue_priority_when_queue_is_empty_and_no_user_is_online(
         self,
@@ -355,8 +355,8 @@ class RoomsQueuePriorityExternalTests(APITestCase):
         mock_start_queue_priority_routing.assert_not_called()
         mock_logger.assert_not_called()
 
-    @patch("chats.apps.api.v1.external.rooms.serializers.start_queue_priority_routing")
-    @patch("chats.apps.api.v1.external.rooms.serializers.logger")
+    @patch("chats.apps.rooms.usecases.resolve_room_user.start_queue_priority_routing")
+    @patch("chats.apps.rooms.usecases.resolve_room_user.logger")
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_room_with_queue_priority_when_queue_is_empty_and_user_is_online(
         self,
@@ -392,8 +392,8 @@ class RoomsQueuePriorityExternalTests(APITestCase):
         mock_start_queue_priority_routing.assert_not_called()
         mock_logger.assert_not_called()
 
-    @patch("chats.apps.api.v1.external.rooms.serializers.start_queue_priority_routing")
-    @patch("chats.apps.api.v1.external.rooms.serializers.logger")
+    @patch("chats.apps.rooms.usecases.resolve_room_user.start_queue_priority_routing")
+    @patch("chats.apps.rooms.usecases.resolve_room_user.logger")
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_room_with_queue_priority_when_user_is_online_but_queue_is_not_empty(
         self,
@@ -452,9 +452,61 @@ class RoomsQueuePriorityExternalTests(APITestCase):
 
         mock_start_queue_priority_routing.assert_called_once_with(self.queue)
         mock_logger.info.assert_any_call(
-            "Calling start_queue_priority_routing for queue %s from get_room_user because the queue is not empty",
+            "Calling start_queue_priority_routing for queue %s from"
+            " ResolveRoomUserUseCase because the queue is not empty",
             self.queue.uuid,
         )
+
+    @patch("chats.apps.rooms.usecases.resolve_room_user.is_feature_active", return_value=True)
+    @patch("chats.apps.rooms.usecases.resolve_room_user.start_queue_priority_routing")
+    @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
+    def test_create_room_with_queue_priority_when_agent_fails_capacity_recheck(
+        self,
+        mock_get_room,
+        mock_start_queue_priority_routing,
+        mock_flag,
+    ):
+        """
+        Queue is empty and there is an ONLINE agent, but the agent is already
+        at/above the sector rooms limit. The last-moment capacity recheck must
+        block the assignment: the room stays unassigned and routing is
+        triggered to retry later.
+        """
+        mock_get_room.return_value = None
+        mock_start_queue_priority_routing.return_value = None
+
+        user = User.objects.create(email="overloaded@email.com")
+        permission = self.project.permissions.create(user=user, status="ONLINE")
+        self.queue.authorizations.create(permission=permission, role=1)
+
+        # sector.rooms_limit == 1 (from setUp); pre-populate above the limit
+        for i in range(2):
+            Room.objects.create(
+                queue=self.queue,
+                contact=Contact.objects.create(external_id=f"overloaded-{i}"),
+                user=user,
+                is_active=True,
+            )
+
+        # Force get_available_agent to return the overloaded agent even though
+        # available_agents' annotate filter would normally exclude him. This
+        # simulates a race between the annotate query and Room.save().
+        with patch.object(Queue, "get_available_agent", return_value=user):
+            data = {
+                "queue_uuid": str(self.queue.uuid),
+                "contact": {
+                    "external_id": "new-contact-001",
+                    "name": "kallil",
+                    "email": "kallil@email.com",
+                    "phone": "+5511985543332",
+                    "custom_fields": {},
+                },
+            }
+            response = self.create_room(data)
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(response.data.get("user"))
+        mock_start_queue_priority_routing.assert_called_once_with(self.queue)
 
 
 class RoomsFlowStartExternalTests(APITestCase):
@@ -922,7 +974,7 @@ class RoomsQueueLimitExternalTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-    @patch("chats.apps.api.v1.external.rooms.serializers.is_feature_active")
+    @patch("chats.apps.rooms.usecases.resolve_room_user.is_feature_active")
     def test_create_room_with_queue_limit_when_not_full(
         self, mock_is_feature_active, mock_get_room
     ):
@@ -945,7 +997,7 @@ class RoomsQueueLimitExternalTests(APITestCase):
         response = self.create_room(data)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-    @patch("chats.apps.api.v1.external.rooms.serializers.is_feature_active")
+    @patch("chats.apps.rooms.usecases.resolve_room_user.is_feature_active")
     def test_create_room_with_queue_limit_when_full(
         self, mock_is_feature_active, mock_get_room
     ):
@@ -973,31 +1025,3 @@ class RoomsQueueLimitExternalTests(APITestCase):
         response = self.create_room(data)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(response.data["error"], "human_support_queue_limit_reached")
-
-    @patch("chats.apps.api.v1.external.rooms.serializers.is_feature_active")
-    def test_create_room_with_queue_limit_when_full_and_feature_flag_is_off(
-        self, mock_is_feature_active, mock_get_room
-    ):
-        mock_get_room.return_value = None
-        mock_is_feature_active.return_value = False
-
-        Room.objects.create(
-            queue=self.queue,
-            contact=Contact.objects.create(external_id="contact-1", name="Foo"),
-        )
-
-        self.queue.queue_limit = 1
-        self.queue.is_queue_limit_active = True
-
-        self.queue.save()
-
-        data = {
-            "queue_uuid": str(self.queue.uuid),
-            "contact": {
-                "external_id": "contact-2",
-                "name": "Bar",
-            },
-        }
-
-        response = self.create_room(data)
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
