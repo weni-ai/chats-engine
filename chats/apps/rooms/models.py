@@ -172,6 +172,8 @@ class Room(BaseModel, BaseConfigurableModel):
         _("Automatic message sent at"), null=True, blank=True
     )
 
+    is_inactive = models.BooleanField(_("is inactive?"), default=False)
+
     tracker = FieldTracker(fields=["user_id", "queue_id"])
 
     def get_automatic_message_sent_at(self) -> Optional[datetime]:
