@@ -273,7 +273,9 @@ class ProjectViewset(
         """Return the Flow catalog for this project."""
         project = self.get_object()
         cursor = request.query_params.get("cursor", "")
-        verify_chats_tag = request.query_params.get("verify_chats_tag", True)
+        verify_chats_tag = (
+            request.query_params.get("verify_chats_tag", "true").lower() == "true"
+        )
 
         flow_list = FlowRESTClient().list_flows(
             project, cursor=cursor, verify_chats_tag=verify_chats_tag
