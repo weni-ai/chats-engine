@@ -503,6 +503,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "start_archive_rooms_messages",
         "schedule": crontab(hour="0-4", minute=0),
     },
+    "check-inactivity-rooms": {
+        "task": "check_inactivity_rooms",
+        "schedule": crontab(minute="*"),
+    },
 }
 
 # Disable report emails unless explicitly enabled
