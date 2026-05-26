@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
@@ -6,9 +7,10 @@ from django.utils import timezone
 
 from chats.apps.accounts.models import User
 from chats.apps.contacts.models import Contact
-from chats.apps.msgs.models import Message
+from chats.apps.msgs.models import AutomaticMessageType, Message
 from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
+from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.usecases.inactivity import (
     INACTIVITY_END_BY,
@@ -68,11 +70,15 @@ class InactivityWarnTests(TestCase):
         room.refresh_from_db()
         self.assertEqual(warned, 1)
         self.assertTrue(room.is_inactive)
-        self.assertTrue(
-            Message.objects.filter(
-                room=room, text="Are you still there?", user=self.user
-            ).exists()
+
+        warning_msg = Message.objects.get(
+            room=room, text="Are you still there?", user=self.user
         )
+        self.assertEqual(
+            warning_msg.automatic_message_type,
+            AutomaticMessageType.INACTIVE_WARNING,
+        )
+        self.assertTrue(warning_msg.is_automatic_message)
 
     def test_room_within_timeout_is_not_warned(self):
         room = self._create_eligible_room(last_interaction_offset_seconds=60)
@@ -180,16 +186,70 @@ class InactivityCloseTests(TestCase):
         # 600 (warn) + 60 (close) = 660s required; offset 700s exceeds it.
         room = self._create_already_warned_room(last_interaction_offset_seconds=700)
 
-        with patch.object(Room, "notify_user"):
+        with patch.object(Room, "notify_user"), patch.object(Message, "notify_room"):
             closed = InactivityService().close_inactive_rooms()
 
         room.refresh_from_db()
         self.assertEqual(closed, 1)
         self.assertFalse(room.is_active)
         self.assertEqual(room.ended_by, INACTIVITY_END_BY)
+        self.assertTrue(room.automatic_closed)
+
+        closure_msg = Message.objects.get(
+            room=room, text="Closing due to inactivity.", user=self.user
+        )
+        self.assertEqual(
+            closure_msg.automatic_message_type,
+            AutomaticMessageType.INACTIVE_CLOSE,
+        )
+
+        feedback_msg = Message.objects.get(
+            room=room,
+            text=json.dumps(
+                {
+                    "method": RoomFeedbackMethods.ROOM_CLOSE,
+                    "content": {"action": "automatic_close"},
+                }
+            ),
+        )
+        self.assertTrue(feedback_msg.seen)
+        self.assertIsNone(feedback_msg.automatic_message_type)
+        self.assertFalse(feedback_msg.is_automatic_message)
+
+    def test_close_creates_feedback_message_even_without_human_text(self):
+        """
+        The `rc/automatic_close` feedback marker is the system signal the
+        front uses to render the "closed by inactivity" UI in the timeline.
+        It must be created even when the sector did NOT configure a
+        human-facing closure text (the human message is optional, the
+        feedback marker is mandatory).
+        """
+        room = self._create_already_warned_room(last_interaction_offset_seconds=700)
+        self.sector.inactivity_timeout = _enabled_inactivity_config()
+        self.sector.inactivity_timeout["close_room_message_text"] = ""
+        self.sector.save()
+
+        with patch.object(Room, "notify_user"), patch.object(Message, "notify_room"):
+            closed = InactivityService().close_inactive_rooms()
+
+        room.refresh_from_db()
+        self.assertEqual(closed, 1)
+        self.assertFalse(room.is_active)
+        self.assertTrue(room.automatic_closed)
+
+        # No human-facing closure message expected.
+        self.assertFalse(
+            Message.objects.filter(
+                room=room,
+                automatic_message_type=AutomaticMessageType.INACTIVE_CLOSE,
+            ).exists()
+        )
+
+        # But the rc feedback must exist.
         self.assertTrue(
             Message.objects.filter(
-                room=room, text="Closing due to inactivity.", user=self.user
+                room=room,
+                text__contains='"action": "automatic_close"',
             ).exists()
         )
 
@@ -362,6 +422,26 @@ class SilentAutomaticMessageTests(TestCase):
 
         self.assertIsNone(result)
         self.assertFalse(Message.objects.filter(room=room).exists())
+
+    def test_persists_provided_message_type(self):
+        room = Room.objects.create(queue=self.queue, contact=self.contact)
+        room.user = self.user
+        room.save()
+
+        with patch.object(Message, "notify_room"):
+            message = _send_silent_automatic_message(
+                room,
+                "warn me",
+                self.user,
+                message_type=AutomaticMessageType.INACTIVE_WARNING,
+            )
+
+        self.assertIsNotNone(message)
+        message.refresh_from_db()
+        self.assertEqual(
+            message.automatic_message_type,
+            AutomaticMessageType.INACTIVE_WARNING,
+        )
 
 
 class RoomNotifyInactivityTests(TestCase):
