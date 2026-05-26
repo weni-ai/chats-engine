@@ -604,6 +604,23 @@ class Room(BaseModel, BaseConfigurableModel):
             action=f"rooms.{action}",
         )
 
+    def notify_inactivity(self):
+        """
+        Notifies the frontend that the inactivity flag of this room has
+        changed. Sends a lightweight payload (`room_uuid` + `is_inactive`)
+        with a dedicated `rooms.inactivity` event so the client can update
+        the visual alert without re-rendering the whole room.
+
+        Routes to the assigned agent's permission group when the room has a
+        user; falls back to the queue group otherwise (defensive — rooms
+        eligible for inactivity always have a user).
+        """
+        content = {
+            "room_uuid": str(self.uuid),
+            "is_inactive": self.is_inactive,
+        }
+        self.base_notification(content=content, action="rooms.inactivity")
+
     def user_connection(self, action: str, user=None):
         user = user if user else self.user
         permission = self.get_permission(user)

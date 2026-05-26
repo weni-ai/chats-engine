@@ -193,7 +193,7 @@ class InactivityService:
         room.is_inactive = False
 
         try:
-            room.notify_room("update")
+            room.notify_inactivity()
         except Exception as exc:
             logger.warning(
                 "[INACTIVITY] Failed to notify websocket on reset for room %s: %s",
@@ -216,7 +216,7 @@ class InactivityService:
         room.is_inactive = True
 
         try:
-            room.notify_room("update")
+            room.notify_inactivity()
         except Exception as exc:
             logger.warning(
                 "[INACTIVITY] Failed to notify websocket on warn for room %s: %s",
