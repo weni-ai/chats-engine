@@ -374,7 +374,11 @@ class Room(BaseModel, BaseConfigurableModel):
         )
 
     def trigger_default_message(self):
-        default_message = self.queue.default_message
+        sector = self.queue.sector
+        if not sector.is_automatic_message_queue_active:
+            return
+
+        default_message = sector.automatic_message_queue_text
         if not default_message:
             return
 

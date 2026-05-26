@@ -69,6 +69,12 @@ class Sector(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMod
     is_automatic_message_active = models.BooleanField(
         _("is automatic message active?"), default=False
     )
+    automatic_message_queue_text = models.TextField(
+        _("automatic queue message text"), blank=True, null=True
+    )
+    is_automatic_message_queue_active = models.BooleanField(
+        _("is automatic queue message active?"), default=False
+    )
     is_csat_enabled = models.BooleanField(_("is CSAT enabled?"), default=False)
     custom_csat_flow_uuid = models.UUIDField(
         _("custom CSAT flow UUID"),
@@ -223,9 +229,7 @@ class Sector(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMod
             "can_edit_custom_fields": self.can_edit_custom_fields,
             "config": self.config,
             "queues": list(
-                self.queues.filter(is_deleted=False).values(
-                    "name", "default_message", "config"
-                )
+                self.queues.filter(is_deleted=False).values("name", "config")
             ),
         }
 
