@@ -3,7 +3,6 @@ from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from weni.feature_flags.shortcuts import (
-    is_feature_active,
     is_feature_active_for_attributes,
 )
 
@@ -16,6 +15,7 @@ from chats.apps.sectors.models import (
     SectorTag,
 )
 from chats.core.serializers import AuditableModelSerializer
+from chats.apps.projects.models import Project
 
 User = get_user_model()
 
@@ -186,12 +186,6 @@ class SectorSerializer(AuditableModelSerializer):
 
         project = self.instance.project if self.instance else data.get("project")
 
-        if (
-            project
-            and (is_csat_enabled := data.get("is_csat_enabled", None)) is not None
-        ):
-            validate_is_csat_enabled(project, is_csat_enabled, self.context)
-
         if project and "custom_csat_flow_uuid" in data:
             validate_custom_csat_flow_uuid(
                 project,
@@ -323,8 +317,6 @@ class SectorUpdateSerializer(AuditableModelSerializer):
             attrs["automatic_message_queue_text"] = text
 
         project = self.instance.project
-
-        validate_is_csat_enabled(project, attrs.get("is_csat_enabled"), self.context)
 
         if "custom_csat_flow_uuid" in attrs:
             validate_custom_csat_flow_uuid(

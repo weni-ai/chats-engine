@@ -614,9 +614,10 @@ class RoomsExternalTests(APITestCase):
     def setUp(self) -> None:
         self.queue_1 = Queue.objects.get(uuid="f2519480-7e58-4fc4-9894-9ab1769e29cf")
 
+    @patch("chats.apps.api.v1.external.rooms.viewsets.is_feature_active_for_attributes", return_value=False)
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
-    def test_create_external_room(self, mock_get_room, mock_is_attending):
+    def test_create_external_room(self, mock_get_room, mock_is_attending, _mock_flag):
         mock_get_room.return_value = None
         url = reverse("external_rooms-list")
         client = self.client
@@ -636,10 +637,11 @@ class RoomsExternalTests(APITestCase):
         response = client.post(url, data=data, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
+    @patch("chats.apps.api.v1.external.rooms.viewsets.is_feature_active_for_attributes", return_value=False)
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_external_room_with_external_uuid(
-        self, mock_get_room, mock_is_attending
+        self, mock_get_room, mock_is_attending, _mock_flag
     ):
         mock_get_room.return_value = None
         url = reverse("external_rooms-list")
@@ -666,10 +668,11 @@ class RoomsExternalTests(APITestCase):
             "aec9f84e-3dcd-11ed-b878-0242ac190012",
         )
 
+    @patch("chats.apps.api.v1.external.rooms.viewsets.is_feature_active_for_attributes", return_value=False)
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_external_room_editing_contact(
-        self, mock_get_room, mock_is_attending
+        self, mock_get_room, mock_is_attending, _mock_flag
     ):
         mock_get_room.return_value = None
         url = reverse("external_rooms-list")

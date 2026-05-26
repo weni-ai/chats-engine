@@ -750,6 +750,10 @@ DENORMALIZED_MESSAGE_FIELDS_FLAG_KEY = env.str(
     "DENORMALIZED_MESSAGE_FIELDS_FLAG_KEY",
     default="weniChatsDenormalizedMessageFields",
 )
+INTERNAL_ROOMS_LIST_PENDING_RESPONSE_FEATURE_FLAG_KEY = env.str(
+    "INTERNAL_ROOMS_LIST_PENDING_RESPONSE_FEATURE_FLAG_KEY",
+    default="weniChatsInternalRoomsListPendingResponse",
+)
 AUDIT_LOG_FEATURE_FLAG_KEY = env.str(
     "AUDIT_LOG_FEATURE_FLAG_KEY", default="weniChatsAuditLog"
 )
@@ -854,10 +858,7 @@ IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL = env.int(
     "IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL", default=30
 )
 
-NEW_GET_ROOM_USER_FEATURE_FLAG_KEY = env.str(
-    "CHATS_NEW_GET_ROOM_USER_FEATURE_FLAG_KEY",
-    default="weniChatsNewGetRoomUser",
-)
+# Cooldown settings
 ROUTE_QUEUE_COOLDOWN_MAX_TIME = env.int(
     "ROUTE_QUEUE_COOLDOWN_MAX_TIME",
     default=30,

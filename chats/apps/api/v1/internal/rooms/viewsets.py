@@ -1,4 +1,8 @@
+import logging
+
+from django.conf import settings
 from django.db.models import (
+    BooleanField,
     Case,
     F,
     IntegerField,
@@ -14,6 +18,7 @@ from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.mixins import ListModelMixin
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.filters import SearchFilter, OrderingFilter
+from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.api.v1.internal.rooms.serializers import (
@@ -28,6 +33,9 @@ from chats.apps.api.v1.internal.rooms.filters import (
     InternalProtocolRoomsFilter,
 )
 from datetime import timedelta
+
+
+logger = logging.getLogger(__name__)
 
 
 class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
@@ -75,6 +83,37 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
 
     pagination_class = LimitOffsetPagination
     pagination_class.page_size = 5
+
+    def _is_pending_response_feature_active(self) -> bool:
+        """
+        Whether to compute and return the `pending_response` field on each room.
+
+        Gated by a feature flag so the extra LEFT JOIN on `msgs_message` can be
+        disabled per project if it starts hurting database performance.
+        """
+        if hasattr(self, "_pending_response_feature_active_cached"):
+            return self._pending_response_feature_active_cached
+
+        active = False
+        project_uuid = self.request.query_params.get("project") if self.request else None
+        try:
+            attributes = {"projectUUID": str(project_uuid)} if project_uuid else {}
+            active = is_feature_active_for_attributes(
+                key=settings.INTERNAL_ROOMS_LIST_PENDING_RESPONSE_FEATURE_FLAG_KEY,
+                attributes=attributes,
+            )
+        except Exception as e:
+            logger.error(
+                "Error checking pending_response feature flag: %s", e
+            )
+
+        self._pending_response_feature_active_cached = active
+        return active
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["include_pending_response"] = self._is_pending_response_feature_active()
+        return context
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -134,6 +173,17 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
                 output_field=IntegerField(),
             ),
         }
+
+        if self._is_pending_response_feature_active():
+            annotations["pending_response"] = Case(
+                When(
+                    last_message_contact__isnull=False,
+                    last_message__seen=True,
+                    then=Value(True),
+                ),
+                default=Value(False),
+                output_field=BooleanField(),
+            )
 
         queryset = queryset.annotate(**annotations)
 
