@@ -10,7 +10,7 @@ from chats.apps.dashboard.models import RoomMetrics
 
 
 class RoomInternalListSerializer(serializers.ModelSerializer):
-    contact = serializers.CharField(source="contact.name")
+    contact = serializers.SerializerMethodField()
     agent = serializers.SerializerMethodField()
     user_email = serializers.EmailField(source="user.email", default=None, read_only=True)
     tags = TagSimpleSerializer(many=True, required=False)
@@ -69,6 +69,12 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
         super().__init__(*args, **kwargs)
         if not self.context.get("include_pending_response", False):
             self.fields.pop("pending_response", None)
+
+    def get_contact(self, obj) -> str:
+        try:
+            return obj.contact.name if obj.contact else ""
+        except AttributeError:
+            return ""
 
     def get_agent(self, obj):
         try:
