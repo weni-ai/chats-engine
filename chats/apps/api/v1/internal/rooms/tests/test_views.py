@@ -226,3 +226,23 @@ class TestInternalListRoomsPendingResponseField(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertNotIn("pending_response", self._result_for(response, room))
+
+    @with_internal_auth
+    @patch(PENDING_RESPONSE_FF_PATH, return_value=False)
+    def test_list_rooms_with_null_contact_does_not_500(self, _mock_ff):
+        """
+        Rooms without a contact must serialize with contact="".
+
+        CharField(source="contact.name") raises when contact is None.
+        """
+        room = Room.objects.create(
+            contact=None,
+            queue=self.queue,
+            user=self.user,
+            project_uuid=str(self.project.uuid),
+        )
+
+        response = self._list_rooms()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(self._result_for(response, room)["contact"], "")
