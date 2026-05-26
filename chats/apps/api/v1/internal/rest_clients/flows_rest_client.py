@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Callable, TYPE_CHECKING
+from typing import Callable, Tuple, TYPE_CHECKING
 
 import requests
 from django.conf import settings
@@ -237,7 +237,7 @@ class FlowRESTClient(
         )
         return response
 
-    def list_flows(self, project, cursor: str = ""):
+    def list_flows(self, project, cursor: str = "", verify_chats_tag: bool = True):
         response = retry_request_and_refresh_flows_auth_token(
             project=project,
             request_method=requests.get,
@@ -255,12 +255,13 @@ class FlowRESTClient(
             raise
         flows["next"] = get_cursor(flows.get("next") or "")
         flows["previous"] = get_cursor(flows.get("previous") or "")
-        results = flows["results"]
-        flows["results"] = [
-            flow
-            for flow in results
-            if flow["labels"] != [] and check_flows_labels(flow["labels"])
-        ]
+        if verify_chats_tag:
+            results = flows["results"]
+            flows["results"] = [
+                flow
+                for flow in results
+                if flow["labels"] != [] and check_flows_labels(flow["labels"])
+            ]
         return flows
 
     def retrieve_flow_definitions(self, project, flow_uuid):
@@ -281,7 +282,7 @@ class FlowRESTClient(
             raise
         return flows
 
-    def start_flow(self, project, data):
+    def start_flow(self, project, data) -> Tuple[int, dict]:
         response = retry_request_and_refresh_flows_auth_token(
             project=project,
             request_method=requests.post,
@@ -290,7 +291,7 @@ class FlowRESTClient(
             headers=self.project_headers(project.flows_authorization),
         )
         try:
-            return response.json()
+            return response.status_code, response.json()
         except ValueError as e:
             LOGGER.error(
                 "Failed to parse JSON response from start_flow: %s. Response content: %s",
@@ -355,3 +356,22 @@ class FlowRESTClient(
         )
 
         return response
+
+    def get_templates(self, project, **kwargs):
+        params = {key: value for key, value in kwargs.items() if value is not None}
+        response = retry_request_and_refresh_flows_auth_token(
+            project=project,
+            request_method=requests.get,
+            headers=self.project_headers(project.flows_authorization),
+            params=params,
+            url=f"{self.base_url}/api/v2/templates.json",
+        )
+        try:
+            return response.json()
+        except ValueError as e:
+            LOGGER.error(
+                "Failed to parse JSON response from get_templates: %s. Response content: %s",
+                str(e),
+                response.content,
+            )
+            raise

@@ -1,6 +1,10 @@
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
+from weni.feature_flags.shortcuts import (
+    is_feature_active_for_attributes,
+)
 
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.sectors.models import (
@@ -10,6 +14,7 @@ from chats.apps.sectors.models import (
     SectorTag,
 )
 from chats.core.serializers import AuditableModelSerializer
+from chats.apps.projects.models import Project
 
 User = get_user_model()
 
@@ -25,6 +30,33 @@ def _apply_sector_config_defaults(instance: Sector, data: dict) -> dict:
             config.setdefault("can_close_chats_in_queue", False)
     data["config"] = config
     return data
+
+
+def validate_custom_csat_flow_uuid(project: Project, value, current_value=None):
+    """
+    Validate if the custom CSAT flow feature is enabled for the sector.
+    When the feature is off, only allow clearing an already-set value.
+    """
+    if is_feature_active_for_attributes(
+        settings.CUSTOM_CSAT_FLOW_FEATURE_FLAG_KEY,
+        {"projectUUID": str(project.uuid)},
+    ):
+        return value
+
+    if current_value is not None and not value:
+        return value
+
+    if value:
+        raise serializers.ValidationError(
+            {
+                "custom_csat_flow_uuid": [
+                    _("The custom CSAT flow feature is not available for this sector")
+                ]
+            },
+            code="custom_csat_flow_feature_flag_is_off",
+        )
+
+    return value
 
 
 class SectorAutomaticMessageSerializer(serializers.ModelSerializer):
@@ -51,6 +83,7 @@ class SectorSerializer(AuditableModelSerializer):
     automatic_message = serializers.JSONField(required=False)
     automatic_message_queue = serializers.JSONField(required=False)
     is_csat_enabled = serializers.BooleanField(required=False, allow_null=False)
+    custom_csat_flow_uuid = serializers.UUIDField(required=False, allow_null=True)
 
     class Meta:
         model = Sector
@@ -73,6 +106,7 @@ class SectorSerializer(AuditableModelSerializer):
             "is_csat_enabled",
             "required_tags",
             "secondary_project",
+            "custom_csat_flow_uuid",
         ]
         extra_kwargs = {
             "work_start": {"required": False, "allow_null": True},
@@ -126,6 +160,19 @@ class SectorSerializer(AuditableModelSerializer):
 
             data["is_automatic_message_queue_active"] = is_active
             data["automatic_message_queue_text"] = text
+            
+        project = self.instance.project if self.instance else data.get("project")
+
+        if project and "custom_csat_flow_uuid" in data:
+            validate_custom_csat_flow_uuid(
+                project,
+                data.get("custom_csat_flow_uuid"),
+                current_value=(
+                    getattr(self.instance, "custom_csat_flow_uuid", None)
+                    if self.instance
+                    else None
+                ),
+            )
 
         config = data.get("config", {})
         if "secondary_project" in config:
@@ -174,6 +221,7 @@ class SectorUpdateSerializer(AuditableModelSerializer):
     automatic_message = serializers.JSONField(required=False)
     automatic_message_queue = serializers.JSONField(required=False)
     is_csat_enabled = serializers.BooleanField(required=False, allow_null=False)
+    custom_csat_flow_uuid = serializers.UUIDField(required=False, allow_null=True)
 
     class Meta:
         model = Sector
@@ -192,6 +240,7 @@ class SectorUpdateSerializer(AuditableModelSerializer):
             "is_csat_enabled",
             "required_tags",
             "secondary_project",
+            "custom_csat_flow_uuid",
         ]
         extra_kwargs = {field: {"required": False} for field in fields}
 
@@ -243,6 +292,14 @@ class SectorUpdateSerializer(AuditableModelSerializer):
 
             attrs["is_automatic_message_queue_active"] = is_active
             attrs["automatic_message_queue_text"] = text
+        project = self.instance.project
+
+        if "custom_csat_flow_uuid" in attrs:
+            validate_custom_csat_flow_uuid(
+                project,
+                attrs.get("custom_csat_flow_uuid"),
+                current_value=self.instance.custom_csat_flow_uuid,
+            )
 
         config = attrs.get("config", {})
         if "secondary_project" in config:
@@ -337,6 +394,7 @@ class SectorReadOnlyRetrieveSerializer(serializers.ModelSerializer):
             "automatic_message_queue",
             "is_csat_enabled",
             "required_tags",
+            "custom_csat_flow_uuid",
         ]
 
     def get_automatic_message(self, sector: Sector):

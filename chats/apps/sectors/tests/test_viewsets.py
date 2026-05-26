@@ -455,6 +455,158 @@ class SectorTests(APITestCase):
         self.sector.refresh_from_db()
         self.assertFalse(self.sector.required_tags)
 
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active_for_attributes")
+    def test_create_sector_with_custom_csat_flow_uuid(
+        self, mock_is_feature_active_for_attributes
+    ):
+        mock_is_feature_active_for_attributes.return_value = True
+        custom_flow_uuid = str(uuid.uuid4())
+        url = reverse("sector-list")
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        data = {
+            "name": "CSAT Sector",
+            "rooms_limit": 3,
+            "work_start": "09:00",
+            "work_end": "18:00",
+            "project": str(self.project.pk),
+            "custom_csat_flow_uuid": custom_flow_uuid,
+        }
+        response = self.client.post(url, data=data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["custom_csat_flow_uuid"], custom_flow_uuid)
+
+    def test_create_sector_without_custom_csat_flow_uuid(self):
+        url = reverse("sector-list")
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        data = {
+            "name": "No CSAT Sector",
+            "rooms_limit": 3,
+            "work_start": "09:00",
+            "work_end": "18:00",
+            "project": str(self.project.pk),
+        }
+        response = self.client.post(url, data=data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(response.data["custom_csat_flow_uuid"])
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active_for_attributes")
+    def test_update_sector_custom_csat_flow_uuid(
+        self, mock_is_feature_active_for_attributes
+    ):
+        mock_is_feature_active_for_attributes.return_value = True
+        custom_flow_uuid = str(uuid.uuid4())
+        url = reverse("sector-detail", args=[self.sector.pk])
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = self.client.patch(
+            url,
+            data={"custom_csat_flow_uuid": custom_flow_uuid},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["custom_csat_flow_uuid"], custom_flow_uuid)
+        self.sector.refresh_from_db()
+        self.assertEqual(str(self.sector.custom_csat_flow_uuid), custom_flow_uuid)
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active_for_attributes")
+    def test_clear_sector_custom_csat_flow_uuid(
+        self, mock_is_feature_active_for_attributes
+    ):
+        mock_is_feature_active_for_attributes.return_value = False
+        self.sector.custom_csat_flow_uuid = uuid.uuid4()
+        self.sector.save(update_fields=["custom_csat_flow_uuid"])
+
+        url = reverse("sector-detail", args=[self.sector.pk])
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = self.client.patch(
+            url,
+            data={"custom_csat_flow_uuid": None},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data["custom_csat_flow_uuid"])
+        self.sector.refresh_from_db()
+        self.assertIsNone(self.sector.custom_csat_flow_uuid)
+
+    def test_retrieve_sector_includes_custom_csat_flow_uuid(self):
+        custom_flow_uuid = uuid.uuid4()
+        self.sector.custom_csat_flow_uuid = custom_flow_uuid
+        self.sector.save(update_fields=["custom_csat_flow_uuid"])
+
+        url = reverse("sector-detail", args=[self.sector.pk])
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["custom_csat_flow_uuid"], str(custom_flow_uuid))
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active_for_attributes")
+    def test_create_sector_with_custom_csat_flow_uuid_when_feature_flag_is_off(
+        self, mock_is_feature_active_for_attributes
+    ):
+        mock_is_feature_active_for_attributes.return_value = False
+        custom_flow_uuid = str(uuid.uuid4())
+        url = reverse("sector-list")
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        data = {
+            "name": "CSAT Sector",
+            "rooms_limit": 3,
+            "work_start": "09:00",
+            "work_end": "18:00",
+            "project": str(self.project.pk),
+            "custom_csat_flow_uuid": custom_flow_uuid,
+        }
+        response = self.client.post(url, data=data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["custom_csat_flow_uuid"][0].code,
+            "custom_csat_flow_feature_flag_is_off",
+        )
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active_for_attributes")
+    def test_update_sector_custom_csat_flow_uuid_when_feature_flag_is_off(
+        self, mock_is_feature_active_for_attributes
+    ):
+        mock_is_feature_active_for_attributes.return_value = False
+        custom_flow_uuid = str(uuid.uuid4())
+        url = reverse("sector-detail", args=[self.sector.pk])
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = self.client.patch(
+            url,
+            data={"custom_csat_flow_uuid": custom_flow_uuid},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["custom_csat_flow_uuid"][0].code,
+            "custom_csat_flow_feature_flag_is_off",
+        )
+        self.sector.refresh_from_db()
+        self.assertIsNone(self.sector.custom_csat_flow_uuid)
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active_for_attributes")
+    def test_update_sector_custom_csat_flow_uuid_to_different_value_when_flag_is_off(
+        self, mock_is_feature_active_for_attributes
+    ):
+        mock_is_feature_active_for_attributes.return_value = False
+        original_uuid = uuid.uuid4()
+        self.sector.custom_csat_flow_uuid = original_uuid
+        self.sector.save(update_fields=["custom_csat_flow_uuid"])
+
+        new_uuid = str(uuid.uuid4())
+        url = reverse("sector-detail", args=[self.sector.pk])
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = self.client.patch(
+            url,
+            data={"custom_csat_flow_uuid": new_uuid},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["custom_csat_flow_uuid"][0].code,
+            "custom_csat_flow_feature_flag_is_off",
+        )
+        self.sector.refresh_from_db()
+        self.assertEqual(self.sector.custom_csat_flow_uuid, original_uuid)
+
 
 class RoomsExternalTests(APITestCase):
     fixtures = ["chats/fixtures/fixture_app.json"]
@@ -462,9 +614,10 @@ class RoomsExternalTests(APITestCase):
     def setUp(self) -> None:
         self.queue_1 = Queue.objects.get(uuid="f2519480-7e58-4fc4-9894-9ab1769e29cf")
 
+    @patch("chats.apps.api.v1.external.rooms.viewsets.is_feature_active_for_attributes", return_value=False)
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
-    def test_create_external_room(self, mock_get_room, mock_is_attending):
+    def test_create_external_room(self, mock_get_room, mock_is_attending, _mock_flag):
         mock_get_room.return_value = None
         url = reverse("external_rooms-list")
         client = self.client
@@ -484,10 +637,11 @@ class RoomsExternalTests(APITestCase):
         response = client.post(url, data=data, format="json")
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
+    @patch("chats.apps.api.v1.external.rooms.viewsets.is_feature_active_for_attributes", return_value=False)
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_external_room_with_external_uuid(
-        self, mock_get_room, mock_is_attending
+        self, mock_get_room, mock_is_attending, _mock_flag
     ):
         mock_get_room.return_value = None
         url = reverse("external_rooms-list")
@@ -514,10 +668,11 @@ class RoomsExternalTests(APITestCase):
             "aec9f84e-3dcd-11ed-b878-0242ac190012",
         )
 
+    @patch("chats.apps.api.v1.external.rooms.viewsets.is_feature_active_for_attributes", return_value=False)
     @patch("chats.apps.sectors.models.Sector.is_attending", return_value=True)
     @patch("chats.apps.projects.usecases.send_room_info.RoomInfoUseCase.get_room")
     def test_create_external_room_editing_contact(
-        self, mock_get_room, mock_is_attending
+        self, mock_get_room, mock_is_attending, _mock_flag
     ):
         mock_get_room.return_value = None
         url = reverse("external_rooms-list")

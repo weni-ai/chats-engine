@@ -672,10 +672,16 @@ WS_LAST_SEEN_UPDATE_INTERVAL_SECONDS = env.int(
 WS_LAST_SEEN_THRESHOLD_SECONDS = env.int("WS_LAST_SEEN_THRESHOLD_SECONDS", default=90)
 
 # CSAT
+CUSTOM_CSAT_FLOW_FEATURE_FLAG_KEY = env.str(
+    "CUSTOM_CSAT_FLOW_FEATURE_FLAG_KEY", default="weniChatsCustomCSATFlow"
+)
 CSAT_FLOW_UPDATE_RETRIES = env.int("CSAT_FLOW_UPDATE_RETRIES", default=5)
 CSAT_FLOW_UPDATE_EXPIRATION_TIME = env.int(
     "CSAT_FLOW_UPDATE_EXPIRATION_TIME", default=24 * 60  # 3 hours
 )  # In minutes
+CUSTOM_FLOW_NOT_FOUND_EMAIL_COOLDOWN = env.int(
+    "CUSTOM_FLOW_NOT_FOUND_EMAIL_COOLDOWN", default=60 * 60 * 24  # 24 hours
+)
 
 CHATS_BASE_URL = env.str("CHATS_BASE_URL", default="http://localhost:8000")
 
@@ -711,6 +717,9 @@ ROOMS_COUNT_BY_QUEUE_FEATURE_FLAG_KEY = env.str(
     default="weniChatsRoomsCountByQueue",
 )
 
+
+# REPORT STATUS CACHE
+REPORT_STATUS_CACHE_TTL = env.int("REPORT_STATUS_CACHE_TTL", default=300)
 
 # USER CACHE
 USER_OBJECT_CACHE_TTL = env.int("USER_OBJECT_CACHE_TTL", default=300)
@@ -798,16 +807,7 @@ IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL = env.int(
     "IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL", default=30
 )
 
-# Route Queue Cooldown Feature Flag
-ROUTE_QUEUE_COOLDOWN_FEATURE_FLAG_KEY = env.str(
-    "ROUTE_QUEUE_COOLDOWN_FEATURE_FLAG_KEY",
-    default="weniChatsRouteQueueCooldown",
-)
-
-NEW_GET_ROOM_USER_FEATURE_FLAG_KEY = env.str(
-    "CHATS_NEW_GET_ROOM_USER_FEATURE_FLAG_KEY",
-    default="weniChatsNewGetRoomUser",
-)
+# Cooldown settings
 ROUTE_QUEUE_COOLDOWN_MAX_TIME = env.int(
     "ROUTE_QUEUE_COOLDOWN_MAX_TIME",
     default=30,
@@ -816,3 +816,14 @@ ROUTE_QUEUE_COOLDOWN_RETRY_DELAY = env.int(
     "ROUTE_QUEUE_COOLDOWN_RETRY_DELAY",
     default=2,
 )
+
+
+# Meta
+META_GRAPH_API_BASE_HOST_URL = env.str(
+    "META_GRAPH_API_BASE_HOST_URL", default="https://graph.facebook.com"
+)
+META_GRAPH_API_VERSION = env.str("META_GRAPH_API_VERSION", default="v21.0")
+WHATSAPP_API_ACCESS_TOKEN = env.str("WHATSAPP_API_ACCESS_TOKEN", default="")
+
+# Flows Templates
+FLOWS_TEMPLATES_MAX_PAGES = env.int("FLOWS_TEMPLATES_MAX_PAGES", default=10)

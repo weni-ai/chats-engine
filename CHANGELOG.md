@@ -1,3 +1,22 @@
+# 3.62.0
+# Add
+  - Report status caching and invalidation
+# Fix
+  - Message permissions for missing project permissions
+# Remove
+  - Deprecated get_room_user function and related feature flag checks
+  - Cooldown feature flag checks from routing logic
+
+# 3.61.1
+# Add
+  - Flow templates endpoint in project viewset
+
+# 3.61.0
+# Add
+  - Meta Graph API client for retrieving WhatsApp templates
+  - Flow templates use case with pagination and variable support
+  - Channel listing from Connect REST client
+
 # 3.60.1
 # Add
   - Status change log to data exporter
