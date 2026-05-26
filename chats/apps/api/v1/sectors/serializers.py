@@ -160,7 +160,7 @@ class SectorSerializer(AuditableModelSerializer):
 
             data["is_automatic_message_queue_active"] = is_active
             data["automatic_message_queue_text"] = text
-            
+
         project = self.instance.project if self.instance else data.get("project")
 
         if project and "custom_csat_flow_uuid" in data:
