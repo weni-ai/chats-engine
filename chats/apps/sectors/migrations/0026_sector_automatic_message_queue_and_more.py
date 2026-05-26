@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("sectors", "0024_groupsector_created_by_groupsector_deleted_by_and_more"),
+        ("sectors", "0025_sector_custom_csat_flow_uuid"),
     ]
 
     operations = [
