@@ -194,6 +194,9 @@ class InactivityCloseTests(TestCase):
         self.assertFalse(room.is_active)
         self.assertEqual(room.ended_by, INACTIVITY_END_BY)
         self.assertTrue(room.automatic_closed)
+        # The owning agent must be registered as `closed_by` so reports
+        # and insights have an accountable user even on automatic closures.
+        self.assertEqual(room.closed_by, self.user)
 
         closure_msg = Message.objects.get(
             room=room, text="Closing due to inactivity.", user=self.user
@@ -215,6 +218,44 @@ class InactivityCloseTests(TestCase):
         self.assertTrue(feedback_msg.seen)
         self.assertIsNone(feedback_msg.automatic_message_type)
         self.assertFalse(feedback_msg.is_automatic_message)
+
+    def test_history_serializer_payload_after_automatic_close(self):
+        """
+        Integration check between the usecase and the history serializer:
+        after `InactivityService` closes a room, the `RoomHistorySerializer`
+        must expose `closed_by` as `{first_name, last_name, email,
+        automatic_closed: true}` matching the front contract.
+        """
+        from chats.apps.history.serializers.rooms import RoomHistorySerializer
+
+        # Replace the bare user from setUp with a fully-named one so the
+        # serializer assertions can exercise the real fields.
+        named_user = User.objects.create(
+            email="kallil.souza@vtex.com",
+            first_name="Kallil",
+            last_name="Souza dos Santos",
+        )
+        room = self._create_already_warned_room(last_interaction_offset_seconds=700)
+        Room.objects.filter(pk=room.pk).update(
+            user=named_user, last_message_user=named_user
+        )
+        room.refresh_from_db()
+
+        with patch.object(Room, "notify_user"), patch.object(Message, "notify_room"):
+            InactivityService().close_inactive_rooms()
+
+        room.refresh_from_db()
+        data = RoomHistorySerializer(room).data
+
+        self.assertEqual(
+            data["closed_by"],
+            {
+                "first_name": "Kallil",
+                "last_name": "Souza dos Santos",
+                "email": "kallil.souza@vtex.com",
+                "automatic_closed": True,
+            },
+        )
 
     def test_close_creates_feedback_message_even_without_human_text(self):
         """

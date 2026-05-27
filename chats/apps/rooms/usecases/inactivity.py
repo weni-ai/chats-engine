@@ -272,7 +272,7 @@ class InactivityService:
         room.automatic_closed = True
 
         try:
-            room.close(end_by=INACTIVITY_END_BY)
+            room.close(end_by=INACTIVITY_END_BY, closed_by=room.user)
         except Exception as exc:
             logger.error(
                 "[INACTIVITY] Failed to close room %s: %s",
