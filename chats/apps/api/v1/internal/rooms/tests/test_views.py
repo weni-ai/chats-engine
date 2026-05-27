@@ -84,8 +84,9 @@ class TestInternalListRoomsPendingResponseField(APITestCase):
     Tests for the `pending_response` field on `GET /v1/internal/rooms/`.
 
     `pending_response` should be True when the room's `last_message` was sent
-    by the contact and has `seen=True`, indicating the agent has acknowledged
-    the message but hasn't replied yet.
+    by the contact AND `Room.unread_messages_count == 0` (i.e. the agent has
+    already opened the room — `clear_unread_messages_count` was called — but
+    hasn't replied yet).
 
     The field is only returned when the
     `INTERNAL_ROOMS_LIST_PENDING_RESPONSE_FEATURE_FLAG_KEY` feature flag is
@@ -114,27 +115,32 @@ class TestInternalListRoomsPendingResponseField(APITestCase):
             project_uuid=str(self.project.uuid),
         )
 
-    def _set_last_contact_message(self, room: Room, seen: bool) -> Message:
+    def _set_last_contact_message(self, room: Room, unread_count: int = 0) -> Message:
+        """Simulates a contact message arriving. `unread_count=0` means the
+        agent has already opened the room (clear_unread_messages_count was
+        called)."""
         message = Message.objects.create(
-            room=room, contact=room.contact, text="hi", seen=seen
+            room=room, contact=room.contact, text="hi"
         )
         Room.objects.filter(pk=room.pk).update(
             last_message=message,
             last_message_contact=room.contact,
             last_message_user=None,
             last_message_text=message.text,
+            unread_messages_count=unread_count,
         )
         return message
 
-    def _set_last_agent_message(self, room: Room, seen: bool) -> Message:
+    def _set_last_agent_message(self, room: Room) -> Message:
         message = Message.objects.create(
-            room=room, user=self.user, text="hello", seen=seen
+            room=room, user=self.user, text="hello"
         )
         Room.objects.filter(pk=room.pk).update(
             last_message=message,
             last_message_contact=None,
             last_message_user=self.user,
             last_message_text=message.text,
+            unread_messages_count=0,
         )
         return message
 
@@ -151,11 +157,11 @@ class TestInternalListRoomsPendingResponseField(APITestCase):
 
     @with_internal_auth
     @patch(PENDING_RESPONSE_FF_PATH, return_value=True)
-    def test_pending_response_true_when_last_message_from_contact_and_seen(
+    def test_pending_response_true_when_last_msg_from_contact_and_unread_zero(
         self, _mock_ff
     ):
-        room = self._create_room("Contact Seen")
-        self._set_last_contact_message(room, seen=True)
+        room = self._create_room("Contact Read")
+        self._set_last_contact_message(room, unread_count=0)
 
         response = self._list_rooms()
 
@@ -164,11 +170,11 @@ class TestInternalListRoomsPendingResponseField(APITestCase):
 
     @with_internal_auth
     @patch(PENDING_RESPONSE_FF_PATH, return_value=True)
-    def test_pending_response_false_when_last_message_from_contact_not_seen(
+    def test_pending_response_false_when_last_msg_from_contact_with_unread(
         self, _mock_ff
     ):
-        room = self._create_room("Contact Unseen")
-        self._set_last_contact_message(room, seen=False)
+        room = self._create_room("Contact Unread")
+        self._set_last_contact_message(room, unread_count=3)
 
         response = self._list_rooms()
 
@@ -178,17 +184,13 @@ class TestInternalListRoomsPendingResponseField(APITestCase):
     @with_internal_auth
     @patch(PENDING_RESPONSE_FF_PATH, return_value=True)
     def test_pending_response_false_when_last_message_from_agent(self, _mock_ff):
-        room_seen = self._create_room("Agent Seen")
-        self._set_last_agent_message(room_seen, seen=True)
-
-        room_unseen = self._create_room("Agent Unseen")
-        self._set_last_agent_message(room_unseen, seen=False)
+        room = self._create_room("Agent Replied")
+        self._set_last_agent_message(room)
 
         response = self._list_rooms()
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertFalse(self._result_for(response, room_seen)["pending_response"])
-        self.assertFalse(self._result_for(response, room_unseen)["pending_response"])
+        self.assertFalse(self._result_for(response, room)["pending_response"])
 
     @with_internal_auth
     @patch(PENDING_RESPONSE_FF_PATH, return_value=True)
@@ -206,7 +208,7 @@ class TestInternalListRoomsPendingResponseField(APITestCase):
         self, _mock_ff
     ):
         room = self._create_room("FF Disabled")
-        self._set_last_contact_message(room, seen=True)
+        self._set_last_contact_message(room, unread_count=0)
 
         response = self._list_rooms()
 
@@ -219,7 +221,7 @@ class TestInternalListRoomsPendingResponseField(APITestCase):
         """When the feature flag client raises, treat it as disabled and omit
         the field instead of breaking the response."""
         room = self._create_room("FF Error")
-        self._set_last_contact_message(room, seen=True)
+        self._set_last_contact_message(room, unread_count=0)
 
         with patch(PENDING_RESPONSE_FF_PATH, side_effect=Exception("boom")):
             response = self._list_rooms()
