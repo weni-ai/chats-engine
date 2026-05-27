@@ -1,0 +1,153 @@
+{
+  "meta": {
+    "generated_at": "2026-05-13T11:14:00Z",
+    "generated_by": "nome.empresa@empresa.com"
+  },
+  "room": {
+    "uuid": "2e7de2a6-cb6b-4a77-b85e-5a6198b5eaf4",
+    "protocol": "",
+    "started_at": "2026-04-23T19:44:23.372Z",
+    "ended_at": "2026-05-08T13:33:17.808Z",
+    "ended_by": "mass_closure",
+    "tags": ["export_mock_tag"],
+    "custom_fields": {
+      "motivo": "Duvida sobre pedido",
+      "prioridade": "alta"
+    }
+  },
+  "contact": {
+    "name": "Elizabeth Miller",
+    "email": null,
+    "phone": "",
+    "external_id": null,
+    "custom_fields": {
+      "cpf": "000.000.000-00",
+      "tipo": "cliente_vip"
+    }
+  },
+  "agents": [
+    { "email": "kallil.souza@vtex.com", "name": "Kallil", "is_current": true },
+    { "email": "eduardo.medeiros@weni.ai", "name": "Eduardo", "is_current": false }
+  ],
+  "timeline": [
+    {
+      "type": "message",
+      "sender_type": "contact",
+      "sender_name": "Elizabeth Miller",
+      "created_on": "2026-04-23T19:44:23.376Z",
+      "text": "Use the online COM program, then you can hack the virtual sensor!",
+      "medias": []
+    },
+    {
+      "type": "message",
+      "sender_type": "contact",
+      "sender_name": "Elizabeth Miller",
+      "created_on": "2026-04-23T19:44:23.376Z",
+      "text": "We need to hack the solid state IB alarm!",
+      "medias": []
+    },
+    {
+      "type": "transfer_chip",
+      "kind": "pick",
+      "from": {
+        "name": "Default queue",
+        "type": "queue",
+        "uuid": "4a23fdde-d856-4908-9373-85ebea475c0f"
+      },
+      "to": {
+        "id": "7",
+        "name": "Eduardo",
+        "type": "user",
+        "email": "eduardo.medeiros@weni.ai"
+      },
+      "by": {
+        "id": "7",
+        "name": "Eduardo",
+        "type": "user",
+        "email": "eduardo.medeiros@weni.ai"
+      },
+      "created_on": "2026-04-27T12:11:36.981Z"
+    },
+    {
+      "type": "transfer_chip",
+      "kind": "transfer",
+      "from": {
+        "name": "Default queue",
+        "type": "queue",
+        "uuid": "4a23fdde-d856-4908-9373-85ebea475c0f"
+      },
+      "to": {
+        "name": "fila pra testar o novos filtros",
+        "type": "queue",
+        "uuid": "537ac764-0462-4745-933b-10758ce8308d"
+      },
+      "by": {
+        "id": "7",
+        "name": "Eduardo",
+        "type": "user",
+        "email": "eduardo.medeiros@weni.ai"
+      },
+      "created_on": "2026-05-01T04:38:50.590Z"
+    },
+    {
+      "type": "transfer_chip",
+      "kind": "transfer",
+      "from": {
+        "id": "7",
+        "name": "Eduardo",
+        "type": "user",
+        "email": "eduardo.medeiros@weni.ai"
+      },
+      "to": {
+        "id": "56",
+        "name": "Kallil",
+        "type": "user",
+        "email": "kallil.souza@vtex.com"
+      },
+      "by": {
+        "id": "7",
+        "name": "Eduardo",
+        "type": "user",
+        "email": "eduardo.medeiros@weni.ai"
+      },
+      "created_on": "2026-05-04T21:06:04.199Z"
+    },
+    {
+      "type": "message",
+      "sender_type": "bot",
+      "sender_name": "bot",
+      "created_on": "2026-05-14T19:34:49.033Z",
+      "text": "[bot] Olá! Como posso te ajudar?",
+      "medias": []
+    },
+    {
+      "type": "message",
+      "sender_type": "agent",
+      "sender_name": "Kallil",
+      "created_on": "2026-05-14T19:34:49.033Z",
+      "text": "Olá, sou o atendente, vou te ajudar",
+      "medias": []
+    },
+    {
+      "type": "message",
+      "sender_type": "contact",
+      "sender_name": "Elizabeth Miller",
+      "created_on": "2026-05-14T19:34:49.033Z",
+      "text": "Foto do produto:",
+      "medias": [
+        {
+          "content_type": "image/jpeg",
+          "url": "https://placehold.co/600x400.jpg",
+          "data_uri": null
+        }
+      ]
+    },
+    {
+      "type": "internal_note",
+      "sender_name": "Kallil",
+      "created_on": "2026-05-14T19:34:49.051Z",
+      "text": "Nota interna: cliente parece urgente",
+      "anchored_message_uuid": null
+    }
+  ]
+}
