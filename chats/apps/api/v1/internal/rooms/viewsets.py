@@ -177,7 +177,7 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
             annotations["pending_response"] = Case(
                 When(
                     last_message_contact__isnull=False,
-                    last_message__seen=True,
+                    unread_messages_count=0,
                     then=Value(True),
                 ),
                 default=Value(False),
