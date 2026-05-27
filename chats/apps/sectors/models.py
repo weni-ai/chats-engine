@@ -229,9 +229,7 @@ class Sector(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMod
             "can_edit_custom_fields": self.can_edit_custom_fields,
             "config": self.config,
             "queues": list(
-                self.queues.filter(is_deleted=False).values(
-                    "name", "default_message", "config"
-                )
+                self.queues.filter(is_deleted=False).values("name", "config")
             ),
         }
 
