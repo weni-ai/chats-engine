@@ -314,7 +314,7 @@
       <div class="report__heading">
         <h1 class="report__title">{% trans "Conversation Report" %}</h1>
         <p class="report__subtitle">
-          {% blocktrans with date=meta.generated_at|date:"d/m/Y, H:i" user=meta.generated_by %}Generated on {{ date }} from {{ user }}{% endblocktrans %}
+          {% blocktrans with date=meta.generated_at|date:"SHORT_DATETIME_FORMAT" user=meta.generated_by %}Generated on {{ date }} from {{ user }}{% endblocktrans %}
         </p>
       </div>
       <svg class="vtex-logo" aria-label="VTEX"><use href="#vtex-logo"/></svg>
@@ -326,7 +326,7 @@
         <div class="transcription__list">
           {% if room.started_at %}
             <div class="chip-row">
-              <span class="chip">{% blocktrans with date=room.started_at|date:"d/m/Y, H:i" %}{{ date }} - Conversation started{% endblocktrans %}</span>
+              <span class="chip">{% blocktrans with date=room.started_at|date:"SHORT_DATETIME_FORMAT" %}{{ date }} - Conversation started{% endblocktrans %}</span>
             </div>
           {% endif %}
 
@@ -337,7 +337,7 @@
                   <div class="msg msg--contact">
                     <header class="msg__header">
                       <span class="msg__sender">{{ item.sender_name }}</span>
-                      <span class="msg__time">{{ item.created_on|date:"H:i" }}</span>
+                      <span class="msg__time">{{ item.created_on|date:"TIME_FORMAT" }}</span>
                     </header>
                     {% if item.text %}<div class="msg__body">{{ item.text|linebreaksbr }}</div>{% endif %}
                     {% for media in item.medias %}
@@ -350,7 +350,7 @@
                   <div class="msg msg--agent">
                     <header class="msg__header">
                       <span class="msg__sender">{{ item.sender_name }}</span>
-                      <span class="msg__time">{{ item.created_on|date:"H:i" }}</span>
+                      <span class="msg__time">{{ item.created_on|date:"TIME_FORMAT" }}</span>
                     </header>
                     {% if item.text %}<div class="msg__body">{{ item.text|linebreaksbr }}</div>{% endif %}
                     {% for media in item.medias %}
@@ -362,7 +362,7 @@
             {% elif item.type == "transfer_chip" %}
               <div class="chip-row">
                 <span class="chip">
-                  {% with date=item.created_on|date:"d/m/Y, H:i" %}
+                  {% with date=item.created_on|date:"SHORT_DATETIME_FORMAT" %}
                     {% if item.kind == "pick" %}
                       {% blocktrans with date=date queue=item.from.name user=item.by.name %}{{ date }} - Chat picked from queue {{ queue }} by {{ user }}{% endblocktrans %}
                     {% elif item.to.type == "queue" %}
@@ -375,7 +375,7 @@
               </div>
             {% elif item.type == "internal_note" %}
               <div class="note">
-                <span class="note__time">{{ item.created_on|date:"d/m/Y - H:i" }}</span>
+                <span class="note__time">{{ item.created_on|date:"SHORT_DATE_FORMAT" }} - {{ item.created_on|date:"TIME_FORMAT" }}</span>
                 | {% trans "Internal note" %}: {{ item.text }}
               </div>
             {% endif %}
@@ -385,9 +385,9 @@
             <div class="chip-row">
               <span class="chip">
                 {% if room.ended_by %}
-                  {% blocktrans with date=room.ended_at|date:"d/m/Y, H:i" user=room.ended_by %}{{ date }} - Chat was ended by {{ user }}{% endblocktrans %}
+                  {% blocktrans with date=room.ended_at|date:"SHORT_DATETIME_FORMAT" user=room.ended_by %}{{ date }} - Chat was ended by {{ user }}{% endblocktrans %}
                 {% else %}
-                  {% blocktrans with date=room.ended_at|date:"d/m/Y, H:i" %}{{ date }} - Chat ended{% endblocktrans %}
+                  {% blocktrans with date=room.ended_at|date:"SHORT_DATETIME_FORMAT" %}{{ date }} - Chat ended{% endblocktrans %}
                 {% endif %}
               </span>
             </div>
@@ -400,11 +400,11 @@
         <div class="sidebar__list">
           <div class="sidebar__row">
             <span class="sidebar__label">{% trans "Started" %}:</span>
-            <span class="sidebar__value">{{ room.started_at|date:"d/m/Y, H:i"|default:"-" }}</span>
+            <span class="sidebar__value">{{ room.started_at|date:"SHORT_DATETIME_FORMAT"|default:"-" }}</span>
           </div>
           <div class="sidebar__row">
             <span class="sidebar__label">{% trans "Ended" %}:</span>
-            <span class="sidebar__value">{{ room.ended_at|date:"d/m/Y, H:i"|default:"-" }}</span>
+            <span class="sidebar__value">{{ room.ended_at|date:"SHORT_DATETIME_FORMAT"|default:"-" }}</span>
           </div>
           <div class="sidebar__row">
             <span class="sidebar__label">{% trans "Representative" %}:</span>
