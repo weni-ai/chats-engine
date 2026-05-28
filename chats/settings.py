@@ -754,6 +754,10 @@ DENORMALIZED_MESSAGE_FIELDS_FLAG_KEY = env.str(
     "DENORMALIZED_MESSAGE_FIELDS_FLAG_KEY",
     default="weniChatsDenormalizedMessageFields",
 )
+INTERNAL_ROOMS_LIST_PENDING_RESPONSE_FEATURE_FLAG_KEY = env.str(
+    "INTERNAL_ROOMS_LIST_PENDING_RESPONSE_FEATURE_FLAG_KEY",
+    default="weniChatsInternalRoomsListPendingResponse",
+)
 AUDIT_LOG_FEATURE_FLAG_KEY = env.str(
     "AUDIT_LOG_FEATURE_FLAG_KEY", default="weniChatsAuditLog"
 )

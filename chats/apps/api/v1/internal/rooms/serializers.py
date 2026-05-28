@@ -10,7 +10,7 @@ from chats.apps.dashboard.models import RoomMetrics
 
 
 class RoomInternalListSerializer(serializers.ModelSerializer):
-    contact = serializers.CharField(source="contact.name")
+    contact = serializers.SerializerMethodField()
     agent = serializers.SerializerMethodField()
     user_email = serializers.EmailField(source="user.email", default=None, read_only=True)
     tags = TagSimpleSerializer(many=True, required=False)
@@ -22,6 +22,7 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
     waiting_time = serializers.SerializerMethodField()
     queue_time = serializers.SerializerMethodField()
     csat_rating = serializers.SerializerMethodField()
+    pending_response = serializers.BooleanField(read_only=True, default=False)
 
     class Meta:
         model = Room
@@ -43,6 +44,7 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
             "waiting_time",
             "queue_time",
             "csat_rating",
+            "pending_response",
             "protocol",
         ]
 
@@ -60,6 +62,17 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
     def get_queue(self, obj) -> str:
         try:
             return self._clean_soft_deleted_name(obj.queue.name)
+        except AttributeError:
+            return ""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.context.get("include_pending_response", False):
+            self.fields.pop("pending_response", None)
+
+    def get_contact(self, obj) -> str:
+        try:
+            return obj.contact.name if obj.contact else ""
         except AttributeError:
             return ""
 
