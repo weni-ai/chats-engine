@@ -259,9 +259,7 @@ class ArchiveChatsService(BaseArchiveChatsService):
 
         with tempfile.SpooledTemporaryFile(max_size=5 * 1024 * 1024) as tmp:
             for message in messages:
-                tmp.write(
-                    json.dumps(message, ensure_ascii=False).encode("utf-8")
-                )
+                tmp.write(json.dumps(message, ensure_ascii=False).encode("utf-8"))
                 tmp.write(b"\n")
 
             room_archived_conversation.status = (

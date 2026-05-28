@@ -54,7 +54,6 @@ class BulkQueueCreationUseCaseTests(TestCase):
             queues_data=[
                 {
                     "name": "Fila Completa",
-                    "default_message": "Olá",
                     "config": {"foo": "bar"},
                     "queue_limit": {"limit": 7, "is_active": True},
                 }
@@ -62,7 +61,6 @@ class BulkQueueCreationUseCaseTests(TestCase):
         ).execute()
 
         queue = Queue.objects.get(sector=self.sector, name="Fila Completa")
-        self.assertEqual(queue.default_message, "Olá")
         self.assertEqual(queue.config, {"foo": "bar"})
         self.assertEqual(queue.queue_limit, 7)
         self.assertTrue(queue.is_queue_limit_active)

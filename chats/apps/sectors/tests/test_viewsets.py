@@ -186,6 +186,212 @@ class SectorTests(APITestCase):
         self.assertTrue(self.sector.is_automatic_message_active)
         self.assertEqual(self.sector.automatic_message_text, text)
 
+    def test_retrieve_sector_returns_default_automatic_message_queue(self):
+        """
+        Sectors not yet configured should return the queue automatic message
+        feature as inactive and empty.
+        """
+        url = reverse("sector-detail", args=[self.sector.pk])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["automatic_message_queue"]["is_active"], False)
+        self.assertIsNone(response.data["automatic_message_queue"]["text"])
+
+    def test_retrieve_sector_returns_configured_automatic_message_queue(self):
+        """
+        Sectors with the queue automatic message configured should expose the
+        text and active flag on retrieve.
+        """
+        self.sector.is_automatic_message_queue_active = True
+        self.sector.automatic_message_queue_text = "Aguarde, em breve te atenderemos"
+        self.sector.save(
+            update_fields=[
+                "is_automatic_message_queue_active",
+                "automatic_message_queue_text",
+            ]
+        )
+        url = reverse("sector-detail", args=[self.sector.pk])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["automatic_message_queue"]["is_active"], True)
+        self.assertEqual(
+            response.data["automatic_message_queue"]["text"],
+            "Aguarde, em breve te atenderemos",
+        )
+
+    def test_create_sector_with_automatic_message_queue(self):
+        """
+        Sector creation must accept and persist the automatic_message_queue
+        contract sent by the front.
+        """
+        url = reverse("sector-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        data = {
+            "name": "Finances Queue Msg",
+            "rooms_limit": 3,
+            "work_start": "11:00",
+            "work_end": "19:30",
+            "project": str(self.project.pk),
+            "automatic_message_queue": {
+                "is_active": True,
+                "text": "Aguarde, em breve te atenderemos",
+            },
+        }
+
+        response = client.post(url, data=data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["automatic_message_queue"]["is_active"], True)
+        self.assertEqual(
+            response.data["automatic_message_queue"]["text"],
+            "Aguarde, em breve te atenderemos",
+        )
+
+        created_sector = Sector.objects.get(uuid=response.data["uuid"])
+        self.assertTrue(created_sector.is_automatic_message_queue_active)
+        self.assertEqual(
+            created_sector.automatic_message_queue_text,
+            "Aguarde, em breve te atenderemos",
+        )
+
+    def test_update_sector_automatic_message_queue(self):
+        """
+        PATCH on sector must persist the automatic_message_queue payload.
+        """
+        url = reverse("sector-detail", args=[self.sector.pk])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        text = "Aguarde, em breve te atenderemos"
+        response = client.patch(
+            url,
+            data={
+                "automatic_message_queue": {
+                    "is_active": True,
+                    "text": text,
+                },
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["automatic_message_queue"]["is_active"], True)
+        self.assertEqual(response.data["automatic_message_queue"]["text"], text)
+
+        self.sector.refresh_from_db()
+        self.assertTrue(self.sector.is_automatic_message_queue_active)
+        self.assertEqual(self.sector.automatic_message_queue_text, text)
+
+    def test_update_sector_can_disable_automatic_message_queue_without_losing_text(
+        self,
+    ):
+        """
+        Disabling the flag must keep the text intact to allow re-enabling later.
+        """
+        self.sector.is_automatic_message_queue_active = True
+        self.sector.automatic_message_queue_text = "Aguarde"
+        self.sector.save(
+            update_fields=[
+                "is_automatic_message_queue_active",
+                "automatic_message_queue_text",
+            ]
+        )
+        url = reverse("sector-detail", args=[self.sector.pk])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = client.patch(
+            url,
+            data={
+                "automatic_message_queue": {
+                    "is_active": False,
+                    "text": "Aguarde",
+                },
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.sector.refresh_from_db()
+        self.assertFalse(self.sector.is_automatic_message_queue_active)
+        self.assertEqual(self.sector.automatic_message_queue_text, "Aguarde")
+
+    def test_create_sector_with_automatic_message_queue_active_without_text_returns_400(
+        self,
+    ):
+        """
+        is_active=True with empty text must return 400 to prevent silent
+        configurations that never fire.
+        """
+        url = reverse("sector-list")
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        data = {
+            "name": "Finances Empty",
+            "rooms_limit": 3,
+            "work_start": "11:00",
+            "work_end": "19:30",
+            "project": str(self.project.pk),
+            "automatic_message_queue": {
+                "is_active": True,
+                "text": "",
+            },
+        }
+
+        response = client.post(url, data=data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("automatic_message_queue", response.data)
+
+    def test_update_sector_automatic_message_queue_active_without_text_returns_400(
+        self,
+    ):
+        """
+        PATCH with is_active=True and empty text must return 400.
+        """
+        url = reverse("sector-detail", args=[self.sector.pk])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = client.patch(
+            url,
+            data={
+                "automatic_message_queue": {
+                    "is_active": True,
+                    "text": "",
+                },
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("automatic_message_queue", response.data)
+
+    def test_update_sector_activates_without_text_uses_existing_text(self):
+        """
+        PATCH sending only is_active=True (without text) should keep the
+        existing text on the sector instead of clearing it.
+        """
+        self.sector.is_automatic_message_queue_active = False
+        self.sector.automatic_message_queue_text = "Aguarde"
+        self.sector.save(
+            update_fields=[
+                "is_automatic_message_queue_active",
+                "automatic_message_queue_text",
+            ]
+        )
+        url = reverse("sector-detail", args=[self.sector.pk])
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = client.patch(
+            url,
+            data={"automatic_message_queue": {"is_active": True}},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.sector.refresh_from_db()
+        self.assertTrue(self.sector.is_automatic_message_queue_active)
+        self.assertEqual(self.sector.automatic_message_queue_text, "Aguarde")
+
     def test_delete_sector_with_right_project_token(self):
         """
         Verify if the endpoint for delete sector is working with correctly.
@@ -248,6 +454,158 @@ class SectorTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.sector.refresh_from_db()
         self.assertFalse(self.sector.required_tags)
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active_for_attributes")
+    def test_create_sector_with_custom_csat_flow_uuid(
+        self, mock_is_feature_active_for_attributes
+    ):
+        mock_is_feature_active_for_attributes.return_value = True
+        custom_flow_uuid = str(uuid.uuid4())
+        url = reverse("sector-list")
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        data = {
+            "name": "CSAT Sector",
+            "rooms_limit": 3,
+            "work_start": "09:00",
+            "work_end": "18:00",
+            "project": str(self.project.pk),
+            "custom_csat_flow_uuid": custom_flow_uuid,
+        }
+        response = self.client.post(url, data=data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["custom_csat_flow_uuid"], custom_flow_uuid)
+
+    def test_create_sector_without_custom_csat_flow_uuid(self):
+        url = reverse("sector-list")
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        data = {
+            "name": "No CSAT Sector",
+            "rooms_limit": 3,
+            "work_start": "09:00",
+            "work_end": "18:00",
+            "project": str(self.project.pk),
+        }
+        response = self.client.post(url, data=data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(response.data["custom_csat_flow_uuid"])
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active_for_attributes")
+    def test_update_sector_custom_csat_flow_uuid(
+        self, mock_is_feature_active_for_attributes
+    ):
+        mock_is_feature_active_for_attributes.return_value = True
+        custom_flow_uuid = str(uuid.uuid4())
+        url = reverse("sector-detail", args=[self.sector.pk])
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = self.client.patch(
+            url,
+            data={"custom_csat_flow_uuid": custom_flow_uuid},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["custom_csat_flow_uuid"], custom_flow_uuid)
+        self.sector.refresh_from_db()
+        self.assertEqual(str(self.sector.custom_csat_flow_uuid), custom_flow_uuid)
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active_for_attributes")
+    def test_clear_sector_custom_csat_flow_uuid(
+        self, mock_is_feature_active_for_attributes
+    ):
+        mock_is_feature_active_for_attributes.return_value = False
+        self.sector.custom_csat_flow_uuid = uuid.uuid4()
+        self.sector.save(update_fields=["custom_csat_flow_uuid"])
+
+        url = reverse("sector-detail", args=[self.sector.pk])
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = self.client.patch(
+            url,
+            data={"custom_csat_flow_uuid": None},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data["custom_csat_flow_uuid"])
+        self.sector.refresh_from_db()
+        self.assertIsNone(self.sector.custom_csat_flow_uuid)
+
+    def test_retrieve_sector_includes_custom_csat_flow_uuid(self):
+        custom_flow_uuid = uuid.uuid4()
+        self.sector.custom_csat_flow_uuid = custom_flow_uuid
+        self.sector.save(update_fields=["custom_csat_flow_uuid"])
+
+        url = reverse("sector-detail", args=[self.sector.pk])
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["custom_csat_flow_uuid"], str(custom_flow_uuid))
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active_for_attributes")
+    def test_create_sector_with_custom_csat_flow_uuid_when_feature_flag_is_off(
+        self, mock_is_feature_active_for_attributes
+    ):
+        mock_is_feature_active_for_attributes.return_value = False
+        custom_flow_uuid = str(uuid.uuid4())
+        url = reverse("sector-list")
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        data = {
+            "name": "CSAT Sector",
+            "rooms_limit": 3,
+            "work_start": "09:00",
+            "work_end": "18:00",
+            "project": str(self.project.pk),
+            "custom_csat_flow_uuid": custom_flow_uuid,
+        }
+        response = self.client.post(url, data=data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["custom_csat_flow_uuid"][0].code,
+            "custom_csat_flow_feature_flag_is_off",
+        )
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active_for_attributes")
+    def test_update_sector_custom_csat_flow_uuid_when_feature_flag_is_off(
+        self, mock_is_feature_active_for_attributes
+    ):
+        mock_is_feature_active_for_attributes.return_value = False
+        custom_flow_uuid = str(uuid.uuid4())
+        url = reverse("sector-detail", args=[self.sector.pk])
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = self.client.patch(
+            url,
+            data={"custom_csat_flow_uuid": custom_flow_uuid},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["custom_csat_flow_uuid"][0].code,
+            "custom_csat_flow_feature_flag_is_off",
+        )
+        self.sector.refresh_from_db()
+        self.assertIsNone(self.sector.custom_csat_flow_uuid)
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active_for_attributes")
+    def test_update_sector_custom_csat_flow_uuid_to_different_value_when_flag_is_off(
+        self, mock_is_feature_active_for_attributes
+    ):
+        mock_is_feature_active_for_attributes.return_value = False
+        original_uuid = uuid.uuid4()
+        self.sector.custom_csat_flow_uuid = original_uuid
+        self.sector.save(update_fields=["custom_csat_flow_uuid"])
+
+        new_uuid = str(uuid.uuid4())
+        url = reverse("sector-detail", args=[self.sector.pk])
+        self.client.credentials(HTTP_AUTHORIZATION="Token " + self.login_token.key)
+        response = self.client.patch(
+            url,
+            data={"custom_csat_flow_uuid": new_uuid},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["custom_csat_flow_uuid"][0].code,
+            "custom_csat_flow_feature_flag_is_off",
+        )
+        self.sector.refresh_from_db()
+        self.assertEqual(self.sector.custom_csat_flow_uuid, original_uuid)
 
 
 class RoomsExternalTests(APITestCase):
@@ -540,318 +898,3 @@ class SectorTicketerCreationTests(APITestCase):
 
         self.assertEqual(mock_create_ticketer.call_count, 0)
         self.assertEqual(mock_integrate_individual.call_count, 1)
-
-
-class SectorEndAllChatsTests(APITestCase):
-
-    def setUp(self):
-        self.project = Project.objects.create(name="Test Project")
-        self.sector = Sector.objects.create(
-            project=self.project,
-            name="Test Sector",
-            rooms_limit=5,
-            work_start="09:00",
-            work_end="18:00",
-        )
-        self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
-        self.queue_2 = Queue.objects.create(
-            name="Test Queue 2", sector=self.sector
-        )
-        self.contact = Contact.objects.create(
-            external_id="ext-1", name="Contact 1"
-        )
-        self.contact_2 = Contact.objects.create(
-            external_id="ext-2", name="Contact 2"
-        )
-
-        self.user = User.objects.create(email="admin@endall.test")
-        self.agent = User.objects.create(email="agent@endall.test")
-        self.client.force_authenticate(user=self.user)
-
-    def _delete_sector(self, sector_uuid, end_all_chats=False):
-        url = reverse("sector-detail", args=[sector_uuid])
-        if end_all_chats:
-            url += "?end_all_chats=true"
-        return self.client.delete(url)
-
-    @with_project_permission()
-    def test_delete_sector_without_flag_does_not_close_rooms(self):
-        room = Room.objects.create(
-            contact=self.contact,
-            queue=self.queue,
-            user=self.agent,
-            is_active=True,
-        )
-        response = self._delete_sector(self.sector.uuid)
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        room.refresh_from_db()
-        self.assertTrue(room.is_active)
-
-    @with_project_permission()
-    def test_delete_sector_with_flag_closes_ongoing_rooms(self):
-        room = Room.objects.create(
-            contact=self.contact,
-            queue=self.queue,
-            user=self.agent,
-            is_active=True,
-        )
-        response = self._delete_sector(self.sector.uuid, end_all_chats=True)
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        room.refresh_from_db()
-        self.assertFalse(room.is_active)
-        self.assertEqual(room.ended_by, "sector_deleted")
-
-    @with_project_permission()
-    def test_delete_sector_with_flag_closes_waiting_rooms(self):
-        room = Room.objects.create(
-            contact=self.contact,
-            queue=self.queue,
-            user=None,
-            is_active=True,
-        )
-        response = self._delete_sector(self.sector.uuid, end_all_chats=True)
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        room.refresh_from_db()
-        self.assertFalse(room.is_active)
-
-    @with_project_permission()
-    def test_delete_sector_with_flag_closes_rooms_across_all_queues(self):
-        room_q1 = Room.objects.create(
-            contact=self.contact,
-            queue=self.queue,
-            user=self.agent,
-            is_active=True,
-        )
-        room_q2 = Room.objects.create(
-            contact=self.contact_2,
-            queue=self.queue_2,
-            user=None,
-            is_active=True,
-        )
-        response = self._delete_sector(self.sector.uuid, end_all_chats=True)
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        room_q1.refresh_from_db()
-        room_q2.refresh_from_db()
-        self.assertFalse(room_q1.is_active)
-        self.assertFalse(room_q2.is_active)
-
-    @with_project_permission()
-    def test_delete_sector_with_flag_no_active_rooms_succeeds(self):
-        response = self._delete_sector(self.sector.uuid, end_all_chats=True)
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(Sector.objects.filter(uuid=self.sector.uuid).exists())
-
-    @with_project_permission()
-    def test_delete_sector_with_flag_skips_already_closed_rooms(self):
-        closed_room = Room.objects.create(
-            contact=self.contact,
-            queue=self.queue,
-            user=self.agent,
-            is_active=False,
-        )
-        active_room = Room.objects.create(
-            contact=self.contact_2,
-            queue=self.queue,
-            user=None,
-            is_active=True,
-        )
-        response = self._delete_sector(self.sector.uuid, end_all_chats=True)
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        active_room.refresh_from_db()
-        self.assertFalse(active_room.is_active)
-        closed_room.refresh_from_db()
-        self.assertFalse(closed_room.is_active)
-
-
-class SectorTransferOnDeleteTests(APITestCase):
-
-    def setUp(self):
-        self.project = Project.objects.create(name="Test Project")
-        self.sector = Sector.objects.create(
-            project=self.project,
-            name="Sector To Delete",
-            rooms_limit=5,
-            work_start="09:00",
-            work_end="18:00",
-        )
-        self.queue_1 = Queue.objects.create(
-            name="Queue 1", sector=self.sector
-        )
-        self.queue_2 = Queue.objects.create(
-            name="Queue 2", sector=self.sector
-        )
-
-        self.other_sector = Sector.objects.create(
-            project=self.project,
-            name="Other Sector",
-            rooms_limit=5,
-            work_start="09:00",
-            work_end="18:00",
-        )
-        self.target_queue = Queue.objects.create(
-            name="Target Queue", sector=self.other_sector
-        )
-
-        self.contact = Contact.objects.create(
-            external_id="ext-transfer-s1", name="Contact ST1"
-        )
-        self.contact_2 = Contact.objects.create(
-            external_id="ext-transfer-s2", name="Contact ST2"
-        )
-        self.contact_3 = Contact.objects.create(
-            external_id="ext-transfer-s3", name="Contact ST3"
-        )
-
-        self.user = User.objects.create(email="admin@transfer-sector.test")
-        self.agent = User.objects.create(email="agent@transfer-sector.test")
-        self.client.force_authenticate(user=self.user)
-
-    def _delete_sector(
-        self, sector_uuid, transfer_to_queue=None, end_all_chats=False
-    ):
-        url = reverse("sector-detail", args=[sector_uuid])
-        params = []
-        if transfer_to_queue:
-            params.append(f"transfer_to_queue={transfer_to_queue}")
-        if end_all_chats:
-            params.append("end_all_chats=true")
-        if params:
-            url += "?" + "&".join(params)
-        return self.client.delete(url)
-
-    @with_project_permission()
-    def test_transfer_succeeds_and_sector_is_deleted(self):
-        room = Room.objects.create(
-            contact=self.contact,
-            queue=self.queue_1,
-            user=self.agent,
-            is_active=True,
-        )
-        response = self._delete_sector(
-            self.sector.uuid, transfer_to_queue=self.target_queue.uuid
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertTrue(response.data["is_deleted"])
-        self.assertIsNotNone(response.data["transfer"])
-        self.assertEqual(response.data["transfer"]["success_count"], 1)
-        self.assertEqual(response.data["transfer"]["failed_count"], 0)
-
-        room.refresh_from_db()
-        self.assertEqual(room.queue, self.target_queue)
-        self.assertTrue(room.is_active)
-        self.assertFalse(Sector.objects.filter(uuid=self.sector.uuid).exists())
-
-    @with_project_permission()
-    def test_transfer_failure_aborts_deletion(self):
-        room = Room.objects.create(
-            contact=self.contact,
-            queue=self.queue_1,
-            user=self.agent,
-            is_active=True,
-        )
-        with patch(
-            "chats.apps.api.v1.sectors.viewsets.BulkTransferService.transfer"
-        ) as mock_transfer:
-            mock_result = MagicMock()
-            mock_result.failed_count = 1
-            mock_result.success_count = 0
-            mock_result.to_dict.return_value = {
-                "success_count": 0,
-                "failed_count": 1,
-                "total_processed": 1,
-                "errors": ["Room failed"],
-                "failed_rooms": [str(room.uuid)],
-                "has_more_errors": False,
-            }
-            mock_transfer.return_value = mock_result
-
-            response = self._delete_sector(
-                self.sector.uuid, transfer_to_queue=self.target_queue.uuid
-            )
-
-        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
-        self.assertIn("transfer", response.data)
-        self.assertEqual(response.data["transfer"]["failed_count"], 1)
-        self.assertTrue(Sector.objects.filter(uuid=self.sector.uuid).exists())
-
-    @with_project_permission()
-    def test_target_queue_belongs_to_sector_being_deleted(self):
-        response = self._delete_sector(
-            self.sector.uuid, transfer_to_queue=self.queue_1.uuid
-        )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertTrue(Sector.objects.filter(uuid=self.sector.uuid).exists())
-
-    @with_project_permission()
-    def test_target_queue_not_found(self):
-        response = self._delete_sector(
-            self.sector.uuid, transfer_to_queue=str(uuid.uuid4())
-        )
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertTrue(Sector.objects.filter(uuid=self.sector.uuid).exists())
-
-    @with_project_permission()
-    def test_target_queue_in_different_project(self):
-        other_project = Project.objects.create(name="Other Project")
-        other_sector = Sector.objects.create(
-            project=other_project,
-            name="Other Sector Foreign",
-            rooms_limit=5,
-            work_start="09:00",
-            work_end="18:00",
-        )
-        foreign_queue = Queue.objects.create(
-            name="Foreign Queue", sector=other_sector
-        )
-        response = self._delete_sector(
-            self.sector.uuid, transfer_to_queue=foreign_queue.uuid
-        )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertTrue(Sector.objects.filter(uuid=self.sector.uuid).exists())
-
-    @with_project_permission()
-    def test_transfer_and_end_all_chats_are_mutually_exclusive(self):
-        response = self._delete_sector(
-            self.sector.uuid,
-            transfer_to_queue=self.target_queue.uuid,
-            end_all_chats=True,
-        )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertTrue(Sector.objects.filter(uuid=self.sector.uuid).exists())
-
-    @with_project_permission()
-    def test_transfer_no_active_rooms_deletes_sector(self):
-        response = self._delete_sector(
-            self.sector.uuid, transfer_to_queue=self.target_queue.uuid
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertTrue(response.data["is_deleted"])
-        self.assertIsNone(response.data["transfer"])
-        self.assertFalse(Sector.objects.filter(uuid=self.sector.uuid).exists())
-
-    @with_project_permission()
-    def test_transfer_rooms_across_multiple_queues_in_sector(self):
-        room_q1 = Room.objects.create(
-            contact=self.contact,
-            queue=self.queue_1,
-            user=self.agent,
-            is_active=True,
-        )
-        room_q2 = Room.objects.create(
-            contact=self.contact_2,
-            queue=self.queue_2,
-            user=None,
-            is_active=True,
-        )
-        response = self._delete_sector(
-            self.sector.uuid, transfer_to_queue=self.target_queue.uuid
-        )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["transfer"]["success_count"], 2)
-
-        room_q1.refresh_from_db()
-        room_q2.refresh_from_db()
-        self.assertEqual(room_q1.queue, self.target_queue)
-        self.assertEqual(room_q2.queue, self.target_queue)
-        self.assertTrue(room_q1.is_active)
-        self.assertTrue(room_q2.is_active)

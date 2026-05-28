@@ -25,7 +25,7 @@ from chats.apps.core.internal_domains import (
     exclude_vtex_internal_domains,
     is_vtex_internal_domain,
 )
-from chats.apps.projects.models.models import Project
+from chats.apps.projects.models.models import Project, ProjectPermission
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.queues.usecases.bulk_queue_creation import BulkQueueCreationUseCase
@@ -36,6 +36,7 @@ from chats.apps.sectors.usecases.group_sector_authorization import (
 )
 from chats.core.audit import apply_audit_fields
 from chats.core.cache_utils import get_user_id_by_email_cached
+from chats.apps.rooms.models import Room
 
 from .serializers import (
     QueueAgentsSerializer,

@@ -122,6 +122,17 @@ class InServiceStatusService:
                 custom_status_type_uuid=str(status_type.uuid),
             )
 
+            # Log status change
+            from chats.apps.projects.tasks import log_agent_status_change
+
+            log_agent_status_change.delay(
+                agent_email=user.email,
+                project_uuid=str(project.uuid),
+                status="OFFLINE",
+                custom_status_name=status_type.name,
+                custom_status_type_uuid=str(status_type.uuid),
+            )
+
     @classmethod
     @transaction.atomic
     def room_closed(cls, user, project):

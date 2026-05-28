@@ -40,18 +40,23 @@ class AudioTranscriptionView(APIView):
         Get the first audio media from a message by message UUID.
         Queries MessageMedia table directly (more efficient than querying Message).
         """
-        return MessageMedia.objects.select_related(
-            "message__room__queue__sector"
-        ).filter(
-            message_id=msg_uuid,
-            content_type__startswith="audio",
-        ).first()
+        return (
+            MessageMedia.objects.select_related(
+                "message__room" "message__room__queue__sector"
+            )
+            .filter(
+                message_id=msg_uuid,
+                content_type__startswith="audio",
+            )
+            .first()
+        )
 
     def post(self, request, msg_uuid: str):
         """
         Create an audio transcription for a message.
         Expects the message to have audio media attached.
         """
+        # Get the first audio media from the message (queries MessageMedia table)
         audio_media = self.get_audio_media(msg_uuid)
 
         if not audio_media:
@@ -82,7 +87,8 @@ class AudioTranscriptionView(APIView):
                     "detail": _(
                         "Audio duration exceeds the maximum allowed "
                         "(%(max)s seconds). Audio duration: %(duration)s seconds."
-                    ) % {"max": max_duration, "duration": int(audio_duration)}
+                    )
+                    % {"max": max_duration, "duration": int(audio_duration)}
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -137,12 +143,14 @@ class AudioTranscriptionFeedbackView(APIView):
         """
         Create feedback for an audio transcription.
         """
-        audio_media = MessageMedia.objects.select_related(
-            "message__room__queue__sector"
-        ).filter(
-            message_id=msg_uuid,
-            content_type__startswith="audio",
-        ).first()
+        audio_media = (
+            MessageMedia.objects.select_related("message__room__queue__sector")
+            .filter(
+                message_id=msg_uuid,
+                content_type__startswith="audio",
+            )
+            .first()
+        )
 
         if not audio_media:
             return Response(

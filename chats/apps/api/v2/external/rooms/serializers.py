@@ -5,10 +5,9 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from chats.apps.accounts.models import User
-from chats.apps.rooms.models import Room
 from chats.apps.contacts.models import Contact
+from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorTag
-
 
 SERVER_TZ = timezone.get_current_timezone()
 

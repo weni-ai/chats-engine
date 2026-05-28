@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('sectors', '0023_sector_is_csat_enabled'),
+        ('sectors', '0023_sector_secondary_project'),
     ]
 
     operations = [

@@ -1,4 +1,5 @@
 import json
+import traceback
 import logging
 from typing import TYPE_CHECKING
 
@@ -77,11 +78,9 @@ class HistorySummaryService:
             ).select_related("contact", "user")
 
             conversation = []
-
             for message in messages:
                 is_contact = message.contact is not None
                 sender = "user" if is_contact else "agent"
-
                 conversation.append(
                     {
                         "sender": sender,
@@ -101,6 +100,8 @@ class HistorySummaryService:
                 feature_prompt.settings, prompt_msgs
             )
 
+            print("Summary text: %s", summary_text)
+
             logger.info(
                 "Response from AI for room %s: %s",
                 room.uuid,
@@ -108,6 +109,7 @@ class HistorySummaryService:
             )
 
             if "<no_summary_available>" in summary_text:
+                print("No summary available for room %s", room.uuid)
                 history_summary.update_status(HistorySummaryStatus.UNAVAILABLE)
                 reason = summary_text.replace("<no_summary_available>", "").replace(
                     "</no_summary_available>", ""
@@ -136,9 +138,14 @@ class HistorySummaryService:
             history_summary.save()
 
         except Exception as e:
+            print("Error generating summary for room %s: %s", room.uuid, e)
+            print("Traceback: %s", traceback.format_exc())
             history_summary.update_status(HistorySummaryStatus.UNAVAILABLE)
             logger.error(
-                "Error generating history summary for room %s: %s", room.uuid, e
+                "Error generating history summary for room %s: %s\n%s",
+                room.uuid,
+                e,
+                traceback.format_exc(),
             )
             capture_message(
                 "Error generating history summary for room %s: %s" % (room.uuid, e),

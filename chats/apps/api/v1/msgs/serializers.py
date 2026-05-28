@@ -333,7 +333,12 @@ class MessageSerializer(BaseMessageSerializer):
 
         try:
             replied_id = context.get("id")
-            replied_msg = ChatMessageReplyIndex.objects.get(external_id=replied_id)
+            try:
+                replied_msg = ChatMessageReplyIndex.objects.get(external_id=replied_id)
+                print("replied_msg", replied_msg.message.uuid)
+                print("replied_msg", replied_msg.message.text)
+            except ChatMessageReplyIndex.DoesNotExist:
+                return None
 
             result = {
                 "uuid": str(replied_msg.message.uuid),
@@ -366,14 +371,11 @@ class MessageSerializer(BaseMessageSerializer):
                 }
 
             return result
-        except ChatMessageReplyIndex.DoesNotExist:
-            # Replied message not found in index - expected scenario for projects that dont use whatsapp.
-            return None
-        except Exception as error:
-            LOGGER.error("Error getting replied message: %s", error)
+        except ChatMessage.DoesNotExist:
             return None
 
     def get_internal_note(self, obj):
+        # Returns the internal note attached to this message (if any)
         try:
             note = obj.internal_note
         except RoomNote.DoesNotExist:

@@ -18,6 +18,8 @@ import sentry_sdk
 from celery.schedules import crontab
 from django.utils.log import DEFAULT_LOGGING
 from sentry_sdk.integrations.django import DjangoIntegration
+from celery.schedules import crontab
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -71,6 +73,7 @@ INSTALLED_APPS = [
     "chats.core",
     "chats.apps.ai_features",
     "chats.apps.ai_features.history_summary",
+    "chats.apps.ai_features.response_suggestions",
     "chats.apps.ai_features.audio_transcription",
     "chats.apps.ai_features.improve_user_message",
     "chats.apps.feature_flags",
@@ -523,6 +526,24 @@ CELERY_TASK_TIME_LIMIT = 30 * 60
 CELERY_BEAT_SCHEDULER = "celery.beat:PersistentScheduler"
 CELERY_BEAT_MAX_LOOP_INTERVAL = 10
 
+# Intervalo (em segundos) para a tarefa de relatórios (configurável por env)
+REPORTS_SCHEDULE_SECONDS = env.float("REPORTS_SCHEDULE_SECONDS", default=20.0)
+
+CELERY_BEAT_SCHEDULE = {
+    "process-pending-reports": {
+        "task": "process_pending_reports",
+        "schedule": REPORTS_SCHEDULE_SECONDS,
+    }
+}
+
+# Disable report emails unless explicitly enabled
+REPORTS_SEND_EMAILS = env.bool("REPORTS_SEND_EMAILS", default=True)
+REPORTS_SAVE_DIR = env.str(
+    "REPORTS_SAVE_DIR", default=str(BASE_DIR / "media" / "reports")
+)
+REPORTS_CHUNK_SIZE = env.int("REPORTS_CHUNK_SIZE", default=5000)
+REPORTS_SAVE_LOCALLY = env.bool("REPORTS_SAVE_LOCALLY", default=False)
+
 # Event Driven Architecture configurations
 
 USE_EDA = env.bool("USE_EDA", default=False)
@@ -566,6 +587,7 @@ USE_WS_CONNECTION_CHECK = env.bool("USE_WS_CONNECTION_CHECK", default=False)
 MAX_RETRIES = env.int("WS_MESSAGE_RETRIES", default=3)
 RETRY_DELAY_SECONDS = env.int("WS_MESSAGE_RETRIES", default=0.5)
 
+
 # HTTP Callback Retry Configuration
 CALLBACK_RETRYABLE_STATUS_CODES = env.list(
     "CALLBACK_RETRYABLE_STATUS_CODES",
@@ -603,7 +625,7 @@ AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS = env.bool(
     "AI_CHAT_SUMMARY_ENABLED_FOR_ALL_PROJECTS", default=False
 )
 
-AI_FEATURES_PROMPTS_API_SECRET = env.str("AI_FEATURES_PROMPTS_API_SECRET")
+AI_FEATURES_PROMPTS_API_SECRET = env.str("AI_FEATURES_PROMPTS_API_SECRET", default="")
 
 HISTORY_SUMMARY_GENERATION_DELAY = env.int(
     "HISTORY_SUMMARY_GENERATION_DELAY", default=3
@@ -620,6 +642,10 @@ MESSAGE_STATUS_UPDATE_ENABLED_PROJECTS = env.list(
     "MESSAGE_STATUS_UPDATE_ENABLED_PROJECTS", default=[]
 )
 
+# Response Suggestions
+CHATS_RESPONSE_SUGGESTIONS_MAX_MESSAGES = env.int(
+    "CHATS_RESPONSE_SUGGESTIONS_MAX_MESSAGES", default=20
+)
 # MESSAGE_BULK_SIZE deve estar no settings.py
 MESSAGE_BULK_SIZE = env.int("MESSAGE_BULK_SIZE", default=100)
 
@@ -657,6 +683,10 @@ GROWTHBOOK_LONG_CACHE_TTL = env.int(
 )  # 30 days
 GROWTHBOOK_WEBHOOK_SECRET = env.str("GROWTHBOOK_WEBHOOK_SECRET", default="")
 
+# Insights API
+INSIGHTS_API_URL = env.str("INSIGHTS_API_URL", default="")
+INSIGHTS_API_MAX_RETRIES = env.int("INSIGHTS_API_MAX_RETRIES", default=3)
+INSIGHTS_API_RETRY_DELAY = env.int("INSIGHTS_API_RETRY_DELAY", default=5)
 
 # Feature flags
 FEEDBACK_FEATURE_FLAG_KEY = env.str(
@@ -676,13 +706,26 @@ WS_LAST_SEEN_UPDATE_INTERVAL_SECONDS = env.int(
 WS_LAST_SEEN_THRESHOLD_SECONDS = env.int("WS_LAST_SEEN_THRESHOLD_SECONDS", default=90)
 
 # CSAT
+CSAT_FEATURE_FLAG_KEY = env.str("CSAT_FEATURE_FLAG_KEY", default="weniChatsCSAT")
+CUSTOM_CSAT_FLOW_FEATURE_FLAG_KEY = env.str(
+    "CUSTOM_CSAT_FLOW_FEATURE_FLAG_KEY", default="weniChatsCustomCSATFlow"
+)
 CSAT_FLOW_UPDATE_RETRIES = env.int("CSAT_FLOW_UPDATE_RETRIES", default=5)
 CSAT_FLOW_UPDATE_EXPIRATION_TIME = env.int(
     "CSAT_FLOW_UPDATE_EXPIRATION_TIME", default=24 * 60  # 3 hours
 )  # In minutes
+CUSTOM_FLOW_NOT_FOUND_EMAIL_COOLDOWN = env.int(
+    "CUSTOM_FLOW_NOT_FOUND_EMAIL_COOLDOWN", default=60 * 60 * 24  # 24 hours
+)
 
 CHATS_BASE_URL = env.str("CHATS_BASE_URL", default="http://localhost:8000")
 
+AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY = env.str(
+    "AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY", default="weniChatsAutomaticMessage"
+)
+WS_PING_TIMEOUT_FEATURE_FLAG_KEY = env.str(
+    "WS_PING_TIMEOUT_FEATURE_FLAG_KEY", default="weniChatsPingTimeout"
+)
 AUTOMATIC_MESSAGE_FLOWS_GET_TICKET_RETRIES = env.int(
     "AUTOMATIC_MESSAGE_FLOWS_GET_TICKET_RETRIES", default=3
 )
@@ -707,6 +750,10 @@ WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY = env.str(
     "WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY",
     default="weniChatsBackEndReturn24hValidOnRoomsList",
 )
+DENORMALIZED_MESSAGE_FIELDS_FLAG_KEY = env.str(
+    "DENORMALIZED_MESSAGE_FIELDS_FLAG_KEY",
+    default="weniChatsDenormalizedMessageFields",
+)
 AUDIT_LOG_FEATURE_FLAG_KEY = env.str(
     "AUDIT_LOG_FEATURE_FLAG_KEY", default="weniChatsAuditLog"
 )
@@ -715,6 +762,9 @@ ROOMS_COUNT_BY_QUEUE_FEATURE_FLAG_KEY = env.str(
     default="weniChatsRoomsCountByQueue",
 )
 
+AUDIT_LOG_FEATURE_FLAG_KEY = env.str(
+    "AUDIT_LOG_FEATURE_FLAG_KEY", default="weniChatsAuditLog"
+)
 
 # REPORT STATUS CACHE
 REPORT_STATUS_CACHE_TTL = env.int("REPORT_STATUS_CACHE_TTL", default=300)
@@ -729,6 +779,9 @@ ROOM_24H_VALID_CACHE_TTL = env.int(
     "ROOM_24H_VALID_CACHE_TTL", default=0
 )  # 0 means no cache
 
+
+# Internal API Token
+INTERNAL_API_TOKEN = env.str("INTERNAL_API_TOKEN")
 
 # Archive chats
 ARCHIVE_CHATS_MAX_ROOMS = env.int("ARCHIVE_CHATS_MAX_ROOMS", default=5000)
@@ -825,3 +878,5 @@ WHATSAPP_API_ACCESS_TOKEN = env.str("WHATSAPP_API_ACCESS_TOKEN", default="")
 
 # Flows Templates
 FLOWS_TEMPLATES_MAX_PAGES = env.int("FLOWS_TEMPLATES_MAX_PAGES", default=10)
+
+TEST_TEMPLATE_FLOW_UUID = env.str("TEST_TEMPLATE_FLOW_UUID", default="")

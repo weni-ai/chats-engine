@@ -16,6 +16,7 @@ from chats.apps.api.authentication.token import JWTTokenGenerator
 
 @app.task
 def start_csat_flow(room_uuid: str):
+    print(f"🔍 DEBUG start_csat_flow(): Starting CSAT flow for room {room_uuid}")
     room = Room.objects.get(uuid=room_uuid)
 
     CSATFlowService(
@@ -65,3 +66,13 @@ def update_project_csat_flow_definition(
         cache_client=CacheClient(),
         token_generator=JWTTokenGenerator(),
     ).update_csat_flow_definition(project, definition, version)
+
+
+@app.task
+def send_custom_flow_not_found_email(project_uuid: str):
+    from chats.apps.csat.usecases.notify_admins_about_not_found_csat_flow import (
+        NotifyAdminsAboutNotFoundCSATFlow,
+    )
+
+    project = Project.objects.get(uuid=project_uuid)
+    NotifyAdminsAboutNotFoundCSATFlow(project).execute()

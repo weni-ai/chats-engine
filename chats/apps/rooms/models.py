@@ -168,6 +168,11 @@ class Room(BaseModel, BaseConfigurableModel):
         blank=True,
     )
 
+    # Denormalized fields to avoid joins with messages table
+    first_agent_message_at = models.DateTimeField(
+        _("First agent message at"), null=True, blank=True
+    )
+    has_agent_messages = models.BooleanField(_("Has agent messages"), default=False)
     automatic_message_sent_at = models.DateTimeField(
         _("Automatic message sent at"), null=True, blank=True
     )
@@ -182,7 +187,7 @@ class Room(BaseModel, BaseConfigurableModel):
         ),
     )
 
-    tracker = FieldTracker(fields=["user_id", "queue_id"])
+    tracker = FieldTracker(fields=["user_id", "queue_id", "is_active"])
 
     def get_automatic_message_sent_at(self) -> Optional[datetime]:
         if self.automatic_message_sent_at:
@@ -197,9 +202,7 @@ class Room(BaseModel, BaseConfigurableModel):
     def get_time_to_send_automatic_message(self) -> Optional[int]:
         sent_at = self.get_automatic_message_sent_at()
         if sent_at and self.first_user_assigned_at:
-            return max(
-                int((sent_at - self.first_user_assigned_at).total_seconds()), 0
-            )
+            return max(int((sent_at - self.first_user_assigned_at).total_seconds()), 0)
         return None
 
     @property
@@ -385,7 +388,11 @@ class Room(BaseModel, BaseConfigurableModel):
         )
 
     def trigger_default_message(self):
-        default_message = self.queue.default_message
+        sector = self.queue.sector
+        if not sector.is_automatic_message_queue_active:
+            return
+
+        default_message = sector.automatic_message_queue_text
         if not default_message:
             return
 
@@ -447,6 +454,12 @@ class Room(BaseModel, BaseConfigurableModel):
         return is_24h_valid
 
     @property
+    def imported_history_url(self):
+        if self.contact and self.contact.imported_history_url:
+            return self.contact.imported_history_url
+        return None
+
+    @property
     def serialized_ws_data(self):
         from chats.apps.api.v1.rooms.serializers import RoomSerializer  # noqa
 
@@ -485,6 +498,24 @@ class Room(BaseModel, BaseConfigurableModel):
             self.clear_pins()
 
             self.save()
+
+        # AGORA chamar room_closed, quando a sala já está inativa no banco
+        if self.user:
+            project = None
+            if self.queue and hasattr(self.queue, "sector"):
+                sector = self.queue.sector
+                if sector and hasattr(sector, "project"):
+                    project = sector.project
+
+            print(f"🔍 DEBUG close(): project={project}")
+
+            if project:
+                print(f"🔍 DEBUG close(): Chamando InServiceStatusService.room_closed")
+                InServiceStatusService.room_closed(self.user, project)
+            else:
+                print(f"🔍 DEBUG close(): project é None, não chama room_closed")
+        else:
+            print(f"🔍 DEBUG close(): user é None, não chama room_closed")
 
         if self.user:
             project = None
@@ -769,6 +800,14 @@ class Room(BaseModel, BaseConfigurableModel):
         self.transfer_history = transfer  # legacy
         self.save(update_fields=["full_transfer_history", "transfer_history"])
 
+    def start_csat_flow(self):
+        """
+        Starts the CSAT flow for a room.
+        """
+        from chats.apps.csat.tasks import start_csat_flow
+
+        start_csat_flow.delay(self.uuid)
+
     def increment_unread_messages_count(
         self, count: int, last_unread_message_at: datetime
     ):
@@ -794,6 +833,7 @@ class Room(BaseModel, BaseConfigurableModel):
     def update_last_message(self, message, user=None):
         """
         Updates last message fields. Used for agent/system messages.
+        Also updates denormalized agent message fields when user is provided.
         """
         media_data = [
             {"content_type": media.content_type, "url": media.url}

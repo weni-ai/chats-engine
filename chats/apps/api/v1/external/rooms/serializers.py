@@ -23,7 +23,9 @@ from chats.apps.rooms.usecases.resolve_room_user import ResolveRoomUserUseCase
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import close_room
 from chats.apps.sectors.utils import working_hours_validator
-
+from weni.feature_flags.shortcuts import is_feature_active
+from django.conf import settings
+from rest_framework.exceptions import PermissionDenied
 
 logger = logging.getLogger(__name__)
 
@@ -418,6 +420,8 @@ class RoomFlowSerializer(serializers.ModelSerializer):
         self.handle_urn(validated_data)
 
         groups, flow_uuid = self.extract_flow_start_data(validated_data)
+
+        print(f"flow_uuid: {flow_uuid}")
 
         contact, created = self.update_or_create_contact(validated_data)
 

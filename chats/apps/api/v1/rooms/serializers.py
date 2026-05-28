@@ -6,6 +6,7 @@ from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
+from weni.feature_flags.shortcuts import is_feature_active
 
 from chats.apps.accounts.models import User
 from chats.apps.ai_features.history_summary.enums import HistorySummaryFeedbackTags
@@ -213,6 +214,11 @@ class RoomSerializer(serializers.ModelSerializer):
     def get_can_edit_custom_fields(self, room: Room):
         return room.queue.sector.can_edit_custom_fields
 
+    def get_imported_history_url(self, room: Room):
+        if room.contact and hasattr(room.contact, "imported_history_url"):
+            return room.contact.imported_history_url
+        return None
+
     def get_has_history(self, room: Room) -> bool:
         if self.context.get("disable_has_history"):
             return False
@@ -344,6 +350,10 @@ class ListRoomSerializer(serializers.ModelSerializer):
         }
 
     def get_is_pinned(self, room: Room) -> bool:
+        pinned_room_ids = self.context.get("pinned_room_ids")
+        if pinned_room_ids is not None:
+            return room.pk in pinned_room_ids
+
         request = self.context.get("request")
 
         if not request:
@@ -451,6 +461,12 @@ class TransferRoomSerializer(serializers.ModelSerializer):
         except AttributeError:
             return ""
 
+    def get_imported_history_url(self, room: Room):
+        """Retorna a URL do histórico importado do contato"""
+        if room.contact and hasattr(room.contact, "imported_history_url"):
+            return room.contact.imported_history_url
+        return None
+
 
 class RoomContactSerializer(serializers.ModelSerializer):
     user = UserSerializer(many=False, read_only=True)
@@ -496,6 +512,18 @@ class RoomInfoSerializer(serializers.ModelSerializer):
             "user_assigned_at",
         ]
 
+    def _is_denormalized_enabled(self, room) -> bool:
+        project = room.queue.sector.project if room.queue else None
+        if not project:
+            return False
+        request = self.context.get("request")
+        user_email = request.user.email if request and hasattr(request, "user") else ""
+        return is_feature_active(
+            settings.DENORMALIZED_MESSAGE_FIELDS_FLAG_KEY,
+            user_email,
+            str(project.uuid),
+        )
+
     def get_user(self, room: Room) -> dict:
         user: User = room.user
 
@@ -507,13 +535,14 @@ class RoomInfoSerializer(serializers.ModelSerializer):
         return {"email": user.email, "name": name}
 
     def get_first_user_message_sent_at(self, room: Room) -> datetime:
-        if (
-            first_user_message := room.messages.filter(user__isnull=False)
-            .order_by("created_on")
-            .first()
-        ):
-            return first_user_message.created_on
-
+        if self._is_denormalized_enabled(room):
+            return room.first_agent_message_at
+        # Fallback: query original
+        first_msg = (
+            room.messages.filter(user__isnull=False).order_by("created_on").first()
+        )
+        if first_msg:
+            return first_msg.created_on
         return None
 
 
@@ -620,6 +649,27 @@ class PinRoomSerializer(serializers.Serializer):
 
     # True to pin, False to unpin
     status = serializers.BooleanField(required=True)
+
+
+class RoomNoteSerializer(serializers.ModelSerializer):
+    """
+    Serializer for room notes
+    """
+
+    user = serializers.SerializerMethodField()
+    is_deletable = serializers.ReadOnlyField()
+
+    class Meta:
+        model = RoomNote
+        fields = ["uuid", "created_on", "user", "text", "is_deletable"]
+        read_only_fields = ["uuid", "created_on", "user", "is_deletable"]
+
+    def get_user(self, obj):
+        return {
+            "uuid": str(obj.user.pk),
+            "name": obj.user.full_name,
+            "email": obj.user.email,
+        }
 
 
 class RoomTagSerializer(serializers.ModelSerializer):

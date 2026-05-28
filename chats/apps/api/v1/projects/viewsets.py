@@ -2,6 +2,7 @@ import logging
 
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import transaction
+from django.conf import settings
 from django.db.models import CharField, Value
 from django.db.models.functions import Concat
 from django.utils import timezone
@@ -63,6 +64,8 @@ from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.views import create_room_feedback_message
 from chats.apps.sectors.models import Sector
+
+logger = logging.getLogger(__name__)
 
 logger = logging.getLogger(__name__)
 
@@ -302,6 +305,58 @@ class ProjectViewset(
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # STAGING-ONLY
+        if settings.TEST_TEMPLATE_FLOW_UUID == flow_uuid:
+            mock_response = {
+                "flow_uuid": "7099478d-0d1e-4e7b-b606-6ae7313c43cd",
+                "total_template_qty": 1,
+                "templates": [
+                    {
+                        "variables": ["nomecontato", "nomeatendente", "pdflink"],
+                        "data": {
+                            "name": "orcamento",
+                            "parameter_format": "POSITIONAL",
+                            "components": [
+                                {
+                                    "type": "HEADER",
+                                    "format": "TEXT",
+                                    "text": "Seu orçamento está pronto!",
+                                },
+                                {
+                                    "type": "BODY",
+                                    "text": "Olá {{1}}, tudo bem? Me chamo {{2}} e estou aqui está o link do orçamento: {{3}}",
+                                    "example": {
+                                        "body_text": [
+                                            [
+                                                "Marcus",
+                                                "Kallil",
+                                                "https://example.local/file.pdf",
+                                            ]
+                                        ]
+                                    },
+                                },
+                                {"type": "FOOTER", "text": "Teste"},
+                                {
+                                    "type": "BUTTONS",
+                                    "buttons": [
+                                        {
+                                            "type": "QUICK_REPLY",
+                                            "text": "Preciso de ajuda",
+                                        }
+                                    ],
+                                },
+                            ],
+                            "language": "pt_BR",
+                            "status": "APPROVED",
+                            "category": "MARKETING",
+                            "is_primary_device_delivery_only": False,
+                            "id": "1405633441367678",
+                        },
+                    }
+                ],
+            }
+            return Response(mock_response)
+
         project = self.get_object()
         usecase = GetFlowTemplatesDataUseCase(project.uuid)
 
@@ -409,14 +464,17 @@ class ProjectViewset(
         chats_flow_start = project.flowstarts.create(**flow_start_data)
         self._create_flow_start_instances(data, chats_flow_start)
 
-        flow_start = FlowRESTClient().start_flow(project, data)
+        status_code, flow_start = FlowRESTClient().start_flow(project, data)
         chats_flow_start.external_id = flow_start.get("uuid")
         chats_flow_start.name = flow_start.get("flow").get("name")
         chats_flow_start.save()
         feedback = {"name": chats_flow_start.name}
         if chats_flow_start.room:
             create_room_feedback_message(
-                room, feedback, method=RoomFeedbackMethods.FLOW_START, requested_by=request.user
+                room,
+                feedback,
+                method=RoomFeedbackMethods.FLOW_START,
+                requested_by=request.user,
             )
             room.notify_room("update")
         return Response(flow_start, status.HTTP_200_OK)
@@ -778,6 +836,17 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                 custom_status_type_uuid=str(status_type.uuid),
             )
 
+            # Log status change
+            from chats.apps.projects.tasks import log_agent_status_change
+
+            log_agent_status_change.delay(
+                agent_email=user.email,
+                project_uuid=str(project.uuid),
+                status="OFFLINE",
+                custom_status_name=status_type.name,
+                custom_status_type_uuid=str(status_type.uuid),
+            )
+
     @decorators.action(detail=False, methods=["get"])
     def last_status(self, request):
         serializer = LastStatusQueryParamsSerializer(data=request.query_params)
@@ -801,8 +870,16 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def close_status(self, request, pk=None):
+        print("🔍 DEBUG: close_status foi chamado!")
+
         try:
             instance = CustomStatus.objects.get(pk=pk)
+            print(f"🔍 DEBUG: close_status chamado para {instance.user}")
+
+            print(f"🔍 DEBUG: request.data = {request.data}")
+            print(
+                f"🔍 DEBUG: is_active do request = {request.data.get('is_active', 'NÃO ENVIADO')}"
+            )
 
             last_active_status = (
                 CustomStatus.objects.filter(
@@ -839,6 +916,15 @@ class CustomStatusViewSet(viewsets.ModelViewSet):
                         raise serializers.ValidationError(
                             {"status": "Can't update user status in project."}
                         )
+
+                    # Log status change
+                    from chats.apps.projects.tasks import log_agent_status_change
+
+                    log_agent_status_change.delay(
+                        agent_email=instance.user.email,
+                        project_uuid=str(instance.status_type.project.uuid),
+                        status="ONLINE",
+                    )
 
                     # Log status change
                     from chats.apps.projects.tasks import log_agent_status_change

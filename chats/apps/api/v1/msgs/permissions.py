@@ -1,10 +1,12 @@
 from django.contrib.auth.models import AnonymousUser
 from rest_framework import permissions
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.rooms.models import Room
+
+RESTRICT_OFFLINE_AGENTS = "restrict_offline_agents"
 
 
 class MessagePermission(permissions.BasePermission):
@@ -106,3 +108,37 @@ class MessageMediaPermission(permissions.BasePermission):
             return False
 
         return obj.message.room.user == request.user
+
+
+class RestrictOfflineAgents(permissions.BasePermission):
+    def has_permission(self, request, view):
+        if view.action != "create":
+            return True
+
+        room_uuid = request.data.get("room")
+        if not room_uuid:
+            return True
+
+        room = (
+            Room.objects.filter(uuid=room_uuid)
+            .select_related("queue__sector__project")
+            .first()
+        )
+        if not room or not room.queue:
+            return True
+
+        project = room.queue.sector.project
+        if not project.get_config(RESTRICT_OFFLINE_AGENTS, False):
+            return True
+
+        if not room.queue.online_agents.filter(pk=request.user.pk).exists():
+            raise PermissionDenied(
+                detail={
+                    "error_code": "agent_offline",
+                    "error_message": _(
+                        "Offline agents cannot send messages in this project"
+                    ),
+                }
+            )
+
+        return True

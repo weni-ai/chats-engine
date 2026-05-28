@@ -42,6 +42,7 @@ from chats.apps.ai_features.history_summary.models import (
 )
 from chats.apps.api.utils import verify_user_room
 from chats.apps.api.v1 import permissions as api_permissions
+from chats.apps.api.v1.rooms.permissions import RoomNotePermission
 from chats.apps.api.v1.internal.rest_clients.openai_rest_client import OpenAIClient
 from chats.apps.api.v1.msgs.serializers import ChatCompletionSerializer
 from chats.apps.api.v1.rooms import filters as room_filters
@@ -85,9 +86,12 @@ from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.exceptions import (
+    FlowsChangeTicketerError,
+    FlowsTicketerNotFoundError,
     MaxPinRoomLimitReachedError,
     RoomIsNotActiveError,
 )
+from chats.apps.rooms.flows_ticketer_service import change_ticketer_for_room
 from chats.apps.rooms.models import Room, RoomNote, RoomPin
 from chats.apps.rooms.services import RoomsReportService
 from chats.apps.rooms.tasks import generate_rooms_report
@@ -169,6 +173,7 @@ class RoomViewset(
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context["disable_has_history"] = getattr(self, "disable_has_history", False)
+        context["pinned_room_ids"] = getattr(self, "_pinned_room_ids", None)
         return context
 
     def list(self, request, *args, **kwargs):
@@ -268,59 +273,50 @@ class RoomViewset(
         return self._get_paginated_response(annotated_qs)
 
     def _list_with_optimized_pin_order(self, qs, request, project):
-        target_pins_queryset = RoomPin.objects.filter(
-            room__queue__sector__project=project,
-        )
-
+        pin_filters = {"room__queue__sector__project": project}
         if user_email := request.query_params.get("email"):
-            target_pins_queryset = target_pins_queryset.filter(user__email=user_email)
+            pin_filters["user__email"] = user_email
         else:
-            target_pins_queryset = target_pins_queryset.filter(user=request.user)
+            pin_filters["user"] = request.user
 
-        annotation_pins_queryset = RoomPin.objects.filter(
-            room__queue__sector__project=project,
+        pins = list(
+            RoomPin.objects.filter(**pin_filters)
+            .order_by("-created_on")
+            .values("room_id", "created_on")[: settings.MAX_ROOM_PINS_LIMIT]
         )
-        if user_email:
-            annotation_pins_queryset = annotation_pins_queryset.filter(
-                user__email=user_email
-            )
-        else:
-            annotation_pins_queryset = annotation_pins_queryset.filter(
-                user=request.user
-            )
+        pinned_room_ids = [p["room_id"] for p in pins]
+        pin_dates = {p["room_id"]: p["created_on"] for p in pins}
 
-        pin_subquery = annotation_pins_queryset.filter(room=OuterRef("pk")).order_by(
-            "-created_on"
-        )
-        target_pin_subquery = target_pins_queryset.filter(room=OuterRef("pk")).order_by(
-            "-created_on"
+        self._pinned_room_ids = set(pinned_room_ids)
+
+        filtered_qs = self.filter_queryset(qs)
+
+        if not pinned_room_ids:
+            return self._get_paginated_response(filtered_qs)
+
+        combined_qs = qs.filter(
+            Q(pk__in=filtered_qs.order_by().values("pk"))
+            | Q(pk__in=pinned_room_ids)
         )
 
-        annotated_qs = qs.annotate(
-            is_pinned=Exists(pin_subquery),
-            pin_created_on=Subquery(
-                pin_subquery.values("created_on")[:1],
+        pin_date_whens = [
+            When(pk=rid, then=Value(dt)) for rid, dt in pin_dates.items()
+        ]
+
+        combined_qs = combined_qs.annotate(
+            is_pinned=Case(
+                When(pk__in=pinned_room_ids, then=True),
+                default=False,
+                output_field=BooleanField(),
+            ),
+            pin_created_on=Case(
+                *pin_date_whens,
+                default=None,
                 output_field=DateTimeField(),
             ),
-            list_is_pinned=Exists(target_pin_subquery),
-            list_pin_created_on=Subquery(
-                target_pin_subquery.values("created_on")[:1],
-                output_field=DateTimeField(),
-            ),
         )
-
-        filtered_qs = self.filter_queryset(annotated_qs)
-        filtered_room_ids = filtered_qs.values("pk").order_by()
 
         secondary_sort = list(filtered_qs.query.order_by or self.ordering or [])
-
-        pinned_room_subquery = target_pins_queryset.values("room_id")
-
-        combined_qs = annotated_qs.filter(
-            Q(pk__in=Subquery(filtered_room_ids))
-            | Q(pk__in=Subquery(pinned_room_subquery))
-        ).distinct()
-
         if secondary_sort:
             combined_qs = combined_qs.order_by(
                 "-is_pinned", "-pin_created_on", *secondary_sort
@@ -389,6 +385,9 @@ class RoomViewset(
                 ).values_list("uuid", flat=True)
             ]
 
+            print(f"DEBUG tags: {tags}")
+            print(f"DEBUG sector_tags: {sector_tags}")
+
             if set(tags) - set(sector_tags):
                 raise ValidationError(
                     {"tags": ["Tag not found for the room's sector"]},
@@ -447,15 +446,45 @@ class RoomViewset(
         serializer.save()
         serializer.instance.notify_queue("create")
 
+    @transaction.atomic
     def perform_update(self, serializer):
         # TODO Separate this into smaller methods
         old_instance = serializer.instance
         old_user = old_instance.user
         old_user = old_instance.user
+        old_sector_uuid = (
+            str(old_instance.queue.sector.uuid)
+            if old_instance.queue and old_instance.queue.sector
+            else None
+        )
 
         user = self.request.data.get("user_email")
         queue = self.request.data.get("queue_uuid")
         serializer.save()
+
+        if queue:
+            instance = serializer.instance
+            new_sector_uuid = (
+                str(instance.queue.sector.uuid)
+                if instance.queue and instance.queue.sector
+                else None
+            )
+            if new_sector_uuid and new_sector_uuid != old_sector_uuid:
+                try:
+                    change_ticketer_for_room(instance, new_sector_uuid)
+                except (
+                    FlowsTicketerNotFoundError,
+                    FlowsChangeTicketerError,
+                ) as exc:
+                    raise ValidationError(
+                        {
+                            "detail": (
+                                "Could not update the ticketer in Flows. "
+                                "The room transfer was not applied."
+                            ),
+                            "error": str(exc),
+                        }
+                    ) from exc
 
         if not (user or queue):
             return None
@@ -1169,6 +1198,53 @@ class RoomViewset(
             return Response({"detail": str(e)}, status=status.HTTP_403_FORBIDDEN)
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="room_note",
+        serializer_class=RoomNoteSerializer,
+    )
+    def create_note(self, request, pk=None):
+        """
+        Create a note for the room
+        """
+        room = self.get_object()
+
+        # Verify user has access to the room
+        if not verify_user_room(room, request.user):
+            raise PermissionDenied(
+                "You don't have permission to add notes to this room"
+            )
+
+        # Room must be active
+        if not room.is_active:
+            raise ValidationError({"detail": "Cannot add notes to closed rooms"})
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # Create a blank message to attach the internal note
+        msg = Message.objects.create(
+            room=room,
+            user=request.user,
+            contact=None,
+            text="",
+        )
+
+        # Create the note attached to the message
+        note = RoomNote.objects.create(
+            room=room,
+            user=request.user,
+            text=serializer.validated_data["text"],
+            message=msg,
+        )
+
+        # Notify message creation for clients listening to messages
+        msg.notify_room("create", True)
+
+        # Return serialized note
+        return Response(RoomNoteSerializer(note).data, status=status.HTTP_201_CREATED)
 
     @action(
         detail=True,

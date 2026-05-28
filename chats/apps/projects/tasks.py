@@ -36,7 +36,6 @@ def log_agent_status_change(
 ):
     """
     Create or update daily agent status log.
-
     Args:
         agent_email: Agent email
         project_uuid: Project UUID

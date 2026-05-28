@@ -1,6 +1,7 @@
 from typing import Optional
 from django.utils import timezone
 from rest_framework import serializers
+from django.utils import timezone
 
 from chats.apps.api.v1.sectors.serializers import TagSimpleSerializer
 from chats.apps.csat.models import CSATSurvey
@@ -13,8 +14,8 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
     agent = serializers.SerializerMethodField()
     user_email = serializers.EmailField(source="user.email", default=None, read_only=True)
     tags = TagSimpleSerializer(many=True, required=False)
-    sector = serializers.CharField(source="queue.sector.name")
-    queue = serializers.CharField(source="queue.name")
+    sector = serializers.SerializerMethodField()
+    queue = serializers.SerializerMethodField()
     link = serializers.SerializerMethodField()
     duration = serializers.SerializerMethodField()
     first_response_time = serializers.SerializerMethodField()
@@ -45,6 +46,23 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
             "protocol",
         ]
 
+    def _clean_soft_deleted_name(self, name: str) -> str:
+        if "_is_deleted_" in name:
+            return name.split("_is_deleted_")[0]
+        return name
+
+    def get_sector(self, obj) -> str:
+        try:
+            return self._clean_soft_deleted_name(obj.queue.sector.name)
+        except AttributeError:
+            return ""
+
+    def get_queue(self, obj) -> str:
+        try:
+            return self._clean_soft_deleted_name(obj.queue.name)
+        except AttributeError:
+            return ""
+
     def get_agent(self, obj):
         try:
             return obj.user.full_name
@@ -68,14 +86,12 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
 
     def get_duration(self, obj: Room) -> int:
         if not obj.first_user_assigned_at:
-            return 0
-
+            return None
         if obj.is_active and obj.user:
             return int((timezone.now() - obj.first_user_assigned_at).total_seconds())
         elif not obj.is_active and obj.ended_at:
             return int((obj.ended_at - obj.first_user_assigned_at).total_seconds())
-
-        return 0
+        return None
 
     def get_first_response_time(self, obj: Room) -> int:
         try:

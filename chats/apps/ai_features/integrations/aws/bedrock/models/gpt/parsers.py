@@ -20,6 +20,9 @@ class GPTResponseBodyParser(ResponseBodyParser):
         Parse the response body for the GPT client.
         Remove <reasoning>...</reasoning> blocks if present.
         """
+        print("\n\n===== RESPONSE BODY =====")
+        print(response_body)
+        print("===== END RESPONSE BODY =====\n\n")
         response_text = (
             response_body.get("choices")[0].get("message", {}).get("content", "")
         )

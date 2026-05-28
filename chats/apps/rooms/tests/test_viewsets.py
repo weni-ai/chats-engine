@@ -317,9 +317,11 @@ class RoomsManagerTests(APITestCase):
         self.assertEquals(response.status_code, status.HTTP_200_OK)
 
         self.room.refresh_from_db()
-        feedback_message = self.room.messages.filter(
-            text__contains=RoomFeedbackMethods.ROOM_TRANSFER
-        ).order_by("-created_on").first()
+        feedback_message = (
+            self.room.messages.filter(text__contains=RoomFeedbackMethods.ROOM_TRANSFER)
+            .order_by("-created_on")
+            .first()
+        )
 
         self.assertIsNotNone(feedback_message)
 
@@ -327,9 +329,7 @@ class RoomsManagerTests(APITestCase):
         feedback_content = message_data.get("content", {})
 
         self.assertIn("requested_by", feedback_content)
-        self.assertEqual(
-            feedback_content["requested_by"]["email"], self.admin.email
-        )
+        self.assertEqual(feedback_content["requested_by"]["email"], self.admin.email)
         self.assertEqual(feedback_content["requested_by"]["type"], "user")
 
 
@@ -637,9 +637,7 @@ class RoomPickTests(APITestCase):
         feedback_content = message_data.get("content", {})
 
         self.assertIn("requested_by", feedback_content)
-        self.assertEqual(
-            feedback_content["requested_by"]["email"], self.user.email
-        )
+        self.assertEqual(feedback_content["requested_by"]["email"], self.user.email)
         self.assertEqual(feedback_content["requested_by"]["type"], "user")
 
 

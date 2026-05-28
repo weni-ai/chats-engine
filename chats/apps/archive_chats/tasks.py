@@ -194,3 +194,8 @@ def archive_room_messages(room_uuid: UUID, job_uuid: UUID):
         f"[archive_room_messages] ArchiveChatsService "
         f"finished archiving room history for room {room_uuid} with job {job_uuid}"
     )
+
+
+@shared_task(queue="archive-chats")
+def staging_test():
+    logger.info("[staging_test] Starting staging test")

@@ -3,6 +3,7 @@ import time
 from typing import Dict, Optional
 
 from django.conf import settings
+from django.db import transaction
 from django.db.models import QuerySet
 
 from chats.apps.accounts.models import User
@@ -12,6 +13,7 @@ from chats.apps.projects.models.models import ProjectPermission
 from chats.apps.queues.models import Queue
 from chats.apps.queues.utils import start_queue_priority_routing
 from chats.apps.rooms.choices import RoomFeedbackMethods
+from chats.apps.rooms.flows_ticketer_service import change_ticketer_for_room
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.utils import create_transfer_json
 from chats.apps.rooms.views import create_room_feedback_message
@@ -262,6 +264,8 @@ class BulkTransferService:
         old_user = room.user
         old_queue = room.queue
 
+        change_ticketer_for_room(room, str(queue.sector.uuid))
+
         room.user = user
         room.queue = queue
         room.save()
@@ -359,6 +363,8 @@ class BulkTransferService:
     def _transfer_queue(self, room: Room, queue: Queue, user_request: User):
         transfer_user = room.user if room.user else user_request
 
+        change_ticketer_for_room(room, str(queue.sector.uuid))
+
         feedback = create_transfer_json(
             action="transfer",
             from_=transfer_user,
@@ -409,7 +415,8 @@ class BulkTransferService:
         for room in batch:
             try:
                 old_queue_id = room.queue_id
-                self._transfer_room(room, user, queue, user_request)
+                with transaction.atomic():
+                    self._transfer_room(room, user, queue, user_request)
                 result.add_success()
 
                 if old_queue_id:
@@ -420,9 +427,7 @@ class BulkTransferService:
             except Exception as e:
                 error_msg = f"Room {room.uuid}: {str(e)}"
                 result.add_failure(room.uuid, error_msg)
-                logger.warning(
-                    f"[BULK_TRANSFER] Failed to transfer room: {error_msg}"
-                )
+                logger.warning(f"[BULK_TRANSFER] Failed to transfer room: {error_msg}")
 
         for queue_id in affected_queue_ids:
             try:
@@ -465,7 +470,7 @@ class BulkTransferService:
         start_time = time.perf_counter()
 
         for batch_index in range(0, total, batch_size):
-            batch_pks = room_pks[batch_index:batch_index + batch_size]
+            batch_pks = room_pks[batch_index : batch_index + batch_size]
             batch = list(
                 Room.objects.filter(pk__in=batch_pks).select_related(
                     "queue__sector__project",

@@ -10,6 +10,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
+from weni.feature_flags.shortcuts import is_feature_active
 from chats.apps.projects.models.models import CustomStatus
 from chats.apps.queues.dataclass import QueueLimit
 from chats.core.models import (
@@ -18,6 +19,9 @@ from chats.core.models import (
     BaseModel,
     BaseSoftDeleteModel,
 )
+
+# Threshold for considering an agent as "recently seen" (in seconds)
+LAST_SEEN_THRESHOLD_SECONDS = 60
 
 from .queue_managers import QueueAuthorizationManager, QueueManager
 
@@ -266,7 +270,7 @@ class Queue(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMode
         If there is still a tie, a random agent is returned.
         """
         agents = list(self.available_agents)
-
+        print("agents", agents)
         if not agents:
             return None
 
@@ -281,6 +285,10 @@ class Queue(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMode
         eligible_agents = [
             agent for agent in agents if getattr(agent, field_name) == min_rooms_count
         ]
+        print("eligible_agents", eligible_agents)
+        if len(eligible_agents) == 1:
+            print("verificando se tem agente")
+            return eligible_agents[0]
 
         if len(eligible_agents) == 1:
             return eligible_agents[0]

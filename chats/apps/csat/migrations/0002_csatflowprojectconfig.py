@@ -8,24 +8,43 @@ import uuid
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('projects', '0030_agentdisconnectlog'),
-        ('csat', '0001_initial'),
+        ("projects", "0031_agentdisconnectlog"),
+        ("csat", "0001_initial"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='CSATFlowProjectConfig',
+            name="CSATFlowProjectConfig",
             fields=[
-                ('uuid', models.UUIDField(default=uuid.uuid4, primary_key=True, serialize=False)),
-                ('created_on', models.DateTimeField(auto_now_add=True, verbose_name='Created on')),
-                ('modified_on', models.DateTimeField(auto_now=True, verbose_name='Modified on')),
-                ('flow_uuid', models.UUIDField(verbose_name='Flow UUID')),
-                ('version', models.IntegerField(verbose_name='Version')),
-                ('project', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='csat_flow_project_config', to='projects.project', verbose_name='Project')),
+                (
+                    "uuid",
+                    models.UUIDField(
+                        default=uuid.uuid4, primary_key=True, serialize=False
+                    ),
+                ),
+                (
+                    "created_on",
+                    models.DateTimeField(auto_now_add=True, verbose_name="Created on"),
+                ),
+                (
+                    "modified_on",
+                    models.DateTimeField(auto_now=True, verbose_name="Modified on"),
+                ),
+                ("flow_uuid", models.UUIDField(verbose_name="Flow UUID")),
+                ("version", models.IntegerField(verbose_name="Version")),
+                (
+                    "project",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="csat_flow_project_config",
+                        to="projects.project",
+                        verbose_name="Project",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'CSAT Flow Project Config',
-                'verbose_name_plural': 'CSAT Flow Project Configs',
+                "verbose_name": "CSAT Flow Project Config",
+                "verbose_name_plural": "CSAT Flow Project Configs",
             },
         ),
     ]

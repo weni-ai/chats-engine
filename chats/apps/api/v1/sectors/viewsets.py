@@ -9,6 +9,7 @@ from django.utils.decorators import method_decorator
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import exceptions, filters, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -30,17 +31,15 @@ from chats.apps.api.v1.sectors.filters import (
 from chats.apps.projects.models import Project
 from chats.apps.projects.models.models import ProjectPermission
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
-from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import (
     Sector,
     SectorAuthorization,
     SectorHoliday,
     SectorTag,
 )
+from chats.apps.rooms.models import Room
 from chats.apps.sectors.utils import get_country_from_timezone, get_country_holidays
 from chats.core.audit import apply_audit_fields
-
-logger = logging.getLogger(__name__)
 
 
 @method_decorator(name="create", decorator=swagger_auto_schema(auto_schema=None))
@@ -147,6 +146,9 @@ class SectorViewset(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
         return super().update(request, *args, **kwargs)
+
+    def perform_update(self, serializer):
+        serializer.save(modified_by=self.request.user)
 
     def _close_active_rooms(self, instance):
         rooms = Room.objects.filter(
@@ -386,6 +388,10 @@ class SectorViewset(viewsets.ModelViewSet):
         return Response({"working_hours": working_hours}, status=status.HTTP_200_OK)
 
 
+class SectorTagPagination(LimitOffsetPagination):
+    default_limit = 20
+
+
 class SectorTagsViewset(viewsets.ModelViewSet):
     swagger_tag = "Sectors"
     queryset = SectorTag.objects.all().order_by("name")
@@ -393,6 +399,7 @@ class SectorTagsViewset(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_class = SectorTagFilter
     lookup_field = "uuid"
+    pagination_class = SectorTagPagination
 
     def get_queryset(self):
         queryset = super().get_queryset()

@@ -98,6 +98,12 @@ class Message(BaseModelWithManualCreatedOn):
         ),
     )
 
+    status = models.JSONField(
+        _("message status"),
+        blank=True,
+        null=True,
+    )
+
     class Meta:
         verbose_name = "Message"
         verbose_name_plural = "Messages"

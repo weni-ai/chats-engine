@@ -43,3 +43,14 @@ class RoomNotePermission(permissions.BasePermission):
                 return False
 
         return permission.role > 0 if view.action == "list" else False
+
+
+class CanAddOrRemoveRoomTagPermission(permissions.BasePermission):
+
+    def has_object_permission(self, request, view, obj):
+        room_user = getattr(obj, "user", None)
+
+        if not room_user:
+            return False
+
+        return room_user == request.user

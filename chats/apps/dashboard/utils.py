@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from django.db.models import QuerySet
+
     from chats.apps.msgs.models import Message
     from chats.apps.rooms.models import Room
 

@@ -1,3 +1,4 @@
+from chats.apps.api.utils import calculate_in_service_time
 from rest_framework import serializers
 from django.db.models import Q
 
@@ -108,8 +109,10 @@ class DashboardCustomAgentStatusSerializer(serializers.Serializer):
             "name", flat=True
         )
 
+        # Criar dicionário para os tempos acumulados de break_time
         status_dict = {status_type: 0 for status_type in all_status_types}
 
+        # Processar tempos de break_time para todos os status exceto In-Service
         if custom_status_list:
             for status_item in custom_status_list:
                 status_type = status_item.get("status_type")

@@ -8,12 +8,10 @@ from rest_framework.response import Response
 from unittest.mock import patch, MagicMock
 
 from chats.apps.accounts.models import User
-from chats.apps.contacts.models import Contact
 from chats.apps.core.internal_domains import get_vtex_internal_domains_with_at_symbol
 from chats.apps.projects.models import Project
 from chats.apps.projects.models.models import ProjectPermission
 from chats.apps.queues.models import Queue, QueueAuthorization
-from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorAuthorization
 
 from chats.apps.projects.tests.decorators import with_project_permission
