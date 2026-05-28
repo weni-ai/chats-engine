@@ -49,9 +49,26 @@ class ChangeTicketerForRoomTests(TestCase):
             is_active=True,
         )
 
+        # By default, treat the feature flag as enabled for all tests; the
+        # flag-disabled behavior is exercised by a dedicated test below.
+        ff_patcher = patch(
+            f"{HELPER_PATH}.is_feature_active", return_value=True
+        )
+        self.mock_is_feature_active = ff_patcher.start()
+        self.addCleanup(ff_patcher.stop)
+
     @override_settings(USE_WENI_FLOWS=False)
     @patch(f"{HELPER_PATH}.FlowRESTClient")
     def test_noop_when_use_weni_flows_disabled(self, mock_client_cls):
+        change_ticketer_for_room(self.room, str(self.sector_b.uuid))
+
+        mock_client_cls.assert_not_called()
+
+    @override_settings(USE_WENI_FLOWS=True)
+    @patch(f"{HELPER_PATH}.FlowRESTClient")
+    def test_noop_when_feature_flag_disabled(self, mock_client_cls):
+        self.mock_is_feature_active.return_value = False
+
         change_ticketer_for_room(self.room, str(self.sector_b.uuid))
 
         mock_client_cls.assert_not_called()
