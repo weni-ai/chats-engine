@@ -28,7 +28,7 @@ class MessageViewset(
     swagger_tag = "Messages"
     queryset = ChatMessage.objects.select_related(
         "room", "user", "contact", "internal_note", "internal_note__user"
-    ).prefetch_related("medias")
+    ).prefetch_related("medias", "internal_note__medias")
     serializer_class = MessageSerializer
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = MessageFilter

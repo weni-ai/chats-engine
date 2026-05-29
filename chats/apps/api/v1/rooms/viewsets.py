@@ -20,7 +20,8 @@ from django.utils.timezone import make_aware
 from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
-from rest_framework import filters, mixins, permissions, status
+from pydub.exceptions import CouldntDecodeError
+from rest_framework import filters, mixins, parsers, permissions, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.filters import OrderingFilter
@@ -40,6 +41,7 @@ from chats.apps.ai_features.history_summary.models import (
     HistorySummary,
     HistorySummaryStatus,
 )
+from chats.apps.api.pagination import CustomCursorPagination
 from chats.apps.api.utils import verify_user_room
 from chats.apps.api.v1 import permissions as api_permissions
 from chats.apps.api.v1.internal.rest_clients.openai_rest_client import OpenAIClient
@@ -48,6 +50,7 @@ from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1.rooms.pagination import RoomListPagination
 from chats.apps.api.v1.rooms.permissions import (
     CanAddOrRemoveRoomTagPermission,
+    RoomNoteMediaPermission,
     RoomNotePermission,
 )
 from chats.apps.api.v1.rooms.serializers import (
@@ -62,6 +65,7 @@ from chats.apps.api.v1.rooms.serializers import (
     RoomHistorySummarySerializer,
     RoomInfoSerializer,
     RoomMessageStatusSerializer,
+    RoomNoteMediaSerializer,
     RoomNoteSerializer,
     RoomsCountByQueueQueryParamsSerializer,
     RoomsCountByQueueResponseSerializer,
@@ -91,7 +95,7 @@ from chats.apps.rooms.exceptions import (
     RoomIsNotActiveError,
 )
 from chats.apps.rooms.flows_ticketer_service import change_ticketer_for_room
-from chats.apps.rooms.models import Room, RoomNote, RoomPin
+from chats.apps.rooms.models import Room, RoomNote, RoomNoteMedia, RoomPin
 from chats.apps.rooms.services import RoomsReportService
 from chats.apps.rooms.tasks import generate_rooms_report
 from chats.apps.rooms.utils import create_transfer_json
@@ -1471,6 +1475,63 @@ class RoomNoteViewSet(
         note.notify_websocket("delete")
 
         return super().destroy(request, *args, **kwargs)
+
+
+class RoomNoteMediaViewset(
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    GenericViewSet,
+):
+    """
+    ViewSet for Room Note Medias.
+
+    Mirrors the message media viewset, allowing agents to upload and list
+    medias attached to a room internal note.
+    """
+
+    swagger_tag = "Rooms"
+    queryset = RoomNoteMedia.objects.all()
+    serializer_class = RoomNoteMediaSerializer
+    filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
+    filterset_class = room_filters.RoomNoteMediaFilter
+    parser_classes = [parsers.MultiPartParser]
+    permission_classes = [IsAuthenticated, RoomNoteMediaPermission]
+    pagination_class = CustomCursorPagination
+    lookup_field = "uuid"
+    ordering = "created_on"
+    ordering_fields = ["created_on", "content_type"]
+
+    def get_queryset(self):
+        if self.request.query_params.get("room") or self.request.query_params.get(
+            "project"
+        ):
+            return super().get_queryset()
+        return self.queryset.none()
+
+    def create(self, request, *args, **kwargs):
+        try:
+            return super().create(request, *args, **kwargs)
+        except CouldntDecodeError:
+            return Response(
+                {
+                    "detail": "Could not decode audio file, possibility of corrupted file",
+                    "status": "error",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    def perform_create(self, serializer):
+        with transaction.atomic():
+            serializer.save()
+            instance = serializer.instance
+            note = instance.note
+
+            # Re-notify the related message so clients receive the note with
+            # its updated medias.
+            if note.message:
+                note.message.notify_room("update", True)
+            else:
+                note.notify_websocket("create")
 
 
 class RoomsCountView(APIView):
