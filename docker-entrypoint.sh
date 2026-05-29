@@ -78,6 +78,31 @@ elif [[ "celery-beat" == "$1" ]]; then
         -A "${CELERY_APP}" --workdir="${PROJECT_PATH}" beat \
         --loglevel="${LOG_LEVEL}" \
         -s "${CELERY_BEAT_DATABASE_FILE}"
+elif [[ "edaconsume" == "$1" ]]; then
+    shift 1
+    group="eda"
+    if [[ "$1" == "template" ]]; then
+        group="template"
+        shift 1
+    fi
+    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py edaconsume --group "$group" "$@"
+elif [[ "edaconsumemsg" == "$1" ]]; then
+    shift 1
+    group="eda"
+    if [[ "$1" == "template" ]]; then
+        group="template"
+        shift 1
+    fi
+    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py msg_edaconsume --group "$group" "$@"
+elif [[ "edaconsume" == "$1" ]]; then
+    shift 1
+    group="eda"
+    if [[ "$1" == "template" ]]; then
+        group="template"
+        shift 1
+    fi
+    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py msg_edaconsume_amq --group "$group" "$@"
 fi
+
 
 exec "$@"
