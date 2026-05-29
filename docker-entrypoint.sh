@@ -94,7 +94,7 @@ elif [[ "edaconsumemsg" == "$1" ]]; then
         shift 1
     fi
     do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py msg_edaconsume --group "$group" "$@"
-elif [[ "edaconsume" == "$1" ]]; then
+elif [[ "edaconsumemsg-amq" == "$1" ]]; then
     shift 1
     group="eda"
     if [[ "$1" == "template" ]]; then
