@@ -499,24 +499,9 @@ class Room(BaseModel, BaseConfigurableModel):
 
             self.save()
 
-        # AGORA chamar room_closed, quando a sala já está inativa no banco
-        if self.user:
-            project = None
-            if self.queue and hasattr(self.queue, "sector"):
-                sector = self.queue.sector
-                if sector and hasattr(sector, "project"):
-                    project = sector.project
-
-            print(f"🔍 DEBUG close(): project={project}")
-
-            if project:
-                print(f"🔍 DEBUG close(): Chamando InServiceStatusService.room_closed")
-                InServiceStatusService.room_closed(self.user, project)
-            else:
-                print(f"🔍 DEBUG close(): project é None, não chama room_closed")
-        else:
-            print(f"🔍 DEBUG close(): user é None, não chama room_closed")
-
+        # Notify the in-service tracker now that the room is inactive in the
+        # database, so the agent leaves "In-Service" if this was their last
+        # open room.
         if self.user:
             project = None
             if self.queue and hasattr(self.queue, "sector"):
