@@ -750,6 +750,10 @@ ROOMS_COUNT_BY_QUEUE_FEATURE_FLAG_KEY = env.str(
     "ROOMS_COUNT_BY_QUEUE_FEATURE_FLAG_KEY",
     default="weniChatsRoomsCountByQueue",
 )
+CHANGE_TICKETER_ON_TRANSFER_FEATURE_FLAG_KEY = env.str(
+    "CHANGE_TICKETER_ON_TRANSFER_FEATURE_FLAG_KEY",
+    default="weniChatsChangeTicketerOnTransfer",
+)
 
 AUDIT_LOG_FEATURE_FLAG_KEY = env.str(
     "AUDIT_LOG_FEATURE_FLAG_KEY", default="weniChatsAuditLog"

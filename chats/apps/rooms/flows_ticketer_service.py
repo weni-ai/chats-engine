@@ -12,6 +12,7 @@ import logging
 
 from django.conf import settings
 from sentry_sdk import capture_exception
+from weni.feature_flags.shortcuts import is_feature_active
 
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import (
     FlowRESTClient,
@@ -34,7 +35,10 @@ def change_ticketer_for_room(
     No-ops when:
       - `settings.USE_WENI_FLOWS` is False;
       - the room has no `ticket_uuid` (no Flows ticket to migrate);
-      - the destination sector is the same as the current sector.
+      - the destination sector is the same as the current sector;
+      - the `CHANGE_TICKETER_ON_TRANSFER_FEATURE_FLAG_KEY` feature flag is
+        disabled for the room's project (preserves the previous behavior
+        where no Flows ticketer sync happened on transfer).
 
     On any failure interacting with Flows, the exception is captured in
     Sentry and re-raised so the caller can rollback the in-progress transfer.
@@ -64,6 +68,20 @@ def change_ticketer_for_room(
         logger.error(
             "[CHANGE_TICKETER] Cannot resolve project for room %s "
             "(ticket=%s); skipping Flows ticketer update",
+            room.uuid,
+            room.ticket_uuid,
+        )
+        return
+
+    if not is_feature_active(
+        settings.CHANGE_TICKETER_ON_TRANSFER_FEATURE_FLAG_KEY,
+        None,
+        str(project.uuid),
+    ):
+        logger.info(
+            "[CHANGE_TICKETER] Feature flag disabled for project %s; "
+            "skipping Flows ticketer update for room %s (ticket=%s)",
+            project.uuid,
             room.uuid,
             room.ticket_uuid,
         )
