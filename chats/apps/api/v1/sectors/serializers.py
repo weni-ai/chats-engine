@@ -1,6 +1,10 @@
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
+from weni.feature_flags.shortcuts import (
+    is_feature_active_for_attributes,
+)
 
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.sectors.models import (
@@ -10,6 +14,7 @@ from chats.apps.sectors.models import (
     SectorTag,
 )
 from chats.core.serializers import AuditableModelSerializer
+from chats.apps.projects.models import Project
 
 User = get_user_model()
 
@@ -27,6 +32,33 @@ def _apply_sector_config_defaults(instance: Sector, data: dict) -> dict:
     return data
 
 
+def validate_custom_csat_flow_uuid(project: Project, value, current_value=None):
+    """
+    Validate if the custom CSAT flow feature is enabled for the sector.
+    When the feature is off, only allow clearing an already-set value.
+    """
+    if is_feature_active_for_attributes(
+        settings.CUSTOM_CSAT_FLOW_FEATURE_FLAG_KEY,
+        {"projectUUID": str(project.uuid)},
+    ):
+        return value
+
+    if current_value is not None and not value:
+        return value
+
+    if value:
+        raise serializers.ValidationError(
+            {
+                "custom_csat_flow_uuid": [
+                    _("The custom CSAT flow feature is not available for this sector")
+                ]
+            },
+            code="custom_csat_flow_feature_flag_is_off",
+        )
+
+    return value
+
+
 class SectorAutomaticMessageSerializer(serializers.ModelSerializer):
     is_active = serializers.BooleanField(source="is_automatic_message_active")
     text = serializers.CharField(source="automatic_message_text")
@@ -36,9 +68,22 @@ class SectorAutomaticMessageSerializer(serializers.ModelSerializer):
         fields = ["is_active", "text"]
 
 
+class SectorAutomaticMessageQueueSerializer(serializers.ModelSerializer):
+    is_active = serializers.BooleanField(source="is_automatic_message_queue_active")
+    text = serializers.CharField(
+        source="automatic_message_queue_text", allow_blank=True, allow_null=True
+    )
+
+    class Meta:
+        model = Sector
+        fields = ["is_active", "text"]
+
+
 class SectorSerializer(AuditableModelSerializer):
     automatic_message = serializers.JSONField(required=False)
+    automatic_message_queue = serializers.JSONField(required=False)
     is_csat_enabled = serializers.BooleanField(required=False, allow_null=False)
+    custom_csat_flow_uuid = serializers.UUIDField(required=False, allow_null=True)
 
     class Meta:
         model = Sector
@@ -57,9 +102,11 @@ class SectorSerializer(AuditableModelSerializer):
             "can_edit_custom_fields",
             "working_day",
             "automatic_message",
+            "automatic_message_queue",
             "is_csat_enabled",
             "required_tags",
             "secondary_project",
+            "custom_csat_flow_uuid",
         ]
         extra_kwargs = {
             "work_start": {"required": False, "allow_null": True},
@@ -91,6 +138,41 @@ class SectorSerializer(AuditableModelSerializer):
 
             data["is_automatic_message_active"] = automatic_message.get("is_active")
             data["automatic_message_text"] = automatic_message.get("text")
+
+        automatic_message_queue = data.get("automatic_message_queue")
+
+        if automatic_message_queue is not None:
+            data.pop("automatic_message_queue")
+
+            is_active = automatic_message_queue.get("is_active")
+            text = automatic_message_queue.get("text")
+
+            if is_active and not (text and text.strip()):
+                raise serializers.ValidationError(
+                    {
+                        "automatic_message_queue": _(
+                            "Text is required when automatic queue message "
+                            "is active."
+                        )
+                    },
+                    code="automatic_message_queue_text_required_when_active",
+                )
+
+            data["is_automatic_message_queue_active"] = is_active
+            data["automatic_message_queue_text"] = text
+
+        project = self.instance.project if self.instance else data.get("project")
+
+        if project and "custom_csat_flow_uuid" in data:
+            validate_custom_csat_flow_uuid(
+                project,
+                data.get("custom_csat_flow_uuid"),
+                current_value=(
+                    getattr(self.instance, "custom_csat_flow_uuid", None)
+                    if self.instance
+                    else None
+                ),
+            )
 
         config = data.get("config", {})
         if "secondary_project" in config:
@@ -127,6 +209,9 @@ class SectorSerializer(AuditableModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
         data["automatic_message"] = SectorAutomaticMessageSerializer(instance).data
+        data["automatic_message_queue"] = SectorAutomaticMessageQueueSerializer(
+            instance
+        ).data
         data = _apply_sector_config_defaults(instance, data)
 
         return data
@@ -134,7 +219,9 @@ class SectorSerializer(AuditableModelSerializer):
 
 class SectorUpdateSerializer(AuditableModelSerializer):
     automatic_message = serializers.JSONField(required=False)
+    automatic_message_queue = serializers.JSONField(required=False)
     is_csat_enabled = serializers.BooleanField(required=False, allow_null=False)
+    custom_csat_flow_uuid = serializers.UUIDField(required=False, allow_null=True)
 
     class Meta:
         model = Sector
@@ -149,9 +236,11 @@ class SectorUpdateSerializer(AuditableModelSerializer):
             "can_edit_custom_fields",
             "config",
             "automatic_message",
+            "automatic_message_queue",
             "is_csat_enabled",
             "required_tags",
             "secondary_project",
+            "custom_csat_flow_uuid",
         ]
         extra_kwargs = {field: {"required": False} for field in fields}
 
@@ -175,6 +264,42 @@ class SectorUpdateSerializer(AuditableModelSerializer):
             attrs.pop("automatic_message")
             attrs["is_automatic_message_active"] = new_is_automatic_message_active
             attrs["automatic_message_text"] = automatic_message.get("text")
+
+        automatic_message_queue = attrs.get("automatic_message_queue", None)
+
+        if automatic_message_queue is not None:
+            attrs.pop("automatic_message_queue")
+
+            is_active = automatic_message_queue.get("is_active")
+
+            if "text" in automatic_message_queue:
+                text = automatic_message_queue.get("text")
+            elif self.instance is not None:
+                text = self.instance.automatic_message_queue_text
+            else:
+                text = None
+
+            if is_active and not (text and text.strip()):
+                raise serializers.ValidationError(
+                    {
+                        "automatic_message_queue": _(
+                            "Text is required when automatic queue message "
+                            "is active."
+                        )
+                    },
+                    code="automatic_message_queue_text_required_when_active",
+                )
+
+            attrs["is_automatic_message_queue_active"] = is_active
+            attrs["automatic_message_queue_text"] = text
+        project = self.instance.project
+
+        if "custom_csat_flow_uuid" in attrs:
+            validate_custom_csat_flow_uuid(
+                project,
+                attrs.get("custom_csat_flow_uuid"),
+                current_value=self.instance.custom_csat_flow_uuid,
+            )
 
         config = attrs.get("config", {})
         if "secondary_project" in config:
@@ -202,6 +327,9 @@ class SectorUpdateSerializer(AuditableModelSerializer):
         data = super().to_representation(instance)
 
         data["automatic_message"] = SectorAutomaticMessageSerializer(instance).data
+        data["automatic_message_queue"] = SectorAutomaticMessageQueueSerializer(
+            instance
+        ).data
         data = _apply_sector_config_defaults(instance, data)
 
         return data
@@ -212,6 +340,7 @@ class SectorReadOnlyListSerializer(serializers.ModelSerializer):
     contacts = serializers.SerializerMethodField()
     has_group_sector = serializers.SerializerMethodField()
     automatic_message = serializers.SerializerMethodField()
+    automatic_message_queue = serializers.SerializerMethodField()
 
     class Meta:
         model = Sector
@@ -224,6 +353,7 @@ class SectorReadOnlyListSerializer(serializers.ModelSerializer):
             "created_on",
             "has_group_sector",
             "automatic_message",
+            "automatic_message_queue",
             "is_csat_enabled",
             "required_tags",
         ]
@@ -240,9 +370,13 @@ class SectorReadOnlyListSerializer(serializers.ModelSerializer):
     def get_automatic_message(self, sector: Sector):
         return SectorAutomaticMessageSerializer(sector).data
 
+    def get_automatic_message_queue(self, sector: Sector):
+        return SectorAutomaticMessageQueueSerializer(sector).data
+
 
 class SectorReadOnlyRetrieveSerializer(serializers.ModelSerializer):
     automatic_message = serializers.SerializerMethodField()
+    automatic_message_queue = serializers.SerializerMethodField()
 
     class Meta:
         model = Sector
@@ -257,12 +391,17 @@ class SectorReadOnlyRetrieveSerializer(serializers.ModelSerializer):
             "can_edit_custom_fields",
             "config",
             "automatic_message",
+            "automatic_message_queue",
             "is_csat_enabled",
             "required_tags",
+            "custom_csat_flow_uuid",
         ]
 
     def get_automatic_message(self, sector: Sector):
         return SectorAutomaticMessageSerializer(sector).data
+
+    def get_automatic_message_queue(self, sector: Sector):
+        return SectorAutomaticMessageQueueSerializer(sector).data
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
