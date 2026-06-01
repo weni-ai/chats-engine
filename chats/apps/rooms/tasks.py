@@ -137,7 +137,9 @@ def _process_room_export(report: ReportStatus) -> None:
             f"ReportStatus {report.uuid} has no export types in fields_config"
         )
 
-    data = BuildRoomExportData().execute(report.room)
+    data = BuildRoomExportData().execute(
+        report.room, generated_by=report.user.email
+    )
     files = RenderRoomExport().execute(data, types)
 
     if getattr(settings, "REPORTS_SEND_EMAILS", False):
