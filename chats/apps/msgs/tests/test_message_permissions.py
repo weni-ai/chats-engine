@@ -14,7 +14,7 @@ from chats.apps.api.v1.msgs.permissions import (
     MessagePermission,
 )
 from chats.apps.projects.models import Project, ProjectPermission
-from chats.apps.queues.models import Queue, QueueAuthorization
+from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
 
@@ -217,13 +217,8 @@ class TestRestrictOfflineAgents(APITestCase):
             user=self.user,
             project=self.project,
             role=ProjectPermission.ROLE_ATTENDANT,
-            status="ONLINE",
+            status=ProjectPermission.STATUS_ONLINE,
             last_seen=timezone.now(),
-        )
-        QueueAuthorization.objects.create(
-            queue=self.queue,
-            permission=self.project_permission,
-            role=QueueAuthorization.ROLE_AGENT,
         )
         self.url = "/v1/msg/"
         self.client.force_authenticate(user=self.user)
@@ -246,7 +241,7 @@ class TestRestrictOfflineAgents(APITestCase):
     def test_blocks_offline_agent_when_config_enabled(self):
         self.project.config = {"restrict_offline_agents": True}
         self.project.save(update_fields=["config"])
-        self.project_permission.status = "OFFLINE"
+        self.project_permission.status = ProjectPermission.STATUS_OFFLINE
         self.project_permission.save(update_fields=["status"])
 
         response = self.client.post(
@@ -259,10 +254,21 @@ class TestRestrictOfflineAgents(APITestCase):
             "Offline agents cannot send messages in this project",
         )
 
+    def test_blocks_agent_without_project_permission_when_config_enabled(self):
+        self.project.config = {"restrict_offline_agents": True}
+        self.project.save(update_fields=["config"])
+        self.project_permission.delete()
+
+        response = self.client.post(
+            self.url, {"room": str(self.room.uuid)}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data["error_code"], "agent_offline")
+
     def test_allows_non_create_actions(self):
         self.project.config = {"restrict_offline_agents": True}
         self.project.save(update_fields=["config"])
-        self.project_permission.status = "OFFLINE"
+        self.project_permission.status = ProjectPermission.STATUS_OFFLINE
         self.project_permission.save(update_fields=["status"])
 
         response = self.client.get(self.url, {"room": str(self.room.uuid)})

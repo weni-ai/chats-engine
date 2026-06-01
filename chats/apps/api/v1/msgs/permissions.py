@@ -131,7 +131,12 @@ class RestrictOfflineAgents(permissions.BasePermission):
         if not project.get_config(RESTRICT_OFFLINE_AGENTS, False):
             return True
 
-        if not room.queue.online_agents.filter(pk=request.user.pk).exists():
+        is_online = request.user.project_permissions.filter(
+            project=project,
+            status=ProjectPermission.STATUS_ONLINE,
+        ).exists()
+
+        if not is_online:
             raise PermissionDenied(
                 detail={
                     "error_code": "agent_offline",
