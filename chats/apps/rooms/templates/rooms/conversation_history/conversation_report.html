@@ -5,67 +5,42 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{% blocktrans with uuid=room.uuid %}Conversation Report - {{ uuid }}{% endblocktrans %}</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
-    :root {
-      --bg-base: #ffffff;
-      --bg-base-soft: #f5f5f5;
-      --bg-accent-plain: #cff8f4;
-      --bg-yellow-plain: #fdf5ad;
-      --fg-emphasized: #1f1f1f;
-      --fg-base: #3d3d3d;
-      --fg-muted: #6b6c6e;
-      --border-base: #e0e0e0;
-      --radius-2: 8px;
-      --space-1: 4px;
-      --space-2: 8px;
-      --space-3: 12px;
-      --space-4: 16px;
-      --space-6: 24px;
-      --vtex-brand: #f71963;
-      --shadow-bubble: 0 2px 5px -1px rgba(0, 0, 0, 0.1);
-    }
-
     *, *::before, *::after { box-sizing: border-box; }
 
     html, body {
       margin: 0;
       padding: 0;
-      background: var(--bg-base);
+      background: #ffffff;
     }
 
     body {
-      color: var(--fg-base);
-      font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      color: #3d3d3d;
+      font-family: Arial, Helvetica, "Segoe UI", sans-serif;
       font-size: 14px;
       line-height: 20px;
-      letter-spacing: -0.14px;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
     }
 
     .report {
       max-width: 1280px;
       margin: 0 auto;
-      padding: var(--space-2) var(--space-4) var(--space-6);
+      padding: 8px 16px 24px;
     }
 
     .report__header,
     .report__footer {
       display: flex;
       align-items: center;
-      gap: var(--space-4);
       width: 100%;
     }
 
     .report__header {
-      padding: var(--space-2) 0 var(--space-6);
-      border-bottom: 1px solid var(--border-base);
-      margin-bottom: var(--space-6);
+      padding: 8px 0 24px;
+      border-bottom: 1px solid #e0e0e0;
+      margin-bottom: 24px;
     }
 
     .report__footer {
-      padding: var(--space-6) 0 0;
+      padding: 24px 0 0;
     }
 
     .report__heading {
@@ -73,24 +48,24 @@
       min-width: 0;
       display: flex;
       flex-direction: column;
-      gap: var(--space-2);
+      margin-right: 16px;
     }
+
+    .report__heading > * + * { margin-top: 8px; }
 
     .report__title {
       margin: 0;
       font-size: 24px;
       line-height: 32px;
-      font-weight: 600;
-      letter-spacing: -0.96px;
-      color: var(--fg-emphasized);
+      font-weight: 700;
+      color: #1f1f1f;
     }
 
     .report__subtitle {
       margin: 0;
       font-size: 14px;
       line-height: 20px;
-      letter-spacing: -0.14px;
-      color: var(--fg-base);
+      color: #3d3d3d;
     }
 
     .vtex-logo {
@@ -106,7 +81,7 @@
     }
 
     .panel {
-      background: var(--bg-base);
+      background: #ffffff;
       display: flex;
       flex-direction: column;
       min-width: 0;
@@ -115,29 +90,28 @@
     .panel__header {
       display: flex;
       align-items: center;
-      gap: var(--space-2);
-      padding: var(--space-4);
+      padding: 16px;
       font-size: 16px;
       line-height: 24px;
       font-weight: 600;
-      letter-spacing: -0.32px;
-      color: var(--fg-emphasized);
-      border-bottom: 1px solid var(--border-base);
+      color: #1f1f1f;
+      border-bottom: 1px solid #e0e0e0;
     }
 
     .transcription {
       flex: 1 1 auto;
-      border: 1px solid var(--border-base);
+      border: 1px solid #e0e0e0;
       border-right: 0;
-      border-radius: var(--radius-2) 0 0 var(--radius-2);
+      border-radius: 8px 0 0 8px;
     }
 
     .transcription__list {
       display: flex;
       flex-direction: column;
-      gap: var(--space-3);
-      padding: var(--space-3) var(--space-4);
+      padding: 12px 16px;
     }
+
+    .transcription__list > * + * { margin-top: 12px; }
 
     .msg-row {
       display: flex;
@@ -145,26 +119,25 @@
     }
 
     .msg-row--contact { justify-content: flex-start; }
-    .msg-row--agent { justify-content: flex-end; }
+    .msg-row--agent   { justify-content: flex-end; }
 
     .msg {
-      max-width: min(802px, 90%);
-      padding: var(--space-2) var(--space-4);
-      border-radius: var(--radius-2);
-      box-shadow: var(--shadow-bubble);
+      max-width: 90%;
+      padding: 8px 16px;
+      border-radius: 8px;
       display: flex;
       flex-direction: column;
-      gap: var(--space-2);
-      color: var(--fg-emphasized);
+      color: #1f1f1f;
     }
 
-    .msg--contact { background: var(--bg-base-soft); }
-    .msg--agent { background: var(--bg-accent-plain); }
+    .msg > * + * { margin-top: 8px; }
+
+    .msg--contact { background: #f5f5f5; }
+    .msg--agent   { background: #cff8f4; }
 
     .msg__header {
       display: flex;
       align-items: flex-end;
-      gap: var(--space-2);
       white-space: nowrap;
       width: 100%;
     }
@@ -173,33 +146,32 @@
       font-weight: 600;
       font-size: 14px;
       line-height: 20px;
-      letter-spacing: -0.14px;
-      color: var(--fg-emphasized);
+      color: #1f1f1f;
+      margin-right: 8px;
     }
 
     .msg__time {
       margin-left: auto;
       font-size: 12px;
       line-height: 16px;
-      color: var(--fg-emphasized);
+      color: #6b6c6e;
     }
 
     .msg__body {
       font-size: 14px;
       line-height: 20px;
-      letter-spacing: -0.14px;
-      color: var(--fg-base);
-      word-break: break-word;
+      color: #3d3d3d;
+      overflow-wrap: break-word;
       white-space: pre-wrap;
     }
 
-    .msg--agent .msg__body { color: var(--fg-emphasized); }
+    .msg--agent .msg__body { color: #1f1f1f; }
 
     .msg__media {
       display: block;
       max-width: 100%;
       height: auto;
-      border-radius: var(--radius-2);
+      border-radius: 8px;
     }
 
     .chip-row {
@@ -209,49 +181,47 @@
     }
 
     .chip {
-      padding: 2px var(--space-3);
+      padding: 2px 12px;
       border-radius: 600px;
       font-size: 12px;
       line-height: 16px;
       font-weight: 500;
-      color: var(--fg-emphasized);
+      color: #1f1f1f;
       text-align: center;
     }
 
     .note {
-      background: var(--bg-yellow-plain);
-      border-radius: var(--radius-2);
-      padding: var(--space-2) var(--space-3);
-      box-shadow: 0 2px 2.5px rgba(0, 0, 0, 0.1);
-      color: var(--fg-base);
+      background: #fdf5ad;
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: #3d3d3d;
       font-size: 14px;
       line-height: 20px;
-      letter-spacing: -0.14px;
-      word-break: break-word;
+      overflow-wrap: break-word;
     }
 
     .note__time {
       font-weight: 600;
-      color: var(--fg-emphasized);
+      color: #1f1f1f;
     }
 
     .sidebar {
       flex: none;
       width: 380px;
-      border: 1px solid var(--border-base);
-      border-radius: 0 var(--radius-2) var(--radius-2) 0;
+      border: 1px solid #e0e0e0;
+      border-radius: 0 8px 8px 0;
     }
 
     .sidebar__list {
       display: flex;
       flex-direction: column;
-      gap: var(--space-3);
-      padding: var(--space-2);
+      padding: 8px;
     }
+
+    .sidebar__list > * + * { margin-top: 12px; }
 
     .sidebar__row {
       display: flex;
-      gap: var(--space-1);
       align-items: flex-start;
       font-size: 14px;
       line-height: 16px;
@@ -260,15 +230,16 @@
     .sidebar__label {
       flex: none;
       font-weight: 600;
-      color: var(--fg-emphasized);
+      color: #1f1f1f;
       white-space: nowrap;
+      margin-right: 4px;
     }
 
     .sidebar__value {
       flex: 1 1 auto;
       min-width: 0;
-      color: var(--fg-base);
-      word-break: break-word;
+      color: #3d3d3d;
+      overflow-wrap: break-word;
     }
 
     .report__footer-title {
@@ -276,27 +247,25 @@
       font-size: 24px;
       line-height: 32px;
       font-weight: 600;
-      letter-spacing: -0.96px;
-      color: var(--fg-emphasized);
+      color: #1f1f1f;
     }
 
-    @media (max-width: 720px) {
+    @media screen and (max-width: 720px) {
       .report__body { flex-direction: column; }
       .transcription {
-        border: 1px solid var(--border-base);
+        border: 1px solid #e0e0e0;
         border-bottom: 0;
-        border-radius: var(--radius-2) var(--radius-2) 0 0;
+        border-radius: 8px 8px 0 0;
       }
       .sidebar {
         width: 100%;
         border-top: 0;
-        border-radius: 0 0 var(--radius-2) var(--radius-2);
+        border-radius: 0 0 8px 8px;
       }
     }
 
     @media print {
-      body { background: white; }
-      .msg, .note { box-shadow: none; }
+      body { background: #ffffff; }
       .report { padding: 0; }
     }
   </style>
