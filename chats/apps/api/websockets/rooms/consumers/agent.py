@@ -314,6 +314,8 @@ class AgentRoomConsumer(AsyncJsonWebsocketConsumer):
             await self.set_connection_check_response(
                 connection_id=event["content"].get("connection_id"), response=True
             )
+        elif event.get("action") == "rooms.inactivity":
+            await self.send_json(event)
         elif "rooms." in event.get("action"):
             content = event.get("content", {})
             action = event.get("action")
