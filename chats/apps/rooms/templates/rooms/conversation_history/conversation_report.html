@@ -232,33 +232,33 @@
     }
 
     .sidebar__list {
-      display: block;
+      display: table;
+      width: 100%;
       padding: 8px;
+      border-spacing: 0 8px;
     }
 
     .sidebar__row {
-      display: block;
-      overflow: hidden;
+      display: table-row;
       font-size: 14px;
       line-height: 20px;
-      margin-bottom: 12px;
     }
 
-    .sidebar__row:last-child { margin-bottom: 0; }
-
     .sidebar__label {
-      float: left;
+      display: table-cell;
       font-weight: 600;
       color: #1f1f1f;
       white-space: nowrap;
-      margin-right: 4px;
+      padding-right: 6px;
+      vertical-align: top;
     }
 
     .sidebar__value {
-      display: block;
-      overflow: hidden;
+      display: table-cell;
       color: #3d3d3d;
       overflow-wrap: break-word;
+      vertical-align: top;
+      width: 100%;
     }
 
     /* ---------- print ---------- */
