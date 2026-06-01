@@ -37,11 +37,12 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
         self.channel_uuid = str(uuid.uuid4())
         self.waba_id = "111222333444"
 
-    def _make_definition_with_template(
+    def _make_flow_with_template(
         self,
         template_uuid,
         template_name,
         variables=None,
+        flow_uuid=None,
     ):
         if variables is None:
             variables = [
@@ -49,52 +50,64 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
                 "@trigger.params.agentname",
             ]
         return {
-            "flows": [
+            "uuid": flow_uuid or self.flow_uuid,
+            "nodes": [
                 {
-                    "nodes": [
+                    "uuid": str(uuid.uuid4()),
+                    "actions": [
                         {
+                            "type": "send_msg",
                             "uuid": str(uuid.uuid4()),
-                            "actions": [
-                                {
-                                    "type": "send_msg",
-                                    "uuid": str(uuid.uuid4()),
-                                    "text": "",
-                                    "templating": {
-                                        "uuid": str(uuid.uuid4()),
-                                        "template": {
-                                            "uuid": template_uuid,
-                                            "name": template_name,
-                                        },
-                                        "variables": variables,
-                                    },
-                                }
-                            ],
+                            "text": "",
+                            "templating": {
+                                "uuid": str(uuid.uuid4()),
+                                "template": {
+                                    "uuid": template_uuid,
+                                    "name": template_name,
+                                },
+                                "variables": variables,
+                            },
                         }
-                    ]
+                    ],
                 }
+            ],
+        }
+
+    def _make_definition_with_template(
+        self,
+        template_uuid,
+        template_name,
+        variables=None,
+        flow_uuid=None,
+    ):
+        return {
+            "flows": [
+                self._make_flow_with_template(
+                    template_uuid, template_name, variables, flow_uuid
+                )
             ]
         }
 
-    def _make_definition_without_template(self):
+    def _make_flow_without_template(self, flow_uuid=None):
         return {
-            "flows": [
+            "uuid": flow_uuid or self.flow_uuid,
+            "nodes": [
                 {
-                    "nodes": [
+                    "uuid": str(uuid.uuid4()),
+                    "actions": [
                         {
+                            "type": "set_run_result",
                             "uuid": str(uuid.uuid4()),
-                            "actions": [
-                                {
-                                    "type": "set_run_result",
-                                    "uuid": str(uuid.uuid4()),
-                                    "name": "params",
-                                    "value": "@trigger.params",
-                                }
-                            ],
+                            "name": "params",
+                            "value": "@trigger.params",
                         }
-                    ]
+                    ],
                 }
-            ]
+            ],
         }
+
+    def _make_definition_without_template(self):
+        return {"flows": [self._make_flow_without_template()]}
 
     def _make_flows_template_response(self, channel_uuid, channel_name="Channel"):
         return {
@@ -180,6 +193,7 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
         definition = {
             "flows": [
                 {
+                    "uuid": self.flow_uuid,
                     "nodes": [
                         {
                             "uuid": str(uuid.uuid4()),
@@ -221,7 +235,7 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
                                 }
                             ],
                         },
-                    ]
+                    ],
                 }
             ]
         }
@@ -254,6 +268,7 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
         definition = {
             "flows": [
                 {
+                    "uuid": self.flow_uuid,
                     "nodes": [
                         {
                             "uuid": str(uuid.uuid4()),
@@ -295,7 +310,7 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
                                 }
                             ],
                         },
-                    ]
+                    ],
                 }
             ]
         }
@@ -379,11 +394,11 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
         self.assertIn("exc_info", call_kwargs.kwargs)
 
     def test_extract_templates_from_definition_finds_templating_in_actions(self):
-        definition = self._make_definition_with_template(
+        flow = self._make_flow_with_template(
             self.template_uuid, self.template_name
         )
 
-        result = self.use_case._extract_templates_from_definition(definition)
+        result = self.use_case._extract_templates_from_definition(flow)
 
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["uuid"], self.template_uuid)
@@ -393,14 +408,14 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
         )
 
     def test_extract_templates_ignores_actions_without_templating(self):
-        definition = self._make_definition_without_template()
+        flow = self._make_flow_without_template()
 
-        result = self.use_case._extract_templates_from_definition(definition)
+        result = self.use_case._extract_templates_from_definition(flow)
 
         self.assertEqual(result, [])
 
     def test_extract_templates_filters_only_trigger_params_variables(self):
-        definition = self._make_definition_with_template(
+        flow = self._make_flow_with_template(
             self.template_uuid,
             self.template_name,
             variables=[
@@ -411,7 +426,7 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
             ],
         )
 
-        result = self.use_case._extract_templates_from_definition(definition)
+        result = self.use_case._extract_templates_from_definition(flow)
 
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["variables"], ["contactname", "url"])
@@ -427,3 +442,59 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
 
         with self.assertRaises(FlowTemplateChannelsNotFound):
             self.use_case.execute(flow_uuid=self.flow_uuid)
+
+    def test_get_flow_definition_filters_response_by_flow_uuid(self):
+        other_flow_uuid = str(uuid.uuid4())
+        other_template_uuid = str(uuid.uuid4())
+
+        definition = {
+            "flows": [
+                self._make_flow_with_template(
+                    other_template_uuid,
+                    "other_template",
+                    flow_uuid=other_flow_uuid,
+                ),
+                self._make_flow_with_template(
+                    self.template_uuid,
+                    self.template_name,
+                ),
+            ]
+        }
+        self.mock_flows_client.retrieve_flow_definitions.return_value = definition
+
+        self.mock_flows_templates_usecase.execute.return_value = (
+            self._make_flows_template_response(self.channel_uuid)
+        )
+        self.mock_channels_usecase.execute.return_value = [
+            self._make_project_channel(self.channel_uuid, self.waba_id)
+        ]
+        meta_template = self._make_meta_template()
+        self.mock_meta_client.get_templates_list.return_value = {
+            "data": [meta_template]
+        }
+
+        result = self.use_case.execute(flow_uuid=self.flow_uuid)
+
+        self.assertEqual(len(result.templates), 1)
+        self.assertEqual(result.templates[0].id, meta_template["id"])
+        self.mock_flows_templates_usecase.execute.assert_called_once_with(
+            name=self.template_name, uuid=self.template_uuid
+        )
+
+    def test_get_flow_definition_returns_empty_when_no_flow_matches(self):
+        definition = {
+            "flows": [
+                self._make_flow_with_template(
+                    str(uuid.uuid4()),
+                    "other_template",
+                    flow_uuid=str(uuid.uuid4()),
+                )
+            ]
+        }
+        self.mock_flows_client.retrieve_flow_definitions.return_value = definition
+
+        result = self.use_case.execute(flow_uuid=self.flow_uuid)
+
+        self.assertEqual(result, FlowTemplatesData(uuid=self.flow_uuid, templates=[]))
+        self.mock_flows_templates_usecase.execute.assert_not_called()
+        self.mock_meta_client.get_templates_list.assert_not_called()
