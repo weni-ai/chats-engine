@@ -64,7 +64,9 @@ class RoomExportTaskTests(TestCase):
 
         self.report.refresh_from_db()
         self.assertEqual(self.report.status, "ready")
-        mock_build.return_value.execute.assert_called_once_with(self.room)
+        mock_build.return_value.execute.assert_called_once_with(
+            self.room, generated_by=self.user.email
+        )
         mock_render.return_value.execute.assert_called_once()
         mock_send.return_value.execute.assert_called_once()
 
