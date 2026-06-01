@@ -107,6 +107,9 @@ COPY --chown=${PROJECT_USER}:${PROJECT_GROUP} . ${PROJECT_PATH}
 
 USER "${PROJECT_USER}:${PROJECT_GROUP}"
 
+ENV XDG_CACHE_HOME=/tmp/cache
+RUN mkdir -p /tmp/cache/fontconfig
+
 EXPOSE 8000
 
 ENTRYPOINT ["bash", "docker-entrypoint.sh"]
