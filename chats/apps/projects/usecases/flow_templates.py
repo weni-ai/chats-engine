@@ -32,7 +32,19 @@ class GetFlowTemplatesDataUseCase:
 
     def _get_flow_definition(self, flow_uuid):
         project = Project.objects.get(uuid=self.project_uuid)
-        return self.flows_client.retrieve_flow_definitions(project, flow_uuid)
+
+        response_data = self.flows_client.retrieve_flow_definitions(
+            project, flow_uuid, dependencies="none"
+        )
+
+        definition = {}
+
+        for flow in response_data.get("flows", []):
+            if flow.get("uuid") == flow_uuid:
+                definition = flow
+                break
+
+        return definition
 
     TRIGGER_PARAMS_PREFIX = "@trigger.params."
 
@@ -40,39 +52,38 @@ class GetFlowTemplatesDataUseCase:
         seen_uuids = set()
         templates_info = []
 
-        for flow in definition.get("flows", []):
-            for node in flow.get("nodes", []):
-                for action in node.get("actions", []):
-                    templating = action.get("templating")
-                    if not templating:
-                        continue
+        for node in definition.get("nodes", []):
+            for action in node.get("actions", []):
+                templating = action.get("templating")
+                if not templating:
+                    continue
 
-                    template = templating.get("template", {})
-                    template_uuid = template.get("uuid")
-                    template_name = template.get("name")
+                template = templating.get("template", {})
+                template_uuid = template.get("uuid")
+                template_name = template.get("name")
 
-                    if not template_uuid or not template_name:
-                        continue
+                if not template_uuid or not template_name:
+                    continue
 
-                    if template_uuid in seen_uuids:
-                        continue
+                if template_uuid in seen_uuids:
+                    continue
 
-                    seen_uuids.add(template_uuid)
+                seen_uuids.add(template_uuid)
 
-                    prefix_len = len(self.TRIGGER_PARAMS_PREFIX)
-                    variables = [
-                        var[prefix_len:]
-                        for var in templating.get("variables", [])
-                        if var.startswith(self.TRIGGER_PARAMS_PREFIX)
-                    ]
+                prefix_len = len(self.TRIGGER_PARAMS_PREFIX)
+                variables = [
+                    var[prefix_len:]
+                    for var in templating.get("variables", [])
+                    if var.startswith(self.TRIGGER_PARAMS_PREFIX)
+                ]
 
-                    templates_info.append(
-                        {
-                            "uuid": template_uuid,
-                            "name": template_name,
-                            "variables": variables,
-                        }
-                    )
+                templates_info.append(
+                    {
+                        "uuid": template_uuid,
+                        "name": template_name,
+                        "variables": variables,
+                    }
+                )
 
         return templates_info
 
@@ -147,23 +158,17 @@ class GetFlowTemplatesDataUseCase:
                     f"in flow '{flow_uuid}'"
                 )
 
-            waba_id = self._resolve_waba_id(
-                template_channels, project_channels_map
-            )
+            waba_id = self._resolve_waba_id(template_channels, project_channels_map)
             if not waba_id:
                 continue
 
-            meta_template = self._fetch_meta_template(
-                waba_id, template_info["name"]
-            )
+            meta_template = self._fetch_meta_template(waba_id, template_info["name"])
             flow_template = FlowTemplate(
                 id=meta_template["id"],
                 name=meta_template["name"],
                 data=meta_template,
                 variables=template_info.get("variables", []),
             )
-            return FlowTemplatesData(
-                uuid=flow_uuid, templates=[flow_template]
-            )
+            return FlowTemplatesData(uuid=flow_uuid, templates=[flow_template])
 
         return FlowTemplatesData(uuid=flow_uuid, templates=[])
