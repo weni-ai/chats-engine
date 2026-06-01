@@ -268,12 +268,12 @@ class FlowRESTClient(
             ]
         return flows
 
-    def retrieve_flow_definitions(self, project, flow_uuid):
+    def retrieve_flow_definitions(self, project, flow_uuid, dependencies="all"):
         response = retry_request_and_refresh_flows_auth_token(
             project=project,
             request_method=requests.get,
             headers=self.project_headers(project.flows_authorization),
-            url=f"{self.base_url}/api/v2/definitions.json?flow={flow_uuid}",
+            url=f"{self.base_url}/api/v2/definitions.json?flow={flow_uuid}&dependencies={dependencies}",
         )
         try:
             flows = response.json()
@@ -355,9 +355,7 @@ class FlowRESTClient(
         except requests.RequestException as exc:
             raise FlowsTicketerNotFoundError(
                 sector_uuid=str(sector_uuid),
-                message=(
-                    f"Failed to request ticketer for sector {sector_uuid}: {exc}"
-                ),
+                message=(f"Failed to request ticketer for sector {sector_uuid}: {exc}"),
             ) from exc
 
         if response.status_code != status.HTTP_200_OK:

@@ -33,7 +33,9 @@ class GetFlowTemplatesDataUseCase:
     def _get_flow_definition(self, flow_uuid):
         project = Project.objects.get(uuid=self.project_uuid)
 
-        response_data = self.flows_client.retrieve_flow_definitions(project, flow_uuid)
+        response_data = self.flows_client.retrieve_flow_definitions(
+            project, flow_uuid, dependencies="none"
+        )
 
         definition = {}
 
