@@ -4,7 +4,7 @@ import os
 import tempfile
 import zipfile
 from datetime import datetime, timedelta, timezone
-from typing import Optional, List
+from typing import List, Optional
 from uuid import UUID
 
 import pandas as pd
@@ -15,7 +15,6 @@ from django.db import transaction
 
 from chats.apps.dashboard.email_templates import get_report_ready_email
 from chats.apps.dashboard.models import ReportStatus, RoomMetrics
-from chats.core.storages import ExcelStorage
 from chats.apps.dashboard.utils import (
     calculate_first_response_time,
     calculate_last_queue_waiting_time,
@@ -24,6 +23,7 @@ from chats.apps.dashboard.utils import (
 from chats.apps.projects.models import Project
 from chats.apps.rooms.models import Room
 from chats.celery import app
+from chats.core.storages import ExcelStorage
 
 logger = logging.getLogger(__name__)
 
@@ -641,6 +641,7 @@ def _select_report_to_process():
     with transaction.atomic():
         report = (
             ReportStatus.objects.select_for_update(skip_locked=True)
+            .filter(report_type=ReportStatus.REPORT_TYPE_CUSTOM_DASHBOARD)
             .filter(
                 Q(status__in=["pending", "failed"])
                 | Q(status="in_progress", modified_on__lt=stuck_timeout)

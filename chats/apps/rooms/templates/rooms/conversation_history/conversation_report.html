@@ -1,0 +1,450 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ LANGUAGE_CODE|default:'en' }}">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% blocktrans with uuid=room.uuid %}Conversation Report - {{ uuid }}{% endblocktrans %}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    :root {
+      --bg-base: #ffffff;
+      --bg-base-soft: #f5f5f5;
+      --bg-accent-plain: #cff8f4;
+      --bg-yellow-plain: #fdf5ad;
+      --fg-emphasized: #1f1f1f;
+      --fg-base: #3d3d3d;
+      --fg-muted: #6b6c6e;
+      --border-base: #e0e0e0;
+      --radius-2: 8px;
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-6: 24px;
+      --vtex-brand: #f71963;
+      --shadow-bubble: 0 2px 5px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg-base);
+    }
+
+    body {
+      color: var(--fg-base);
+      font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      font-size: 14px;
+      line-height: 20px;
+      letter-spacing: -0.14px;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .report {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: var(--space-2) var(--space-4) var(--space-6);
+    }
+
+    .report__header,
+    .report__footer {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      width: 100%;
+    }
+
+    .report__header {
+      padding: var(--space-2) 0 var(--space-6);
+      border-bottom: 1px solid var(--border-base);
+      margin-bottom: var(--space-6);
+    }
+
+    .report__footer {
+      padding: var(--space-6) 0 0;
+    }
+
+    .report__heading {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .report__title {
+      margin: 0;
+      font-size: 24px;
+      line-height: 32px;
+      font-weight: 600;
+      letter-spacing: -0.96px;
+      color: var(--fg-emphasized);
+    }
+
+    .report__subtitle {
+      margin: 0;
+      font-size: 14px;
+      line-height: 20px;
+      letter-spacing: -0.14px;
+      color: var(--fg-base);
+    }
+
+    .vtex-logo {
+      flex: none;
+      width: 96px;
+      height: 53px;
+    }
+
+    .report__body {
+      display: flex;
+      align-items: stretch;
+      width: 100%;
+    }
+
+    .panel {
+      background: var(--bg-base);
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .panel__header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-4);
+      font-size: 16px;
+      line-height: 24px;
+      font-weight: 600;
+      letter-spacing: -0.32px;
+      color: var(--fg-emphasized);
+      border-bottom: 1px solid var(--border-base);
+    }
+
+    .transcription {
+      flex: 1 1 auto;
+      border: 1px solid var(--border-base);
+      border-right: 0;
+      border-radius: var(--radius-2) 0 0 var(--radius-2);
+    }
+
+    .transcription__list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-4);
+    }
+
+    .msg-row {
+      display: flex;
+      width: 100%;
+    }
+
+    .msg-row--contact { justify-content: flex-start; }
+    .msg-row--agent { justify-content: flex-end; }
+
+    .msg {
+      max-width: min(802px, 90%);
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius-2);
+      box-shadow: var(--shadow-bubble);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+      color: var(--fg-emphasized);
+    }
+
+    .msg--contact { background: var(--bg-base-soft); }
+    .msg--agent { background: var(--bg-accent-plain); }
+
+    .msg__header {
+      display: flex;
+      align-items: flex-end;
+      gap: var(--space-2);
+      white-space: nowrap;
+      width: 100%;
+    }
+
+    .msg__sender {
+      font-weight: 600;
+      font-size: 14px;
+      line-height: 20px;
+      letter-spacing: -0.14px;
+      color: var(--fg-emphasized);
+    }
+
+    .msg__time {
+      margin-left: auto;
+      font-size: 12px;
+      line-height: 16px;
+      color: var(--fg-emphasized);
+    }
+
+    .msg__body {
+      font-size: 14px;
+      line-height: 20px;
+      letter-spacing: -0.14px;
+      color: var(--fg-base);
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+
+    .msg--agent .msg__body { color: var(--fg-emphasized); }
+
+    .msg__media {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      border-radius: var(--radius-2);
+    }
+
+    .chip-row {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .chip {
+      padding: 2px var(--space-3);
+      border-radius: 600px;
+      font-size: 12px;
+      line-height: 16px;
+      font-weight: 500;
+      color: var(--fg-emphasized);
+      text-align: center;
+    }
+
+    .note {
+      background: var(--bg-yellow-plain);
+      border-radius: var(--radius-2);
+      padding: var(--space-2) var(--space-3);
+      box-shadow: 0 2px 2.5px rgba(0, 0, 0, 0.1);
+      color: var(--fg-base);
+      font-size: 14px;
+      line-height: 20px;
+      letter-spacing: -0.14px;
+      word-break: break-word;
+    }
+
+    .note__time {
+      font-weight: 600;
+      color: var(--fg-emphasized);
+    }
+
+    .sidebar {
+      flex: none;
+      width: 380px;
+      border: 1px solid var(--border-base);
+      border-radius: 0 var(--radius-2) var(--radius-2) 0;
+    }
+
+    .sidebar__list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      padding: var(--space-2);
+    }
+
+    .sidebar__row {
+      display: flex;
+      gap: var(--space-1);
+      align-items: flex-start;
+      font-size: 14px;
+      line-height: 16px;
+    }
+
+    .sidebar__label {
+      flex: none;
+      font-weight: 600;
+      color: var(--fg-emphasized);
+      white-space: nowrap;
+    }
+
+    .sidebar__value {
+      flex: 1 1 auto;
+      min-width: 0;
+      color: var(--fg-base);
+      word-break: break-word;
+    }
+
+    .report__footer-title {
+      margin: 0;
+      font-size: 24px;
+      line-height: 32px;
+      font-weight: 600;
+      letter-spacing: -0.96px;
+      color: var(--fg-emphasized);
+    }
+
+    @media (max-width: 720px) {
+      .report__body { flex-direction: column; }
+      .transcription {
+        border: 1px solid var(--border-base);
+        border-bottom: 0;
+        border-radius: var(--radius-2) var(--radius-2) 0 0;
+      }
+      .sidebar {
+        width: 100%;
+        border-top: 0;
+        border-radius: 0 0 var(--radius-2) var(--radius-2);
+      }
+    }
+
+    @media print {
+      body { background: white; }
+      .msg, .note { box-shadow: none; }
+      .report { padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  <svg width="0" height="0" aria-hidden="true" style="position:absolute">
+    <symbol id="vtex-logo" viewBox="0 0 96 53">
+      <path d="M8 14h28L22 36Z" fill="#f71963"/>
+      <text x="42" y="33" font-family="Inter, system-ui, sans-serif" font-weight="700" font-size="20" fill="#f71963" letter-spacing="0.5">VTEX</text>
+    </symbol>
+  </svg>
+
+  <main class="report">
+    <header class="report__header">
+      <div class="report__heading">
+        <h1 class="report__title">{% trans "Conversation Report" %}</h1>
+        <p class="report__subtitle">
+          {% blocktrans with date=meta.generated_at|date:"SHORT_DATETIME_FORMAT" user=meta.generated_by %}Generated on {{ date }} from {{ user }}{% endblocktrans %}
+        </p>
+      </div>
+      <svg class="vtex-logo" aria-label="VTEX"><use href="#vtex-logo"/></svg>
+    </header>
+
+    <section class="report__body">
+      <article class="panel transcription">
+        <div class="panel__header">{% trans "Transcription of the conversation" %}</div>
+        <div class="transcription__list">
+          {% if room.started_at %}
+            <div class="chip-row">
+              <span class="chip">{% blocktrans with date=room.started_at|date:"SHORT_DATETIME_FORMAT" %}{{ date }} - Conversation started{% endblocktrans %}</span>
+            </div>
+          {% endif %}
+
+          {% for item in timeline %}
+            {% if item.type == "message" %}
+              {% if item.sender_type == "contact" %}
+                <div class="msg-row msg-row--contact">
+                  <div class="msg msg--contact">
+                    <header class="msg__header">
+                      <span class="msg__sender">{{ item.sender_name }}</span>
+                      <span class="msg__time">{{ item.created_on|date:"TIME_FORMAT" }}</span>
+                    </header>
+                    {% if item.text %}<div class="msg__body">{{ item.text|linebreaksbr }}</div>{% endif %}
+                    {% for media in item.medias %}
+                      <img class="msg__media" alt="" src="{{ media.data_uri|default:media.url }}">
+                    {% endfor %}
+                  </div>
+                </div>
+              {% else %}
+                <div class="msg-row msg-row--agent">
+                  <div class="msg msg--agent">
+                    <header class="msg__header">
+                      <span class="msg__sender">{{ item.sender_name }}</span>
+                      <span class="msg__time">{{ item.created_on|date:"TIME_FORMAT" }}</span>
+                    </header>
+                    {% if item.text %}<div class="msg__body">{{ item.text|linebreaksbr }}</div>{% endif %}
+                    {% for media in item.medias %}
+                      <img class="msg__media" alt="" src="{{ media.data_uri|default:media.url }}">
+                    {% endfor %}
+                  </div>
+                </div>
+              {% endif %}
+            {% elif item.type == "transfer_chip" %}
+              <div class="chip-row">
+                <span class="chip">
+                  {% with date=item.created_on|date:"SHORT_DATETIME_FORMAT" %}
+                    {% if item.kind == "pick" %}
+                      {% blocktrans with date=date queue=item.from.name user=item.by.name %}{{ date }} - Chat picked from queue {{ queue }} by {{ user }}{% endblocktrans %}
+                    {% elif item.to.type == "queue" %}
+                      {% blocktrans with date=date queue=item.to.name %}{{ date }} - Chat forwarded to the {{ queue }} queue{% endblocktrans %}
+                    {% else %}
+                      {% blocktrans with date=date user=item.to.name %}{{ date }} - Chat assigned to {{ user }}{% endblocktrans %}
+                    {% endif %}
+                  {% endwith %}
+                </span>
+              </div>
+            {% elif item.type == "internal_note" %}
+              <div class="note">
+                <span class="note__time">{{ item.created_on|date:"SHORT_DATE_FORMAT" }} - {{ item.created_on|date:"TIME_FORMAT" }}</span>
+                | {% trans "Internal note" %}: {{ item.text }}
+              </div>
+            {% endif %}
+          {% endfor %}
+
+          {% if room.ended_at %}
+            <div class="chip-row">
+              <span class="chip">
+                {% if room.ended_by %}
+                  {% blocktrans with date=room.ended_at|date:"SHORT_DATETIME_FORMAT" user=room.ended_by %}{{ date }} - Chat was ended by {{ user }}{% endblocktrans %}
+                {% else %}
+                  {% blocktrans with date=room.ended_at|date:"SHORT_DATETIME_FORMAT" %}{{ date }} - Chat ended{% endblocktrans %}
+                {% endif %}
+              </span>
+            </div>
+          {% endif %}
+        </div>
+      </article>
+
+      <aside class="panel sidebar">
+        <div class="panel__header">{% trans "Support Information" %}</div>
+        <div class="sidebar__list">
+          <div class="sidebar__row">
+            <span class="sidebar__label">{% trans "Started" %}:</span>
+            <span class="sidebar__value">{{ room.started_at|date:"SHORT_DATETIME_FORMAT"|default:"-" }}</span>
+          </div>
+          <div class="sidebar__row">
+            <span class="sidebar__label">{% trans "Ended" %}:</span>
+            <span class="sidebar__value">{{ room.ended_at|date:"SHORT_DATETIME_FORMAT"|default:"-" }}</span>
+          </div>
+          <div class="sidebar__row">
+            <span class="sidebar__label">{% trans "Representative" %}:</span>
+            <span class="sidebar__value">
+              {% for agent in agents %}{{ agent.email }}{% if agent.is_current %} {% trans "(current)" %}{% endif %}{% if not forloop.last %}, {% endif %}{% empty %}-{% endfor %}
+            </span>
+          </div>
+          <div class="sidebar__row">
+            <span class="sidebar__label">{% trans "Contact" %}:</span>
+            <span class="sidebar__value">{{ contact.name|default:"-" }}</span>
+          </div>
+          <div class="sidebar__row">
+            <span class="sidebar__label">{% trans "URN" %}:</span>
+            <span class="sidebar__value">{{ contact.phone|default:"-" }}</span>
+          </div>
+          <div class="sidebar__row">
+            <span class="sidebar__label">{% trans "Ticket ID" %}:</span>
+            <span class="sidebar__value">{{ room.protocol|default:"-" }}</span>
+          </div>
+          <div class="sidebar__row">
+            <span class="sidebar__label">{% trans "Tags" %}:</span>
+            <span class="sidebar__value">
+              {% for tag in room.tags %}[{{ tag }}]{% if not forloop.last %} {% endif %}{% empty %}-{% endfor %}
+            </span>
+          </div>
+          <div class="sidebar__row">
+            <span class="sidebar__label">{% trans "CSAT" %}:</span>
+            <span class="sidebar__value">-</span>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <footer class="report__footer">
+      <div class="report__heading">
+        <h2 class="report__footer-title">{% trans "VTEX CX Platform" %}</h2>
+        <p class="report__subtitle">{% trans "Document automatically generated for auditing and compliance purposes. Altering this document may result in penalties." %}</p>
+      </div>
+      <svg class="vtex-logo" aria-label="VTEX"><use href="#vtex-logo"/></svg>
+    </footer>
+  </main>
+</body>
+</html>
