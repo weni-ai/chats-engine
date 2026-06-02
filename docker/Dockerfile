@@ -21,7 +21,13 @@ ARG RUNTIME_DEPS="\
   gettext \
   postgresql-client \
   ffmpeg \
-  libmagic1"
+  libmagic1 \
+  libpango-1.0-0 \
+  libpangoft2-1.0-0 \
+  libcairo2 \
+  libgdk-pixbuf-2.0-0 \
+  shared-mime-info \
+  fontconfig"
 
 FROM python:${PYTHON_VERSION}-slim as base
 
@@ -100,6 +106,9 @@ COPY --from=build /install /usr/local
 COPY --chown=${PROJECT_USER}:${PROJECT_GROUP} . ${PROJECT_PATH}
 
 USER "${PROJECT_USER}:${PROJECT_GROUP}"
+
+ENV XDG_CACHE_HOME=/tmp/cache
+RUN mkdir -p /tmp/cache/fontconfig
 
 EXPOSE 8000
 

@@ -1,0 +1,349 @@
+{
+  "meta": {
+    "generated_at": "2026-05-27T17:15:00Z",
+    "generated_by": "ana.atendente@empresa.com"
+  },
+  "room": {
+    "uuid": "9c1b6a44-2d3a-4e5f-9a17-3e2c7c5e1f88",
+    "protocol": "PR-2026-000874",
+    "started_at": "2026-05-20T13:02:11.000Z",
+    "ended_at": "2026-05-27T16:48:33.000Z",
+    "ended_by": "Ana",
+    "tags": ["pedido", "cancelamento", "vip"],
+    "custom_fields": {
+      "motivo": "Atraso na entrega",
+      "prioridade": "alta",
+      "canal_origem": "whatsapp"
+    }
+  },
+  "contact": {
+    "name": "Maria Aparecida da Silva Pereira",
+    "email": "maria.pereira@cliente.com",
+    "phone": "+5511987654321",
+    "external_id": "ext-7788",
+    "custom_fields": {
+      "cpf": "123.456.789-00",
+      "tipo": "cliente_vip",
+      "lifetime_value": "R$ 12.450,00"
+    }
+  },
+  "agents": [
+    { "email": "ana.atendente@empresa.com", "name": "Ana", "is_current": true },
+    { "email": "bruno.suporte@empresa.com", "name": "Bruno", "is_current": false },
+    { "email": "carolina.cs@empresa.com", "name": "Carolina", "is_current": false }
+  ],
+  "timeline": [
+    {
+      "type": "message",
+      "sender_type": "bot",
+      "sender_name": "AI Agent",
+      "created_on": "2026-05-20T13:02:12.000Z",
+      "text": "Olá! Sou o assistente virtual. Como posso te ajudar hoje?",
+      "medias": []
+    },
+    {
+      "type": "message",
+      "sender_type": "contact",
+      "sender_name": "Maria",
+      "created_on": "2026-05-20T13:02:45.000Z",
+      "text": "Oi, meu pedido está atrasado e eu já paguei tudo certinho.",
+      "medias": []
+    },
+    {
+      "type": "message",
+      "sender_type": "contact",
+      "sender_name": "Maria",
+      "created_on": "2026-05-20T13:02:51.000Z",
+      "text": "É urgente, é presente de aniversário pra minha mãe e o aniversário é amanhã.",
+      "medias": []
+    },
+    {
+      "type": "message",
+      "sender_type": "contact",
+      "sender_name": "Maria",
+      "created_on": "2026-05-20T13:03:02.000Z",
+      "text": "Pedido número 8847221.",
+      "medias": []
+    },
+    {
+      "type": "message",
+      "sender_type": "bot",
+      "sender_name": "AI Agent",
+      "created_on": "2026-05-20T13:03:10.000Z",
+      "text": "Entendi, Maria. Vou te transferir para um especialista de pedidos.",
+      "medias": []
+    },
+    {
+      "type": "transfer_chip",
+      "kind": "pick",
+      "from": {
+        "name": "Fila inicial - Bot",
+        "type": "queue",
+        "uuid": "11111111-1111-1111-1111-111111111111"
+      },
+      "to": {
+        "id": "11",
+        "name": "Bruno",
+        "type": "user",
+        "email": "bruno.suporte@empresa.com"
+      },
+      "by": {
+        "id": "11",
+        "name": "Bruno",
+        "type": "user",
+        "email": "bruno.suporte@empresa.com"
+      },
+      "created_on": "2026-05-20T13:05:00.000Z"
+    },
+    {
+      "type": "message",
+      "sender_type": "agent",
+      "sender_name": "Bruno",
+      "created_on": "2026-05-20T13:05:30.000Z",
+      "text": "Olá Maria, sou o Bruno do suporte. Vou conferir o pedido 8847221 agora mesmo, só um instante.",
+      "medias": []
+    },
+    {
+      "type": "internal_note",
+      "sender_name": "Bruno",
+      "created_on": "2026-05-20T13:06:12.000Z",
+      "text": "Cliente VIP, ativar tratamento prioritário. Verificar com a transportadora se há previsão de entrega ainda hoje.",
+      "anchored_message_uuid": null
+    },
+    {
+      "type": "message",
+      "sender_type": "agent",
+      "sender_name": "Bruno",
+      "created_on": "2026-05-20T13:09:48.000Z",
+      "text": "Maria, identifiquei aqui que o pedido está com a transportadora desde ontem, mas houve um problema na rota e o motorista não conseguiu finalizar a entrega. Vou abrir um pedido de emergência para tentar redirecionar para hoje ainda. Posso te ligar para confirmar o endereço?",
+      "medias": []
+    },
+    {
+      "type": "message",
+      "sender_type": "contact",
+      "sender_name": "Maria",
+      "created_on": "2026-05-20T13:10:21.000Z",
+      "text": "Pode sim, mas prefiro continuar por aqui se possível. Endereço: Rua das Flores, 123, apto 45, Jardim Primavera - SP. CEP 04567-890.",
+      "medias": []
+    },
+    {
+      "type": "message",
+      "sender_type": "contact",
+      "sender_name": "Maria",
+      "created_on": "2026-05-20T13:10:55.000Z",
+      "text": "Segue o comprovante de pagamento:",
+      "medias": [
+        {
+          "content_type": "image/png",
+          "url": "https://placehold.co/600x400/png?text=Comprovante+de+pagamento",
+          "data_uri": null
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "sender_type": "agent",
+      "sender_name": "Bruno",
+      "created_on": "2026-05-20T13:12:03.000Z",
+      "text": "Recebi, obrigado! Vou anexar aqui também a etiqueta com o novo número de rastreio:",
+      "medias": [
+        {
+          "content_type": "image/svg+xml",
+          "url": "https://placehold.co/300x150/svg",
+          "data_uri": "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20300%20150%22%3E%3Crect%20width%3D%22300%22%20height%3D%22150%22%20fill%3D%22%23f5f5f5%22%2F%3E%3Ctext%20x%3D%22150%22%20y%3D%2278%22%20text-anchor%3D%22middle%22%20font-family%3D%22Inter%2C%20sans-serif%22%20font-size%3D%2218%22%20fill%3D%22%231f1f1f%22%3EBR987654321XX%3C%2Ftext%3E%3C%2Fsvg%3E"
+        }
+      ]
+    },
+    {
+      "type": "internal_note",
+      "sender_name": "Bruno",
+      "created_on": "2026-05-20T13:18:40.000Z",
+      "text": "Solicitei reentrega prioritária via formulário interno (ticket TR-3344). Aguardando retorno do operador.",
+      "anchored_message_uuid": null
+    },
+    {
+      "type": "message",
+      "sender_type": "agent",
+      "sender_name": "Bruno",
+      "created_on": "2026-05-20T18:42:15.000Z",
+      "text": "Maria, o time logístico confirmou a reentrega para amanhã pela manhã, entre 8h e 12h. Vou te encaminhar para a equipe de pós-venda que vai acompanhar até a chegada do pedido.",
+      "medias": []
+    },
+    {
+      "type": "transfer_chip",
+      "kind": "transfer",
+      "from": {
+        "id": "11",
+        "name": "Bruno",
+        "type": "user",
+        "email": "bruno.suporte@empresa.com"
+      },
+      "to": {
+        "name": "Pós-venda VIP",
+        "type": "queue",
+        "uuid": "22222222-2222-2222-2222-222222222222"
+      },
+      "by": {
+        "id": "11",
+        "name": "Bruno",
+        "type": "user",
+        "email": "bruno.suporte@empresa.com"
+      },
+      "created_on": "2026-05-20T18:45:01.000Z"
+    },
+    {
+      "type": "transfer_chip",
+      "kind": "pick",
+      "from": {
+        "name": "Pós-venda VIP",
+        "type": "queue",
+        "uuid": "22222222-2222-2222-2222-222222222222"
+      },
+      "to": {
+        "id": "22",
+        "name": "Carolina",
+        "type": "user",
+        "email": "carolina.cs@empresa.com"
+      },
+      "by": {
+        "id": "22",
+        "name": "Carolina",
+        "type": "user",
+        "email": "carolina.cs@empresa.com"
+      },
+      "created_on": "2026-05-20T18:46:11.000Z"
+    },
+    {
+      "type": "message",
+      "sender_type": "agent",
+      "sender_name": "Carolina",
+      "created_on": "2026-05-20T18:46:50.000Z",
+      "text": "Oi Maria! Sou a Carolina do pós-venda. Já estou de olho no seu pedido, qualquer atualização aviso por aqui.",
+      "medias": []
+    },
+    {
+      "type": "message",
+      "sender_type": "contact",
+      "sender_name": "Maria",
+      "created_on": "2026-05-20T18:47:30.000Z",
+      "text": "Muito obrigada, gente! 😊",
+      "medias": []
+    },
+    {
+      "type": "message",
+      "sender_type": "contact",
+      "sender_name": "Maria",
+      "created_on": "2026-05-21T11:32:00.000Z",
+      "text": "Pessoal, o motorista chegou mas o produto está com a embalagem rasgada. Olha:",
+      "medias": [
+        {
+          "content_type": "image/jpeg",
+          "url": "https://placehold.co/600x400.jpg?text=Embalagem+danificada",
+          "data_uri": null
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "sender_type": "contact",
+      "sender_name": "Maria",
+      "created_on": "2026-05-21T11:32:10.000Z",
+      "text": "O conteúdo parece ok, mas a caixa não dá pra presentear assim.",
+      "medias": []
+    },
+    {
+      "type": "message",
+      "sender_type": "agent",
+      "sender_name": "Carolina",
+      "created_on": "2026-05-21T11:34:02.000Z",
+      "text": "Que situação, Maria. Sinto muito! Vou te enviar agora um voucher de desconto e organizar o envio de uma embalagem nova de cortesia, ok?",
+      "medias": []
+    },
+    {
+      "type": "message",
+      "sender_type": "agent",
+      "sender_name": "Carolina",
+      "created_on": "2026-05-21T11:38:21.000Z",
+      "text": "Aqui está o voucher: VIP-CARE-2026 (15% de desconto, válido até o fim do mês).",
+      "medias": []
+    },
+    {
+      "type": "internal_note",
+      "sender_name": "Carolina",
+      "created_on": "2026-05-21T11:41:00.000Z",
+      "text": "Embalagem nova solicitada via SAP, número de retirada NR-7781. Cliente já avisada.",
+      "anchored_message_uuid": null
+    },
+    {
+      "type": "message",
+      "sender_type": "contact",
+      "sender_name": "Maria",
+      "created_on": "2026-05-21T11:42:14.000Z",
+      "text": "Você é maravilhosa, muito obrigada Carolina!",
+      "medias": []
+    },
+    {
+      "type": "transfer_chip",
+      "kind": "forward",
+      "from": {
+        "id": "22",
+        "name": "Carolina",
+        "type": "user",
+        "email": "carolina.cs@empresa.com"
+      },
+      "to": {
+        "id": "33",
+        "name": "Ana",
+        "type": "user",
+        "email": "ana.atendente@empresa.com"
+      },
+      "by": {
+        "id": "22",
+        "name": "Carolina",
+        "type": "user",
+        "email": "carolina.cs@empresa.com"
+      },
+      "created_on": "2026-05-26T09:11:00.000Z"
+    },
+    {
+      "type": "message",
+      "sender_type": "agent",
+      "sender_name": "Ana",
+      "created_on": "2026-05-26T09:12:30.000Z",
+      "text": "Bom dia Maria, aqui é a Ana, dando continuidade no seu caso. A embalagem nova foi entregue?",
+      "medias": []
+    },
+    {
+      "type": "message",
+      "sender_type": "contact",
+      "sender_name": "Maria",
+      "created_on": "2026-05-26T09:33:14.000Z",
+      "text": "Bom dia Ana! Foi sim, chegou ontem. Tudo certinho agora, obrigada!",
+      "medias": []
+    },
+    {
+      "type": "message",
+      "sender_type": "agent",
+      "sender_name": "Ana",
+      "created_on": "2026-05-26T09:34:02.000Z",
+      "text": "Maravilha! Posso te ajudar em mais alguma coisa antes de encerrar o atendimento?",
+      "medias": []
+    },
+    {
+      "type": "message",
+      "sender_type": "contact",
+      "sender_name": "Maria",
+      "created_on": "2026-05-26T09:34:55.000Z",
+      "text": "Não, era só isso mesmo. Agradeço a atenção de toda a equipe.",
+      "medias": []
+    },
+    {
+      "type": "message",
+      "sender_type": "agent",
+      "sender_name": "Ana",
+      "created_on": "2026-05-26T09:35:30.000Z",
+      "text": "Imagina, Maria. Foi um prazer ajudar. Vou encerrar este chamado então. Até a próxima!",
+      "medias": []
+    }
+  ]
+}

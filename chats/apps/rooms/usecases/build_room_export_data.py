@@ -5,7 +5,9 @@ here must be reflected in the template and vice-versa.
 """
 
 from datetime import timedelta
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
+
+from django.utils import timezone
 
 from chats.apps.accounts.models import User
 
@@ -70,17 +72,24 @@ def _build_media_entry(media) -> dict:
 class BuildRoomExportData:
     """Builds the dict consumed by the room export template."""
 
-    def execute(self, room: "Room") -> dict:
+    def execute(self, room: "Room", generated_by: Optional[str] = None) -> dict:
         room_block = self._build_room_block(room)
         contact_block = self._build_contact_block(room)
         agents_block = self._build_agents_block(room)
         timeline = self._build_timeline(room)
 
         return {
+            "meta": self._build_meta_block(generated_by),
             "room": room_block,
             "contact": contact_block,
             "agents": agents_block,
             "timeline": timeline,
+        }
+
+    def _build_meta_block(self, generated_by: Optional[str]) -> dict:
+        return {
+            "generated_at": timezone.now(),
+            "generated_by": generated_by,
         }
 
     def _build_room_block(self, room: "Room") -> dict:
@@ -112,7 +121,7 @@ class BuildRoomExportData:
             "custom_fields": contact.custom_fields or {},
         }
 
-    def _build_agents_block(self, room: "Room") -> list[dict]:
+    def _build_agents_block(self, room: "Room") -> List[dict]:
         emails: set[str] = set()
 
         message_emails = room.messages.filter(user__isnull=False).values_list(
@@ -144,7 +153,7 @@ class BuildRoomExportData:
             for user in users
         ]
 
-    def _build_timeline(self, room: "Room") -> list[dict]:
+    def _build_timeline(self, room: "Room") -> List[dict]:
         items: list[dict] = []
         items.extend(self._build_message_items(room))
         items.extend(self._build_note_items(room))
@@ -152,7 +161,7 @@ class BuildRoomExportData:
         items.sort(key=lambda item: item["created_on"])
         return items
 
-    def _build_message_items(self, room: "Room") -> list[dict]:
+    def _build_message_items(self, room: "Room") -> List[dict]:
         queryset = (
             room.messages.all()
             .select_related("user", "contact")
@@ -176,7 +185,7 @@ class BuildRoomExportData:
             )
         return items
 
-    def _build_note_items(self, room: "Room") -> list[dict]:
+    def _build_note_items(self, room: "Room") -> List[dict]:
         queryset = room.notes.all().select_related("user")
         items = []
         for note in queryset:
@@ -198,7 +207,7 @@ class BuildRoomExportData:
             return None
         return note.user.first_name or note.user.email
 
-    def _build_transfer_chip_items(self, room: "Room") -> list[dict]:
+    def _build_transfer_chip_items(self, room: "Room") -> List[dict]:
         history = room.full_transfer_history or []
         if not history:
             return []
