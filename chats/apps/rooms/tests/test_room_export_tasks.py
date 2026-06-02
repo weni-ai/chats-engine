@@ -161,3 +161,25 @@ class RoomExportTaskTests(TestCase):
         self.report.save()
         result = _select_room_export_to_process()
         self.assertIsNone(result)
+
+    @patch("chats.apps.rooms.tasks._process_room_export")
+    def test_generate_skips_when_already_in_progress(self, mock_process):
+        self.report.status = "in_progress"
+        self.report.save()
+
+        generate_room_export(str(self.report.uuid))
+
+        mock_process.assert_not_called()
+        self.report.refresh_from_db()
+        self.assertEqual(self.report.status, "in_progress")
+
+    @patch("chats.apps.rooms.tasks._process_room_export")
+    def test_generate_skips_when_already_ready(self, mock_process):
+        self.report.status = "ready"
+        self.report.save()
+
+        generate_room_export(str(self.report.uuid))
+
+        mock_process.assert_not_called()
+        self.report.refresh_from_db()
+        self.assertEqual(self.report.status, "ready")

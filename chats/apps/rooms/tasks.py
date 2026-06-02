@@ -137,9 +137,7 @@ def _process_room_export(report: ReportStatus) -> None:
             f"ReportStatus {report.uuid} has no export types in fields_config"
         )
 
-    data = BuildRoomExportData().execute(
-        report.room, generated_by=report.user.email
-    )
+    data = BuildRoomExportData().execute(report.room, generated_by=report.user.email)
     files = RenderRoomExport().execute(data, types)
 
     if getattr(settings, "REPORTS_SEND_EMAILS", False):
@@ -197,16 +195,40 @@ def _handle_room_export_error(report: ReportStatus, error: Exception) -> None:
 
 @app.task(name="generate_room_export")
 def generate_room_export(report_status_uuid: str) -> None:
-    """Generates a room export end-to-end for the given ReportStatus UUID."""
-    report = ReportStatus.objects.select_related("room", "user", "project").get(
-        uuid=report_status_uuid
-    )
+    """Generates a room export end-to-end for the given ReportStatus UUID.
 
-    if report.report_type != ReportStatus.REPORT_TYPE_ROOM_EXPORT:
-        raise ValueError(f"ReportStatus {report.uuid} is not a room export report")
+    Uses ``select_for_update(skip_locked=True)`` plus a status guard so this
+    synchronous task never races with ``process_pending_room_exports``: if the
+    periodic worker already locked or moved the report to a non-pending state,
+    this call exits early instead of double-processing it.
+    """
+    with transaction.atomic():
+        report = (
+            ReportStatus.objects.select_for_update(skip_locked=True, of=("self",))
+            .select_related("room", "user", "project")
+            .filter(uuid=report_status_uuid)
+            .first()
+        )
+        if report is None:
+            logger.info(
+                "Room export %s is locked by another worker, skipping",
+                report_status_uuid,
+            )
+            return
 
-    report.status = "in_progress"
-    report.save(update_fields=["status", "modified_on"])
+        if report.report_type != ReportStatus.REPORT_TYPE_ROOM_EXPORT:
+            raise ValueError(f"ReportStatus {report.uuid} is not a room export report")
+
+        if report.status not in ("pending", "failed"):
+            logger.info(
+                "Room export %s already in status=%s, skipping",
+                report.uuid,
+                report.status,
+            )
+            return
+
+        report.status = "in_progress"
+        report.save(update_fields=["status", "modified_on"])
 
     try:
         _process_room_export(report)

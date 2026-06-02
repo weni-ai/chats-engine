@@ -57,10 +57,16 @@ class SendRoomExportEmail:
         if not files:
             raise ValueError("No files to upload")
 
+        # Two-phase delivery: upload everything first, then send emails. This
+        # prevents partial delivery (one email sent, another upload failing)
+        # which would cause duplicate emails when the task is retried.
         download_urls: Dict[str, str] = {}
         for extension, content in files.items():
-            download_url = self._upload_single_file(room, extension, content)
-            download_urls[extension] = download_url
+            download_urls[extension] = self._upload_single_file(
+                room, extension, content
+            )
+
+        for extension, download_url in download_urls.items():
             self._send_ready_email(room, download_url, recipient_email)
 
         return download_urls
