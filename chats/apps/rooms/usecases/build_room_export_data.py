@@ -5,7 +5,7 @@ here must be reflected in the template and vice-versa.
 """
 
 from datetime import timedelta
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from django.utils import timezone
 
