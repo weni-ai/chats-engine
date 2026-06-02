@@ -1036,6 +1036,11 @@ class RoomNoteMedia(BaseModelWithManualCreatedOn):
             raise ValidationError(
                 {"detail": _("Closed rooms cannot receive notes")}
             )
+        is_new = self._state.adding
+        if is_new and self.note.medias.count() >= 10:
+            raise ValidationError(
+                {"detail": _("Internal notes can't have more than 10 media files")}
+            )
         return super().save(*args, **kwargs)
 
     @property
