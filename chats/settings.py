@@ -164,6 +164,11 @@ DATABASES = {
     }
 }
 
+# Custom test runner that gives each parallel worker its own Redis DB so that
+# tests using `cache.clear()` / `get_redis_connection()` don't race with
+# sibling workers. See chats/core/test_runner.py for details.
+TEST_RUNNER = "chats.core.test_runner.IsolatedCacheTestRunner"
+
 # User
 
 AUTH_USER_MODEL = "accounts.User"

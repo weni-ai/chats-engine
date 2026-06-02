@@ -21,6 +21,9 @@ env:
   GROWTHBOOK_CLIENT_KEY: "dummy_key_ci"
   GROWTHBOOK_HOST_BASE_URL: "http://localhost"
   INTERNAL_API_TOKEN: "dummy-token"
+  # Disable persistent DB connections for the parallel test runner;
+  # CONN_MAX_AGE>0 causes "connection already closed" failures across fork()ed workers.
+  CONN_MAX_AGE: 0
 
 jobs:
   build:
@@ -77,7 +80,10 @@ jobs:
         run: isort .
 
       - name: Run tests
-        run: coverage run manage.py test --verbosity=2 --noinput
+        run: coverage run manage.py test --parallel=auto --verbosity=2 --noinput
+
+      - name: Combine coverage
+        run: coverage combine
 
       - name: Coverage report
         run: coverage report -m
