@@ -24,3 +24,11 @@ class InvalidSectorData(Exception):
 
 class InvalidFeatureVersion(Exception):
     pass
+
+
+class FlowTemplateNotFound(Exception):
+    pass
+
+
+class FlowTemplateChannelsNotFound(Exception):
+    pass

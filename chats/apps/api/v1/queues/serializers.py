@@ -48,7 +48,6 @@ class QueueSerializer(AuditableModelSerializer):
             "is_deleted",
             "config",
             "name",
-            "default_message",
             "sector",
         ]
 
@@ -222,9 +221,6 @@ class QueuePermissionsListQueryParamsSerializer(serializers.Serializer):
 
 class BulkQueueItemSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=150)
-    default_message = serializers.CharField(
-        required=False, allow_null=True, allow_blank=True
-    )
     config = serializers.JSONField(required=False, allow_null=True)
     queue_limit = QueueLimitSerializer(required=False, allow_null=True)
     agents = serializers.ListField(

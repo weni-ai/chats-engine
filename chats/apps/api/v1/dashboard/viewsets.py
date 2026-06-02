@@ -28,6 +28,7 @@ from chats.apps.api.v1.dashboard.serializers import (
 )
 from chats.apps.core.filters import get_filters_from_query_params
 from chats.apps.dashboard.models import ReportStatus
+from chats.apps.dashboard.usecases import GetReportStatusUseCase
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.rooms.models import Room
 from chats.core.storages import ExcelStorage
@@ -41,8 +42,6 @@ from .service import (
     SectorService,
     TimeMetricsService,
 )
-
-logger = logging.getLogger(__name__)
 
 logger = logging.getLogger(__name__)
 
@@ -986,32 +985,6 @@ class ReportFieldsValidatorViewSet(APIView):
             raise ValidationError({"project_uuid": "This field is required."})
 
         project = get_object_or_404(Project, uuid=project_uuid)
+        data = GetReportStatusUseCase().execute(project)
 
-        current_report = (
-            ReportStatus.objects.filter(
-                project=project,
-                report_type=ReportStatus.REPORT_TYPE_CUSTOM_DASHBOARD,
-                status__in=["pending", "in_progress"],
-            )
-            .order_by("created_on")
-            .last()
-        )
-
-        if not current_report:
-            return Response(
-                {
-                    "status": "ready",
-                    "email": None,
-                    "report_uuid": None,
-                },
-                status=status.HTTP_200_OK,
-            )
-
-        return Response(
-            {
-                "status": current_report.status,
-                "email": current_report.user.email,
-                "report_uuid": str(current_report.uuid),
-            },
-            status=status.HTTP_200_OK,
-        )
+        return Response(data, status=status.HTTP_200_OK)

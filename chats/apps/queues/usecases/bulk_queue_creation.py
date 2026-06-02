@@ -64,7 +64,6 @@ class BulkQueueCreationUseCase:
         return Queue.objects.create(
             sector=self.sector,
             name=queue_data["name"],
-            default_message=queue_data.get("default_message"),
             config=queue_data.get("config"),
             queue_limit=queue_limit_data.get("limit"),
             # Coerce explicit ``null`` from the serializer (which allows it)
