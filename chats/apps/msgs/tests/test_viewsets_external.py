@@ -28,11 +28,17 @@ class MsgsExternalTests(APITestCase):
         room.save()
         return room
 
-    def _update_default_message(self, default_message):
-        queue = self.room.queue
-        queue.default_message = default_message
-        queue.save()
-        return queue
+    def _update_default_message(self, default_message, is_active=True):
+        sector = self.room.queue.sector
+        sector.automatic_message_queue_text = default_message
+        sector.is_automatic_message_queue_active = is_active
+        sector.save(
+            update_fields=[
+                "automatic_message_queue_text",
+                "is_automatic_message_queue_active",
+            ]
+        )
+        return sector
 
     def _request_create_message(
         self,
@@ -107,7 +113,7 @@ class MsgsExternalTests(APITestCase):
     def test_create_with_default_message_room_without_user(self):
         _ = self._remove_user()
 
-        queue = self._update_default_message(default_message="DEFAULT MESSAGE")
+        sector = self._update_default_message(default_message="DEFAULT MESSAGE")
 
         response = self._request_create_message()
 
@@ -115,11 +121,11 @@ class MsgsExternalTests(APITestCase):
         self.assertEqual(self.room.messages.count(), 4)
         self.assertEqual(
             self.room.messages.order_by("-created_on").first().text,
-            queue.default_message,
+            sector.automatic_message_queue_text,
         )
 
     def test_create_with_default_message_room_with_user(self):
-        queue = self._update_default_message(default_message="DEFAULT MESSAGE")
+        sector = self._update_default_message(default_message="DEFAULT MESSAGE")
 
         response = self._request_create_message()
 
@@ -127,7 +133,7 @@ class MsgsExternalTests(APITestCase):
         self.assertEqual(self.room.messages.count(), 3)
         self.assertNotEqual(
             self.room.messages.order_by("-created_on").first().text,
-            queue.default_message,
+            sector.automatic_message_queue_text,
         )
 
     def test_create_without_default_message_room_without_user(self):
@@ -138,7 +144,7 @@ class MsgsExternalTests(APITestCase):
         self.assertEqual(self.room.messages.count(), 3)
         self.assertNotEqual(
             self.room.messages.order_by("-created_on").first().text,
-            room.queue.default_message,
+            room.queue.sector.automatic_message_queue_text,
         )
 
     def test_create_without_default_message_room_with_user(self):
@@ -148,13 +154,13 @@ class MsgsExternalTests(APITestCase):
         self.assertEqual(self.room.messages.count(), 3)
         self.assertNotEqual(
             self.room.messages.order_by("-created_on").first().text,
-            self.room.queue.default_message,
+            self.room.queue.sector.automatic_message_queue_text,
         )
 
     def test_create_with_empty_default_message_room_without_user(self):
         _ = self._remove_user()
 
-        queue = self._update_default_message(default_message="")
+        sector = self._update_default_message(default_message="")
 
         response = self._request_create_message()
 
@@ -162,13 +168,13 @@ class MsgsExternalTests(APITestCase):
         self.assertEqual(self.room.messages.count(), 3)
         self.assertNotEqual(
             self.room.messages.order_by("-created_on").first().text,
-            queue.default_message,
+            sector.automatic_message_queue_text,
         )
 
     def test_create_outgoing_with_default_message_room_without_user(self):
         _ = self._remove_user()
 
-        queue = self._update_default_message(default_message="DEFAULT MESSAGE")
+        sector = self._update_default_message(default_message="DEFAULT MESSAGE")
 
         response = self._request_create_message(direction="outgoing")
 
@@ -176,7 +182,24 @@ class MsgsExternalTests(APITestCase):
         self.assertEqual(self.room.messages.count(), 3)
         self.assertNotEqual(
             self.room.messages.order_by("-created_on").first().text,
-            queue.default_message,
+            sector.automatic_message_queue_text,
+        )
+
+    def test_create_with_default_message_flag_disabled_room_without_user(self):
+        """Flag desativada não deve disparar a mensagem automática"""
+        _ = self._remove_user()
+
+        sector = self._update_default_message(
+            default_message="DEFAULT MESSAGE", is_active=False
+        )
+
+        response = self._request_create_message()
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(self.room.messages.count(), 3)
+        self.assertNotEqual(
+            self.room.messages.order_by("-created_on").first().text,
+            sector.automatic_message_queue_text,
         )
 
     @mock.patch(

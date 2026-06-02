@@ -33,27 +33,28 @@ class TestCSATFlowService(TestCase):
         )
         self.project = Project.objects.create(name="Test Project")
 
-    def _create_room(self) -> Room:
+    def _create_room(self, custom_csat_flow_uuid=None) -> Room:
         sector = Sector.objects.create(
             name="Test Sector",
             project=self.project,
             rooms_limit=1,
             work_start="09:00",
             work_end="18:00",
+            custom_csat_flow_uuid=custom_csat_flow_uuid,
         )
         queue = Queue.objects.create(name="Test Queue", sector=sector)
 
         return Room.objects.create(queue=queue)
 
-    def test_get_flow_uuid_when_project_has_no_csat_flow_config(self):
+    def test_get_flow_uuid_from_project_when_no_csat_flow_config(self):
         self.mock_cache_client.get.return_value = None
 
         with self.assertRaises(ValueError) as context:
-            self.service.get_flow_uuid(self.project.uuid)
+            self.service.get_flow_uuid_from_project(self.project.uuid)
 
         self.assertEqual(str(context.exception), "CSAT flow not found")
 
-    def test_get_flow_uuid_when_project_has_csat_flow_config(self):
+    def test_get_flow_uuid_from_project_when_has_csat_flow_config(self):
         self.mock_cache_client.get.return_value = None
         self.mock_cache_client.set.return_value = True
         csat_flow_project_config = CSATFlowProjectConfig.objects.create(
@@ -62,7 +63,7 @@ class TestCSATFlowService(TestCase):
             version=1,
         )
         self.assertEqual(
-            self.service.get_flow_uuid(self.project.uuid),
+            self.service.get_flow_uuid_from_project(self.project.uuid),
             csat_flow_project_config.flow_uuid,
         )
 
@@ -76,7 +77,7 @@ class TestCSATFlowService(TestCase):
         )
 
     @patch("chats.apps.csat.tests.test_services.CSATFlowProjectConfig.objects.filter")
-    def test_get_flow_uuid_from_cache(self, mock_filter):
+    def test_get_flow_uuid_from_project_cache_hit(self, mock_filter):
         flow_uuid = uuid.uuid4()
         self.mock_cache_client.get.return_value = str(flow_uuid)
         self.mock_cache_client.set.return_value = True
@@ -86,7 +87,7 @@ class TestCSATFlowService(TestCase):
         mock_query.values_list.return_value.first.return_value = None
 
         self.assertEqual(
-            self.service.get_flow_uuid(self.project.uuid),
+            self.service.get_flow_uuid_from_project(self.project.uuid),
             flow_uuid,
         )
         self.mock_cache_client.get.assert_called_once_with(
@@ -94,6 +95,41 @@ class TestCSATFlowService(TestCase):
         )
         self.mock_cache_client.set.assert_not_called()
         mock_filter.assert_not_called()
+
+    def test_get_flow_uuid_returns_custom_csat_flow_uuid_when_set(self):
+        custom_flow_uuid = uuid.uuid4()
+        sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=1,
+            work_start="09:00",
+            work_end="18:00",
+            custom_csat_flow_uuid=custom_flow_uuid,
+        )
+
+        result = self.service.get_flow_uuid(sector)
+
+        self.assertEqual(result, custom_flow_uuid)
+
+    def test_get_flow_uuid_falls_back_to_project_config(self):
+        self.mock_cache_client.get.return_value = None
+        self.mock_cache_client.set.return_value = True
+        csat_flow_project_config = CSATFlowProjectConfig.objects.create(
+            project=self.project,
+            flow_uuid=uuid.uuid4(),
+            version=1,
+        )
+        sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=1,
+            work_start="09:00",
+            work_end="18:00",
+        )
+
+        result = self.service.get_flow_uuid(sector)
+
+        self.assertEqual(result, csat_flow_project_config.flow_uuid)
 
     def test_start_csat_flow_when_room_is_active(self):
         mock_flow_uuid = uuid.uuid4()
@@ -110,7 +146,7 @@ class TestCSATFlowService(TestCase):
         mock_flow_uuid = uuid.uuid4()
         self.service.get_flow_uuid = Mock(return_value=mock_flow_uuid)
         self.mock_token_generator.generate_token.return_value = "test_token"
-        self.mock_flows_client.start_flow.return_value = {}
+        self.mock_flows_client.start_flow.return_value = (200, {})
 
         room = self._create_room()
 
@@ -223,3 +259,116 @@ class TestCSATFlowService(TestCase):
         config.refresh_from_db()
         self.assertEqual(config.flow_uuid, new_flow_uuid)
         self.assertEqual(config.version, CSAT_FLOW_VERSION)
+
+    @patch("chats.apps.csat.tasks.send_custom_flow_not_found_email")
+    def test_start_csat_flow_sends_email_when_custom_flow_not_found(
+        self, mock_email_task
+    ):
+        custom_flow_uuid = uuid.uuid4()
+        self.service.get_flow_uuid = Mock(return_value=custom_flow_uuid)
+        self.mock_token_generator.generate_token.return_value = "test_token"
+        self.mock_cache_client.get.return_value = None
+        self.mock_flows_client.start_flow.return_value = (
+            400,
+            {"flow": [f"No such object: {custom_flow_uuid}"]},
+        )
+
+        room = self._create_room(custom_csat_flow_uuid=custom_flow_uuid)
+        room.is_active = False
+        room.save(update_fields=["is_active"])
+
+        self.service.start_csat_flow(room)
+
+        mock_email_task.delay.assert_called_once_with(self.project.uuid)
+        self.mock_cache_client.set.assert_called_once_with(
+            f"csat:custom_flow_not_found_email_sent:{self.project.uuid}",
+            "1",
+            ex=settings.CUSTOM_FLOW_NOT_FOUND_EMAIL_COOLDOWN,
+        )
+
+    @patch("chats.apps.csat.tasks.send_custom_flow_not_found_email")
+    def test_start_csat_flow_skips_email_when_already_sent_for_custom_flow_not_found(
+        self, mock_email_task
+    ):
+        custom_flow_uuid = uuid.uuid4()
+        self.service.get_flow_uuid = Mock(return_value=custom_flow_uuid)
+        self.mock_token_generator.generate_token.return_value = "test_token"
+        self.mock_cache_client.get.return_value = "1"
+        self.mock_flows_client.start_flow.return_value = (
+            400,
+            {"flow": [f"No such object: {custom_flow_uuid}"]},
+        )
+
+        room = self._create_room(custom_csat_flow_uuid=custom_flow_uuid)
+        room.is_active = False
+        room.save(update_fields=["is_active"])
+
+        self.service.start_csat_flow(room)
+
+        mock_email_task.delay.assert_not_called()
+
+    @patch("chats.apps.csat.services.capture_message")
+    def test_start_csat_flow_logs_error_when_non_custom_flow_fails(
+        self, mock_capture_message
+    ):
+        mock_flow_uuid = uuid.uuid4()
+        self.service.get_flow_uuid = Mock(return_value=mock_flow_uuid)
+        self.mock_token_generator.generate_token.return_value = "test_token"
+        self.service.send_custom_flow_not_found_email = Mock()
+        self.mock_flows_client.start_flow.return_value = (
+            400,
+            {"flow": [f"No such object: {mock_flow_uuid}"]},
+        )
+
+        room = self._create_room()
+        room.is_active = False
+        room.save(update_fields=["is_active"])
+
+        self.service.start_csat_flow(room)
+
+        self.service.send_custom_flow_not_found_email.assert_not_called()
+        mock_capture_message.assert_called_once()
+
+    @patch("chats.apps.csat.services.capture_message")
+    def test_start_csat_flow_logs_error_when_custom_flow_error_is_not_no_such_object(
+        self, mock_capture_message
+    ):
+        custom_flow_uuid = uuid.uuid4()
+        self.service.get_flow_uuid = Mock(return_value=custom_flow_uuid)
+        self.mock_token_generator.generate_token.return_value = "test_token"
+        self.service.send_custom_flow_not_found_email = Mock()
+        self.mock_flows_client.start_flow.return_value = (
+            400,
+            {"flow": ["Some other validation error"]},
+        )
+
+        room = self._create_room(custom_csat_flow_uuid=custom_flow_uuid)
+        room.is_active = False
+        room.save(update_fields=["is_active"])
+
+        self.service.start_csat_flow(room)
+
+        self.service.send_custom_flow_not_found_email.assert_not_called()
+        mock_capture_message.assert_called_once()
+
+    @patch("chats.apps.csat.services.capture_message")
+    def test_start_csat_flow_logs_error_when_custom_flow_fails_with_server_error(
+        self, mock_capture_message
+    ):
+        custom_flow_uuid = uuid.uuid4()
+        self.service.get_flow_uuid = Mock(return_value=custom_flow_uuid)
+        self.mock_token_generator.generate_token.return_value = "test_token"
+        self.service.send_custom_flow_not_found_email = Mock()
+        self.mock_flows_client.start_flow.return_value = (
+            500,
+            {"detail": "Internal server error"},
+        )
+
+        room = self._create_room(custom_csat_flow_uuid=custom_flow_uuid)
+        room.is_active = False
+        room.save(update_fields=["is_active"])
+
+        self.service.start_csat_flow(room)
+
+        self.service.send_custom_flow_not_found_email.assert_not_called()
+        mock_capture_message.assert_called_once()
