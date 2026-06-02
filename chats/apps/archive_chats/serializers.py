@@ -76,6 +76,10 @@ class ArchiveMessageSerializer(serializers.ModelSerializer):
             return {
                 "uuid": str(internal_note.uuid),
                 "text": internal_note.text,
+                "media": [
+                    {"content_type": media.content_type, "url": media.url}
+                    for media in internal_note.medias.all()
+                ],
             }
 
         return None
