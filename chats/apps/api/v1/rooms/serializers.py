@@ -584,6 +584,42 @@ class RoomsReportSerializer(serializers.Serializer):
     filters = RoomsReportFiltersSerializer(required=True)
 
 
+class RoomExportRequestSerializer(serializers.Serializer):
+    """Serializer for the room export request body."""
+
+    SUPPORTED_TYPES = ("html", "pdf")
+
+    room = serializers.UUIDField(required=True)
+    types = serializers.ListField(
+        child=serializers.CharField(),
+        required=True,
+        min_length=1,
+    )
+
+    def validate_types(self, value):
+        normalized = []
+        seen = set()
+        for raw in value:
+            if not raw:
+                continue
+            item = raw.lower()
+            if item not in self.SUPPORTED_TYPES:
+                raise serializers.ValidationError(
+                    _("Unsupported export format: %(value)s") % {"value": raw}
+                )
+            if item in seen:
+                continue
+            seen.add(item)
+            normalized.append(item)
+
+        if not normalized:
+            raise serializers.ValidationError(
+                _("At least one export format is required")
+            )
+
+        return normalized
+
+
 class PinRoomSerializer(serializers.Serializer):
     """
     Serializer for the pin room.

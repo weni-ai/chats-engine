@@ -1654,6 +1654,98 @@ msgstr "Modificado por"
 msgid "Deleted by"
 msgstr "Eliminado por"
 
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html:7
+msgid "Conversation Report - %(uuid)s"
+msgstr "Informe de conversación - %(uuid)s"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html:315
+msgid "Conversation Report"
+msgstr "Informe de conversación"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html:317
+msgid "Generated on %(date)s from %(user)s"
+msgstr "Generado el %(date)s por %(user)s"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html:325
+msgid "Transcription of the conversation"
+msgstr "Transcripción de la conversación"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "%(date)s - Conversation started"
+msgstr "%(date)s - Conversación iniciada"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "%(date)s - Chat picked from queue %(queue)s by %(user)s"
+msgstr "%(date)s - Conversación asumida de la cola %(queue)s por %(user)s"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "%(date)s - Chat forwarded to the %(queue)s queue"
+msgstr "%(date)s - Conversación enviada a la cola %(queue)s"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "%(date)s - Chat assigned to %(user)s"
+msgstr "%(date)s - Conversación asignada a %(user)s"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "%(date)s - Chat was ended by %(user)s"
+msgstr "%(date)s - Conversación finalizada por %(user)s"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "%(date)s - Chat ended"
+msgstr "%(date)s - Conversación finalizada"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "Internal note"
+msgstr "Nota interna"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html:468
+msgid "Support Information"
+msgstr "Información del servicio"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "Started"
+msgstr "Inicio"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "Ended"
+msgstr "Fin"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "Representative"
+msgstr "Atendiente"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "(current)"
+msgstr "(actual)"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "URN"
+msgstr "URN"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "Ticket ID"
+msgstr "ID del ticket"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "Tags"
+msgstr "Etiquetas"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "CSAT"
+msgstr "CSAT"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "VTEX CX Platform"
+msgstr "VTEX CX Platform"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid ""
+"Document automatically generated for auditing and compliance purposes. "
+"Altering this document may result in penalties."
+msgstr ""
+"Documento generado automáticamente con fines de auditoría y cumplimiento. "
+"La alteración de este documento puede resultar en sanciones."
+
 #~ msgid "Queue's ID"
 #~ msgstr "ID de la Cola"
 

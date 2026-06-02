@@ -499,6 +499,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "process_pending_reports",
         "schedule": 20.0,
     },
+    "process-pending-room-exports": {
+        "task": "process_pending_room_exports",
+        "schedule": 20.0,
+    },
     "start-archive-rooms-messages": {
         "task": "start_archive_rooms_messages",
         "schedule": crontab(hour="0-4", minute=0),
