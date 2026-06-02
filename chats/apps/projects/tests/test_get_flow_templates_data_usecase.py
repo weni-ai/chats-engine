@@ -260,10 +260,12 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
             name=self.template_name, uuid=self.template_uuid
         )
 
-    def test_execute_returns_only_first_valid_template(self):
+    def test_execute_returns_all_valid_templates(self):
         channel_uuid_1 = str(uuid.uuid4())
+        channel_uuid_2 = str(uuid.uuid4())
         template_uuid_1 = str(uuid.uuid4())
         template_uuid_2 = str(uuid.uuid4())
+        template_name_2 = "other_template"
 
         definition = {
             "flows": [
@@ -301,7 +303,7 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
                                         "uuid": str(uuid.uuid4()),
                                         "template": {
                                             "uuid": template_uuid_2,
-                                            "name": "other_template",
+                                            "name": template_name_2,
                                         },
                                         "variables": [
                                             "@trigger.params.url",
@@ -316,35 +318,67 @@ class TestGetFlowTemplatesDataUseCase(TestCase):
         }
         self.mock_flows_client.retrieve_flow_definitions.return_value = definition
 
-        self.mock_flows_templates_usecase.execute.return_value = {
-            "uuid": template_uuid_1,
-            "name": self.template_name,
-            "translations": [
-                {
-                    "language": "por",
-                    "status": "approved",
-                    "channel": {"uuid": channel_uuid_1, "name": "Channel 1"},
-                }
-            ],
-        }
+        self.mock_flows_templates_usecase.execute.side_effect = [
+            {
+                "uuid": template_uuid_1,
+                "name": self.template_name,
+                "translations": [
+                    {
+                        "language": "por",
+                        "status": "approved",
+                        "channel": {"uuid": channel_uuid_1, "name": "Channel 1"},
+                    }
+                ],
+            },
+            {
+                "uuid": template_uuid_2,
+                "name": template_name_2,
+                "translations": [
+                    {
+                        "language": "por",
+                        "status": "approved",
+                        "channel": {"uuid": channel_uuid_2, "name": "Channel 2"},
+                    }
+                ],
+            },
+        ]
 
         self.mock_channels_usecase.execute.return_value = [
             self._make_project_channel(channel_uuid_1, self.waba_id),
+            self._make_project_channel(channel_uuid_2, self.waba_id),
         ]
 
-        meta_template = self._make_meta_template()
-        self.mock_meta_client.get_templates_list.return_value = {
-            "data": [meta_template]
-        }
+        meta_template_1 = self._make_meta_template(
+            template_id="111", name=self.template_name
+        )
+        meta_template_2 = self._make_meta_template(
+            template_id="222", name=template_name_2
+        )
+        self.mock_meta_client.get_templates_list.side_effect = [
+            {"data": [meta_template_1]},
+            {"data": [meta_template_2]},
+        ]
 
         result = self.use_case.execute(flow_uuid=self.flow_uuid)
 
-        self.assertEqual(len(result.templates), 1)
-        self.assertEqual(result.templates[0].id, meta_template["id"])
-        self.mock_meta_client.get_templates_list.assert_called_once_with(
+        self.assertEqual(len(result.templates), 2)
+
+        returned_ids = {template.id for template in result.templates}
+        self.assertEqual(returned_ids, {meta_template_1["id"], meta_template_2["id"]})
+
+        self.assertEqual(result.templates[0].id, meta_template_1["id"])
+        self.assertEqual(result.templates[0].variables, ["contactname"])
+        self.assertEqual(result.templates[1].id, meta_template_2["id"])
+        self.assertEqual(result.templates[1].variables, ["url"])
+
+        self.assertEqual(self.mock_meta_client.get_templates_list.call_count, 2)
+        self.mock_meta_client.get_templates_list.assert_any_call(
             waba_id=self.waba_id, name=self.template_name
         )
-        self.mock_flows_templates_usecase.execute.assert_called_once()
+        self.mock_meta_client.get_templates_list.assert_any_call(
+            waba_id=self.waba_id, name=template_name_2
+        )
+        self.assertEqual(self.mock_flows_templates_usecase.execute.call_count, 2)
 
     def test_template_not_found_in_meta_raises_exception(self):
         definition = self._make_definition_with_template(
