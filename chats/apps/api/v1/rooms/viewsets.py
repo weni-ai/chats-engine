@@ -20,7 +20,8 @@ from django.utils.timezone import make_aware
 from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
-from rest_framework import filters, mixins, permissions, status
+from pydub.exceptions import CouldntDecodeError
+from rest_framework import filters, mixins, parsers, permissions, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.filters import OrderingFilter
@@ -40,6 +41,7 @@ from chats.apps.ai_features.history_summary.models import (
     HistorySummary,
     HistorySummaryStatus,
 )
+from chats.apps.api.pagination import CustomCursorPagination
 from chats.apps.api.utils import verify_user_room
 from chats.apps.api.v1 import permissions as api_permissions
 from chats.apps.api.v1.internal.rest_clients.openai_rest_client import OpenAIClient
@@ -48,6 +50,7 @@ from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1.rooms.pagination import RoomListPagination
 from chats.apps.api.v1.rooms.permissions import (
     CanAddOrRemoveRoomTagPermission,
+    RoomNoteMediaPermission,
     RoomNotePermission,
 )
 from chats.apps.api.v1.rooms.serializers import (
@@ -58,10 +61,12 @@ from chats.apps.api.v1.rooms.serializers import (
     ListRoomSerializer,
     PinRoomSerializer,
     RemoveRoomTagSerializer,
+    RoomExportRequestSerializer,
     RoomHistorySummaryFeedbackSerializer,
     RoomHistorySummarySerializer,
     RoomInfoSerializer,
     RoomMessageStatusSerializer,
+    RoomNoteMediaSerializer,
     RoomNoteSerializer,
     RoomsCountByQueueQueryParamsSerializer,
     RoomsCountByQueueResponseSerializer,
@@ -77,7 +82,7 @@ from chats.apps.api.v1.rooms.services.bulk_transfer_service import BulkTransferS
 from chats.apps.api.v1.rooms.services.rooms_count_by_queue_service import (
     RoomsCountByQueueService,
 )
-from chats.apps.dashboard.models import RoomMetrics
+from chats.apps.dashboard.models import ReportStatus, RoomMetrics
 from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
 from chats.apps.msgs.models import Message
 from chats.apps.projects.models.models import Project, ProjectPermission
@@ -91,9 +96,9 @@ from chats.apps.rooms.exceptions import (
     RoomIsNotActiveError,
 )
 from chats.apps.rooms.flows_ticketer_service import change_ticketer_for_room
-from chats.apps.rooms.models import Room, RoomNote, RoomPin
+from chats.apps.rooms.models import Room, RoomNote, RoomNoteMedia, RoomPin
 from chats.apps.rooms.services import RoomsReportService
-from chats.apps.rooms.tasks import generate_rooms_report
+from chats.apps.rooms.tasks import generate_room_export, generate_rooms_report
 from chats.apps.rooms.utils import create_transfer_json
 from chats.apps.rooms.views import (
     close_room,
@@ -1398,6 +1403,75 @@ class RoomsReportViewSet(APIView):
         )
 
 
+class RoomReportViewSet(APIView):
+    """Generates a conversation export for a closed room and emails the result."""
+
+    swagger_tag = "Rooms"
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request, *args, **kwargs) -> Response:
+        serializer = RoomExportRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        room_uuid = serializer.validated_data["room"]
+        types = serializer.validated_data["types"]
+
+        room = (
+            Room.objects.select_related("queue__sector__project")
+            .filter(uuid=room_uuid)
+            .first()
+        )
+        if not room:
+            raise NotFound(_("Room not found"))
+
+        if room.is_active:
+            raise ValidationError({"room": _("Only closed rooms can be exported")})
+
+        if not room.can_retrieve(request.user):
+            raise PermissionDenied(_("You do not have permission to export this room"))
+
+        active_export_exists = ReportStatus.objects.filter(
+            room=room,
+            report_type=ReportStatus.REPORT_TYPE_ROOM_EXPORT,
+            status__in=["pending", "in_progress"],
+        ).exists()
+        if active_export_exists:
+            return Response(
+                {
+                    "error": {
+                        "code": "export_in_progress",
+                        "message": "An export is already being generated for this room.",
+                    }
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        report_status = ReportStatus.objects.create(
+            project=room.queue.sector.project,
+            user=request.user,
+            room=room,
+            report_type=ReportStatus.REPORT_TYPE_ROOM_EXPORT,
+            fields_config={"types": types},
+        )
+
+        generate_room_export.delay(str(report_status.uuid))
+
+        logger.info(
+            "Room export requested | room=%s | report=%s | user=%s",
+            room.uuid,
+            report_status.uuid,
+            request.user.email,
+        )
+
+        return Response(
+            {
+                "report_uuid": str(report_status.uuid),
+                "detail": "The export will be sent to your email when ready.",
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+
 class RoomNoteViewSet(
     mixins.ListModelMixin,
     mixins.DestroyModelMixin,
@@ -1471,6 +1545,63 @@ class RoomNoteViewSet(
         note.notify_websocket("delete")
 
         return super().destroy(request, *args, **kwargs)
+
+
+class RoomNoteMediaViewset(
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    GenericViewSet,
+):
+    """
+    ViewSet for Room Note Medias.
+
+    Mirrors the message media viewset, allowing agents to upload and list
+    medias attached to a room internal note.
+    """
+
+    swagger_tag = "Rooms"
+    queryset = RoomNoteMedia.objects.all()
+    serializer_class = RoomNoteMediaSerializer
+    filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
+    filterset_class = room_filters.RoomNoteMediaFilter
+    parser_classes = [parsers.MultiPartParser]
+    permission_classes = [IsAuthenticated, RoomNoteMediaPermission]
+    pagination_class = CustomCursorPagination
+    lookup_field = "uuid"
+    ordering = "created_on"
+    ordering_fields = ["created_on", "content_type"]
+
+    def get_queryset(self):
+        if self.request.query_params.get("room") or self.request.query_params.get(
+            "project"
+        ):
+            return super().get_queryset()
+        return self.queryset.none()
+
+    def create(self, request, *args, **kwargs):
+        try:
+            return super().create(request, *args, **kwargs)
+        except CouldntDecodeError:
+            return Response(
+                {
+                    "detail": "Could not decode audio file, possibility of corrupted file",
+                    "status": "error",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    def perform_create(self, serializer):
+        with transaction.atomic():
+            serializer.save()
+            instance = serializer.instance
+            note = instance.note
+
+            # Re-notify the related message so clients receive the note with
+            # its updated medias.
+            if note.message:
+                note.message.notify_room("update", True)
+            else:
+                note.notify_websocket("create")
 
 
 class RoomsCountView(APIView):

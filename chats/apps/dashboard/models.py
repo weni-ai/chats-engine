@@ -35,8 +35,28 @@ class RoomMetrics(BaseModel):
 class ReportStatus(BaseModel):
     MAX_RETRY_COUNT = 3
 
+    REPORT_TYPE_CUSTOM_DASHBOARD = "custom_dashboard"
+    REPORT_TYPE_ROOM_EXPORT = "room_export"
+    REPORT_TYPE_CHOICES = [
+        (REPORT_TYPE_CUSTOM_DASHBOARD, "Custom Dashboard"),
+        (REPORT_TYPE_ROOM_EXPORT, "Room Export"),
+    ]
+
     project = models.ForeignKey("projects.Project", on_delete=models.CASCADE)
     user = models.ForeignKey("accounts.User", on_delete=models.CASCADE)
+    room = models.ForeignKey(
+        "rooms.Room",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="export_reports",
+    )
+    report_type = models.CharField(
+        max_length=30,
+        choices=REPORT_TYPE_CHOICES,
+        default=REPORT_TYPE_CUSTOM_DASHBOARD,
+        db_index=True,
+    )
     status = models.CharField(
         max_length=20,
         choices=[

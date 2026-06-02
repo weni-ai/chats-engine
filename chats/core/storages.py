@@ -1,6 +1,7 @@
 # chats/core/storages.py
-from storages.backends.s3boto3 import S3Boto3Storage
 from typing import Optional
+
+from storages.backends.s3boto3 import S3Boto3Storage
 
 
 class BaseS3Storage(S3Boto3Storage):
@@ -44,3 +45,9 @@ class ReportsStorage(BaseS3Storage):
     """Storage for report files (CSV, XLSX, ZIP)"""
 
     storage_location = "reports"
+
+
+class RoomExportStorage(BaseS3Storage):
+    """Storage for room export files (HTML, PDF)"""
+
+    storage_location = "room_exports"
