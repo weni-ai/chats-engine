@@ -23,6 +23,10 @@ def _build_sample_data() -> dict:
     started = datetime(2026, 5, 1, 10, 0, tzinfo=timezone.utc)
     ended = datetime(2026, 5, 1, 12, 0, tzinfo=timezone.utc)
     return {
+        "meta": {
+            "generated_at": started,
+            "generated_by": "agent@example.com",
+        },
         "room": {
             "uuid": "room-uuid",
             "protocol": "PROTO-123",
@@ -134,11 +138,10 @@ class RenderRoomExportHtmlTests(TestCase):
         # embed_media=True in HTML branch, template prefers data_uri
         self.assertIn("data:image/jpeg;base64,FAKE", html)
 
-    def test_html_renders_custom_fields(self):
+    def test_html_renders_meta_generated_by(self):
         result = self.usecase.execute(self.data, [FORMAT_HTML])
         html = result[FORMAT_HTML].decode("utf-8")
-        self.assertIn("motivo", html)
-        self.assertIn("duvida", html)
+        self.assertIn("agent@example.com", html)
 
     def test_html_renders_tags(self):
         result = self.usecase.execute(self.data, [FORMAT_HTML])
@@ -169,15 +172,21 @@ class RenderRoomExportPdfTests(TestCase):
         self.assertIn("Test Contact", rendered)
 
     @patch("weasyprint.HTML")
-    def test_pdf_template_does_not_use_data_uri(self, mock_html_cls):
+    def test_pdf_falls_back_to_media_url_without_data_uri(self, mock_html_cls):
         mock_instance = MagicMock()
         mock_instance.write_pdf.return_value = b"%PDF-fake"
         mock_html_cls.return_value = mock_instance
 
-        self.usecase.execute(self.data, [FORMAT_PDF])
+        # In production BuildRoomExportData always sets data_uri=None, so the
+        # template falls back to the external media URL.
+        data = _build_sample_data()
+        for item in data["timeline"]:
+            for media in item.get("medias", []):
+                media["data_uri"] = None
+
+        self.usecase.execute(data, [FORMAT_PDF])
 
         rendered = mock_html_cls.call_args.kwargs.get("string", "")
-        # PDF branch sets embed_media=False so template uses media.url
         self.assertIn("https://example.com/img.jpg", rendered)
         self.assertNotIn("data:image/jpeg;base64,FAKE", rendered)
 

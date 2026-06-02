@@ -7,6 +7,8 @@ here must be reflected in the template and vice-versa.
 from datetime import timedelta
 from typing import TYPE_CHECKING, Dict, List, Optional
 
+from django.utils import timezone
+
 from chats.apps.accounts.models import User
 
 if TYPE_CHECKING:
@@ -70,17 +72,24 @@ def _build_media_entry(media) -> dict:
 class BuildRoomExportData:
     """Builds the dict consumed by the room export template."""
 
-    def execute(self, room: "Room") -> dict:
+    def execute(self, room: "Room", generated_by: Optional[str] = None) -> dict:
         room_block = self._build_room_block(room)
         contact_block = self._build_contact_block(room)
         agents_block = self._build_agents_block(room)
         timeline = self._build_timeline(room)
 
         return {
+            "meta": self._build_meta_block(generated_by),
             "room": room_block,
             "contact": contact_block,
             "agents": agents_block,
             "timeline": timeline,
+        }
+
+    def _build_meta_block(self, generated_by: Optional[str]) -> dict:
+        return {
+            "generated_at": timezone.now(),
+            "generated_by": generated_by,
         }
 
     def _build_room_block(self, room: "Room") -> dict:

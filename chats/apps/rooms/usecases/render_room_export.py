@@ -15,7 +15,7 @@ FORMAT_HTML = "html"
 FORMAT_PDF = "pdf"
 SUPPORTED_FORMATS = (FORMAT_HTML, FORMAT_PDF)
 
-DEFAULT_TEMPLATE = "rooms/exports/conversation.html"
+DEFAULT_TEMPLATE = "rooms/conversation_history/conversation_report.html"
 
 
 class UnsupportedExportFormatError(ValueError):
