@@ -41,3 +41,7 @@ class UserNameEmailSerializer(serializers.ModelSerializer):
             "last_name",
             "email",
         ]
+
+
+class UserDataQueryParamsSerializer(serializers.Serializer):
+    user_email = serializers.EmailField(required=True)
