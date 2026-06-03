@@ -5,6 +5,24 @@ from unittest.mock import MagicMock, patch
 from django.test import TestCase
 from django.utils import timezone
 
+
+def _enable_inactivity_feature_flag(test_case: TestCase) -> None:
+    """
+    Helper: enables the `weniChatsInactivityTimeout` feature flag for the
+    duration of a test case. The flag is evaluated through
+    `is_feature_active_for_attributes` inside the inactivity usecase and
+    `Room.notify_inactivity`; both are patched here.
+    """
+    patchers = [
+        patch(
+            "chats.apps.rooms.usecases.inactivity.is_feature_active_for_attributes",
+            return_value=True,
+        ),
+    ]
+    for p in patchers:
+        p.start()
+        test_case.addCleanup(p.stop)
+
 from chats.apps.accounts.models import User
 from chats.apps.contacts.models import Contact
 from chats.apps.msgs.models import AutomaticMessageType, Message
@@ -35,6 +53,7 @@ def _enabled_inactivity_config(
 
 class InactivityWarnTests(TestCase):
     def setUp(self):
+        _enable_inactivity_feature_flag(self)
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
             name="Sector",
@@ -153,6 +172,7 @@ class InactivityWarnTests(TestCase):
 
 class InactivityCloseTests(TestCase):
     def setUp(self):
+        _enable_inactivity_feature_flag(self)
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
             name="Sector",
@@ -334,6 +354,7 @@ class InactivityCloseTests(TestCase):
 
 class InactivityResetTests(TestCase):
     def setUp(self):
+        _enable_inactivity_feature_flag(self)
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
             name="Sector",
@@ -495,6 +516,7 @@ class RoomNotifyInactivityTests(TestCase):
     """
 
     def setUp(self):
+        _enable_inactivity_feature_flag(self)
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
             name="Sector",

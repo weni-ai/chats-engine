@@ -623,6 +623,18 @@ class Room(BaseModel, BaseConfigurableModel):
         user; falls back to the queue group otherwise (defensive — rooms
         eligible for inactivity always have a user).
         """
+        from chats.apps.rooms.usecases.inactivity import (
+            is_inactivity_feature_active,
+        )
+
+        try:
+            project_uuid = str(self.queue.sector.project.uuid)
+        except AttributeError:
+            project_uuid = None
+
+        if not is_inactivity_feature_active(project_uuid):
+            return
+
         content = {
             "room_uuid": str(self.uuid),
             "is_inactive": self.is_inactive,

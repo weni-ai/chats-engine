@@ -801,6 +801,12 @@ AGENTS_MANAGEMENT_FEATURE_FLAG_KEY = env.str(
     "AGENTS_MANAGEMENT_FEATURE_FLAG_KEY",
     default="weniChatsAgentsManagement",
 )
+
+# Inactivity Timeout
+WENI_CHATS_INACTIVITY_TIMEOUT_FLAG_KEY = env.str(
+    "WENI_CHATS_INACTIVITY_TIMEOUT_FLAG_KEY",
+    default="weniChatsInactivityTimeout",
+)
 IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL = env.int(
     "IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL", default=30
 )

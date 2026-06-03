@@ -16,6 +16,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from sentry_sdk import capture_exception
+from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
 from chats.apps.msgs.models import AutomaticMessageType, Message
 from chats.apps.rooms.choices import RoomFeedbackMethods
@@ -29,6 +30,43 @@ logger = logging.getLogger(__name__)
 
 
 INACTIVITY_END_BY = "inactivity"
+
+
+def _get_room_project_uuid(room: "Room") -> Optional[str]:
+    """
+    Extracts the project UUID from a room safely. Returns None when the
+    related sector/project chain is missing (defensive — not expected in
+    eligible rooms).
+    """
+    try:
+        return str(room.queue.sector.project.uuid)
+    except AttributeError:
+        return None
+
+
+def is_inactivity_feature_active(project_uuid: Optional[str]) -> bool:
+    """
+    Evaluates the inactivity feature flag (`weniChatsInactivityTimeout`)
+    for the given project. Returns False on missing project or if the
+    feature flag service raises, so a flag outage never closes/warns
+    rooms unexpectedly.
+    """
+    if not project_uuid:
+        return False
+
+    try:
+        return is_feature_active_for_attributes(
+            settings.WENI_CHATS_INACTIVITY_TIMEOUT_FLAG_KEY,
+            {"projectUUID": project_uuid},
+        )
+    except Exception as exc:
+        logger.warning(
+            "[INACTIVITY] Failed to evaluate feature flag for project %s: %s",
+            project_uuid,
+            exc,
+        )
+        capture_exception(exc)
+        return False
 
 
 def _send_silent_automatic_message(
@@ -121,6 +159,23 @@ class InactivityService:
     Encapsulates the inactivity flow. Stateless; safe to instantiate per call.
     """
 
+    def __init__(self) -> None:
+        # Per-instance cache to avoid re-evaluating the feature flag for the
+        # same project on every room when iterating large querysets.
+        self._feature_flag_cache: dict[str, bool] = {}
+
+    def _is_feature_active_for_room(self, room: "Room") -> bool:
+        project_uuid = _get_room_project_uuid(room)
+        if not project_uuid:
+            return False
+
+        if project_uuid in self._feature_flag_cache:
+            return self._feature_flag_cache[project_uuid]
+
+        active = is_inactivity_feature_active(project_uuid)
+        self._feature_flag_cache[project_uuid] = active
+        return active
+
     def warn_inactive_rooms(self) -> int:
         """
         Sends inactivity warnings to all eligible rooms.
@@ -131,6 +186,9 @@ class InactivityService:
         warned = 0
 
         for room in _eligible_warn_queryset().iterator():
+            if not self._is_feature_active_for_room(room):
+                continue
+
             config = _read_inactivity_config(room)
 
             if not config or not config.get("is_message_timeout_enabled"):
@@ -163,6 +221,9 @@ class InactivityService:
         closed = 0
 
         for room in _eligible_close_queryset().iterator():
+            if not self._is_feature_active_for_room(room):
+                continue
+
             config = _read_inactivity_config(room)
 
             if not config or not config.get("is_close_room_enabled"):
@@ -196,6 +257,9 @@ class InactivityService:
         room closed, etc.).
         """
         if not room.is_active or not room.is_inactive:
+            return False
+
+        if not self._is_feature_active_for_room(room):
             return False
 
         Room.objects.filter(pk=room.pk, is_active=True).update(is_inactive=False)
