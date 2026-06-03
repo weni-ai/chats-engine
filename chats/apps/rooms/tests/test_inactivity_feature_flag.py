@@ -108,7 +108,9 @@ class InactivityFeatureFlagUsecaseTests(TestCase):
         # Two eligible rooms in the same project must trigger only ONE
         # feature flag evaluation thanks to the per-instance cache.
         for i in range(2):
-            contact = Contact.objects.create(name=f"contact-{i}", external_id=f"c-{i}")
+            contact = Contact.objects.create(
+                name=f"cache-contact-{i}", external_id=f"cache-c-{i}"
+            )
             room = Room.objects.create(queue=self.queue, contact=contact)
             room.user = self.user
             room.last_message_user = self.user
