@@ -5,6 +5,20 @@ from unittest.mock import MagicMock, patch
 from django.test import TestCase
 from django.utils import timezone
 
+from chats.apps.accounts.models import User
+from chats.apps.contacts.models import Contact
+from chats.apps.msgs.models import AutomaticMessageType, Message
+from chats.apps.projects.models.models import Project
+from chats.apps.queues.models import Queue
+from chats.apps.rooms.choices import RoomFeedbackMethods
+from chats.apps.rooms.models import Room
+from chats.apps.rooms.usecases.inactivity import (
+    INACTIVITY_END_BY,
+    InactivityService,
+    _send_silent_automatic_message,
+)
+from chats.apps.sectors.models import Sector
+
 
 def _enable_inactivity_feature_flag(test_case: TestCase) -> None:
     """
@@ -22,20 +36,6 @@ def _enable_inactivity_feature_flag(test_case: TestCase) -> None:
     for p in patchers:
         p.start()
         test_case.addCleanup(p.stop)
-
-from chats.apps.accounts.models import User
-from chats.apps.contacts.models import Contact
-from chats.apps.msgs.models import AutomaticMessageType, Message
-from chats.apps.projects.models.models import Project
-from chats.apps.queues.models import Queue
-from chats.apps.rooms.choices import RoomFeedbackMethods
-from chats.apps.rooms.models import Room
-from chats.apps.rooms.usecases.inactivity import (
-    INACTIVITY_END_BY,
-    InactivityService,
-    _send_silent_automatic_message,
-)
-from chats.apps.sectors.models import Sector
 
 
 def _enabled_inactivity_config(
@@ -346,7 +346,7 @@ class InactivityCloseTests(TestCase):
         self.assertFalse(room.is_inactive)
 
         with patch.object(Room, "notify_user"):
-            closed = InactivityService().close_inactive_rooms()
+            InactivityService().close_inactive_rooms()
 
         room.refresh_from_db()
         self.assertTrue(room.is_active)
