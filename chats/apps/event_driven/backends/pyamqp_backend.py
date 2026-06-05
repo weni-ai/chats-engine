@@ -31,7 +31,7 @@ class PyAMQPConnectionBackend:
         "[+] Connection established. Waiting for events. To exit press CTRL+C"
     )
 
-    def __init__(self, handle_consumers: callable, connection_params: dict):
+    def __init__(self, handle_consumers: callable, connection_params: dict = None):
         self._handle_consumers = handle_consumers
         self.connection_params = connection_params
 
@@ -42,7 +42,15 @@ class PyAMQPConnectionBackend:
     def _conection(self, **kwargs) -> amqp.Connection:
         return amqp.Connection(**self.connection_params, **kwargs)
 
-    def start_consuming(self):
+    def start_consuming(self, connection_params: dict = None):
+        if connection_params is not None:
+            self.connection_params = connection_params
+
+        if self.connection_params is None:
+            raise ValueError(
+                "connection_params must be provided either in __init__ or start_consuming"
+            )
+
         while True:
             try:
                 with self._conection() as connection:
