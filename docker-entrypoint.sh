@@ -85,7 +85,7 @@ elif [[ "edaconsume" == "$1" ]]; then
         group="template"
         shift 1
     fi
-    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py edaconsume --group "$group" "$@"
+    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py edaconsume "$@"
 elif [[ "edaconsume-amq" == "$1" ]]; then
     shift 1
     group="eda"
@@ -93,7 +93,7 @@ elif [[ "edaconsume-amq" == "$1" ]]; then
         group="template"
         shift 1
     fi
-    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py edaconsume_amq --group "$group" "$@"
+    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py edaconsume_amq "$@"
 elif [[ "edaconsumemsg" == "$1" ]]; then
     shift 1
     group="eda"
@@ -101,7 +101,7 @@ elif [[ "edaconsumemsg" == "$1" ]]; then
         group="template"
         shift 1
     fi
-    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py msg_edaconsume --group "$group" "$@"
+    do_gosu "${PROJECT_USER}:${PROJECT_GROUP}" exec python manage.py msg_edaconsume "$@"
 elif [[ "edaconsumemsg-amq" == "$1" ]]; then
     shift 1
     group="eda"
