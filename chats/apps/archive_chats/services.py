@@ -173,8 +173,12 @@ class ArchiveChatsService(BaseArchiveChatsService):
             except Exception as e:
                 sentry_event_id = capture_exception(e)
                 room_archived_conversation.register_error(e, sentry_event_id)
+                log_msg = (
+                    f"[ArchiveChatsService] Error archiving room history "
+                    f"for room {room.uuid} with job {job.uuid}: {e}"
+                )
                 logger.error(
-                    f"[ArchiveChatsService] Error archiving room history for room {room.uuid} with job {job.uuid}: {e}",
+                    log_msg,
                     exc_info=True,
                 )
 
