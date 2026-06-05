@@ -82,7 +82,7 @@ INSTALLED_APPS = [
     "chats.apps.archive_chats",
     # third party apps
     "weni.feature_flags",  # weni-commons feature flags
-    "weni.eda.django.eda_app",
+    #"weni.eda.django.eda_app",
     "channels",
     "drf_yasg",
     "django_filters",
