@@ -4625,13 +4625,13 @@ weni-feature-flags = ">=2.1.2,<3.0.0"
 
 [[package]]
 name = "weni-eda"
-version = "0.2.0a3"
+version = "0.2.0a4"
 description = ""
 optional = false
 python-versions = "<4.0,>=3.8"
 files = [
-    {file = "weni_eda-0.2.0a3-py3-none-any.whl", hash = "sha256:aec4952cb2c06a22bcb61bf122f20c77f00717fce33a9850a7d7ccbc35fe8370"},
-    {file = "weni_eda-0.2.0a3.tar.gz", hash = "sha256:2985184d2ade6a08d430a36009491a836475fe1aa1b3563d4b5593e08e7b5a27"},
+    {file = "weni_eda-0.2.0a4-py3-none-any.whl", hash = "sha256:44c5338e201bc46c5647cfa29550b1dd74de08467f7817eca901248f35785b0a"},
+    {file = "weni_eda-0.2.0a4.tar.gz", hash = "sha256:d6cc0d9d572d0931f12483cc13f9e4df4ee3af464ffabdbeadd018cdc600d0e3"},
 ]
 
 [package.dependencies]
@@ -4951,4 +4951,4 @@ test = ["pytest"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.8"
-content-hash = "50233f33c2f9495d0b437dc502e795fdc287ad1026f6f0a504f7ad2ed903a335"
+content-hash = "543822fdc2f33caf7588332d99b455c70f9d579f8fd000bf60022507573c0c93"
