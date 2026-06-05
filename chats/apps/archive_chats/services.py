@@ -87,62 +87,100 @@ class ArchiveChatsService(BaseArchiveChatsService):
             f"[ArchiveChatsService] Archiving room history for room {room.uuid} with job {job.uuid}"
         )
 
-        room_archived_conversation = self._get_or_create_room_archived_conversation(
-            room, job
-        )
-
-        if room_archived_conversation.status == ArchiveConversationsJobStatus.FINISHED:
-            logger.info(
-                f"[ArchiveChatsService] Room {room.uuid} is already archived "
-                f"(conversation {room_archived_conversation.uuid}), skipping"
+        with transaction.atomic():
+            room_archived_conversation = (
+                RoomArchivedConversation.objects.select_for_update(skip_locked=True)
+                .filter(room=room)
+                .first()
             )
-            return room_archived_conversation
 
-        try:
-            if self._needs_processing_and_upload(room_archived_conversation):
-                messages_data = self.process_messages(room_archived_conversation)
-                self.upload_messages_file(room_archived_conversation, messages_data)
-            else:
-                logger.info(
-                    f"[ArchiveChatsService] Skipping message processing and upload "
-                    f"for room {room.uuid} - file already uploaded"
-                )
-
-            room_archived_conversation.refresh_from_db()
-
-            if self._needs_message_deletion(room_archived_conversation):
-                if (
-                    room_archived_conversation.status
-                    != ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED
-                ):
-                    room_archived_conversation.status = (
-                        ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED
+            if room_archived_conversation is None:
+                if RoomArchivedConversation.objects.filter(room=room).exists():
+                    logger.info(
+                        f"[ArchiveChatsService] Room {room.uuid} is being processed "
+                        f"by another worker, skipping"
                     )
-                    room_archived_conversation.save(update_fields=["status"])
-                self.delete_room_messages(room_archived_conversation)
-            else:
+                    return None
+
+                room_archived_conversation = RoomArchivedConversation.objects.create(
+                    job=job,
+                    room=room,
+                    status=ArchiveConversationsJobStatus.PENDING,
+                )
                 logger.info(
-                    f"[ArchiveChatsService] Skipping message deletion "
-                    f"for room {room.uuid} - messages already deleted"
+                    f"[ArchiveChatsService] Room archived conversation created: "
+                    f"{room_archived_conversation.uuid} with status "
+                    f"{room_archived_conversation.status} for room {room.uuid} "
+                    f"and job {job.uuid}"
+                )
+
+            if (
+                room_archived_conversation.status
+                == ArchiveConversationsJobStatus.FINISHED
+            ):
+                logger.info(
+                    f"[ArchiveChatsService] Room {room.uuid} is already archived "
+                    f"(conversation {room_archived_conversation.uuid}), skipping"
+                )
+                return room_archived_conversation
+
+            if room_archived_conversation.job_id != job.uuid:
+                logger.info(
+                    f"[ArchiveChatsService] Resuming room archived conversation "
+                    f"{room_archived_conversation.uuid} with status "
+                    f"{room_archived_conversation.status} "
+                    f"for room {room.uuid} and job {job.uuid}"
+                )
+                room_archived_conversation.job = job
+                room_archived_conversation.save(update_fields=["job"])
+
+            try:
+                if self._needs_processing_and_upload(room_archived_conversation):
+                    messages_data = self.process_messages(room_archived_conversation)
+                    self.upload_messages_file(room_archived_conversation, messages_data)
+                else:
+                    logger.info(
+                        f"[ArchiveChatsService] Skipping message processing and upload "
+                        f"for room {room.uuid} - file already uploaded"
+                    )
+
+                room_archived_conversation.refresh_from_db()
+
+                if self._needs_message_deletion(room_archived_conversation):
+                    if (
+                        room_archived_conversation.status
+                        != ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED
+                    ):
+                        room_archived_conversation.status = (
+                            ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED
+                        )
+                        room_archived_conversation.save(update_fields=["status"])
+                    self.delete_room_messages(room_archived_conversation)
+                else:
+                    logger.info(
+                        f"[ArchiveChatsService] Skipping message deletion "
+                        f"for room {room.uuid} - messages already deleted"
+                    )
+
+                room_archived_conversation.refresh_from_db()
+                room_archived_conversation.status = (
+                    ArchiveConversationsJobStatus.FINISHED
+                )
+                room_archived_conversation.archive_process_finished_at = timezone.now()
+                room_archived_conversation.save(
+                    update_fields=["status", "archive_process_finished_at"]
+                )
+            except Exception as e:
+                sentry_event_id = capture_exception(e)
+                room_archived_conversation.register_error(e, sentry_event_id)
+                logger.error(
+                    f"[ArchiveChatsService] Error archiving room history for room {room.uuid} with job {job.uuid}: {e}",
+                    exc_info=True,
                 )
 
             room_archived_conversation.refresh_from_db()
-            room_archived_conversation.status = ArchiveConversationsJobStatus.FINISHED
-            room_archived_conversation.archive_process_finished_at = timezone.now()
-            room_archived_conversation.save(
-                update_fields=["status", "archive_process_finished_at"]
-            )
-        except Exception as e:
-            sentry_event_id = capture_exception(e)
-            room_archived_conversation.register_error(e, sentry_event_id)
-            logger.error(
-                f"[ArchiveChatsService] Error archiving room history for room {room.uuid} with job {job.uuid}: {e}",
-                exc_info=True,
-            )
 
-        room_archived_conversation.refresh_from_db()
-
-        return room_archived_conversation
+            return room_archived_conversation
 
     def _get_or_create_room_archived_conversation(
         self, room: Room, job: ArchiveConversationsJob
@@ -259,9 +297,7 @@ class ArchiveChatsService(BaseArchiveChatsService):
 
         with tempfile.SpooledTemporaryFile(max_size=5 * 1024 * 1024) as tmp:
             for message in messages:
-                tmp.write(
-                    json.dumps(message, ensure_ascii=False).encode("utf-8")
-                )
+                tmp.write(json.dumps(message, ensure_ascii=False).encode("utf-8"))
                 tmp.write(b"\n")
 
             room_archived_conversation.status = (

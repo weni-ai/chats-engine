@@ -104,6 +104,37 @@ class TestArchiveChatsService(TestCase):
             archived_conversation.errors[0]["sentry_event_id"], "test-event-id"
         )
 
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.process_messages")
+    def test_archive_room_history_skips_when_row_locked_by_another_worker(
+        self, mock_process_messages
+    ):
+        job_a = ArchiveConversationsJob.objects.create(started_at=timezone.now())
+        job_b = ArchiveConversationsJob.objects.create(started_at=timezone.now())
+
+        existing = RoomArchivedConversation.objects.create(
+            room=self.room,
+            job=job_a,
+            status=ArchiveConversationsJobStatus.PENDING,
+        )
+
+        locked_qs = MagicMock()
+        locked_qs.filter.return_value.first.return_value = None
+
+        with patch.object(
+            RoomArchivedConversation.objects,
+            "select_for_update",
+            return_value=locked_qs,
+        ) as mock_lock:
+            result = self.service.archive_room_history(self.room, job_b)
+
+        mock_lock.assert_called_once_with(skip_locked=True)
+        self.assertIsNone(result)
+        mock_process_messages.assert_not_called()
+
+        existing.refresh_from_db()
+        self.assertEqual(existing.status, ArchiveConversationsJobStatus.PENDING)
+        self.assertEqual(existing.job_id, job_a.uuid)
+
     def test_process_messages(self):
         message_a = Message.objects.create(
             room=self.room,
@@ -318,7 +349,9 @@ class TestArchiveChatsService(TestCase):
     def test_get_or_create_room_archived_conversation_creates_new(self):
         job = self.service.start_archive_job()
 
-        self.assertFalse(RoomArchivedConversation.objects.filter(room=self.room).exists())
+        self.assertFalse(
+            RoomArchivedConversation.objects.filter(room=self.room).exists()
+        )
 
         result = self.service._get_or_create_room_archived_conversation(self.room, job)
 
@@ -329,7 +362,9 @@ class TestArchiveChatsService(TestCase):
             RoomArchivedConversation.objects.filter(room=self.room).count(), 1
         )
 
-    def test_get_or_create_room_archived_conversation_reuses_existing_and_updates_job(self):
+    def test_get_or_create_room_archived_conversation_reuses_existing_and_updates_job(
+        self,
+    ):
         job_a = self.service.start_archive_job()
         job_b = self.service.start_archive_job()
 
@@ -350,7 +385,9 @@ class TestArchiveChatsService(TestCase):
             RoomArchivedConversation.objects.filter(room=self.room).count(), 1
         )
 
-    def test_get_or_create_room_archived_conversation_does_not_update_finished_job(self):
+    def test_get_or_create_room_archived_conversation_does_not_update_finished_job(
+        self,
+    ):
         job_a = self.service.start_archive_job()
         job_b = self.service.start_archive_job()
 
@@ -474,9 +511,7 @@ class TestArchiveChatsService(TestCase):
         self.assertEqual(result.status, ArchiveConversationsJobStatus.FINISHED)
         mock_process_messages.assert_not_called()
 
-    @patch(
-        "chats.apps.archive_chats.services.ArchiveChatsService.delete_room_messages"
-    )
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.delete_room_messages")
     @patch("chats.apps.archive_chats.services.ArchiveChatsService.process_messages")
     def test_archive_room_history_resumes_from_uploaded_skips_processing(
         self, mock_process_messages, mock_delete_messages
@@ -494,9 +529,7 @@ class TestArchiveChatsService(TestCase):
         mock_process_messages.assert_not_called()
         mock_delete_messages.assert_called_once()
 
-    @patch(
-        "chats.apps.archive_chats.services.ArchiveChatsService.delete_room_messages"
-    )
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.delete_room_messages")
     @patch("chats.apps.archive_chats.services.ArchiveChatsService.process_messages")
     def test_archive_room_history_resumes_from_failed_with_file(
         self, mock_process_messages, mock_delete_messages
@@ -515,12 +548,8 @@ class TestArchiveChatsService(TestCase):
         mock_process_messages.assert_not_called()
         mock_delete_messages.assert_called_once()
 
-    @patch(
-        "chats.apps.archive_chats.services.ArchiveChatsService.delete_room_messages"
-    )
-    @patch(
-        "chats.apps.archive_chats.services.ArchiveChatsService.upload_messages_file"
-    )
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.delete_room_messages")
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.upload_messages_file")
     @patch("chats.apps.archive_chats.services.ArchiveChatsService.process_messages")
     def test_archive_room_history_resumes_from_failed_with_messages_deleted(
         self, mock_process_messages, mock_upload, mock_delete_messages
