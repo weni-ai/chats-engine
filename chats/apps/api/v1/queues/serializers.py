@@ -195,14 +195,34 @@ class QueueAgentsSerializer(serializers.ModelSerializer):
         ]
 
     def get_status(self, obj):
+        pause_name = getattr(obj, "_pause_name", None)
+        if pause_name:
+            return pause_name
+
+        is_online = getattr(obj, "_is_online", None)
+        if is_online is not None:
+            return "online" if is_online else "offline"
+
         project = self.context.get("project")
-        if project:
-            project_permission = obj.project_permissions.filter(project=project)
-            if (
-                project_permission.exists()
-                and project_permission.first().status == "ONLINE"
-            ):
-                return "online"
+        if not project:
+            return "offline"
+
+        from chats.apps.projects.models.models import CustomStatus
+
+        active_pause = (
+            CustomStatus.objects.filter(
+                user=obj, project=project, is_active=True
+            )
+            .exclude(status_type__name__iexact="in-service")
+            .select_related("status_type")
+            .first()
+        )
+        if active_pause:
+            return active_pause.status_type.name
+
+        project_permission = obj.project_permissions.filter(project=project).first()
+        if project_permission and project_permission.status == "ONLINE":
+            return "online"
         return "offline"
 
 
