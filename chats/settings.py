@@ -560,6 +560,12 @@ if USE_EDA:
     AMQ_BROKER_PASSWORD = env.str("AMQ_BROKER_PASSWORD", default="guest")
     AMQ_VIRTUAL_HOST = env.str("AMQ_VIRTUAL_HOST", default="/")
 
+    # Queue name for the project creation consumer on the new Amazon MQ broker.
+    # Override via env if the cloud configures a different queue name.
+    PROJECT_AMQ_QUEUE_NAME = env.str(
+        "PROJECT_AMQ_QUEUE_NAME", default="chats.projects.queue"
+    )
+
     FLOWS_TICKETER_EXCHANGE = env("FLOWS_TICKETER_EXCHANGE", default="sectors.topic")
     FLOWS_QUEUE_EXCHANGE = env("FLOWS_QUEUE_EXCHANGE", default="queues.topic")
     ROOMS_INFO_EXCHANGE = env("ROOMS_INFO_EXCHANGE", default="rooms.topic")

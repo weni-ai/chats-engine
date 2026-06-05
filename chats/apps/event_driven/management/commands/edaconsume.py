@@ -34,6 +34,15 @@ class Command(BaseCommand):
                 "SSL on port 5671. If omitted, uses the default broker."
             ),
         )
+        parser.add_argument(
+            "--group",
+            dest="group",
+            default="eda",
+            help=(
+                "Consumer group label, kept for parity with the entrypoint "
+                "aliases. Currently informational only."
+            ),
+        )
 
     def handle(self, *args, **options):
         signal.signal(signal.SIGTERM, handle_sigterm)
