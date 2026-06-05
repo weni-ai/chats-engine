@@ -2,6 +2,16 @@ import logging
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.db.models import (
+    Case,
+    CharField,
+    Exists,
+    IntegerField,
+    OuterRef,
+    Subquery,
+    Value,
+    When,
+)
 from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
@@ -25,7 +35,8 @@ from chats.apps.core.internal_domains import (
     exclude_vtex_internal_domains,
     is_vtex_internal_domain,
 )
-from chats.apps.projects.models.models import Project
+from chats.apps.projects.models import ProjectPermission
+from chats.apps.projects.models.models import CustomStatus, Project
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.queues.usecases.bulk_queue_creation import BulkQueueCreationUseCase
@@ -386,6 +397,33 @@ class QueueViewset(ModelViewSet):
 
         if not is_vtex_internal_domain(user_email):
             agents = exclude_vtex_internal_domains(agents)
+
+        pause_subquery = (
+            CustomStatus.objects.filter(
+                user=OuterRef("pk"),
+                project=project,
+                is_active=True,
+            )
+            .exclude(status_type__name__iexact="in-service")
+            .values("status_type__name")[:1]
+        )
+        online_subquery = ProjectPermission.objects.filter(
+            user=OuterRef("pk"),
+            project=project,
+            status="ONLINE",
+        )
+
+        agents = agents.annotate(
+            _pause_name=Subquery(pause_subquery, output_field=CharField()),
+            _is_online=Exists(online_subquery),
+        ).annotate(
+            _order=Case(
+                When(_pause_name__isnull=False, then=Value(1)),
+                When(_is_online=True, then=Value(0)),
+                default=Value(2),
+                output_field=IntegerField(),
+            )
+        ).order_by("_order", "first_name", "last_name")
 
         serializer = QueueAgentsSerializer(
             agents, many=True, context={"project": project}
