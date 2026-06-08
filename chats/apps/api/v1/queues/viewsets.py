@@ -400,17 +400,19 @@ class QueueViewset(ModelViewSet):
 
         pause_subquery = (
             CustomStatus.objects.filter(
-                user=OuterRef("pk"),
+                user_id=OuterRef("email"),
                 project=project,
                 is_active=True,
             )
             .exclude(status_type__name__iexact="in-service")
+            .order_by("-created_on")
             .values("status_type__name")[:1]
         )
         online_subquery = ProjectPermission.objects.filter(
-            user=OuterRef("pk"),
+            user_id=OuterRef("email"),
             project=project,
             status="ONLINE",
+            is_deleted=False,
         )
 
         agents = agents.annotate(
