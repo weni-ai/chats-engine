@@ -211,19 +211,25 @@ class TestArchiveChatsService(TestCase):
     def test_archive_room_history_skips_when_create_loses_race(
         self, mock_process_messages
     ):
+        """
+        Simulate the race where ``select_for_update`` finds nothing and the
+        existence check confirms the row is absent, but a concurrent worker
+        commits the row before our ``create`` call lands. PostgreSQL then
+        raises ``IntegrityError`` on our insert and the service must catch
+        it, return ``None``, and not leave a partial row from our worker.
+
+        The conflicting worker's row cannot be simulated from inside the
+        same connection, because any insert we make here lives inside the
+        service's savepoint and is rolled back together with our failed
+        ``create``. We therefore assert what the service actually
+        guarantees: no duplicate row is left behind by us.
+        """
         job = ArchiveConversationsJob.objects.create(started_at=timezone.now())
 
         empty_qs = MagicMock()
         empty_qs.filter.return_value.first.return_value = None
 
-        original_create = RoomArchivedConversation.objects.create
-
         def raising_create(*args, **kwargs):
-            original_create(
-                room=self.room,
-                job=job,
-                status=ArchiveConversationsJobStatus.PENDING,
-            )
             raise IntegrityError("simulated unique_violation")
 
         with patch.object(
@@ -241,7 +247,7 @@ class TestArchiveChatsService(TestCase):
         mock_process_messages.assert_not_called()
 
         self.assertEqual(
-            RoomArchivedConversation.objects.filter(room=self.room).count(), 1
+            RoomArchivedConversation.objects.filter(room=self.room).count(), 0
         )
 
     @patch("chats.apps.archive_chats.services.ArchiveChatsService.upload_messages_file")
@@ -252,26 +258,33 @@ class TestArchiveChatsService(TestCase):
         """
         The S3 upload and message deletion must run outside the transaction
         that the claim phase opens, otherwise the row lock is held for the
-        duration of network I/O. This is asserted indirectly by checking
-        that no atomic block is active while the heavy work is being called.
+        duration of network I/O.
+
+        Django's ``TestCase`` wraps every test method in an outer
+        ``transaction.atomic()`` so ``connection.in_atomic_block`` is always
+        ``True`` during the test, regardless of what the service does.
+        Instead, we capture the savepoint depth before the call and assert
+        that the heavy work runs at the same depth, i.e. the service did
+        not push an extra savepoint of its own around the upload.
         """
-        from django.db import transaction as _transaction
+        from django.db import connection
 
         mock_process_messages.return_value = []
+        baseline_savepoints = len(connection.savepoint_ids)
         observed = {}
 
-        def record_atomic_state(*args, **kwargs):
-            observed["in_atomic_block"] = _transaction.get_connection().in_atomic_block
+        def record_savepoint_depth(*args, **kwargs):
+            observed["savepoint_count"] = len(connection.savepoint_ids)
             return None
 
-        mock_upload.side_effect = record_atomic_state
+        mock_upload.side_effect = record_savepoint_depth
 
         job = ArchiveConversationsJob.objects.create(started_at=timezone.now())
         self.service.archive_room_history(self.room, job)
 
         mock_upload.assert_called_once()
-        self.assertIn("in_atomic_block", observed)
-        self.assertFalse(observed["in_atomic_block"])
+        self.assertIn("savepoint_count", observed)
+        self.assertEqual(observed["savepoint_count"], baseline_savepoints)
 
     def test_process_messages(self):
         message_a = Message.objects.create(
