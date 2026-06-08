@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from datetime import timedelta
 import json
 import logging
 import tempfile
@@ -13,7 +14,7 @@ from django.utils import timezone
 from django.core.files.base import File
 from sentry_sdk import capture_exception
 from django.conf import settings
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from weni.feature_flags.services import FeatureFlagsService
 
 
@@ -87,6 +88,94 @@ class ArchiveChatsService(BaseArchiveChatsService):
             f"[ArchiveChatsService] Archiving room history for room {room.uuid} with job {job.uuid}"
         )
 
+        room_archived_conversation = self._claim_room_for_archive(room, job)
+
+        if room_archived_conversation is None:
+            return None
+
+        if (
+            room_archived_conversation.status
+            == ArchiveConversationsJobStatus.FINISHED
+        ):
+            return room_archived_conversation
+
+        try:
+            if self._needs_processing_and_upload(room_archived_conversation):
+                messages_data = self.process_messages(room_archived_conversation)
+                self.upload_messages_file(room_archived_conversation, messages_data)
+            else:
+                logger.info(
+                    f"[ArchiveChatsService] Skipping message processing and upload "
+                    f"for room {room.uuid} - file already uploaded"
+                )
+
+            room_archived_conversation.refresh_from_db()
+
+            if self._needs_message_deletion(room_archived_conversation):
+                if (
+                    room_archived_conversation.status
+                    != ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED
+                ):
+                    room_archived_conversation.status = (
+                        ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED
+                    )
+                    room_archived_conversation.save(update_fields=["status"])
+                self.delete_room_messages(room_archived_conversation)
+            else:
+                logger.info(
+                    f"[ArchiveChatsService] Skipping message deletion "
+                    f"for room {room.uuid} - messages already deleted"
+                )
+
+            room_archived_conversation.refresh_from_db()
+            room_archived_conversation.status = (
+                ArchiveConversationsJobStatus.FINISHED
+            )
+            room_archived_conversation.archive_process_finished_at = timezone.now()
+            room_archived_conversation.save(
+                update_fields=["status", "archive_process_finished_at"]
+            )
+        except Exception as e:
+            sentry_event_id = capture_exception(e)
+            room_archived_conversation.register_error(e, sentry_event_id)
+            log_msg = (
+                f"[ArchiveChatsService] Error archiving room history "
+                f"for room {room.uuid} with job {job.uuid}: {e}"
+            )
+            logger.error(
+                log_msg,
+                exc_info=True,
+            )
+
+        room_archived_conversation.refresh_from_db()
+
+        return room_archived_conversation
+
+    def _claim_room_for_archive(
+        self, room: Room, job: ArchiveConversationsJob
+    ) -> "RoomArchivedConversation | None":
+        """
+        Acquire a brief row-level lock to claim a room for archiving.
+
+        The lock is only held long enough to:
+          * read or create the RoomArchivedConversation row,
+          * verify no other worker is actively processing it,
+          * stamp ``archive_process_started_at`` and re-point ``job``.
+
+        The heavy work (message iteration, S3 upload, batched DB deletes)
+        runs OUTSIDE the lock so the transaction is open for milliseconds
+        rather than for the duration of the upload. Concurrency is then
+        protected by:
+          * the row lock during the claim itself,
+          * the unique constraint on ``room``,
+          * the soft lock (``_is_actively_processed``) for the rare case
+            where a duplicate task is dispatched while a previous attempt
+            is still in flight.
+
+        Returns the row when it is safe to proceed, an already-FINISHED
+        row (which the caller should short-circuit on), or ``None`` when
+        another worker holds or has recently claimed the row.
+        """
         with transaction.atomic():
             room_archived_conversation = (
                 RoomArchivedConversation.objects.select_for_update(skip_locked=True)
@@ -102,11 +191,22 @@ class ArchiveChatsService(BaseArchiveChatsService):
                     )
                     return None
 
-                room_archived_conversation = RoomArchivedConversation.objects.create(
-                    job=job,
-                    room=room,
-                    status=ArchiveConversationsJobStatus.PENDING,
-                )
+                try:
+                    with transaction.atomic():
+                        room_archived_conversation = (
+                            RoomArchivedConversation.objects.create(
+                                job=job,
+                                room=room,
+                                status=ArchiveConversationsJobStatus.PENDING,
+                            )
+                        )
+                except IntegrityError:
+                    logger.info(
+                        f"[ArchiveChatsService] Room {room.uuid} was concurrently "
+                        f"created by another worker, skipping"
+                    )
+                    return None
+
                 logger.info(
                     f"[ArchiveChatsService] Room archived conversation created: "
                     f"{room_archived_conversation.uuid} with status "
@@ -124,6 +224,19 @@ class ArchiveChatsService(BaseArchiveChatsService):
                 )
                 return room_archived_conversation
 
+            if self._is_actively_processed(room_archived_conversation):
+                logger.info(
+                    f"[ArchiveChatsService] Room {room.uuid} is already being "
+                    f"processed (conversation {room_archived_conversation.uuid}, "
+                    f"status {room_archived_conversation.status}, "
+                    f"started_at {room_archived_conversation.archive_process_started_at}), "
+                    f"skipping"
+                )
+                return None
+
+            update_fields = ["archive_process_started_at"]
+            room_archived_conversation.archive_process_started_at = timezone.now()
+
             if room_archived_conversation.job_id != job.uuid:
                 logger.info(
                     f"[ArchiveChatsService] Resuming room archived conversation "
@@ -132,59 +245,47 @@ class ArchiveChatsService(BaseArchiveChatsService):
                     f"for room {room.uuid} and job {job.uuid}"
                 )
                 room_archived_conversation.job = job
-                room_archived_conversation.save(update_fields=["job"])
+                update_fields.append("job")
 
-            try:
-                if self._needs_processing_and_upload(room_archived_conversation):
-                    messages_data = self.process_messages(room_archived_conversation)
-                    self.upload_messages_file(room_archived_conversation, messages_data)
-                else:
-                    logger.info(
-                        f"[ArchiveChatsService] Skipping message processing and upload "
-                        f"for room {room.uuid} - file already uploaded"
-                    )
-
-                room_archived_conversation.refresh_from_db()
-
-                if self._needs_message_deletion(room_archived_conversation):
-                    if (
-                        room_archived_conversation.status
-                        != ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED
-                    ):
-                        room_archived_conversation.status = (
-                            ArchiveConversationsJobStatus.MESSAGES_FILE_UPLOADED
-                        )
-                        room_archived_conversation.save(update_fields=["status"])
-                    self.delete_room_messages(room_archived_conversation)
-                else:
-                    logger.info(
-                        f"[ArchiveChatsService] Skipping message deletion "
-                        f"for room {room.uuid} - messages already deleted"
-                    )
-
-                room_archived_conversation.refresh_from_db()
-                room_archived_conversation.status = (
-                    ArchiveConversationsJobStatus.FINISHED
-                )
-                room_archived_conversation.archive_process_finished_at = timezone.now()
-                room_archived_conversation.save(
-                    update_fields=["status", "archive_process_finished_at"]
-                )
-            except Exception as e:
-                sentry_event_id = capture_exception(e)
-                room_archived_conversation.register_error(e, sentry_event_id)
-                log_msg = (
-                    f"[ArchiveChatsService] Error archiving room history "
-                    f"for room {room.uuid} with job {job.uuid}: {e}"
-                )
-                logger.error(
-                    log_msg,
-                    exc_info=True,
-                )
-
-            room_archived_conversation.refresh_from_db()
+            room_archived_conversation.save(update_fields=update_fields)
 
             return room_archived_conversation
+
+    def _is_actively_processed(
+        self, room_archived_conversation: "RoomArchivedConversation"
+    ) -> bool:
+        """
+        Soft-lock detection used after the row lock is released.
+
+        A row is considered actively processed when its status indicates
+        an in-progress pipeline step and ``archive_process_started_at``
+        is recent enough that another worker is plausibly still running.
+
+        FINISHED and FAILED rows are never considered active, since they
+        represent terminal-or-retriable states that must be allowed to
+        progress (FINISHED short-circuits in the caller; FAILED is
+        explicitly resumable).
+
+        The threshold is configurable via the
+        ``ARCHIVE_CHATS_IN_PROGRESS_TIMEOUT_HOURS`` setting and defaults
+        to 12 hours, which is comfortably above the configured task
+        expiration but short enough to recover from a crashed worker
+        within a day.
+        """
+        if room_archived_conversation.status in {
+            ArchiveConversationsJobStatus.FINISHED,
+            ArchiveConversationsJobStatus.FAILED,
+        }:
+            return False
+
+        started_at = room_archived_conversation.archive_process_started_at
+        if started_at is None:
+            return False
+
+        threshold_hours = getattr(
+            settings, "ARCHIVE_CHATS_IN_PROGRESS_TIMEOUT_HOURS", 12
+        )
+        return timezone.now() - started_at < timedelta(hours=threshold_hours)
 
     def _get_or_create_room_archived_conversation(
         self, room: Room, job: ArchiveConversationsJob

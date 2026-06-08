@@ -1,8 +1,10 @@
 import json
+from datetime import timedelta
 from unittest.mock import patch, MagicMock
 
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.db import IntegrityError
+from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
@@ -134,6 +136,142 @@ class TestArchiveChatsService(TestCase):
         existing.refresh_from_db()
         self.assertEqual(existing.status, ArchiveConversationsJobStatus.PENDING)
         self.assertEqual(existing.job_id, job_a.uuid)
+
+    @override_settings(ARCHIVE_CHATS_IN_PROGRESS_TIMEOUT_HOURS=12)
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.process_messages")
+    def test_archive_room_history_soft_locks_recently_started_in_progress_row(
+        self, mock_process_messages
+    ):
+        job_a = ArchiveConversationsJob.objects.create(started_at=timezone.now())
+        job_b = ArchiveConversationsJob.objects.create(started_at=timezone.now())
+
+        existing = RoomArchivedConversation.objects.create(
+            room=self.room,
+            job=job_a,
+            status=ArchiveConversationsJobStatus.PROCESSING_MESSAGES,
+            archive_process_started_at=timezone.now() - timedelta(minutes=5),
+        )
+
+        result = self.service.archive_room_history(self.room, job_b)
+
+        self.assertIsNone(result)
+        mock_process_messages.assert_not_called()
+
+        existing.refresh_from_db()
+        self.assertEqual(
+            existing.status, ArchiveConversationsJobStatus.PROCESSING_MESSAGES
+        )
+        self.assertEqual(existing.job_id, job_a.uuid)
+
+    @override_settings(ARCHIVE_CHATS_IN_PROGRESS_TIMEOUT_HOURS=12)
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.delete_room_messages")
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.process_messages")
+    def test_archive_room_history_reclaims_stale_in_progress_row(
+        self, mock_process_messages, mock_delete_messages
+    ):
+        mock_process_messages.return_value = []
+        job = ArchiveConversationsJob.objects.create(started_at=timezone.now())
+
+        stale_started_at = timezone.now() - timedelta(hours=24)
+        RoomArchivedConversation.objects.create(
+            room=self.room,
+            job=job,
+            status=ArchiveConversationsJobStatus.PROCESSING_MESSAGES,
+            archive_process_started_at=stale_started_at,
+        )
+
+        result = self.service.archive_room_history(self.room, job)
+
+        self.assertIsNotNone(result)
+        mock_process_messages.assert_called_once()
+        self.assertGreater(result.archive_process_started_at, stale_started_at)
+
+    @override_settings(ARCHIVE_CHATS_IN_PROGRESS_TIMEOUT_HOURS=12)
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.process_messages")
+    def test_archive_room_history_allows_retry_for_recently_failed_row(
+        self, mock_process_messages
+    ):
+        mock_process_messages.return_value = []
+        job = ArchiveConversationsJob.objects.create(started_at=timezone.now())
+
+        RoomArchivedConversation.objects.create(
+            room=self.room,
+            job=job,
+            status=ArchiveConversationsJobStatus.FAILED,
+            archive_process_started_at=timezone.now() - timedelta(minutes=1),
+            failed_at=timezone.now() - timedelta(seconds=30),
+        )
+
+        result = self.service.archive_room_history(self.room, job)
+
+        self.assertIsNotNone(result)
+        mock_process_messages.assert_called_once()
+
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.process_messages")
+    def test_archive_room_history_skips_when_create_loses_race(
+        self, mock_process_messages
+    ):
+        job = ArchiveConversationsJob.objects.create(started_at=timezone.now())
+
+        empty_qs = MagicMock()
+        empty_qs.filter.return_value.first.return_value = None
+
+        original_create = RoomArchivedConversation.objects.create
+
+        def raising_create(*args, **kwargs):
+            original_create(
+                room=self.room,
+                job=job,
+                status=ArchiveConversationsJobStatus.PENDING,
+            )
+            raise IntegrityError("simulated unique_violation")
+
+        with patch.object(
+            RoomArchivedConversation.objects,
+            "select_for_update",
+            return_value=empty_qs,
+        ), patch.object(
+            RoomArchivedConversation.objects,
+            "create",
+            side_effect=raising_create,
+        ):
+            result = self.service.archive_room_history(self.room, job)
+
+        self.assertIsNone(result)
+        mock_process_messages.assert_not_called()
+
+        self.assertEqual(
+            RoomArchivedConversation.objects.filter(room=self.room).count(), 1
+        )
+
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.upload_messages_file")
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.process_messages")
+    def test_archive_room_history_does_not_hold_transaction_during_heavy_work(
+        self, mock_process_messages, mock_upload
+    ):
+        """
+        The S3 upload and message deletion must run outside the transaction
+        that the claim phase opens, otherwise the row lock is held for the
+        duration of network I/O. This is asserted indirectly by checking
+        that no atomic block is active while the heavy work is being called.
+        """
+        from django.db import transaction as _transaction
+
+        mock_process_messages.return_value = []
+        observed = {}
+
+        def record_atomic_state(*args, **kwargs):
+            observed["in_atomic_block"] = _transaction.get_connection().in_atomic_block
+            return None
+
+        mock_upload.side_effect = record_atomic_state
+
+        job = ArchiveConversationsJob.objects.create(started_at=timezone.now())
+        self.service.archive_room_history(self.room, job)
+
+        mock_upload.assert_called_once()
+        self.assertIn("in_atomic_block", observed)
+        self.assertFalse(observed["in_atomic_block"])
 
     def test_process_messages(self):
         message_a = Message.objects.create(
