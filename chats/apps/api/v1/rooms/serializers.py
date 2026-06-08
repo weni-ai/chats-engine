@@ -809,6 +809,14 @@ class RoomNoteMediaSerializer(serializers.ModelSerializer):
     def get_url(self, media: RoomNoteMedia):
         return media.url
 
+    def validate(self, attrs):
+        note = attrs.get("note")
+        if note and note.medias.count() >= 10:
+            raise serializers.ValidationError(
+                {"detail": "Internal notes can't have more than 10 media files"}
+            )
+        return super().validate(attrs)
+
     def create(self, validated_data):
         media = validated_data["media_file"]
         file_bytes = media.file.read()

@@ -117,6 +117,25 @@ class SendRoomExportEmailTests(TestCase):
         message = mail.outbox[0]
         self.assertIn("PROTO-42", message.subject)
 
+    def test_does_not_send_emails_when_an_upload_fails(self):
+        # Second upload fails: no email should be sent for the first one either,
+        # so retries don't end up duplicating delivery.
+        self.storage.save.side_effect = [
+            "first-file.html",
+            RuntimeError("s3 down"),
+        ]
+
+        usecase = SendRoomExportEmail(storage=self.storage)
+
+        with self.assertRaises(RuntimeError):
+            usecase.execute(
+                room=self.room,
+                files={"html": b"<html/>", "pdf": b"%PDF"},
+                recipient_email="user@example.com",
+            )
+
+        self.assertEqual(len(mail.outbox), 0)
+
     @patch("chats.apps.rooms.usecases.send_room_export_email.RoomExportStorage")
     def test_uses_default_storage_when_none_provided(self, storage_cls):
         instance = MagicMock()

@@ -1,4 +1,6 @@
 [run]
+parallel = True
+concurrency = multiprocessing
 omit =
     *migrations/*
     debug_*.py

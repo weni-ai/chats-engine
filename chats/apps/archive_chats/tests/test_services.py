@@ -1,8 +1,10 @@
 import json
+from datetime import timedelta
 from unittest.mock import patch, MagicMock
 
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.db import IntegrityError
+from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
@@ -106,6 +108,186 @@ class TestArchiveChatsService(TestCase):
         self.assertEqual(
             archived_conversation.errors[0]["sentry_event_id"], "test-event-id"
         )
+
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.process_messages")
+    def test_archive_room_history_skips_when_row_locked_by_another_worker(
+        self, mock_process_messages
+    ):
+        job_a = ArchiveConversationsJob.objects.create(started_at=timezone.now())
+        job_b = ArchiveConversationsJob.objects.create(started_at=timezone.now())
+
+        existing = RoomArchivedConversation.objects.create(
+            room=self.room,
+            job=job_a,
+            status=ArchiveConversationsJobStatus.PENDING,
+        )
+
+        locked_qs = MagicMock()
+        locked_qs.filter.return_value.first.return_value = None
+
+        with patch.object(
+            RoomArchivedConversation.objects,
+            "select_for_update",
+            return_value=locked_qs,
+        ) as mock_lock:
+            result = self.service.archive_room_history(self.room, job_b)
+
+        mock_lock.assert_called_once_with(skip_locked=True)
+        self.assertIsNone(result)
+        mock_process_messages.assert_not_called()
+
+        existing.refresh_from_db()
+        self.assertEqual(existing.status, ArchiveConversationsJobStatus.PENDING)
+        self.assertEqual(existing.job_id, job_a.uuid)
+
+    @override_settings(ARCHIVE_CHATS_IN_PROGRESS_TIMEOUT_HOURS=12)
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.process_messages")
+    def test_archive_room_history_soft_locks_recently_started_in_progress_row(
+        self, mock_process_messages
+    ):
+        job_a = ArchiveConversationsJob.objects.create(started_at=timezone.now())
+        job_b = ArchiveConversationsJob.objects.create(started_at=timezone.now())
+
+        existing = RoomArchivedConversation.objects.create(
+            room=self.room,
+            job=job_a,
+            status=ArchiveConversationsJobStatus.PROCESSING_MESSAGES,
+            archive_process_started_at=timezone.now() - timedelta(minutes=5),
+        )
+
+        result = self.service.archive_room_history(self.room, job_b)
+
+        self.assertIsNone(result)
+        mock_process_messages.assert_not_called()
+
+        existing.refresh_from_db()
+        self.assertEqual(
+            existing.status, ArchiveConversationsJobStatus.PROCESSING_MESSAGES
+        )
+        self.assertEqual(existing.job_id, job_a.uuid)
+
+    @override_settings(ARCHIVE_CHATS_IN_PROGRESS_TIMEOUT_HOURS=12)
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.delete_room_messages")
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.process_messages")
+    def test_archive_room_history_reclaims_stale_in_progress_row(
+        self, mock_process_messages, mock_delete_messages
+    ):
+        mock_process_messages.return_value = []
+        job = ArchiveConversationsJob.objects.create(started_at=timezone.now())
+
+        stale_started_at = timezone.now() - timedelta(hours=24)
+        RoomArchivedConversation.objects.create(
+            room=self.room,
+            job=job,
+            status=ArchiveConversationsJobStatus.PROCESSING_MESSAGES,
+            archive_process_started_at=stale_started_at,
+        )
+
+        result = self.service.archive_room_history(self.room, job)
+
+        self.assertIsNotNone(result)
+        mock_process_messages.assert_called_once()
+        self.assertGreater(result.archive_process_started_at, stale_started_at)
+
+    @override_settings(ARCHIVE_CHATS_IN_PROGRESS_TIMEOUT_HOURS=12)
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.process_messages")
+    def test_archive_room_history_allows_retry_for_recently_failed_row(
+        self, mock_process_messages
+    ):
+        mock_process_messages.return_value = []
+        job = ArchiveConversationsJob.objects.create(started_at=timezone.now())
+
+        RoomArchivedConversation.objects.create(
+            room=self.room,
+            job=job,
+            status=ArchiveConversationsJobStatus.FAILED,
+            archive_process_started_at=timezone.now() - timedelta(minutes=1),
+            failed_at=timezone.now() - timedelta(seconds=30),
+        )
+
+        result = self.service.archive_room_history(self.room, job)
+
+        self.assertIsNotNone(result)
+        mock_process_messages.assert_called_once()
+
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.process_messages")
+    def test_archive_room_history_skips_when_create_loses_race(
+        self, mock_process_messages
+    ):
+        """
+        Simulate the race where ``select_for_update`` finds nothing and the
+        existence check confirms the row is absent, but a concurrent worker
+        commits the row before our ``create`` call lands. PostgreSQL then
+        raises ``IntegrityError`` on our insert and the service must catch
+        it, return ``None``, and not leave a partial row from our worker.
+
+        The conflicting worker's row cannot be simulated from inside the
+        same connection, because any insert we make here lives inside the
+        service's savepoint and is rolled back together with our failed
+        ``create``. We therefore assert what the service actually
+        guarantees: no duplicate row is left behind by us.
+        """
+        job = ArchiveConversationsJob.objects.create(started_at=timezone.now())
+
+        empty_qs = MagicMock()
+        empty_qs.filter.return_value.first.return_value = None
+
+        def raising_create(*args, **kwargs):
+            raise IntegrityError("simulated unique_violation")
+
+        with patch.object(
+            RoomArchivedConversation.objects,
+            "select_for_update",
+            return_value=empty_qs,
+        ), patch.object(
+            RoomArchivedConversation.objects,
+            "create",
+            side_effect=raising_create,
+        ):
+            result = self.service.archive_room_history(self.room, job)
+
+        self.assertIsNone(result)
+        mock_process_messages.assert_not_called()
+
+        self.assertEqual(
+            RoomArchivedConversation.objects.filter(room=self.room).count(), 0
+        )
+
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.upload_messages_file")
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.process_messages")
+    def test_archive_room_history_does_not_hold_transaction_during_heavy_work(
+        self, mock_process_messages, mock_upload
+    ):
+        """
+        The S3 upload and message deletion must run outside the transaction
+        that the claim phase opens, otherwise the row lock is held for the
+        duration of network I/O.
+
+        Django's ``TestCase`` wraps every test method in an outer
+        ``transaction.atomic()`` so ``connection.in_atomic_block`` is always
+        ``True`` during the test, regardless of what the service does.
+        Instead, we capture the savepoint depth before the call and assert
+        that the heavy work runs at the same depth, i.e. the service did
+        not push an extra savepoint of its own around the upload.
+        """
+        from django.db import connection
+
+        mock_process_messages.return_value = []
+        baseline_savepoints = len(connection.savepoint_ids)
+        observed = {}
+
+        def record_savepoint_depth(*args, **kwargs):
+            observed["savepoint_count"] = len(connection.savepoint_ids)
+            return None
+
+        mock_upload.side_effect = record_savepoint_depth
+
+        job = ArchiveConversationsJob.objects.create(started_at=timezone.now())
+        self.service.archive_room_history(self.room, job)
+
+        mock_upload.assert_called_once()
+        self.assertIn("savepoint_count", observed)
+        self.assertEqual(observed["savepoint_count"], baseline_savepoints)
 
     def test_process_messages(self):
         message_a = Message.objects.create(
@@ -321,7 +503,9 @@ class TestArchiveChatsService(TestCase):
     def test_get_or_create_room_archived_conversation_creates_new(self):
         job = self.service.start_archive_job()
 
-        self.assertFalse(RoomArchivedConversation.objects.filter(room=self.room).exists())
+        self.assertFalse(
+            RoomArchivedConversation.objects.filter(room=self.room).exists()
+        )
 
         result = self.service._get_or_create_room_archived_conversation(self.room, job)
 
@@ -332,7 +516,9 @@ class TestArchiveChatsService(TestCase):
             RoomArchivedConversation.objects.filter(room=self.room).count(), 1
         )
 
-    def test_get_or_create_room_archived_conversation_reuses_existing_and_updates_job(self):
+    def test_get_or_create_room_archived_conversation_reuses_existing_and_updates_job(
+        self,
+    ):
         job_a = self.service.start_archive_job()
         job_b = self.service.start_archive_job()
 
@@ -353,7 +539,9 @@ class TestArchiveChatsService(TestCase):
             RoomArchivedConversation.objects.filter(room=self.room).count(), 1
         )
 
-    def test_get_or_create_room_archived_conversation_does_not_update_finished_job(self):
+    def test_get_or_create_room_archived_conversation_does_not_update_finished_job(
+        self,
+    ):
         job_a = self.service.start_archive_job()
         job_b = self.service.start_archive_job()
 
@@ -477,9 +665,7 @@ class TestArchiveChatsService(TestCase):
         self.assertEqual(result.status, ArchiveConversationsJobStatus.FINISHED)
         mock_process_messages.assert_not_called()
 
-    @patch(
-        "chats.apps.archive_chats.services.ArchiveChatsService.delete_room_messages"
-    )
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.delete_room_messages")
     @patch("chats.apps.archive_chats.services.ArchiveChatsService.process_messages")
     def test_archive_room_history_resumes_from_uploaded_skips_processing(
         self, mock_process_messages, mock_delete_messages
@@ -497,9 +683,7 @@ class TestArchiveChatsService(TestCase):
         mock_process_messages.assert_not_called()
         mock_delete_messages.assert_called_once()
 
-    @patch(
-        "chats.apps.archive_chats.services.ArchiveChatsService.delete_room_messages"
-    )
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.delete_room_messages")
     @patch("chats.apps.archive_chats.services.ArchiveChatsService.process_messages")
     def test_archive_room_history_resumes_from_failed_with_file(
         self, mock_process_messages, mock_delete_messages
@@ -518,12 +702,8 @@ class TestArchiveChatsService(TestCase):
         mock_process_messages.assert_not_called()
         mock_delete_messages.assert_called_once()
 
-    @patch(
-        "chats.apps.archive_chats.services.ArchiveChatsService.delete_room_messages"
-    )
-    @patch(
-        "chats.apps.archive_chats.services.ArchiveChatsService.upload_messages_file"
-    )
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.delete_room_messages")
+    @patch("chats.apps.archive_chats.services.ArchiveChatsService.upload_messages_file")
     @patch("chats.apps.archive_chats.services.ArchiveChatsService.process_messages")
     def test_archive_room_history_resumes_from_failed_with_messages_deleted(
         self, mock_process_messages, mock_upload, mock_delete_messages

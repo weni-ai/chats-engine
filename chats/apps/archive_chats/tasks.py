@@ -8,6 +8,7 @@ import logging
 from celery import group, shared_task
 from dateutil.relativedelta import relativedelta as rdelta
 from django.conf import settings
+from django.db import transaction
 
 from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
 from chats.apps.archive_chats.expiration import calculate_archive_task_expiration_dt
@@ -91,34 +92,48 @@ def start_archive_rooms_messages():
 
 def _create_pending_records(room_uuids, job):
     """
-    Bulk-create PENDING RoomArchivedConversation records at dispatch time so
-    subsequent scheduler runs exclude already-queued rooms via the 24-hour
-    job filter.
+    Prepare RoomArchivedConversation rows for dispatch:
+
+    - Re-point existing non-FINISHED rows to the current ``job`` so the 24-hour
+      filter in the scheduler excludes them on subsequent runs even if no
+      worker has picked the task up yet.
+    - Bulk-create PENDING rows for rooms that have no conversation at all.
+
+    Both operations run inside a single transaction so the dispatch-time
+    bookkeeping is consistent with the tasks queued immediately after.
     """
     if not room_uuids:
         return
 
-    new_room_ids = (
-        Room.objects.filter(uuid__in=room_uuids)
-        .exclude(archived_conversations__isnull=False)
-        .values_list("uuid", flat=True)
-    )
-
-    if new_room_ids:
-        RoomArchivedConversation.objects.bulk_create(
-            [
-                RoomArchivedConversation(
-                    room_id=room_id,
-                    job=job,
-                    status=ArchiveConversationsJobStatus.PENDING,
-                )
-                for room_id in new_room_ids
-            ],
-            batch_size=settings.ARCHIVE_CHATS_BULK_CREATE_PENDING_BATCH_SIZE,
+    with transaction.atomic():
+        repointed = (
+            RoomArchivedConversation.objects.filter(room_id__in=room_uuids)
+            .exclude(status=ArchiveConversationsJobStatus.FINISHED)
+            .update(job=job)
         )
 
+        new_room_ids = list(
+            Room.objects.filter(uuid__in=room_uuids)
+            .exclude(archived_conversations__isnull=False)
+            .values_list("uuid", flat=True)
+        )
+
+        if new_room_ids:
+            RoomArchivedConversation.objects.bulk_create(
+                [
+                    RoomArchivedConversation(
+                        room_id=room_id,
+                        job=job,
+                        status=ArchiveConversationsJobStatus.PENDING,
+                    )
+                    for room_id in new_room_ids
+                ],
+                batch_size=settings.ARCHIVE_CHATS_BULK_CREATE_PENDING_BATCH_SIZE,
+            )
+
     logger.info(
-        f"[start_archive_rooms_messages] Created {len(new_room_ids)} archived conversations rows"
+        f"[start_archive_rooms_messages] Repointed {repointed} existing rows "
+        f"and created {len(new_room_ids)} new archived conversation rows"
     )
 
 

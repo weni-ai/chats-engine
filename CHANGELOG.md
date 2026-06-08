@@ -1,3 +1,49 @@
+# 3.65.1
+# Fix
+  - Restrict accounts userdata endpoint permissions
+
+# 3.65.0
+# Add
+  - Media support in internal notes
+  - Room export data use case with report type isolation
+
+# 3.64.1
+# Fix
+  - Flow template info
+
+# 3.64.0
+# Add
+  - Offline agents send messages restriction
+
+# 3.63.6
+# Add
+  - Feature flag to control transfer flows dependency
+
+# 3.63.5
+# Add
+  - Pending response based on unread messages count
+
+# 3.63.4
+# Add
+  - New params to internal rooms endpoint
+
+# 3.63.3
+# Add
+  - Transfer change ticket logic with flows
+
+# 3.63.2
+# Add
+  - Sector fields for automatic message migration
+
+# 3.63.1
+# Add
+  - verify_chats_tag parameter to list_flows endpoint
+
+# 3.63.0
+# Add
+  - Custom CSAT flow
+  - Email notification when custom CSAT flow fails
+
 # 3.62.0
 # Add
   - Report status caching and invalidation

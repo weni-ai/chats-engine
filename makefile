@@ -19,7 +19,8 @@ install:
 # @make add_initial_data
 
 test:
-	@coverage run manage.py test
+	@CONN_MAX_AGE=0 coverage run manage.py test --parallel=auto --noinput
+	@coverage combine
 	@coverage report -m
 
 lint:

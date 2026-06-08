@@ -168,6 +168,11 @@ DATABASES = {
     }
 }
 
+# Custom test runner that gives each parallel worker its own Redis DB so that
+# tests using `cache.clear()` / `get_redis_connection()` don't race with
+# sibling workers. See chats/core/test_runner.py for details.
+TEST_RUNNER = "chats.core.test_runner.IsolatedCacheTestRunner"
+
 # User
 
 AUTH_USER_MODEL = "accounts.User"
@@ -516,6 +521,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "process_pending_room_exports",
         "schedule": 20.0,
     },
+    "process-pending-room-exports": {
+        "task": "process_pending_room_exports",
+        "schedule": 20.0,
+    },
     "start-archive-rooms-messages": {
         "task": "start_archive_rooms_messages",
         "schedule": crontab(hour="0-4", minute=0),
@@ -814,6 +823,12 @@ ARCHIVE_CHATS_USE_BATCH_DISPATCH = env.bool(
 ARCHIVE_CHATS_BATCH_SIZE = env.int("ARCHIVE_CHATS_BATCH_SIZE", default=500)
 ARCHIVE_CHATS_BULK_CREATE_PENDING_BATCH_SIZE = env.int(
     "ARCHIVE_CHATS_BULK_CREATE_PENDING_BATCH_SIZE", default=2000
+)
+# Soft-lock threshold used by ArchiveChatsService to decide whether an
+# in-progress RoomArchivedConversation is still being processed by another
+# worker or stale enough to be reclaimed.
+ARCHIVE_CHATS_IN_PROGRESS_TIMEOUT_HOURS = env.int(
+    "ARCHIVE_CHATS_IN_PROGRESS_TIMEOUT_HOURS", default=12
 )
 
 # Internal API Token
