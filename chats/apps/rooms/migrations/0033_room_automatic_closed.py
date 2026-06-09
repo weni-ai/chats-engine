@@ -3,7 +3,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("rooms", "0031_rooms_inactivity_idx"),
+        ("rooms", "0032_rooms_inactivity_idx"),
     ]
 
     operations = [

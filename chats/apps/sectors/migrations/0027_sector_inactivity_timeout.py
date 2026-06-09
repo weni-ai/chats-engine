@@ -4,7 +4,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("sectors", "0024_groupsector_created_by_groupsector_deleted_by_and_more"),
+        ("sectors", "0026_sector_automatic_message_queue_and_more"),
     ]
 
     operations = [

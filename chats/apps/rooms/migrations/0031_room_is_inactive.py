@@ -4,7 +4,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("rooms", "0029_room_automatic_message_sent_at"),
+        ("rooms", "0030_roomnotemedia"),
     ]
 
     operations = [

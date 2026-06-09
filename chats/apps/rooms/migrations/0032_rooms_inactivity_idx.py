@@ -4,7 +4,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("rooms", "0030_room_is_inactive"),
+        ("rooms", "0031_room_is_inactive"),
     ]
 
     operations = [
