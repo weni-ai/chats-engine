@@ -5,3 +5,4 @@ class RoomFeedbackMethods(TextChoices):
     ROOM_TRANSFER = "rt"
     EDIT_CUSTOM_FIELDS = "ecf"
     FLOW_START = "fs"
+    ROOM_CLOSE = "rc"

@@ -12,11 +12,13 @@ Responsibilities:
 import logging
 from typing import TYPE_CHECKING, Optional
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from sentry_sdk import capture_exception
 
-from chats.apps.msgs.models import Message
+from chats.apps.msgs.models import AutomaticMessageType, Message
+from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
 
 if TYPE_CHECKING:
@@ -30,7 +32,10 @@ INACTIVITY_END_BY = "inactivity"
 
 
 def _send_silent_automatic_message(
-    room: "Room", text: str, user: Optional["User"]
+    room: "Room",
+    text: str,
+    user: Optional["User"],
+    message_type: Optional[str] = None,
 ) -> Optional[Message]:
     """
     Creates an automatic message on the room WITHOUT updating
@@ -39,6 +44,9 @@ def _send_silent_automatic_message(
     The inactivity feature requires that the warning and closure messages do
     not reset the inactivity counter, so they can't go through the regular
     `room.update_last_message` flow.
+
+    `message_type` classifies the automatic message (e.g. `inactive_warning`
+    or `inactive_close`) so the front can render a specific UI for each.
     """
     if not text:
         return None
@@ -50,6 +58,7 @@ def _send_silent_automatic_message(
                 text=text,
                 user=user,
                 contact=None,
+                automatic_message_type=message_type,
             )
             transaction.on_commit(lambda: message.notify_room("create", True))
             return message
@@ -206,7 +215,12 @@ class InactivityService:
     def _warn_room(self, room: "Room", config: dict) -> bool:
         text = config.get("message_timeout_text") or ""
 
-        message = _send_silent_automatic_message(room, text, room.user)
+        message = _send_silent_automatic_message(
+            room,
+            text,
+            room.user,
+            message_type=AutomaticMessageType.INACTIVE_WARNING,
+        )
         if message is None and text:
             return False
 
@@ -230,10 +244,36 @@ class InactivityService:
     def _close_room(self, room: "Room", config: dict) -> bool:
         text = config.get("close_room_message_text") or ""
 
-        _send_silent_automatic_message(room, text, room.user)
+        # Order matters: both messages must be created BEFORE `room.close()`
+        # because `Message.save()` rejects writes to inactive rooms.
+        # 1) Human-facing closure text (only when configured).
+        # 2) System feedback (`rc` / `automatic_close`) — always emitted.
+        _send_silent_automatic_message(
+            room,
+            text,
+            room.user,
+            message_type=AutomaticMessageType.INACTIVE_CLOSE,
+        )
 
         try:
-            room.close(end_by=INACTIVITY_END_BY)
+            self._create_automatic_close_feedback(room)
+        except Exception as exc:
+            # Feedback failure should not block the actual closure; log and
+            # keep going so the room still closes.
+            logger.warning(
+                "[INACTIVITY] Failed to create close feedback for room %s: %s",
+                room.pk,
+                exc,
+            )
+            capture_exception(exc)
+
+        # Mark `automatic_closed=True` BEFORE `room.close()` so the flag is
+        # persisted in the same `save()` call and visible to any post-close
+        # signal/consumer.
+        room.automatic_closed = True
+
+        try:
+            room.close(end_by=INACTIVITY_END_BY, closed_by=room.user)
         except Exception as exc:
             logger.error(
                 "[INACTIVITY] Failed to close room %s: %s",
@@ -244,5 +284,69 @@ class InactivityService:
             capture_exception(exc)
             return False
 
+        # Notify the websocket groups that the room was closed, mirroring the
+        # manual close endpoint, so the front removes it from the agent's list
+        # in real time (and the room callback is triggered).
+        try:
+            room.notify_queue("close", callback=True)
+            room.notify_user("close")
+        except Exception as exc:
+            logger.warning(
+                "[INACTIVITY] Failed to notify websocket on close for room %s: %s",
+                room.pk,
+                exc,
+            )
+            capture_exception(exc)
+
+        # The manual close endpoint computes service metrics
+        # (interaction_time, message_response_time, etc.) in the view via
+        # `close_room`. The automatic close must replicate it, otherwise
+        # inactivity-closed rooms are left without those metrics.
+        if settings.ACTIVATE_CALC_METRICS:
+            try:
+                from chats.apps.rooms.views import close_room
+
+                close_room(str(room.pk))
+            except Exception as exc:
+                logger.warning(
+                    "[INACTIVITY] Failed to generate metrics for room %s: %s",
+                    room.pk,
+                    exc,
+                )
+                capture_exception(exc)
+
+        # Closing a room frees up the agent's capacity, so re-run the queue
+        # priority routing to assign any waiting room. The manual close
+        # endpoint does this in the view; the automatic close must too.
+        if room.queue:
+            try:
+                from chats.apps.queues.utils import start_queue_priority_routing
+
+                start_queue_priority_routing(room.queue)
+            except Exception as exc:
+                logger.warning(
+                    "[INACTIVITY] Failed to start queue priority routing "
+                    "for room %s: %s",
+                    room.pk,
+                    exc,
+                )
+                capture_exception(exc)
+
         logger.info("[INACTIVITY] Closed room %s", room.pk)
         return True
+
+    def _create_automatic_close_feedback(self, room: "Room") -> None:
+        """
+        Creates the `rc` / `automatic_close` feedback message on the room.
+        Must be called while the room is still active (`Message.save()`
+        rejects writes to inactive rooms). Imports the helper lazily to
+        mirror the pattern used elsewhere (e.g. `chats.apps.queues.utils`)
+        and avoid potential circular imports.
+        """
+        from chats.apps.rooms.views import create_room_feedback_message
+
+        create_room_feedback_message(
+            room,
+            {"action": "automatic_close"},
+            method=RoomFeedbackMethods.ROOM_CLOSE,
+        )

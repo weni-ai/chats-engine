@@ -173,6 +173,14 @@ class Room(BaseModel, BaseConfigurableModel):
     )
 
     is_inactive = models.BooleanField(_("is inactive?"), default=False)
+    automatic_closed = models.BooleanField(
+        _("automatic closed?"),
+        default=False,
+        help_text=_(
+            "True when the room was closed automatically by the system "
+            "(e.g. inactivity timeout) rather than by a human agent."
+        ),
+    )
 
     tracker = FieldTracker(fields=["user_id", "queue_id"])
 
