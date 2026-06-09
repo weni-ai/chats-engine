@@ -1,12 +1,11 @@
-from django.contrib.auth import get_user_model
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
-from weni.feature_flags.shortcuts import (
-    is_feature_active_for_attributes,
-)
+from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
 from chats.apps.api.v1.accounts.serializers import UserSerializer
+from chats.apps.projects.models import Project
 from chats.apps.sectors.constants import get_default_inactivity_timeout
 from chats.apps.sectors.models import (
     Sector,
@@ -15,7 +14,6 @@ from chats.apps.sectors.models import (
     SectorTag,
 )
 from chats.core.serializers import AuditableModelSerializer
-from chats.apps.projects.models import Project
 
 User = get_user_model()
 
@@ -433,7 +431,7 @@ class SectorReadOnlyListSerializer(serializers.ModelSerializer):
         model = Sector
         fields = [
             "uuid",
-            "name", 
+            "name",
             "agents",
             "contacts",
             "can_trigger_flows",

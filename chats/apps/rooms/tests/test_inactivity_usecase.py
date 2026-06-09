@@ -326,7 +326,7 @@ class InactivityCloseTests(TestCase):
         self.assertFalse(room.is_inactive)
 
         with patch.object(Room, "notify_user"):
-            closed = InactivityService().close_inactive_rooms()
+            InactivityService().close_inactive_rooms()
 
         room.refresh_from_db()
         self.assertTrue(room.is_active)
@@ -391,9 +391,7 @@ class InactivityResetTests(TestCase):
 
     def test_on_new_message_from_contact_resets_inactive_room(self):
         room = self._create_inactive_room()
-        message = Message.objects.create(
-            room=room, text="hello", contact=self.contact
-        )
+        message = Message.objects.create(room=room, text="hello", contact=self.contact)
 
         with patch.object(Room, "notify_inactivity"):
             room.on_new_message(message, contact=self.contact)
@@ -441,9 +439,7 @@ class SilentAutomaticMessageTests(TestCase):
         room.save()
 
         with patch.object(Message, "notify_room"):
-            message = _send_silent_automatic_message(
-                room, "warn me", self.user
-            )
+            message = _send_silent_automatic_message(room, "warn me", self.user)
 
         self.assertIsNotNone(message)
 
