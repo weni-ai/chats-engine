@@ -1483,7 +1483,9 @@ class RoomReportViewSet(APIView):
                 {
                     "error": {
                         "code": "export_in_progress",
-                        "message": "An export is already being generated for this room.",
+                        "message": _(
+                            "An export is already being generated for this room."
+                        ),
                     }
                 },
                 status=status.HTTP_409_CONFLICT,
@@ -1509,7 +1511,7 @@ class RoomReportViewSet(APIView):
         return Response(
             {
                 "report_uuid": str(report_status.uuid),
-                "detail": "The export will be sent to your email when ready.",
+                "detail": _("The export will be sent to your email when ready."),
             },
             status=status.HTTP_202_ACCEPTED,
         )
