@@ -487,6 +487,14 @@ CHATS_CACHE_TIME = env.int("CHATS_CACHE_TIME", default=1 * 60 * 60)
 
 DISCUSSION_AGENTS_LIMIT = env.int("DISCUSSION_AGENTS_LIMIT", default=5)
 
+# Inactivity feature defaults (in seconds)
+DEFAULT_MESSAGE_TIMEOUT_TIME = env.int(
+    "DEFAULT_MESSAGE_TIMEOUT_TIME", default=600
+)
+DEFAULT_CLOSE_ROOM_TIMEOUT_TIME = env.int(
+    "DEFAULT_CLOSE_ROOM_TIMEOUT_TIME", default=60
+)
+
 # Celery
 
 METRICS_CUSTOM_QUEUE = env("METRICS_CUSTOM_QUEUE", default="celery")

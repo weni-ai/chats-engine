@@ -81,7 +81,9 @@ def _eligible_warn_queryset():
     - room is open and assigned to an agent (not in queue);
     - not currently flagged as inactive;
     - not waiting for a flow start;
-    - the agent was the last one to talk (`last_message_user` populated).
+    - the agent was the last one to talk (`last_message_user` populated);
+    - the sector has the inactivity warning feature enabled (so we don't
+      pull rooms from sectors that won't be processed anyway).
 
     The final timeout comparison happens in Python because the timeout value
     lives inside the sector's JSON config and varies per sector.
@@ -92,6 +94,7 @@ def _eligible_warn_queryset():
         is_waiting=False,
         user__isnull=False,
         last_message_user__isnull=False,
+        queue__sector__inactivity_timeout__is_message_timeout_enabled=True,
     ).select_related("queue__sector", "user")
 
 
@@ -99,6 +102,9 @@ def _eligible_close_queryset():
     """
     Base queryset for rooms that already received the warning and may need to
     be closed for inactivity.
+
+    Restricted to sectors with the automatic closure feature enabled, so the
+    database does not have to return rooms from sectors that won't be closed.
     """
     return Room.objects.filter(
         is_active=True,
@@ -106,6 +112,7 @@ def _eligible_close_queryset():
         is_waiting=False,
         user__isnull=False,
         last_message_user__isnull=False,
+        queue__sector__inactivity_timeout__is_close_room_enabled=True,
     ).select_related("queue__sector", "user")
 
 
@@ -131,10 +138,7 @@ class InactivityService:
         warned = 0
 
         for room in _eligible_warn_queryset().iterator():
-            config = _read_inactivity_config(room)
-
-            if not config or not config.get("is_message_timeout_enabled"):
-                continue
+            config = _read_inactivity_config(room) or {}
 
             timeout = config.get("message_timeout_time") or 0
             if timeout <= 0:
@@ -163,10 +167,7 @@ class InactivityService:
         closed = 0
 
         for room in _eligible_close_queryset().iterator():
-            config = _read_inactivity_config(room)
-
-            if not config or not config.get("is_close_room_enabled"):
-                continue
+            config = _read_inactivity_config(room) or {}
 
             warn_timeout = config.get("message_timeout_time") or 0
             close_timeout = config.get("close_room_timeout_time") or 0

@@ -1,11 +1,5 @@
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
-
-
-# Default warning time in seconds (10 minutes)
-DEFAULT_MESSAGE_TIMEOUT_TIME = 600
-
-# Default closure time in seconds (1 minute)
-DEFAULT_CLOSE_ROOM_TIMEOUT_TIME = 60
 
 
 def get_default_inactivity_timeout() -> dict:
@@ -26,7 +20,7 @@ def get_default_inactivity_timeout() -> dict:
                 "If there's no response, this conversation will be closed soon."
             )
         ),
-        "message_timeout_time": DEFAULT_MESSAGE_TIMEOUT_TIME,
+        "message_timeout_time": settings.DEFAULT_MESSAGE_TIMEOUT_TIME,
         "is_close_room_enabled": False,
         "close_room_message_text": str(
             _(
@@ -34,5 +28,5 @@ def get_default_inactivity_timeout() -> dict:
                 "Get in touch again if needed."
             )
         ),
-        "close_room_timeout_time": DEFAULT_CLOSE_ROOM_TIMEOUT_TIME,
+        "close_room_timeout_time": settings.DEFAULT_CLOSE_ROOM_TIMEOUT_TIME,
     }

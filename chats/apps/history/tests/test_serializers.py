@@ -6,7 +6,7 @@ from chats.apps.contacts.models import Contact
 from chats.apps.history.serializers.rooms import (
     RoomDetailSerializer,
     RoomHistorySerializer,
-    build_closed_by_payload,
+    _serialize_closed_by,
 )
 from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
@@ -14,7 +14,7 @@ from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
 
 
-class TestBuildClosedByPayload(TestCase):
+class TestSerializeClosedBy(TestCase):
     """
     The contract requires `automatic_closed` to be carried *inside* the
     `closed_by` object. This payload must be coherent across three cases:
@@ -48,11 +48,11 @@ class TestBuildClosedByPayload(TestCase):
 
     def test_returns_none_when_no_user_and_not_automatic(self):
         room = self._make_room()
-        self.assertIsNone(build_closed_by_payload(room))
+        self.assertIsNone(_serialize_closed_by(room))
 
     def test_returns_user_with_automatic_false_for_manual_close(self):
         room = self._make_room(closed_by=self.user)
-        payload = build_closed_by_payload(room)
+        payload = _serialize_closed_by(room)
         self.assertEqual(payload["first_name"], "Agent")
         self.assertEqual(payload["last_name"], "Smith")
         self.assertEqual(payload["email"], "agent@example.com")
@@ -60,13 +60,13 @@ class TestBuildClosedByPayload(TestCase):
 
     def test_returns_user_with_automatic_true_when_both_set(self):
         room = self._make_room(closed_by=self.user, automatic_closed=True)
-        payload = build_closed_by_payload(room)
+        payload = _serialize_closed_by(room)
         self.assertEqual(payload["email"], "agent@example.com")
         self.assertTrue(payload["automatic_closed"])
 
     def test_returns_payload_with_null_user_for_inactivity_close(self):
         room = self._make_room(closed_by=None, automatic_closed=True)
-        payload = build_closed_by_payload(room)
+        payload = _serialize_closed_by(room)
         self.assertIsNone(payload["first_name"])
         self.assertIsNone(payload["last_name"])
         self.assertIsNone(payload["email"])

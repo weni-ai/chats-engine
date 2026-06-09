@@ -9,31 +9,41 @@ from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import SectorTag
 
 
-def build_closed_by_payload(room: Room) -> Optional[dict]:
+class ClosedBySerializer(serializers.Serializer):
     """
-    Build the `closed_by` payload for room history endpoints.
-
-    The contract requires `automatic_closed` to live *inside* the closed_by
-    object so the front can render the closure context (manual vs automatic)
-    in a single place. When the room was closed automatically without an
-    agent (typical for inactivity), we still return the object with
-    null user fields and `automatic_closed=True`.
-
-    Returns None only when neither a user nor an automatic flag is set
-    (preserves the current behavior for older rooms).
+    Serializes the closure context for a room (the agent who closed it, plus
+    whether the closure was automatic). The `automatic_closed` flag lives
+    inside this payload so the front can render manual vs automatic closure
+    from a single object.
     """
-    user = room.closed_by
-    automatic_closed = bool(getattr(room, "automatic_closed", False))
 
-    if user is None and not automatic_closed:
+    first_name = serializers.SerializerMethodField()
+    last_name = serializers.SerializerMethodField()
+    email = serializers.SerializerMethodField()
+    automatic_closed = serializers.SerializerMethodField()
+
+    def get_first_name(self, room: Room) -> Optional[str]:
+        return getattr(room.closed_by, "first_name", None)
+
+    def get_last_name(self, room: Room) -> Optional[str]:
+        return getattr(room.closed_by, "last_name", None)
+
+    def get_email(self, room: Room) -> Optional[str]:
+        return getattr(room.closed_by, "email", None)
+
+    def get_automatic_closed(self, room: Room) -> bool:
+        return bool(getattr(room, "automatic_closed", False))
+
+
+def _serialize_closed_by(room: Room) -> Optional[dict]:
+    """
+    Returns the serialized `closed_by` payload, or None when the room has
+    neither a closing agent nor the automatic flag set (preserves the legacy
+    behavior for older rooms).
+    """
+    if room.closed_by is None and not getattr(room, "automatic_closed", False):
         return None
-
-    return {
-        "first_name": getattr(user, "first_name", None),
-        "last_name": getattr(user, "last_name", None),
-        "email": getattr(user, "email", None),
-        "automatic_closed": automatic_closed,
-    }
+    return ClosedBySerializer(room).data
 
 
 class ContactOptimizedSerializer(serializers.ModelSerializer):
@@ -82,7 +92,7 @@ class RoomHistorySerializer(serializers.ModelSerializer):
         ).data
 
     def get_closed_by(self, obj: Room) -> Optional[dict]:
-        return build_closed_by_payload(obj)
+        return _serialize_closed_by(obj)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -124,7 +134,7 @@ class RoomDetailSerializer(serializers.ModelSerializer):
         ]
 
     def get_closed_by(self, obj: Room) -> Optional[dict]:
-        return build_closed_by_payload(obj)
+        return _serialize_closed_by(obj)
 
     def get_contact(self, obj):
         contact_data = ContactSimpleSerializer(obj.contact).data
