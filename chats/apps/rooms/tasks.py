@@ -1,5 +1,8 @@
 import logging
 from uuid import UUID
+
+from sentry_sdk import capture_exception
+
 from chats.apps.projects.models.models import Project
 from chats.apps.rooms.models import Room
 from chats.apps.rooms.services import requeue_agent_rooms, RoomsReportService
@@ -73,3 +76,31 @@ def update_ticket_assignee_async(room_uuid: str, ticket_uuid: str, user_email: s
         )
 
         raise exc
+
+
+@app.task(name="check_inactivity_rooms")
+def check_inactivity_rooms():
+    """
+    Periodic Celery beat task that drives the inactivity feature.
+
+    Runs `warn_inactive_rooms` and `close_inactive_rooms` every tick. Each
+    step is wrapped in its own try/except so that a failure in the warning
+    pass does not prevent the closure pass from executing on this tick.
+    """
+    from chats.apps.rooms.usecases.inactivity import InactivityService
+
+    service = InactivityService()
+
+    try:
+        warned = service.warn_inactive_rooms()
+        logger.info("[INACTIVITY TASK] warn_inactive_rooms processed %s rooms", warned)
+    except Exception as exc:
+        logger.exception("[INACTIVITY TASK] warn_inactive_rooms failed: %s", exc)
+        capture_exception(exc)
+
+    try:
+        closed = service.close_inactive_rooms()
+        logger.info("[INACTIVITY TASK] close_inactive_rooms processed %s rooms", closed)
+    except Exception as exc:
+        logger.exception("[INACTIVITY TASK] close_inactive_rooms failed: %s", exc)
+        capture_exception(exc)
