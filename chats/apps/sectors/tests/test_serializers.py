@@ -12,11 +12,7 @@ from chats.apps.api.v1.sectors.serializers import (
     validate_custom_csat_flow_uuid,
 )
 from chats.apps.projects.models import Project
-from chats.apps.sectors.constants import (
-    DEFAULT_CLOSE_ROOM_TIMEOUT_TIME,
-    DEFAULT_MESSAGE_TIMEOUT_TIME,
-    get_default_inactivity_timeout,
-)
+from chats.apps.sectors.constants import get_default_inactivity_timeout
 from chats.apps.sectors.models import Sector
 
 
@@ -267,11 +263,11 @@ class TestSectorSerializerInactivityTimeout(TestCase):
         self.assertEqual(data["inactivity_timeout"], get_default_inactivity_timeout())
         self.assertEqual(
             data["inactivity_timeout"]["message_timeout_time"],
-            DEFAULT_MESSAGE_TIMEOUT_TIME,
+            settings.DEFAULT_MESSAGE_TIMEOUT_TIME,
         )
         self.assertEqual(
             data["inactivity_timeout"]["close_room_timeout_time"],
-            DEFAULT_CLOSE_ROOM_TIMEOUT_TIME,
+            settings.DEFAULT_CLOSE_ROOM_TIMEOUT_TIME,
         )
         self.assertFalse(data["inactivity_timeout"]["is_message_timeout_enabled"])
         self.assertFalse(data["inactivity_timeout"]["is_close_room_enabled"])

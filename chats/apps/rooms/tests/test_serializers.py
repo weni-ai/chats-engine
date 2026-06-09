@@ -1,4 +1,5 @@
 import uuid
+from django.conf import settings
 from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
@@ -12,10 +13,7 @@ from chats.apps.api.v1.rooms.serializers import (
 )
 from chats.apps.contacts.models import Contact
 from chats.apps.rooms.models import Room
-from chats.apps.sectors.constants import (
-    DEFAULT_MESSAGE_TIMEOUT_TIME,
-    get_default_inactivity_timeout,
-)
+from chats.apps.sectors.constants import get_default_inactivity_timeout
 from chats.apps.sectors.models import SectorTag
 from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
@@ -122,7 +120,7 @@ class TestRoomInactivityTimeoutHelper(TestCase):
 
         result = _get_room_inactivity_timeout_time(self.room)
 
-        self.assertEqual(result, DEFAULT_MESSAGE_TIMEOUT_TIME)
+        self.assertEqual(result, settings.DEFAULT_MESSAGE_TIMEOUT_TIME)
 
     def test_returns_sector_value_when_configured(self):
         self.sector.inactivity_timeout = {
@@ -154,7 +152,7 @@ class TestRoomInactivityTimeoutHelper(TestCase):
         self.room.refresh_from_db()
         result = _get_room_inactivity_timeout_time(self.room)
 
-        self.assertEqual(result, DEFAULT_MESSAGE_TIMEOUT_TIME)
+        self.assertEqual(result, settings.DEFAULT_MESSAGE_TIMEOUT_TIME)
 
 
 class TestRoomIsInactiveField(TestCase):
