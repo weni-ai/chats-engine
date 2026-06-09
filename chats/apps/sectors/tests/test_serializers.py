@@ -1,9 +1,15 @@
+import uuid
+from unittest.mock import patch
+
+from django.conf import settings
 from django.test import TestCase
+from rest_framework import serializers
 
 from chats.apps.api.v1.sectors.serializers import (
     SectorInactivityTimeoutSerializer,
     SectorSerializer,
     SectorUpdateSerializer,
+    validate_custom_csat_flow_uuid,
 )
 from chats.apps.projects.models import Project
 from chats.apps.sectors.constants import (
@@ -367,3 +373,69 @@ class TestSectorSerializerInactivityTimeout(TestCase):
         self.sector.refresh_from_db()
         self.assertEqual(self.sector.inactivity_timeout, previous_value)
         self.assertEqual(self.sector.name, "Renamed")
+
+
+class TestValidateCustomCsatFlowUuid(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(
+            name="Test Project", timezone="America/Sao_Paulo"
+        )
+        self.flow_uuid = uuid.uuid4()
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active_for_attributes")
+    def test_allows_any_value_when_feature_flag_is_on(self, mock_flag):
+        mock_flag.return_value = True
+        result = validate_custom_csat_flow_uuid(self.project, self.flow_uuid)
+        self.assertEqual(result, self.flow_uuid)
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active_for_attributes")
+    def test_allows_none_when_feature_flag_is_on(self, mock_flag):
+        mock_flag.return_value = True
+        result = validate_custom_csat_flow_uuid(self.project, None)
+        self.assertIsNone(result)
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active_for_attributes")
+    def test_allows_clearing_existing_value_when_flag_is_off(self, mock_flag):
+        mock_flag.return_value = False
+        result = validate_custom_csat_flow_uuid(
+            self.project, None, current_value=self.flow_uuid
+        )
+        self.assertIsNone(result)
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active_for_attributes")
+    def test_raises_when_setting_value_and_flag_is_off(self, mock_flag):
+        mock_flag.return_value = False
+        with self.assertRaises(serializers.ValidationError) as ctx:
+            validate_custom_csat_flow_uuid(self.project, self.flow_uuid)
+        self.assertEqual(
+            ctx.exception.detail["custom_csat_flow_uuid"][0].code,
+            "custom_csat_flow_feature_flag_is_off",
+        )
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active_for_attributes")
+    def test_raises_when_changing_value_and_flag_is_off(self, mock_flag):
+        mock_flag.return_value = False
+        new_uuid = uuid.uuid4()
+        with self.assertRaises(serializers.ValidationError) as ctx:
+            validate_custom_csat_flow_uuid(
+                self.project, new_uuid, current_value=self.flow_uuid
+            )
+        self.assertEqual(
+            ctx.exception.detail["custom_csat_flow_uuid"][0].code,
+            "custom_csat_flow_feature_flag_is_off",
+        )
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active_for_attributes")
+    def test_allows_none_when_no_current_value_and_flag_is_off(self, mock_flag):
+        mock_flag.return_value = False
+        result = validate_custom_csat_flow_uuid(self.project, None)
+        self.assertIsNone(result)
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active_for_attributes")
+    def test_passes_correct_attributes_to_feature_flag(self, mock_flag):
+        mock_flag.return_value = True
+        validate_custom_csat_flow_uuid(self.project, self.flow_uuid)
+        mock_flag.assert_called_once_with(
+            settings.CUSTOM_CSAT_FLOW_FEATURE_FLAG_KEY,
+            {"projectUUID": str(self.project.uuid)},
+        )

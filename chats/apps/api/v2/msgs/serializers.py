@@ -180,4 +180,8 @@ class MessageSerializerV2(serializers.ModelSerializer):
             "uuid": str(note.uuid),
             "text": note.text,
             "is_deletable": note.is_deletable,
+            "media": [
+                {"content_type": media.content_type, "url": media.url}
+                for media in note.medias.all()
+            ],
         }

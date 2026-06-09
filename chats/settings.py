@@ -164,6 +164,11 @@ DATABASES = {
     }
 }
 
+# Custom test runner that gives each parallel worker its own Redis DB so that
+# tests using `cache.clear()` / `get_redis_connection()` don't race with
+# sibling workers. See chats/core/test_runner.py for details.
+TEST_RUNNER = "chats.core.test_runner.IsolatedCacheTestRunner"
+
 # User
 
 AUTH_USER_MODEL = "accounts.User"
@@ -499,6 +504,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "process_pending_reports",
         "schedule": 20.0,
     },
+    "process-pending-room-exports": {
+        "task": "process_pending_room_exports",
+        "schedule": 20.0,
+    },
     "start-archive-rooms-messages": {
         "task": "start_archive_rooms_messages",
         "schedule": crontab(hour="0-4", minute=0),
@@ -676,10 +685,16 @@ WS_LAST_SEEN_UPDATE_INTERVAL_SECONDS = env.int(
 WS_LAST_SEEN_THRESHOLD_SECONDS = env.int("WS_LAST_SEEN_THRESHOLD_SECONDS", default=90)
 
 # CSAT
+CUSTOM_CSAT_FLOW_FEATURE_FLAG_KEY = env.str(
+    "CUSTOM_CSAT_FLOW_FEATURE_FLAG_KEY", default="weniChatsCustomCSATFlow"
+)
 CSAT_FLOW_UPDATE_RETRIES = env.int("CSAT_FLOW_UPDATE_RETRIES", default=5)
 CSAT_FLOW_UPDATE_EXPIRATION_TIME = env.int(
     "CSAT_FLOW_UPDATE_EXPIRATION_TIME", default=24 * 60  # 3 hours
 )  # In minutes
+CUSTOM_FLOW_NOT_FOUND_EMAIL_COOLDOWN = env.int(
+    "CUSTOM_FLOW_NOT_FOUND_EMAIL_COOLDOWN", default=60 * 60 * 24  # 24 hours
+)
 
 CHATS_BASE_URL = env.str("CHATS_BASE_URL", default="http://localhost:8000")
 
@@ -707,12 +722,20 @@ WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY = env.str(
     "WENI_CHATS_BACKEND_RETURN_24H_VALID_ON_ROOMS_LIST_FLAG_KEY",
     default="weniChatsBackEndReturn24hValidOnRoomsList",
 )
+INTERNAL_ROOMS_LIST_PENDING_RESPONSE_FEATURE_FLAG_KEY = env.str(
+    "INTERNAL_ROOMS_LIST_PENDING_RESPONSE_FEATURE_FLAG_KEY",
+    default="weniChatsInternalRoomsListPendingResponse",
+)
 AUDIT_LOG_FEATURE_FLAG_KEY = env.str(
     "AUDIT_LOG_FEATURE_FLAG_KEY", default="weniChatsAuditLog"
 )
 ROOMS_COUNT_BY_QUEUE_FEATURE_FLAG_KEY = env.str(
     "ROOMS_COUNT_BY_QUEUE_FEATURE_FLAG_KEY",
     default="weniChatsRoomsCountByQueue",
+)
+CHANGE_TICKETER_ON_TRANSFER_FEATURE_FLAG_KEY = env.str(
+    "CHANGE_TICKETER_ON_TRANSFER_FEATURE_FLAG_KEY",
+    default="weniChatsChangeTicketerOnTransfer",
 )
 
 
@@ -746,6 +769,12 @@ ARCHIVE_CHATS_USE_BATCH_DISPATCH = env.bool(
 ARCHIVE_CHATS_BATCH_SIZE = env.int("ARCHIVE_CHATS_BATCH_SIZE", default=500)
 ARCHIVE_CHATS_BULK_CREATE_PENDING_BATCH_SIZE = env.int(
     "ARCHIVE_CHATS_BULK_CREATE_PENDING_BATCH_SIZE", default=2000
+)
+# Soft-lock threshold used by ArchiveChatsService to decide whether an
+# in-progress RoomArchivedConversation is still being processed by another
+# worker or stale enough to be reclaimed.
+ARCHIVE_CHATS_IN_PROGRESS_TIMEOUT_HOURS = env.int(
+    "ARCHIVE_CHATS_IN_PROGRESS_TIMEOUT_HOURS", default=12
 )
 
 # Internal API Token

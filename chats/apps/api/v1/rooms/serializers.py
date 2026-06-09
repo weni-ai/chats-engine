@@ -1,10 +1,13 @@
+import io
 import logging
 from datetime import datetime
 
+import magic
 from django.conf import settings
 from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from pydub import AudioSegment
 from rest_framework import serializers
 
 from chats.apps.accounts.models import User
@@ -21,7 +24,7 @@ from chats.apps.history.filters.rooms_filter import (
     get_history_rooms_queryset_by_contact,
 )
 from chats.apps.queues.models import Queue
-from chats.apps.rooms.models import Room, RoomNote, RoomPin
+from chats.apps.rooms.models import Room, RoomNote, RoomNoteMedia, RoomPin
 from chats.apps.sectors.constants import get_default_inactivity_timeout
 from chats.apps.sectors.models import SectorTag
 
@@ -613,6 +616,42 @@ class RoomsReportSerializer(serializers.Serializer):
     filters = RoomsReportFiltersSerializer(required=True)
 
 
+class RoomExportRequestSerializer(serializers.Serializer):
+    """Serializer for the room export request body."""
+
+    SUPPORTED_TYPES = ("html", "pdf")
+
+    room = serializers.UUIDField(required=True)
+    types = serializers.ListField(
+        child=serializers.CharField(),
+        required=True,
+        min_length=1,
+    )
+
+    def validate_types(self, value):
+        normalized = []
+        seen = set()
+        for raw in value:
+            if not raw:
+                continue
+            item = raw.lower()
+            if item not in self.SUPPORTED_TYPES:
+                raise serializers.ValidationError(
+                    _("Unsupported export format: %(value)s") % {"value": raw}
+                )
+            if item in seen:
+                continue
+            seen.add(item)
+            normalized.append(item)
+
+        if not normalized:
+            raise serializers.ValidationError(
+                _("At least one export format is required")
+            )
+
+        return normalized
+
+
 class PinRoomSerializer(serializers.Serializer):
     """
     Serializer for the pin room.
@@ -680,6 +719,81 @@ class RemoveRoomTagSerializer(AddOrRemoveTagFromRoomSerializer):
         return attrs
 
 
+class RoomNoteMediaSimpleSerializer(serializers.ModelSerializer):
+    """
+    Read-only serializer used to nest medias inside a room note.
+    """
+
+    url = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = RoomNoteMedia
+        fields = ["content_type", "url", "created_on"]
+        ref_name = "V1RoomNoteMediaSimpleSerializer"
+
+    def get_url(self, media: RoomNoteMedia):
+        return media.url
+
+
+class RoomNoteMediaSerializer(serializers.ModelSerializer):
+    """
+    Serializer for room note medias, used on the media CRUD endpoint.
+    """
+
+    url = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = RoomNoteMedia
+        fields = [
+            "uuid",
+            "note",
+            "content_type",
+            "media_file",
+            "url",
+            "created_on",
+        ]
+        extra_kwargs = {
+            "media_file": {"write_only": True},
+        }
+
+    def get_url(self, media: RoomNoteMedia):
+        return media.url
+
+    def validate(self, attrs):
+        note = attrs.get("note")
+        if note and note.medias.count() >= 10:
+            raise serializers.ValidationError(
+                {"detail": "Internal notes can't have more than 10 media files"}
+            )
+        return super().validate(attrs)
+
+    def create(self, validated_data):
+        media = validated_data["media_file"]
+        file_bytes = media.file.read()
+        file_type = magic.from_buffer(file_bytes, mime=True)
+        if file_type in settings.FILE_CHECK_CONTENT_TYPE:
+            file_type = media.name[-3:]
+        if (
+            file_type.startswith("audio")
+            or file_type.lower() in settings.UNPERMITTED_AUDIO_TYPES
+        ):
+            export_conf = {"format": settings.AUDIO_TYPE_TO_CONVERT}
+            if settings.AUDIO_CODEC_TO_CONVERT != "":
+                export_conf["codec"] = settings.AUDIO_CODEC_TO_CONVERT
+
+            converted_bytes = io.BytesIO()
+            AudioSegment.from_file(io.BytesIO(file_bytes)).export(
+                converted_bytes, **export_conf
+            )
+
+            media.file = converted_bytes
+            media.name = media.name[:-3] + settings.AUDIO_EXTENSION_TO_CONVERT
+            file_type = magic.from_buffer(converted_bytes.read(), mime=True)
+
+        validated_data["content_type"] = file_type
+        return super().create(validated_data)
+
+
 class RoomNoteSerializer(serializers.ModelSerializer):
     """
     Serializer for room notes
@@ -687,11 +801,12 @@ class RoomNoteSerializer(serializers.ModelSerializer):
 
     user = serializers.SerializerMethodField()
     is_deletable = serializers.ReadOnlyField()
+    media = RoomNoteMediaSimpleSerializer(many=True, read_only=True, source="medias")
 
     class Meta:
         model = RoomNote
-        fields = ["uuid", "created_on", "user", "text", "is_deletable"]
-        read_only_fields = ["uuid", "created_on", "user", "is_deletable"]
+        fields = ["uuid", "created_on", "user", "text", "is_deletable", "media"]
+        read_only_fields = ["uuid", "created_on", "user", "is_deletable", "media"]
 
     def get_user(self, obj):
         return {

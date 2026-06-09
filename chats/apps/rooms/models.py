@@ -29,7 +29,11 @@ from chats.apps.rooms.exceptions import (
     MaxPinRoomLimitReachedError,
     RoomIsNotActiveError,
 )
-from chats.core.models import BaseConfigurableModel, BaseModel
+from chats.core.models import (
+    BaseConfigurableModel,
+    BaseModel,
+    BaseModelWithManualCreatedOn,
+)
 from chats.utils.websockets import send_channels_group
 
 if TYPE_CHECKING:
@@ -385,7 +389,11 @@ class Room(BaseModel, BaseConfigurableModel):
         )
 
     def trigger_default_message(self):
-        default_message = self.queue.default_message
+        sector = self.queue.sector
+        if not sector.is_automatic_message_queue_active:
+            return
+
+        default_message = sector.automatic_message_queue_text
         if not default_message:
             return
 
@@ -951,6 +959,10 @@ class RoomNote(BaseModel):
             "text": self.text,
             "created_on": self.created_on.isoformat(),
             "is_deletable": self.is_deletable,
+            "media": [
+                {"content_type": media.content_type, "url": media.url}
+                for media in self.medias.all()
+            ],
         }
 
     def notify_websocket(self, action):
@@ -1000,3 +1012,79 @@ class RoomNote(BaseModel):
         super().delete(*args, **kwargs)
         if msg:
             msg.delete()
+
+
+def room_note_media_upload_to(instance, filename):
+    """
+    Generate unique file path for RoomNoteMedia uploads using UUID.
+    This prevents file name collisions when multiple medias are uploaded
+    in the same second with the same original filename.
+
+    Args:
+        instance: RoomNoteMedia instance
+        filename: Original filename from upload
+
+    Returns:
+        str: Unique file path in format: roomnotemedia/{uuid}{extension}
+    """
+    from pathlib import Path
+
+    ext = Path(filename).suffix.lower()
+    return f"roomnotemedia/{instance.uuid}{ext}"
+
+
+class RoomNoteMedia(BaseModelWithManualCreatedOn):
+    """
+    Media files attached to a room internal note.
+    """
+
+    note = models.ForeignKey(
+        "rooms.RoomNote",
+        related_name="medias",
+        verbose_name=_("room note"),
+        on_delete=models.CASCADE,
+    )
+    content_type = models.CharField(_("Content Type"), max_length=300)
+    media_file = models.FileField(
+        _("Media File"),
+        null=True,
+        blank=True,
+        max_length=300,
+        upload_to=room_note_media_upload_to,
+    )
+    media_url = models.TextField(_("Media url"), null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("RoomNoteMedia")
+        verbose_name_plural = _("RoomNoteMedias")
+        indexes = [
+            models.Index(
+                fields=["content_type"],
+                name="room_note_media_ct_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.note.pk} - {self.url}"
+
+    def save(self, *args, **kwargs) -> None:
+        if self.note.room.is_active is False:
+            raise ValidationError(
+                {"detail": _("Closed rooms cannot receive notes")}
+            )
+        is_new = self._state.adding
+        if is_new and self.note.medias.count() >= 10:
+            raise ValidationError(
+                {"detail": _("Internal notes can't have more than 10 media files")}
+            )
+        return super().save(*args, **kwargs)
+
+    @property
+    def url(self):
+        url = self.media_file.url if self.media_file else self.media_url
+        try:
+            if url.startswith("/"):
+                url = settings.ENGINE_BASE_URL + url
+        except AttributeError:
+            return ""
+        return url

@@ -3,11 +3,16 @@ from unittest import mock
 
 from django.contrib.auth.models import AnonymousUser
 from django.test import TestCase
+from django.utils import timezone
+from rest_framework import status
 from rest_framework.request import Request
-from rest_framework.test import APIRequestFactory, force_authenticate
+from rest_framework.test import APIRequestFactory, APITestCase, force_authenticate
 
 from chats.apps.accounts.models import User
-from chats.apps.api.v1.msgs.permissions import MessageMediaPermission, MessagePermission
+from chats.apps.api.v1.msgs.permissions import (
+    MessageMediaPermission,
+    MessagePermission,
+)
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
@@ -188,3 +193,83 @@ class TestMessageMediaPermission(TestCase):
 
         result = self.permission.has_object_permission(request, None, obj)
         self.assertTrue(result)
+
+
+class TestRestrictOfflineAgents(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="agent@example.com",
+            password="testpass123",
+            first_name="Agent",
+            last_name="User",
+        )
+        self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=10,
+            work_start=time(9, 0),
+            work_end=time(18, 0),
+        )
+        self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
+        self.room = Room.objects.create(queue=self.queue, user=self.user)
+        self.project_permission = ProjectPermission.objects.create(
+            user=self.user,
+            project=self.project,
+            role=ProjectPermission.ROLE_ATTENDANT,
+            status=ProjectPermission.STATUS_ONLINE,
+            last_seen=timezone.now(),
+        )
+        self.url = "/v1/msg/"
+        self.client.force_authenticate(user=self.user)
+
+    def test_allows_when_config_disabled(self):
+        response = self.client.post(
+            self.url, {"room": str(self.room.uuid)}, format="json"
+        )
+        self.assertNotEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_allows_online_agent_when_config_enabled(self):
+        self.project.config = {"restrict_offline_agents": True}
+        self.project.save(update_fields=["config"])
+
+        response = self.client.post(
+            self.url, {"room": str(self.room.uuid)}, format="json"
+        )
+        self.assertNotEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_blocks_offline_agent_when_config_enabled(self):
+        self.project.config = {"restrict_offline_agents": True}
+        self.project.save(update_fields=["config"])
+        self.project_permission.status = ProjectPermission.STATUS_OFFLINE
+        self.project_permission.save(update_fields=["status"])
+
+        response = self.client.post(
+            self.url, {"room": str(self.room.uuid)}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data["error_code"], "agent_offline")
+        self.assertEqual(
+            response.data["error_message"],
+            "Offline agents cannot send messages in this project",
+        )
+
+    def test_blocks_agent_without_project_permission_when_config_enabled(self):
+        self.project.config = {"restrict_offline_agents": True}
+        self.project.save(update_fields=["config"])
+        self.project_permission.delete()
+
+        response = self.client.post(
+            self.url, {"room": str(self.room.uuid)}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.data["error_code"], "agent_offline")
+
+    def test_allows_non_create_actions(self):
+        self.project.config = {"restrict_offline_agents": True}
+        self.project.save(update_fields=["config"])
+        self.project_permission.status = ProjectPermission.STATUS_OFFLINE
+        self.project_permission.save(update_fields=["status"])
+
+        response = self.client.get(self.url, {"room": str(self.room.uuid)})
+        self.assertNotEqual(response.status_code, status.HTTP_403_FORBIDDEN)
