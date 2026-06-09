@@ -12,6 +12,7 @@ Responsibilities:
 import logging
 from typing import TYPE_CHECKING, Optional
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from sentry_sdk import capture_exception
@@ -272,7 +273,7 @@ class InactivityService:
         room.automatic_closed = True
 
         try:
-            room.close(end_by=INACTIVITY_END_BY)
+            room.close(end_by=INACTIVITY_END_BY, closed_by=room.user)
         except Exception as exc:
             logger.error(
                 "[INACTIVITY] Failed to close room %s: %s",
@@ -282,6 +283,54 @@ class InactivityService:
             )
             capture_exception(exc)
             return False
+
+        # Notify the websocket groups that the room was closed, mirroring the
+        # manual close endpoint, so the front removes it from the agent's list
+        # in real time (and the room callback is triggered).
+        try:
+            room.notify_queue("close", callback=True)
+            room.notify_user("close")
+        except Exception as exc:
+            logger.warning(
+                "[INACTIVITY] Failed to notify websocket on close for room %s: %s",
+                room.pk,
+                exc,
+            )
+            capture_exception(exc)
+
+        # The manual close endpoint computes service metrics
+        # (interaction_time, message_response_time, etc.) in the view via
+        # `close_room`. The automatic close must replicate it, otherwise
+        # inactivity-closed rooms are left without those metrics.
+        if settings.ACTIVATE_CALC_METRICS:
+            try:
+                from chats.apps.rooms.views import close_room
+
+                close_room(str(room.pk))
+            except Exception as exc:
+                logger.warning(
+                    "[INACTIVITY] Failed to generate metrics for room %s: %s",
+                    room.pk,
+                    exc,
+                )
+                capture_exception(exc)
+
+        # Closing a room frees up the agent's capacity, so re-run the queue
+        # priority routing to assign any waiting room. The manual close
+        # endpoint does this in the view; the automatic close must too.
+        if room.queue:
+            try:
+                from chats.apps.queues.utils import start_queue_priority_routing
+
+                start_queue_priority_routing(room.queue)
+            except Exception as exc:
+                logger.warning(
+                    "[INACTIVITY] Failed to start queue priority routing "
+                    "for room %s: %s",
+                    room.pk,
+                    exc,
+                )
+                capture_exception(exc)
 
         logger.info("[INACTIVITY] Closed room %s", room.pk)
         return True
