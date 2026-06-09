@@ -201,9 +201,7 @@ class Room(BaseModel, BaseConfigurableModel):
     def get_time_to_send_automatic_message(self) -> Optional[int]:
         sent_at = self.get_automatic_message_sent_at()
         if sent_at and self.first_user_assigned_at:
-            return max(
-                int((sent_at - self.first_user_assigned_at).total_seconds()), 0
-            )
+            return max(int((sent_at - self.first_user_assigned_at).total_seconds()), 0)
         return None
 
     @property
@@ -631,6 +629,16 @@ class Room(BaseModel, BaseConfigurableModel):
         user; falls back to the queue group otherwise (defensive — rooms
         eligible for inactivity always have a user).
         """
+        from chats.apps.rooms.usecases.inactivity import is_inactivity_feature_active
+
+        try:
+            project_uuid = str(self.queue.sector.project.uuid)
+        except AttributeError:
+            project_uuid = None
+
+        if not is_inactivity_feature_active(project_uuid):
+            return
+
         content = {
             "room_uuid": str(self.uuid),
             "is_inactive": self.is_inactive,
@@ -863,16 +871,16 @@ class Room(BaseModel, BaseConfigurableModel):
 
     @property
     def is_archived(self) -> bool:
-        from chats.apps.archive_chats.models import RoomArchivedConversation
         from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
+        from chats.apps.archive_chats.models import RoomArchivedConversation
 
         return RoomArchivedConversation.objects.filter(
             room=self, status=ArchiveConversationsJobStatus.FINISHED, file__isnull=False
         ).exists()
 
     def get_archived_conversation_file_url(self) -> Optional[str]:
-        from chats.apps.archive_chats.models import RoomArchivedConversation
         from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
+        from chats.apps.archive_chats.models import RoomArchivedConversation
 
         archive = RoomArchivedConversation.objects.filter(
             room=self, status=ArchiveConversationsJobStatus.FINISHED, file__isnull=False
@@ -1069,9 +1077,7 @@ class RoomNoteMedia(BaseModelWithManualCreatedOn):
 
     def save(self, *args, **kwargs) -> None:
         if self.note.room.is_active is False:
-            raise ValidationError(
-                {"detail": _("Closed rooms cannot receive notes")}
-            )
+            raise ValidationError({"detail": _("Closed rooms cannot receive notes")})
         is_new = self._state.adding
         if is_new and self.note.medias.count() >= 10:
             raise ValidationError(

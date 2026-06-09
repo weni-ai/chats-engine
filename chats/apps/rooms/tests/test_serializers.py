@@ -1,9 +1,10 @@
 import uuid
+from unittest.mock import patch
+
 from django.conf import settings
 from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
-
 
 from chats.apps.api.v1.rooms.serializers import (
     AddOrRemoveTagFromRoomSerializer,
@@ -12,12 +13,11 @@ from chats.apps.api.v1.rooms.serializers import (
     _get_room_inactivity_timeout_time,
 )
 from chats.apps.contacts.models import Contact
-from chats.apps.rooms.models import Room
-from chats.apps.sectors.constants import get_default_inactivity_timeout
-from chats.apps.sectors.models import SectorTag
 from chats.apps.projects.models.models import Project
 from chats.apps.queues.models import Queue
-from chats.apps.sectors.models import Sector
+from chats.apps.rooms.models import Room
+from chats.apps.sectors.constants import get_default_inactivity_timeout
+from chats.apps.sectors.models import Sector, SectorTag
 
 
 class TestAddOrRemoveTagFromRoomSerializer(TestCase):
@@ -97,6 +97,10 @@ class TestAddRoomTagSerializer(TestCase):
         self.assertTrue(serializer.is_valid())
 
 
+@patch(
+    "chats.apps.api.v1.rooms.serializers.is_inactivity_feature_active",
+    return_value=True,
+)
 class TestRoomInactivityTimeoutHelper(TestCase):
     """
     The `_get_room_inactivity_timeout_time` helper is shared by
@@ -115,14 +119,14 @@ class TestRoomInactivityTimeoutHelper(TestCase):
         self.queue = Queue.objects.create(name="test", sector=self.sector)
         self.room = Room.objects.create(queue=self.queue)
 
-    def test_falls_back_to_default_when_sector_not_configured(self):
+    def test_falls_back_to_default_when_sector_not_configured(self, _mock_ff):
         self.assertIsNone(self.sector.inactivity_timeout)
 
         result = _get_room_inactivity_timeout_time(self.room)
 
         self.assertEqual(result, settings.DEFAULT_MESSAGE_TIMEOUT_TIME)
 
-    def test_returns_sector_value_when_configured(self):
+    def test_returns_sector_value_when_configured(self, _mock_ff):
         self.sector.inactivity_timeout = {
             "is_message_timeout_enabled": True,
             "message_timeout_text": "warn",
@@ -138,7 +142,7 @@ class TestRoomInactivityTimeoutHelper(TestCase):
 
         self.assertEqual(result, 1500)
 
-    def test_falls_back_when_sector_json_lacks_message_timeout_time(self):
+    def test_falls_back_when_sector_json_lacks_message_timeout_time(self, _mock_ff):
         self.sector.inactivity_timeout = {
             "is_message_timeout_enabled": False,
             "message_timeout_text": "",
@@ -173,6 +177,10 @@ class TestRoomIsInactiveField(TestCase):
         self.assertFalse(room.is_inactive)
 
 
+@patch(
+    "chats.apps.api.v1.rooms.serializers.is_inactivity_feature_active",
+    return_value=True,
+)
 class TestListRoomSerializerInactivityFields(TestCase):
     """
     Ensures the inactivity-related fields appear in the list serializer output
@@ -200,7 +208,7 @@ class TestListRoomSerializerInactivityFields(TestCase):
         self.queue = Queue.objects.create(name="test", sector=self.sector)
         self.contact = Contact.objects.create(name="John")
 
-    def test_serializer_returns_is_inactive_and_inactivity_timeout_time(self):
+    def test_serializer_returns_is_inactive_and_inactivity_timeout_time(self, _mock_ff):
         room = Room.objects.create(queue=self.queue, contact=self.contact)
 
         data = ListRoomSerializer(room).data
@@ -209,7 +217,9 @@ class TestListRoomSerializerInactivityFields(TestCase):
         self.assertFalse(data["is_inactive"])
         self.assertEqual(data["inactivity_timeout_time"], 720)
 
-    def test_serializer_returns_default_timeout_when_sector_not_configured(self):
+    def test_serializer_returns_default_timeout_when_sector_not_configured(
+        self, _mock_ff
+    ):
         sector = Sector.objects.create(
             name="other",
             project=self.project,
@@ -228,13 +238,13 @@ class TestListRoomSerializerInactivityFields(TestCase):
             get_default_inactivity_timeout()["message_timeout_time"],
         )
 
-    def test_inactivity_fields_do_not_cause_n_plus_one(self):
+    def test_inactivity_fields_do_not_cause_n_plus_one(self, _mock_ff):
         for i in range(5):
             contact = Contact.objects.create(name=f"contact-{i}")
             Room.objects.create(queue=self.queue, contact=contact)
 
         rooms_qs = Room.objects.select_related(
-            "user", "contact", "queue", "queue__sector"
+            "user", "contact", "queue", "queue__sector", "queue__sector__project"
         ).all()
 
         with CaptureQueriesContext(connection) as ctx:
