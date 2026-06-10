@@ -99,7 +99,6 @@ class MessageSerializerV2(serializers.ModelSerializer):
             "is_delivered",
             "internal_note",
             "is_automatic_message",
-            "automatic_message_type",
         ]
         read_only_fields = [
             "uuid",
@@ -114,7 +113,6 @@ class MessageSerializerV2(serializers.ModelSerializer):
             "is_delivered",
             "internal_note",
             "is_automatic_message",
-            "automatic_message_type",
         ]
 
     def get_replied_message(self, obj):

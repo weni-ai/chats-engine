@@ -42,7 +42,6 @@ class ArchiveMessageSerializer(serializers.ModelSerializer):
             "user",
             "contact",
             "is_automatic_message",
-            "automatic_message_type",
             "internal_note",
             "media",
         ]

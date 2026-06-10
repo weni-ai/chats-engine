@@ -7,7 +7,7 @@ from django.db import transaction
 from sentry_sdk import capture_exception
 
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
-from chats.apps.msgs.models import AutomaticMessage, AutomaticMessageType, Message
+from chats.apps.msgs.models import AutomaticMessage, Message
 from chats.apps.projects.models.models import Project
 from chats.apps.rooms.models import Room
 
@@ -112,7 +112,6 @@ class AutomaticMessagesService:
                     text=message_text,
                     user=user,
                     contact=None,
-                    automatic_message_type=AutomaticMessageType.AUTOMATIC_OPEN,
                 )
                 AutomaticMessage.objects.create(
                     room=room,

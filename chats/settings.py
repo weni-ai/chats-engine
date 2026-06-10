@@ -487,10 +487,6 @@ CHATS_CACHE_TIME = env.int("CHATS_CACHE_TIME", default=1 * 60 * 60)
 
 DISCUSSION_AGENTS_LIMIT = env.int("DISCUSSION_AGENTS_LIMIT", default=5)
 
-# Inactivity feature defaults (in seconds)
-DEFAULT_MESSAGE_TIMEOUT_TIME = env.int("DEFAULT_MESSAGE_TIMEOUT_TIME", default=600)
-DEFAULT_CLOSE_ROOM_TIMEOUT_TIME = env.int("DEFAULT_CLOSE_ROOM_TIMEOUT_TIME", default=60)
-
 # Celery
 
 METRICS_CUSTOM_QUEUE = env("METRICS_CUSTOM_QUEUE", default="celery")
@@ -515,10 +511,6 @@ CELERY_BEAT_SCHEDULE = {
     "start-archive-rooms-messages": {
         "task": "start_archive_rooms_messages",
         "schedule": crontab(hour="22-23,0-5", minute=0),
-    },
-    "check-inactivity-rooms": {
-        "task": "check_inactivity_rooms",
-        "schedule": crontab(minute="*"),
     },
 }
 
@@ -834,13 +826,6 @@ AGENTS_MANAGEMENT_FEATURE_FLAG_KEY = env.str(
     "AGENTS_MANAGEMENT_FEATURE_FLAG_KEY",
     default="weniChatsAgentsManagement",
 )
-
-# Inactivity Timeout
-WENI_CHATS_INACTIVITY_TIMEOUT_FLAG_KEY = env.str(
-    "WENI_CHATS_INACTIVITY_TIMEOUT_FLAG_KEY",
-    default="weniChatsInactivityTimeout",
-)
-
 IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL = env.int(
     "IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL", default=30
 )

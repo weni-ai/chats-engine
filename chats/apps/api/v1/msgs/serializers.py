@@ -294,7 +294,6 @@ class MessageSerializer(BaseMessageSerializer):
             "is_delivered",
             "internal_note",
             "is_automatic_message",
-            "automatic_message_type",
             "ai_text_improvement",
         ]
         read_only_fields = [

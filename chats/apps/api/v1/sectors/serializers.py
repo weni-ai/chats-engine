@@ -1,12 +1,12 @@
-from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
-from weni.feature_flags.shortcuts import is_feature_active_for_attributes
+from weni.feature_flags.shortcuts import (
+    is_feature_active_for_attributes,
+)
 
 from chats.apps.api.v1.accounts.serializers import UserSerializer
-from chats.apps.projects.models import Project
-from chats.apps.sectors.constants import get_default_inactivity_timeout
 from chats.apps.sectors.models import (
     Sector,
     SectorAuthorization,
@@ -14,6 +14,7 @@ from chats.apps.sectors.models import (
     SectorTag,
 )
 from chats.core.serializers import AuditableModelSerializer
+from chats.apps.projects.models import Project
 
 User = get_user_model()
 
@@ -67,67 +68,6 @@ class SectorAutomaticMessageSerializer(serializers.ModelSerializer):
         fields = ["is_active", "text"]
 
 
-class SectorInactivityTimeoutSerializer(serializers.Serializer):
-    """
-    Validates the shape of the `Sector.inactivity_timeout` JSON field.
-
-    Time fields are stored in seconds.
-    """
-
-    is_message_timeout_enabled = serializers.BooleanField()
-    message_timeout_text = serializers.CharField(allow_blank=True, allow_null=True)
-    message_timeout_time = serializers.IntegerField(min_value=1, allow_null=True)
-    is_close_room_enabled = serializers.BooleanField()
-    close_room_message_text = serializers.CharField(allow_blank=True, allow_null=True)
-    close_room_timeout_time = serializers.IntegerField(min_value=1, allow_null=True)
-
-    def validate(self, attrs: dict) -> dict:
-        is_message_timeout_enabled = attrs.get("is_message_timeout_enabled", False)
-        is_close_room_enabled = attrs.get("is_close_room_enabled", False)
-
-        if is_close_room_enabled and not is_message_timeout_enabled:
-            raise serializers.ValidationError(
-                {
-                    "is_close_room_enabled": _(
-                        "Automatic closure can only be enabled if the inactivity "
-                        "warning is also enabled."
-                    )
-                }
-            )
-
-        if is_message_timeout_enabled and not attrs.get("message_timeout_time"):
-            raise serializers.ValidationError(
-                {
-                    "message_timeout_time": _(
-                        "Provide a value greater than zero when the inactivity "
-                        "warning is enabled."
-                    )
-                }
-            )
-
-        if is_close_room_enabled and not attrs.get("close_room_timeout_time"):
-            raise serializers.ValidationError(
-                {
-                    "close_room_timeout_time": _(
-                        "Provide a value greater than zero when the automatic "
-                        "closure is enabled."
-                    )
-                }
-            )
-
-        return attrs
-
-
-def _serialize_inactivity_timeout(instance: Sector) -> dict:
-    """
-    Returns the sector's `inactivity_timeout` value, falling back to the
-    default shape when the sector has not configured the feature yet.
-    """
-    if instance and instance.inactivity_timeout:
-        return instance.inactivity_timeout
-    return get_default_inactivity_timeout()
-
-
 class SectorAutomaticMessageQueueSerializer(serializers.ModelSerializer):
     is_active = serializers.BooleanField(source="is_automatic_message_queue_active")
     text = serializers.CharField(
@@ -141,7 +81,6 @@ class SectorAutomaticMessageQueueSerializer(serializers.ModelSerializer):
 
 class SectorSerializer(AuditableModelSerializer):
     automatic_message = serializers.JSONField(required=False)
-    inactivity_timeout = serializers.JSONField(required=False, allow_null=True)
     automatic_message_queue = serializers.JSONField(required=False)
     is_csat_enabled = serializers.BooleanField(required=False, allow_null=False)
     custom_csat_flow_uuid = serializers.UUIDField(required=False, allow_null=True)
@@ -163,7 +102,6 @@ class SectorSerializer(AuditableModelSerializer):
             "can_edit_custom_fields",
             "working_day",
             "automatic_message",
-            "inactivity_timeout",
             "automatic_message_queue",
             "is_csat_enabled",
             "required_tags",
@@ -200,15 +138,6 @@ class SectorSerializer(AuditableModelSerializer):
 
             data["is_automatic_message_active"] = automatic_message.get("is_active")
             data["automatic_message_text"] = automatic_message.get("text")
-
-        if "inactivity_timeout" in data:
-            inactivity_timeout = data.get("inactivity_timeout")
-            if inactivity_timeout is None:
-                data["inactivity_timeout"] = None
-            else:
-                nested = SectorInactivityTimeoutSerializer(data=inactivity_timeout)
-                nested.is_valid(raise_exception=True)
-                data["inactivity_timeout"] = nested.validated_data
 
         automatic_message_queue = data.get("automatic_message_queue")
 
@@ -280,7 +209,6 @@ class SectorSerializer(AuditableModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
         data["automatic_message"] = SectorAutomaticMessageSerializer(instance).data
-        data["inactivity_timeout"] = _serialize_inactivity_timeout(instance)
         data["automatic_message_queue"] = SectorAutomaticMessageQueueSerializer(
             instance
         ).data
@@ -291,7 +219,6 @@ class SectorSerializer(AuditableModelSerializer):
 
 class SectorUpdateSerializer(AuditableModelSerializer):
     automatic_message = serializers.JSONField(required=False)
-    inactivity_timeout = serializers.JSONField(required=False, allow_null=True)
     automatic_message_queue = serializers.JSONField(required=False)
     is_csat_enabled = serializers.BooleanField(required=False, allow_null=False)
     custom_csat_flow_uuid = serializers.UUIDField(required=False, allow_null=True)
@@ -309,7 +236,6 @@ class SectorUpdateSerializer(AuditableModelSerializer):
             "can_edit_custom_fields",
             "config",
             "automatic_message",
-            "inactivity_timeout",
             "automatic_message_queue",
             "is_csat_enabled",
             "required_tags",
@@ -338,15 +264,6 @@ class SectorUpdateSerializer(AuditableModelSerializer):
             attrs.pop("automatic_message")
             attrs["is_automatic_message_active"] = new_is_automatic_message_active
             attrs["automatic_message_text"] = automatic_message.get("text")
-
-        if "inactivity_timeout" in attrs:
-            inactivity_timeout = attrs.get("inactivity_timeout")
-            if inactivity_timeout is None:
-                attrs["inactivity_timeout"] = None
-            else:
-                nested = SectorInactivityTimeoutSerializer(data=inactivity_timeout)
-                nested.is_valid(raise_exception=True)
-                attrs["inactivity_timeout"] = nested.validated_data
 
         automatic_message_queue = attrs.get("automatic_message_queue", None)
 
@@ -410,7 +327,6 @@ class SectorUpdateSerializer(AuditableModelSerializer):
         data = super().to_representation(instance)
 
         data["automatic_message"] = SectorAutomaticMessageSerializer(instance).data
-        data["inactivity_timeout"] = _serialize_inactivity_timeout(instance)
         data["automatic_message_queue"] = SectorAutomaticMessageQueueSerializer(
             instance
         ).data
@@ -424,7 +340,6 @@ class SectorReadOnlyListSerializer(serializers.ModelSerializer):
     contacts = serializers.SerializerMethodField()
     has_group_sector = serializers.SerializerMethodField()
     automatic_message = serializers.SerializerMethodField()
-    inactivity_timeout = serializers.SerializerMethodField()
     automatic_message_queue = serializers.SerializerMethodField()
 
     class Meta:
@@ -438,7 +353,6 @@ class SectorReadOnlyListSerializer(serializers.ModelSerializer):
             "created_on",
             "has_group_sector",
             "automatic_message",
-            "inactivity_timeout",
             "automatic_message_queue",
             "is_csat_enabled",
             "required_tags",
@@ -456,16 +370,12 @@ class SectorReadOnlyListSerializer(serializers.ModelSerializer):
     def get_automatic_message(self, sector: Sector):
         return SectorAutomaticMessageSerializer(sector).data
 
-    def get_inactivity_timeout(self, sector: Sector):
-        return _serialize_inactivity_timeout(sector)
-
     def get_automatic_message_queue(self, sector: Sector):
         return SectorAutomaticMessageQueueSerializer(sector).data
 
 
 class SectorReadOnlyRetrieveSerializer(serializers.ModelSerializer):
     automatic_message = serializers.SerializerMethodField()
-    inactivity_timeout = serializers.SerializerMethodField()
     automatic_message_queue = serializers.SerializerMethodField()
 
     class Meta:
@@ -481,7 +391,6 @@ class SectorReadOnlyRetrieveSerializer(serializers.ModelSerializer):
             "can_edit_custom_fields",
             "config",
             "automatic_message",
-            "inactivity_timeout",
             "automatic_message_queue",
             "is_csat_enabled",
             "required_tags",
@@ -490,9 +399,6 @@ class SectorReadOnlyRetrieveSerializer(serializers.ModelSerializer):
 
     def get_automatic_message(self, sector: Sector):
         return SectorAutomaticMessageSerializer(sector).data
-
-    def get_inactivity_timeout(self, sector: Sector):
-        return _serialize_inactivity_timeout(sector)
 
     def get_automatic_message_queue(self, sector: Sector):
         return SectorAutomaticMessageQueueSerializer(sector).data

@@ -6,12 +6,7 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 from django.utils.timezone import timedelta
 
-from chats.apps.msgs.models import (
-    AutomaticMessage,
-    AutomaticMessageType,
-    Message,
-    MessageMedia,
-)
+from chats.apps.msgs.models import Message, MessageMedia, AutomaticMessage
 from chats.apps.projects.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
@@ -136,44 +131,11 @@ class TestMessageModel(TestCase):
     def test_message_without_automatic_message(self):
         msg = Message.objects.create(room=self.room)
         self.assertFalse(msg.is_automatic_message)
-        self.assertIsNone(msg.automatic_message_type)
 
-    def test_message_with_automatic_message_type(self):
-        msg = Message.objects.create(
-            room=self.room,
-            automatic_message_type=AutomaticMessageType.AUTOMATIC_OPEN,
-        )
-        self.assertTrue(msg.is_automatic_message)
-        self.assertEqual(
-            msg.automatic_message_type, AutomaticMessageType.AUTOMATIC_OPEN
-        )
-
-    def test_message_with_inactive_warning_type(self):
-        msg = Message.objects.create(
-            room=self.room,
-            automatic_message_type=AutomaticMessageType.INACTIVE_WARNING,
-        )
-        self.assertTrue(msg.is_automatic_message)
-
-    def test_message_with_inactive_close_type(self):
-        msg = Message.objects.create(
-            room=self.room,
-            automatic_message_type=AutomaticMessageType.INACTIVE_CLOSE,
-        )
-        self.assertTrue(msg.is_automatic_message)
-
-    def test_legacy_automatic_message_relation_does_not_alone_flip_flag(self):
-        """
-        After this migration the source of truth for `is_automatic_message`
-        is the `automatic_message_type` field, NOT the legacy OneToOne
-        `AutomaticMessage` relation. The data migration is responsible for
-        setting `automatic_message_type='automatic_open'` on legacy welcomes
-        — without that backfill the flag would be False.
-        """
+    def test_message_with_automatic_message(self):
         msg = Message.objects.create(room=self.room)
         AutomaticMessage.objects.create(message=msg, room=self.room)
-        msg.refresh_from_db()
-        self.assertFalse(msg.is_automatic_message)
+        self.assertTrue(msg.is_automatic_message)
 
 
 class TestMessageMediaModel(TestCase):

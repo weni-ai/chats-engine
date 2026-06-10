@@ -163,9 +163,7 @@ class RoomViewset(
             .filter(queue__sector__project__permissions__user=self.request.user)
         )
 
-        qs = qs.select_related(
-            "user", "contact", "queue", "queue__sector", "queue__sector__project"
-        )
+        qs = qs.select_related("user", "contact", "queue", "queue__sector")
 
         return qs
 
