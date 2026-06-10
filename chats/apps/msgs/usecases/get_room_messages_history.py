@@ -41,5 +41,5 @@ class GetRoomMessagesHistoryUseCase:
             Message.objects.filter(room=room, internal_note__isnull=True)
             .select_related("user", "contact")
             .prefetch_related("medias")
-            .order_by("-created_on")
+            .order_by("created_on")
         )
