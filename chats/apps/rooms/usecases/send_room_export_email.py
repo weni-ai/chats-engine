@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING, Dict
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.mail import EmailMultiAlternatives
-from django.utils.translation import gettext as _
 
 from chats.apps.rooms.email_templates import (
     get_room_export_failed_email,
@@ -78,9 +77,10 @@ class SendRoomExportEmail:
         """Sends the failure notification email to the requester."""
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
         identifier = self._room_identifier(room)
-        subject = _(
-            "Error generating conversation export for room %(identifier)s - %(timestamp)s"
-        ) % {"identifier": identifier, "timestamp": timestamp}
+        subject = (
+            f"Error generating conversation export for room "
+            f"{identifier} - {timestamp}"
+        )
         message_plain, message_html = get_room_export_failed_email(
             identifier, error_message
         )
@@ -120,9 +120,7 @@ class SendRoomExportEmail:
     ) -> None:
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
         identifier = self._room_identifier(room)
-        subject = _(
-            "Conversation export for room %(identifier)s - %(timestamp)s"
-        ) % {"identifier": identifier, "timestamp": timestamp}
+        subject = f"Conversation export for room {identifier} - {timestamp}"
         message_plain, message_html = get_room_export_ready_email(
             identifier, download_url
         )
