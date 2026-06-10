@@ -144,25 +144,29 @@
     .msg--agent   { background: #cff8f4; }
 
     .msg__header {
-      display: block;
-      overflow: hidden;
+      display: table;
+      width: 100%;
       margin-bottom: 6px;
     }
 
     .msg__sender {
-      display: inline;
+      display: table-cell;
       font-weight: 600;
       font-size: 14px;
       line-height: 20px;
       color: #1f1f1f;
+      vertical-align: top;
     }
 
     .msg__time {
-      float: right;
+      display: table-cell;
+      text-align: right;
+      white-space: nowrap;
       font-size: 12px;
       line-height: 20px;
       color: #6b6c6e;
-      margin-left: 8px;
+      padding-left: 8px;
+      vertical-align: top;
     }
 
     .msg__body {
@@ -402,7 +406,7 @@
           </div>
           <div class="sidebar__row">
             <span class="sidebar__label">{% trans "URN" %}:</span>
-            <span class="sidebar__value">{{ contact.phone|default:"-" }}</span>
+            <span class="sidebar__value">{{ room.urn|default:"-" }}</span>
           </div>
           <div class="sidebar__row">
             <span class="sidebar__label">{% trans "Ticket ID" %}:</span>
