@@ -235,6 +235,8 @@ class RoomHistoryMessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
         fields = [
+            "uuid",
+            "text",
             "user",
             "contact",
             "created_on",
@@ -262,9 +264,7 @@ class RoomHistoryMessageSerializer(serializers.ModelSerializer):
         except ChatMessageReplyIndex.DoesNotExist:
             return None
         except Exception as error:
-            LOGGER.error(
-                "Error resolving replied message for room history: %s", error
-            )
+            LOGGER.error("Error resolving replied message for room history: %s", error)
             return None
 
         return {
