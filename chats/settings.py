@@ -552,7 +552,8 @@ USE_WENI_EDA_FOR_PROJECTS = env.bool("USE_WENI_EDA_FOR_PROJECTS", default=False)
 
 if USE_EDA:
     EDA_CONNECTION_BACKEND = "chats.apps.event_driven.backends.PyAMQPConnectionBackend"
-    EDA_CONSUMERS_HANDLE = "chats.apps.event_driven.handle.handle_consumers"
+    EDA_CONSUMERS_HANDLE_LEGACY = "chats.apps.event_driven.handle.handle_consumers"
+    EDA_CONSUMERS_HANDLE = "chats.apps.event_driven.handle_amq.handle_amq_consumers"
 
     EDA_BROKER_HOST = env("EDA_BROKER_HOST", default="localhost")
     EDA_VIRTUAL_HOST = env("EDA_VIRTUAL_HOST", default="/")

@@ -37,14 +37,6 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         signal.signal(signal.SIGTERM, handle_sigterm)
 
-        from django.conf import settings
-
-        # Override the consumers handler for this AMQ-only process so it
-        # registers only the consumers that have been migrated to Amazon MQ.
-        settings.EDA_CONSUMERS_HANDLE = (
-            "chats.apps.event_driven.handle_amq.handle_amq_consumers"
-        )
-
         params_class = import_string(self.AMQ_PARAMS_CLASS)
 
         from weni.eda.django.consumers import start_consuming
