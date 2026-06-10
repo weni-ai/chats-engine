@@ -139,7 +139,7 @@ class GetRoomMessagesHistoryUseCaseTests(TestCase):
 
         self.assertIn(msg.uuid, result_uuids)
 
-    def test_messages_are_ordered_by_created_on_descending(self):
+    def test_messages_are_ordered_by_created_on_ascending(self):
         msg1 = Message.objects.create(
             room=self.room, contact=self.contact, text="first"
         )
@@ -157,7 +157,7 @@ class GetRoomMessagesHistoryUseCaseTests(TestCase):
 
         self.assertEqual(
             [m.uuid for m in result],
-            [msg3.uuid, msg2.uuid, msg1.uuid],
+            [msg1.uuid, msg2.uuid, msg3.uuid],
         )
 
     def test_returns_queryset_instance(self):
