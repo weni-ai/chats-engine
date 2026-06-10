@@ -1,4 +1,5 @@
 from unittest import mock
+from urllib.parse import parse_qs, urlparse
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
@@ -447,8 +448,8 @@ class TestRoomHistoryCaching(BaseRoomHistoryTest):
         self.assertEqual(first.status_code, status.HTTP_200_OK)
         first_count = len(first.data["results"])
 
-        self.room.is_active = True
-        self.room.save(update_fields=["is_active"])
+        Room.objects.filter(pk=self.room.pk).update(is_active=True)
+        self.room.refresh_from_db()
         Message.objects.create(
             room=self.room, contact=self.contact, text="added after cache"
         )
@@ -474,7 +475,7 @@ class TestRoomHistoryCaching(BaseRoomHistoryTest):
         self.assertEqual(first.status_code, status.HTTP_200_OK)
         self.assertIsNotNone(first.data["next"])
 
-        cursor_value = first.data["next"].split("cursor=")[-1]
+        cursor_value = parse_qs(urlparse(first.data["next"]).query)["cursor"][0]
         second = self.get({"room": str(self.room.uuid), "cursor": cursor_value})
         self.assertEqual(second.status_code, status.HTTP_200_OK)
 
