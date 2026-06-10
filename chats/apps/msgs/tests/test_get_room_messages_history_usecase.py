@@ -1,7 +1,10 @@
+import uuid
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from chats.apps.contacts.models import Contact
+from chats.apps.msgs.exceptions import RoomNotFoundError, RoomStillActiveError
 from chats.apps.msgs.models import Message
 from chats.apps.msgs.usecases.get_room_messages_history import (
     GetRoomMessagesHistoryUseCase,
@@ -47,6 +50,33 @@ class GetRoomMessagesHistoryUseCaseTests(TestCase):
 
         self.usecase = GetRoomMessagesHistoryUseCase()
 
+    def close_room(self, room=None):
+        target = room or self.room
+        Room.objects.filter(pk=target.pk).update(is_active=False)
+        target.refresh_from_db()
+        return target
+
+    def test_raises_room_not_found_when_uuid_does_not_exist(self):
+        self.close_room()
+        with self.assertRaises(RoomNotFoundError):
+            self.usecase.execute(
+                room_uuid=uuid.uuid4(), project=self.project
+            )
+
+    def test_raises_room_not_found_when_room_belongs_to_another_project(self):
+        other_project = Project.objects.create(name="Other Project")
+        self.close_room()
+        with self.assertRaises(RoomNotFoundError):
+            self.usecase.execute(
+                room_uuid=self.room.uuid, project=other_project
+            )
+
+    def test_raises_room_still_active_when_room_is_open(self):
+        with self.assertRaises(RoomStillActiveError):
+            self.usecase.execute(
+                room_uuid=self.room.uuid, project=self.project
+            )
+
     def test_returns_only_messages_from_the_given_room(self):
         msg_in_room = Message.objects.create(
             room=self.room, contact=self.contact, text="Hello room"
@@ -56,8 +86,11 @@ class GetRoomMessagesHistoryUseCaseTests(TestCase):
             contact=self.other_room.contact,
             text="From another room",
         )
+        self.close_room()
 
-        result = list(self.usecase.execute(self.room))
+        result = list(
+            self.usecase.execute(room_uuid=self.room.uuid, project=self.project)
+        )
 
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].uuid, msg_in_room.uuid)
@@ -73,8 +106,14 @@ class GetRoomMessagesHistoryUseCaseTests(TestCase):
             text="Internal observation",
             message=note_msg,
         )
+        self.close_room()
 
-        result_uuids = [m.uuid for m in self.usecase.execute(self.room)]
+        result_uuids = [
+            m.uuid
+            for m in self.usecase.execute(
+                room_uuid=self.room.uuid, project=self.project
+            )
+        ]
 
         self.assertIn(regular_msg.uuid, result_uuids)
         self.assertNotIn(note_msg.uuid, result_uuids)
@@ -89,8 +128,14 @@ class GetRoomMessagesHistoryUseCaseTests(TestCase):
             text="Note without anchor",
             message=None,
         )
+        self.close_room()
 
-        result_uuids = [m.uuid for m in self.usecase.execute(self.room)]
+        result_uuids = [
+            m.uuid
+            for m in self.usecase.execute(
+                room_uuid=self.room.uuid, project=self.project
+            )
+        ]
 
         self.assertIn(msg.uuid, result_uuids)
 
@@ -104,8 +149,11 @@ class GetRoomMessagesHistoryUseCaseTests(TestCase):
         msg3 = Message.objects.create(
             room=self.room, contact=self.contact, text="third"
         )
+        self.close_room()
 
-        result = list(self.usecase.execute(self.room))
+        result = list(
+            self.usecase.execute(room_uuid=self.room.uuid, project=self.project)
+        )
 
         self.assertEqual(
             [m.uuid for m in result],
@@ -115,6 +163,9 @@ class GetRoomMessagesHistoryUseCaseTests(TestCase):
     def test_returns_queryset_instance(self):
         from django.db.models.query import QuerySet
 
-        result = self.usecase.execute(self.room)
+        self.close_room()
+        result = self.usecase.execute(
+            room_uuid=self.room.uuid, project=self.project
+        )
 
         self.assertIsInstance(result, QuerySet)

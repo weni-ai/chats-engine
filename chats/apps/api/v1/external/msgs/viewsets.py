@@ -30,11 +30,11 @@ from chats.apps.api.v1.external.throttling import (
     ExternalSecondRateThrottle,
 )
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
+from chats.apps.msgs.exceptions import RoomNotFoundError, RoomStillActiveError
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.usecases.get_room_messages_history import (
     GetRoomMessagesHistoryUseCase,
 )
-from chats.apps.rooms.models import Room
 
 
 class MessageFlowViewset(
@@ -158,20 +158,24 @@ class RoomHistoryMessagesViewSet(viewsets.GenericViewSet):
         query_serializer.is_valid(raise_exception=True)
         room_uuid = query_serializer.validated_data["room"]
 
-        room = (
-            Room.objects.filter(
-                uuid=room_uuid,
-                queue__sector__project=request.auth.project,
-            )
-            .only("uuid", "is_active")
-            .first()
+        cursor = request.query_params.get(
+            RoomHistoryMessagesPagination.cursor_query_param, ""
         )
-        if room is None:
+        cache_key = self._cache_key(str(room_uuid), cursor)
+        cached_payload = cache.get(cache_key)
+        if cached_payload is not None:
+            return Response(cached_payload, status=status.HTTP_200_OK)
+
+        try:
+            queryset = GetRoomMessagesHistoryUseCase().execute(
+                room_uuid=room_uuid,
+                project=request.auth.project,
+            )
+        except RoomNotFoundError:
             return Response(
                 {"detail": "Room not found."}, status=status.HTTP_404_NOT_FOUND
             )
-
-        if room.is_active:
+        except RoomStillActiveError:
             return Response(
                 {
                     "detail": (
@@ -182,15 +186,6 @@ class RoomHistoryMessagesViewSet(viewsets.GenericViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        cursor = request.query_params.get(
-            RoomHistoryMessagesPagination.cursor_query_param, ""
-        )
-        cache_key = self._cache_key(str(room.uuid), cursor)
-        cached_payload = cache.get(cache_key)
-        if cached_payload is not None:
-            return Response(cached_payload, status=status.HTTP_200_OK)
-
-        queryset = GetRoomMessagesHistoryUseCase().execute(room)
         page = self.paginate_queryset(queryset)
         serializer = self.get_serializer(page, many=True)
         paginated_response = self.get_paginated_response(serializer.data)

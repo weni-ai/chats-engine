@@ -182,9 +182,7 @@ class TestRoomHistoryClosedRoomRequirement(BaseRoomHistoryTest):
 @override_settings(REST_FRAMEWORK=NO_THROTTLE_RATES)
 class TestRoomHistoryPayloadShape(BaseRoomHistoryTest):
     def test_response_returns_documented_fields(self):
-        Message.objects.create(
-            room=self.room, contact=self.contact, text="Hello!"
-        )
+        Message.objects.create(room=self.room, contact=self.contact, text="Hello!")
         Message.objects.create(
             room=self.room, user=self.agent, text="Hi, how can I help?"
         )
@@ -204,6 +202,8 @@ class TestRoomHistoryPayloadShape(BaseRoomHistoryTest):
             "replied_message",
             "media",
             "is_automatic_message",
+            "uuid",
+            "text",
         }
         for item in response.data["results"]:
             self.assertEqual(set(item.keys()), expected_fields)
@@ -275,11 +275,7 @@ class TestRoomHistoryPayloadShape(BaseRoomHistoryTest):
         response = self.get({"room": str(self.room.uuid)})
 
         target = next(
-            (
-                m
-                for m in response.data["results"]
-                if m["media"] and len(m["media"]) > 0
-            ),
+            (m for m in response.data["results"] if m["media"] and len(m["media"]) > 0),
             None,
         )
         self.assertIsNotNone(target)
@@ -304,9 +300,7 @@ class TestRoomHistoryPayloadShape(BaseRoomHistoryTest):
 @override_settings(REST_FRAMEWORK=NO_THROTTLE_RATES)
 class TestRoomHistoryInternalNoteFilter(BaseRoomHistoryTest):
     def test_internal_note_messages_are_excluded(self):
-        Message.objects.create(
-            room=self.room, contact=self.contact, text="Visible"
-        )
+        Message.objects.create(room=self.room, contact=self.contact, text="Visible")
         hidden_msg = Message.objects.create(room=self.room, user=self.agent, text="")
         RoomNote.objects.create(
             room=self.room,
@@ -337,9 +331,7 @@ class TestRoomHistoryRepliedMessage(BaseRoomHistoryTest):
             text="What are your business hours?",
             external_id="ext-123",
         )
-        ChatMessageReplyIndex.objects.create(
-            external_id="ext-123", message=original
-        )
+        ChatMessageReplyIndex.objects.create(external_id="ext-123", message=original)
         Message.objects.create(
             room=self.room,
             user=self.agent,
@@ -397,9 +389,7 @@ class TestRoomHistoryRepliedMessage(BaseRoomHistoryTest):
 @override_settings(REST_FRAMEWORK=NO_THROTTLE_RATES)
 class TestRoomHistoryPagination(BaseRoomHistoryTest):
     def test_pagination_keys_present(self):
-        Message.objects.create(
-            room=self.room, contact=self.contact, text="hello"
-        )
+        Message.objects.create(room=self.room, contact=self.contact, text="hello")
         self.close_room()
 
         self.auth()
@@ -438,9 +428,7 @@ class TestRoomHistoryPagination(BaseRoomHistoryTest):
 @override_settings(REST_FRAMEWORK=NO_THROTTLE_RATES)
 class TestRoomHistoryCaching(BaseRoomHistoryTest):
     def test_second_identical_request_returns_cached_payload(self):
-        Message.objects.create(
-            room=self.room, contact=self.contact, text="first call"
-        )
+        Message.objects.create(room=self.room, contact=self.contact, text="first call")
         self.close_room()
 
         self.auth()
@@ -485,9 +473,7 @@ class TestRoomHistoryCaching(BaseRoomHistoryTest):
 
     @override_settings(ROOM_HISTORY_CACHE_TTL=123)
     def test_uses_room_history_cache_ttl_from_settings(self):
-        Message.objects.create(
-            room=self.room, contact=self.contact, text="payload"
-        )
+        Message.objects.create(room=self.room, contact=self.contact, text="payload")
         self.close_room()
 
         self.auth()
