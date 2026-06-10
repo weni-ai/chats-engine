@@ -96,12 +96,23 @@ class BuildRoomExportData:
         return {
             "uuid": str(room.uuid),
             "protocol": room.protocol,
+            "urn": self._format_urn(room.urn),
             "started_at": room.created_on,
             "ended_at": room.ended_at,
             "ended_by": room.ended_by,
             "tags": list(room.tags.values_list("name", flat=True)),
             "custom_fields": room.custom_fields or {},
         }
+
+    def _format_urn(self, urn: Optional[str]) -> Optional[str]:
+        """Returns the URN identifier without the channel scheme prefix.
+
+        URNs are stored as ``scheme:identifier`` (e.g. ``whatsapp:5511...``);
+        the scheme is dropped so the export shows just the identifier.
+        """
+        if not urn:
+            return None
+        return urn.split(":", 1)[-1]
 
     def _build_contact_block(self, room: "Room") -> dict:
         contact = room.contact
