@@ -10,6 +10,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.0/ref/settings/
 """
 
+import sys
+
 import os
 from pathlib import Path
 
@@ -82,7 +84,7 @@ INSTALLED_APPS = [
     "chats.apps.archive_chats",
     # third party apps
     "weni.feature_flags",  # weni-commons feature flags
-    #"weni.eda.django.eda_app",
+    # "weni.eda.django.eda_app",
     "channels",
     "drf_yasg",
     "django_filters",
@@ -550,10 +552,21 @@ USE_EDA = env.bool("USE_EDA", default=False)
 # TODO: Remove this once we permanently migrate to Weni EDA
 USE_WENI_EDA_FOR_PROJECTS = env.bool("USE_WENI_EDA_FOR_PROJECTS", default=False)
 
+EDA_CONSUMERS_HANDLES = {
+    "edaconsume": "chats.apps.event_driven.handle.handle_consumers",
+    "edaconsume_amq": "chats.apps.event_driven.handle_amq.handle_amq_consumers",
+    "msg_edaconsume": "chats.apps.msgs.handle.handle_consumers",
+    "msg_edaconsume_amq": "chats.apps.msgs.handle_amq.handle_amq_consumers",
+}
+
 if USE_EDA:
     EDA_CONNECTION_BACKEND = "chats.apps.event_driven.backends.PyAMQPConnectionBackend"
-    EDA_CONSUMERS_HANDLE_LEGACY = "chats.apps.event_driven.handle.handle_consumers"
-    EDA_CONSUMERS_HANDLE = "chats.apps.event_driven.handle_amq.handle_amq_consumers"
+
+    _command = sys.argv[1] if len(sys.argv) > 1 else None
+
+    EDA_CONSUMERS_HANDLE = EDA_CONSUMERS_HANDLES.get(
+        _command, EDA_CONSUMERS_HANDLES["edaconsume"]
+    )
 
     EDA_BROKER_HOST = env("EDA_BROKER_HOST", default="localhost")
     EDA_VIRTUAL_HOST = env("EDA_VIRTUAL_HOST", default="/")
