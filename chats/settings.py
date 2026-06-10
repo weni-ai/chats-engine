@@ -555,8 +555,8 @@ USE_WENI_EDA_FOR_PROJECTS = env.bool("USE_WENI_EDA_FOR_PROJECTS", default=False)
 EDA_CONSUMERS_HANDLES = {
     "edaconsume": "chats.apps.event_driven.handle.handle_consumers",
     "edaconsume_amq": "chats.apps.event_driven.handle_amq.handle_amq_consumers",
-    "msg_edaconsume": "chats.apps.msgs.handle.handle_consumers",
-    "msg_edaconsume_amq": "chats.apps.msgs.handle_amq.handle_amq_consumers",
+    "msg_edaconsume": "chats.apps.event_driven.handle.handle_consumers",
+    "msg_edaconsume_amq": "chats.apps.event_driven.handle_amq.handle_amq_consumers",
 }
 
 if USE_EDA:
