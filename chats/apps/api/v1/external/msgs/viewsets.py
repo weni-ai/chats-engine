@@ -122,7 +122,7 @@ class MessageFlowViewset(
 class RoomHistoryMessagesPagination(CursorPagination):
     page_size = 100
     max_page_size = 100
-    ordering = "-created_on"
+    ordering = "created_on"
     cursor_query_param = "cursor"
 
 
