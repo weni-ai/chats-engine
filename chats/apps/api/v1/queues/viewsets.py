@@ -35,7 +35,8 @@ from chats.apps.core.internal_domains import (
     exclude_vtex_internal_domains,
     is_vtex_internal_domain,
 )
-from chats.apps.projects.models.models import CustomStatus, Project, ProjectPermission
+from chats.apps.projects.models import ProjectPermission
+from chats.apps.projects.models.models import CustomStatus, Project
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.queues.models import Queue, QueueAuthorization
 from chats.apps.queues.usecases.bulk_queue_creation import BulkQueueCreationUseCase
@@ -405,25 +406,31 @@ class QueueViewset(ModelViewSet):
                 is_active=True,
             )
             .exclude(status_type__name__iexact="in-service")
+            .order_by("-created_on")
             .values("status_type__name")[:1]
         )
         online_subquery = ProjectPermission.objects.filter(
             user_id=OuterRef("email"),
             project=project,
             status="ONLINE",
+            is_deleted=False,
         )
 
-        agents = agents.annotate(
-            _pause_name=Subquery(pause_subquery, output_field=CharField()),
-            _is_online=Exists(online_subquery),
-        ).annotate(
-            _order=Case(
-                When(_pause_name__isnull=False, then=Value(1)),
-                When(_is_online=True, then=Value(0)),
-                default=Value(2),
-                output_field=IntegerField(),
+        agents = (
+            agents.annotate(
+                _pause_name=Subquery(pause_subquery, output_field=CharField()),
+                _is_online=Exists(online_subquery),
             )
-        ).order_by("_order", "first_name", "last_name")
+            .annotate(
+                _order=Case(
+                    When(_pause_name__isnull=False, then=Value(1)),
+                    When(_is_online=True, then=Value(0)),
+                    default=Value(2),
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by("_order", "first_name", "last_name")
+        )
 
         serializer = QueueAgentsSerializer(
             agents, many=True, context={"project": project}

@@ -195,6 +195,7 @@ class QueueAgentsSerializer(serializers.ModelSerializer):
         ]
 
     def get_status(self, obj):
+        # Prefer annotations set by the view to avoid N+1 queries.
         pause_name = getattr(obj, "_pause_name", None)
         if pause_name:
             return pause_name
@@ -211,16 +212,19 @@ class QueueAgentsSerializer(serializers.ModelSerializer):
 
         active_pause = (
             CustomStatus.objects.filter(
-                user=obj, project=project, is_active=True
+                user_id=obj.email, project=project, is_active=True
             )
             .exclude(status_type__name__iexact="in-service")
             .select_related("status_type")
+            .order_by("-created_on")
             .first()
         )
         if active_pause:
             return active_pause.status_type.name
 
-        project_permission = obj.project_permissions.filter(project=project).first()
+        project_permission = obj.project_permissions.filter(
+            project=project, is_deleted=False
+        ).first()
         if project_permission and project_permission.status == "ONLINE":
             return "online"
         return "offline"
