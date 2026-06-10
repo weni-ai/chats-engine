@@ -1,3 +1,5 @@
+import logging
+
 from django.utils.translation import gettext_lazy as _
 from rest_framework import exceptions, serializers
 
@@ -5,7 +7,9 @@ from chats.apps.api.utils import create_reply_index
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactRelationsSerializer
 from chats.apps.api.v1.msgs.serializers import MessageMediaSerializer
-from chats.apps.msgs.models import Message, MessageMedia
+from chats.apps.msgs.models import ChatMessageReplyIndex, Message, MessageMedia
+
+LOGGER = logging.getLogger(__name__)
 
 
 class AttachmentSerializer(serializers.ModelSerializer):
@@ -131,3 +135,102 @@ class MsgFlowSerializer(serializers.ModelSerializer):
 
         create_reply_index(msg)
         return msg
+
+
+class RoomHistoryQuerySerializer(serializers.Serializer):
+    """Validates query params for the external room history endpoint."""
+
+    room = serializers.UUIDField(
+        required=True,
+        help_text="UUID of the room whose message history will be returned",
+    )
+
+
+class RoomHistoryUserSerializer(serializers.Serializer):
+    """Minimal user payload used inside the room history response."""
+
+    name = serializers.SerializerMethodField()
+    email = serializers.EmailField(read_only=True)
+
+    def get_name(self, user) -> str:
+        first_name = getattr(user, "first_name", "") or ""
+        last_name = getattr(user, "last_name", "") or ""
+        full_name = f"{first_name} {last_name}".strip()
+        return full_name or (getattr(user, "email", "") or "")
+
+
+class RoomHistoryContactSerializer(serializers.Serializer):
+    """Minimal contact payload used inside the room history response."""
+
+    uuid = serializers.UUIDField(read_only=True)
+    name = serializers.CharField(read_only=True)
+
+
+class RoomHistoryMessageMediaSerializer(serializers.ModelSerializer):
+    """Read-only media payload returned inside the room history response."""
+
+    url = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = MessageMedia
+        fields = ["content_type", "url", "created_on"]
+        read_only_fields = ["content_type", "url", "created_on"]
+        ref_name = "ExternalRoomHistoryMessageMediaSerializer"
+
+    def get_url(self, media: MessageMedia) -> str:
+        return media.public_url
+
+
+class RoomHistoryMessageSerializer(serializers.ModelSerializer):
+    """
+    Read-only serializer for messages of a closed room exposed via the
+    external room history endpoint.
+    """
+
+    user = RoomHistoryUserSerializer(read_only=True, allow_null=True)
+    contact = RoomHistoryContactSerializer(read_only=True, allow_null=True)
+    media = RoomHistoryMessageMediaSerializer(
+        many=True, read_only=True, source="medias"
+    )
+    replied_message = serializers.SerializerMethodField(read_only=True)
+    is_automatic_message = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = Message
+        fields = [
+            "user",
+            "contact",
+            "created_on",
+            "replied_message",
+            "media",
+            "is_automatic_message",
+        ]
+        read_only_fields = fields
+        ref_name = "ExternalRoomHistoryMessageSerializer"
+
+    def get_replied_message(self, obj: Message):
+        metadata = obj.metadata or {}
+        context = metadata.get("context") if isinstance(metadata, dict) else None
+        if not context or not isinstance(context, dict):
+            return None
+
+        replied_id = context.get("id")
+        if not replied_id:
+            return None
+
+        try:
+            reply_index = ChatMessageReplyIndex.objects.select_related("message").get(
+                external_id=replied_id
+            )
+        except ChatMessageReplyIndex.DoesNotExist:
+            return None
+        except Exception as error:
+            LOGGER.error(
+                "Error resolving replied message for room history: %s", error
+            )
+            return None
+
+        return {
+            "uuid": str(reply_index.message.uuid),
+            "text": reply_index.message.text or "",
+        }
