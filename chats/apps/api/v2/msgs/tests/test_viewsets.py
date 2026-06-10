@@ -148,7 +148,6 @@ class TestMessageViewSetV2AsAuthenticatedUser(BaseTestMessageViewSetV2):
             "is_read",
             "internal_note",
             "is_automatic_message",
-            "automatic_message_type",
             "created_on",
         ]
 

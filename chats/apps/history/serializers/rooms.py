@@ -9,43 +9,6 @@ from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import SectorTag
 
 
-class ClosedBySerializer(serializers.Serializer):
-    """
-    Serializes the closure context for a room (the agent who closed it, plus
-    whether the closure was automatic). The `automatic_closed` flag lives
-    inside this payload so the front can render manual vs automatic closure
-    from a single object.
-    """
-
-    first_name = serializers.SerializerMethodField()
-    last_name = serializers.SerializerMethodField()
-    email = serializers.SerializerMethodField()
-    automatic_closed = serializers.SerializerMethodField()
-
-    def get_first_name(self, room: Room) -> Optional[str]:
-        return getattr(room.closed_by, "first_name", None)
-
-    def get_last_name(self, room: Room) -> Optional[str]:
-        return getattr(room.closed_by, "last_name", None)
-
-    def get_email(self, room: Room) -> Optional[str]:
-        return getattr(room.closed_by, "email", None)
-
-    def get_automatic_closed(self, room: Room) -> bool:
-        return bool(getattr(room, "automatic_closed", False))
-
-
-def _serialize_closed_by(room: Room) -> Optional[dict]:
-    """
-    Returns the serialized `closed_by` payload, or None when the room has
-    neither a closing agent nor the automatic flag set (preserves the legacy
-    behavior for older rooms).
-    """
-    if room.closed_by is None and not getattr(room, "automatic_closed", False):
-        return None
-    return ClosedBySerializer(room).data
-
-
 class ContactOptimizedSerializer(serializers.ModelSerializer):
     class Meta:
         model = Contact
@@ -68,7 +31,7 @@ class RoomHistorySerializer(serializers.ModelSerializer):
     user = UserNameEmailSerializer(many=False, read_only=True)
     contact = ContactOptimizedSerializer(read_only=True)
     tags = serializers.SerializerMethodField()
-    closed_by = serializers.SerializerMethodField()
+    closed_by = UserNameEmailSerializer(many=False, read_only=True)
 
     class Meta:
         model = Room
@@ -91,9 +54,6 @@ class RoomHistorySerializer(serializers.ModelSerializer):
             many=True,
         ).data
 
-    def get_closed_by(self, obj: Room) -> Optional[dict]:
-        return _serialize_closed_by(obj)
-
     def to_representation(self, instance):
         data = super().to_representation(instance)
         contact_serializer = ContactOptimizedSerializer(
@@ -114,7 +74,7 @@ class RoomDetailSerializer(serializers.ModelSerializer):
     contact = serializers.SerializerMethodField()
     tags = serializers.SerializerMethodField()
     archived_conversation_file_url = serializers.SerializerMethodField()
-    closed_by = serializers.SerializerMethodField()
+    closed_by = UserNameEmailSerializer(many=False, read_only=True)
 
     class Meta:
         model = Room
@@ -132,9 +92,6 @@ class RoomDetailSerializer(serializers.ModelSerializer):
             "archived_conversation_file_url",
             "closed_by",
         ]
-
-    def get_closed_by(self, obj: Room) -> Optional[dict]:
-        return _serialize_closed_by(obj)
 
     def get_contact(self, obj):
         contact_data = ContactSimpleSerializer(obj.contact).data

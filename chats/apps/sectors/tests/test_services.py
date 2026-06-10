@@ -7,11 +7,7 @@ from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.accounts.models import User
 from chats.apps.projects.models.models import Project
-from chats.apps.msgs.models import (
-    AutomaticMessage,
-    AutomaticMessageType,
-    Message,
-)
+from chats.apps.msgs.models import Message, AutomaticMessage
 
 
 class TestAutomaticMessagesService(TestCase):
@@ -84,24 +80,3 @@ class TestAutomaticMessagesService(TestCase):
                 self.room, self.sector.automatic_message_text, self.user
             )
         )
-
-    def test_welcome_message_is_tagged_as_automatic_open(self):
-        """
-        The welcome message must be classified with
-        `automatic_message_type=automatic_open` so the front can render the
-        right UI marker (and so `is_automatic_message` keeps returning True
-        after we moved the source of truth to the new field).
-        """
-        self.sector.is_automatic_message_active = True
-        self.sector.automatic_message_text = "Welcome!"
-        self.sector.save()
-
-        self.service.send_automatic_message(
-            self.room, self.sector.automatic_message_text, self.user
-        )
-
-        msg = Message.objects.get(room=self.room, text="Welcome!")
-        self.assertEqual(
-            msg.automatic_message_type, AutomaticMessageType.AUTOMATIC_OPEN
-        )
-        self.assertTrue(msg.is_automatic_message)

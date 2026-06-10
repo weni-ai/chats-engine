@@ -176,16 +176,6 @@ class Room(BaseModel, BaseConfigurableModel):
         _("Automatic message sent at"), null=True, blank=True
     )
 
-    is_inactive = models.BooleanField(_("is inactive?"), default=False)
-    automatic_closed = models.BooleanField(
-        _("automatic closed?"),
-        default=False,
-        help_text=_(
-            "True when the room was closed automatically by the system "
-            "(e.g. inactivity timeout) rather than by a human agent."
-        ),
-    )
-
     tracker = FieldTracker(fields=["user_id", "queue_id"])
 
     def get_automatic_message_sent_at(self) -> Optional[datetime]:
@@ -201,7 +191,9 @@ class Room(BaseModel, BaseConfigurableModel):
     def get_time_to_send_automatic_message(self) -> Optional[int]:
         sent_at = self.get_automatic_message_sent_at()
         if sent_at and self.first_user_assigned_at:
-            return max(int((sent_at - self.first_user_assigned_at).total_seconds()), 0)
+            return max(
+                int((sent_at - self.first_user_assigned_at).total_seconds()), 0
+            )
         return None
 
     @property
@@ -286,10 +278,6 @@ class Room(BaseModel, BaseConfigurableModel):
         ]
         indexes = [
             models.Index(fields=["project_uuid"]),
-            models.Index(
-                fields=["is_active", "is_inactive", "is_waiting", "last_interaction"],
-                name="rooms_inactivity_idx",
-            ),
         ]
 
     def save(self, *args, **kwargs) -> None:
@@ -618,33 +606,6 @@ class Room(BaseModel, BaseConfigurableModel):
             action=f"rooms.{action}",
         )
 
-    def notify_inactivity(self):
-        """
-        Notifies the frontend that the inactivity flag of this room has
-        changed. Sends a lightweight payload (`room_uuid` + `is_inactive`)
-        with a dedicated `rooms.inactivity` event so the client can update
-        the visual alert without re-rendering the whole room.
-
-        Routes to the assigned agent's permission group when the room has a
-        user; falls back to the queue group otherwise (defensive — rooms
-        eligible for inactivity always have a user).
-        """
-        from chats.apps.rooms.usecases.inactivity import is_inactivity_feature_active
-
-        try:
-            project_uuid = str(self.queue.sector.project.uuid)
-        except AttributeError:
-            project_uuid = None
-
-        if not is_inactivity_feature_active(project_uuid):
-            return
-
-        content = {
-            "room_uuid": str(self.uuid),
-            "is_inactive": self.is_inactive,
-        }
-        self.base_notification(content=content, action="rooms.inactivity")
-
     def user_connection(self, action: str, user=None):
         user = user if user else self.user
         permission = self.get_permission(user)
@@ -856,11 +817,6 @@ class Room(BaseModel, BaseConfigurableModel):
             ),
         ).update(**update_fields)
 
-        if self.is_inactive and contact is not None:
-            from chats.apps.rooms.usecases.inactivity import InactivityService
-
-            InactivityService().reset_inactivity(self)
-
     def start_csat_flow(self):
         """
         Starts the CSAT flow for a room.
@@ -871,16 +827,16 @@ class Room(BaseModel, BaseConfigurableModel):
 
     @property
     def is_archived(self) -> bool:
-        from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
         from chats.apps.archive_chats.models import RoomArchivedConversation
+        from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
 
         return RoomArchivedConversation.objects.filter(
             room=self, status=ArchiveConversationsJobStatus.FINISHED, file__isnull=False
         ).exists()
 
     def get_archived_conversation_file_url(self) -> Optional[str]:
-        from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
         from chats.apps.archive_chats.models import RoomArchivedConversation
+        from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
 
         archive = RoomArchivedConversation.objects.filter(
             room=self, status=ArchiveConversationsJobStatus.FINISHED, file__isnull=False
@@ -1077,7 +1033,9 @@ class RoomNoteMedia(BaseModelWithManualCreatedOn):
 
     def save(self, *args, **kwargs) -> None:
         if self.note.room.is_active is False:
-            raise ValidationError({"detail": _("Closed rooms cannot receive notes")})
+            raise ValidationError(
+                {"detail": _("Closed rooms cannot receive notes")}
+            )
         is_new = self._state.adding
         if is_new and self.note.medias.count() >= 10:
             raise ValidationError(

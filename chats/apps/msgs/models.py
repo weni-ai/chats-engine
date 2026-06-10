@@ -18,12 +18,6 @@ from chats.core.requests import get_request_session_with_retries
 logger = logging.getLogger(__name__)
 
 
-class AutomaticMessageType(models.TextChoices):
-    AUTOMATIC_OPEN = "automatic_open", _("Automatic open")
-    INACTIVE_WARNING = "inactive_warning", _("Inactive warning")
-    INACTIVE_CLOSE = "inactive_close", _("Inactive close")
-
-
 def message_media_upload_to(instance, filename):
     """
     Generate unique file path for MessageMedia uploads using UUID.
@@ -85,17 +79,6 @@ class Message(BaseModelWithManualCreatedOn):
     )
     is_delivered = models.CharField(
         _("message is delivered"), max_length=50, blank=True, null=True
-    )
-    automatic_message_type = models.CharField(
-        _("automatic message type"),
-        max_length=32,
-        choices=AutomaticMessageType.choices,
-        null=True,
-        blank=True,
-        help_text=_(
-            "Classification for automatic messages sent by the system "
-            "(welcome, inactivity warning, inactivity closure)."
-        ),
     )
 
     class Meta:
@@ -222,7 +205,7 @@ class Message(BaseModelWithManualCreatedOn):
 
     @property
     def is_automatic_message(self):
-        return self.automatic_message_type is not None
+        return hasattr(self, "automatic_message") and self.automatic_message is not None
 
 
 class MessageMedia(BaseModelWithManualCreatedOn):
