@@ -1832,34 +1832,6 @@ msgstr ""
 "Documento gerado automaticamente para fins de auditoria e conformidade. "
 "A alteração deste documento pode resultar em penalidades."
 
-#: chats/apps/rooms/usecases/send_room_export_email.py
-msgid "Conversation export for room %(identifier)s - %(timestamp)s"
-msgstr "Exportação da conversa da sala %(identifier)s - %(timestamp)s"
-
-#: chats/apps/rooms/usecases/send_room_export_email.py
-msgid "Error generating conversation export for room %(identifier)s - %(timestamp)s"
-msgstr "Não foi possível gerar a exportação da conversa da sala %(identifier)s - %(timestamp)s"
-
-#: chats/apps/api/v1/rooms/viewsets.py
-msgid "An export is already being generated for this room."
-msgstr "Já existe uma exportação em andamento para esta sala."
-
-#: chats/apps/api/v1/rooms/viewsets.py
-msgid "The export will be sent to your email when ready."
-msgstr "A exportação será enviada para o seu e-mail quando estiver pronta."
-
-#: chats/apps/api/v1/rooms/viewsets.py
-msgid "Room not found"
-msgstr "Sala não encontrada"
-
-#: chats/apps/api/v1/rooms/viewsets.py
-msgid "Only closed rooms can be exported"
-msgstr "Apenas salas encerradas podem ser exportadas"
-
-#: chats/apps/api/v1/rooms/viewsets.py
-msgid "You do not have permission to export this room"
-msgstr "Você não tem permissão para exportar esta sala"
-
 #~ msgid "Queue's ID"
 #~ msgstr "ID da Fila"
 
