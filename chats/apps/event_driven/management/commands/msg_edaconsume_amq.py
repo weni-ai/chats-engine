@@ -1,9 +1,10 @@
 import os
 import signal
 
-from django.core.management.base import BaseCommand
-from django.utils.module_loading import import_string
 from weni.eda.django.eda_app.management.commands.edaconsume import Command as WeniEDACommand
+
+
+AMQ_PARAMS_CLASS = "weni.eda.django.connection_params.AMQConnectionParamsFactory"
 
 
 def handle_sigterm(*args):
@@ -16,4 +17,6 @@ def handle_sigterm(*args):
 
 class Command(WeniEDACommand):
     def handle(self, *args, **options):
+        signal.signal(signal.SIGTERM, handle_sigterm)
+        options["params_class"] = AMQ_PARAMS_CLASS
         super().handle(*args, **options)
