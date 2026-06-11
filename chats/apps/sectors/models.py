@@ -14,7 +14,12 @@ from model_utils import FieldTracker
 from chats.apps.csat.flows.definitions.flow import CSAT_FLOW_VERSION
 from chats.apps.csat.models import CSATFlowProjectConfig
 from chats.apps.queues.utils import start_queue_priority_routing
-from chats.core.models import AuditableMixin, BaseConfigurableModel, BaseModel, BaseSoftDeleteModel
+from chats.core.models import (
+    AuditableMixin,
+    BaseConfigurableModel,
+    BaseModel,
+    BaseSoftDeleteModel,
+)
 from chats.utils.websockets import send_channels_group
 
 from .sector_managers import SectorAuthorizationManager, SectorManager, SectorTagManager
@@ -83,6 +88,17 @@ class Sector(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMod
         help_text=_("The UUID of the custom CSAT flow"),
     )
     required_tags = models.BooleanField(_("required tags?"), default=False)
+
+    inactivity_timeout = models.JSONField(
+        _("inactivity timeout"),
+        null=True,
+        blank=True,
+        default=None,
+        help_text=_(
+            "Configuration for inactivity warning message and automatic room "
+            "closure. See `chats.apps.sectors.constants.get_default_inactivity_timeout`."
+        ),
+    )
 
     tracker = FieldTracker(fields=["rooms_limit", "is_csat_enabled"])
 
