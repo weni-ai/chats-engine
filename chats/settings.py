@@ -549,7 +549,7 @@ CELERY_BEAT_SCHEDULE = {
     },
     "start-archive-rooms-messages": {
         "task": "start_archive_rooms_messages",
-        "schedule": crontab(hour="0-4", minute=0),
+        "schedule": crontab(hour="22-23,0-5", minute=0),
     },
     "check-inactivity-rooms": {
         "task": "check_inactivity_rooms",
@@ -831,6 +831,11 @@ REPORT_STATUS_CACHE_TTL = env.int("REPORT_STATUS_CACHE_TTL", default=300)
 USER_OBJECT_CACHE_TTL = env.int("USER_OBJECT_CACHE_TTL", default=300)
 USER_OBJECT_CACHE_ENABLED = env.bool("USER_OBJECT_CACHE_ENABLED", default=True)
 
+
+# SECTOR QUICK MESSAGES CACHE
+SECTOR_QUICK_MESSAGES_CACHE_TTL = env.int(
+    "SECTOR_QUICK_MESSAGES_CACHE_TTL", default=300
+)
 
 # ROOM 24H VALID CACHE
 ROOM_24H_VALID_CACHE_TTL = env.int(
