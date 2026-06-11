@@ -1,14 +1,3 @@
-# 3.65.3
-# Add
-  - Custom status in transfer endpoint
-  - Logging to ProjectPermissionConsumer for better traceability
-
-# 3.65.2
-# Add
-  - Improved room archiving logic and transaction handling
-# Fix
-  - Test coverage setup with parallel execution and Redis isolation
-
 # 3.65.1
 # Fix
   - Restrict accounts userdata endpoint permissions

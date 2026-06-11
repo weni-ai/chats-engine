@@ -368,7 +368,11 @@ class ArchiveChatsService(BaseArchiveChatsService):
         return self._iter_messages(room)
 
     def _iter_messages(self, room: Room) -> Iterable[dict]:
-        messages = Message.objects.filter(room=room).order_by("created_on")
+        messages = (
+            Message.objects.filter(room=room)
+            .select_related("automatic_message")
+            .order_by("created_on")
+        )
 
         for message in messages.iterator():
             message_context = {"media": []}

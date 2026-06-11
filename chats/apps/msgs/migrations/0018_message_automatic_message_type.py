@@ -1,51 +1,53 @@
 from django.db import migrations, models
 
 
-def backfill_automatic_open_type(apps, schema_editor):
-    """
-    Mark every legacy welcome message (`AutomaticMessage` OneToOne) with the
-    new explicit `automatic_message_type='automatic_open'` so the
-    `is_automatic_message` property keeps returning True for them after we
-    switched the source of truth from the OneToOne reverse relation to the
-    new field.
-    """
-    Message = apps.get_model("msgs", "Message")
-    AutomaticMessage = apps.get_model("msgs", "AutomaticMessage")
-
-    message_ids = AutomaticMessage.objects.values_list("message_id", flat=True)
-    Message.objects.filter(pk__in=list(message_ids)).update(
-        automatic_message_type="automatic_open"
-    )
-
-
-def noop_reverse(apps, schema_editor):
-    return None
-
-
 class Migration(migrations.Migration):
+    """
+    Moves the automatic message classification to `AutomaticMessage`.
+
+    - Relaxes the `room` relation from OneToOne to ForeignKey so the same
+      room can receive multiple automatic messages (welcome, inactivity
+      warning, inactivity closure).
+    - Adds `automatic_message_type` with default `automatic_open`, which
+      correctly classifies every legacy row (the only kind that existed
+      before the inactivity feature).
+
+    No backfill on `msgs_message` is required: the default applied by
+    Postgres covers every existing `AutomaticMessage` row, and the
+    `msgs_message` table is left untouched.
+    """
+
     dependencies = [
         ("msgs", "0017_alter_messagemedia_media_file"),
+        ("rooms", "0030_roomnotemedia"),
     ]
 
     operations = [
+        migrations.AlterField(
+            model_name="automaticmessage",
+            name="room",
+            field=models.ForeignKey(
+                on_delete=models.deletion.CASCADE,
+                related_name="automatic_messages",
+                to="rooms.room",
+            ),
+        ),
         migrations.AddField(
-            model_name="message",
+            model_name="automaticmessage",
             name="automatic_message_type",
             field=models.CharField(
-                blank=True,
                 choices=[
                     ("automatic_open", "Automatic open"),
                     ("inactive_warning", "Inactive warning"),
                     ("inactive_close", "Inactive close"),
                 ],
+                default="automatic_open",
                 help_text=(
                     "Classification for automatic messages sent by the system "
                     "(welcome, inactivity warning, inactivity closure)."
                 ),
                 max_length=32,
-                null=True,
                 verbose_name="automatic message type",
             ),
         ),
-        migrations.RunPython(backfill_automatic_open_type, noop_reverse),
     ]

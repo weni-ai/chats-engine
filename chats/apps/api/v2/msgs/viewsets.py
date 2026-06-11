@@ -37,6 +37,7 @@ class MessageViewSetV2(
             "contact",
             "internal_note",
             "internal_note__user",
+            "automatic_message",
         ).prefetch_related("medias", "internal_note__medias")
 
     def get_paginated_response(self, data):

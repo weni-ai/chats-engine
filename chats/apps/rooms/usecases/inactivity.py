@@ -18,7 +18,7 @@ from django.utils import timezone
 from sentry_sdk import capture_exception
 from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
-from chats.apps.msgs.models import AutomaticMessageType, Message
+from chats.apps.msgs.models import AutomaticMessage, AutomaticMessageType, Message
 from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
 
@@ -96,8 +96,13 @@ def _send_silent_automatic_message(
                 text=text,
                 user=user,
                 contact=None,
-                automatic_message_type=message_type,
             )
+            if message_type is not None:
+                AutomaticMessage.objects.create(
+                    message=message,
+                    room=room,
+                    automatic_message_type=message_type,
+                )
             transaction.on_commit(lambda: message.notify_room("create", True))
             return message
     except Exception as exc:

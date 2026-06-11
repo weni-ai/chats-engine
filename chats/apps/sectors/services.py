@@ -95,7 +95,9 @@ class AutomaticMessagesService:
         if (
             room.queue.sector.is_automatic_message_active is False
             or not room.queue.sector.automatic_message_text
-            or hasattr(room, "automatic_message")
+            or room.automatic_messages.filter(
+                automatic_message_type=AutomaticMessageType.AUTOMATIC_OPEN
+            ).exists()
             or room.messages.filter(user__isnull=False).exists()
         ):
             logger.info(
@@ -112,11 +114,11 @@ class AutomaticMessagesService:
                     text=message_text,
                     user=user,
                     contact=None,
-                    automatic_message_type=AutomaticMessageType.AUTOMATIC_OPEN,
                 )
                 AutomaticMessage.objects.create(
                     room=room,
                     message=message,
+                    automatic_message_type=AutomaticMessageType.AUTOMATIC_OPEN,
                 )
 
                 Room.objects.filter(pk=room.pk).update(

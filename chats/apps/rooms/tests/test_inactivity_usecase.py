@@ -302,7 +302,9 @@ class InactivityCloseTests(TestCase):
         self.assertFalse(
             Message.objects.filter(
                 room=room,
-                automatic_message_type=AutomaticMessageType.INACTIVE_CLOSE,
+                automatic_message__automatic_message_type=(
+                    AutomaticMessageType.INACTIVE_CLOSE
+                ),
             ).exists()
         )
 

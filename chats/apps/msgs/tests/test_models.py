@@ -139,41 +139,77 @@ class TestMessageModel(TestCase):
         self.assertIsNone(msg.automatic_message_type)
 
     def test_message_with_automatic_message_type(self):
-        msg = Message.objects.create(
+        msg = Message.objects.create(room=self.room)
+        AutomaticMessage.objects.create(
+            message=msg,
             room=self.room,
             automatic_message_type=AutomaticMessageType.AUTOMATIC_OPEN,
         )
+        msg.refresh_from_db()
         self.assertTrue(msg.is_automatic_message)
         self.assertEqual(
             msg.automatic_message_type, AutomaticMessageType.AUTOMATIC_OPEN
         )
 
     def test_message_with_inactive_warning_type(self):
-        msg = Message.objects.create(
+        msg = Message.objects.create(room=self.room)
+        AutomaticMessage.objects.create(
+            message=msg,
             room=self.room,
             automatic_message_type=AutomaticMessageType.INACTIVE_WARNING,
         )
+        msg.refresh_from_db()
         self.assertTrue(msg.is_automatic_message)
+        self.assertEqual(
+            msg.automatic_message_type, AutomaticMessageType.INACTIVE_WARNING
+        )
 
     def test_message_with_inactive_close_type(self):
-        msg = Message.objects.create(
+        msg = Message.objects.create(room=self.room)
+        AutomaticMessage.objects.create(
+            message=msg,
             room=self.room,
             automatic_message_type=AutomaticMessageType.INACTIVE_CLOSE,
         )
+        msg.refresh_from_db()
         self.assertTrue(msg.is_automatic_message)
+        self.assertEqual(
+            msg.automatic_message_type, AutomaticMessageType.INACTIVE_CLOSE
+        )
 
-    def test_legacy_automatic_message_relation_does_not_alone_flip_flag(self):
+    def test_legacy_automatic_message_relation_flips_flag(self):
         """
-        After this migration the source of truth for `is_automatic_message`
-        is the `automatic_message_type` field, NOT the legacy OneToOne
-        `AutomaticMessage` relation. The data migration is responsible for
-        setting `automatic_message_type='automatic_open'` on legacy welcomes
-        — without that backfill the flag would be False.
+        The source of truth for `is_automatic_message` is the existence of
+        the related `AutomaticMessage` row. The default type for legacy
+        rows is `automatic_open`, so the flag returns True for them.
         """
         msg = Message.objects.create(room=self.room)
         AutomaticMessage.objects.create(message=msg, room=self.room)
         msg.refresh_from_db()
-        self.assertFalse(msg.is_automatic_message)
+        self.assertTrue(msg.is_automatic_message)
+        self.assertEqual(
+            msg.automatic_message_type, AutomaticMessageType.AUTOMATIC_OPEN
+        )
+
+    def test_multiple_automatic_messages_per_room_are_allowed(self):
+        """
+        After moving `room` from OneToOne to ForeignKey, a single room can
+        own multiple `AutomaticMessage` rows (one welcome + N inactivity
+        warnings/closes).
+        """
+        msg1 = Message.objects.create(room=self.room)
+        msg2 = Message.objects.create(room=self.room)
+        AutomaticMessage.objects.create(
+            message=msg1,
+            room=self.room,
+            automatic_message_type=AutomaticMessageType.AUTOMATIC_OPEN,
+        )
+        AutomaticMessage.objects.create(
+            message=msg2,
+            room=self.room,
+            automatic_message_type=AutomaticMessageType.INACTIVE_WARNING,
+        )
+        self.assertEqual(self.room.automatic_messages.count(), 2)
 
 
 class TestMessageMediaModel(TestCase):
