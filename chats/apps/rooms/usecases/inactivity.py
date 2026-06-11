@@ -137,6 +137,7 @@ def _eligible_warn_queryset():
         is_waiting=False,
         user__isnull=False,
         last_message_user__isnull=False,
+        last_message__automatic_message__isnull=True,
         queue__sector__inactivity_timeout__is_message_timeout_enabled=True,
     ).select_related("queue__sector", "user")
 
@@ -155,6 +156,7 @@ def _eligible_close_queryset():
         is_waiting=False,
         user__isnull=False,
         last_message_user__isnull=False,
+        last_message__automatic_message__isnull=True,
         queue__sector__inactivity_timeout__is_close_room_enabled=True,
     ).select_related("queue__sector", "user")
 
