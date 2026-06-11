@@ -156,11 +156,8 @@ def _eligible_close_queryset():
         is_waiting=False,
         user__isnull=False,
         last_message_user__isnull=False,
+        last_message__automatic_message__isnull=True,
         queue__sector__inactivity_timeout__is_close_room_enabled=True,
-    ).exclude(
-        last_message__automatic_message__automatic_message_type=(
-            AutomaticMessageType.AUTOMATIC_OPEN
-        ),
     ).select_related("queue__sector", "user")
 
 
