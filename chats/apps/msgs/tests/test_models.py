@@ -6,7 +6,12 @@ from django.test import TestCase, override_settings
 from django.utils import timezone
 from django.utils.timezone import timedelta
 
-from chats.apps.msgs.models import Message, MessageMedia, AutomaticMessage
+from chats.apps.msgs.models import (
+    AutomaticMessage,
+    AutomaticMessageType,
+    Message,
+    MessageMedia,
+)
 from chats.apps.projects.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
@@ -131,11 +136,80 @@ class TestMessageModel(TestCase):
     def test_message_without_automatic_message(self):
         msg = Message.objects.create(room=self.room)
         self.assertFalse(msg.is_automatic_message)
+        self.assertIsNone(msg.automatic_message_type)
 
-    def test_message_with_automatic_message(self):
+    def test_message_with_automatic_message_type(self):
+        msg = Message.objects.create(room=self.room)
+        AutomaticMessage.objects.create(
+            message=msg,
+            room=self.room,
+            automatic_message_type=AutomaticMessageType.AUTOMATIC_OPEN,
+        )
+        msg.refresh_from_db()
+        self.assertTrue(msg.is_automatic_message)
+        self.assertEqual(
+            msg.automatic_message_type, AutomaticMessageType.AUTOMATIC_OPEN
+        )
+
+    def test_message_with_inactive_warning_type(self):
+        msg = Message.objects.create(room=self.room)
+        AutomaticMessage.objects.create(
+            message=msg,
+            room=self.room,
+            automatic_message_type=AutomaticMessageType.INACTIVE_WARNING,
+        )
+        msg.refresh_from_db()
+        self.assertTrue(msg.is_automatic_message)
+        self.assertEqual(
+            msg.automatic_message_type, AutomaticMessageType.INACTIVE_WARNING
+        )
+
+    def test_message_with_inactive_close_type(self):
+        msg = Message.objects.create(room=self.room)
+        AutomaticMessage.objects.create(
+            message=msg,
+            room=self.room,
+            automatic_message_type=AutomaticMessageType.INACTIVE_CLOSE,
+        )
+        msg.refresh_from_db()
+        self.assertTrue(msg.is_automatic_message)
+        self.assertEqual(
+            msg.automatic_message_type, AutomaticMessageType.INACTIVE_CLOSE
+        )
+
+    def test_legacy_automatic_message_relation_flips_flag(self):
+        """
+        The source of truth for `is_automatic_message` is the existence of
+        the related `AutomaticMessage` row. The default type for legacy
+        rows is `automatic_open`, so the flag returns True for them.
+        """
         msg = Message.objects.create(room=self.room)
         AutomaticMessage.objects.create(message=msg, room=self.room)
+        msg.refresh_from_db()
         self.assertTrue(msg.is_automatic_message)
+        self.assertEqual(
+            msg.automatic_message_type, AutomaticMessageType.AUTOMATIC_OPEN
+        )
+
+    def test_multiple_automatic_messages_per_room_are_allowed(self):
+        """
+        After moving `room` from OneToOne to ForeignKey, a single room can
+        own multiple `AutomaticMessage` rows (one welcome + N inactivity
+        warnings/closes).
+        """
+        msg1 = Message.objects.create(room=self.room)
+        msg2 = Message.objects.create(room=self.room)
+        AutomaticMessage.objects.create(
+            message=msg1,
+            room=self.room,
+            automatic_message_type=AutomaticMessageType.AUTOMATIC_OPEN,
+        )
+        AutomaticMessage.objects.create(
+            message=msg2,
+            room=self.room,
+            automatic_message_type=AutomaticMessageType.INACTIVE_WARNING,
+        )
+        self.assertEqual(self.room.automatic_messages.count(), 2)
 
 
 class TestMessageMediaModel(TestCase):
