@@ -14,6 +14,7 @@ from chats.apps.rooms.exceptions import (
     FlowsChangeTicketerError,
     FlowsTicketerNotFoundError,
 )
+from chats.core.phone import get_whatsapp_urn_variations, is_ninth_digit_search_enabled
 from chats.core.requests import get_request_session_with_retries
 
 
@@ -121,7 +122,7 @@ class FlowsContactsAndGroupsMixin:
         }
         return headers
 
-    def list_contacts(self, project, cursor: str = "", query_filters: dict = {}):
+    def _fetch_list_contacts(self, project, cursor: str = "", query_filters: dict = {}):
         response = retry_request_and_refresh_flows_auth_token(
             project=project,
             request_method=requests.get,
@@ -142,16 +143,50 @@ class FlowsContactsAndGroupsMixin:
         contacts["previous"] = get_cursor(contacts.get("previous") or "")
         return contacts
 
+    def list_contacts(self, project, cursor: str = "", query_filters: dict = {}):
+        filters = dict(query_filters)
+        urn_term = filters.get("urn")
+        ninth_digit_enabled = is_ninth_digit_search_enabled(project_uuid=str(project.uuid))
+        variations = (
+            get_whatsapp_urn_variations(urn_term)
+            if urn_term and ninth_digit_enabled
+            else None
+        )
+        if not variations:
+            return self._fetch_list_contacts(project, cursor=cursor, query_filters=filters)
+
+        seen_uuids = set()
+        merged_results = []
+        last_response = {}
+        for variation in variations:
+            response = self._fetch_list_contacts(
+                project,
+                cursor=cursor,
+                query_filters={**filters, "urn": variation},
+            )
+            last_response = response
+            for contact in response.get("results", []):
+                contact_uuid = contact.get("uuid")
+                if contact_uuid and contact_uuid not in seen_uuids:
+                    seen_uuids.add(contact_uuid)
+                    merged_results.append(contact)
+        return {**last_response, "results": merged_results}
+
     def validate_contact_exists(self, urn, project):
-        number = urn.split(":")[1]
-        num_variations = [f"{number[:4]}{number[-8:]}", f"{number[:4]}9{number[-8:]}"]
-        for num_var in num_variations:
-            response = self.list_contacts(
-                project=project, query_filters={"urn": f"whatsapp:{num_var}"}
+        scheme, _, rest = urn.partition(":")
+        number = rest.split("?")[0]
+        ninth_digit_enabled = is_ninth_digit_search_enabled(project_uuid=str(project.uuid))
+        if scheme == "whatsapp" and ninth_digit_enabled:
+            variations = get_whatsapp_urn_variations(number) or [urn]
+        else:
+            variations = [urn]
+        for variation in variations:
+            response = self._fetch_list_contacts(
+                project=project, query_filters={"urn": variation}
             )
             if response.get("results") != []:
-                return True  # contact already exists, early return
-        return False  # contact does not exist
+                return True
+        return False
 
     def create_contact(self, project, data: dict, contact_id: str = ""):
         url = (

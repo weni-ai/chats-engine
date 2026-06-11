@@ -806,6 +806,10 @@ USE_FLOWS_MEDIA_URL_FEATURE_FLAG_KEY = env.str(
     "USE_FLOWS_MEDIA_URL_FEATURE_FLAG_KEY",
     default="weniChatsUseFlowsMediaUrl",
 )
+NINTH_DIGIT_SEARCH_FEATURE_FLAG_KEY = env.str(
+    "NINTH_DIGIT_SEARCH_FEATURE_FLAG_KEY",
+    default="weniChatsNinthDigitSearch",
+)
 
 FLOWS_BASE_URL = env.str("FLOWS_BASE_URL", default="https://flows.weni.ai")
 

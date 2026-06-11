@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock, patch
+
 from django.test import TestCase
 from rest_framework.test import APITestCase
 from rest_framework import status
@@ -134,6 +136,55 @@ class RoomFilterTestCase(TestCase):
         filtered_queryset = room_filter.qs
 
         self.assertIn(self.room_angela, filtered_queryset)
+
+    def _filter_contact(self, contact_term, ninth_digit_enabled=True):
+        request = MagicMock()
+        request.query_params = {"project": str(self.project.uuid)}
+        request.user.email = "test@test.com"
+        request.user.is_authenticated = True
+        with patch(
+            "chats.apps.api.v1.internal.rooms.filters.ninth_digit_search_enabled_from_request",
+            return_value=ninth_digit_enabled,
+        ):
+            room_filter = RoomFilter(
+                data={"contact": contact_term, "project": str(self.project.uuid)},
+                queryset=Room.objects.all(),
+                request=request,
+            )
+            return room_filter.qs
+
+    def test_filter_contact_finds_room_without_ninth_digit(self):
+        contact = Contact.objects.create(name="Nine Digit Contact")
+        room = Room.objects.create(
+            contact=contact,
+            queue=self.queue,
+            user=self.user,
+            project_uuid=str(self.project.uuid),
+            urn="whatsapp:5584992126050",
+        )
+        self.assertIn(room, self._filter_contact("992126050"))
+
+    def test_filter_contact_finds_room_with_ninth_digit(self):
+        contact = Contact.objects.create(name="No Nine Digit Contact")
+        room = Room.objects.create(
+            contact=contact,
+            queue=self.queue,
+            user=self.user,
+            project_uuid=str(self.project.uuid),
+            urn="whatsapp:558492126050",
+        )
+        self.assertIn(room, self._filter_contact("992126050"))
+
+    def test_filter_contact_without_flag_does_not_find_room_without_ninth_digit(self):
+        contact = Contact.objects.create(name="No Nine Digit Contact")
+        room = Room.objects.create(
+            contact=contact,
+            queue=self.queue,
+            user=self.user,
+            project_uuid=str(self.project.uuid),
+            urn="whatsapp:558492126050",
+        )
+        self.assertNotIn(room, self._filter_contact("992126050", ninth_digit_enabled=False))
 
     def test_filter_contact_no_matches(self):
         """
