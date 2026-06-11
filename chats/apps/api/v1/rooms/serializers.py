@@ -25,9 +25,44 @@ from chats.apps.history.filters.rooms_filter import (
 )
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room, RoomNote, RoomNoteMedia, RoomPin
+from chats.apps.rooms.usecases.inactivity import is_inactivity_feature_active
+from chats.apps.sectors.constants import get_default_inactivity_timeout
 from chats.apps.sectors.models import SectorTag
 
 logger = logging.getLogger(__name__)
+
+
+def _get_room_project_uuid(room: Room):
+    try:
+        return str(room.queue.sector.project.uuid)
+    except AttributeError:
+        return None
+
+
+def _is_room_inactivity_feature_active(room: Room) -> bool:
+    return is_inactivity_feature_active(_get_room_project_uuid(room))
+
+
+def _get_room_inactivity_timeout_time(room: Room) -> int:
+    """
+    Returns the inactivity warning timeout (in seconds) configured for the
+    room's sector, falling back to the default when not configured.
+
+    Returns 0 when the inactivity feature flag is disabled for the project,
+    so the front-end skips the inactivity timer for that room.
+    """
+    if not _is_room_inactivity_feature_active(room):
+        return 0
+
+    try:
+        sector_config = room.queue.sector.inactivity_timeout
+    except AttributeError:
+        sector_config = None
+
+    if sector_config and sector_config.get("message_timeout_time"):
+        return sector_config["message_timeout_time"]
+
+    return get_default_inactivity_timeout()["message_timeout_time"]
 
 
 class RoomMessageStatusSerializer(serializers.Serializer):
@@ -92,6 +127,8 @@ class RoomSerializer(serializers.ModelSerializer):
     imported_history_url = serializers.CharField(read_only=True, default="")
     added_to_queue_at = serializers.DateTimeField(read_only=True)
     has_history = serializers.SerializerMethodField()
+    inactivity_timeout_time = serializers.SerializerMethodField()
+    is_inactive = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -111,8 +148,10 @@ class RoomSerializer(serializers.ModelSerializer):
             "flowstart_data",
             "has_history",
             "imported_history_url",
+            "inactivity_timeout_time",
             "is_24h_valid",
             "is_active",
+            "is_inactive",
             "is_waiting",
             "last_interaction",
             "last_message",
@@ -215,6 +254,17 @@ class RoomSerializer(serializers.ModelSerializer):
             room.contact, user, room.queue.sector.project
         ).exists()
 
+    def get_inactivity_timeout_time(self, room: Room) -> int:
+        return _get_room_inactivity_timeout_time(room)
+
+    def get_is_inactive(self, room: Room) -> bool:
+        # Hide stale `is_inactive` values when the feature flag is off, so
+        # the front-end never renders an inactivity alert for projects that
+        # opted out of the feature.
+        if not _is_room_inactivity_feature_active(room):
+            return False
+        return bool(room.is_inactive)
+
 
 class ListRoomSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
@@ -234,6 +284,8 @@ class ListRoomSerializer(serializers.ModelSerializer):
     is_pinned = serializers.SerializerMethodField()
     added_to_queue_at = serializers.DateTimeField(read_only=True)
     has_history = serializers.SerializerMethodField()
+    inactivity_timeout_time = serializers.SerializerMethodField()
+    is_inactive = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -254,6 +306,8 @@ class ListRoomSerializer(serializers.ModelSerializer):
             "protocol",
             "service_chat",
             "is_active",
+            "is_inactive",
+            "inactivity_timeout_time",
             "config",
             "imported_history_url",
             "is_pinned",
@@ -360,6 +414,14 @@ class ListRoomSerializer(serializers.ModelSerializer):
             return room_24h_valid
 
         return None
+
+    def get_inactivity_timeout_time(self, room: Room) -> int:
+        return _get_room_inactivity_timeout_time(room)
+
+    def get_is_inactive(self, room: Room) -> bool:
+        if not _is_room_inactivity_feature_active(room):
+            return False
+        return bool(room.is_inactive)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
