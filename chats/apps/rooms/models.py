@@ -191,9 +191,12 @@ class Room(BaseModel, BaseConfigurableModel):
     def get_automatic_message_sent_at(self) -> Optional[datetime]:
         if self.automatic_message_sent_at:
             return self.automatic_message_sent_at
-        from chats.apps.msgs.models import AutomaticMessage
+        from chats.apps.msgs.models import AutomaticMessage, AutomaticMessageType
 
-        auto_msg = AutomaticMessage.objects.filter(room=self).first()
+        auto_msg = AutomaticMessage.objects.filter(
+            room=self,
+            automatic_message_type=AutomaticMessageType.AUTOMATIC_OPEN,
+        ).first()
         if auto_msg:
             return auto_msg.message.created_on
         return None
