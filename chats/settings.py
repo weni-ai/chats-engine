@@ -510,7 +510,7 @@ CELERY_BEAT_SCHEDULE = {
     },
     "start-archive-rooms-messages": {
         "task": "start_archive_rooms_messages",
-        "schedule": crontab(hour="22-23,0-5", minute=0),
+        "schedule": crontab(hour="0-4", minute=0),
     },
 }
 
