@@ -11,11 +11,12 @@ from chats.apps.quickmessages.models import QuickMessage
 def invalidate_cache_on_save(sender, instance, **kwargs):
     if instance.sector_id is not None:
         return
-    invalidate_personal_quick_messages_cache()
+    invalidate_personal_quick_messages_cache(instance.user.id)
 
 
 @receiver(post_delete, sender=QuickMessage)
 def invalidate_cache_on_delete(sender, instance, **kwargs):
     if instance.sector_id is not None:
         return
-    invalidate_personal_quick_messages_cache()
+
+    invalidate_personal_quick_messages_cache(instance.user.id)

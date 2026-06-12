@@ -166,6 +166,42 @@ class TestQuickMessageV2AsAuthenticated(BaseTestQuickMessageV2):
             status.HTTP_405_METHOD_NOT_ALLOWED,
         )
 
+    def test_list_excludes_other_users_quick_messages(self):
+        other_user = User.objects.create_user(
+            email="other@test.com", password="testpass123"
+        )
+        QuickMessage.objects.create(
+            shortcut="other_qm",
+            title="Other user QM",
+            text="Should not appear",
+            user=other_user,
+            sector=None,
+        )
+
+        response = self.list()
+        uuids = {r["uuid"] for r in response.data["results"]}
+        self.assertEqual(uuids, {str(self.qm1.uuid), str(self.qm2.uuid)})
+
+    def test_cache_is_isolated_per_user(self):
+        self.list()
+
+        other_user = User.objects.create_user(
+            email="other2@test.com", password="testpass123"
+        )
+        QuickMessage.objects.create(
+            shortcut="other_cached",
+            title="Other cached",
+            text="Only for other user",
+            user=other_user,
+            sector=None,
+        )
+
+        self.client.force_authenticate(user=other_user)
+        response = self.list()
+        uuids = {r["uuid"] for r in response.data["results"]}
+        self.assertNotIn(str(self.qm1.uuid), uuids)
+        self.assertEqual(len(response.data["results"]), 1)
+
     def test_cache_invalidation_on_create(self):
         response1 = self.list()
         initial_count = len(response1.data["results"])

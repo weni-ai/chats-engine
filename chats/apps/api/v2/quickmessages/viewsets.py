@@ -21,13 +21,17 @@ class QuickMessageViewSetV2(
     lookup_field = "uuid"
 
     def get_queryset(self):
-        return QuickMessage.objects.filter(sector__isnull=True)
+        return QuickMessage.objects.filter(
+            sector__isnull=True, user=self.request.user
+        )
 
     def list(self, request, *args, **kwargs):
         cursor = request.query_params.get("cursor", "")
         limit = request.query_params.get("limit", "")
 
-        cache_key = get_list_user_qm_cache_key(cursor=cursor, limit=limit)
+        cache_key = get_list_user_qm_cache_key(
+            user_id=request.user.id, cursor=cursor, limit=limit
+        )
         cached = cache.get(cache_key)
         if cached is not None:
             return Response(cached)
