@@ -4,7 +4,7 @@ from rest_framework import mixins, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from chats.apps.api.v2.quickmessages.cache import get_list_cache_key
+from chats.apps.api.v2.quickmessages.cache import get_list_user_qm_cache_key
 from chats.apps.api.v2.quickmessages.pagination import QuickMessageCursorPagination
 from chats.apps.api.v2.quickmessages.serializers import QuickMessageResponseSerializer
 from chats.apps.quickmessages.models import QuickMessage
@@ -27,7 +27,7 @@ class QuickMessageViewSetV2(
         cursor = request.query_params.get("cursor", "")
         limit = request.query_params.get("limit", "")
 
-        cache_key = get_list_cache_key(cursor=cursor, limit=limit)
+        cache_key = get_list_user_qm_cache_key(cursor=cursor, limit=limit)
         cached = cache.get(cache_key)
         if cached is not None:
             return Response(cached)

@@ -12,7 +12,7 @@ def _get_version() -> int:
     return version
 
 
-def get_list_cache_key(*, cursor: str, limit: str) -> str:
+def get_list_user_qm_cache_key(*, cursor: str, limit: str) -> str:
     version = _get_version()
     return f"personal_qm:v2:v{version}:{cursor}:{limit}"
 
