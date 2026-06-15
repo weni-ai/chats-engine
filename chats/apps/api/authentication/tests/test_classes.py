@@ -13,7 +13,7 @@ from rest_framework import status
 
 from chats.apps.api.authentication.classes import (
     InternalAPITokenAuthentication,
-    JWTAuthentication,
+    GenericJWTAuthentication,
 )
 from chats.apps.api.authentication.token import JWTTokenGenerator
 
@@ -24,7 +24,7 @@ from chats.apps.api.authentication.permissions import (
 )
 
 
-class JWTAuthenticationTests(TestCase):
+class GenericJWTAuthenticationTests(TestCase):
     def setUp(self):
         self.token_generator = JWTTokenGenerator()
         self.valid_token = self.token_generator.generate_token(
@@ -32,7 +32,7 @@ class JWTAuthenticationTests(TestCase):
         )
 
     def test_authenticate(self):
-        authentication = JWTAuthentication()
+        authentication = GenericJWTAuthentication()
         request = HttpRequest()
         request.META["HTTP_AUTHORIZATION"] = f"Token {self.valid_token}"
         result = authentication.authenticate(request)
@@ -42,7 +42,7 @@ class JWTAuthenticationTests(TestCase):
         self.assertIsNotNone(result[1])
 
     def test_authenticate_credentials(self):
-        authentication = JWTAuthentication()
+        authentication = GenericJWTAuthentication()
         result = authentication.authenticate_credentials(self.valid_token)
         self.assertIsNotNone(result)
         self.assertEqual(len(result), 2)
@@ -50,8 +50,8 @@ class JWTAuthenticationTests(TestCase):
         self.assertIsNotNone(result[1])
 
 
-class JWTAuthenticationView(APIView):
-    authentication_classes = [JWTAuthentication]
+class GenericJWTAuthenticationView(APIView):
+    authentication_classes = [GenericJWTAuthentication]
     permission_classes = [JWTRequiredPermission]
 
     def get(self, request):
@@ -66,8 +66,8 @@ class JWTAuthenticationView(APIView):
 
 
 @override_settings(ROOT_URLCONF="chats.apps.api.authentication.tests.test_urls")
-class JWTAuthenticationViewAPITestCase(APITestCase):
-    """Test cases for JWTAuthenticationView using JWTAuthentication."""
+class GenericJWTAuthenticationViewAPITestCase(APITestCase):
+    """Test cases for GenericJWTAuthenticationView using GenericJWTAuthentication."""
 
     def setUp(self):
         self.client = APIClient()

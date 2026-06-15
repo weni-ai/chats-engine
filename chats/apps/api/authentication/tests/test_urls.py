@@ -1,13 +1,13 @@
 from django.urls import path
 from chats.apps.api.authentication.tests.test_classes import (
     InternalAPITokenAuthenticationView,
-    JWTAuthenticationView,
+    GenericJWTAuthenticationView,
 )
 
 urlpatterns = [
     path(
         "jwt-authentication/",
-        JWTAuthenticationView.as_view(),
+        GenericJWTAuthenticationView.as_view(),
         name="jwt-authentication-view",
     ),
     path(
