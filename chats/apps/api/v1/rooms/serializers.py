@@ -388,6 +388,13 @@ class ListRoomSerializer(serializers.ModelSerializer):
         }
 
     def get_is_pinned(self, room: Room) -> bool:
+        # The list queryset annotates ``is_pinned`` (see RoomViewset), so the
+        # value is read straight from the instance and the per-room query below
+        # is skipped, avoiding an N+1 during listing.
+        annotated = getattr(room, "is_pinned", None)
+        if annotated is not None:
+            return bool(annotated)
+
         request = self.context.get("request")
 
         if not request:
