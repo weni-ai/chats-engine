@@ -8,10 +8,11 @@ from django.db.models import (
     Case,
     Count,
     DateTimeField,
-    Exists,
+    IntegerField,
     OuterRef,
     Q,
     Subquery,
+    Value,
     When,
 )
 from django.shortcuts import get_object_or_404
@@ -278,56 +279,57 @@ class RoomViewset(
         return self._get_paginated_response(annotated_qs)
 
     def _list_with_optimized_pin_order(self, qs, request, project):
-        pin_filters = {"room__queue__sector__project": project}
+        # The pin limit is capped at ``MAX_ROOM_PINS_LIMIT`` (3) per user, so the
+        # pinned rooms form a tiny, bounded set. We resolve them with a single
+        # small query and reuse the resulting ids as constant literals, avoiding
+        # the correlated subqueries / full-PK materialization of the other paths.
+        pins_query = {"room__queue__sector__project": project, "room__is_active": True}
+
         if user_email := request.query_params.get("email"):
-            pin_filters["user__email"] = user_email
+            pins_query["user__email"] = user_email
         else:
-            pin_filters["user"] = request.user
+            pins_query["user"] = request.user
 
-        pins = list(
-            RoomPin.objects.filter(**pin_filters)
+        # Ordered most-recent-first so the list index doubles as the pin rank.
+        pinned_ids = list(
+            RoomPin.objects.filter(**pins_query)
             .order_by("-created_on")
-            .values("room_id", "created_on")[: settings.MAX_ROOM_PINS_LIMIT]
+            .values_list("room_id", flat=True)
         )
-        pinned_room_ids = [p["room_id"] for p in pins]
-        pin_dates = {p["room_id"]: p["created_on"] for p in pins}
 
-        self._pinned_room_ids = set(pinned_room_ids)
+        self._pinned_room_ids = set(pinned_ids)
 
         filtered_qs = self.filter_queryset(qs)
+        secondary_sort = list(filtered_qs.query.order_by or self.ordering or [])
 
-        if not pinned_room_ids:
+        if not pinned_ids:
             return self._get_paginated_response(filtered_qs)
 
+        # Pinned rooms must always appear at the top, even if other active
+        # filters (queue, sector, search) would otherwise exclude them. The
+        # filtered set is referenced as a subquery (never pulled into Python)
+        # and the pinned ids are a literal list of at most 3 elements.
         combined_qs = qs.filter(
-            Q(pk__in=filtered_qs.order_by().values("pk"))
-            | Q(pk__in=pinned_room_ids)
+            Q(pk__in=Subquery(filtered_qs.values("pk"))) | Q(pk__in=pinned_ids)
         )
 
-        pin_date_whens = [
-            When(pk=rid, then=Value(dt)) for rid, dt in pin_dates.items()
+        pin_rank_whens = [
+            When(pk=room_id, then=Value(index))
+            for index, room_id in enumerate(pinned_ids)
         ]
 
         combined_qs = combined_qs.annotate(
             is_pinned=Case(
-                When(pk__in=pinned_room_ids, then=True),
-                default=False,
+                When(pk__in=pinned_ids, then=Value(True)),
+                default=Value(False),
                 output_field=BooleanField(),
             ),
-            pin_created_on=Case(
-                *pin_date_whens,
-                default=None,
-                output_field=DateTimeField(),
+            pin_rank=Case(
+                *pin_rank_whens,
+                default=Value(len(pinned_ids)),
+                output_field=IntegerField(),
             ),
-        )
-
-        secondary_sort = list(filtered_qs.query.order_by or self.ordering or [])
-        if secondary_sort:
-            combined_qs = combined_qs.order_by(
-                "-is_pinned", "-pin_created_on", *secondary_sort
-            )
-        else:
-            combined_qs = combined_qs.order_by("-is_pinned", "-pin_created_on")
+        ).order_by("pin_rank", *secondary_sort)
 
         return self._get_paginated_response(combined_qs)
 

@@ -230,6 +230,12 @@ class Message(BaseModelWithManualCreatedOn):
     def is_automatic_message(self):
         return self.automatic_message_type is not None
 
+    @property
+    def automatic_message_type(self):
+        if not self.is_automatic_message:
+            return None
+        return self.automatic_message.automatic_message_type
+
 
 class MessageMedia(BaseModelWithManualCreatedOn):
     message = models.ForeignKey(
@@ -435,17 +441,32 @@ class AutomaticMessage(BaseModel):
     """
     Automatic message for a room.
 
-    This is only used as a reference for a message that is sent automatically
-    when the room is first assigned to a user.
+    Stores metadata for messages sent automatically by the system. The
+    `automatic_message_type` classifies the message (welcome, inactivity
+    warning, inactivity closure) so the front can render specific UI for
+    each kind.
 
-    A room can only have one automatic message.
+    Each `Message` has at most one `AutomaticMessage` (OneToOne). A room can
+    have multiple `AutomaticMessage` rows because, with the inactivity
+    feature, the same room may receive warnings/closures in addition to the
+    legacy welcome message.
     """
 
     message = models.OneToOneField(
         "msgs.Message", on_delete=models.CASCADE, related_name="automatic_message"
     )
-    room = models.OneToOneField(
-        "rooms.Room", on_delete=models.CASCADE, related_name="automatic_message"
+    room = models.ForeignKey(
+        "rooms.Room", on_delete=models.CASCADE, related_name="automatic_messages"
+    )
+    automatic_message_type = models.CharField(
+        _("automatic message type"),
+        max_length=32,
+        choices=AutomaticMessageType.choices,
+        default=AutomaticMessageType.AUTOMATIC_OPEN,
+        help_text=_(
+            "Classification for automatic messages sent by the system "
+            "(welcome, inactivity warning, inactivity closure)."
+        ),
     )
 
     class Meta:
