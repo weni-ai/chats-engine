@@ -372,6 +372,9 @@ OIDC_CACHE_TTL = env.int(
 OIDC_INTERNAL_TOKEN_CACHE_TTL = env.int(
     "OIDC_INTERNAL_TOKEN_CACHE_TTL", default=(60 * 60 * 6)
 )  # Time-to-live for cached user tokens (default: 6 hours).
+OIDC_TIMEOUT = env.int(
+    "OIDC_TIMEOUT", default=5
+)  # Timeout in seconds for all requests to the Keycloak/OIDC provider (default: 5 seconds).
 
 INTERNAL_CLIENTS_PERM_CACHE_TTL = env.int(
     "INTERNAL_CLIENTS_PERM_CACHE_TTL", default=600

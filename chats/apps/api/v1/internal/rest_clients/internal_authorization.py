@@ -11,6 +11,7 @@ class InternalAuthentication:
                 "client_secret": settings.OIDC_RP_CLIENT_SECRET,
                 "grant_type": "client_credentials",
             },
+            timeout=settings.OIDC_TIMEOUT,
         )
         # TODO: exception token None
         token = request.json().get("access_token")
