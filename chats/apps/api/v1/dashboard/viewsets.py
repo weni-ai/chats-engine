@@ -29,7 +29,7 @@ from chats.apps.api.v1.dashboard.serializers import (
 )
 from chats.apps.api.authentication.classes import JWTAuthentication
 from chats.apps.api.authentication.permissions import (
-    HasInternalAuthenticationPermission,
+    IsAuthenticatedOrHasInternalJWT,
 )
 from chats.apps.core.filters import get_filters_from_query_params
 from chats.apps.dashboard.models import ReportStatus
@@ -77,9 +77,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
 
     def get_permissions(self):
         if self.action == "time_metrics":
-            return [
-                permissions.IsAuthenticated() | HasInternalAuthenticationPermission()
-            ]
+            return [IsAuthenticatedOrHasInternalJWT()]
         return super().get_permissions()
 
     @action(
