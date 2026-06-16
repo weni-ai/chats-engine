@@ -61,10 +61,19 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
     queryset = Project.objects.all()
     serializer_class = _DashboardEmptySerializer
 
-    def get_authenticators(self):
-        if self.action == "time_metrics":
-            return [JWTAuthentication()] + super().get_authenticators()
-        return super().get_authenticators()
+    def initialize_request(self, request, *args, **kwargs):
+        if hasattr(self, "action_map"):
+            self.action = self.action_map.get(request.method.lower())
+        return super().initialize_request(request, *args, **kwargs)
+
+    @property
+    def authentication_classes(self):
+        if getattr(self, "action", None) == "time_metrics":
+            classes = list(super().authentication_classes)
+            if JWTAuthentication not in classes:
+                classes.insert(0, JWTAuthentication)
+            return classes
+        return super().authentication_classes
 
     def get_permissions(self):
         if self.action == "time_metrics":
