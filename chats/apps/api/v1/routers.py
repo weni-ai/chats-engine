@@ -10,7 +10,10 @@ from chats.apps.api.v1.external.agents.viewsets import (
 from chats.apps.api.v1.external.dashboard.viewsets import (
     ExternalFinishedRoomsStatusViewSet,
 )
-from chats.apps.api.v1.external.msgs.viewsets import MessageFlowViewset
+from chats.apps.api.v1.external.msgs.viewsets import (
+    MessageFlowViewset,
+    RoomHistoryMessagesViewSet,
+)
 from chats.apps.api.v1.external.queues.viewsets import QueueFlowViewset
 from chats.apps.api.v1.external.rooms.viewsets import (
     CustomFieldsUserExternalViewSet,
@@ -208,6 +211,11 @@ router.register(
 
 # External
 router.register("external/msgs", MessageFlowViewset, basename="external_message")
+router.register(
+    "external/room_messages",
+    RoomHistoryMessagesViewSet,
+    basename="external_room_messages",
+)
 router.register("external/rooms", RoomFlowViewSet, basename="external_rooms")
 router.register(
     "external/room_agent", RoomUserExternalViewSet, basename="external_roomagent"
