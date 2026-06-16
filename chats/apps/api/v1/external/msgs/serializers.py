@@ -1,5 +1,3 @@
-import logging
-
 from django.utils.translation import gettext_lazy as _
 from rest_framework import exceptions, serializers
 
@@ -7,9 +5,7 @@ from chats.apps.api.utils import create_reply_index
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactRelationsSerializer
 from chats.apps.api.v1.msgs.serializers import MessageMediaSerializer
-from chats.apps.msgs.models import ChatMessageReplyIndex, Message, MessageMedia
-
-LOGGER = logging.getLogger(__name__)
+from chats.apps.msgs.models import Message, MessageMedia
 
 
 class AttachmentSerializer(serializers.ModelSerializer):
@@ -220,14 +216,12 @@ class RoomHistoryMessageSerializer(serializers.ModelSerializer):
         if not replied_id:
             return None
 
-        try:
-            reply_index = ChatMessageReplyIndex.objects.select_related("message").get(
-                external_id=replied_id
-            )
-        except ChatMessageReplyIndex.DoesNotExist:
+        reply_index_map = self.context.get("reply_index_map")
+        if reply_index_map is None:
             return None
-        except Exception as error:
-            LOGGER.error("Error resolving replied message for room history: %s", error)
+
+        reply_index = reply_index_map.get(replied_id)
+        if reply_index is None:
             return None
 
         return {

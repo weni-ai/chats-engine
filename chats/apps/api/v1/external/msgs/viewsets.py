@@ -31,7 +31,7 @@ from chats.apps.api.v1.external.throttling import (
 )
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.msgs.exceptions import RoomNotFoundError, RoomStillActiveError
-from chats.apps.msgs.models import Message as ChatMessage
+from chats.apps.msgs.models import ChatMessageReplyIndex, Message as ChatMessage
 from chats.apps.msgs.usecases.get_room_messages_history import (
     GetRoomMessagesHistoryUseCase,
 )
@@ -151,6 +151,31 @@ class RoomHistoryMessagesViewSet(viewsets.GenericViewSet):
     def _cache_key(room_uuid: str, cursor: str) -> str:
         return f"external:room_history:{room_uuid}:{cursor or ''}"
 
+    @staticmethod
+    def _build_reply_index_map(messages) -> dict:
+        """
+        Bulk-fetch ChatMessageReplyIndex rows for every replied-to
+        external_id in the page, returning a dict keyed by external_id.
+        """
+        external_ids = set()
+        for msg in messages:
+            metadata = msg.metadata if isinstance(msg.metadata, dict) else {}
+            context = metadata.get("context")
+            if isinstance(context, dict):
+                ext_id = context.get("id")
+                if ext_id:
+                    external_ids.add(ext_id)
+
+        if not external_ids:
+            return {}
+
+        return {
+            ri.external_id: ri
+            for ri in ChatMessageReplyIndex.objects.select_related("message").filter(
+                external_id__in=external_ids
+            )
+        }
+
     @swagger_auto_schema(auto_schema=None)
     def list(self, request, *args, **kwargs):
         """List the message history of a closed room with cursor pagination."""
@@ -187,7 +212,12 @@ class RoomHistoryMessagesViewSet(viewsets.GenericViewSet):
             )
 
         page = self.paginate_queryset(queryset)
-        serializer = self.get_serializer(page, many=True)
+
+        reply_index_map = self._build_reply_index_map(page)
+
+        serializer = self.get_serializer(
+            page, many=True, context={"reply_index_map": reply_index_map}
+        )
         paginated_response = self.get_paginated_response(serializer.data)
 
         cache.set(
