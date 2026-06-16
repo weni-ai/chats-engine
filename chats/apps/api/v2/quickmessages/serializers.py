@@ -33,3 +33,10 @@ class SectorQuickMessageResponseSerializer(serializers.ModelSerializer):
         model = QuickMessage
         fields = ["uuid", "title", "shortcut", "text", "sector"]
         read_only_fields = fields
+
+
+class QuickMessageResponseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = QuickMessage
+        fields = ["uuid", "title", "shortcut", "text"]
+        read_only_fields = fields
