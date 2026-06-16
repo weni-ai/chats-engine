@@ -477,6 +477,9 @@ if USE_SENTRY:
         environment=env.str("ENVIRONMENT", default="develop"),
     )
 
+# JWT
+JWT_SECRET_KEY = env.str("JWT_SECRET_KEY", default="").replace("\\n", "\n")
+JWT_PUBLIC_KEY = env.str("JWT_PUBLIC_KEY", default="").replace("\\n", "\n")
 
 # Query Limiters
 
