@@ -26,6 +26,10 @@ from chats.apps.api.v1.dashboard.serializers import (
     DashboardRoomSerializer,
     DashboardSectorSerializer,
 )
+from chats.apps.api.authentication.classes import JWTAuthentication
+from chats.apps.api.authentication.permissions import (
+    HasInternalAuthenticationPermission,
+)
 from chats.apps.core.filters import get_filters_from_query_params
 from chats.apps.dashboard.models import ReportStatus
 from chats.apps.dashboard.usecases import GetReportStatusUseCase
@@ -55,6 +59,18 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
     lookup_field = "uuid"
     queryset = Project.objects.all()
     serializer_class = _DashboardEmptySerializer
+
+    def get_authenticators(self):
+        if self.action == "time_metrics":
+            return [JWTAuthentication()] + super().get_authenticators()
+        return super().get_authenticators()
+
+    def get_permissions(self):
+        if self.action == "time_metrics":
+            return [
+                permissions.IsAuthenticated() | HasInternalAuthenticationPermission()
+            ]
+        return super().get_permissions()
 
     @action(
         detail=True,
@@ -412,6 +428,13 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         project = self.get_object()
         params = get_filters_from_query_params(request.query_params)
 
+        is_anonymous = not request.user or request.user.is_anonymous
+        user_email = "" if is_anonymous else request.user.email
+
+        if getattr(request, "jwt_payload", None):
+            # Is internal authentication call
+            user_email = request.query_params.get("user_request", "")
+
         filters = Filters(
             start_date=params.get("start_date"),
             end_date=params.get("end_date"),
@@ -419,11 +442,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             sector=params.get("sector"),
             tag=params.get("tag"),
             queue=params.get("queue"),
-            user_request=request.user,
+            user_request=None if is_anonymous else request.user,
             project=project,
-            is_weni_admin=should_exclude_admin_domains(
-                request.user.email if request.user else ""
-            ),
+            is_weni_admin=should_exclude_admin_domains(user_email),
         )
 
         time_metrics_service = TimeMetricsService()
