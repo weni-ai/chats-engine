@@ -273,6 +273,15 @@ REST_FRAMEWORK = {
         "external_hour": env.str("EXTERNAL_HOUR_LIMIT", default="30000/hour"),
         "external_anon": env.str("EXTERNAL_ANON_LIMIT", default="100/hour"),
         "external_critical": env.str("EXTERNAL_CRITICAL_LIMIT", default="1000/minute"),
+        "external_room_history_second": env.str(
+            "EXTERNAL_ROOM_HISTORY_SECOND_LIMIT", default="5/second"
+        ),
+        "external_room_history_minute": env.str(
+            "EXTERNAL_ROOM_HISTORY_MINUTE_LIMIT", default="100/minute"
+        ),
+        "external_room_history_hour": env.str(
+            "EXTERNAL_ROOM_HISTORY_HOUR_LIMIT", default="4000/hour"
+        ),
         "ai_text_improvement": env.str(
             "AI_TEXT_IMPROVEMENT_LIMIT", default="20/minute"
         ),
@@ -287,6 +296,17 @@ EXTERNAL_MINUTE_LIMIT = env.str("EXTERNAL_MINUTE_LIMIT", default="600/minute")
 EXTERNAL_HOUR_LIMIT = env.str("EXTERNAL_HOUR_LIMIT", default="30000/hour")
 EXTERNAL_ANON_LIMIT = env.str("EXTERNAL_ANON_LIMIT", default="100/hour")
 EXTERNAL_CRITICAL_LIMIT = env.str("EXTERNAL_CRITICAL_LIMIT", default="1000/minute")
+EXTERNAL_ROOM_HISTORY_SECOND_LIMIT = env.str(
+    "EXTERNAL_ROOM_HISTORY_SECOND_LIMIT", default="5/second"
+)
+EXTERNAL_ROOM_HISTORY_MINUTE_LIMIT = env.str(
+    "EXTERNAL_ROOM_HISTORY_MINUTE_LIMIT", default="100/minute"
+)
+EXTERNAL_ROOM_HISTORY_HOUR_LIMIT = env.str(
+    "EXTERNAL_ROOM_HISTORY_HOUR_LIMIT", default="4000/hour"
+)
+
+ROOM_HISTORY_CACHE_TTL = env.int("ROOM_HISTORY_CACHE_TTL", default=300)
 
 # Logging
 
@@ -487,6 +507,10 @@ CHATS_CACHE_TIME = env.int("CHATS_CACHE_TIME", default=1 * 60 * 60)
 
 DISCUSSION_AGENTS_LIMIT = env.int("DISCUSSION_AGENTS_LIMIT", default=5)
 
+# Inactivity feature defaults (in seconds)
+DEFAULT_MESSAGE_TIMEOUT_TIME = env.int("DEFAULT_MESSAGE_TIMEOUT_TIME", default=600)
+DEFAULT_CLOSE_ROOM_TIMEOUT_TIME = env.int("DEFAULT_CLOSE_ROOM_TIMEOUT_TIME", default=60)
+
 # Celery
 
 METRICS_CUSTOM_QUEUE = env("METRICS_CUSTOM_QUEUE", default="celery")
@@ -511,6 +535,10 @@ CELERY_BEAT_SCHEDULE = {
     "start-archive-rooms-messages": {
         "task": "start_archive_rooms_messages",
         "schedule": crontab(hour="0-4", minute=0),
+    },
+    "check-inactivity-rooms": {
+        "task": "check_inactivity_rooms",
+        "schedule": crontab(minute="*"),
     },
 }
 
@@ -745,6 +773,11 @@ USER_OBJECT_CACHE_ENABLED = env.bool("USER_OBJECT_CACHE_ENABLED", default=True)
 # QUICK MESSAGES CACHE
 QUICK_MESSAGES_CACHE_TTL = env.int("QUICK_MESSAGES_CACHE_TTL", default=300)
 
+# SECTOR QUICK MESSAGES CACHE
+SECTOR_QUICK_MESSAGES_CACHE_TTL = env.int(
+    "SECTOR_QUICK_MESSAGES_CACHE_TTL", default=300
+)
+
 # ROOM 24H VALID CACHE
 ROOM_24H_VALID_CACHE_TTL = env.int(
     "ROOM_24H_VALID_CACHE_TTL", default=0
@@ -828,6 +861,13 @@ AGENTS_MANAGEMENT_FEATURE_FLAG_KEY = env.str(
     "AGENTS_MANAGEMENT_FEATURE_FLAG_KEY",
     default="weniChatsAgentsManagement",
 )
+
+# Inactivity Timeout
+WENI_CHATS_INACTIVITY_TIMEOUT_FLAG_KEY = env.str(
+    "WENI_CHATS_INACTIVITY_TIMEOUT_FLAG_KEY",
+    default="weniChatsInactivityTimeout",
+)
+
 IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL = env.int(
     "IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL", default=30
 )

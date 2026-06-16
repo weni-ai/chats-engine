@@ -47,6 +47,7 @@ class RoomInternalListSerializerV2(serializers.ModelSerializer):
             "queue_time",
             "csat_rating",
             "protocol",
+            "automatic_closed",
         ]
 
     def _agent_permission_is_deleted(self, obj: Room) -> bool:
