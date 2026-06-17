@@ -1,3 +1,4 @@
+import logging
 import re
 from typing import Optional, Tuple
 
@@ -7,6 +8,8 @@ from weni.feature_flags.shortcuts import (
     is_feature_active,
     is_feature_active_for_attributes,
 )
+
+LOGGER = logging.getLogger(__name__)
 
 _BR_PHONE_MIN_DIGITS = 8
 _BR_PHONE_MAX_DIGITS = 13
@@ -21,6 +24,10 @@ def _parse_br_phone_digits(term: str) -> Optional[Tuple[str, str]]:
     Accepts numbers with or without country code (55) and with or without
     the optional 9th digit. Returns (ddd, base8) or None when the term does
     not look like a Brazilian mobile number.
+
+    Numbers with 12 or 13 digits that do not start with the BR country
+    code (``55``) are considered foreign and rejected, since the country
+    code is the only reliable signal at that length.
     """
     digits = re.sub(r"\D", "", term)
     if len(digits) < _BR_PHONE_MIN_DIGITS or len(digits) > _BR_PHONE_MAX_DIGITS:
@@ -28,8 +35,6 @@ def _parse_br_phone_digits(term: str) -> Optional[Tuple[str, str]]:
     if digits.startswith(_BR_COUNTRY_CODE) and len(digits) in (12, 13):
         digits = digits[2:]
     elif len(digits) in (12, 13):
-        return None
-    elif len(digits) == 11 and digits.startswith("1"):
         return None
     if len(digits) not in (8, 9, 10, 11):
         return None
@@ -57,6 +62,11 @@ def is_ninth_digit_search_enabled(
             {"projectUUID": str(project_uuid)},
         )
     except Exception:
+        LOGGER.warning(
+            "Failed to evaluate ninth-digit search feature flag for project %s",
+            project_uuid,
+            exc_info=True,
+        )
         return False
 
 

@@ -8,6 +8,15 @@ from rest_framework.filters import SearchFilter
 from chats.apps.contacts.models import normalize_document
 from chats.core.phone import ninth_digit_search_enabled_from_request, phone_urn_q
 
+# DRF SearchFilter prefixes (see ``SearchFilter.lookup_prefixes``) used to
+# request specific lookups from the configured ``search_fields``. They must
+# be stripped before using the field name as an ORM lookup target.
+_DRF_SEARCH_PREFIXES = "^=$@"
+
+
+def _strip_search_prefix(field: str) -> str:
+    return field[1:] if field and field[0] in _DRF_SEARCH_PREFIXES else field
+
 
 def build_field_search_q(
     field: str,
@@ -15,11 +24,12 @@ def build_field_search_q(
     construct_search,
     ninth_digit_enabled: bool = False,
 ) -> Optional[Q]:
-    if field.endswith("document"):
+    bare_field = _strip_search_prefix(field)
+    if bare_field.endswith("document"):
         value = normalize_document(term)
         return Q(**{construct_search(field): value}) if value else None
-    if field.endswith("urn"):
-        phone_q = phone_urn_q(term, field=field) if ninth_digit_enabled else None
+    if bare_field.endswith("urn"):
+        phone_q = phone_urn_q(term, field=bare_field) if ninth_digit_enabled else None
         default_q = Q(**{construct_search(field): term})
         return phone_q | default_q if phone_q else default_q
     return Q(**{construct_search(field): term})
