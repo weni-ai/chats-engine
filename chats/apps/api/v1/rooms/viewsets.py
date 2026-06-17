@@ -158,11 +158,15 @@ class RoomViewset(
     ):  # TODO: sparate list and retrieve queries from update and close
         if self.action != "list":
             self.filterset_class = None
-        qs = (
-            super()
-            .get_queryset()
-            .filter(queue__sector__project__permissions__user=self.request.user)
-        )
+
+        project = self.request.query_params.get("project")
+
+        if not ProjectPermission.objects.filter(
+            project=project, user=self.request.user
+        ).exists():
+            return Room.objects.none()
+
+        qs = super().get_queryset().filter(queue__sector__project=project)
 
         qs = qs.select_related(
             "user", "contact", "queue", "queue__sector", "queue__sector__project"
