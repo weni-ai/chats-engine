@@ -337,6 +337,7 @@ USE_APM = env.bool("USE_APM", default=False)
 
 if USE_APM:
     INSTALLED_APPS.append("elasticapm.contrib.django")
+    MIDDLEWARE.insert(0, "elasticapm.contrib.django.middleware.TracingMiddleware")
 
     ELASTIC_APM = {
         "SERVICE_NAME": env("APM_SERVICE_NAME", default="chats-production"),
