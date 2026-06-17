@@ -1,9 +1,12 @@
 import re
-from typing import Optional
+from typing import Optional, Tuple
 
 from django.conf import settings
 from django.db.models import Q
-from weni.feature_flags.shortcuts import is_feature_active, is_feature_active_for_attributes
+from weni.feature_flags.shortcuts import (
+    is_feature_active,
+    is_feature_active_for_attributes,
+)
 
 _BR_PHONE_MIN_DIGITS = 8
 _BR_PHONE_MAX_DIGITS = 13
@@ -11,7 +14,7 @@ _BR_COUNTRY_CODE = "55"
 _WHATSAPP_SCHEME = "whatsapp:"
 
 
-def _parse_br_phone_digits(term: str) -> tuple[str, str] | None:
+def _parse_br_phone_digits(term: str) -> Optional[Tuple[str, str]]:
     """
     Extract DDD and 8-digit base from a Brazilian mobile search term.
 
@@ -66,7 +69,11 @@ def ninth_digit_search_enabled_from_request(request) -> bool:
     params = getattr(request, "query_params", None) or getattr(request, "GET", {})
     project_uuid = params.get("project")
     user = getattr(request, "user", None)
-    user_email = getattr(user, "email", None) if getattr(user, "is_authenticated", False) else None
+    user_email = (
+        getattr(user, "email", None)
+        if getattr(user, "is_authenticated", False)
+        else None
+    )
     result = is_ninth_digit_search_enabled(
         user_email=user_email,
         project_uuid=project_uuid,
@@ -75,20 +82,32 @@ def ninth_digit_search_enabled_from_request(request) -> bool:
     return result
 
 
-def phone_urn_q(term: str, field: str = "urn") -> Q | None:
+def phone_urn_q(term: str, field: str = "urn") -> Optional[Q]:
     """
     Build a combined URN filter that matches Brazilian mobile numbers with
     or without the 9th digit in a single query.
 
     Example: searching ``992126050`` matches both ``whatsapp:5584992126050``
     and ``whatsapp:558492126050``.
+
+    When a DDD is present in the term, the filter is built from the two
+    exact URN prefixes to avoid false positives across different DDDs or
+    URNs that incidentally contain the same 8-digit suffix. When no DDD
+    is provided, the filter falls back to a scope restricted to Brazilian
+    numbers (``whatsapp:55``) that end with the 8-digit suffix.
     """
     parsed = _parse_br_phone_digits(term)
     if parsed is None:
         return None
     ddd, base8 = parsed
-    return Q(**{f"{field}__startswith": f"{_WHATSAPP_SCHEME}{_BR_COUNTRY_CODE}{ddd}"}) & Q(
-        **{f"{field}__contains": base8}
+    if ddd:
+        without_nine = f"{_WHATSAPP_SCHEME}{_BR_COUNTRY_CODE}{ddd}{base8}"
+        with_nine = f"{_WHATSAPP_SCHEME}{_BR_COUNTRY_CODE}{ddd}9{base8}"
+        return Q(**{f"{field}__startswith": without_nine}) | Q(
+            **{f"{field}__startswith": with_nine}
+        )
+    return Q(**{f"{field}__startswith": f"{_WHATSAPP_SCHEME}{_BR_COUNTRY_CODE}"}) & Q(
+        **{f"{field}__endswith": base8}
     )
 
 
@@ -101,21 +120,8 @@ def build_urn_lookup_q(
 ) -> Q:
     """URN lookup with 9th-digit awareness and a fallback substring match."""
     phone_q = phone_urn_q(term, field=field) if ninth_digit_enabled else None
-    lookup_key = f"{field}__unaccent__{lookup}" if use_unaccent else f"{field}__{lookup}"
+    lookup_key = (
+        f"{field}__unaccent__{lookup}" if use_unaccent else f"{field}__{lookup}"
+    )
     default_q = Q(**{lookup_key: term})
     return phone_q | default_q if phone_q else default_q
-
-
-def get_whatsapp_urn_variations(term: str) -> Optional[list]:
-    """
-    Return exact ``whatsapp:`` URNs to try for Flows API lookups.
-
-    Returns None when the term does not look like a Brazilian mobile number.
-    """
-    parsed = _parse_br_phone_digits(term)
-    if parsed is None:
-        return None
-    ddd, base8 = parsed
-    without_nine = f"{_WHATSAPP_SCHEME}{_BR_COUNTRY_CODE}{ddd}{base8}"
-    with_nine = f"{_WHATSAPP_SCHEME}{_BR_COUNTRY_CODE}{ddd}9{base8}"
-    return list(dict.fromkeys([without_nine, with_nine]))

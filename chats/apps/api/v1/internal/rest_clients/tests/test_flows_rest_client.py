@@ -3,14 +3,11 @@ from unittest.mock import MagicMock, patch
 import requests
 from django.test import TestCase, override_settings
 
-from chats.apps.api.v1.internal.rest_clients.flows_rest_client import (
-    FlowRESTClient,
-)
+from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.rooms.exceptions import (
     FlowsChangeTicketerError,
     FlowsTicketerNotFoundError,
 )
-
 
 CLIENT_PATH = "chats.apps.api.v1.internal.rest_clients.flows_rest_client"
 
@@ -62,9 +59,7 @@ class GetTicketerBySectorTests(TestCase):
             "https://flows.test/api/v2/ticketers.json",
         )
         self.assertEqual(call_kwargs["params"], {"sector_uuid": "sector-uuid"})
-        self.assertEqual(
-            call_kwargs["headers"]["Authorization"], "Token project-token"
-        )
+        self.assertEqual(call_kwargs["headers"]["Authorization"], "Token project-token")
 
     @patch(f"{CLIENT_PATH}.retry_request_and_refresh_flows_auth_token")
     def test_raises_when_results_are_empty(self, mock_retry):
@@ -104,9 +99,7 @@ class GetTicketerBySectorTests(TestCase):
 
     @patch(f"{CLIENT_PATH}.retry_request_and_refresh_flows_auth_token")
     def test_raises_when_first_result_has_no_uuid(self, mock_retry):
-        mock_retry.return_value = _build_response(
-            200, {"results": [{"name": "T1"}]}
-        )
+        mock_retry.return_value = _build_response(200, {"results": [{"name": "T1"}]})
 
         client = FlowRESTClient()
 
@@ -146,9 +139,7 @@ class ChangeTicketerTests(TestCase):
                 "ticketer": "ticketer-1",
             },
         )
-        self.assertEqual(
-            call_kwargs["headers"]["Authorization"], "Token project-token"
-        )
+        self.assertEqual(call_kwargs["headers"]["Authorization"], "Token project-token")
 
     @patch(f"{CLIENT_PATH}.retry_request_and_refresh_flows_auth_token")
     def test_raises_on_non_2xx_response(self, mock_retry):
@@ -169,78 +160,3 @@ class ChangeTicketerTests(TestCase):
 
         with self.assertRaises(FlowsChangeTicketerError):
             client.change_ticketer(self.project, ["t-1"], "ticketer-1")
-
-
-@override_settings(FLOWS_API_URL="https://flows.test")
-class ListContactsPhoneVariationsTests(TestCase):
-    def setUp(self):
-        self.project = _build_project()
-
-    @patch(f"{CLIENT_PATH}.is_ninth_digit_search_enabled", return_value=True)
-    @patch(f"{CLIENT_PATH}.retry_request_and_refresh_flows_auth_token")
-    def test_list_contacts_merges_results_from_both_urn_variations(
-        self, mock_retry, _mock_flag
-    ):
-        mock_retry.side_effect = [
-            _build_response(
-                200,
-                {"results": [{"uuid": "contact-with-nine"}], "next": None, "previous": None},
-            ),
-            _build_response(
-                200,
-                {"results": [{"uuid": "contact-without-nine"}], "next": None, "previous": None},
-            ),
-        ]
-
-        client = FlowRESTClient()
-        response = client.list_contacts(
-            self.project,
-            query_filters={"urn": "84992126050"},
-        )
-
-        self.assertEqual(
-            {contact["uuid"] for contact in response["results"]},
-            {"contact-with-nine", "contact-without-nine"},
-        )
-        self.assertEqual(mock_retry.call_count, 2)
-
-    @patch(f"{CLIENT_PATH}.is_ninth_digit_search_enabled", return_value=True)
-    @patch(f"{CLIENT_PATH}.retry_request_and_refresh_flows_auth_token")
-    def test_validate_contact_exists_checks_both_variations(self, mock_retry, _mock_flag):
-        mock_retry.side_effect = [
-            _build_response(200, {"results": []}),
-            _build_response(
-                200,
-                {"results": [{"uuid": "existing-contact"}]},
-            ),
-        ]
-
-        client = FlowRESTClient()
-        exists = client.validate_contact_exists(
-            urn="whatsapp:5584992126050",
-            project=self.project,
-        )
-
-        self.assertTrue(exists)
-        self.assertEqual(mock_retry.call_count, 2)
-
-    @patch(f"{CLIENT_PATH}.is_ninth_digit_search_enabled", return_value=False)
-    @patch(f"{CLIENT_PATH}.retry_request_and_refresh_flows_auth_token")
-    def test_list_contacts_without_flag_uses_single_urn_lookup(self, mock_retry, _mock_flag):
-        mock_retry.return_value = _build_response(
-            200,
-            {"results": [{"uuid": "contact-1"}], "next": None, "previous": None},
-        )
-
-        client = FlowRESTClient()
-        response = client.list_contacts(
-            self.project,
-            query_filters={"urn": "84992126050"},
-        )
-
-        self.assertEqual(response["results"], [{"uuid": "contact-1"}])
-        self.assertEqual(mock_retry.call_count, 1)
-        self.assertEqual(
-            mock_retry.call_args.kwargs["params"],
-            {"urn": "84992126050"},
-        )

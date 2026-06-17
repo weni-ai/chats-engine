@@ -6,11 +6,7 @@ from chats.apps.projects.models import Project
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
-from chats.core.phone import (
-    build_urn_lookup_q,
-    get_whatsapp_urn_variations,
-    phone_urn_q,
-)
+from chats.core.phone import build_urn_lookup_q, phone_urn_q
 
 
 class PhoneUrnQTests(TestCase):
@@ -106,18 +102,6 @@ class PhoneUrnQTests(TestCase):
 
         matches = Contact.objects.filter(phone_urn_q("992126050", field="rooms__urn"))
         self.assertEqual(matches.count(), 1)
-
-
-class GetWhatsappUrnVariationsTests(TestCase):
-    def test_returns_both_variations_for_local_number(self):
-        variations = get_whatsapp_urn_variations("84992126050")
-        self.assertEqual(
-            variations,
-            ["whatsapp:558492126050", "whatsapp:5584992126050"],
-        )
-
-    def test_returns_none_for_non_br_phone(self):
-        self.assertIsNone(get_whatsapp_urn_variations("+12025550123"))
 
 
 class BuildUrnLookupQTests(TestCase):

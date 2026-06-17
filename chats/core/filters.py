@@ -1,5 +1,6 @@
 import operator
 from functools import reduce
+from typing import Optional
 
 from django.db.models import Q
 from rest_framework.filters import SearchFilter
@@ -13,7 +14,7 @@ def build_field_search_q(
     term: str,
     construct_search,
     ninth_digit_enabled: bool = False,
-) -> Q | None:
+) -> Optional[Q]:
     if field.endswith("document"):
         value = normalize_document(term)
         return Q(**{construct_search(field): value}) if value else None
