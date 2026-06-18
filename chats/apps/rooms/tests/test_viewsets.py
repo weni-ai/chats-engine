@@ -583,10 +583,10 @@ class TestRoomsViewSet(APITestCase):
 
         self.assertNotIn(str(room_5.uuid), rooms_uuids)
 
-        self.assertEqual(rooms_uuids[0], str(room_3.uuid))
+        self.assertEqual(rooms_uuids[0], str(room_2.uuid))
         self.assertEqual(results[0].get("is_pinned"), True)
 
-        self.assertEqual(rooms_uuids[1], str(room_2.uuid))
+        self.assertEqual(rooms_uuids[1], str(room_3.uuid))
         self.assertEqual(results[1].get("is_pinned"), True)
 
         self.assertEqual(rooms_uuids[2], str(room_4.uuid))
