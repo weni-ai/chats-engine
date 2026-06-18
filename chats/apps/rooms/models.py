@@ -819,23 +819,30 @@ class Room(BaseModel, BaseConfigurableModel):
             unread_messages_count=0, last_unread_message_at=timezone.now()
         )
 
-    def update_last_message(self, message, user=None):
+    def update_last_message(self, message, user=None, update_last_interaction=True):
         """
         Updates last message fields. Used for agent/system messages.
         Also updates denormalized agent message fields when user is provided.
+
+        When ``update_last_interaction`` is False the interaction timestamp
+        is preserved — useful for automatic messages (e.g. inactivity
+        warnings) that must not reset timers.
         """
         media_data = [
             {"content_type": media.content_type, "url": media.url}
             for media in message.medias.all()
         ]
-        Room.objects.filter(pk=self.pk).update(
-            last_interaction=message.created_on,
-            last_message=message,
-            last_message_text=message.text,
-            last_message_user=user,
-            last_message_contact=None,
-            last_message_media=media_data,
-        )
+        fields = {
+            "last_message": message,
+            "last_message_text": message.text,
+            "last_message_user": user,
+            "last_message_contact": None,
+            "last_message_media": media_data,
+        }
+        if update_last_interaction:
+            fields["last_interaction"] = message.created_on
+
+        Room.objects.filter(pk=self.pk).update(**fields)
 
     def on_new_message(self, message, contact=None, increment_unread: int = 0):
         """
