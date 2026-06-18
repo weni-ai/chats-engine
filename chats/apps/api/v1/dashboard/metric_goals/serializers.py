@@ -1,6 +1,9 @@
 from rest_framework import serializers
 
-from chats.apps.api.v1.dashboard.metric_goals.constants import UNIT_TO_SECONDS
+from chats.apps.api.v1.dashboard.metric_goals.constants import (
+    UNIT_TO_SECONDS,
+    threshold_seconds_to_unit_value,
+)
 from chats.apps.dashboard.models import MetricGoal
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.sectors.models import SectorAuthorization
@@ -18,18 +21,23 @@ class MetricGoalRecipientReadSerializer(serializers.ModelSerializer):
 
 class MetricGoalReadSerializer(serializers.ModelSerializer):
     recipients = MetricGoalRecipientReadSerializer(many=True, read_only=True)
+    threshold_value = serializers.SerializerMethodField()
 
     class Meta:
         model = MetricGoal
         fields = [
             "metric",
             "threshold_seconds",
+            "threshold_value",
             "unit",
             "is_active",
             "email_enabled",
             "rooms_threshold_count",
             "recipients",
         ]
+
+    def get_threshold_value(self, goal: MetricGoal) -> int:
+        return threshold_seconds_to_unit_value(goal.threshold_seconds, goal.unit)
 
 
 class MetricGoalRecipientWriteSerializer(serializers.Serializer):

@@ -92,6 +92,7 @@ class MetricGoalsViewsetTestCase(APITestCase):
         )
         self.assertEqual(response.data["goals"][0]["threshold_seconds"], 300)
         self.assertEqual(response.data["goals"][0]["unit"], MetricGoal.UNIT_MINUTE)
+        self.assertEqual(response.data["goals"][0]["threshold_value"], 5)
 
     def test_list_empty_when_no_goals_configured(self):
         self._auth(self.manager_token)
@@ -139,6 +140,7 @@ class MetricGoalsViewsetTestCase(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["threshold_seconds"], 300)
+        self.assertEqual(response.data["threshold_value"], 5)
         self.assertEqual(response.data["unit"], MetricGoal.UNIT_MINUTE)
         self.assertEqual(response.data["rooms_threshold_count"], 5)
         self.assertTrue(response.data["email_enabled"])
