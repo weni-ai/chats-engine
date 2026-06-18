@@ -17,7 +17,7 @@ from django.db import transaction
 from django.utils import timezone
 from sentry_sdk import capture_exception
 
-from chats.apps.msgs.models import AutomaticMessageType, Message
+from chats.apps.msgs.models import AutomaticMessage, AutomaticMessageType, Message
 from chats.apps.rooms.choices import RoomFeedbackMethods
 from chats.apps.rooms.models import Room
 
