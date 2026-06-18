@@ -99,6 +99,24 @@ class InactivityWarnTests(TestCase):
         )
         self.assertTrue(warning_msg.is_automatic_message)
 
+    def test_warn_updates_last_message_but_not_last_interaction(self):
+        room = self._create_eligible_room()
+        original_last_interaction = room.last_interaction
+
+        with patch.object(Room, "notify_inactivity"):
+            InactivityService().warn_inactive_rooms()
+
+        room.refresh_from_db()
+        warning_msg = Message.objects.get(
+            room=room, text="Are you still there?", user=self.user
+        )
+        self.assertEqual(room.last_message, warning_msg)
+        self.assertEqual(room.last_message_text, "Are you still there?")
+        self.assertEqual(
+            int(room.last_interaction.timestamp()),
+            int(original_last_interaction.timestamp()),
+        )
+
     def test_room_within_timeout_is_not_warned(self):
         room = self._create_eligible_room(last_interaction_offset_seconds=60)
 
@@ -238,6 +256,24 @@ class InactivityCloseTests(TestCase):
         self.assertTrue(feedback_msg.seen)
         self.assertIsNone(feedback_msg.automatic_message_type)
         self.assertFalse(feedback_msg.is_automatic_message)
+
+    def test_close_updates_last_message_to_closure_text(self):
+        room = self._create_already_warned_room(last_interaction_offset_seconds=700)
+        original_last_interaction = room.last_interaction
+
+        with patch.object(Room, "notify_user"), patch.object(Message, "notify_room"):
+            InactivityService().close_inactive_rooms()
+
+        room.refresh_from_db()
+        closure_msg = Message.objects.get(
+            room=room, text="Closing due to inactivity.", user=self.user
+        )
+        self.assertEqual(room.last_message, closure_msg)
+        self.assertEqual(room.last_message_text, "Closing due to inactivity.")
+        self.assertEqual(
+            int(room.last_interaction.timestamp()),
+            int(original_last_interaction.timestamp()),
+        )
 
     def test_history_serializer_payload_after_automatic_close(self):
         """
@@ -471,7 +507,10 @@ class SilentAutomaticMessageTests(TestCase):
             int(room.last_interaction.timestamp()),
             int(original_last_interaction.timestamp()),
         )
+        self.assertEqual(room.last_message, message)
+        self.assertEqual(room.last_message_text, "warn me")
         self.assertEqual(room.last_message_user, self.user)
+        self.assertIsNone(room.last_message_contact)
 
     def test_returns_none_when_text_is_empty(self):
         room = Room.objects.create(queue=self.queue, contact=self.contact)
