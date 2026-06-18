@@ -1,4 +1,5 @@
 import logging
+from collections import OrderedDict
 from datetime import datetime, timedelta
 
 from django.conf import settings
@@ -177,7 +178,14 @@ class RoomViewset(
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context["disable_has_history"] = getattr(self, "disable_has_history", False)
-        context["pinned_room_ids"] = getattr(self, "_pinned_room_ids", None)
+        # Evaluated once per request (see `list`); fallback to None so the
+        # serializer falls back to per-room evaluation in other actions.
+        context["inactivity_feature_active"] = getattr(
+            self, "inactivity_feature_active", None
+        )
+        pinned_ids = getattr(self, "_pinned_ids_context", None)
+        if pinned_ids is not None:
+            context["pinned_ids"] = pinned_ids
         return context
 
     def list(self, request, *args, **kwargs):
@@ -277,54 +285,70 @@ class RoomViewset(
         return self._get_paginated_response(annotated_qs)
 
     def _list_with_optimized_pin_order(self, qs, request, project):
-        pins_query = {
-            "room__queue__sector__project": project,
-            "room__is_active": True,
-        }
-
+        user = request.user
         if user_email := request.query_params.get("email"):
-            pins_query["user__email"] = user_email
-        else:
-            pins_query["user"] = request.user
+            user = User.objects.filter(email=user_email).first()
 
-        room_pins = RoomPin.objects.filter(**pins_query).values_list(
-            "room__pk", flat=True
-        )
+            if not user:
+                return self._get_paginated_response(qs)
 
-        filtered_qs = self.filter_queryset(qs).exclude(pk__in=room_pins)
-        combined_qs = filtered_qs | Room.objects.filter(pk__in=room_pins)
-
-        secondary_sort = list(filtered_qs.query.order_by or self.ordering or [])
-
-        pin_created_on_subquery = (
+        pinned_ids = list(
             RoomPin.objects.filter(
-                user__email=user_email or request.user.email,
-                room=OuterRef("pk"),
+                user=user,
                 room__queue__sector__project=project,
+                room__is_active=True,
             )
             .order_by("-created_on")
-            .values("created_on")[:1]
+            .values_list("room_id", flat=True)
         )
 
-        annotated_qs = combined_qs.annotate(
-            is_pinned=Case(
-                When(pk__in=room_pins, then=True),
-                default=False,
-                output_field=BooleanField(),
-            ),
-            pin_created_on=Subquery(
-                pin_created_on_subquery, output_field=DateTimeField()
-            ),
+        filtered_qs = self.filter_queryset(qs)
+
+        if not pinned_ids:
+            return self._get_paginated_response(filtered_qs)
+
+        main_qs = filtered_qs.exclude(pk__in=pinned_ids)
+        self._pinned_ids_context = set(pinned_ids)
+
+        is_first_page = int(request.query_params.get("offset", 0)) == 0
+        if not is_first_page:
+            return self._get_paginated_response(main_qs)
+
+        pin_order = {rid: idx for idx, rid in enumerate(pinned_ids)}
+        pinned_rooms = sorted(
+            qs.filter(pk__in=pinned_ids),
+            key=lambda r: pin_order.get(r.pk, len(pinned_ids)),
         )
 
-        if secondary_sort:
-            annotated_qs = annotated_qs.order_by(
-                "-is_pinned", "-pin_created_on", *secondary_sort
+        paginator = self.paginator
+        limit = paginator.get_limit(request)
+        main_page_size = max(limit - len(pinned_rooms), 0)
+
+        main_qs_count = main_qs.count()
+        main_page = list(main_qs[:main_page_size])
+
+        results = pinned_rooms + main_page
+        serializer = self.get_serializer(results, many=True)
+
+        total_count = main_qs_count + len(pinned_rooms)
+        offset = len(results)
+        next_link = (
+            paginator.get_next_link_from_offset(request, offset, limit, total_count)
+            if offset < total_count
+            else None
+        )
+
+        return Response(
+            OrderedDict(
+                [
+                    ("max_pin_limit", settings.MAX_ROOM_PINS_LIMIT),
+                    ("count", total_count),
+                    ("next", next_link),
+                    ("previous", None),
+                    ("results", serializer.data),
+                ]
             )
-        else:
-            annotated_qs = annotated_qs.order_by("-is_pinned", "-pin_created_on")
-
-        return self._get_paginated_response(annotated_qs.distinct())
+        )
 
     def _get_paginated_response(self, queryset):
         page = self.paginate_queryset(queryset)
