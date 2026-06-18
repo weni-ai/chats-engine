@@ -298,10 +298,12 @@ class RoomViewset(
             "room__is_active": True,
         }
 
+        user = request.user
+
         if user_email := request.query_params.get("email"):
-            pins_query["user__email"] = user_email
-        else:
-            pins_query["user"] = request.user
+            user = User.objects.filter(email=user_email).first()
+
+        pins_query["user"] = user
 
         room_pins = RoomPin.objects.filter(**pins_query).values_list(
             "room__pk", flat=True
@@ -314,7 +316,7 @@ class RoomViewset(
 
         pin_created_on_subquery = (
             RoomPin.objects.filter(
-                user__email=user_email or request.user.email,
+                user=user,
                 room=OuterRef("pk"),
                 room__queue__sector__project=project,
             )
