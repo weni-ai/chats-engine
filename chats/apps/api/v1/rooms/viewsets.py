@@ -8,11 +8,9 @@ from django.db.models import (
     Case,
     Count,
     DateTimeField,
-    IntegerField,
     OuterRef,
     Q,
     Subquery,
-    Value,
     When,
 )
 from django.shortcuts import get_object_or_404
