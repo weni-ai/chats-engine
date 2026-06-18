@@ -331,7 +331,7 @@ class RoomViewset(
         serializer = self.get_serializer(results, many=True)
 
         total_count = main_qs_count + len(pinned_rooms)
-        offset = len(results)
+        offset = len(main_page)
         next_link = (
             paginator.get_next_link_from_offset(request, offset, limit, total_count)
             if offset < total_count
