@@ -22,7 +22,7 @@ from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
 from pydub.exceptions import CouldntDecodeError
-from rest_framework import filters, mixins, parsers, permissions, status
+from rest_framework import mixins, parsers, permissions, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.filters import OrderingFilter
@@ -109,6 +109,7 @@ from chats.apps.rooms.views import (
     update_flows_custom_fields,
 )
 from chats.apps.sectors.models import SectorTag
+from chats.core.filters import PhoneAwareSearchFilter
 from chats.core.permissions import GetPermission
 
 logger = logging.getLogger(__name__)
@@ -125,7 +126,7 @@ class RoomViewset(
     serializer_class = RoomSerializer
     filter_backends = [
         DjangoFilterBackend,
-        filters.SearchFilter,
+        PhoneAwareSearchFilter,
         OrderingFilter,
     ]
     filterset_class = room_filters.RoomFilter
@@ -1571,7 +1572,7 @@ class RoomNoteMediaViewset(
     swagger_tag = "Rooms"
     queryset = RoomNoteMedia.objects.all()
     serializer_class = RoomNoteMediaSerializer
-    filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
+    filter_backends = [OrderingFilter, DjangoFilterBackend]
     filterset_class = room_filters.RoomNoteMediaFilter
     parser_classes = [parsers.MultiPartParser]
     permission_classes = [IsAuthenticated, RoomNoteMediaPermission]
