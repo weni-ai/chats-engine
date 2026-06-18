@@ -316,7 +316,7 @@ class RoomViewset(
 
         pin_created_on_subquery = (
             RoomPin.objects.filter(
-                user__email=user_email,
+                user__email=user_email or request.user.email,
                 room=OuterRef("pk"),
                 room__queue__sector__project=project,
             )
