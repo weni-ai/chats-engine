@@ -76,12 +76,11 @@ def _send_silent_automatic_message(
     message_type: Optional[str] = None,
 ) -> Optional[Message]:
     """
-    Creates an automatic message on the room WITHOUT updating
-    `last_interaction` / `last_message_*` fields.
-
-    The inactivity feature requires that the warning and closure messages do
-    not reset the inactivity counter, so they can't go through the regular
-    `room.update_last_message` flow.
+    Creates an automatic message on the room and updates the
+    `last_message*` fields so REST and WebSocket payloads reflect the
+    actual latest message. `last_interaction` is intentionally left
+    unchanged — it anchors the inactivity timer to the last real
+    conversation turn.
 
     `message_type` classifies the automatic message (e.g. `inactive_warning`
     or `inactive_close`) so the front can render a specific UI for each.
@@ -103,6 +102,20 @@ def _send_silent_automatic_message(
                     room=room,
                     automatic_message_type=message_type,
                 )
+
+            Room.objects.filter(pk=room.pk).update(
+                last_message=message,
+                last_message_text=text,
+                last_message_user=user,
+                last_message_contact=None,
+                last_message_media=[],
+            )
+            room.last_message = message
+            room.last_message_text = text
+            room.last_message_user = user
+            room.last_message_contact = None
+            room.last_message_media = []
+
             transaction.on_commit(lambda: message.notify_room("create", True))
             return message
     except Exception as exc:
@@ -137,7 +150,6 @@ def _eligible_warn_queryset():
         is_waiting=False,
         user__isnull=False,
         last_message_user__isnull=False,
-        last_message__automatic_message__isnull=True,
         queue__sector__inactivity_timeout__is_message_timeout_enabled=True,
     ).select_related("queue__sector", "user")
 
@@ -156,7 +168,6 @@ def _eligible_close_queryset():
         is_waiting=False,
         user__isnull=False,
         last_message_user__isnull=False,
-        last_message__automatic_message__isnull=True,
         queue__sector__inactivity_timeout__is_close_room_enabled=True,
     ).select_related("queue__sector", "user")
 
