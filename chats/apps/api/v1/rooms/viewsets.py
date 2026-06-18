@@ -1,4 +1,5 @@
 import logging
+from collections import OrderedDict
 from datetime import datetime, timedelta
 
 from django.conf import settings
@@ -185,6 +186,9 @@ class RoomViewset(
         context["inactivity_feature_active"] = getattr(
             self, "inactivity_feature_active", None
         )
+        pinned_ids = getattr(self, "_pinned_ids_context", None)
+        if pinned_ids is not None:
+            context["pinned_ids"] = pinned_ids
         return context
 
     def list(self, request, *args, **kwargs):
@@ -313,31 +317,52 @@ class RoomViewset(
         )
 
         filtered_qs = self.filter_queryset(qs)
-        secondary_sort = list(filtered_qs.query.order_by or self.ordering or [])
 
         if not pinned_ids:
             return self._get_paginated_response(filtered_qs)
 
-        combined_qs = filtered_qs | qs.filter(pk__in=pinned_ids)
+        main_qs = filtered_qs.exclude(pk__in=pinned_ids)
+        self._pinned_ids_context = set(pinned_ids)
 
-        pin_rank_whens = [
-            When(pk=room_id, then=Value(idx)) for idx, room_id in enumerate(pinned_ids)
-        ]
+        is_first_page = int(request.query_params.get("offset", 0)) == 0
+        if not is_first_page:
+            return self._get_paginated_response(main_qs)
 
-        annotated_qs = combined_qs.annotate(
-            is_pinned=Case(
-                When(pk__in=pinned_ids, then=Value(True)),
-                default=Value(False),
-                output_field=BooleanField(),
-            ),
-            pin_rank=Case(
-                *pin_rank_whens,
-                default=Value(len(pinned_ids)),
-                output_field=IntegerField(),
-            ),
-        ).order_by("pin_rank", *secondary_sort)
+        pin_order = {rid: idx for idx, rid in enumerate(pinned_ids)}
+        pinned_rooms = sorted(
+            qs.filter(pk__in=pinned_ids),
+            key=lambda r: pin_order.get(r.pk, len(pinned_ids)),
+        )
 
-        return self._get_paginated_response(annotated_qs)
+        paginator = self.paginator
+        limit = paginator.get_limit(request)
+        main_page_size = max(limit - len(pinned_rooms), 0)
+
+        main_qs_count = main_qs.count()
+        main_page = list(main_qs[:main_page_size])
+
+        results = pinned_rooms + main_page
+        serializer = self.get_serializer(results, many=True)
+
+        total_count = main_qs_count + len(pinned_rooms)
+        offset = len(results)
+        next_link = (
+            paginator.get_next_link_from_offset(request, offset, limit, total_count)
+            if offset < total_count
+            else None
+        )
+
+        return Response(
+            OrderedDict(
+                [
+                    ("max_pin_limit", settings.MAX_ROOM_PINS_LIMIT),
+                    ("count", total_count),
+                    ("next", next_link),
+                    ("previous", None),
+                    ("results", serializer.data),
+                ]
+            )
+        )
 
     def _get_paginated_response(self, queryset):
         page = self.paginate_queryset(queryset)
