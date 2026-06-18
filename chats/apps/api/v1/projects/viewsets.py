@@ -14,6 +14,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
+from chats.apps.api.v1.dashboard.metric_goals.viewsets import MetricGoalActionsMixin
 from chats.apps.api.v1.internal.projects.serializers import (
     CheckAccessReadSerializer,
     ProjectPermissionReadSerializer,
@@ -68,6 +69,7 @@ logger = logging.getLogger(__name__)
 
 
 class ProjectViewset(
+    MetricGoalActionsMixin,
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin,

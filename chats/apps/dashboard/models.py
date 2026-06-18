@@ -74,3 +74,67 @@ class ReportStatus(BaseModel):
 
     def __str__(self):
         return f"Report Status: {self.project.name} - {self.status}"
+
+
+class MetricGoal(BaseModel):
+    METRIC_WAITING_TIME = "waiting_time"
+    METRIC_FIRST_RESPONSE_TIME = "first_response_time"
+    METRIC_CONVERSATION_DURATION = "conversation_duration"
+
+    METRIC_CHOICES = [
+        (METRIC_WAITING_TIME, _("Waiting time")),
+        (METRIC_FIRST_RESPONSE_TIME, _("First response time")),
+        (METRIC_CONVERSATION_DURATION, _("Conversation duration")),
+    ]
+
+    UNIT_SECOND = "s"
+    UNIT_MINUTE = "m"
+    UNIT_HOUR = "h"
+
+    UNIT_CHOICES = [
+        (UNIT_SECOND, _("Seconds")),
+        (UNIT_MINUTE, _("Minutes")),
+        (UNIT_HOUR, _("Hours")),
+    ]
+
+    DEFAULT_ROOMS_THRESHOLD_COUNT = 5
+
+    project = models.ForeignKey(
+        "projects.Project",
+        related_name="metric_goals",
+        verbose_name=_("Project"),
+        on_delete=models.CASCADE,
+    )
+    metric = models.CharField(_("Metric"), max_length=50, choices=METRIC_CHOICES)
+    threshold_seconds = models.PositiveIntegerField(_("Threshold in seconds"))
+    unit = models.CharField(
+        _("Unit"),
+        max_length=1,
+        choices=UNIT_CHOICES,
+        default=UNIT_SECOND,
+    )
+    is_active = models.BooleanField(_("Is active"), default=True)
+    email_enabled = models.BooleanField(_("Email enabled"), default=False)
+    rooms_threshold_count = models.PositiveIntegerField(
+        _("Rooms threshold count"),
+        default=DEFAULT_ROOMS_THRESHOLD_COUNT,
+    )
+    recipients = models.ManyToManyField(
+        "projects.ProjectPermission",
+        related_name="metric_goal_notifications",
+        verbose_name=_("Recipients"),
+        blank=True,
+    )
+
+    class Meta:
+        verbose_name = _("Metric goal")
+        verbose_name_plural = _("Metric goals")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project", "metric"],
+                name="unique_project_metric_goal",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.project.name} - {self.metric}"
