@@ -77,10 +77,11 @@ def _send_silent_automatic_message(
 ) -> Optional[Message]:
     """
     Creates an automatic message on the room and updates the
-    `last_message*` fields so REST and WebSocket payloads reflect the
-    actual latest message. `last_interaction` is intentionally left
-    unchanged — it anchors the inactivity timer to the last real
-    conversation turn.
+    `last_message*` fields (via the standard ``update_last_message``)
+    so REST and WebSocket payloads reflect the actual latest message.
+
+    `last_interaction` is intentionally left unchanged — it anchors the
+    inactivity timer to the last real conversation turn.
 
     `message_type` classifies the automatic message (e.g. `inactive_warning`
     or `inactive_close`) so the front can render a specific UI for each.
@@ -103,18 +104,11 @@ def _send_silent_automatic_message(
                     automatic_message_type=message_type,
                 )
 
-            Room.objects.filter(pk=room.pk).update(
-                last_message=message,
-                last_message_text=text,
-                last_message_user=user,
-                last_message_contact=None,
-                last_message_media=[],
+            room.update_last_message(
+                message=message,
+                user=user,
+                update_last_interaction=False,
             )
-            room.last_message = message
-            room.last_message_text = text
-            room.last_message_user = user
-            room.last_message_contact = None
-            room.last_message_media = []
 
             transaction.on_commit(lambda: message.notify_room("create", True))
             return message
