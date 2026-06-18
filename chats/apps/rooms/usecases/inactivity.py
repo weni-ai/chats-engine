@@ -344,9 +344,12 @@ class InactivityService:
             )
             capture_exception(exc)
 
-        # Mark `automatic_closed=True` BEFORE `room.close()` so the flag is
-        # persisted in the same `save()` call and visible to any post-close
-        # signal/consumer.
+        # Refresh from DB so the in-memory instance picks up
+        # `last_message*` fields written by `update_last_message` via
+        # queryset `.update()`. Without this, `room.close()` → `save()`
+        # would overwrite those columns with stale in-memory values.
+        room.refresh_from_db()
+
         room.automatic_closed = True
 
         try:
