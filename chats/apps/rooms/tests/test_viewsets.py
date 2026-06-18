@@ -879,9 +879,7 @@ class RoomsBulkTransferTestCase(APITestCase):
     @patch(
         "chats.apps.api.v1.rooms.services.bulk_transfer_service.start_queue_priority_routing"
     )
-    def test_bulk_transfer_to_user_and_queue(
-        self, mock_start_queue_priority_routing
-    ):
+    def test_bulk_transfer_to_user_and_queue(self, mock_start_queue_priority_routing):
         mock_start_queue_priority_routing.return_value = None
 
         url = reverse("room-bulk_transfer")

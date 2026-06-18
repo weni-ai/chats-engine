@@ -7,7 +7,6 @@ from rest_framework.test import APITestCase
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.quickmessages.models import QuickMessage
 from chats.apps.sectors.models import Sector
-from chats.apps.quickmessages.models import QuickMessage
 
 User = get_user_model()
 
@@ -321,6 +320,10 @@ class TestQuickMessageV2AsAnonymous(BaseTestQuickMessageV2):
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
+    def test_retrieve_returns_401(self):
+        response = self.retrieve(str(self.qm.uuid))
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
 
 class TestQuickMessageV2AsAuthenticated(BaseTestQuickMessageV2):
     def setUp(self):
@@ -486,7 +489,6 @@ class TestQuickMessageV2AsAuthenticated(BaseTestQuickMessageV2):
 
     def test_cache_invalidation_on_create(self):
         response1 = self.list()
-
         initial_count = len(response1.data["results"])
 
         QuickMessage.objects.create(

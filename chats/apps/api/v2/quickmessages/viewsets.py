@@ -4,7 +4,10 @@ from rest_framework import mixins, viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from chats.apps.api.v2.quickmessages.cache import get_list_cache_key
+from chats.apps.api.v2.quickmessages.cache import (
+    get_list_cache_key,
+    get_list_user_qm_cache_key,
+)
 from chats.apps.api.v2.quickmessages.pagination import QuickMessageCursorPagination
 from chats.apps.api.v2.quickmessages.permissions import (
     SectorQuickMessageProjectPermission,
@@ -12,11 +15,8 @@ from chats.apps.api.v2.quickmessages.permissions import (
 from chats.apps.api.v2.quickmessages.serializers import (
     SectorQuickMessageQueryParamsSerializer,
     SectorQuickMessageResponseSerializer,
+    QuickMessageResponseSerializer,
 )
-from chats.apps.quickmessages.models import QuickMessage
-from chats.apps.api.v2.quickmessages.cache import get_list_user_qm_cache_key
-from chats.apps.api.v2.quickmessages.pagination import QuickMessageCursorPagination
-from chats.apps.api.v2.quickmessages.serializers import QuickMessageResponseSerializer
 from chats.apps.quickmessages.models import QuickMessage
 
 
@@ -93,7 +93,6 @@ class QuickMessageViewSetV2(
 ):
     serializer_class = QuickMessageResponseSerializer
     permission_classes = [IsAuthenticated]
-
     pagination_class = QuickMessageCursorPagination
     lookup_field = "uuid"
 
@@ -107,12 +106,10 @@ class QuickMessageViewSetV2(
         cache_key = get_list_user_qm_cache_key(
             user_id=request.user.id, cursor=cursor, limit=limit
         )
-
         cached = cache.get(cache_key)
         if cached is not None:
             return Response(cached)
 
         response = super().list(request, *args, **kwargs)
-
         cache.set(cache_key, response.data, settings.QUICK_MESSAGES_CACHE_TTL)
         return response

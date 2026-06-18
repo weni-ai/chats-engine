@@ -157,19 +157,17 @@ class AgentRepository:
         #     output_field=FloatField(),
         # )
 
+        date_filter = Q(
+            created_on__range=[custom_status_start_date, custom_status_end_date]
+        )
+        if not filters.start_date and not filters.end_date:
+            date_filter |= Q(is_active=True)
+
         custom_status_subquery = Subquery(
             CustomStatus.objects.filter(
                 Q(user=OuterRef("email"))
                 & Q(status_type__project=project)
-                & (
-                    Q(
-                        created_on__range=[
-                            custom_status_start_date,
-                            custom_status_end_date,
-                        ]
-                    )
-                    | Q(is_active=True)
-                )
+                & date_filter
             )
             .values("user")
             .annotate(

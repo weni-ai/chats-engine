@@ -26,6 +26,17 @@ def _get_list_user_qm_version(user_id: int) -> int:
     return version
 
 
+def get_list_user_qm_cache_key(*, user_id: int, cursor: str, limit: str) -> str:
+    version = _get_list_user_qm_version(user_id)
+    return f"personal_qm:v2:u{user_id}:v{version}:{cursor}:{limit}"
+
+
+def invalidate_personal_quick_messages_cache(user_id: int):
+    key = _list_user_qm_version_key(user_id)
+    version = cache.get(key)
+    cache.set(key, (version or 0) + 1, timeout=None)
+
+
 def get_list_cache_key(
     *, sector_uuid: str = None, project_uuid: str = None, cursor: str, limit: str
 ) -> str:
@@ -48,14 +59,3 @@ def invalidate_sector_quick_messages_cache(sector_uuid: str, project_uuid: str):
 
     cache.set(sector_key, (sector_version or 0) + 1, timeout=None)
     cache.set(project_key, (project_version or 0) + 1, timeout=None)
-
-
-def get_list_user_qm_cache_key(*, user_id: int, cursor: str, limit: str) -> str:
-    version = _get_list_user_qm_version(user_id)
-    return f"personal_qm:v2:u{user_id}:v{version}:{cursor}:{limit}"
-
-
-def invalidate_personal_quick_messages_cache(user_id: int):
-    key = _list_user_qm_version_key(user_id)
-    version = cache.get(key)
-    cache.set(key, (version or 0) + 1, timeout=None)

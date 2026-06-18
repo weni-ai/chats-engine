@@ -2,8 +2,8 @@ from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
 from chats.apps.api.v2.quickmessages.cache import (
-    invalidate_sector_quick_messages_cache,
     invalidate_personal_quick_messages_cache,
+    invalidate_sector_quick_messages_cache,
 )
 from chats.apps.quickmessages.models import QuickMessage
 
