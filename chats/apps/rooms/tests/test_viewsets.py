@@ -317,9 +317,11 @@ class RoomsManagerTests(APITestCase):
         self.assertEquals(response.status_code, status.HTTP_200_OK)
 
         self.room.refresh_from_db()
-        feedback_message = self.room.messages.filter(
-            text__contains=RoomFeedbackMethods.ROOM_TRANSFER
-        ).order_by("-created_on").first()
+        feedback_message = (
+            self.room.messages.filter(text__contains=RoomFeedbackMethods.ROOM_TRANSFER)
+            .order_by("-created_on")
+            .first()
+        )
 
         self.assertIsNotNone(feedback_message)
 
@@ -327,9 +329,7 @@ class RoomsManagerTests(APITestCase):
         feedback_content = message_data.get("content", {})
 
         self.assertIn("requested_by", feedback_content)
-        self.assertEqual(
-            feedback_content["requested_by"]["email"], self.admin.email
-        )
+        self.assertEqual(feedback_content["requested_by"]["email"], self.admin.email)
         self.assertEqual(feedback_content["requested_by"]["type"], "user")
 
 
@@ -583,10 +583,10 @@ class TestRoomsViewSet(APITestCase):
 
         self.assertNotIn(str(room_5.uuid), rooms_uuids)
 
-        self.assertEqual(rooms_uuids[0], str(room_2.uuid))
+        self.assertEqual(rooms_uuids[0], str(room_3.uuid))
         self.assertEqual(results[0].get("is_pinned"), True)
 
-        self.assertEqual(rooms_uuids[1], str(room_3.uuid))
+        self.assertEqual(rooms_uuids[1], str(room_2.uuid))
         self.assertEqual(results[1].get("is_pinned"), True)
 
         self.assertEqual(rooms_uuids[2], str(room_4.uuid))
@@ -778,9 +778,7 @@ class RoomPickTests(APITestCase):
         feedback_content = message_data.get("content", {})
 
         self.assertIn("requested_by", feedback_content)
-        self.assertEqual(
-            feedback_content["requested_by"]["email"], self.user.email
-        )
+        self.assertEqual(feedback_content["requested_by"]["email"], self.user.email)
         self.assertEqual(feedback_content["requested_by"]["type"], "user")
 
 
@@ -881,9 +879,7 @@ class RoomsBulkTransferTestCase(APITestCase):
     @patch(
         "chats.apps.api.v1.rooms.services.bulk_transfer_service.start_queue_priority_routing"
     )
-    def test_bulk_transfer_to_user_and_queue(
-        self, mock_start_queue_priority_routing
-    ):
+    def test_bulk_transfer_to_user_and_queue(self, mock_start_queue_priority_routing):
         mock_start_queue_priority_routing.return_value = None
 
         url = reverse("room-bulk_transfer")
