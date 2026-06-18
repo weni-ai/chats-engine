@@ -299,6 +299,9 @@ class RoomViewset(
         if user_email := request.query_params.get("email"):
             user = User.objects.filter(email=user_email).first()
 
+            if not user:
+                return self._get_paginated_response(qs)
+
         pinned_ids = list(
             RoomPin.objects.filter(
                 user=user,
@@ -318,8 +321,7 @@ class RoomViewset(
         combined_qs = filtered_qs | qs.filter(pk__in=pinned_ids)
 
         pin_rank_whens = [
-            When(pk=room_id, then=Value(idx))
-            for idx, room_id in enumerate(pinned_ids)
+            When(pk=room_id, then=Value(idx)) for idx, room_id in enumerate(pinned_ids)
         ]
 
         annotated_qs = combined_qs.annotate(
