@@ -627,6 +627,26 @@ class TestUpdateLastMessage(APITestCase):
         self.assertEqual(self.room.last_message_text, "Automatic warning")
         self.assertEqual(self.room.last_interaction, original_last_interaction)
 
+    def test_update_last_message_persists_after_refresh_and_close(self):
+        message_1 = Message.objects.create(
+            room=self.room, text="Agent message", user=self.user
+        )
+        self.room.update_last_message(message=message_1, user=self.user)
+
+        message_2 = Message.objects.create(
+            room=self.room, text="Automatic warning", user=self.user
+        )
+        self.room.update_last_message(
+            message=message_2, user=self.user, update_last_interaction=False
+        )
+
+        self.room.refresh_from_db()
+        self.room.close(end_by="inactivity", closed_by=self.user)
+        self.room.refresh_from_db()
+
+        self.assertEqual(self.room.last_message, message_2)
+        self.assertEqual(self.room.last_message_text, "Automatic warning")
+
 
 class TestOnNewMessage(APITestCase):
     def setUp(self):
