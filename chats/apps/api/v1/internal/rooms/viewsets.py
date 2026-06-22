@@ -207,11 +207,18 @@ class InternalProtocolRoomsViewSet(ListModelMixin, GenericViewSet):
     serializer_class = InternalProtocolRoomsSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = InternalProtocolRoomsFilter
-    permission_classes = [permissions.IsAuthenticated, ModuleHasPermission]
+    authentication_classes = [
+        JWTAuthentication
+    ] + api_settings.DEFAULT_AUTHENTICATION_CLASSES
     search_fields = ["protocol"]
     ordering = ["protocol"]
     ordering_fields = ["protocol"]
     pagination_class = CustomCursorPagination
+
+    def get_permissions(self):
+        if getattr(self.request, "jwt_payload", None):
+            return [HasInternalAuthenticationPermission()]
+        return [permissions.IsAuthenticated(), ModuleHasPermission()]
 
     def get_queryset(self):
         return super().get_queryset().exclude(Q(protocol__isnull=True) | Q(protocol=""))

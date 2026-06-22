@@ -10,7 +10,12 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.settings import api_settings
 
+from chats.apps.api.authentication.classes import JWTAuthentication
+from chats.apps.api.authentication.permissions import (
+    HasInternalAuthenticationPermission,
+)
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.api.v1.internal.projects import serializers
 from chats.apps.projects.models import CustomStatus, Project, ProjectPermission
@@ -33,8 +38,15 @@ class ProjectViewset(viewsets.ModelViewSet):
     swagger_tag = "Projects"
     queryset = Project.objects.all()
     serializer_class = serializers.ProjectInternalSerializer
-    permission_classes = [IsAuthenticated, ModuleHasPermission]
+    authentication_classes = [
+        JWTAuthentication
+    ] + api_settings.DEFAULT_AUTHENTICATION_CLASSES
     lookup_field = "uuid"
+
+    def get_permissions(self):
+        if getattr(self.request, "jwt_payload", None):
+            return [HasInternalAuthenticationPermission()]
+        return [IsAuthenticated(), ModuleHasPermission()]
 
     def list(self, request, *args, **kwargs):
         """List projects for internal modules."""
