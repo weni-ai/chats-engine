@@ -67,7 +67,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
 
     @property
     def authentication_classes(self):
-        if getattr(self, "action", None) == "time_metrics":
+        if getattr(self, "action", None) in ("time_metrics", "raw_data"):
             classes = list(super().authentication_classes)
             if JWTAuthentication not in classes:
                 classes.insert(0, JWTAuthentication)
@@ -75,7 +75,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         return super().authentication_classes
 
     def get_permissions(self):
-        if self.action == "time_metrics":
+        if self.action in ("time_metrics", "raw_data"):
             return [IsAuthenticatedOrHasInternalJWT()]
         return super().get_permissions()
 
@@ -185,9 +185,19 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         """Raw data for the project, sector, queue and agent."""
         project = self.get_object()
         params = request.query_params.dict()
-        user_permission = ProjectPermission.objects.select_related(
-            "user", "project"
-        ).get(user=request.user, project=project)
+
+        is_anonymous = not request.user or request.user.is_anonymous
+        user_email = "" if is_anonymous else request.user.email
+
+        if getattr(request, "jwt_payload", None):
+            user_email = request.query_params.get("user_request", "")
+
+        user_permission = None
+        if not is_anonymous:
+            user_permission = ProjectPermission.objects.select_related(
+                "user", "project"
+            ).get(user=request.user, project=project)
+
         filters = Filters(
             start_date=params.get("start_date"),
             end_date=params.get("end_date"),
@@ -197,9 +207,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=params.get("tag"),
             user_request=user_permission,
             project=project,
-            is_weni_admin=should_exclude_admin_domains(
-                request.user.email if request.user else ""
-            ),
+            is_weni_admin=should_exclude_admin_domains(user_email),
         )
 
         raw_service = RawDataService()

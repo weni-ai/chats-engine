@@ -13,7 +13,12 @@ from django.db.models.functions import Concat, Extract, Now
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, permissions, viewsets
 from rest_framework.pagination import LimitOffsetPagination
+from rest_framework.settings import api_settings
 
+from chats.apps.api.authentication.classes import JWTAuthentication
+from chats.apps.api.authentication.permissions import (
+    HasInternalAuthenticationPermission,
+)
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.api.v1.internal.rooms.filters import RoomFilter
 from chats.apps.api.v2.internal.rooms.serializers import RoomInternalListSerializerV2
@@ -25,7 +30,14 @@ class InternalListRoomsViewSetV2(viewsets.ReadOnlyModelViewSet):
     queryset = Room.objects.all()
     serializer_class = RoomInternalListSerializerV2
     lookup_field = "uuid"
-    permission_classes = [permissions.IsAuthenticated, ModuleHasPermission]
+    authentication_classes = [
+        JWTAuthentication
+    ] + api_settings.DEFAULT_AUTHENTICATION_CLASSES
+
+    def get_permissions(self):
+        if getattr(self.request, "jwt_payload", None):
+            return [HasInternalAuthenticationPermission()]
+        return [permissions.IsAuthenticated(), ModuleHasPermission()]
 
     filter_backends = [
         filters.OrderingFilter,
