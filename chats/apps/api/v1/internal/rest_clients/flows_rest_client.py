@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Callable, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Tuple
 
 import requests
 from django.conf import settings
@@ -15,7 +15,6 @@ from chats.apps.rooms.exceptions import (
     FlowsTicketerNotFoundError,
 )
 from chats.core.requests import get_request_session_with_retries
-
 
 if TYPE_CHECKING:
     from chats.apps.projects.models.models import Project
