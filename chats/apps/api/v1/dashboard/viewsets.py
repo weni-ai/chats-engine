@@ -67,7 +67,11 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
 
     @property
     def authentication_classes(self):
-        if getattr(self, "action", None) in ("time_metrics", "raw_data"):
+        if getattr(self, "action", None) in (
+            "time_metrics",
+            "time_metrics_for_analysis",
+            "raw_data",
+        ):
             classes = list(super().authentication_classes)
             if JWTAuthentication not in classes:
                 classes.insert(0, JWTAuthentication)
