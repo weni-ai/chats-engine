@@ -343,7 +343,7 @@ class RoomViewset(
             results = pinned_rooms + main_page
             next_offset = len(main_page)
         else:
-            main_page = list(main_qs[offset : offset + limit])
+            main_page = list(main_qs[offset : offset + limit])  # noqa: E203
             results = main_page
             next_offset = offset + len(main_page)
 
