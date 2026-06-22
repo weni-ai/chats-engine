@@ -323,10 +323,6 @@ class RoomViewset(
         main_qs = filtered_qs.exclude(pk__in=pinned_ids)
         self._pinned_ids_context = set(pinned_ids)
 
-        is_first_page = int(request.query_params.get("offset", 0)) == 0
-        if not is_first_page:
-            return self._get_paginated_response(main_qs)
-
         pin_order = {rid: idx for idx, rid in enumerate(pinned_ids)}
         pinned_rooms = sorted(
             qs.filter(pk__in=pinned_ids),
@@ -335,19 +331,34 @@ class RoomViewset(
 
         paginator = self.paginator
         limit = paginator.get_limit(request)
-        main_page_size = max(limit - len(pinned_rooms), 0)
+        offset = int(request.query_params.get("offset", 0))
+        is_first_page = offset == 0
 
         main_qs_count = main_qs.count()
-        main_page = list(main_qs[:main_page_size])
+        total_count = main_qs_count + len(pinned_rooms)
 
-        results = pinned_rooms + main_page
+        if is_first_page:
+            main_page_size = max(limit - len(pinned_rooms), 0)
+            main_page = list(main_qs[:main_page_size])
+            results = pinned_rooms + main_page
+            next_offset = len(main_page)
+        else:
+            main_page = list(main_qs[offset : offset + limit])
+            results = main_page
+            next_offset = offset + len(main_page)
+
         serializer = self.get_serializer(results, many=True)
 
-        total_count = main_qs_count + len(pinned_rooms)
-        offset = len(main_page)
         next_link = (
-            paginator.get_next_link_from_offset(request, offset, limit, total_count)
-            if offset < total_count
+            paginator.build_page_link(request, next_offset, limit, main_qs_count)
+            if next_offset < main_qs_count
+            else None
+        )
+        prev_link = (
+            paginator.build_page_link(
+                request, max(offset - limit, 0), limit, main_qs_count
+            )
+            if offset > 0
             else None
         )
 
@@ -357,7 +368,7 @@ class RoomViewset(
                     ("max_pin_limit", settings.MAX_ROOM_PINS_LIMIT),
                     ("count", total_count),
                     ("next", next_link),
-                    ("previous", None),
+                    ("previous", prev_link),
                     ("results", serializer.data),
                 ]
             )

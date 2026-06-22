@@ -26,7 +26,7 @@ class RoomListPagination(LimitOffsetPagination):
             )
         )
 
-    def get_next_link_from_offset(self, request, offset, limit, count):
+    def build_page_link(self, request, offset, limit, count):
         if offset >= count:
             return None
         url = self.get_base_url(request)
