@@ -118,7 +118,9 @@ class AutomaticMessagesService:
         if (
             room.queue.sector.is_automatic_message_active is False
             or not room.queue.sector.automatic_message_text
-            or hasattr(room, "automatic_message")
+            or room.automatic_messages.filter(
+                automatic_message_type=AutomaticMessageType.AUTOMATIC_OPEN
+            ).exists()
             or has_agent_messages
         ):
             logger.info(
