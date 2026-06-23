@@ -338,6 +338,12 @@ USE_APM = env.bool("USE_APM", default=False)
 if USE_APM:
     INSTALLED_APPS.append("elasticapm.contrib.django")
     MIDDLEWARE.insert(0, "elasticapm.contrib.django.middleware.TracingMiddleware")
+    # Sits right after the upstream TracingMiddleware so the active APM
+    # transaction is available when we copy its trace identifiers onto the
+    # outgoing response headers.
+    MIDDLEWARE.insert(
+        1, "chats.core.middleware.ElasticAPMTraceResponseHeaderMiddleware"
+    )
 
     ELASTIC_APM = {
         "SERVICE_NAME": env("APM_SERVICE_NAME", default="chats-production"),
@@ -345,6 +351,12 @@ if USE_APM:
         "SERVER_URL": env("APM_SERVER_URL"),
         "ENVIRONMENT": env("APM_SERVICE_ENVIRONMENT", default="production"),
         "DEBUG": env.bool("APM_SERVICE_DEBUG", default=False),
+        # Controls whether outgoing HTTP calls instrumented by the agent
+        # carry the legacy ``elastic-apm-traceparent`` header alongside the
+        # W3C ``traceparent``.
+        "USE_ELASTIC_TRACEPARENT_HEADER": env.bool(
+            "APM_USE_ELASTIC_TRACEPARENT_HEADER", default=True
+        ),
     }
 
 # mozilla-django-oidc
@@ -459,6 +471,19 @@ SWAGGER_SETTINGS = {
 # CORS CONFIG
 
 CORS_ORIGIN_ALLOW_ALL = True
+
+# Expose APM/distributed-tracing headers so browsers (DevTools, frontend SDKs)
+# can read the trace identifiers returned by the Elastic APM agent on every
+# response. Without this, cross-origin clients would have the headers stripped
+# by the browser.
+CORS_EXPOSE_HEADERS = env.list(
+    "CORS_EXPOSE_HEADERS",
+    default=[
+        "traceparent",
+        "tracestate",
+        "elastic-apm-traceparent",
+    ],
+)
 
 
 # Sentry configuration
