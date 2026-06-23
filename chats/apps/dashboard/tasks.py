@@ -940,12 +940,12 @@ def check_metric_goal_violations():
             )
 
 
-def _eligible_recipient_emails(goal: MetricGoal) -> list[str]:
+def _eligible_recipient_emails(goal: MetricGoal) -> List[str]:
     """Return the emails of recipients still eligible for notifications."""
     permissions = goal.recipients.select_related("user").prefetch_related(
         "sector_authorizations"
     )
-    emails: list[str] = []
+    emails: List[str] = []
     for permission in permissions:
         user = getattr(permission, "user", None)
         if not user or not user.email:
