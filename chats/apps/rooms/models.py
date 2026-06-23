@@ -919,6 +919,8 @@ class RoomPin(BaseModel):
         related_name="room_pins",
         verbose_name=_("project"),
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
     )
     created_on = models.DateTimeField(_("created on"), auto_now_add=True)
 
