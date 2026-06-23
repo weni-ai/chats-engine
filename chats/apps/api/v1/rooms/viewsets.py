@@ -1530,7 +1530,7 @@ class RoomNoteViewSet(
         if not room_uuid:
             raise ValidationError({"detail": "Room UUID is required"})
 
-        if not Room.objects.filter(uuid=room_uuid).exists():
+        if not self.queryset.filter(uuid=room_uuid).exists():
             raise ValidationError({"detail": "Room not found"})
 
         return super().list(request, *args, **kwargs)
