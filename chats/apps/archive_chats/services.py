@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from datetime import timedelta
 import json
 import logging
@@ -368,6 +369,10 @@ class ArchiveChatsService(BaseArchiveChatsService):
         return self._iter_messages(room)
 
     def _iter_messages(self, room: Room) -> Iterable[dict]:
+        medias_by_message = defaultdict(list)
+        for media in MessageMedia.objects.filter(message__room=room):
+            medias_by_message[media.message_id].append(media)
+
         messages = (
             Message.objects.filter(room=room)
             .select_related("automatic_message")
@@ -376,17 +381,14 @@ class ArchiveChatsService(BaseArchiveChatsService):
 
         for message in messages.iterator():
             message_context = {"media": []}
-            if message.medias.exists():
-                for media in message.medias.all():  # noqa
-                    url = self.process_media(media)
-                    media_data = {
+            for media in medias_by_message.get(message.pk, []):
+                url = self.process_media(media)
+                if url:
+                    message_context["media"].append({
                         "url": url,
                         "content_type": media.content_type,
                         "created_on": media.created_on.isoformat(),
-                    }
-
-                    if url:
-                        message_context["media"].append(media_data)
+                    })
 
             yield ArchiveMessageSerializer(message, context=message_context).data
 
