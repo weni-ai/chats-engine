@@ -268,6 +268,28 @@ class ProcessingResult:
     resolved: list[str]
 
 
+def _safe_call(
+    callback,
+    label: str,
+    project_uuid: str,
+    metric: str,
+    *args,
+) -> bool:
+    """Invoke ``callback`` when provided, logging failures.
+
+    Returns ``True`` only when the callback ran without raising. ``False``
+    when the callback is ``None`` or when it raised an exception.
+    """
+    if callback is None:
+        return False
+    try:
+        callback(*args)
+        return True
+    except Exception:  # noqa: BLE001
+        logger.exception(label, project_uuid, metric)
+        return False
+
+
 def process_violations(
     metric: str,
     *,
@@ -303,15 +325,13 @@ def process_violations(
 
         if is_new:
             new_alerts.append(violation)
-            if on_new_alert is not None:
-                try:
-                    on_new_alert(violation)
-                except Exception:  # noqa: BLE001
-                    logger.exception(
-                        "metric_goal: on_new_alert failed (project=%s metric=%s)",
-                        violation.project_uuid,
-                        metric,
-                    )
+            _safe_call(
+                on_new_alert,
+                "metric_goal: on_new_alert failed (project=%s metric=%s)",
+                violation.project_uuid,
+                metric,
+                violation,
+            )
 
             if (
                 on_email is not None
@@ -322,40 +342,36 @@ def process_violations(
                     metric,
                     email_cooldown_seconds,
                 )
+                and _safe_call(
+                    on_email,
+                    "metric_goal: on_email failed (project=%s metric=%s)",
+                    violation.project_uuid,
+                    metric,
+                    violation,
+                )
             ):
-                try:
-                    on_email(violation)
-                    emails_sent.append(violation)
-                except Exception:  # noqa: BLE001
-                    logger.exception(
-                        "metric_goal: on_email failed (project=%s metric=%s)",
-                        violation.project_uuid,
-                        metric,
-                    )
+                emails_sent.append(violation)
         else:
             updates.append(violation)
-            if on_update is not None:
-                try:
-                    on_update(violation)
-                except Exception:  # noqa: BLE001
-                    logger.exception(
-                        "metric_goal: on_update failed (project=%s metric=%s)",
-                        violation.project_uuid,
-                        metric,
-                    )
+            _safe_call(
+                on_update,
+                "metric_goal: on_update failed (project=%s metric=%s)",
+                violation.project_uuid,
+                metric,
+                violation,
+            )
 
     resolved_uuids = list(previously_violating - currently_violating)
     for project_uuid in resolved_uuids:
         _clear_state(redis_conn, project_uuid, metric)
-        if on_resolved is not None:
-            try:
-                on_resolved(project_uuid, metric)
-            except Exception:  # noqa: BLE001
-                logger.exception(
-                    "metric_goal: on_resolved failed (project=%s metric=%s)",
-                    project_uuid,
-                    metric,
-                )
+        _safe_call(
+            on_resolved,
+            "metric_goal: on_resolved failed (project=%s metric=%s)",
+            project_uuid,
+            metric,
+            project_uuid,
+            metric,
+        )
 
     logger.info(
         "metric_goal sweep: metric=%s new=%s updates=%s resolved=%s emails=%s",
