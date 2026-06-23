@@ -1,5 +1,4 @@
 import logging
-from collections import OrderedDict
 from datetime import datetime, timedelta
 
 from django.conf import settings
@@ -323,56 +322,21 @@ class RoomViewset(
         main_qs = filtered_qs.exclude(pk__in=pinned_ids)
         self._pinned_ids_context = set(pinned_ids)
 
-        pin_order = {rid: idx for idx, rid in enumerate(pinned_ids)}
-        pinned_rooms = sorted(
-            qs.filter(pk__in=pinned_ids),
-            key=lambda r: pin_order.get(r.pk, len(pinned_ids)),
-        )
+        response = self._get_paginated_response(main_qs)
 
-        paginator = self.paginator
-        limit = paginator.get_limit(request)
-        offset = int(request.query_params.get("offset", 0))
-        is_first_page = offset == 0
-
-        main_qs_count = main_qs.count()
-        total_count = main_qs_count + len(pinned_rooms)
-
-        if is_first_page:
-            main_page_size = max(limit - len(pinned_rooms), 0)
-            main_page = list(main_qs[:main_page_size])
-            results = pinned_rooms + main_page
-            next_offset = len(main_page)
+        include_pinned = request.query_params.get("include_pinned", "true")
+        if include_pinned.lower() == "true":
+            pin_order = {rid: idx for idx, rid in enumerate(pinned_ids)}
+            pinned_rooms = sorted(
+                qs.filter(pk__in=pinned_ids),
+                key=lambda r: pin_order.get(r.pk, len(pinned_ids)),
+            )
+            serializer = self.get_serializer(pinned_rooms, many=True)
+            response.data["pinned_rooms"] = serializer.data
         else:
-            main_page = list(main_qs[offset : offset + limit])  # noqa: E203
-            results = main_page
-            next_offset = offset + len(main_page)
+            response.data["pinned_rooms"] = []
 
-        serializer = self.get_serializer(results, many=True)
-
-        next_link = (
-            paginator.build_page_link(request, next_offset, limit, main_qs_count)
-            if next_offset < main_qs_count
-            else None
-        )
-        prev_link = (
-            paginator.build_page_link(
-                request, max(offset - limit, 0), limit, main_qs_count
-            )
-            if offset > 0
-            else None
-        )
-
-        return Response(
-            OrderedDict(
-                [
-                    ("max_pin_limit", settings.MAX_ROOM_PINS_LIMIT),
-                    ("count", total_count),
-                    ("next", next_link),
-                    ("previous", prev_link),
-                    ("results", serializer.data),
-                ]
-            )
-        )
+        return response
 
     def _get_paginated_response(self, queryset):
         page = self.paginate_queryset(queryset)
