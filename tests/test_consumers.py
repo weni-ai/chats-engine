@@ -3,10 +3,8 @@ from unittest import mock
 from django.test import SimpleTestCase
 
 from chats.apps.msgs.consumers.msg_consumer import MsgConsumer
-from chats.apps.projects.consumers.project_consumer import ProjectConsumer
-from chats.apps.projects.consumers.project_update_consumer import (
-    ProjectUpdateConsumer,
-)
+from chats.apps.projects.consumers.project_consumer import OldProjectConsumer
+from chats.apps.projects.consumers.project_update_consumer import ProjectUpdateConsumer
 from chats.apps.projects.consumers.sector_consumer import SectorConsumer
 
 
@@ -55,7 +53,7 @@ class MsgConsumerTests(SimpleTestCase):
         self.assertEqual(self.message.channel.acked, [1])
 
 
-class ProjectConsumerTests(SimpleTestCase):
+class OldProjectConsumerTests(SimpleTestCase):
     def setUp(self):
         self.message = DummyMessage(body=b"{}")
 
@@ -71,7 +69,7 @@ class ProjectConsumerTests(SimpleTestCase):
         self, mock_sector_handler, mock_proj_usecase_cls, _
     ):
         # Act
-        ProjectConsumer.consume(self.message)
+        OldProjectConsumer.consume(self.message)
 
         # Assert
         # Ensure the creation usecase was instantiated with the mocked sector handler
@@ -98,9 +96,7 @@ class ProjectUpdateConsumerTests(SimpleTestCase):
     @mock.patch(
         "chats.apps.projects.consumers.project_update_consumer.ProjectUpdateUseCase"
     )
-    def test_project_update_consumer_triggers_update(
-        self, mock_usecase_cls, _
-    ):
+    def test_project_update_consumer_triggers_update(self, mock_usecase_cls, _):
         ProjectUpdateConsumer.consume(self.message)
 
         mock_usecase_cls.assert_called_once()
@@ -117,9 +113,7 @@ class ProjectUpdateConsumerTests(SimpleTestCase):
     @mock.patch(
         "chats.apps.projects.consumers.project_update_consumer.ProjectUpdateUseCase"
     )
-    def test_project_update_consumer_with_partial_fields(
-        self, mock_usecase_cls, _
-    ):
+    def test_project_update_consumer_with_partial_fields(self, mock_usecase_cls, _):
         ProjectUpdateConsumer.consume(self.message)
 
         mock_usecase_cls.return_value.update_project.assert_called_once()
