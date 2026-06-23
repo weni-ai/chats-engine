@@ -1,4 +1,6 @@
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from chats.core.models import BaseModel
@@ -119,6 +121,17 @@ class MetricGoal(BaseModel):
         _("Rooms threshold count"),
         default=DEFAULT_ROOMS_THRESHOLD_COUNT,
     )
+    rooms_threshold_percent = models.PositiveSmallIntegerField(
+        _("Rooms threshold percent"),
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(100)],
+        help_text=_(
+            "When set, takes precedence over rooms_threshold_count and "
+            "represents the percentage of active rooms in violation "
+            "required to trigger the alert."
+        ),
+    )
     recipients = models.ManyToManyField(
         "projects.ProjectPermission",
         related_name="metric_goal_notifications",
@@ -134,6 +147,13 @@ class MetricGoal(BaseModel):
                 fields=["project", "metric"],
                 name="unique_project_metric_goal",
             )
+        ]
+        indexes = [
+            models.Index(
+                fields=["metric", "project"],
+                name="metric_goal_active_lookup_idx",
+                condition=Q(is_active=True),
+            ),
         ]
 
     def __str__(self):

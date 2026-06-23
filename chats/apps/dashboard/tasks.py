@@ -13,8 +13,15 @@ from django.core.files.base import ContentFile
 from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
 
-from chats.apps.dashboard.email_templates import get_report_ready_email
-from chats.apps.dashboard.models import ReportStatus, RoomMetrics
+from chats.apps.dashboard.email_templates import (
+    get_metric_goal_alert_email,
+    get_report_ready_email,
+)
+from chats.apps.dashboard.models import MetricGoal, ReportStatus, RoomMetrics
+from chats.apps.dashboard.services.metric_goal_alerts import (
+    Violation,
+    process_violations,
+)
 from chats.apps.dashboard.utils import (
     calculate_first_response_time,
     calculate_last_queue_waiting_time,
@@ -24,6 +31,7 @@ from chats.apps.projects.models import Project
 from chats.apps.rooms.models import Room
 from chats.celery import app
 from chats.core.storages import ExcelStorage
+from chats.utils.websockets import send_channels_group
 
 logger = logging.getLogger(__name__)
 
@@ -835,3 +843,181 @@ def process_pending_reports():
 
     except Exception as e:
         _handle_report_error(report, e, user_email)
+
+
+def _metric_goal_group(project_uuid: str) -> str:
+    return f"metric_goal_alerts:{project_uuid}"
+
+
+def _broadcast_metric_goal(call_type: str, action: str, content: dict) -> None:
+    """Send a metric goal event to the project's WebSocket group."""
+    project_uuid = content["project_uuid"]
+    send_channels_group(
+        group_name=_metric_goal_group(project_uuid),
+        call_type=call_type,
+        content=content,
+        action=action,
+    )
+
+
+def _broadcast_new_alert(violation: Violation) -> None:
+    payload = violation.as_broadcast_payload(state="violating")
+    payload["transition"] = "new"
+    _broadcast_metric_goal(
+        call_type="metric_goal_violated",
+        action="metric_goal.violated",
+        content=payload,
+    )
+
+
+def _broadcast_update(violation: Violation) -> None:
+    payload = violation.as_broadcast_payload(state="violating")
+    payload["transition"] = "update"
+    _broadcast_metric_goal(
+        call_type="metric_goal_update",
+        action="metric_goal.update",
+        content=payload,
+    )
+
+
+def _broadcast_resolved(project_uuid: str, metric: str) -> None:
+    payload = {
+        "project_uuid": project_uuid,
+        "metric": metric,
+        "state": "ok",
+        "detected_at": datetime.now(timezone.utc).isoformat(),
+    }
+    _broadcast_metric_goal(
+        call_type="metric_goal_resolved",
+        action="metric_goal.resolved",
+        content=payload,
+    )
+
+
+def _queue_metric_goal_email(violation: Violation) -> None:
+    """Hand off email delivery to a Celery worker so the sweep stays fast."""
+    send_metric_goal_email.delay(
+        project_uuid=violation.project_uuid,
+        metric=violation.metric,
+        violating_count=violation.violating_count,
+        threshold_seconds=violation.threshold_seconds,
+        max_value_seconds=violation.max_value_seconds,
+        rooms_threshold_count=violation.rooms_threshold_count,
+    )
+
+
+@app.task(name="check_metric_goal_violations")
+def check_metric_goal_violations():
+    """Sweep every configured metric and dispatch alerts.
+
+    Runs every 30 seconds via Celery beat. Each metric is processed
+    independently so a transient failure in one does not block the
+    others.
+    """
+    metrics = [
+        MetricGoal.METRIC_WAITING_TIME,
+        MetricGoal.METRIC_FIRST_RESPONSE_TIME,
+        MetricGoal.METRIC_CONVERSATION_DURATION,
+    ]
+    state_ttl = getattr(settings, "METRIC_GOAL_STATE_TTL_SECONDS", 30 * 60)
+    email_cooldown = getattr(
+        settings, "METRIC_GOAL_EMAIL_COOLDOWN_SECONDS", 15 * 60
+    )
+    for metric in metrics:
+        try:
+            process_violations(
+                metric,
+                state_ttl_seconds=state_ttl,
+                email_cooldown_seconds=email_cooldown,
+                on_new_alert=_broadcast_new_alert,
+                on_update=_broadcast_update,
+                on_resolved=_broadcast_resolved,
+                on_email=_queue_metric_goal_email,
+            )
+        except Exception:
+            logger.exception(
+                "metric_goal sweep failed for metric=%s", metric
+            )
+
+
+def _eligible_recipient_emails(goal: MetricGoal) -> List[str]:
+    """Return the emails of recipients still eligible for notifications."""
+    permissions = goal.recipients.select_related("user").prefetch_related(
+        "sector_authorizations"
+    )
+    emails: List[str] = []
+    for permission in permissions:
+        user = getattr(permission, "user", None)
+        if not user or not user.email:
+            continue
+        if permission.is_admin or permission.sector_authorizations.all():
+            emails.append(user.email)
+    return emails
+
+
+@app.task(name="send_metric_goal_email")
+def send_metric_goal_email(
+    project_uuid: str,
+    metric: str,
+    violating_count: int,
+    threshold_seconds: int,
+    max_value_seconds: int,
+    rooms_threshold_count: int,
+):
+    """Dispatch the violation email respecting per-goal opt-ins."""
+    try:
+        goal = (
+            MetricGoal.objects.select_related("project")
+            .get(project__uuid=project_uuid, metric=metric)
+        )
+    except MetricGoal.DoesNotExist:
+        logger.info(
+            "send_metric_goal_email: goal removed before send (%s, %s)",
+            project_uuid,
+            metric,
+        )
+        return
+
+    if not goal.is_active or not goal.email_enabled:
+        return
+
+    recipients = _eligible_recipient_emails(goal)
+    if not recipients:
+        return
+
+    project_name = goal.project.name
+    plain, html = get_metric_goal_alert_email(
+        project_name=project_name,
+        metric=metric,
+        violating_count=violating_count,
+        threshold_seconds=threshold_seconds,
+        max_value_seconds=max_value_seconds,
+        rooms_threshold_count=rooms_threshold_count,
+    )
+
+    subject = f"[Chats] Metric goal alert - {project_name}"
+    email = EmailMultiAlternatives(
+        subject=subject,
+        body=plain,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=recipients,
+    )
+    if html:
+        email.attach_alternative(html, "text/html")
+    email.extra_headers = {
+        "X-No-Track": "True",
+        "X-Track-Click": "no",
+        "o:tracking-clicks": "no",
+    }
+    try:
+        email.send(fail_silently=False)
+        logger.info(
+            "metric_goal_email sent project=%s metric=%s recipients=%s",
+            project_uuid,
+            metric,
+            len(recipients),
+        )
+    except Exception:
+        logger.exception(
+            "metric_goal_email failed project=%s metric=%s", project_uuid, metric
+        )

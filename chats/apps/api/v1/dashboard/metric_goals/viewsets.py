@@ -95,6 +95,9 @@ class MetricGoalActionsMixin:
                     "rooms_threshold_count",
                     MetricGoal.DEFAULT_ROOMS_THRESHOLD_COUNT,
                 ),
+                "rooms_threshold_percent": validated_data.get(
+                    "rooms_threshold_percent"
+                ),
             },
         )
 
