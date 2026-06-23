@@ -541,7 +541,20 @@ CELERY_BEAT_SCHEDULE = {
         "task": "check_inactivity_rooms",
         "schedule": crontab(minute="*"),
     },
+    "check-metric-goal-violations": {
+        "task": "check_metric_goal_violations",
+        "schedule": env.float(
+            "METRIC_GOAL_SWEEP_INTERVAL_SECONDS", default=30.0
+        ),
+    },
 }
+
+METRIC_GOAL_STATE_TTL_SECONDS = env.int(
+    "METRIC_GOAL_STATE_TTL_SECONDS", default=30 * 60
+)
+METRIC_GOAL_EMAIL_COOLDOWN_SECONDS = env.int(
+    "METRIC_GOAL_EMAIL_COOLDOWN_SECONDS", default=15 * 60
+)
 
 # Disable report emails unless explicitly enabled
 REPORTS_SEND_EMAILS = env.bool("REPORTS_SEND_EMAILS", default=True)

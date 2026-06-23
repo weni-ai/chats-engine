@@ -33,6 +33,7 @@ class MetricGoalReadSerializer(serializers.ModelSerializer):
             "is_active",
             "email_enabled",
             "rooms_threshold_count",
+            "rooms_threshold_percent",
             "recipients",
         ]
 
@@ -56,6 +57,12 @@ class MetricGoalWriteSerializer(serializers.Serializer):
     rooms_threshold_count = serializers.IntegerField(
         min_value=1,
         default=MetricGoal.DEFAULT_ROOMS_THRESHOLD_COUNT,
+    )
+    rooms_threshold_percent = serializers.IntegerField(
+        min_value=1,
+        max_value=100,
+        required=False,
+        allow_null=True,
     )
     recipients = MetricGoalRecipientWriteSerializer(many=True, required=False)
 
