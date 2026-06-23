@@ -191,8 +191,8 @@ class RoomViewsetListTests(TestCase):
         pinned_room = self._create_room("PINNED", user=self.other_user)
         regular_room = self._create_room("REGULAR", user=self.other_user)
 
-        RoomPin.objects.create(room=pinned_room, user=self.other_user)
-        RoomPin.objects.create(room=regular_room, user=self.request_user)
+        RoomPin.objects.create(room=pinned_room, user=self.other_user, project=self.project)
+        RoomPin.objects.create(room=regular_room, user=self.request_user, project=self.project)
 
         response = self._list({"email": self.other_user.email, "limit": 10})
 
@@ -210,7 +210,7 @@ class RoomViewsetListTests(TestCase):
             if i < 3:
                 pinned_rooms.append(room)
         RoomPin.objects.bulk_create(
-            [RoomPin(room=room, user=self.request_user) for room in pinned_rooms]
+            [RoomPin(room=room, user=self.request_user, project=self.project) for room in pinned_rooms]
         )
 
         params = {"project": str(self.project.pk), "limit": 50}
@@ -260,8 +260,8 @@ class RoomViewsetListTests(TestCase):
         inactive_pinned = self._create_room("INACTIVE-PINNED", is_active=False)
 
         # Pin both pinned rooms
-        RoomPin.objects.create(room=active_pinned, user=self.request_user)
-        RoomPin.objects.create(room=inactive_pinned, user=self.request_user)
+        RoomPin.objects.create(room=active_pinned, user=self.request_user, project=self.project)
+        RoomPin.objects.create(room=inactive_pinned, user=self.request_user, project=self.project)
 
         # Request only active rooms
         params = {
