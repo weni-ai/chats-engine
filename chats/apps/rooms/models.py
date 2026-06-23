@@ -750,6 +750,7 @@ class Room(BaseModel, BaseConfigurableModel):
         if (
             RoomPin.objects.filter(
                 user=user,
+                # TODO: Change to project once we have the project field populated
                 room__queue__sector__project=project,
                 room__is_active=True,
             ).count()
