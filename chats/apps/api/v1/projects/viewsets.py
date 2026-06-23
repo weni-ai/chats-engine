@@ -20,6 +20,7 @@ from chats.apps.api.authentication.classes import JWTAuthentication
 from chats.apps.api.authentication.permissions import (
     IsAuthenticatedOrHasInternalJWT,
 )
+from chats.apps.api.v1.dashboard.metric_goals.viewsets import MetricGoalActionsMixin
 from chats.apps.api.v1.internal.projects.serializers import (
     CheckAccessReadSerializer,
     ProjectPermissionReadSerializer,
@@ -76,6 +77,7 @@ logger = logging.getLogger(__name__)
 
 
 class ProjectViewset(
+    MetricGoalActionsMixin,
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
     mixins.UpdateModelMixin,
