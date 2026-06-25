@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.0/ref/settings/
 """
 
+import sys
 import os
 from pathlib import Path
 
@@ -79,6 +80,7 @@ INSTALLED_APPS = [
     "chats.apps.archive_chats",
     # third party apps
     "weni.feature_flags",  # weni-commons feature flags
+    # "weni.eda.django.eda_app",
     "channels",
     "drf_yasg",
     "django_filters",
@@ -561,9 +563,24 @@ CELERY_BEAT_MAX_LOOP_INTERVAL = 10
 
 USE_EDA = env.bool("USE_EDA", default=False)
 
+# TODO: Remove this once we permanently migrate to Weni EDA
+USE_WENI_EDA_FOR_PROJECTS = env.bool("USE_WENI_EDA_FOR_PROJECTS", default=False)
+
+EDA_CONSUMERS_HANDLES = {
+    "edaconsume": "chats.apps.event_driven.handle.handle_consumers",
+    "edaconsume_amq": "chats.apps.event_driven.handle_amq.handle_amq_consumers",
+    "msg_edaconsume": "chats.apps.event_driven.handle.handle_consumers",
+    "msg_edaconsume_amq": "chats.apps.event_driven.handle_amq.handle_amq_consumers",
+}
+
 if USE_EDA:
     EDA_CONNECTION_BACKEND = "chats.apps.event_driven.backends.PyAMQPConnectionBackend"
-    EDA_CONSUMERS_HANDLE = "chats.apps.event_driven.handle.handle_consumers"
+    EDA_CONSUMERS_HANDLE_LEGACY = "chats.apps.event_driven.handle.handle_consumers"
+
+    _command = sys.argv[1] if len(sys.argv) > 1 else None
+    EDA_CONSUMERS_HANDLE = EDA_CONSUMERS_HANDLES.get(
+        _command, EDA_CONSUMERS_HANDLES["edaconsume"]
+    )
 
     EDA_BROKER_HOST = env("EDA_BROKER_HOST", default="localhost")
     EDA_VIRTUAL_HOST = env("EDA_VIRTUAL_HOST", default="/")
@@ -571,6 +588,20 @@ if USE_EDA:
     EDA_BROKER_USER = env("EDA_BROKER_USER", default="guest")
     EDA_BROKER_PASSWORD = env("EDA_BROKER_PASSWORD", default="guest")
     EDA_WAIT_TIME_RETRY = env.int("EDA_WAIT_TIME_RETRY", default=5)
+
+    # TEMPORARY[EDA Migration]: Connection params for the new Amazon MQ broker,
+    # consumed by weni.eda's AMQConnectionParamsFactory. Remove once the
+    # migration to Weni EDA is complete and EDA_* points to the new broker.
+    AMQ_BROKER_HOST = env.str("AMQ_BROKER_HOST", default="localhost:5672")
+    AMQ_BROKER_USER = env.str("AMQ_BROKER_USER", default="guest")
+    AMQ_BROKER_PASSWORD = env.str("AMQ_BROKER_PASSWORD", default="guest")
+    AMQ_VIRTUAL_HOST = env.str("AMQ_VIRTUAL_HOST", default="/")
+
+    # Queue name for the project creation consumer on the new Amazon MQ broker.
+    # Override via env if the cloud configures a different queue name.
+    PROJECT_AMQ_QUEUE_NAME = env.str(
+        "PROJECT_AMQ_QUEUE_NAME", default="chats.projects.queue"
+    )
 
     FLOWS_TICKETER_EXCHANGE = env("FLOWS_TICKETER_EXCHANGE", default="sectors.topic")
     FLOWS_QUEUE_EXCHANGE = env("FLOWS_QUEUE_EXCHANGE", default="queues.topic")
