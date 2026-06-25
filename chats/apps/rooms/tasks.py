@@ -95,24 +95,63 @@ def check_inactivity_rooms():
     Runs `warn_inactive_rooms` and `close_inactive_rooms` every tick. Each
     step is wrapped in its own try/except so that a failure in the warning
     pass does not prevent the closure pass from executing on this tick.
+
+    Guarded by a Redis lock so two beats can never process the same eligible
+    rooms in parallel — if a previous tick still holds the lock, the new
+    tick exits early and waits for the next schedule slot. The lock has a
+    safety TTL so a crashed worker cannot keep the lock forever.
     """
+    from django_redis import get_redis_connection
+
     from chats.apps.rooms.usecases.inactivity import InactivityService
 
-    service = InactivityService()
+    redis_conn = get_redis_connection("default")
+    lock = redis_conn.lock(
+        settings.INACTIVITY_TASK_LOCK_NAME,
+        timeout=settings.INACTIVITY_TASK_LOCK_TIMEOUT,
+    )
+
+    acquired = lock.acquire(blocking=False)
+    if not acquired:
+        logger.info(
+            "[INACTIVITY TASK] another execution is in progress (lock %s held), "
+            "skipping this tick",
+            settings.INACTIVITY_TASK_LOCK_NAME,
+        )
+        return
 
     try:
-        warned = service.warn_inactive_rooms()
-        logger.info("[INACTIVITY TASK] warn_inactive_rooms processed %s rooms", warned)
-    except Exception as exc:
-        logger.exception("[INACTIVITY TASK] warn_inactive_rooms failed: %s", exc)
-        capture_exception(exc)
+        service = InactivityService()
 
-    try:
-        closed = service.close_inactive_rooms()
-        logger.info("[INACTIVITY TASK] close_inactive_rooms processed %s rooms", closed)
-    except Exception as exc:
-        logger.exception("[INACTIVITY TASK] close_inactive_rooms failed: %s", exc)
-        capture_exception(exc)
+        try:
+            warned = service.warn_inactive_rooms()
+            logger.info(
+                "[INACTIVITY TASK] warn_inactive_rooms processed %s rooms", warned
+            )
+        except Exception as exc:
+            logger.exception("[INACTIVITY TASK] warn_inactive_rooms failed: %s", exc)
+            capture_exception(exc)
+
+        try:
+            closed = service.close_inactive_rooms()
+            logger.info(
+                "[INACTIVITY TASK] close_inactive_rooms processed %s rooms", closed
+            )
+        except Exception as exc:
+            logger.exception("[INACTIVITY TASK] close_inactive_rooms failed: %s", exc)
+            capture_exception(exc)
+    finally:
+        try:
+            lock.release()
+        except Exception as exc:
+            # Release can fail if the lock TTL already expired and another
+            # worker re-acquired it; that is a benign race we should log but
+            # not treat as fatal — the next tick will run normally.
+            logger.warning(
+                "[INACTIVITY TASK] failed to release lock %s: %s",
+                settings.INACTIVITY_TASK_LOCK_NAME,
+                exc,
+            )
 
 
 # ---------------------------------------------------------------------------
