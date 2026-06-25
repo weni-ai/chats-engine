@@ -76,12 +76,12 @@ def _send_silent_automatic_message(
     message_type: Optional[str] = None,
 ) -> Optional[Message]:
     """
-    Creates an automatic message on the room WITHOUT updating
-    `last_interaction` / `last_message_*` fields.
+    Creates an automatic message on the room and updates the
+    `last_message*` fields (via the standard ``update_last_message``)
+    so REST and WebSocket payloads reflect the actual latest message.
 
-    The inactivity feature requires that the warning and closure messages do
-    not reset the inactivity counter, so they can't go through the regular
-    `room.update_last_message` flow.
+    `last_interaction` is intentionally left unchanged — it anchors the
+    inactivity timer to the last real conversation turn.
 
     `message_type` classifies the automatic message (e.g. `inactive_warning`
     or `inactive_close`) so the front can render a specific UI for each.
@@ -103,6 +103,13 @@ def _send_silent_automatic_message(
                     room=room,
                     automatic_message_type=message_type,
                 )
+
+            room.update_last_message(
+                message=message,
+                user=user,
+                update_last_interaction=False,
+            )
+
             transaction.on_commit(lambda: message.notify_room("create", True))
             return message
     except Exception as exc:
@@ -137,7 +144,6 @@ def _eligible_warn_queryset():
         is_waiting=False,
         user__isnull=False,
         last_message_user__isnull=False,
-        last_message__automatic_message__isnull=True,
         queue__sector__inactivity_timeout__is_message_timeout_enabled=True,
     ).select_related("queue__sector", "user")
 
@@ -156,7 +162,6 @@ def _eligible_close_queryset():
         is_waiting=False,
         user__isnull=False,
         last_message_user__isnull=False,
-        last_message__automatic_message__isnull=True,
         queue__sector__inactivity_timeout__is_close_room_enabled=True,
     ).select_related("queue__sector", "user")
 
@@ -339,9 +344,12 @@ class InactivityService:
             )
             capture_exception(exc)
 
-        # Mark `automatic_closed=True` BEFORE `room.close()` so the flag is
-        # persisted in the same `save()` call and visible to any post-close
-        # signal/consumer.
+        # Refresh from DB so the in-memory instance picks up
+        # `last_message*` fields written by `update_last_message` via
+        # queryset `.update()`. Without this, `room.close()` → `save()`
+        # would overwrite those columns with stale in-memory values.
+        room.refresh_from_db()
+
         room.automatic_closed = True
 
         try:
