@@ -1,10 +1,13 @@
+import io
 import logging
 from datetime import datetime
 
+import magic
 from django.conf import settings
 from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from pydub import AudioSegment
 from rest_framework import serializers
 
 from chats.apps.accounts.models import User
@@ -21,10 +24,58 @@ from chats.apps.history.filters.rooms_filter import (
     get_history_rooms_queryset_by_contact,
 )
 from chats.apps.queues.models import Queue
-from chats.apps.rooms.models import Room, RoomNote, RoomPin
+from chats.apps.rooms.models import Room, RoomNote, RoomNoteMedia, RoomPin
+from chats.apps.rooms.usecases.inactivity import is_inactivity_feature_active
+from chats.apps.sectors.constants import get_default_inactivity_timeout
 from chats.apps.sectors.models import SectorTag
 
 logger = logging.getLogger(__name__)
+
+
+def _get_room_project_uuid(room: Room):
+    try:
+        return str(room.queue.sector.project.uuid)
+    except AttributeError:
+        return None
+
+
+def _is_room_inactivity_feature_active(room: Room) -> bool:
+    return is_inactivity_feature_active(_get_room_project_uuid(room))
+
+
+def _is_inactivity_feature_active_from_context(context: dict, room: Room) -> bool:
+    """
+    Prefers the `inactivity_feature_active` flag pre-computed by the viewset
+    (avoids calling the feature-flag service once per room in list endpoints).
+    Falls back to a per-room evaluation when the context does not provide it
+    (e.g. when the serializer is used outside `RoomViewset.list`).
+    """
+    cached = context.get("inactivity_feature_active") if context else None
+    if cached is not None:
+        return cached
+    return _is_room_inactivity_feature_active(room)
+
+
+def _get_room_inactivity_timeout_time(room: Room, context: dict = None) -> int:
+    """
+    Returns the inactivity warning timeout (in seconds) configured for the
+    room's sector, falling back to the default when not configured.
+
+    Returns 0 when the inactivity feature flag is disabled for the project,
+    so the front-end skips the inactivity timer for that room.
+    """
+    if not _is_inactivity_feature_active_from_context(context or {}, room):
+        return 0
+
+    try:
+        sector_config = room.queue.sector.inactivity_timeout
+    except AttributeError:
+        sector_config = None
+
+    if sector_config and sector_config.get("message_timeout_time"):
+        return sector_config["message_timeout_time"]
+
+    return get_default_inactivity_timeout()["message_timeout_time"]
 
 
 class RoomMessageStatusSerializer(serializers.Serializer):
@@ -89,6 +140,8 @@ class RoomSerializer(serializers.ModelSerializer):
     imported_history_url = serializers.CharField(read_only=True, default="")
     added_to_queue_at = serializers.DateTimeField(read_only=True)
     has_history = serializers.SerializerMethodField()
+    inactivity_timeout_time = serializers.SerializerMethodField()
+    is_inactive = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -108,8 +161,10 @@ class RoomSerializer(serializers.ModelSerializer):
             "flowstart_data",
             "has_history",
             "imported_history_url",
+            "inactivity_timeout_time",
             "is_24h_valid",
             "is_active",
+            "is_inactive",
             "is_waiting",
             "last_interaction",
             "last_message",
@@ -212,6 +267,17 @@ class RoomSerializer(serializers.ModelSerializer):
             room.contact, user, room.queue.sector.project
         ).exists()
 
+    def get_inactivity_timeout_time(self, room: Room) -> int:
+        return _get_room_inactivity_timeout_time(room, self.context)
+
+    def get_is_inactive(self, room: Room) -> bool:
+        # Hide stale `is_inactive` values when the feature flag is off, so
+        # the front-end never renders an inactivity alert for projects that
+        # opted out of the feature.
+        if not _is_inactivity_feature_active_from_context(self.context, room):
+            return False
+        return bool(room.is_inactive)
+
 
 class ListRoomSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
@@ -231,6 +297,8 @@ class ListRoomSerializer(serializers.ModelSerializer):
     is_pinned = serializers.SerializerMethodField()
     added_to_queue_at = serializers.DateTimeField(read_only=True)
     has_history = serializers.SerializerMethodField()
+    inactivity_timeout_time = serializers.SerializerMethodField()
+    is_inactive = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -251,6 +319,8 @@ class ListRoomSerializer(serializers.ModelSerializer):
             "protocol",
             "service_chat",
             "is_active",
+            "is_inactive",
+            "inactivity_timeout_time",
             "config",
             "imported_history_url",
             "is_pinned",
@@ -318,6 +388,13 @@ class ListRoomSerializer(serializers.ModelSerializer):
         }
 
     def get_is_pinned(self, room: Room) -> bool:
+        # The list queryset annotates ``is_pinned`` (see RoomViewset), so the
+        # value is read straight from the instance and the per-room query below
+        # is skipped, avoiding an N+1 during listing.
+        annotated = getattr(room, "is_pinned", None)
+        if annotated is not None:
+            return bool(annotated)
+
         request = self.context.get("request")
 
         if not request:
@@ -357,6 +434,14 @@ class ListRoomSerializer(serializers.ModelSerializer):
             return room_24h_valid
 
         return None
+
+    def get_inactivity_timeout_time(self, room: Room) -> int:
+        return _get_room_inactivity_timeout_time(room, self.context)
+
+    def get_is_inactive(self, room: Room) -> bool:
+        if not _is_inactivity_feature_active_from_context(self.context, room):
+            return False
+        return bool(room.is_inactive)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -584,6 +669,42 @@ class RoomsReportSerializer(serializers.Serializer):
     filters = RoomsReportFiltersSerializer(required=True)
 
 
+class RoomExportRequestSerializer(serializers.Serializer):
+    """Serializer for the room export request body."""
+
+    SUPPORTED_TYPES = ("html", "pdf")
+
+    room = serializers.UUIDField(required=True)
+    types = serializers.ListField(
+        child=serializers.CharField(),
+        required=True,
+        min_length=1,
+    )
+
+    def validate_types(self, value):
+        normalized = []
+        seen = set()
+        for raw in value:
+            if not raw:
+                continue
+            item = raw.lower()
+            if item not in self.SUPPORTED_TYPES:
+                raise serializers.ValidationError(
+                    _("Unsupported export format: %(value)s") % {"value": raw}
+                )
+            if item in seen:
+                continue
+            seen.add(item)
+            normalized.append(item)
+
+        if not normalized:
+            raise serializers.ValidationError(
+                _("At least one export format is required")
+            )
+
+        return normalized
+
+
 class PinRoomSerializer(serializers.Serializer):
     """
     Serializer for the pin room.
@@ -651,6 +772,81 @@ class RemoveRoomTagSerializer(AddOrRemoveTagFromRoomSerializer):
         return attrs
 
 
+class RoomNoteMediaSimpleSerializer(serializers.ModelSerializer):
+    """
+    Read-only serializer used to nest medias inside a room note.
+    """
+
+    url = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = RoomNoteMedia
+        fields = ["content_type", "url", "created_on"]
+        ref_name = "V1RoomNoteMediaSimpleSerializer"
+
+    def get_url(self, media: RoomNoteMedia):
+        return media.url
+
+
+class RoomNoteMediaSerializer(serializers.ModelSerializer):
+    """
+    Serializer for room note medias, used on the media CRUD endpoint.
+    """
+
+    url = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = RoomNoteMedia
+        fields = [
+            "uuid",
+            "note",
+            "content_type",
+            "media_file",
+            "url",
+            "created_on",
+        ]
+        extra_kwargs = {
+            "media_file": {"write_only": True},
+        }
+
+    def get_url(self, media: RoomNoteMedia):
+        return media.url
+
+    def validate(self, attrs):
+        note = attrs.get("note")
+        if note and note.medias.count() >= 10:
+            raise serializers.ValidationError(
+                {"detail": "Internal notes can't have more than 10 media files"}
+            )
+        return super().validate(attrs)
+
+    def create(self, validated_data):
+        media = validated_data["media_file"]
+        file_bytes = media.file.read()
+        file_type = magic.from_buffer(file_bytes, mime=True)
+        if file_type in settings.FILE_CHECK_CONTENT_TYPE:
+            file_type = media.name[-3:]
+        if (
+            file_type.startswith("audio")
+            or file_type.lower() in settings.UNPERMITTED_AUDIO_TYPES
+        ):
+            export_conf = {"format": settings.AUDIO_TYPE_TO_CONVERT}
+            if settings.AUDIO_CODEC_TO_CONVERT != "":
+                export_conf["codec"] = settings.AUDIO_CODEC_TO_CONVERT
+
+            converted_bytes = io.BytesIO()
+            AudioSegment.from_file(io.BytesIO(file_bytes)).export(
+                converted_bytes, **export_conf
+            )
+
+            media.file = converted_bytes
+            media.name = media.name[:-3] + settings.AUDIO_EXTENSION_TO_CONVERT
+            file_type = magic.from_buffer(converted_bytes.read(), mime=True)
+
+        validated_data["content_type"] = file_type
+        return super().create(validated_data)
+
+
 class RoomNoteSerializer(serializers.ModelSerializer):
     """
     Serializer for room notes
@@ -658,11 +854,12 @@ class RoomNoteSerializer(serializers.ModelSerializer):
 
     user = serializers.SerializerMethodField()
     is_deletable = serializers.ReadOnlyField()
+    media = RoomNoteMediaSimpleSerializer(many=True, read_only=True, source="medias")
 
     class Meta:
         model = RoomNote
-        fields = ["uuid", "created_on", "user", "text", "is_deletable"]
-        read_only_fields = ["uuid", "created_on", "user", "is_deletable"]
+        fields = ["uuid", "created_on", "user", "text", "is_deletable", "media"]
+        read_only_fields = ["uuid", "created_on", "user", "is_deletable", "media"]
 
     def get_user(self, obj):
         return {

@@ -8,10 +8,11 @@ from django.db.models import (
     Case,
     Count,
     DateTimeField,
-    Exists,
+    IntegerField,
     OuterRef,
     Q,
     Subquery,
+    Value,
     When,
 )
 from django.shortcuts import get_object_or_404
@@ -20,7 +21,8 @@ from django.utils.timezone import make_aware
 from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
-from rest_framework import filters, mixins, permissions, status
+from pydub.exceptions import CouldntDecodeError
+from rest_framework import mixins, parsers, permissions, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.filters import OrderingFilter
@@ -40,6 +42,7 @@ from chats.apps.ai_features.history_summary.models import (
     HistorySummary,
     HistorySummaryStatus,
 )
+from chats.apps.api.pagination import CustomCursorPagination
 from chats.apps.api.utils import verify_user_room
 from chats.apps.api.v1 import permissions as api_permissions
 from chats.apps.api.v1.internal.rest_clients.openai_rest_client import OpenAIClient
@@ -48,6 +51,7 @@ from chats.apps.api.v1.rooms import filters as room_filters
 from chats.apps.api.v1.rooms.pagination import RoomListPagination
 from chats.apps.api.v1.rooms.permissions import (
     CanAddOrRemoveRoomTagPermission,
+    RoomNoteMediaPermission,
     RoomNotePermission,
 )
 from chats.apps.api.v1.rooms.serializers import (
@@ -58,10 +62,12 @@ from chats.apps.api.v1.rooms.serializers import (
     ListRoomSerializer,
     PinRoomSerializer,
     RemoveRoomTagSerializer,
+    RoomExportRequestSerializer,
     RoomHistorySummaryFeedbackSerializer,
     RoomHistorySummarySerializer,
     RoomInfoSerializer,
     RoomMessageStatusSerializer,
+    RoomNoteMediaSerializer,
     RoomNoteSerializer,
     RoomsCountByQueueQueryParamsSerializer,
     RoomsCountByQueueResponseSerializer,
@@ -77,7 +83,7 @@ from chats.apps.api.v1.rooms.services.bulk_transfer_service import BulkTransferS
 from chats.apps.api.v1.rooms.services.rooms_count_by_queue_service import (
     RoomsCountByQueueService,
 )
-from chats.apps.dashboard.models import RoomMetrics
+from chats.apps.dashboard.models import ReportStatus, RoomMetrics
 from chats.apps.dashboard.utils import calculate_last_queue_waiting_time
 from chats.apps.msgs.models import Message
 from chats.apps.projects.models.models import Project, ProjectPermission
@@ -91,9 +97,9 @@ from chats.apps.rooms.exceptions import (
     RoomIsNotActiveError,
 )
 from chats.apps.rooms.flows_ticketer_service import change_ticketer_for_room
-from chats.apps.rooms.models import Room, RoomNote, RoomPin
+from chats.apps.rooms.models import Room, RoomNote, RoomNoteMedia, RoomPin
 from chats.apps.rooms.services import RoomsReportService
-from chats.apps.rooms.tasks import generate_rooms_report
+from chats.apps.rooms.tasks import generate_room_export, generate_rooms_report
 from chats.apps.rooms.utils import create_transfer_json
 from chats.apps.rooms.views import (
     close_room,
@@ -103,6 +109,7 @@ from chats.apps.rooms.views import (
     update_flows_custom_fields,
 )
 from chats.apps.sectors.models import SectorTag
+from chats.core.filters import PhoneAwareSearchFilter
 from chats.core.permissions import GetPermission
 
 logger = logging.getLogger(__name__)
@@ -119,7 +126,7 @@ class RoomViewset(
     serializer_class = RoomSerializer
     filter_backends = [
         DjangoFilterBackend,
-        filters.SearchFilter,
+        PhoneAwareSearchFilter,
         OrderingFilter,
     ]
     filterset_class = room_filters.RoomFilter
@@ -152,13 +159,16 @@ class RoomViewset(
     ):  # TODO: sparate list and retrieve queries from update and close
         if self.action != "list":
             self.filterset_class = None
-        qs = (
-            super()
-            .get_queryset()
-            .filter(queue__sector__project__permissions__user=self.request.user)
-        )
 
-        qs = qs.select_related("user", "contact", "queue", "queue__sector")
+        user_projects = ProjectPermission.objects.filter(
+            user=self.request.user
+        ).values_list("project", flat=True)
+
+        qs = super().get_queryset().filter(queue__sector__project__in=user_projects)
+
+        qs = qs.select_related(
+            "user", "contact", "queue", "queue__sector", "queue__sector__project"
+        )
 
         return qs
 
@@ -172,6 +182,11 @@ class RoomViewset(
     def get_serializer_context(self):
         context = super().get_serializer_context()
         context["disable_has_history"] = getattr(self, "disable_has_history", False)
+        # Evaluated once per request (see `list`); fallback to None so the
+        # serializer falls back to per-room evaluation in other actions.
+        context["inactivity_feature_active"] = getattr(
+            self, "inactivity_feature_active", None
+        )
         return context
 
     def list(self, request, *args, **kwargs):
@@ -185,6 +200,7 @@ class RoomViewset(
         room_status = request.query_params.get("room_status", None)
 
         self.disable_has_history = False
+        self.inactivity_feature_active = None
 
         if (
             not project
@@ -211,6 +227,16 @@ class RoomViewset(
                     str(project_instance.uuid),
                 ):
                     self.disable_has_history = True
+
+                # Evaluate the inactivity feature flag once per request so the
+                # serializer does not re-evaluate it for every room in the list.
+                from chats.apps.rooms.usecases.inactivity import (
+                    is_inactivity_feature_active,
+                )
+
+                self.inactivity_feature_active = is_inactivity_feature_active(
+                    str(project_instance.uuid)
+                )
 
         if use_pins_optimization:
             return self._list_with_optimized_pin_order(qs, request, project)
@@ -271,65 +297,55 @@ class RoomViewset(
         return self._get_paginated_response(annotated_qs)
 
     def _list_with_optimized_pin_order(self, qs, request, project):
-        target_pins_queryset = RoomPin.objects.filter(
-            room__queue__sector__project=project,
-        )
+        # The pin limit is capped at ``MAX_ROOM_PINS_LIMIT`` (3) per user, so the
+        # pinned rooms form a tiny, bounded set. We resolve them with a single
+        # small query and reuse the resulting ids as constant literals, avoiding
+        # the correlated subqueries / full-PK materialization of the other paths.
+        pins_query = {"room__queue__sector__project": project, "room__is_active": True}
 
         if user_email := request.query_params.get("email"):
-            target_pins_queryset = target_pins_queryset.filter(user__email=user_email)
+            pins_query["user__email"] = user_email
         else:
-            target_pins_queryset = target_pins_queryset.filter(user=request.user)
+            pins_query["user"] = request.user
 
-        annotation_pins_queryset = RoomPin.objects.filter(
-            room__queue__sector__project=project,
-        )
-        if user_email:
-            annotation_pins_queryset = annotation_pins_queryset.filter(
-                user__email=user_email
-            )
-        else:
-            annotation_pins_queryset = annotation_pins_queryset.filter(
-                user=request.user
-            )
-
-        pin_subquery = annotation_pins_queryset.filter(room=OuterRef("pk")).order_by(
-            "-created_on"
-        )
-        target_pin_subquery = target_pins_queryset.filter(room=OuterRef("pk")).order_by(
-            "-created_on"
+        # Ordered most-recent-first so the list index doubles as the pin rank.
+        pinned_ids = list(
+            RoomPin.objects.filter(**pins_query)
+            .order_by("-created_on")
+            .values_list("room_id", flat=True)
         )
 
-        annotated_qs = qs.annotate(
-            is_pinned=Exists(pin_subquery),
-            pin_created_on=Subquery(
-                pin_subquery.values("created_on")[:1],
-                output_field=DateTimeField(),
-            ),
-            list_is_pinned=Exists(target_pin_subquery),
-            list_pin_created_on=Subquery(
-                target_pin_subquery.values("created_on")[:1],
-                output_field=DateTimeField(),
-            ),
-        )
-
-        filtered_qs = self.filter_queryset(annotated_qs)
-        filtered_room_ids = filtered_qs.values("pk").order_by()
-
+        filtered_qs = self.filter_queryset(qs)
         secondary_sort = list(filtered_qs.query.order_by or self.ordering or [])
 
-        pinned_room_subquery = target_pins_queryset.values("room_id")
+        if not pinned_ids:
+            return self._get_paginated_response(filtered_qs)
 
-        combined_qs = annotated_qs.filter(
-            Q(pk__in=Subquery(filtered_room_ids))
-            | Q(pk__in=Subquery(pinned_room_subquery))
-        ).distinct()
+        # Pinned rooms must always appear at the top, even if other active
+        # filters (queue, sector, search) would otherwise exclude them. The
+        # filtered set is referenced as a subquery (never pulled into Python)
+        # and the pinned ids are a literal list of at most 3 elements.
+        combined_qs = qs.filter(
+            Q(pk__in=Subquery(filtered_qs.values("pk"))) | Q(pk__in=pinned_ids)
+        )
 
-        if secondary_sort:
-            combined_qs = combined_qs.order_by(
-                "-is_pinned", "-pin_created_on", *secondary_sort
-            )
-        else:
-            combined_qs = combined_qs.order_by("-is_pinned", "-pin_created_on")
+        pin_rank_whens = [
+            When(pk=room_id, then=Value(index))
+            for index, room_id in enumerate(pinned_ids)
+        ]
+
+        combined_qs = combined_qs.annotate(
+            is_pinned=Case(
+                When(pk__in=pinned_ids, then=Value(True)),
+                default=Value(False),
+                output_field=BooleanField(),
+            ),
+            pin_rank=Case(
+                *pin_rank_whens,
+                default=Value(len(pinned_ids)),
+                output_field=IntegerField(),
+            ),
+        ).order_by("pin_rank", *secondary_sort)
 
         return self._get_paginated_response(combined_qs)
 
@@ -1398,6 +1414,75 @@ class RoomsReportViewSet(APIView):
         )
 
 
+class RoomReportViewSet(APIView):
+    """Generates a conversation export for a closed room and emails the result."""
+
+    swagger_tag = "Rooms"
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request: Request, *args, **kwargs) -> Response:
+        serializer = RoomExportRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        room_uuid = serializer.validated_data["room"]
+        types = serializer.validated_data["types"]
+
+        room = (
+            Room.objects.select_related("queue__sector__project")
+            .filter(uuid=room_uuid)
+            .first()
+        )
+        if not room:
+            raise NotFound(_("Room not found"))
+
+        if room.is_active:
+            raise ValidationError({"room": _("Only closed rooms can be exported")})
+
+        if not room.can_retrieve(request.user):
+            raise PermissionDenied(_("You do not have permission to export this room"))
+
+        active_export_exists = ReportStatus.objects.filter(
+            room=room,
+            report_type=ReportStatus.REPORT_TYPE_ROOM_EXPORT,
+            status__in=["pending", "in_progress"],
+        ).exists()
+        if active_export_exists:
+            return Response(
+                {
+                    "error": {
+                        "code": "export_in_progress",
+                        "message": "An export is already being generated for this room.",
+                    }
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        report_status = ReportStatus.objects.create(
+            project=room.queue.sector.project,
+            user=request.user,
+            room=room,
+            report_type=ReportStatus.REPORT_TYPE_ROOM_EXPORT,
+            fields_config={"types": types},
+        )
+
+        generate_room_export.delay(str(report_status.uuid))
+
+        logger.info(
+            "Room export requested | room=%s | report=%s | user=%s",
+            room.uuid,
+            report_status.uuid,
+            request.user.email,
+        )
+
+        return Response(
+            {
+                "report_uuid": str(report_status.uuid),
+                "detail": "The export will be sent to your email when ready.",
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+
 class RoomNoteViewSet(
     mixins.ListModelMixin,
     mixins.DestroyModelMixin,
@@ -1445,7 +1530,7 @@ class RoomNoteViewSet(
         if not room_uuid:
             raise ValidationError({"detail": "Room UUID is required"})
 
-        if not Room.objects.filter(uuid=room_uuid).exists():
+        if not self.queryset.filter(uuid=room_uuid).exists():
             raise ValidationError({"detail": "Room not found"})
 
         return super().list(request, *args, **kwargs)
@@ -1471,6 +1556,63 @@ class RoomNoteViewSet(
         note.notify_websocket("delete")
 
         return super().destroy(request, *args, **kwargs)
+
+
+class RoomNoteMediaViewset(
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    GenericViewSet,
+):
+    """
+    ViewSet for Room Note Medias.
+
+    Mirrors the message media viewset, allowing agents to upload and list
+    medias attached to a room internal note.
+    """
+
+    swagger_tag = "Rooms"
+    queryset = RoomNoteMedia.objects.all()
+    serializer_class = RoomNoteMediaSerializer
+    filter_backends = [OrderingFilter, DjangoFilterBackend]
+    filterset_class = room_filters.RoomNoteMediaFilter
+    parser_classes = [parsers.MultiPartParser]
+    permission_classes = [IsAuthenticated, RoomNoteMediaPermission]
+    pagination_class = CustomCursorPagination
+    lookup_field = "uuid"
+    ordering = "created_on"
+    ordering_fields = ["created_on", "content_type"]
+
+    def get_queryset(self):
+        if self.request.query_params.get("room") or self.request.query_params.get(
+            "project"
+        ):
+            return super().get_queryset()
+        return self.queryset.none()
+
+    def create(self, request, *args, **kwargs):
+        try:
+            return super().create(request, *args, **kwargs)
+        except CouldntDecodeError:
+            return Response(
+                {
+                    "detail": "Could not decode audio file, possibility of corrupted file",
+                    "status": "error",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+    def perform_create(self, serializer):
+        with transaction.atomic():
+            serializer.save()
+            instance = serializer.instance
+            note = instance.note
+
+            # Re-notify the related message so clients receive the note with
+            # its updated medias.
+            if note.message:
+                note.message.notify_room("update", True)
+            else:
+                note.notify_websocket("create")
 
 
 class RoomsCountView(APIView):

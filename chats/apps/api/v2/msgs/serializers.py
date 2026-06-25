@@ -99,6 +99,7 @@ class MessageSerializerV2(serializers.ModelSerializer):
             "is_delivered",
             "internal_note",
             "is_automatic_message",
+            "automatic_message_type",
         ]
         read_only_fields = [
             "uuid",
@@ -113,6 +114,7 @@ class MessageSerializerV2(serializers.ModelSerializer):
             "is_delivered",
             "internal_note",
             "is_automatic_message",
+            "automatic_message_type",
         ]
 
     def get_replied_message(self, obj):
@@ -125,7 +127,12 @@ class MessageSerializerV2(serializers.ModelSerializer):
 
         try:
             replied_id = context.get("id")
-            replied_msg = ChatMessageReplyIndex.objects.get(external_id=replied_id)
+            replied_msg = ChatMessageReplyIndex.objects.filter(
+                external_id=replied_id
+            ).first()
+
+            if not replied_msg:
+                return None
 
             result = {
                 "uuid": str(replied_msg.message.uuid),
@@ -178,4 +185,8 @@ class MessageSerializerV2(serializers.ModelSerializer):
             "uuid": str(note.uuid),
             "text": note.text,
             "is_deletable": note.is_deletable,
+            "media": [
+                {"content_type": media.content_type, "url": media.url}
+                for media in note.medias.all()
+            ],
         }

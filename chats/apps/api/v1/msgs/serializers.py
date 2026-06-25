@@ -294,6 +294,7 @@ class MessageSerializer(BaseMessageSerializer):
             "is_delivered",
             "internal_note",
             "is_automatic_message",
+            "automatic_message_type",
             "ai_text_improvement",
         ]
         read_only_fields = [
@@ -387,6 +388,10 @@ class MessageSerializer(BaseMessageSerializer):
             "uuid": str(note.uuid),
             "text": note.text,
             "is_deletable": note.is_deletable,
+            "media": [
+                {"content_type": media.content_type, "url": media.url}
+                for media in note.medias.all()
+            ],
         }
 
 

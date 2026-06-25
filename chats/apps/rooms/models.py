@@ -29,7 +29,11 @@ from chats.apps.rooms.exceptions import (
     MaxPinRoomLimitReachedError,
     RoomIsNotActiveError,
 )
-from chats.core.models import BaseConfigurableModel, BaseModel
+from chats.core.models import (
+    BaseConfigurableModel,
+    BaseModel,
+    BaseModelWithManualCreatedOn,
+)
 from chats.utils.websockets import send_channels_group
 
 if TYPE_CHECKING:
@@ -172,14 +176,27 @@ class Room(BaseModel, BaseConfigurableModel):
         _("Automatic message sent at"), null=True, blank=True
     )
 
+    is_inactive = models.BooleanField(_("is inactive?"), default=False)
+    automatic_closed = models.BooleanField(
+        _("automatic closed?"),
+        default=False,
+        help_text=_(
+            "True when the room was closed automatically by the system "
+            "(e.g. inactivity timeout) rather than by a human agent."
+        ),
+    )
+
     tracker = FieldTracker(fields=["user_id", "queue_id"])
 
     def get_automatic_message_sent_at(self) -> Optional[datetime]:
         if self.automatic_message_sent_at:
             return self.automatic_message_sent_at
-        from chats.apps.msgs.models import AutomaticMessage
+        from chats.apps.msgs.models import AutomaticMessage, AutomaticMessageType
 
-        auto_msg = AutomaticMessage.objects.filter(room=self).first()
+        auto_msg = AutomaticMessage.objects.filter(
+            room=self,
+            automatic_message_type=AutomaticMessageType.AUTOMATIC_OPEN,
+        ).first()
         if auto_msg:
             return auto_msg.message.created_on
         return None
@@ -187,9 +204,7 @@ class Room(BaseModel, BaseConfigurableModel):
     def get_time_to_send_automatic_message(self) -> Optional[int]:
         sent_at = self.get_automatic_message_sent_at()
         if sent_at and self.first_user_assigned_at:
-            return max(
-                int((sent_at - self.first_user_assigned_at).total_seconds()), 0
-            )
+            return max(int((sent_at - self.first_user_assigned_at).total_seconds()), 0)
         return None
 
     @property
@@ -274,6 +289,10 @@ class Room(BaseModel, BaseConfigurableModel):
         ]
         indexes = [
             models.Index(fields=["project_uuid"]),
+            models.Index(
+                fields=["is_active", "is_inactive", "is_waiting", "last_interaction"],
+                name="rooms_inactivity_idx",
+            ),
         ]
 
     def save(self, *args, **kwargs) -> None:
@@ -602,6 +621,33 @@ class Room(BaseModel, BaseConfigurableModel):
             action=f"rooms.{action}",
         )
 
+    def notify_inactivity(self):
+        """
+        Notifies the frontend that the inactivity flag of this room has
+        changed. Sends a lightweight payload (`room_uuid` + `is_inactive`)
+        with a dedicated `rooms.inactivity` event so the client can update
+        the visual alert without re-rendering the whole room.
+
+        Routes to the assigned agent's permission group when the room has a
+        user; falls back to the queue group otherwise (defensive — rooms
+        eligible for inactivity always have a user).
+        """
+        from chats.apps.rooms.usecases.inactivity import is_inactivity_feature_active
+
+        try:
+            project_uuid = str(self.queue.sector.project.uuid)
+        except AttributeError:
+            project_uuid = None
+
+        if not is_inactivity_feature_active(project_uuid):
+            return
+
+        content = {
+            "room_uuid": str(self.uuid),
+            "is_inactive": self.is_inactive,
+        }
+        self.base_notification(content=content, action="rooms.inactivity")
+
     def user_connection(self, action: str, user=None):
         user = user if user else self.user
         permission = self.get_permission(user)
@@ -813,6 +859,11 @@ class Room(BaseModel, BaseConfigurableModel):
             ),
         ).update(**update_fields)
 
+        if self.is_inactive and contact is not None:
+            from chats.apps.rooms.usecases.inactivity import InactivityService
+
+            InactivityService().reset_inactivity(self)
+
     def start_csat_flow(self):
         """
         Starts the CSAT flow for a room.
@@ -823,16 +874,16 @@ class Room(BaseModel, BaseConfigurableModel):
 
     @property
     def is_archived(self) -> bool:
-        from chats.apps.archive_chats.models import RoomArchivedConversation
         from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
+        from chats.apps.archive_chats.models import RoomArchivedConversation
 
         return RoomArchivedConversation.objects.filter(
             room=self, status=ArchiveConversationsJobStatus.FINISHED, file__isnull=False
         ).exists()
 
     def get_archived_conversation_file_url(self) -> Optional[str]:
-        from chats.apps.archive_chats.models import RoomArchivedConversation
         from chats.apps.archive_chats.choices import ArchiveConversationsJobStatus
+        from chats.apps.archive_chats.models import RoomArchivedConversation
 
         archive = RoomArchivedConversation.objects.filter(
             room=self, status=ArchiveConversationsJobStatus.FINISHED, file__isnull=False
@@ -919,6 +970,10 @@ class RoomNote(BaseModel):
             "text": self.text,
             "created_on": self.created_on.isoformat(),
             "is_deletable": self.is_deletable,
+            "media": [
+                {"content_type": media.content_type, "url": media.url}
+                for media in self.medias.all()
+            ],
         }
 
     def notify_websocket(self, action):
@@ -968,3 +1023,77 @@ class RoomNote(BaseModel):
         super().delete(*args, **kwargs)
         if msg:
             msg.delete()
+
+
+def room_note_media_upload_to(instance, filename):
+    """
+    Generate unique file path for RoomNoteMedia uploads using UUID.
+    This prevents file name collisions when multiple medias are uploaded
+    in the same second with the same original filename.
+
+    Args:
+        instance: RoomNoteMedia instance
+        filename: Original filename from upload
+
+    Returns:
+        str: Unique file path in format: roomnotemedia/{uuid}{extension}
+    """
+    from pathlib import Path
+
+    ext = Path(filename).suffix.lower()
+    return f"roomnotemedia/{instance.uuid}{ext}"
+
+
+class RoomNoteMedia(BaseModelWithManualCreatedOn):
+    """
+    Media files attached to a room internal note.
+    """
+
+    note = models.ForeignKey(
+        "rooms.RoomNote",
+        related_name="medias",
+        verbose_name=_("room note"),
+        on_delete=models.CASCADE,
+    )
+    content_type = models.CharField(_("Content Type"), max_length=300)
+    media_file = models.FileField(
+        _("Media File"),
+        null=True,
+        blank=True,
+        max_length=300,
+        upload_to=room_note_media_upload_to,
+    )
+    media_url = models.TextField(_("Media url"), null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("RoomNoteMedia")
+        verbose_name_plural = _("RoomNoteMedias")
+        indexes = [
+            models.Index(
+                fields=["content_type"],
+                name="room_note_media_ct_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.note.pk} - {self.url}"
+
+    def save(self, *args, **kwargs) -> None:
+        if self.note.room.is_active is False:
+            raise ValidationError({"detail": _("Closed rooms cannot receive notes")})
+        is_new = self._state.adding
+        if is_new and self.note.medias.count() >= 10:
+            raise ValidationError(
+                {"detail": _("Internal notes can't have more than 10 media files")}
+            )
+        return super().save(*args, **kwargs)
+
+    @property
+    def url(self):
+        url = self.media_file.url if self.media_file else self.media_url
+        try:
+            if url.startswith("/"):
+                url = settings.ENGINE_BASE_URL + url
+        except AttributeError:
+            return ""
+        return url

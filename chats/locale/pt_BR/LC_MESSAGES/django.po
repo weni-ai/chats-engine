@@ -1639,6 +1639,95 @@ msgstr "Modificado em"
 msgid "config to use in project integration"
 msgstr "configuração para usar na integração do projeto"
 
+#: chats/apps/api/v1/sectors/serializers.py:62
+msgid ""
+"Automatic closure can only be enabled if the inactivity warning is also "
+"enabled."
+msgstr ""
+"O encerramento automático só pode ser ativado se o aviso de inatividade "
+"também estiver ativado."
+
+#: chats/apps/msgs/models.py:22
+msgid "Automatic open"
+msgstr "Abertura automática"
+
+#: chats/apps/msgs/models.py:95
+msgid ""
+"Classification for automatic messages sent by the system (welcome, "
+"inactivity warning, inactivity closure)."
+msgstr ""
+"Classificação para mensagens automáticas enviadas pelo sistema "
+"(boas-vindas, aviso de inatividade, encerramento por inatividade)."
+
+#: chats/apps/sectors/models.py:80
+msgid ""
+"Configuration for inactivity warning message and automatic room closure. "
+"See `chats.apps.sectors.constants.get_default_inactivity_timeout`."
+msgstr ""
+"Configuração da mensagem de aviso de inatividade e do encerramento "
+"automático da sala. Consulte "
+"`chats.apps.sectors.constants.get_default_inactivity_timeout`."
+
+#: chats/apps/sectors/constants.py:24
+msgid ""
+"Hi! Are you still there? If there's no response, this conversation will be "
+"closed soon."
+msgstr ""
+"Olá! Ainda está por aí? Caso não haja resposta, esta conversa será "
+"encerrada em breve."
+
+#: chats/apps/msgs/models.py:24
+msgid "Inactive close"
+msgstr "Encerramento por inatividade"
+
+#: chats/apps/msgs/models.py:23
+msgid "Inactive warning"
+msgstr "Aviso de inatividade"
+
+#: chats/apps/api/v1/sectors/serializers.py:82
+msgid "Provide a value greater than zero when the automatic closure is enabled."
+msgstr ""
+"Informe um valor maior que zero quando o encerramento automático estiver "
+"ativado."
+
+#: chats/apps/api/v1/sectors/serializers.py:72
+msgid "Provide a value greater than zero when the inactivity warning is enabled."
+msgstr ""
+"Informe um valor maior que zero quando o aviso de inatividade estiver "
+"ativado."
+
+#: chats/apps/rooms/models.py:180
+msgid ""
+"True when the room was closed automatically by the system (e.g. inactivity "
+"timeout) rather than by a human agent."
+msgstr ""
+"Verdadeiro quando a sala foi fechada automaticamente pelo sistema (ex.: "
+"tempo limite de inatividade) e não por um atendente."
+
+#: chats/apps/sectors/constants.py:32
+msgid ""
+"We're closing this conversation due to inactivity. Get in touch again if "
+"needed."
+msgstr ""
+"Estamos encerrando essa conversa por inatividade. Caso necessário, entre "
+"em contato novamente."
+
+#: chats/apps/rooms/models.py:177
+msgid "automatic closed?"
+msgstr "fechada automaticamente?"
+
+#: chats/apps/msgs/models.py:90
+msgid "automatic message type"
+msgstr "tipo de mensagem automática"
+
+#: chats/apps/sectors/models.py:76
+msgid "inactivity timeout"
+msgstr "tempo limite de inatividade"
+
+#: chats/apps/rooms/models.py:175
+msgid "is inactive?"
+msgstr "inativa?"
+
 #: chats/core/models.py:137
 msgid "Created by"
 msgstr "Criado por"
@@ -1650,6 +1739,98 @@ msgstr "Modificado por"
 #: chats/core/models.py:155
 msgid "Deleted by"
 msgstr "Excluído por"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html:7
+msgid "Conversation Report - %(uuid)s"
+msgstr "Relatório de conversa - %(uuid)s"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html:315
+msgid "Conversation Report"
+msgstr "Relatório de conversa"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html:317
+msgid "Generated on %(date)s from %(user)s"
+msgstr "Gerado em %(date)s por %(user)s"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html:325
+msgid "Transcription of the conversation"
+msgstr "Transcrição da conversa"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "%(date)s - Conversation started"
+msgstr "%(date)s - Conversa iniciada"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "%(date)s - Chat picked from queue %(queue)s by %(user)s"
+msgstr "%(date)s - Conversa assumida da fila %(queue)s por %(user)s"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "%(date)s - Chat forwarded to the %(queue)s queue"
+msgstr "%(date)s - Conversa encaminhada para a fila %(queue)s"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "%(date)s - Chat assigned to %(user)s"
+msgstr "%(date)s - Conversa atribuída a %(user)s"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "%(date)s - Chat was ended by %(user)s"
+msgstr "%(date)s - Conversa encerrada por %(user)s"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "%(date)s - Chat ended"
+msgstr "%(date)s - Conversa encerrada"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "Internal note"
+msgstr "Nota interna"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html:468
+msgid "Support Information"
+msgstr "Informações do atendimento"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "Started"
+msgstr "Início"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "Ended"
+msgstr "Fim"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "Representative"
+msgstr "Atendente"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "(current)"
+msgstr "(atual)"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "URN"
+msgstr "URN"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "Ticket ID"
+msgstr "ID do ticket"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "Tags"
+msgstr "Tags"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "CSAT"
+msgstr "CSAT"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid "VTEX CX Platform"
+msgstr "VTEX CX Platform"
+
+#: chats/apps/rooms/templates/rooms/conversation_history/conversation_report.html
+msgid ""
+"Document automatically generated for auditing and compliance purposes. "
+"Altering this document may result in penalties."
+msgstr ""
+"Documento gerado automaticamente para fins de auditoria e conformidade. "
+"A alteração deste documento pode resultar em penalidades."
 
 #~ msgid "Queue's ID"
 #~ msgstr "ID da Fila"

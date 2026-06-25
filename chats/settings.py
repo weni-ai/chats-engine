@@ -164,6 +164,11 @@ DATABASES = {
     }
 }
 
+# Custom test runner that gives each parallel worker its own Redis DB so that
+# tests using `cache.clear()` / `get_redis_connection()` don't race with
+# sibling workers. See chats/core/test_runner.py for details.
+TEST_RUNNER = "chats.core.test_runner.IsolatedCacheTestRunner"
+
 # User
 
 AUTH_USER_MODEL = "accounts.User"
@@ -268,6 +273,15 @@ REST_FRAMEWORK = {
         "external_hour": env.str("EXTERNAL_HOUR_LIMIT", default="30000/hour"),
         "external_anon": env.str("EXTERNAL_ANON_LIMIT", default="100/hour"),
         "external_critical": env.str("EXTERNAL_CRITICAL_LIMIT", default="1000/minute"),
+        "external_room_history_second": env.str(
+            "EXTERNAL_ROOM_HISTORY_SECOND_LIMIT", default="5/second"
+        ),
+        "external_room_history_minute": env.str(
+            "EXTERNAL_ROOM_HISTORY_MINUTE_LIMIT", default="100/minute"
+        ),
+        "external_room_history_hour": env.str(
+            "EXTERNAL_ROOM_HISTORY_HOUR_LIMIT", default="4000/hour"
+        ),
         "ai_text_improvement": env.str(
             "AI_TEXT_IMPROVEMENT_LIMIT", default="20/minute"
         ),
@@ -282,6 +296,17 @@ EXTERNAL_MINUTE_LIMIT = env.str("EXTERNAL_MINUTE_LIMIT", default="600/minute")
 EXTERNAL_HOUR_LIMIT = env.str("EXTERNAL_HOUR_LIMIT", default="30000/hour")
 EXTERNAL_ANON_LIMIT = env.str("EXTERNAL_ANON_LIMIT", default="100/hour")
 EXTERNAL_CRITICAL_LIMIT = env.str("EXTERNAL_CRITICAL_LIMIT", default="1000/minute")
+EXTERNAL_ROOM_HISTORY_SECOND_LIMIT = env.str(
+    "EXTERNAL_ROOM_HISTORY_SECOND_LIMIT", default="5/second"
+)
+EXTERNAL_ROOM_HISTORY_MINUTE_LIMIT = env.str(
+    "EXTERNAL_ROOM_HISTORY_MINUTE_LIMIT", default="100/minute"
+)
+EXTERNAL_ROOM_HISTORY_HOUR_LIMIT = env.str(
+    "EXTERNAL_ROOM_HISTORY_HOUR_LIMIT", default="4000/hour"
+)
+
+ROOM_HISTORY_CACHE_TTL = env.int("ROOM_HISTORY_CACHE_TTL", default=300)
 
 # Logging
 
@@ -312,6 +337,7 @@ USE_APM = env.bool("USE_APM", default=False)
 
 if USE_APM:
     INSTALLED_APPS.append("elasticapm.contrib.django")
+    MIDDLEWARE.insert(0, "elasticapm.contrib.django.middleware.TracingMiddleware")
 
     ELASTIC_APM = {
         "SERVICE_NAME": env("APM_SERVICE_NAME", default="chats-production"),
@@ -482,6 +508,10 @@ CHATS_CACHE_TIME = env.int("CHATS_CACHE_TIME", default=1 * 60 * 60)
 
 DISCUSSION_AGENTS_LIMIT = env.int("DISCUSSION_AGENTS_LIMIT", default=5)
 
+# Inactivity feature defaults (in seconds)
+DEFAULT_MESSAGE_TIMEOUT_TIME = env.int("DEFAULT_MESSAGE_TIMEOUT_TIME", default=600)
+DEFAULT_CLOSE_ROOM_TIMEOUT_TIME = env.int("DEFAULT_CLOSE_ROOM_TIMEOUT_TIME", default=60)
+
 # Celery
 
 METRICS_CUSTOM_QUEUE = env("METRICS_CUSTOM_QUEUE", default="celery")
@@ -499,9 +529,17 @@ CELERY_BEAT_SCHEDULE = {
         "task": "process_pending_reports",
         "schedule": 20.0,
     },
+    "process-pending-room-exports": {
+        "task": "process_pending_room_exports",
+        "schedule": 20.0,
+    },
     "start-archive-rooms-messages": {
         "task": "start_archive_rooms_messages",
         "schedule": crontab(hour="0-4", minute=0),
+    },
+    "check-inactivity-rooms": {
+        "task": "check_inactivity_rooms",
+        "schedule": crontab(minute="*"),
     },
 }
 
@@ -733,6 +771,13 @@ REPORT_STATUS_CACHE_TTL = env.int("REPORT_STATUS_CACHE_TTL", default=300)
 USER_OBJECT_CACHE_TTL = env.int("USER_OBJECT_CACHE_TTL", default=300)
 USER_OBJECT_CACHE_ENABLED = env.bool("USER_OBJECT_CACHE_ENABLED", default=True)
 
+# QUICK MESSAGES CACHE
+QUICK_MESSAGES_CACHE_TTL = env.int("QUICK_MESSAGES_CACHE_TTL", default=300)
+
+# SECTOR QUICK MESSAGES CACHE
+SECTOR_QUICK_MESSAGES_CACHE_TTL = env.int(
+    "SECTOR_QUICK_MESSAGES_CACHE_TTL", default=300
+)
 
 # ROOM 24H VALID CACHE
 ROOM_24H_VALID_CACHE_TTL = env.int(
@@ -756,6 +801,12 @@ ARCHIVE_CHATS_USE_BATCH_DISPATCH = env.bool(
 ARCHIVE_CHATS_BATCH_SIZE = env.int("ARCHIVE_CHATS_BATCH_SIZE", default=500)
 ARCHIVE_CHATS_BULK_CREATE_PENDING_BATCH_SIZE = env.int(
     "ARCHIVE_CHATS_BULK_CREATE_PENDING_BATCH_SIZE", default=2000
+)
+# Soft-lock threshold used by ArchiveChatsService to decide whether an
+# in-progress RoomArchivedConversation is still being processed by another
+# worker or stale enough to be reclaimed.
+ARCHIVE_CHATS_IN_PROGRESS_TIMEOUT_HOURS = env.int(
+    "ARCHIVE_CHATS_IN_PROGRESS_TIMEOUT_HOURS", default=12
 )
 
 # Internal API Token
@@ -791,6 +842,10 @@ USE_FLOWS_MEDIA_URL_FEATURE_FLAG_KEY = env.str(
     "USE_FLOWS_MEDIA_URL_FEATURE_FLAG_KEY",
     default="weniChatsUseFlowsMediaUrl",
 )
+NINTH_DIGIT_SEARCH_FEATURE_FLAG_KEY = env.str(
+    "NINTH_DIGIT_SEARCH_FEATURE_FLAG_KEY",
+    default="weniChatsNinthDigitSearch",
+)
 
 FLOWS_BASE_URL = env.str("FLOWS_BASE_URL", default="https://flows.weni.ai")
 
@@ -811,6 +866,13 @@ AGENTS_MANAGEMENT_FEATURE_FLAG_KEY = env.str(
     "AGENTS_MANAGEMENT_FEATURE_FLAG_KEY",
     default="weniChatsAgentsManagement",
 )
+
+# Inactivity Timeout
+WENI_CHATS_INACTIVITY_TIMEOUT_FLAG_KEY = env.str(
+    "WENI_CHATS_INACTIVITY_TIMEOUT_FLAG_KEY",
+    default="weniChatsInactivityTimeout",
+)
+
 IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL = env.int(
     "IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL", default=30
 )

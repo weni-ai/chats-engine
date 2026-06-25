@@ -18,6 +18,12 @@ from chats.core.requests import get_request_session_with_retries
 logger = logging.getLogger(__name__)
 
 
+class AutomaticMessageType(models.TextChoices):
+    AUTOMATIC_OPEN = "automatic_open", _("Automatic open")
+    INACTIVE_WARNING = "inactive_warning", _("Inactive warning")
+    INACTIVE_CLOSE = "inactive_close", _("Inactive close")
+
+
 def message_media_upload_to(instance, filename):
     """
     Generate unique file path for MessageMedia uploads using UUID.
@@ -206,6 +212,12 @@ class Message(BaseModelWithManualCreatedOn):
     @property
     def is_automatic_message(self):
         return hasattr(self, "automatic_message") and self.automatic_message is not None
+
+    @property
+    def automatic_message_type(self):
+        if not self.is_automatic_message:
+            return None
+        return self.automatic_message.automatic_message_type
 
 
 class MessageMedia(BaseModelWithManualCreatedOn):
@@ -412,17 +424,32 @@ class AutomaticMessage(BaseModel):
     """
     Automatic message for a room.
 
-    This is only used as a reference for a message that is sent automatically
-    when the room is first assigned to a user.
+    Stores metadata for messages sent automatically by the system. The
+    `automatic_message_type` classifies the message (welcome, inactivity
+    warning, inactivity closure) so the front can render specific UI for
+    each kind.
 
-    A room can only have one automatic message.
+    Each `Message` has at most one `AutomaticMessage` (OneToOne). A room can
+    have multiple `AutomaticMessage` rows because, with the inactivity
+    feature, the same room may receive warnings/closures in addition to the
+    legacy welcome message.
     """
 
     message = models.OneToOneField(
         "msgs.Message", on_delete=models.CASCADE, related_name="automatic_message"
     )
-    room = models.OneToOneField(
-        "rooms.Room", on_delete=models.CASCADE, related_name="automatic_message"
+    room = models.ForeignKey(
+        "rooms.Room", on_delete=models.CASCADE, related_name="automatic_messages"
+    )
+    automatic_message_type = models.CharField(
+        _("automatic message type"),
+        max_length=32,
+        choices=AutomaticMessageType.choices,
+        default=AutomaticMessageType.AUTOMATIC_OPEN,
+        help_text=_(
+            "Classification for automatic messages sent by the system "
+            "(welcome, inactivity warning, inactivity closure)."
+        ),
     )
 
     class Meta:

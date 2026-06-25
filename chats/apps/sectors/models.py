@@ -84,6 +84,17 @@ class Sector(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMod
     )
     required_tags = models.BooleanField(_("required tags?"), default=False)
 
+    inactivity_timeout = models.JSONField(
+        _("inactivity timeout"),
+        null=True,
+        blank=True,
+        default=None,
+        help_text=_(
+            "Configuration for inactivity warning message and automatic room "
+            "closure. See `chats.apps.sectors.constants.get_default_inactivity_timeout`."
+        ),
+    )
+
     tracker = FieldTracker(fields=["rooms_limit", "is_csat_enabled"])
 
     objects = SectorManager()
