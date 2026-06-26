@@ -1,3 +1,12 @@
+# 3.67.5
+# Add
+  - JWT authentication and authorization
+# Fix
+  - Inactivity last message update on room closure
+  - Room filtering to exclude deleted entities
+# Refactor
+  - Optimized inactivity feature
+
 # 3.67.4
 # Add
   - Optimized media handling in archived chat messages
