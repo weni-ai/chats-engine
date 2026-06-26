@@ -13,7 +13,7 @@
       margin-top: 24px;
     "
   >
-    {% trans 'Hi, here is your data export' %}
+    {% trans 'Hi, here is your chat export' %}
   </div>
 
   <div
@@ -28,7 +28,7 @@
     "
   >
     <p style="margin-top: 24px; margin-bottom: 0;">
-      {% blocktrans with project_name=project_name %}Unable to generate export of {{ project_name }} project data.{% endblocktrans %}
+      {% blocktrans with project_name=project_name %}Unable to generate chat export for the {{ project_name }} project.{% endblocktrans %}
     </p>
     <p style="margin-top: 24px; margin-bottom: 0;">
       {% trans 'Use the following information to report to support:' %} {{ error_message }}.

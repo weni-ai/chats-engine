@@ -741,34 +741,32 @@ msgstr ""
 #: chats/apps/dashboard/email_templates.py:27
 #, python-format
 msgid ""
-"The custom report for the project %(project)s is ready.\n"
+"The chat export for the %(project)s project is ready.\n"
 "\n"
-"Copy and paste the URL below to download the report:\n"
+"Copy and paste the URL below to download it:\n"
 "\n"
 "%(url)s"
 msgstr ""
-"O relatório personalizado para o projeto %(project)s está pronto.\n"
+"A exportação de chat do projeto %(project)s está pronta.\n"
 "\n"
-"Copie e cole a URL abaixo para baixar o relatório:\n"
+"Copie e cole a URL abaixo para baixá-la:\n"
 "\n"
 "%(url)s"
 
 #: chats/apps/dashboard/email_templates.py:54
 #, python-format
 msgid ""
-"An error occurred while generating the custom report for project "
-"%(project)s.\n"
+"Unable to generate chat export for the %(project)s project.\n"
 "\n"
 "Error: %(error)s\n"
 "\n"
-"Please try again later or contact support."
+"Try again later or contact support."
 msgstr ""
-"Ocorreu um erro ao gerar o relatório personalizado para o projeto "
-"%(project)s.\n"
+"Não foi possível gerar a exportação de chat do projeto %(project)s.\n"
 "\n"
 "Erro: %(error)s\n"
 "\n"
-"Por favor, tente novamente mais tarde ou entre em contato com o suporte."
+"Tente novamente mais tarde ou entre em contato com o suporte."
 
 #: chats/apps/dashboard/email_templates.py:56
 msgid "Unknown error"
@@ -1371,44 +1369,28 @@ msgstr ""
 msgid "All rights reserved."
 msgstr "Todos os direitos reservados."
 
-#: chats/apps/rooms/templates/rooms/emails/base.html:30
-msgid ""
-"You are receiving this mail because you registered in VTEX CX Platform. This "
-"also shows that you agree to our Terms of use and Privacy Policies. If you "
-"no longer want to receive mails from use, click the unsubscribe link below "
-"to unsubscribe."
-msgstr ""
-"Você está recebendo este e-mail porque se registrou na VTEX CX Platform. "
-"Isso também mostra que você concorda com nossos Termos de uso e Políticas de "
-"privacidade. Se não quiser mais receber e-mails, clique no link de "
-"cancelamento de assinatura abaixo para cancelar."
-
-#: chats/apps/rooms/templates/rooms/emails/base.html:33
+#: chats/apps/rooms/templates/rooms/emails/base.html:32
 msgid "Privacy Policy"
 msgstr "Política de Privacidade"
 
-#: chats/apps/rooms/templates/rooms/emails/base.html:37
+#: chats/apps/rooms/templates/rooms/emails/base.html:36
 msgid "Terms of use"
 msgstr "Termos de uso"
 
-#: chats/apps/rooms/templates/rooms/emails/base.html:41
+#: chats/apps/rooms/templates/rooms/emails/base.html:40
 msgid "Help Center"
 msgstr "Central de Ajuda"
 
-#: chats/apps/rooms/templates/rooms/emails/base.html:45
-msgid "Unsubscribe"
-msgstr "Cancelar inscrição"
-
 #: chats/apps/rooms/templates/rooms/emails/report_failed.html:16
 #: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:16
-msgid "Hi, here is your data export"
-msgstr "Olá, aqui está sua exportação de dados"
+msgid "Hi, here is your chat export"
+msgstr "Olá, aqui está sua exportação de chat"
 
 #: chats/apps/rooms/templates/rooms/emails/report_failed.html:31
 #, python-format
-msgid "Unable to generate export of %(project_name)s project data."
+msgid "Unable to generate chat export for the %(project_name)s project."
 msgstr ""
-"Não foi possível gerar a exportação de dados do projeto %(project_name)s."
+"Não foi possível gerar a exportação de chat do projeto %(project_name)s."
 
 #: chats/apps/rooms/templates/rooms/emails/report_failed.html:34
 msgid "Use the following information to report to support:"
@@ -1417,10 +1399,10 @@ msgstr "Use as informações abaixo para reportar ao suporte:"
 #: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:31
 #, python-format
 msgid ""
-"The data export for the %(project_name)s project is ready. Click the button "
+"The chat export for the %(project_name)s project is ready. Click the button "
 "below to download it."
 msgstr ""
-"A exportação de dados do projeto %(project_name)s está pronta. Clique no "
+"A exportação de chat do projeto %(project_name)s está pronta. Clique no "
 "botão abaixo para baixá-la."
 
 #: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:63
