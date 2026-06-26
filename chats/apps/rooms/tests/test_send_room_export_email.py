@@ -67,6 +67,42 @@ class SendRoomExportEmailTests(TestCase):
         for message in mail.outbox:
             self.assertIn("user@example.com", message.to)
 
+    def test_email_body_contains_project_name_instead_of_room_uuid(self):
+        usecase = SendRoomExportEmail(storage=self.storage)
+
+        usecase.execute(
+            room=self.room,
+            files={"html": b"<html/>"},
+            recipient_email="user@example.com",
+        )
+
+        message = mail.outbox[0]
+        html_alt = next(
+            (content for content, mimetype in message.alternatives if mimetype == "text/html"),
+            "",
+        )
+        self.assertIn(self.project.name, message.body)
+        self.assertIn(self.project.name, html_alt)
+        self.assertNotIn(str(self.room.uuid), html_alt)
+
+    def test_failure_email_body_contains_project_name(self):
+        usecase = SendRoomExportEmail(storage=self.storage)
+
+        usecase.send_failure_notification(
+            room=self.room,
+            recipient_email="user@example.com",
+            error_message="boom",
+        )
+
+        message = mail.outbox[0]
+        html_alt = next(
+            (content for content, mimetype in message.alternatives if mimetype == "text/html"),
+            "",
+        )
+        self.assertIn(self.project.name, message.body)
+        self.assertIn(self.project.name, html_alt)
+        self.assertNotIn(str(self.room.uuid), html_alt)
+
     def test_sends_single_email_when_only_one_format_requested(self):
         usecase = SendRoomExportEmail(storage=self.storage)
 
