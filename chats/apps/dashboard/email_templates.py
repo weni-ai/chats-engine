@@ -24,8 +24,8 @@ def get_report_ready_email(project_name: str, download_url: str):
     html = render_to_string("rooms/emails/report_is_ready.html", context)
 
     plain_text = _(
-        "The chat export for the %(project)s project is ready.\n\n"
-        "Copy and paste the URL below to download it:\n\n%(url)s"
+        "The custom report for the project %(project)s is ready.\n\n"
+        "Copy and paste the URL below to download the report:\n\n%(url)s"
     ) % {"project": project_name, "url": download_url}
 
     return plain_text, html
@@ -51,8 +51,8 @@ def get_report_failed_email(project_name: str, error_message: str = None):
     html = render_to_string("rooms/emails/report_failed.html", context)
 
     plain_text = _(
-        "Unable to generate chat export for the %(project)s project.\n\n"
-        "Error: %(error)s\n\nTry again later or contact support."
+        "An error occurred while generating the custom report for project %(project)s.\n\n"
+        "Error: %(error)s\n\nPlease try again later or contact support."
     ) % {"project": project_name, "error": error_message or _("Unknown error")}
 
     return plain_text, html

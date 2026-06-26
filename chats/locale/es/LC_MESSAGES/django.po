@@ -740,6 +740,38 @@ msgstr ""
 #: chats/apps/dashboard/email_templates.py:27
 #, python-format
 msgid ""
+"The custom report for the project %(project)s is ready.\n"
+"\n"
+"Copy and paste the URL below to download the report:\n"
+"\n"
+"%(url)s"
+msgstr ""
+"El informe personalizado para el proyecto %(project)s está listo.\n"
+"\n"
+"Copie y pegue la URL a continuación para descargar el informe:\n"
+"\n"
+"%(url)s"
+
+#: chats/apps/dashboard/email_templates.py:54
+#, python-format
+msgid ""
+"An error occurred while generating the custom report for project "
+"%(project)s.\n"
+"\n"
+"Error: %(error)s\n"
+"\n"
+"Please try again later or contact support."
+msgstr ""
+"Ocurrió un error al generar el informe personalizado para el proyecto "
+"%(project)s.\n"
+"\n"
+"Error: %(error)s\n"
+"\n"
+"Por favor, inténtelo de nuevo más tarde o contacte al soporte."
+
+#: chats/apps/rooms/email_templates.py:23
+#, python-format
+msgid ""
 "The chat export for the %(project)s project is ready.\n"
 "\n"
 "Copy and paste the URL below to download it:\n"
@@ -752,7 +784,7 @@ msgstr ""
 "\n"
 "%(url)s"
 
-#: chats/apps/dashboard/email_templates.py:54
+#: chats/apps/rooms/email_templates.py:43
 #, python-format
 msgid ""
 "Unable to generate chat export for the %(project)s project.\n"
@@ -1386,20 +1418,41 @@ msgstr "Centro de Ayuda"
 
 #: chats/apps/rooms/templates/rooms/emails/report_failed.html:16
 #: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:16
+msgid "Hi, here is your data export"
+msgstr "Hola, aquí está su exportación de datos"
+
+#: chats/apps/rooms/templates/rooms/emails/report_failed.html:31
+#, python-format
+msgid "Unable to generate export of %(project_name)s project data."
+msgstr ""
+"No se pudo generar la exportación de datos del proyecto %(project_name)s."
+
+#: chats/apps/rooms/templates/rooms/emails/report_failed.html:34
+#: chats/apps/rooms/templates/rooms/emails/room_export_failed.html:34
+msgid "Use the following information to report to support:"
+msgstr "Use la siguiente información para reportar al soporte:"
+
+#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:31
+#, python-format
+msgid ""
+"The data export for the %(project_name)s project is ready. Click the button "
+"below to download it."
+msgstr ""
+"La exportación de datos del proyecto %(project_name)s está lista. Haga clic "
+"en el botón a continuación para descargarla."
+
+#: chats/apps/rooms/templates/rooms/emails/room_export_failed.html:16
+#: chats/apps/rooms/templates/rooms/emails/room_export_is_ready.html:16
 msgid "Hi, here is your chat export"
 msgstr "Hola, aquí está tu exportación de chat"
 
-#: chats/apps/rooms/templates/rooms/emails/report_failed.html:31
+#: chats/apps/rooms/templates/rooms/emails/room_export_failed.html:31
 #, python-format
 msgid "Unable to generate chat export for the %(project_name)s project."
 msgstr ""
 "No se pudo generar la exportación de chat del proyecto %(project_name)s."
 
-#: chats/apps/rooms/templates/rooms/emails/report_failed.html:34
-msgid "Use the following information to report to support:"
-msgstr "Usa la siguiente información para reportar al soporte:"
-
-#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:31
+#: chats/apps/rooms/templates/rooms/emails/room_export_is_ready.html:31
 #, python-format
 msgid ""
 "The chat export for the %(project_name)s project is ready. Click the button "
