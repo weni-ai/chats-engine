@@ -16,6 +16,7 @@ def get_auth_token() -> str:
             "client_secret": settings.OIDC_ADMIN_CLIENT_SECRET,
             "grant_type": "client_credentials",
         },
+        timeout=settings.OIDC_TIMEOUT,
     )
     token = request.json().get("access_token")
     return f"Bearer {token}"
@@ -31,7 +32,7 @@ def get_internal_headers() -> dict:
 def persist_keycloak_user_by_email(user_email: str):  # TODO: ERROR HANDLING
     url = settings.OIDC_OP_USERS_DATA_ENDPOINT + f"?email={user_email}"
     headers = get_internal_headers()
-    response = requests.get(url, headers=headers)
+    response = requests.get(url, headers=headers, timeout=settings.OIDC_TIMEOUT)
     data = response.json()
     try:
         user_data = data[0]
