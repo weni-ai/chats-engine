@@ -1,3 +1,4 @@
+import logging
 from functools import cached_property
 
 from django.conf import settings
@@ -7,6 +8,8 @@ from drf_yasg.utils import swagger_auto_schema
 from rest_framework import filters, mixins, status, viewsets
 from rest_framework.pagination import CursorPagination
 from rest_framework.response import Response
+from sentry_sdk import capture_exception
+from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
 from chats.apps.accounts.authentication.drf.authorization import (
     ProjectAdminAuthentication,
@@ -35,6 +38,34 @@ from chats.apps.msgs.models import ChatMessageReplyIndex, Message as ChatMessage
 from chats.apps.msgs.usecases.get_room_messages_history import (
     GetRoomMessagesHistoryUseCase,
 )
+from chats.apps.msgs.utils import extract_wamid_core
+
+logger = logging.getLogger(__name__)
+
+
+def _is_reply_core_fallback_active(project_uuid: str) -> bool:
+    """Wrapper around the WAMID core fallback feature flag.
+
+    Mirrors the safety pattern used elsewhere in the codebase
+    (see ``MessageMedia.is_flows_media_url_feature_active``): any failure
+    in the feature flag integration is captured but never bubbles up,
+    keeping the request on the legacy/exact-match path.
+    """
+
+    if not project_uuid:
+        return False
+
+    try:
+        return is_feature_active_for_attributes(
+            settings.REPLY_CORE_FALLBACK_FEATURE_FLAG_KEY,
+            {"projectUUID": project_uuid},
+        )
+    except Exception as e:
+        capture_exception(e)
+        logger.error(
+            "Error checking if reply core fallback feature flag is active: %s", e
+        )
+        return False
 
 
 class MessageFlowViewset(
@@ -176,6 +207,39 @@ class RoomHistoryMessagesViewSet(viewsets.GenericViewSet):
             )
         }
 
+    @staticmethod
+    def _build_reply_index_core_map(messages, exact_map: dict) -> dict:
+        """
+        Bulk-fetch ChatMessageReplyIndex rows by stable WAMID core for every
+        replied-to id that was *not* resolved by the exact ``external_id``
+        lookup. Returns a dict keyed by ``external_id_core`` so callers can
+        fall back when Meta sent a different envelope inside ``context.id``.
+        """
+        unresolved = set()
+        for msg in messages:
+            metadata = msg.metadata if isinstance(msg.metadata, dict) else {}
+            context = metadata.get("context")
+            if isinstance(context, dict):
+                ext_id = context.get("id")
+                if ext_id and ext_id not in exact_map:
+                    unresolved.add(ext_id)
+
+        if not unresolved:
+            return {}
+
+        cores = {core for core in (extract_wamid_core(eid) for eid in unresolved) if core}
+        if not cores:
+            return {}
+
+        return {
+            ri.external_id_core: ri
+            for ri in (
+                ChatMessageReplyIndex.objects.select_related("message")
+                .filter(external_id_core__in=cores)
+                .order_by("created_on")
+            )
+        }
+
     @swagger_auto_schema(auto_schema=None)
     def list(self, request, *args, **kwargs):
         """List the message history of a closed room with cursor pagination."""
@@ -215,8 +279,24 @@ class RoomHistoryMessagesViewSet(viewsets.GenericViewSet):
 
         reply_index_map = self._build_reply_index_map(page)
 
+        reply_index_core_map = {}
+        try:
+            project_uuid = str(request.auth.project)
+        except AttributeError:
+            project_uuid = ""
+
+        if _is_reply_core_fallback_active(project_uuid):
+            reply_index_core_map = self._build_reply_index_core_map(
+                page, reply_index_map
+            )
+
         serializer = self.get_serializer(
-            page, many=True, context={"reply_index_map": reply_index_map}
+            page,
+            many=True,
+            context={
+                "reply_index_map": reply_index_map,
+                "reply_index_core_map": reply_index_core_map,
+            },
         )
         paginated_response = self.get_paginated_response(serializer.data)
 

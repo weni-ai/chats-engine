@@ -411,6 +411,19 @@ class ChatMessageReplyIndex(BaseModelWithManualCreatedOn):
     external_id = models.CharField(
         _("External ID"), max_length=255, unique=True, db_index=True
     )
+    # Stable hex "core" of the WAMID payload (see ``extract_wamid_core``).
+    # Stored alongside ``external_id`` so replies can be resolved even when
+    # Meta sends a different WAMID envelope inside ``context.id`` (HBgM vs
+    # HBgT). Nullable because legacy rows and non-WAMID identifiers may not
+    # have one; not unique because two distinct WAMIDs can resolve to the same
+    # core during the rollout window.
+    external_id_core = models.CharField(
+        _("External ID core"),
+        max_length=64,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
     message = models.ForeignKey(
         "Message", on_delete=models.CASCADE, related_name="reply_indexes"
     )

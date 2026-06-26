@@ -790,6 +790,15 @@ CHANGE_TICKETER_ON_TRANSFER_FEATURE_FLAG_KEY = env.str(
     default="weniChatsChangeTicketerOnTransfer",
 )
 
+# When enabled for a project, ``get_replied_message`` falls back to matching
+# the stable WAMID core (``external_id_core``) when the exact ``external_id``
+# match against ``ChatMessageReplyIndex`` returns nothing. Mitigates the
+# observed WAMID envelope mismatch (``HBgM`` vs ``HBgT``) sent by Meta.
+REPLY_CORE_FALLBACK_FEATURE_FLAG_KEY = env.str(
+    "REPLY_CORE_FALLBACK_FEATURE_FLAG_KEY",
+    default="weniChatsReplyCoreFallback",
+)
+
 
 # REPORT STATUS CACHE
 REPORT_STATUS_CACHE_TTL = env.int("REPORT_STATUS_CACHE_TTL", default=300)
