@@ -1,5 +1,6 @@
 import random
 from datetime import timedelta
+from typing import Any
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -321,7 +322,7 @@ class Queue(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMode
         return self.sector.required_tags
 
 
-class QueueAuthorization(AuditableMixin, BaseModel):
+class QueueAuthorization(AuditableMixin, BaseSoftDeleteModel, BaseModel):
     ROLE_NOT_SETTED = 0
     ROLE_AGENT = 1
 
@@ -332,7 +333,7 @@ class QueueAuthorization(AuditableMixin, BaseModel):
 
     queue = models.ForeignKey(
         Queue,
-        verbose_name=_("Queue"),
+        verbose_name=_[tuple, dict[str, Any]]("Queue"),
         related_name="authorizations",
         on_delete=models.CASCADE,
     )
