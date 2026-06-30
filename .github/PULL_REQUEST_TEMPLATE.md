@@ -1,13 +1,9 @@
-### **Please check if the PR fulfills these requirements**
-- [ ] The commit message follows our guidelines
-- [ ] Tests for the changes have been added (for bug fixes/features)
-- [ ] Docs have been added / updated (for bug fixes / features)
-- [ ] Do we need to implement analytics?
+### What
+_Summarize what changed. Name the key components (models, endpoints, managers, use cases, serializers, etc.) and describe the behavioral impact — not just what files were touched._
+_Use a short paragraph for focused changes, or bullet points when the PR spans multiple areas._
 
+### Why
+_Explain the motivation. What problem or limitation existed before? What does this change enable, fix, or simplify for consumers of the code?_
 
-### **What**
-Please provide a short description of the purpose of this pull request.
-
-
-### **Why**
-Explain why the proposed change is necessary.
+<!-- ### Mermaid diagram -->
+<!-- _Optional. Mermaid sequence diagram explaining the new feature process._ -->
