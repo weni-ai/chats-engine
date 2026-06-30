@@ -28,6 +28,10 @@ import base64
 import logging
 from typing import Optional
 
+from django.conf import settings
+from sentry_sdk import capture_exception
+from weni.feature_flags.shortcuts import is_feature_active_for_attributes
+
 logger = logging.getLogger(__name__)
 
 
@@ -79,3 +83,31 @@ def extract_wamid_core(wamid: Optional[str]) -> Optional[str]:
                 return core_bytes.hex().upper()
 
     return None
+
+
+def is_reply_core_fallback_active(project_uuid: Optional[str]) -> bool:
+    """Return whether the WAMID core fallback is enabled for ``project_uuid``.
+
+    Centralized wrapper around the feature flag SDK so all call sites
+    (viewsets and serializers) share the same safety net: a missing or
+    falsy ``project_uuid`` short-circuits to ``False``, and any failure
+    talking to the flag service is captured on Sentry/logger and degrades
+    to ``False`` so the request stays on the legacy/exact-match path.
+    Never raises.
+    """
+
+    if not project_uuid:
+        return False
+
+    try:
+        return is_feature_active_for_attributes(
+            settings.REPLY_CORE_FALLBACK_FEATURE_FLAG_KEY,
+            {"projectUUID": str(project_uuid)},
+        )
+    except Exception as error:
+        capture_exception(error)
+        logger.error(
+            "Error checking if reply core fallback feature flag is active: %s",
+            error,
+        )
+        return False

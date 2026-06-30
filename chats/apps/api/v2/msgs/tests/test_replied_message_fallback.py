@@ -92,13 +92,15 @@ class _BaseFallbackSetup(APITestCase):
         return None
 
 
+_FLAG_PATCH_TARGET = (
+    "chats.apps.msgs.utils.is_feature_active_for_attributes"
+)
+
+
 class V2ExactMatchTests(_BaseFallbackSetup):
     """The exact ``external_id`` match must never depend on the feature flag."""
 
-    @mock.patch(
-        "chats.apps.api.v2.msgs.serializers.is_feature_active_for_attributes",
-        return_value=False,
-    )
+    @mock.patch(_FLAG_PATCH_TARGET, return_value=False)
     def test_exact_external_id_match_resolves_without_flag(self, _mock_flag):
         reply = self._create_reply_pointing_to(WAMID_STORED)
 
@@ -128,10 +130,7 @@ class V2CoreFallbackTests(_BaseFallbackSetup):
         self.assertEqual(target_core, extract_wamid_core(WAMID_STORED))
         return WAMID_STORED  # exact match path is tested elsewhere
 
-    @mock.patch(
-        "chats.apps.api.v2.msgs.serializers.is_feature_active_for_attributes",
-        return_value=False,
-    )
+    @mock.patch(_FLAG_PATCH_TARGET, return_value=False)
     def test_fallback_is_off_by_default(self, _mock_flag):
         # Reply arrives with a *different* WAMID whose core does not match the
         # stored one; serializer must return None and never reach the fallback.
@@ -142,10 +141,7 @@ class V2CoreFallbackTests(_BaseFallbackSetup):
         reply_data = self._find_reply(response, reply.uuid)
         self.assertIsNone(reply_data["replied_message"])
 
-    @mock.patch(
-        "chats.apps.api.v2.msgs.serializers.is_feature_active_for_attributes",
-        return_value=True,
-    )
+    @mock.patch(_FLAG_PATCH_TARGET, return_value=True)
     def test_fallback_resolves_when_cores_match(self, _mock_flag):
         # Bind the stored row to the core of WAMID_REPLY_DIFFERENT_ENVELOPE so
         # the fallback has something to find. This simulates what
@@ -165,10 +161,7 @@ class V2CoreFallbackTests(_BaseFallbackSetup):
             reply_data["replied_message"]["uuid"], str(self.original_message.uuid),
         )
 
-    @mock.patch(
-        "chats.apps.api.v2.msgs.serializers.is_feature_active_for_attributes",
-        return_value=True,
-    )
+    @mock.patch(_FLAG_PATCH_TARGET, return_value=True)
     def test_fallback_returns_none_when_no_core_row_exists(self, _mock_flag):
         # Even with the flag on, if no ``external_id_core`` matches, we must
         # return None instead of mounting some random reply.
@@ -179,14 +172,48 @@ class V2CoreFallbackTests(_BaseFallbackSetup):
         reply_data = self._find_reply(response, reply.uuid)
         self.assertIsNone(reply_data["replied_message"])
 
-    @mock.patch(
-        "chats.apps.api.v2.msgs.serializers.is_feature_active_for_attributes",
-        return_value=True,
-    )
+    @mock.patch(_FLAG_PATCH_TARGET, return_value=True)
     def test_fallback_returns_none_for_non_wamid_context_id(self, _mock_flag):
         # When the context id is not a WAMID (no core extractable) the
         # fallback path should short-circuit and not query the DB.
         reply = self._create_reply_pointing_to("non-wamid-legacy-id")
+
+        response = self._list_messages()
+
+        reply_data = self._find_reply(response, reply.uuid)
+        self.assertIsNone(reply_data["replied_message"])
+
+    @mock.patch(_FLAG_PATCH_TARGET, return_value=True)
+    def test_fallback_does_not_cross_rooms(self, _mock_flag):
+        """
+        With the flag ON, a reply whose core matches a ChatMessageReplyIndex
+        row from a *different room* must NOT be surfaced. Guards against
+        cross-tenant data leakage if cores ever collide.
+        """
+        target_core = extract_wamid_core(WAMID_REPLY_DIFFERENT_ENVELOPE)
+        # Move the existing index row to a brand-new room. The reply
+        # below lives in ``self.room`` — they no longer share a room.
+        foreign_room = Room.objects.create(
+            contact=self.contact,
+            is_active=True,
+            queue=self.queue,
+            user=self.agent,
+            project_uuid=str(self.project.uuid),
+        )
+        foreign_message = Message.objects.create(
+            room=foreign_room,
+            user=self.agent,
+            text="Foreign",
+            external_id=WAMID_STORED + "-foreign",
+        )
+        ChatMessageReplyIndex.objects.filter(external_id=WAMID_STORED).delete()
+        ChatMessageReplyIndex.objects.create(
+            external_id=WAMID_STORED + "-foreign",
+            message=foreign_message,
+            external_id_core=target_core,
+        )
+
+        reply = self._create_reply_pointing_to(WAMID_REPLY_DIFFERENT_ENVELOPE)
 
         response = self._list_messages()
 

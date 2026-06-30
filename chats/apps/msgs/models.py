@@ -431,6 +431,16 @@ class ChatMessageReplyIndex(BaseModelWithManualCreatedOn):
     class Meta:
         verbose_name = "Chat Message Reply Index"
         verbose_name_plural = "Chat Message Reply Indexes"
+        indexes = [
+            # Serves the fallback query in ``_resolve_reply_index``:
+            # ``WHERE external_id_core = ? ORDER BY created_on DESC LIMIT 1``.
+            # Additive on top of the standalone ``external_id_core`` index so
+            # the migration carries no risk of dropping anything existing.
+            models.Index(
+                fields=["external_id_core", "-created_on"],
+                name="cmri_core_created_desc_idx",
+            ),
+        ]
 
 
 class AutomaticMessage(BaseModel):

@@ -7,14 +7,12 @@ from django.db import transaction
 from pydub import AudioSegment
 from rest_framework import exceptions, serializers
 
-from weni.feature_flags.shortcuts import is_feature_active_for_attributes
-
 from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactSerializer
 from chats.apps.msgs.models import ChatMessageReplyIndex
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
-from chats.apps.msgs.utils import extract_wamid_core
+from chats.apps.msgs.utils import extract_wamid_core, is_reply_core_fallback_active
 from chats.apps.ai_features.improve_user_message.choices import (
     ImprovedUserMessageStatusChoices,
     ImprovedUserMessageTypeChoices,
@@ -34,6 +32,9 @@ def _resolve_reply_index(message: ChatMessage, replied_id: str):
     active for the message's project, falls back to matching the stable
     WAMID core (``external_id_core``) so replies still mount when Meta sends
     a different envelope (``HBgM`` vs ``HBgT``) inside ``context.id``.
+
+    The fallback is scoped to ``message.room_id`` to prevent a core
+    collision between rooms/projects from surfacing a foreign message.
     """
 
     exact_match = ChatMessageReplyIndex.objects.filter(
@@ -53,17 +54,14 @@ def _resolve_reply_index(message: ChatMessage, replied_id: str):
     except Exception:
         project_uuid = ""
 
-    if not project_uuid:
-        return None
-
-    if not is_feature_active_for_attributes(
-        settings.REPLY_CORE_FALLBACK_FEATURE_FLAG_KEY,
-        {"projectUUID": project_uuid},
-    ):
+    if not is_reply_core_fallback_active(project_uuid):
         return None
 
     return (
-        ChatMessageReplyIndex.objects.filter(external_id_core=core)
+        ChatMessageReplyIndex.objects.filter(
+            external_id_core=core,
+            message__room_id=message.room_id,
+        )
         .order_by("-created_on")
         .first()
     )
