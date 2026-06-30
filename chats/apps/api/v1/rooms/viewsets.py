@@ -245,7 +245,7 @@ class RoomViewset(
 
     def _list_with_legacy_pin_order(self, qs, request, project):
         pins_query = {
-            "room__queue__sector__project": project,
+            "project": project,
         }
 
         if user_email := request.query_params.get("email"):
@@ -270,7 +270,7 @@ class RoomViewset(
             RoomPin.objects.filter(
                 user=request.user,
                 room=OuterRef("pk"),
-                room__queue__sector__project=project,
+                project=project,
             )
             .order_by("-created_on")
             .values("created_on")[:1]
@@ -301,7 +301,7 @@ class RoomViewset(
         # pinned rooms form a tiny, bounded set. We resolve them with a single
         # small query and reuse the resulting ids as constant literals, avoiding
         # the correlated subqueries / full-PK materialization of the other paths.
-        pins_query = {"room__queue__sector__project": project, "room__is_active": True}
+        pins_query = {"project": project, "room__is_active": True}
 
         if user_email := request.query_params.get("email"):
             pins_query["user__email"] = user_email
