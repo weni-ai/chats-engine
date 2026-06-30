@@ -35,6 +35,7 @@ from chats.apps.msgs.models import ChatMessageReplyIndex, Message as ChatMessage
 from chats.apps.msgs.usecases.get_room_messages_history import (
     GetRoomMessagesHistoryUseCase,
 )
+from chats.apps.msgs.utils import extract_wamid_core, is_reply_core_fallback_active
 
 
 class MessageFlowViewset(
@@ -176,6 +177,44 @@ class RoomHistoryMessagesViewSet(viewsets.GenericViewSet):
             )
         }
 
+    @staticmethod
+    def _build_reply_index_core_map(messages, exact_map: dict, room_uuid) -> dict:
+        """
+        Bulk-fetch ChatMessageReplyIndex rows by stable WAMID core for every
+        replied-to id that was *not* resolved by the exact ``external_id``
+        lookup. Returns a dict keyed by ``external_id_core`` so callers can
+        fall back when Meta sent a different envelope inside ``context.id``.
+
+        Results are scoped to ``room_uuid`` so a core collision can never
+        leak a message from another room (or project) into this room's
+        history. WhatsApp replies always belong to the same conversation as
+        the original message, so this is a safe invariant to enforce.
+        """
+        unresolved = set()
+        for msg in messages:
+            metadata = msg.metadata if isinstance(msg.metadata, dict) else {}
+            context = metadata.get("context")
+            if isinstance(context, dict):
+                ext_id = context.get("id")
+                if ext_id and ext_id not in exact_map:
+                    unresolved.add(ext_id)
+
+        if not unresolved:
+            return {}
+
+        cores = {core for core in (extract_wamid_core(eid) for eid in unresolved) if core}
+        if not cores:
+            return {}
+
+        return {
+            ri.external_id_core: ri
+            for ri in (
+                ChatMessageReplyIndex.objects.select_related("message")
+                .filter(external_id_core__in=cores, message__room_id=room_uuid)
+                .order_by("created_on")
+            )
+        }
+
     @swagger_auto_schema(auto_schema=None)
     def list(self, request, *args, **kwargs):
         """List the message history of a closed room with cursor pagination."""
@@ -215,8 +254,24 @@ class RoomHistoryMessagesViewSet(viewsets.GenericViewSet):
 
         reply_index_map = self._build_reply_index_map(page)
 
+        reply_index_core_map = {}
+        try:
+            project_uuid = str(request.auth.project)
+        except AttributeError:
+            project_uuid = ""
+
+        if is_reply_core_fallback_active(project_uuid):
+            reply_index_core_map = self._build_reply_index_core_map(
+                page, reply_index_map, room_uuid
+            )
+
         serializer = self.get_serializer(
-            page, many=True, context={"reply_index_map": reply_index_map}
+            page,
+            many=True,
+            context={
+                "reply_index_map": reply_index_map,
+                "reply_index_core_map": reply_index_core_map,
+            },
         )
         paginated_response = self.get_paginated_response(serializer.data)
 

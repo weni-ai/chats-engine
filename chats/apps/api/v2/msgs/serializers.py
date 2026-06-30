@@ -5,9 +5,52 @@ from rest_framework import serializers
 from chats.apps.msgs.models import ChatMessageReplyIndex
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
+from chats.apps.msgs.utils import extract_wamid_core, is_reply_core_fallback_active
 from chats.apps.rooms.models import RoomNote
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _resolve_reply_index(message: ChatMessage, replied_id: str):
+    """Resolve a :class:`ChatMessageReplyIndex` for a replied-to WAMID.
+
+    Performs an exact ``external_id`` lookup first. When the feature flag is
+    active for the message's project, falls back to matching the stable
+    WAMID core (``external_id_core``) so replies still mount when Meta sends
+    a different envelope (``HBgM`` vs ``HBgT``) inside ``context.id``.
+
+    The fallback is scoped to ``message.room_id`` to prevent a core
+    collision between rooms/projects from surfacing a foreign message.
+    """
+
+    exact_match = ChatMessageReplyIndex.objects.filter(
+        external_id=replied_id
+    ).first()
+    if exact_match is not None:
+        return exact_match
+
+    core = extract_wamid_core(replied_id)
+    if not core:
+        return None
+
+    try:
+        project_uuid = str(message.room.project_uuid or "") or str(
+            message.project.uuid
+        )
+    except Exception:
+        project_uuid = ""
+
+    if not is_reply_core_fallback_active(project_uuid):
+        return None
+
+    return (
+        ChatMessageReplyIndex.objects.filter(
+            external_id_core=core,
+            message__room_id=message.room_id,
+        )
+        .order_by("-created_on")
+        .first()
+    )
 
 
 class UserMinimalSerializer(serializers.Serializer):
@@ -127,9 +170,7 @@ class MessageSerializerV2(serializers.ModelSerializer):
 
         try:
             replied_id = context.get("id")
-            replied_msg = ChatMessageReplyIndex.objects.filter(
-                external_id=replied_id
-            ).first()
+            replied_msg = _resolve_reply_index(obj, replied_id)
 
             if not replied_msg:
                 return None

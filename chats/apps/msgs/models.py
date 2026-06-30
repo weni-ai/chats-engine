@@ -411,6 +411,19 @@ class ChatMessageReplyIndex(BaseModelWithManualCreatedOn):
     external_id = models.CharField(
         _("External ID"), max_length=255, unique=True, db_index=True
     )
+    # Stable hex "core" of the WAMID payload (see ``extract_wamid_core``).
+    # Stored alongside ``external_id`` so replies can be resolved even when
+    # Meta sends a different WAMID envelope inside ``context.id`` (HBgM vs
+    # HBgT). Nullable because legacy rows and non-WAMID identifiers may not
+    # have one; not unique because two distinct WAMIDs can resolve to the same
+    # core during the rollout window.
+    external_id_core = models.CharField(
+        _("External ID core"),
+        max_length=64,
+        null=True,
+        blank=True,
+        db_index=True,
+    )
     message = models.ForeignKey(
         "Message", on_delete=models.CASCADE, related_name="reply_indexes"
     )
@@ -418,6 +431,16 @@ class ChatMessageReplyIndex(BaseModelWithManualCreatedOn):
     class Meta:
         verbose_name = "Chat Message Reply Index"
         verbose_name_plural = "Chat Message Reply Indexes"
+        indexes = [
+            # Serves the fallback query in ``_resolve_reply_index``:
+            # ``WHERE external_id_core = ? ORDER BY created_on DESC LIMIT 1``.
+            # Additive on top of the standalone ``external_id_core`` index so
+            # the migration carries no risk of dropping anything existing.
+            models.Index(
+                fields=["external_id_core", "-created_on"],
+                name="cmri_core_created_desc_idx",
+            ),
+        ]
 
 
 class AutomaticMessage(BaseModel):

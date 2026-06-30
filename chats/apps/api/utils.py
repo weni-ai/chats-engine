@@ -11,6 +11,7 @@ from chats.apps.api.v1.dashboard.dto import RoomData
 from chats.apps.api.v1.dashboard.serializers import DashboardRoomSerializer
 from chats.apps.contacts.models import Contact
 from chats.apps.msgs.models import ChatMessageReplyIndex, Message
+from chats.apps.msgs.utils import extract_wamid_core
 
 logger = logging.getLogger(__name__)
 
@@ -82,14 +83,18 @@ def create_reply_index(message: Message):
     if not message.external_id:
         return
 
+    external_id_core = extract_wamid_core(message.external_id)
+
     if ChatMessageReplyIndex.objects.filter(external_id=message.external_id).exists():
         ChatMessageReplyIndex.objects.filter(external_id=message.external_id).update(
             message=message,
+            external_id_core=external_id_core,
         )
     else:
         ChatMessageReplyIndex.objects.update_or_create(
             external_id=message.external_id,
             message=message,
+            defaults={"external_id_core": external_id_core},
         )
 
 
