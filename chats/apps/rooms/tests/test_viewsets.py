@@ -428,8 +428,8 @@ class TestRoomsViewSet(APITestCase):
         room_3 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
         room_4 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
 
-        RoomPin.objects.create(room=room_3, user=self.user)
-        RoomPin.objects.create(room=room_2, user=self.user)
+        RoomPin.objects.create(room=room_3, user=self.user, project=self.project)
+        RoomPin.objects.create(room=room_2, user=self.user, project=self.project)
 
         queue = Queue.objects.create(
             name="Test Queue",
@@ -453,7 +453,7 @@ class TestRoomsViewSet(APITestCase):
 
         # Room from a different project, should be excluded
         room_5 = Room.objects.create(queue=queue, contact=Contact.objects.create())
-        RoomPin.objects.create(room=room_5, user=self.user)
+        RoomPin.objects.create(room=room_5, user=self.user, project=queue.sector.project)
 
         response = self.list_rooms(
             filters={
@@ -507,7 +507,7 @@ class TestRoomsViewSet(APITestCase):
             )
             rooms.append(room)
 
-        RoomPin.objects.create(room=rooms[1], user=another_user)
+        RoomPin.objects.create(room=rooms[1], user=another_user, project=self.project)
 
         response = self.list_rooms(
             filters={
@@ -536,8 +536,8 @@ class TestRoomsViewSet(APITestCase):
         room_3 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
         room_4 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
 
-        RoomPin.objects.create(room=room_3, user=self.user)
-        RoomPin.objects.create(room=room_2, user=self.user)
+        RoomPin.objects.create(room=room_3, user=self.user, project=self.project)
+        RoomPin.objects.create(room=room_2, user=self.user, project=self.project)
 
         queue = Queue.objects.create(
             name="Test Queue",
@@ -561,7 +561,7 @@ class TestRoomsViewSet(APITestCase):
 
         # Room from a different project, should be excluded even when pinned
         room_5 = Room.objects.create(queue=queue, contact=Contact.objects.create())
-        RoomPin.objects.create(room=room_5, user=self.user)
+        RoomPin.objects.create(room=room_5, user=self.user, project=queue.sector.project)
 
         response = self.list_rooms(
             filters={
@@ -616,7 +616,7 @@ class TestRoomsViewSet(APITestCase):
             )
             rooms.append(room)
 
-        RoomPin.objects.create(room=rooms[1], user=another_user)
+        RoomPin.objects.create(room=rooms[1], user=another_user, project=self.project)
 
         response = self.list_rooms(
             filters={
@@ -648,7 +648,7 @@ class TestRoomsViewSet(APITestCase):
 
         # Pin the most recently created room; ascending ordering would place it
         # last, yet it must stay at the top because it is pinned.
-        RoomPin.objects.create(room=room_3, user=self.user)
+        RoomPin.objects.create(room=room_3, user=self.user, project=self.project)
 
         response = self.list_rooms(
             filters={
@@ -1725,7 +1725,7 @@ class TestRoomPinAuthenticatedUser(BaseRoomPinTestCase):
                 queue=self.queue,
                 user=self.user,
             )
-            RoomPin.objects.create(room=room, user=self.user)
+            RoomPin.objects.create(room=room, user=self.user, project=self.project)
 
         room = Room.objects.create(
             queue=self.queue,
