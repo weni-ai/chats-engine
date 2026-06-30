@@ -58,3 +58,10 @@ class HasInternalAuthenticationPermission(BasePermission):
         project_uuid = getattr(request, "project_uuid", None)
 
         return jwt_payload is not None and project_uuid is not None
+
+
+class IsAuthenticatedOrHasInternalJWT(BasePermission):
+    def has_permission(self, request, view):
+        if request.user and request.user.is_authenticated:
+            return True
+        return HasInternalAuthenticationPermission().has_permission(request, view)
