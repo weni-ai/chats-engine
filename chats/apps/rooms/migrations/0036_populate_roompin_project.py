@@ -20,7 +20,7 @@ def reverse_noop(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("rooms", "0034_roompin_project"),
+        ("rooms", "0035_roompin_project"),
     ]
 
     operations = [
