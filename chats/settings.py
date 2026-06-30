@@ -698,6 +698,10 @@ GROWTHBOOK_WEBHOOK_SECRET = env.str("GROWTHBOOK_WEBHOOK_SECRET", default="")
 FEEDBACK_FEATURE_FLAG_KEY = env.str(
     "FEEDBACK_FEATURE_FLAG_KEY", default="weniChatsFeedback"
 )
+DISABLE_OLD_PROJECT_CONSUMER_FEATURE_FLAG_KEY = env.str(
+    "DISABLE_OLD_PROJECT_CONSUMER_FEATURE_FLAG_KEY",
+    default="weniChatsDisableOldProjectConsumer",
+)
 AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY = env.str(
     "AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY", default="weniChatsAutomaticMessage"
 )
