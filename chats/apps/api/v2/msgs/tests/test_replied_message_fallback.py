@@ -191,10 +191,11 @@ class V2CoreFallbackTests(_BaseFallbackSetup):
         cross-tenant data leakage if cores ever collide.
         """
         target_core = extract_wamid_core(WAMID_REPLY_DIFFERENT_ENVELOPE)
-        # Move the existing index row to a brand-new room. The reply
-        # below lives in ``self.room`` — they no longer share a room.
+        # Index row lives in a different room (different contact avoids the
+        # unique_contact_queue_is_activetrue_room constraint on self.room).
+        foreign_contact = Contact.objects.create(name="Foreign Client")
         foreign_room = Room.objects.create(
-            contact=self.contact,
+            contact=foreign_contact,
             is_active=True,
             queue=self.queue,
             user=self.agent,
