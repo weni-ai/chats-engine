@@ -472,6 +472,9 @@ if USE_SENTRY:
         environment=env.str("ENVIRONMENT", default="develop"),
     )
 
+# JWT
+JWT_SECRET_KEY = env.str("JWT_SECRET_KEY", default="").replace("\\n", "\n")
+JWT_PUBLIC_KEY = env.str("JWT_PUBLIC_KEY", default="").replace("\\n", "\n")
 
 # Query Limiters
 
@@ -511,6 +514,30 @@ DISCUSSION_AGENTS_LIMIT = env.int("DISCUSSION_AGENTS_LIMIT", default=5)
 # Inactivity feature defaults (in seconds)
 DEFAULT_MESSAGE_TIMEOUT_TIME = env.int("DEFAULT_MESSAGE_TIMEOUT_TIME", default=600)
 DEFAULT_CLOSE_ROOM_TIMEOUT_TIME = env.int("DEFAULT_CLOSE_ROOM_TIMEOUT_TIME", default=60)
+
+# Inactivity task safety caps: hard ceiling on how many rooms each periodic
+# execution may warn or close. Anything above the cap is processed by the
+# next run (the task runs every minute). Prevents one execution from
+# overflowing past the schedule window even in worst-case spikes.
+INACTIVITY_MAX_WARNINGS_PER_RUN = env.int(
+    "INACTIVITY_MAX_WARNINGS_PER_RUN", default=1000
+)
+INACTIVITY_MAX_CLOSURES_PER_RUN = env.int(
+    "INACTIVITY_MAX_CLOSURES_PER_RUN", default=500
+)
+INACTIVITY_QUERYSET_CHUNK_SIZE = env.int(
+    "INACTIVITY_QUERYSET_CHUNK_SIZE", default=200
+)
+
+# Distributed lock used by `check_inactivity_rooms` to guarantee only one
+# instance of the task runs at a time, even if a previous run overlaps the
+# 1-minute schedule.
+INACTIVITY_TASK_LOCK_NAME = env.str(
+    "INACTIVITY_TASK_LOCK_NAME", default="inactivity_task_lock"
+)
+INACTIVITY_TASK_LOCK_TIMEOUT = env.int(
+    "INACTIVITY_TASK_LOCK_TIMEOUT", default=120
+)
 
 # Celery
 
@@ -761,6 +788,15 @@ ROOMS_COUNT_BY_QUEUE_FEATURE_FLAG_KEY = env.str(
 CHANGE_TICKETER_ON_TRANSFER_FEATURE_FLAG_KEY = env.str(
     "CHANGE_TICKETER_ON_TRANSFER_FEATURE_FLAG_KEY",
     default="weniChatsChangeTicketerOnTransfer",
+)
+
+# When enabled for a project, ``get_replied_message`` falls back to matching
+# the stable WAMID core (``external_id_core``) when the exact ``external_id``
+# match against ``ChatMessageReplyIndex`` returns nothing. Mitigates the
+# observed WAMID envelope mismatch (``HBgM`` vs ``HBgT``) sent by Meta.
+REPLY_CORE_FALLBACK_FEATURE_FLAG_KEY = env.str(
+    "REPLY_CORE_FALLBACK_FEATURE_FLAG_KEY",
+    default="weniChatsReplyCoreFallback",
 )
 
 

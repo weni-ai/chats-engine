@@ -76,12 +76,12 @@ def _send_silent_automatic_message(
     message_type: Optional[str] = None,
 ) -> Optional[Message]:
     """
-    Creates an automatic message on the room WITHOUT updating
-    `last_interaction` / `last_message_*` fields.
+    Creates an automatic message on the room and updates the
+    `last_message*` fields (via the standard ``update_last_message``)
+    so REST and WebSocket payloads reflect the actual latest message.
 
-    The inactivity feature requires that the warning and closure messages do
-    not reset the inactivity counter, so they can't go through the regular
-    `room.update_last_message` flow.
+    `last_interaction` is intentionally left unchanged — it anchors the
+    inactivity timer to the last real conversation turn.
 
     `message_type` classifies the automatic message (e.g. `inactive_warning`
     or `inactive_close`) so the front can render a specific UI for each.
@@ -103,6 +103,13 @@ def _send_silent_automatic_message(
                     room=room,
                     automatic_message_type=message_type,
                 )
+
+            room.update_last_message(
+                message=message,
+                user=user,
+                update_last_interaction=False,
+            )
+
             transaction.on_commit(lambda: message.notify_room("create", True))
             return message
     except Exception as exc:
@@ -137,7 +144,6 @@ def _eligible_warn_queryset():
         is_waiting=False,
         user__isnull=False,
         last_message_user__isnull=False,
-        last_message__automatic_message__isnull=True,
         queue__sector__inactivity_timeout__is_message_timeout_enabled=True,
     ).select_related("queue__sector", "user")
 
@@ -156,7 +162,6 @@ def _eligible_close_queryset():
         is_waiting=False,
         user__isnull=False,
         last_message_user__isnull=False,
-        last_message__automatic_message__isnull=True,
         queue__sector__inactivity_timeout__is_close_room_enabled=True,
     ).select_related("queue__sector", "user")
 
@@ -195,11 +200,26 @@ class InactivityService:
         Sends inactivity warnings to all eligible rooms.
 
         Returns the number of rooms that were warned.
+
+        Hard-capped by `settings.INACTIVITY_MAX_WARNINGS_PER_RUN`. Anything
+        above the cap is left for the next run (the periodic task runs every
+        minute), guaranteeing the execution window stays bounded even on
+        spikes.
         """
         now = timezone.now()
         warned = 0
+        max_per_run = settings.INACTIVITY_MAX_WARNINGS_PER_RUN
+        chunk_size = settings.INACTIVITY_QUERYSET_CHUNK_SIZE
 
-        for room in _eligible_warn_queryset().iterator():
+        for room in _eligible_warn_queryset().iterator(chunk_size=chunk_size):
+            if warned >= max_per_run:
+                logger.info(
+                    "[INACTIVITY] reached warn batch limit (%s); "
+                    "remaining rooms will be processed on the next run",
+                    max_per_run,
+                )
+                break
+
             if not self._is_feature_active_for_room(room):
                 continue
 
@@ -227,11 +247,26 @@ class InactivityService:
         Closes all rooms that exceeded the closure timeout after the warning.
 
         Returns the number of rooms that were closed.
+
+        Hard-capped by `settings.INACTIVITY_MAX_CLOSURES_PER_RUN`. Anything
+        above the cap is left for the next run (the periodic task runs every
+        minute), so per-room work — including metrics enqueueing — never
+        outgrows the schedule window.
         """
         now = timezone.now()
         closed = 0
+        max_per_run = settings.INACTIVITY_MAX_CLOSURES_PER_RUN
+        chunk_size = settings.INACTIVITY_QUERYSET_CHUNK_SIZE
 
-        for room in _eligible_close_queryset().iterator():
+        for room in _eligible_close_queryset().iterator(chunk_size=chunk_size):
+            if closed >= max_per_run:
+                logger.info(
+                    "[INACTIVITY] reached close batch limit (%s); "
+                    "remaining rooms will be processed on the next run",
+                    max_per_run,
+                )
+                break
+
             if not self._is_feature_active_for_room(room):
                 continue
 
@@ -339,9 +374,12 @@ class InactivityService:
             )
             capture_exception(exc)
 
-        # Mark `automatic_closed=True` BEFORE `room.close()` so the flag is
-        # persisted in the same `save()` call and visible to any post-close
-        # signal/consumer.
+        # Refresh from DB so the in-memory instance picks up
+        # `last_message*` fields written by `update_last_message` via
+        # queryset `.update()`. Without this, `room.close()` → `save()`
+        # would overwrite those columns with stale in-memory values.
+        room.refresh_from_db()
+
         room.automatic_closed = True
 
         try:
@@ -372,16 +410,23 @@ class InactivityService:
 
         # The manual close endpoint computes service metrics
         # (interaction_time, message_response_time, etc.) in the view via
-        # `close_room`. The automatic close must replicate it, otherwise
-        # inactivity-closed rooms are left without those metrics.
+        # `close_room`. The automatic close enqueues the same work to the
+        # `close_metrics` Celery task instead of running it inline, so the
+        # per-room loop is not paid for the database round-trips that
+        # `generate_metrics` performs. Behaviour is identical: `close_metrics`
+        # is the canonical async metrics task already used by the manual
+        # close path.
         if settings.ACTIVATE_CALC_METRICS:
             try:
-                from chats.apps.rooms.views import close_room
+                from chats.apps.dashboard.tasks import close_metrics
 
-                close_room(str(room.pk))
+                close_metrics.apply_async(
+                    args=[str(room.pk)],
+                    queue=settings.METRICS_CUSTOM_QUEUE,
+                )
             except Exception as exc:
                 logger.warning(
-                    "[INACTIVITY] Failed to generate metrics for room %s: %s",
+                    "[INACTIVITY] Failed to enqueue metrics for room %s: %s",
                     room.pk,
                     exc,
                 )

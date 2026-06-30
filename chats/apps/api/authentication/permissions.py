@@ -1,5 +1,7 @@
 from rest_framework.permissions import BasePermission
 from rest_framework.exceptions import ValidationError
+from rest_framework.request import Request
+from rest_framework.views import APIView
 
 from chats.apps.projects.models.models import Project
 
@@ -48,3 +50,11 @@ class ProjectUUIDRequestBodyPermission(BasePermission):
 
         request.project = project
         return True
+
+
+class HasInternalAuthenticationPermission(BasePermission):
+    def has_permission(self, request: Request, view: APIView) -> bool:
+        jwt_payload = getattr(request, "jwt_payload", None)
+        project_uuid = getattr(request, "project_uuid", None)
+
+        return jwt_payload is not None and project_uuid is not None

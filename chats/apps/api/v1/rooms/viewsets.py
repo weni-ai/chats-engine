@@ -159,11 +159,12 @@ class RoomViewset(
     ):  # TODO: sparate list and retrieve queries from update and close
         if self.action != "list":
             self.filterset_class = None
-        qs = (
-            super()
-            .get_queryset()
-            .filter(queue__sector__project__permissions__user=self.request.user)
-        )
+
+        user_projects = ProjectPermission.objects.filter(
+            user=self.request.user
+        ).values_list("project", flat=True)
+
+        qs = super().get_queryset().filter(queue__sector__project__in=user_projects)
 
         qs = qs.select_related(
             "user", "contact", "queue", "queue__sector", "queue__sector__project"
@@ -1529,7 +1530,7 @@ class RoomNoteViewSet(
         if not room_uuid:
             raise ValidationError({"detail": "Room UUID is required"})
 
-        if not Room.objects.filter(uuid=room_uuid).exists():
+        if not self.queryset.filter(uuid=room_uuid).exists():
             raise ValidationError({"detail": "Room not found"})
 
         return super().list(request, *args, **kwargs)

@@ -1,3 +1,64 @@
+# 3.67.5
+# Add
+  - JWT authentication and authorization
+# Fix
+  - Inactivity last message update on room closure
+  - Room filtering to exclude deleted entities
+# Refactor
+  - Optimized inactivity feature
+
+# 3.67.4
+# Add
+  - Optimized media handling in archived chat messages
+# Fix
+  - Handle missing replied messages in MessageSerializerV2
+
+# 3.67.3
+# Add
+  - 9-digit phone number support
+
+# 3.67.2
+# Add
+  - APM tracers to requests
+# Fix
+  - Exclude active custom statuses from historical date filter
+
+# 3.67.1
+# Refactor
+  - Optimized pinned room retrieval and serialization performance
+
+# 3.67.0
+# Add
+  - Quick Messages feature with caching and API endpoints
+  - Sector quick messages functionality
+  - External room history endpoint with throttling and caching
+
+# 3.66.3
+# Fix
+  - Error when closing rooms
+
+# 3.66.2
+# Add
+  - Inactivity timeout feature V2
+# Fix
+  - Archive rooms messages task schedule
+
+# 3.66.1
+# Remove
+  - Inactivity feature fields (reverted)
+  - Room export translation fixes (reverted)
+
+# 3.66.0
+# Add
+  - Inactivity timeout fields and CRUD with feature flag
+  - Updated archive chats schedule
+# Fix
+  - Translations, URN, and hour format in room export
+
+# 3.65.4
+# Fix
+  - VTEX logo dimensions and SVG paths in conversation report template
+
 # 3.65.3
 # Add
   - Custom status in transfer endpoint

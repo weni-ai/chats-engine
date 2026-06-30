@@ -293,6 +293,22 @@ class Room(BaseModel, BaseConfigurableModel):
                 fields=["is_active", "is_inactive", "is_waiting", "last_interaction"],
                 name="rooms_inactivity_idx",
             ),
+            # Partial index used by `InactivityService.warn_inactive_rooms`.
+            # Pre-filters rows that match every `rooms_room`-local predicate
+            # of the warn queryset so the planner picks this index directly
+            # instead of doing a BitmapAnd with `rooms_room_last_message_user_id_*`,
+            # which scans hundreds of thousands of historical rows.
+            models.Index(
+                fields=["last_interaction"],
+                name="rooms_inactivity_warn_idx",
+                condition=models.Q(
+                    is_active=True,
+                    is_inactive=False,
+                    is_waiting=False,
+                    user__isnull=False,
+                    last_message_user__isnull=False,
+                ),
+            ),
         ]
 
     def save(self, *args, **kwargs) -> None:
@@ -813,22 +829,29 @@ class Room(BaseModel, BaseConfigurableModel):
             unread_messages_count=0, last_unread_message_at=timezone.now()
         )
 
-    def update_last_message(self, message, user=None):
+    def update_last_message(self, message, user=None, update_last_interaction=True):
         """
         Updates last message fields. Used for agent/system messages.
+
+        When ``update_last_interaction`` is False the interaction timestamp
+        is preserved — useful for automatic messages (e.g. inactivity
+        warnings) that must not reset timers.
         """
         media_data = [
             {"content_type": media.content_type, "url": media.url}
             for media in message.medias.all()
         ]
-        Room.objects.filter(pk=self.pk).update(
-            last_interaction=message.created_on,
-            last_message=message,
-            last_message_text=message.text,
-            last_message_user=user,
-            last_message_contact=None,
-            last_message_media=media_data,
-        )
+        fields = {
+            "last_message": message,
+            "last_message_text": message.text,
+            "last_message_user": user,
+            "last_message_contact": None,
+            "last_message_media": media_data,
+        }
+        if update_last_interaction:
+            fields["last_interaction"] = message.created_on
+
+        Room.objects.filter(pk=self.pk).update(**fields)
 
     def on_new_message(self, message, contact=None, increment_unread: int = 0):
         """
