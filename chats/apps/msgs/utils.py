@@ -41,9 +41,17 @@ _WAMID_PREFIX = "wamid."
 # id bytes inside the decoded WAMID payload. They were derived from real
 # WAMIDs observed in production for both ``wamid.HBgM`` (contact-origin) and
 # ``wamid.HBgT`` (agent-origin) envelopes.
+#
+# ``0x12, 0x18, 0x20`` additionally covers the envelope seen when a contact
+# replies to their own earlier message: the ``context.id`` Meta sends in that
+# case uses a LID-based ``wamid.HBgT<LID>...`` wrapper instead of the
+# phone-based ``wamid.HBgM<phone>...`` wrapper the original message was
+# stored with, so the exact ``external_id`` match misses and this fallback
+# marker is what lets the core comparison still line up.
 _WAMID_TRAILER_MARKERS = (
     bytes([0x12, 0x18, 0x16]),
     bytes([0x11, 0x18, 0x12]),
+    bytes([0x12, 0x18, 0x20]),
 )
 
 

@@ -17,6 +17,20 @@ WAMID_HBGT_BUSINESS = (
 WAMID_HBGL_US_CONTACT = (
     "wamid.HBgLMTUwODcxODkzNDUVAgARGBIxNjYzM0EyMURBNjg5RkZFODUA"
 )
+# Contact-self-reply pair observed in production: a contact message
+# (HBgM/phone envelope) and the ``context.id`` of a later reply by the same
+# contact to that message (HBgT/LID envelope). Both share the same internal
+# id (``ACF1292A9EB1991D17C575DDA2A6B587``) but use the ``0x12, 0x18, 0x20``
+# trailer marker, which is distinct from ``WAMID_HBGT_BUSINESS`` above
+# (same HBgT/LID shape, but ``0x12, 0x18, 0x16`` marker).
+WAMID_HBGM_CONTACT_SELF_REPLY_ORIGINAL = (
+    "wamid.HBgMNTU4NDg3NzgyMDg3FQIAEhggQUNGMTI5MkE5RUIxOTkxRDE3QzU3NUREQTJB"
+    "NkI1ODcA"
+)
+WAMID_HBGT_CONTACT_SELF_REPLY_CONTEXT = (
+    "wamid.HBgTQlIuMTE4MDk1NTMyMDg2MDk4OBUUABIYIEFDRjEyOTJBOUVCMTk5MUQxN0M1"
+    "NzVEREEyQTZCNTg3AA=="
+)
 
 
 class ExtractWamidCoreTests(SimpleTestCase):
@@ -70,3 +84,18 @@ class ExtractWamidCoreTests(SimpleTestCase):
             extract_wamid_core(unpadded),
             extract_wamid_core(WAMID_HBGM_AGENT_A),
         )
+
+    def test_resolves_contact_self_reply_envelope(self):
+        # Regression test: a contact replying to their own earlier message
+        # used to fail to resolve because the ``0x12, 0x18, 0x20`` trailer
+        # marker wasn't recognized, even though the original (HBgM/phone)
+        # and the reply's context.id (HBgT/LID) reference the same message.
+        original_core = extract_wamid_core(
+            WAMID_HBGM_CONTACT_SELF_REPLY_ORIGINAL
+        )
+        context_core = extract_wamid_core(
+            WAMID_HBGT_CONTACT_SELF_REPLY_CONTEXT
+        )
+        self.assertIsNotNone(original_core)
+        self.assertIsNotNone(context_core)
+        self.assertEqual(original_core, context_core)
