@@ -333,7 +333,7 @@ class QueueAuthorization(AuditableMixin, BaseSoftDeleteModel, BaseModel):
 
     queue = models.ForeignKey(
         Queue,
-        verbose_name=_[tuple, dict[str, Any]]("Queue"),
+        verbose_name=_("Queue"),
         related_name="authorizations",
         on_delete=models.CASCADE,
     )
