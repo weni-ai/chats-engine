@@ -149,6 +149,8 @@ class GetFlowTemplatesDataUseCase:
             for ch in project_channels
         }
 
+        collected: list[FlowTemplate] = []
+
         for template_info in templates_info:
             template_channels = self._get_template_channels(template_info)
 
@@ -163,12 +165,13 @@ class GetFlowTemplatesDataUseCase:
                 continue
 
             meta_template = self._fetch_meta_template(waba_id, template_info["name"])
-            flow_template = FlowTemplate(
-                id=meta_template["id"],
-                name=meta_template["name"],
-                data=meta_template,
-                variables=template_info.get("variables", []),
+            collected.append(
+                FlowTemplate(
+                    id=meta_template["id"],
+                    name=meta_template["name"],
+                    data=meta_template,
+                    variables=template_info.get("variables", []),
+                )
             )
-            return FlowTemplatesData(uuid=flow_uuid, templates=[flow_template])
 
-        return FlowTemplatesData(uuid=flow_uuid, templates=[])
+        return FlowTemplatesData(uuid=flow_uuid, templates=collected)
