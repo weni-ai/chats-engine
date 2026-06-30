@@ -39,6 +39,7 @@ class Queue(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMode
     default_message = models.TextField(
         _("Default queue message"), null=True, blank=True
     )
+    queue_purpose = models.TextField(_("Queue purpose"), null=True, blank=True)
     queue_limit = models.PositiveIntegerField(_("Limit"), null=True, blank=True)
     is_queue_limit_active = models.BooleanField(_("Is limit active?"), default=False)
 
