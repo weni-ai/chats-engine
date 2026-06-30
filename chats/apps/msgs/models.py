@@ -417,9 +417,17 @@ class ChatMessageReplyIndex(BaseModelWithManualCreatedOn):
     # HBgT). Nullable because legacy rows and non-WAMID identifiers may not
     # have one; not unique because two distinct WAMIDs can resolve to the same
     # core during the rollout window.
-    external_id_core = models.CharField(
+    #
+    # ``TextField`` (no length cap) on purpose: a ``CharField(max_length=64)``
+    # caused a production ``DataError`` because the LID-based envelope
+    # (``HBgT<LID>...``, e.g. when a contact replies to their own message)
+    # wraps a longer internal id whose hex core is consistently 66 chars —
+    # not a rare outlier. Rather than guess a "safe" max for every current
+    # and future Meta envelope, store this as unbounded text; Postgres
+    # indexes ``text`` columns the same way as ``varchar`` and our values are
+    # always tiny (well under 1KB), so there's no practical cost.
+    external_id_core = models.TextField(
         _("External ID core"),
-        max_length=64,
         null=True,
         blank=True,
         db_index=True,

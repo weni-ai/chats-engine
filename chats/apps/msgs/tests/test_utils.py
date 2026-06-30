@@ -99,3 +99,17 @@ class ExtractWamidCoreTests(SimpleTestCase):
         self.assertIsNotNone(original_core)
         self.assertIsNotNone(context_core)
         self.assertEqual(original_core, context_core)
+
+    def test_lid_envelope_core_exceeds_old_64_char_column_limit(self):
+        # Production incident regression test: every core produced via the
+        # ``0x12, 0x18, 0x20`` marker (LID-based envelope) is 66 hex chars,
+        # not a rare outlier. ``ChatMessageReplyIndex.external_id_core`` used
+        # to be ``CharField(max_length=64)``, so storing this value raised a
+        # ``DataError`` on every incoming message matching this envelope.
+        # The field is now an unbounded ``TextField`` (see migration 0021);
+        # this test documents *why* and guards against the column ever being
+        # narrowed again without re-checking this.
+        core = extract_wamid_core(WAMID_HBGT_CONTACT_SELF_REPLY_CONTEXT)
+        self.assertIsNotNone(core)
+        self.assertEqual(len(core), 66)
+        self.assertGreater(len(core), 64)
