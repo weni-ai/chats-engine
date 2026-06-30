@@ -5,5 +5,5 @@ _Use a short paragraph for focused changes, or bullet points when the PR spans m
 ### Why
 _Explain the motivation. What problem or limitation existed before? What does this change enable, fix, or simplify for consumers of the code?_
 
-<!-- ### Mermaid diagram -->
+<!-- ### Sequence diagram -->
 <!-- _Optional. Mermaid sequence diagram explaining the new feature process._ -->
