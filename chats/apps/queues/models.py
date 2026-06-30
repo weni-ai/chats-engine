@@ -321,7 +321,7 @@ class Queue(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMode
         return self.sector.required_tags
 
 
-class QueueAuthorization(AuditableMixin, BaseModel):
+class QueueAuthorization(AuditableMixin, BaseSoftDeleteModel, BaseModel):
     ROLE_NOT_SETTED = 0
     ROLE_AGENT = 1
 
