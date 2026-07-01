@@ -525,9 +525,7 @@ INACTIVITY_MAX_WARNINGS_PER_RUN = env.int(
 INACTIVITY_MAX_CLOSURES_PER_RUN = env.int(
     "INACTIVITY_MAX_CLOSURES_PER_RUN", default=500
 )
-INACTIVITY_QUERYSET_CHUNK_SIZE = env.int(
-    "INACTIVITY_QUERYSET_CHUNK_SIZE", default=200
-)
+INACTIVITY_QUERYSET_CHUNK_SIZE = env.int("INACTIVITY_QUERYSET_CHUNK_SIZE", default=200)
 
 # Distributed lock used by `check_inactivity_rooms` to guarantee only one
 # instance of the task runs at a time, even if a previous run overlaps the
@@ -535,9 +533,7 @@ INACTIVITY_QUERYSET_CHUNK_SIZE = env.int(
 INACTIVITY_TASK_LOCK_NAME = env.str(
     "INACTIVITY_TASK_LOCK_NAME", default="inactivity_task_lock"
 )
-INACTIVITY_TASK_LOCK_TIMEOUT = env.int(
-    "INACTIVITY_TASK_LOCK_TIMEOUT", default=120
-)
+INACTIVITY_TASK_LOCK_TIMEOUT = env.int("INACTIVITY_TASK_LOCK_TIMEOUT", default=120)
 
 # Celery
 
@@ -562,7 +558,7 @@ CELERY_BEAT_SCHEDULE = {
     },
     "start-archive-rooms-messages": {
         "task": "start_archive_rooms_messages",
-        "schedule": crontab(hour="0-4", minute=0),
+        "schedule": crontab(hour="0-6", minute=0),
     },
     "check-inactivity-rooms": {
         "task": "check_inactivity_rooms",
