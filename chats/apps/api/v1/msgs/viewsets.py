@@ -1,12 +1,5 @@
-import logging
-import mimetypes
-import os
-from urllib.parse import urlparse
-
-import sentry_sdk
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
-from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
@@ -18,6 +11,10 @@ from rest_framework.response import Response
 
 from chats.apps.api.pagination import CustomCursorPagination
 from chats.apps.api.v1.msgs.filters import MessageFilter, MessageMediaFilter
+from chats.apps.api.v1.msgs.media_download import (
+    build_media_download_response,
+    resolve_message_media_for_download,
+)
 from chats.apps.api.v1.msgs.permissions import (
     MessageMediaPermission,
     MessagePermission,
@@ -30,11 +27,6 @@ from chats.apps.api.v1.msgs.serializers import (
 )
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
-from chats.core.requests import get_request_session_with_retries
-
-logger = logging.getLogger(__name__)
-
-DOWNLOAD_CHUNK_SIZE = 8192
 
 
 class MessageViewset(
@@ -139,6 +131,27 @@ class MessageViewset(
 
         return super().get_parsers()
 
+    @action(detail=True, methods=["GET"], url_path="download")
+    def download(self, request, *args, **kwargs):
+        message = get_object_or_404(
+            ChatMessage.objects.select_related(
+                "room__queue__sector__project"
+            ).prefetch_related("medias"),
+            uuid=kwargs["uuid"],
+        )
+        self.check_object_permissions(request, message)
+
+        media = resolve_message_media_for_download(message)
+        if not media:
+            return Response(
+                {"detail": _("Media file not found")},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return build_media_download_response(
+            media, log_context="MessageViewset.download"
+        )
+
 
 class MessageMediaViewset(
     mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
@@ -198,68 +211,6 @@ class MessageMediaViewset(
         )
         self.check_object_permissions(request, media)
 
-        content_type = media.content_type or "application/octet-stream"
-        filename = self._get_download_filename(media)
-
-        try:
-            if media.media_file:
-                response = StreamingHttpResponse(
-                    media.media_file.open("rb").chunks(
-                        chunk_size=DOWNLOAD_CHUNK_SIZE
-                    ),
-                    content_type=content_type,
-                )
-            elif media.media_url:
-                # `public_url` returns the Flows proxy URL when the feature
-                # flag is active (same URL the frontend used to hit
-                # directly). Fetching it here, server-side, means *we*
-                # follow the redirect chain (Flows -> presigned S3 URL)
-                # instead of the browser, which is what caused CORS
-                # failures when the client tried to download cross-origin.
-                upstream = get_request_session_with_retries().get(
-                    media.public_url, stream=True, timeout=30, allow_redirects=True
-                )
-                upstream.raise_for_status()
-                response = StreamingHttpResponse(
-                    upstream.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE),
-                    content_type=media.content_type
-                    or upstream.headers.get(
-                        "Content-Type", "application/octet-stream"
-                    ),
-                )
-            else:
-                return Response(
-                    {"detail": _("Media file not found")},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-        except Exception as error:
-            logger.error(
-                "[MessageMediaViewset.download] Failed to fetch media "
-                f"{media.uuid}: {error}"
-            )
-            sentry_sdk.capture_exception(error)
-            return Response(
-                {
-                    "detail": _(
-                        "Media couldn't be downloaded due to a technical issue"
-                    )
-                },
-                status=status.HTTP_502_BAD_GATEWAY,
-            )
-
-        response["Content-Disposition"] = f'attachment; filename="{filename}"'
-        return response
-
-    @staticmethod
-    def _get_download_filename(media: MessageMedia) -> str:
-        if media.media_file:
-            name = os.path.basename(media.media_file.name)
-            if name:
-                return name
-        elif media.media_url:
-            name = os.path.basename(urlparse(media.media_url).path)
-            if name:
-                return name
-
-        ext = mimetypes.guess_extension(media.content_type or "") or ""
-        return f"{media.uuid}{ext}"
+        return build_media_download_response(
+            media, log_context="MessageMediaViewset.download"
+        )
