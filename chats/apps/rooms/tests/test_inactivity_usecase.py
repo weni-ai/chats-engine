@@ -99,6 +99,24 @@ class InactivityWarnTests(TestCase):
         )
         self.assertTrue(warning_msg.is_automatic_message)
 
+    def test_warn_updates_last_message_but_not_last_interaction(self):
+        room = self._create_eligible_room()
+        original_last_interaction = room.last_interaction
+
+        with patch.object(Room, "notify_inactivity"):
+            InactivityService().warn_inactive_rooms()
+
+        room.refresh_from_db()
+        warning_msg = Message.objects.get(
+            room=room, text="Are you still there?", user=self.user
+        )
+        self.assertEqual(room.last_message, warning_msg)
+        self.assertEqual(room.last_message_text, "Are you still there?")
+        self.assertEqual(
+            int(room.last_interaction.timestamp()),
+            int(original_last_interaction.timestamp()),
+        )
+
     def test_room_within_timeout_is_not_warned(self):
         room = self._create_eligible_room(last_interaction_offset_seconds=60)
 
@@ -238,6 +256,24 @@ class InactivityCloseTests(TestCase):
         self.assertTrue(feedback_msg.seen)
         self.assertIsNone(feedback_msg.automatic_message_type)
         self.assertFalse(feedback_msg.is_automatic_message)
+
+    def test_close_updates_last_message_to_closure_text(self):
+        room = self._create_already_warned_room(last_interaction_offset_seconds=700)
+        original_last_interaction = room.last_interaction
+
+        with patch.object(Room, "notify_user"), patch.object(Message, "notify_room"):
+            InactivityService().close_inactive_rooms()
+
+        room.refresh_from_db()
+        closure_msg = Message.objects.get(
+            room=room, text="Closing due to inactivity.", user=self.user
+        )
+        self.assertEqual(room.last_message, closure_msg)
+        self.assertEqual(room.last_message_text, "Closing due to inactivity.")
+        self.assertEqual(
+            int(room.last_interaction.timestamp()),
+            int(original_last_interaction.timestamp()),
+        )
 
     def test_history_serializer_payload_after_automatic_close(self):
         """
@@ -471,7 +507,10 @@ class SilentAutomaticMessageTests(TestCase):
             int(room.last_interaction.timestamp()),
             int(original_last_interaction.timestamp()),
         )
+        self.assertEqual(room.last_message, message)
+        self.assertEqual(room.last_message_text, "warn me")
         self.assertEqual(room.last_message_user, self.user)
+        self.assertIsNone(room.last_message_contact)
 
     def test_returns_none_when_text_is_empty(self):
         room = Room.objects.create(queue=self.queue, contact=self.contact)
@@ -570,3 +609,190 @@ class RoomNotifyInactivityTests(TestCase):
             self.room.notify_inactivity()
 
         mock_send.assert_not_called()
+
+
+class InactivityBatchLimitTests(TestCase):
+    """
+    Tests for the per-execution caps that bound how many rooms the inactivity
+    service warns or closes in a single run. Above the cap, remaining rooms
+    must be left untouched for the next periodic execution to pick up.
+    """
+
+    def setUp(self):
+        _enable_inactivity_feature_flag(self)
+        self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            name="Sector",
+            project=self.project,
+            rooms_limit=5,
+            work_start="09:00",
+            work_end="18:00",
+            inactivity_timeout=_enabled_inactivity_config(),
+        )
+        self.queue = Queue.objects.create(name="Queue", sector=self.sector)
+        self.user = User.objects.create(email="agent@example.com")
+        # Counter feeds unique contact ids; the rooms_room unique constraint
+        # `(contact_id, queue_id, is_active=True)` forbids two active rooms
+        # with the same contact in the same queue, so each room must use a
+        # fresh contact.
+        self._contact_seq = 0
+
+    def _new_contact(self) -> Contact:
+        self._contact_seq += 1
+        return Contact.objects.create(
+            name=f"Contact {self._contact_seq}",
+            external_id=f"c-batch-{self._contact_seq}",
+        )
+
+    def _create_warn_eligible_room(self) -> Room:
+        room = Room.objects.create(queue=self.queue, contact=self._new_contact())
+        room.user = self.user
+        room.last_message_user = self.user
+        room.last_interaction = timezone.now() - timedelta(seconds=900)
+        room.save()
+        return room
+
+    def _create_close_eligible_room(self) -> Room:
+        room = self._create_warn_eligible_room()
+        room.is_inactive = True
+        room.save()
+        return room
+
+    def test_warn_stops_at_configured_batch_limit(self):
+        rooms = [self._create_warn_eligible_room() for _ in range(3)]
+
+        with self.settings(INACTIVITY_MAX_WARNINGS_PER_RUN=2), patch.object(
+            Room, "notify_inactivity"
+        ):
+            warned = InactivityService().warn_inactive_rooms()
+
+        self.assertEqual(warned, 2)
+
+        inactive_count = Room.objects.filter(
+            pk__in=[r.pk for r in rooms], is_inactive=True
+        ).count()
+        self.assertEqual(inactive_count, 2)
+
+    def test_warn_processes_everything_when_under_limit(self):
+        rooms = [self._create_warn_eligible_room() for _ in range(3)]
+
+        with self.settings(INACTIVITY_MAX_WARNINGS_PER_RUN=10), patch.object(
+            Room, "notify_inactivity"
+        ):
+            warned = InactivityService().warn_inactive_rooms()
+
+        self.assertEqual(warned, 3)
+        inactive_count = Room.objects.filter(
+            pk__in=[r.pk for r in rooms], is_inactive=True
+        ).count()
+        self.assertEqual(inactive_count, 3)
+
+    def test_close_stops_at_configured_batch_limit(self):
+        rooms = [self._create_close_eligible_room() for _ in range(3)]
+
+        with self.settings(
+            INACTIVITY_MAX_CLOSURES_PER_RUN=2, ACTIVATE_CALC_METRICS=False
+        ), patch.object(Room, "notify_user"), patch.object(
+            Room, "notify_queue"
+        ), patch.object(
+            Message, "notify_room"
+        ):
+            closed = InactivityService().close_inactive_rooms()
+
+        self.assertEqual(closed, 2)
+
+        closed_count = Room.objects.filter(
+            pk__in=[r.pk for r in rooms], is_active=False
+        ).count()
+        self.assertEqual(closed_count, 2)
+
+
+class InactivityMetricsEnqueueTests(TestCase):
+    """
+    Tests that the inactivity usecase enqueues the metrics work to the
+    `close_metrics` Celery task instead of running `close_room` (which does
+    DB-bound work synchronously) inline in the per-room loop.
+
+    The contract verified here is local to the inactivity flow: the manual
+    close path in `viewsets.py` continues to use `close_room` directly and
+    is intentionally not affected.
+    """
+
+    def setUp(self):
+        _enable_inactivity_feature_flag(self)
+        self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            name="Sector",
+            project=self.project,
+            rooms_limit=5,
+            work_start="09:00",
+            work_end="18:00",
+            inactivity_timeout=_enabled_inactivity_config(),
+        )
+        self.queue = Queue.objects.create(name="Queue", sector=self.sector)
+        self.user = User.objects.create(email="agent@example.com")
+        self.contact = Contact.objects.create(name="Contact", external_id="c-1")
+
+    def _create_already_warned_room(self) -> Room:
+        room = Room.objects.create(queue=self.queue, contact=self.contact)
+        room.user = self.user
+        room.last_message_user = self.user
+        room.last_interaction = timezone.now() - timedelta(seconds=700)
+        room.is_inactive = True
+        room.save()
+        return room
+
+    def test_metrics_are_enqueued_to_celery_when_activated(self):
+        room = self._create_already_warned_room()
+
+        with self.settings(
+            ACTIVATE_CALC_METRICS=True, METRICS_CUSTOM_QUEUE="metrics-queue"
+        ), patch.object(Room, "notify_user"), patch.object(
+            Room, "notify_queue"
+        ), patch.object(
+            Message, "notify_room"
+        ), patch(
+            "chats.apps.dashboard.tasks.close_metrics.apply_async"
+        ) as mock_apply_async, patch(
+            "chats.apps.rooms.views.close_room"
+        ) as mock_inline_close_room:
+            closed = InactivityService().close_inactive_rooms()
+
+        self.assertEqual(closed, 1)
+        mock_apply_async.assert_called_once_with(
+            args=[str(room.pk)], queue="metrics-queue"
+        )
+        mock_inline_close_room.assert_not_called()
+
+    def test_metrics_are_not_enqueued_when_deactivated(self):
+        self._create_already_warned_room()
+
+        with self.settings(ACTIVATE_CALC_METRICS=False), patch.object(
+            Room, "notify_user"
+        ), patch.object(Room, "notify_queue"), patch.object(
+            Message, "notify_room"
+        ), patch(
+            "chats.apps.dashboard.tasks.close_metrics.apply_async"
+        ) as mock_apply_async:
+            closed = InactivityService().close_inactive_rooms()
+
+        self.assertEqual(closed, 1)
+        mock_apply_async.assert_not_called()
+
+    def test_metrics_enqueue_failure_does_not_block_close(self):
+        room = self._create_already_warned_room()
+
+        with self.settings(ACTIVATE_CALC_METRICS=True), patch.object(
+            Room, "notify_user"
+        ), patch.object(Room, "notify_queue"), patch.object(
+            Message, "notify_room"
+        ), patch(
+            "chats.apps.dashboard.tasks.close_metrics.apply_async",
+            side_effect=RuntimeError("broker down"),
+        ):
+            closed = InactivityService().close_inactive_rooms()
+
+        room.refresh_from_db()
+        self.assertEqual(closed, 1)
+        self.assertFalse(room.is_active)
+        self.assertTrue(room.automatic_closed)

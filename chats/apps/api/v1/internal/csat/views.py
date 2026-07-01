@@ -2,7 +2,7 @@ from rest_framework.viewsets import GenericViewSet
 from rest_framework.response import Response
 from rest_framework import status
 
-from chats.apps.api.authentication.classes import JWTAuthentication
+from chats.apps.api.authentication.classes import GenericJWTAuthentication
 from chats.apps.api.v1.internal.csat.permissions import CSATWebhookPermission
 from chats.apps.api.v1.internal.csat.serializers import (
     CreateCSATWebhookSerializer,
@@ -14,7 +14,7 @@ from chats.apps.csat.models import CSATSurvey
 class CSATWebhookView(GenericViewSet):
     serializer_class = CreateCSATWebhookSerializer
     permission_classes = [CSATWebhookPermission]
-    authentication_classes = [JWTAuthentication]
+    authentication_classes = [GenericJWTAuthentication]
 
     def create(self, request, *args, **kwargs):
         room_uuid = request.data.get("room")
