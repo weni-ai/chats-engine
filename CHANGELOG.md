@@ -1,3 +1,28 @@
+# 3.68.5
+# Fix
+  - External ID field type changed to text field for reply index
+
+# 3.68.4
+# Fix
+  - Additional WAMID trailer markers support
+
+# 3.68.3
+# Remove
+  - Return all flow templates feature (reverted)
+
+# 3.68.2
+# Refactor
+  - RoomPin creation updated to include project association and filters
+
+# 3.68.1
+# Add
+  - Return all flow templates
+
+# 3.68.0
+# Add
+  - Project association to RoomPin model
+  - Soft delete support to QueueAuthorization model
+
 # 3.67.5
 # Add
   - JWT authentication and authorization
