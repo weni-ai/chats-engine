@@ -48,7 +48,17 @@ class MessagePermission(permissions.BasePermission):
         if isinstance(request.user, AnonymousUser):
             return False
 
-        return message.room.user == request.user
+        room = message.room
+        if room.user == request.user:
+            return True
+
+        if not room.queue:
+            return False
+
+        project = room.queue.sector.project
+        return request.user.project_permissions.filter(
+            project=project, role__gt=0
+        ).exists()
 
 
 class MessageMediaPermission(permissions.BasePermission):
