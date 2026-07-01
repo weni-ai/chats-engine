@@ -43,7 +43,6 @@ class OldProjectConsumer(ChatsEDAConsumer):
         project_dto = _build_project_dto(body)
 
         sector_setup_handler = SectorSetupHandlerUseCase()
-
         project_creation = ProjectCreationUseCase(sector_setup_handler)
         project_creation.create_project(project_dto)
 

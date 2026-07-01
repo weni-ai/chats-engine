@@ -11,7 +11,6 @@ https://docs.djangoproject.com/en/4.0/ref/settings/
 """
 
 import sys
-
 import os
 from pathlib import Path
 
@@ -629,9 +628,9 @@ EDA_CONSUMERS_HANDLES = {
 
 if USE_EDA:
     EDA_CONNECTION_BACKEND = "chats.apps.event_driven.backends.PyAMQPConnectionBackend"
+    EDA_CONSUMERS_HANDLE_LEGACY = "chats.apps.event_driven.handle.handle_consumers"
 
     _command = sys.argv[1] if len(sys.argv) > 1 else None
-
     EDA_CONSUMERS_HANDLE = EDA_CONSUMERS_HANDLES.get(
         _command, EDA_CONSUMERS_HANDLES["edaconsume"]
     )
@@ -789,6 +788,10 @@ INSIGHTS_API_RETRY_DELAY = env.int("INSIGHTS_API_RETRY_DELAY", default=5)
 # Feature flags
 FEEDBACK_FEATURE_FLAG_KEY = env.str(
     "FEEDBACK_FEATURE_FLAG_KEY", default="weniChatsFeedback"
+)
+DISABLE_OLD_PROJECT_CONSUMER_FEATURE_FLAG_KEY = env.str(
+    "DISABLE_OLD_PROJECT_CONSUMER_FEATURE_FLAG_KEY",
+    default="weniChatsDisableOldProjectConsumer",
 )
 AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY = env.str(
     "AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY", default="weniChatsAutomaticMessage"
