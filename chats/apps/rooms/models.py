@@ -313,6 +313,22 @@ class Room(BaseModel, BaseConfigurableModel):
                     first_user_assigned_at__isnull=False,
                 ),
             ),
+            # Partial index used by `InactivityService.warn_inactive_rooms`.
+            # Pre-filters rows that match every `rooms_room`-local predicate
+            # of the warn queryset so the planner picks this index directly
+            # instead of doing a BitmapAnd with `rooms_room_last_message_user_id_*`,
+            # which scans hundreds of thousands of historical rows.
+            models.Index(
+                fields=["last_interaction"],
+                name="rooms_inactivity_warn_idx",
+                condition=models.Q(
+                    is_active=True,
+                    is_inactive=False,
+                    is_waiting=False,
+                    user__isnull=False,
+                    last_message_user__isnull=False,
+                ),
+            ),
         ]
 
     def save(self, *args, **kwargs) -> None:

@@ -97,9 +97,12 @@ class ProjectInternalSerializer(serializers.ModelSerializer):
             }
             self._queue_data = {"uuid": str(queue.pk), "name": queue.name}
 
-            flow_client = FlowRESTClient()
-            response_flows = flow_client.create_queue(
-                str(queue.uuid), queue.name, str(queue.sector.uuid)
+            response_flows = flows_client.create_queue(
+                uuid=str(queue.uuid),
+                project_uuid=str(instance.uuid),
+                name=queue.name,
+                queue_purpose=queue.queue_purpose,
+                sector_uuid=str(queue.sector.uuid),
             )
             status_list = [
                 status.HTTP_200_OK,

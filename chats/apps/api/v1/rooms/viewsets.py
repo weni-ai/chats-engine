@@ -21,7 +21,7 @@ from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_yasg.utils import swagger_auto_schema
 from pydub.exceptions import CouldntDecodeError
-from rest_framework import filters, mixins, parsers, permissions, status
+from rest_framework import mixins, parsers, permissions, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.filters import OrderingFilter
@@ -109,6 +109,7 @@ from chats.apps.rooms.views import (
     update_flows_custom_fields,
 )
 from chats.apps.sectors.models import SectorTag
+from chats.core.filters import PhoneAwareSearchFilter
 from chats.core.permissions import GetPermission
 
 logger = logging.getLogger(__name__)
@@ -125,7 +126,7 @@ class RoomViewset(
     serializer_class = RoomSerializer
     filter_backends = [
         DjangoFilterBackend,
-        filters.SearchFilter,
+        PhoneAwareSearchFilter,
         OrderingFilter,
     ]
     filterset_class = room_filters.RoomFilter
@@ -158,11 +159,12 @@ class RoomViewset(
     ):  # TODO: sparate list and retrieve queries from update and close
         if self.action != "list":
             self.filterset_class = None
-        qs = (
-            super()
-            .get_queryset()
-            .filter(queue__sector__project__permissions__user=self.request.user)
-        )
+
+        user_projects = ProjectPermission.objects.filter(
+            user=self.request.user
+        ).values_list("project", flat=True)
+
+        qs = super().get_queryset().filter(queue__sector__project__in=user_projects)
 
         qs = qs.select_related("user", "contact", "queue", "queue__sector")
 
@@ -1583,7 +1585,7 @@ class RoomNoteViewSet(
         if not room_uuid:
             raise ValidationError({"detail": "Room UUID is required"})
 
-        if not Room.objects.filter(uuid=room_uuid).exists():
+        if not self.queryset.filter(uuid=room_uuid).exists():
             raise ValidationError({"detail": "Room not found"})
 
         return super().list(request, *args, **kwargs)
@@ -1626,7 +1628,7 @@ class RoomNoteMediaViewset(
     swagger_tag = "Rooms"
     queryset = RoomNoteMedia.objects.all()
     serializer_class = RoomNoteMediaSerializer
-    filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
+    filter_backends = [OrderingFilter, DjangoFilterBackend]
     filterset_class = room_filters.RoomNoteMediaFilter
     parser_classes = [parsers.MultiPartParser]
     permission_classes = [IsAuthenticated, RoomNoteMediaPermission]

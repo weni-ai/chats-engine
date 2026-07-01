@@ -1,9 +1,15 @@
+from unittest.mock import patch
+
 from django.test import TestCase
 from rest_framework.request import Request
 from rest_framework.test import APIRequestFactory
 
 from chats.apps.contacts.models import Contact
-from chats.core.filters import DocumentAwareSearchFilter
+from chats.apps.projects.models import Project
+from chats.apps.queues.models import Queue
+from chats.apps.rooms.models import Room
+from chats.apps.sectors.models import Sector
+from chats.core.filters import DocumentAwareSearchFilter, PhoneAwareSearchFilter
 
 
 class _FakeView:
@@ -175,3 +181,124 @@ class DocumentAwareSearchFilterCommaOrTests(TestCase):
         self.assertIn(self.joao, qs)
         self.assertNotIn(self.maria, qs)
         self.assertNotIn(self.outro, qs)
+
+
+class DocumentAwareSearchFilterUrnTests(TestCase):
+    @patch("chats.core.filters.ninth_digit_search_enabled_from_request", return_value=True)
+    def test_urn_field_matches_with_or_without_ninth_digit(self, _):
+        project = Project.objects.create(name="Filter Project")
+        sector = Sector.objects.create(
+            name="Sector",
+            project=project,
+            rooms_limit=5,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        queue = Queue.objects.create(name="Queue", sector=sector)
+        contact = Contact.objects.create(name="Phone Contact")
+        Room.objects.create(
+            contact=contact,
+            queue=queue,
+            urn="whatsapp:5584992126050",
+        )
+
+        backend = DocumentAwareSearchFilter()
+        request = Request(
+            APIRequestFactory().get(
+                "/",
+                {"search": "992126050", "project": str(project.uuid)},
+            )
+        )
+        view = _FakeView(["rooms__urn"])
+        qs = backend.filter_queryset(request, Contact.objects.all(), view)
+        self.assertEqual(qs.count(), 1)
+
+    @patch("chats.core.filters.ninth_digit_search_enabled_from_request", return_value=False)
+    def test_urn_field_without_flag_does_not_match_without_ninth_digit(self, _):
+        project = Project.objects.create(name="Filter Project Off")
+        sector = Sector.objects.create(
+            name="Sector",
+            project=project,
+            rooms_limit=5,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        queue = Queue.objects.create(name="Queue", sector=sector)
+        contact = Contact.objects.create(name="Phone Contact")
+        Room.objects.create(
+            contact=contact,
+            queue=queue,
+            urn="whatsapp:558492126050",
+        )
+
+        backend = DocumentAwareSearchFilter()
+        request = Request(
+            APIRequestFactory().get(
+                "/",
+                {"search": "992126050", "project": str(project.uuid)},
+            )
+        )
+        view = _FakeView(["rooms__urn"])
+        qs = backend.filter_queryset(request, Contact.objects.all(), view)
+        self.assertEqual(qs.count(), 0)
+
+
+class PhoneAwareSearchFilterTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.project = Project.objects.create(name="Room Search Project")
+        cls.sector = Sector.objects.create(
+            name="Sector",
+            project=cls.project,
+            rooms_limit=5,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        cls.queue = Queue.objects.create(name="Queue", sector=cls.sector)
+        cls.contact = Contact.objects.create(name="Room Contact")
+        cls.room_with_nine = Room.objects.create(
+            contact=cls.contact,
+            queue=cls.queue,
+            urn="whatsapp:5584992126050",
+        )
+        cls.room_without_nine = Room.objects.create(
+            contact=Contact.objects.create(name="Other"),
+            queue=cls.queue,
+            urn="whatsapp:558492126050",
+        )
+
+    def _filter(self, search_fields, term, ninth_digit_enabled=True):
+        backend = PhoneAwareSearchFilter()
+        request = Request(
+            APIRequestFactory().get(
+                "/",
+                {"search": term, "project": str(self.project.uuid)},
+            )
+        )
+        view = _FakeView(search_fields)
+        with patch(
+            "chats.core.filters.ninth_digit_search_enabled_from_request",
+            return_value=ninth_digit_enabled,
+        ):
+            return backend.filter_queryset(request, Room.objects.all(), view)
+
+    def test_search_by_urn_without_ninth_digit_finds_room_with_ninth(self):
+        qs = self._filter(["urn"], "992126050")
+        self.assertIn(self.room_with_nine, qs)
+
+    def test_search_by_urn_with_ninth_digit_finds_room_without_ninth(self):
+        qs = self._filter(["urn"], "992126050")
+        self.assertIn(self.room_without_nine, qs)
+
+    def test_search_without_flag_does_not_find_room_without_ninth_digit(self):
+        qs = self._filter(["urn"], "992126050", ninth_digit_enabled=False)
+        self.assertNotIn(self.room_without_nine, qs)
+
+    def test_foreign_number_search_is_unchanged(self):
+        foreign_room = Room.objects.create(
+            contact=Contact.objects.create(name="Foreign"),
+            queue=self.queue,
+            urn="whatsapp:12025550123",
+        )
+        qs = self._filter(["urn"], "2025550123")
+        self.assertIn(foreign_room, qs)

@@ -242,6 +242,40 @@ class TestBulkQueueCreate(APITestCase):
             )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active")
+    @with_project_permission()
+    def test_queue_purpose_with_feature_flag_off_returns_400(self, mock_feature_flag):
+        mock_feature_flag.side_effect = feature_flag_off_for(
+            settings.QUEUE_PURPOSE_FEATURE_FLAG_KEY
+        )
+        response = self.client.post(
+            self._url(),
+            data=self._payload(
+                queues=[{"name": "Fila 1", "queue_purpose": "Atendimento comercial"}]
+            ),
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["detail"][0].code, "queue_purpose_feature_flag_is_off"
+        )
+
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active")
+    @with_project_permission()
+    def test_queue_purpose_without_value_with_feature_flag_off_is_allowed(
+        self, mock_feature_flag
+    ):
+        mock_feature_flag.side_effect = feature_flag_off_for(
+            settings.QUEUE_PURPOSE_FEATURE_FLAG_KEY
+        )
+        with override_settings(USE_WENI_FLOWS=False):
+            response = self.client.post(
+                self._url(),
+                data=self._payload(queues=[{"name": "Fila 1"}]),
+                format="json",
+            )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
     @override_settings(USE_WENI_FLOWS=False)
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
     @with_project_permission()
@@ -383,6 +417,21 @@ class TestBulkQueueCreate(APITestCase):
             self.assertEqual(kwargs.get("project_uuid"), str(self.project.uuid))
             self.assertIn("uuid", kwargs)
             self.assertIn("name", kwargs)
+
+    @override_settings(USE_WENI_FLOWS=True)
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
+    @patch("chats.apps.queues.usecases.bulk_queue_creation.FlowRESTClient")
+    @with_project_permission()
+    def test_flows_calls_include_queue_purpose(self, mock_flows_cls, mock_feature_flag):
+        mock_flows_cls.return_value.create_queue.return_value = make_flows_response(201)
+
+        payload = self._payload(
+            queues=[{"name": "Fila 1", "queue_purpose": "Atendimento comercial"}]
+        )
+        self.client.post(self._url(), data=payload, format="json")
+
+        call_kwargs = mock_flows_cls.return_value.create_queue.call_args.kwargs
+        self.assertEqual(call_kwargs["queue_purpose"], "Atendimento comercial")
 
     @override_settings(USE_WENI_FLOWS=True)
     @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)

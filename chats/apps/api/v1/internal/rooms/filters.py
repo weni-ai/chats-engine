@@ -4,6 +4,7 @@ from django_filters import rest_framework as filters
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
+from chats.core.phone import build_urn_lookup_q, ninth_digit_search_enabled_from_request
 
 
 class RoomFilter(filters.FilterSet):
@@ -78,8 +79,15 @@ class RoomFilter(filters.FilterSet):
         return queryset.filter(queue__sector__project=value)
 
     def filter_contact(self, queryset, name, value):
+        request = getattr(self, "request", None)
+        ninth_digit_enabled = ninth_digit_search_enabled_from_request(request)
         return queryset.filter(
-            Q(contact__name__unaccent__icontains=value) | Q(urn__unaccent__icontains=value)
+            Q(contact__name__unaccent__icontains=value)
+            | build_urn_lookup_q(
+                value,
+                use_unaccent=True,
+                ninth_digit_enabled=ninth_digit_enabled,
+            )
         )
 
     def filter_tags(self, queryset, name, value):

@@ -1,4 +1,5 @@
 import uuid
+from django.conf import settings
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.authtoken.models import Token
@@ -316,6 +317,71 @@ class TestQueueViewSetAsAuthenticatedUser(BaseTestQueueViewSet):
         self.queue.refresh_from_db()
         self.assertEqual(self.queue.queue_limit, None)
         self.assertEqual(self.queue.is_queue_limit_active, False)
+
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
+    @with_project_permission()
+    def test_create_queue_with_queue_purpose(self, mock_is_feature_active):
+        response = self.create_queue(
+            {
+                "name": "Testing",
+                "sector": str(self.sector.pk),
+                "queue_purpose": "Atendimento comercial",
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data.get("queue_purpose"), "Atendimento comercial")
+
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active")
+    @with_project_permission()
+    def test_create_queue_with_queue_purpose_when_feature_flag_off_returns_400(
+        self, mock_is_feature_active
+    ):
+        mock_is_feature_active.side_effect = lambda key, *args, **kwargs: (
+            key != settings.QUEUE_PURPOSE_FEATURE_FLAG_KEY
+        )
+        response = self.create_queue(
+            {
+                "name": "Testing",
+                "sector": str(self.sector.pk),
+                "queue_purpose": "Atendimento comercial",
+            }
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["detail"][0].code, "queue_purpose_feature_flag_is_off"
+        )
+
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active", return_value=True)
+    @with_project_permission()
+    def test_update_queue_with_queue_purpose(self, mock_is_feature_active):
+        response = self.update_queue(
+            self.queue.pk,
+            {"queue_purpose": "Suporte técnico"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.queue.refresh_from_db()
+        self.assertEqual(self.queue.queue_purpose, "Suporte técnico")
+
+    @patch("chats.apps.api.v1.queues.serializers.is_feature_active")
+    @with_project_permission()
+    def test_update_queue_with_queue_purpose_when_feature_flag_off_returns_400(
+        self, mock_is_feature_active
+    ):
+        mock_is_feature_active.side_effect = lambda key, *args, **kwargs: (
+            key != settings.QUEUE_PURPOSE_FEATURE_FLAG_KEY
+        )
+        response = self.update_queue(
+            self.queue.pk,
+            {"queue_purpose": "Suporte técnico"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            response.data["detail"][0].code, "queue_purpose_feature_flag_is_off"
+        )
 
 
 class QueueTransferAgentsTests(APITestCase):
