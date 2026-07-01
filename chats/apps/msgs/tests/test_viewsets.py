@@ -28,6 +28,11 @@ class BaseTestMessageMediaViewSet(APITestCase):
 
         return self.client.get(url)
 
+    def download_message(self, message_uuid) -> Response:
+        url = reverse("message-download", kwargs={"uuid": message_uuid})
+
+        return self.client.get(url)
+
 
 class TestMessageMediaViewSetAsAnonymousUser(BaseTestMessageMediaViewSet):
     def test_list_media_as_anonymous_user(self):
@@ -199,7 +204,7 @@ class TestMessageMediaViewSetDownload(BaseTestMessageMediaViewSet):
         mock_upstream.iter_content = Mock(return_value=iter([b"external-bytes"]))
 
         with patch(
-            "chats.apps.api.v1.msgs.viewsets.get_request_session_with_retries"
+            "chats.apps.api.v1.msgs.media_download.get_request_session_with_retries"
         ) as mock_session:
             mock_session.return_value.get.return_value = mock_upstream
             response = self.download_media(media.uuid)
@@ -233,7 +238,7 @@ class TestMessageMediaViewSetDownload(BaseTestMessageMediaViewSet):
         mock_upstream.iter_content = Mock(return_value=iter([b"flows-proxied-bytes"]))
 
         with patch(
-            "chats.apps.api.v1.msgs.viewsets.get_request_session_with_retries"
+            "chats.apps.api.v1.msgs.media_download.get_request_session_with_retries"
         ) as mock_session:
             mock_session.return_value.get.return_value = mock_upstream
             response = self.download_media(media.uuid)
@@ -257,9 +262,147 @@ class TestMessageMediaViewSetDownload(BaseTestMessageMediaViewSet):
         self.client.force_authenticate(user=self.agent)
 
         with patch(
-            "chats.apps.api.v1.msgs.viewsets.get_request_session_with_retries"
+            "chats.apps.api.v1.msgs.media_download.get_request_session_with_retries"
         ) as mock_session:
             mock_session.return_value.get.side_effect = ConnectionError("boom")
             response = self.download_media(media.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+
+
+class TestMessageViewSetDownload(BaseTestMessageMediaViewSet):
+    def setUp(self):
+        self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            work_start="09:00",
+            work_end="18:00",
+            rooms_limit=10,
+        )
+        self.queue = Queue.objects.create(name="Test Queue", sector=self.sector)
+        self.room = Room.objects.create(
+            contact=Contact.objects.create(
+                name="Test Contact", email="msg-download-contact@test.com"
+            ),
+            is_active=True,
+            queue=self.queue,
+        )
+        self.agent = User.objects.create_user(
+            email="msg-download-agent@test.com", password="testpass123"
+        )
+        self.room.user = self.agent
+        self.room.save(update_fields=["user"])
+
+        self.user = User.objects.create_user(
+            email="msg-download-user@test.com", password="testpass123"
+        )
+
+        self.message = Message.objects.create(room=self.room, user=self.agent)
+        self.media = MessageMedia.objects.create(
+            message=self.message,
+            content_type="audio/mpeg",
+            media_file=SimpleUploadedFile(
+                "audio.mp3", b"fake audio content", content_type="audio/mpeg"
+            ),
+        )
+
+    def test_download_message_as_anonymous_user(self):
+        response = self.download_message(self.message.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_download_message_as_room_agent(self):
+        self.client.force_authenticate(user=self.agent)
+
+        response = self.download_message(self.message.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["Content-Type"], "audio/mpeg")
+        self.assertIn("attachment", response["Content-Disposition"])
+        self.assertEqual(response.getvalue(), b"fake audio content")
+
+    def test_download_message_as_unrelated_user_without_permission(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.download_message(self.message.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    @with_project_permission()
+    def test_download_message_as_project_member(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.download_message(self.message.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.getvalue(), b"fake audio content")
+
+    def test_download_message_not_found(self):
+        self.client.force_authenticate(user=self.agent)
+
+        response = self.download_message("11111111-1111-1111-1111-111111111111")
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_download_message_without_audio_media(self):
+        message = Message.objects.create(room=self.room, user=self.agent)
+        MessageMedia.objects.create(
+            message=message,
+            content_type="image/png",
+            media_url="https://example.com/files/image.png",
+        )
+        self.client.force_authenticate(user=self.agent)
+
+        response = self.download_message(message.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    @patch(
+        "chats.apps.msgs.models.is_feature_active_for_attributes",
+        return_value=False,
+    )
+    def test_download_message_with_media_url(self, _mock_ff):
+        message = Message.objects.create(room=self.room, user=self.agent)
+        MessageMedia.objects.create(
+            message=message,
+            content_type="audio/mpeg",
+            media_url="https://example.com/files/audio.mp3",
+        )
+        self.client.force_authenticate(user=self.agent)
+
+        mock_upstream = Mock()
+        mock_upstream.raise_for_status = Mock()
+        mock_upstream.headers = {"Content-Type": "audio/mpeg"}
+        mock_upstream.iter_content = Mock(return_value=iter([b"external-bytes"]))
+
+        with patch(
+            "chats.apps.api.v1.msgs.media_download.get_request_session_with_retries"
+        ) as mock_session:
+            mock_session.return_value.get.return_value = mock_upstream
+            response = self.download_message(message.uuid)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("attachment", response["Content-Disposition"])
+        self.assertEqual(response.getvalue(), b"external-bytes")
+
+    @patch(
+        "chats.apps.msgs.models.is_feature_active_for_attributes",
+        return_value=False,
+    )
+    def test_download_message_upstream_failure(self, _mock_ff):
+        message = Message.objects.create(room=self.room, user=self.agent)
+        MessageMedia.objects.create(
+            message=message,
+            content_type="audio/mpeg",
+            media_url="https://example.com/files/audio.mp3",
+        )
+        self.client.force_authenticate(user=self.agent)
+
+        with patch(
+            "chats.apps.api.v1.msgs.media_download.get_request_session_with_retries"
+        ) as mock_session:
+            mock_session.return_value.get.side_effect = ConnectionError("boom")
+            response = self.download_message(message.uuid)
 
         self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
