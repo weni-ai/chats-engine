@@ -654,7 +654,7 @@ class TestRoomsViewSet(APITestCase):
         room_2 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
         room_3 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
 
-        RoomPin.objects.create(room=room_3, user=self.user)
+        RoomPin.objects.create(room=room_3, user=self.user, project=self.project)
 
         response = self.list_rooms(
             filters={
@@ -687,7 +687,7 @@ class TestRoomsViewSet(APITestCase):
         room_2 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
         room_3 = Room.objects.create(queue=self.queue, contact=Contact.objects.create())
 
-        RoomPin.objects.create(room=room_3, user=self.user)
+        RoomPin.objects.create(room=room_3, user=self.user, project=self.project)
 
         response = self.list_rooms(
             filters={
