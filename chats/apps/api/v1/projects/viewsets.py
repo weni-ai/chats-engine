@@ -49,10 +49,6 @@ from chats.apps.projects.models import (
     Project,
     ProjectPermission,
 )
-from chats.apps.projects.usecases.exceptions import (
-    FlowTemplateChannelsNotFound,
-    FlowTemplateNotFound,
-)
 from chats.apps.projects.usecases.flow_templates import GetFlowTemplatesDataUseCase
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.projects.usecases.status_service import InServiceStatusService
@@ -309,20 +305,7 @@ class ProjectViewset(
 
         project = self.get_object()
         usecase = GetFlowTemplatesDataUseCase(project.uuid)
-
-        try:
-            result = usecase.execute(flow_uuid)
-        except (FlowTemplateNotFound, FlowTemplateChannelsNotFound) as exc:
-            logger.warning(
-                "Flow templates retrieval failed: project=%s flow=%s error=%s",
-                project.uuid,
-                flow_uuid,
-                exc,
-            )
-            return Response(
-                {"detail": str(exc)},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        result = usecase.execute(flow_uuid)
 
         templates = [
             {

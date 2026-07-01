@@ -1,7 +1,5 @@
 import logging
 
-import sentry_sdk
-
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.api.v1.internal.rest_clients.meta import MetaGraphAPIClient
 from chats.apps.projects.dataclass import (
@@ -10,10 +8,6 @@ from chats.apps.projects.dataclass import (
     FlowTemplatesData,
 )
 from chats.apps.projects.models import Project
-from chats.apps.projects.usecases.exceptions import (
-    FlowTemplateChannelsNotFound,
-    FlowTemplateNotFound,
-)
 from chats.apps.projects.usecases.flows_templates import FlowsTemplatesUseCase
 from chats.apps.projects.usecases.get_project_channels_info import (
     GetProjectChannelsInfoUseCase,
@@ -122,17 +116,13 @@ class GetFlowTemplatesDataUseCase:
         data = response.get("data", [])
 
         if not data:
-            exc = FlowTemplateNotFound(
-                f"Template '{template_name}' not found in WABA '{waba_id}'"
-            )
-            logger.error(
-                "Template not found in Meta Graph API: waba_id=%s, name=%s",
+            logger.warning(
+                "Flow template skipped: not found in Meta Graph API. "
+                "waba_id=%s name=%s",
                 waba_id,
                 template_name,
-                exc_info=exc,
             )
-            sentry_sdk.capture_exception(exc)
-            raise exc
+            return None
 
         return data[0]
 
@@ -149,26 +139,37 @@ class GetFlowTemplatesDataUseCase:
             for ch in project_channels
         }
 
+        collected: list[FlowTemplate] = []
+
         for template_info in templates_info:
             template_channels = self._get_template_channels(template_info)
 
             if not template_channels:
-                raise FlowTemplateChannelsNotFound(
-                    f"No channels found for template '{template_info['name']}' "
-                    f"in flow '{flow_uuid}'"
+                logger.warning(
+                    "Flow template skipped: not found in flows templates or has no channels. "
+                    "project=%s flow=%s template=%s uuid=%s",
+                    self.project_uuid,
+                    flow_uuid,
+                    template_info["name"],
+                    template_info["uuid"],
                 )
+                continue
 
             waba_id = self._resolve_waba_id(template_channels, project_channels_map)
             if not waba_id:
                 continue
 
             meta_template = self._fetch_meta_template(waba_id, template_info["name"])
-            flow_template = FlowTemplate(
-                id=meta_template["id"],
-                name=meta_template["name"],
-                data=meta_template,
-                variables=template_info.get("variables", []),
-            )
-            return FlowTemplatesData(uuid=flow_uuid, templates=[flow_template])
+            if meta_template is None:
+                continue
 
-        return FlowTemplatesData(uuid=flow_uuid, templates=[])
+            collected.append(
+                FlowTemplate(
+                    id=meta_template["id"],
+                    name=meta_template["name"],
+                    data=meta_template,
+                    variables=template_info.get("variables", []),
+                )
+            )
+
+        return FlowTemplatesData(uuid=flow_uuid, templates=collected)
