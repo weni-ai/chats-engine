@@ -107,7 +107,17 @@ class MessageMediaPermission(permissions.BasePermission):
         if isinstance(request.user, AnonymousUser):
             return False
 
-        return obj.message.room.user == request.user
+        room = obj.message.room
+        if room.user == request.user:
+            return True
+
+        if not room.queue:
+            return False
+
+        project = room.queue.sector.project
+        return request.user.project_permissions.filter(
+            project=project, role__gt=0
+        ).exists()
 
 
 class RestrictOfflineAgents(permissions.BasePermission):
