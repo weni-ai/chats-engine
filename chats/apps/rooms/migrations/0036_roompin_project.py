@@ -7,7 +7,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("projects", "0035_project_is_chats_summary_enabled"),
+        ("projects", "0038_project_is_chats_summary_enabled"),
         ("rooms", "0035_rooms_inactivity_warn_idx"),
     ]
 
