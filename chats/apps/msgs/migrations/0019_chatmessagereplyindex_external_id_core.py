@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
     """
 
     dependencies = [
-        ("msgs", "0018_message_automatic_message_type"),
+        ("msgs", "0019_automaticmessage_type_and_fk"),
     ]
 
     operations = [
