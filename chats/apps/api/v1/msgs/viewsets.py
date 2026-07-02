@@ -1,4 +1,3 @@
-from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
@@ -25,6 +24,7 @@ from chats.apps.api.v1.msgs.serializers import (
     MessageMediaSerializer,
     MessageSerializer,
 )
+from chats.apps.msgs.usecases.create_agent_message import PostCreateAgentMessageUseCase
 from chats.apps.msgs.models import Message as ChatMessage
 from chats.apps.msgs.models import MessageMedia
 
@@ -67,39 +67,9 @@ class MessageViewset(
     def perform_create(self, serializer):
         with transaction.atomic():
             serializer.save()
-            serializer.instance.notify_room("create", True)
-
-            instance = serializer.instance
-            is_media_instance = isinstance(instance, MessageMedia)
-            if is_media_instance:
-                message = instance.message
-            else:
-                message = instance
-
-            # Se é MessageMedia, já sabemos que tem mídia (não precisamos consultar medias.exists()
-            # que pode ter cache desatualizado da instância criada antes da mídia)
-            has_content = message.text or is_media_instance or message.medias.exists()
-            if has_content:
-                message.room.update_last_message(
-                    message=message,
-                    user=message.user,
-                )
-
-            if message.user and message.room.first_user_assigned_at:
-                try:
-                    metric = message.room.metric
-                    if metric.first_response_time is None:
-                        from chats.apps.dashboard.tasks import (
-                            calculate_first_response_time_task,
-                        )
-
-                        calculate_first_response_time_task.delay(str(message.room.uuid))
-                except ObjectDoesNotExist:
-                    from chats.apps.dashboard.tasks import (
-                        calculate_first_response_time_task,
-                    )
-
-                    calculate_first_response_time_task.delay(str(message.room.uuid))
+            PostCreateAgentMessageUseCase().execute_from_serializer_instance(
+                serializer.instance
+            )
 
     def perform_update(self, serializer):
         serializer.save()
