@@ -1867,6 +1867,14 @@ msgstr ""
 "Documento gerado automaticamente para fins de auditoria e conformidade. "
 "A alteração deste documento pode resultar em penalidades."
 
+#: chats/apps/rooms/usecases/send_room_export_email.py
+msgid "Conversation export for room %(identifier)s - %(timestamp)s"
+msgstr "Exportação da conversa da sala %(identifier)s - %(timestamp)s"
+
+#: chats/apps/rooms/usecases/send_room_export_email.py
+msgid "Error generating conversation export for room %(identifier)s - %(timestamp)s"
+msgstr "Não foi possível gerar a exportação da conversa da sala %(identifier)s - %(timestamp)s"
+
 #~ msgid "Queue's ID"
 #~ msgstr "ID da Fila"
 

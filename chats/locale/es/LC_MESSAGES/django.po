@@ -1870,6 +1870,14 @@ msgstr ""
 "Documento generado automáticamente con fines de auditoría y cumplimiento. "
 "La alteración de este documento puede resultar en sanciones."
 
+#: chats/apps/rooms/usecases/send_room_export_email.py
+msgid "Conversation export for room %(identifier)s - %(timestamp)s"
+msgstr "Exportación de la conversación de la sala %(identifier)s - %(timestamp)s"
+
+#: chats/apps/rooms/usecases/send_room_export_email.py
+msgid "Error generating conversation export for room %(identifier)s - %(timestamp)s"
+msgstr "No se pudo generar la exportación de la conversación de la sala %(identifier)s - %(timestamp)s"
+
 #~ msgid "Queue's ID"
 #~ msgstr "ID de la Cola"
 
