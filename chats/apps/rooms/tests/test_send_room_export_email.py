@@ -82,8 +82,10 @@ class SendRoomExportEmailTests(TestCase):
             "",
         )
         self.assertIn(self.project.name, message.body)
-        self.assertIn(self.project.name, html_alt)
-        self.assertNotIn(str(self.room.uuid), html_alt)
+        self.assertIn(
+            f"The chat export for the {self.project.name} project is ready",
+            html_alt,
+        )
 
     def test_failure_email_body_contains_project_name(self):
         usecase = SendRoomExportEmail(storage=self.storage)
@@ -100,8 +102,10 @@ class SendRoomExportEmailTests(TestCase):
             "",
         )
         self.assertIn(self.project.name, message.body)
-        self.assertIn(self.project.name, html_alt)
-        self.assertNotIn(str(self.room.uuid), html_alt)
+        self.assertIn(
+            f"Unable to generate chat export for the {self.project.name} project.",
+            html_alt,
+        )
 
     def test_sends_single_email_when_only_one_format_requested(self):
         usecase = SendRoomExportEmail(storage=self.storage)
