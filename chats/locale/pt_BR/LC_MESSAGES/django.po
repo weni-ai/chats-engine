@@ -288,68 +288,7 @@ msgstr "Status de melhoria da mensagem"
 
 #: chats/apps/ai_features/improve_user_message/models.py:47
 msgid "Message Improvement Statuses"
-msgstr "Status de melhoria da mensagem"
-
-#: chats/apps/ai_features/improve_user_message/choices.py:8
-msgid "Used"
-msgstr "Utilizado"
-
-#: chats/apps/ai_features/improve_user_message/choices.py:9
-msgid "Discarded"
-msgstr "Descartado"
-
-#: chats/apps/ai_features/improve_user_message/choices.py:10
-msgid "Edited"
-msgstr "Editado"
-
-#: chats/apps/ai_features/improve_user_message/choices.py:16
-msgid "Grammar and spelling"
-msgstr "Gramática e ortografia"
-
-#: chats/apps/ai_features/improve_user_message/choices.py:17
-msgid "More empathy"
-msgstr "Mais empatia"
-
-#: chats/apps/ai_features/improve_user_message/choices.py:18
-msgid "Clarity"
-msgstr "Clareza"
-
-#: chats/apps/ai_features/improve_user_message/models.py:18
-msgid "Message"
-msgstr "Mensagem"
-
-#: chats/apps/ai_features/improve_user_message/models.py:24
-#: chats/apps/archive_chats/models.py:62 chats/apps/csat/models.py:17
-#: chats/apps/discussions/models/discussion.py:23
-#: chats/apps/rooms/models.py:266
-msgid "Room"
-msgstr "Sala"
-
-#: chats/apps/ai_features/improve_user_message/models.py:30
-#: chats/apps/csat/models.py:46 chats/apps/feature_version/models.py:10
-#: chats/apps/projects/models/models.py:105
-#: chats/apps/projects/models/models.py:322
-#: chats/apps/projects/models/models.py:549 chats/apps/sectors/models.py:31
-#: chats/apps/sectors/models.py:503
-msgid "Project"
-msgstr "Projeto"
-
-#: chats/apps/ai_features/improve_user_message/models.py:35
-#: chats/apps/archive_chats/models.py:48
-msgid "Status"
-msgstr "Status"
-
-#: chats/apps/ai_features/improve_user_message/models.py:40
-msgid "Type"
-msgstr "Tipo"
-
-#: chats/apps/ai_features/improve_user_message/models.py:46
-msgid "Message Improvement Status"
-msgstr "Status de Melhoria da Mensagem"
-
-#: chats/apps/ai_features/improve_user_message/models.py:47
-msgid "Message Improvement Statuses"
-msgstr "Status de Melhorias da Mensagem"
+msgstr "Status de melhorias da mensagem"
 
 #: chats/apps/ai_features/models.py:12
 msgid "Feature"
@@ -385,10 +324,6 @@ msgstr "Prompts da funcionalidade de IA"
 #| msgid "This feature is not available for this project."
 msgid "Feature not available for this project."
 msgstr "Funcionalidade não disponível para este projeto."
-
-#: chats/apps/api/v1/ai_features/views.py:66
-msgid "Feature not available for this project."
-msgstr "Recurso não disponível para este projeto."
 
 #: chats/apps/api/v1/contacts/filters.py:20
 #: chats/apps/api/v1/external/msgs/filters.py:30
@@ -540,10 +475,6 @@ msgstr "Um máximo de %(max)d filas pode ser criado por solicitação."
 msgid "There are duplicate queue names in the request."
 msgstr "Existem nomes de fila duplicados na solicitação."
 
-#: chats/apps/api/v1/queues/serializers.py:308
-msgid "Queue limit feature is not active."
-msgstr "A funcionalidade de limite de fila não está ativa."
-
 #: chats/apps/api/v1/rooms/filters.py:36
 #: chats/apps/discussions/models/discussion.py:33
 msgid "Is active?"
@@ -575,12 +506,6 @@ msgstr "É necessário pelo menos user_email ou queue_uuid"
 #: chats/apps/api/v1/rooms/serializers.py:673
 msgid "No active rooms found with the provided UUIDs"
 msgstr "Nenhuma sala ativa encontrada com os UUIDs fornecidos"
-
-#: chats/apps/api/v1/rooms/serializers.py:689
-#, python-format
-#| msgid "Cannot take more than %(max_rooms)s rooms at once"
-msgid "Cannot transfer more than %(max_rooms)s rooms at once"
-msgstr "Não é possível transferir mais de %(max_rooms)s salas de uma vez"
 
 #: chats/apps/api/v1/rooms/serializers.py:705
 msgid "No available rooms found in queue"
@@ -1838,10 +1763,6 @@ msgstr "tempo limite de inatividade"
 #: chats/apps/rooms/models.py:175
 msgid "is inactive?"
 msgstr "inativa?"
-
-#: chats/core/models.py:137
-msgid "Created by"
-msgstr "Criado por"
 
 #: chats/core/models.py:146
 msgid "Modified by"
