@@ -1,3 +1,12 @@
+# 3.68.6
+# Add
+  - Media download endpoint for message attachments
+# Fix
+  - Message media permission logic for queue association
+  - Archive rooms messages task schedule extended to hours 0-6
+# Refactor
+  - Internal authentication verification to require explicit permission
+
 # 3.68.5
 # Fix
   - External ID field type changed to text field for reply index
