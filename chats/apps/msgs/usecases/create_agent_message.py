@@ -1,4 +1,7 @@
+import json
+
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 from rest_framework import exceptions as drf_exceptions
@@ -90,4 +93,6 @@ class PostCreateAgentMessageUseCase:
 
 class SerializeMessageForWsUseCase:
     def execute(self, message: ChatMessage) -> dict:
-        return dict(MessageWSSerializer(message).data)
+        return json.loads(
+            json.dumps(MessageWSSerializer(message).data, cls=DjangoJSONEncoder)
+        )
