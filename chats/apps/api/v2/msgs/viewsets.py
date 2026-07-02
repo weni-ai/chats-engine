@@ -4,7 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 
 from chats.apps.api.pagination import CustomCursorPagination
 from chats.apps.api.v1.msgs.filters import MessageFilter
-from chats.apps.api.v1.msgs.permissions import MessagePermission
+from chats.apps.api.v1.msgs.permissions import MessagePermission, RestrictOfflineAgents
 from chats.apps.api.v2.msgs.serializers import MessageSerializerV2
 from chats.apps.msgs.models import Message as ChatMessage
 
@@ -23,7 +23,7 @@ class MessageViewSetV2(
     """
 
     serializer_class = MessageSerializerV2
-    permission_classes = [IsAuthenticated, MessagePermission]
+    permission_classes = [IsAuthenticated, MessagePermission, RestrictOfflineAgents]
     filter_backends = [filters.OrderingFilter, DjangoFilterBackend]
     filterset_class = MessageFilter
     pagination_class = CustomCursorPagination
@@ -37,7 +37,8 @@ class MessageViewSetV2(
             "contact",
             "internal_note",
             "internal_note__user",
-        ).prefetch_related("medias")
+            "automatic_message",
+        ).prefetch_related("medias", "internal_note__medias")
 
     def get_paginated_response(self, data):
         if self.request.query_params.get("reverse_results", False):

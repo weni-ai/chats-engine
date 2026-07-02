@@ -7,8 +7,11 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from chats.apps.accounts.models import User
-from chats.apps.api.v1.accounts.serializers import LoginSerializer, UserNameSerializer
-from chats.core.cache_utils import get_user_id_by_email_cached
+from chats.apps.api.v1.accounts.serializers import (
+    LoginSerializer,
+    UserDataQueryParamsSerializer,
+    UserNameSerializer,
+)
 
 
 @method_decorator(
@@ -52,17 +55,24 @@ class UserDataViewset(viewsets.GenericViewSet):
     permission_classes = [IsAuthenticated]
     lookup_field = None
 
-    def get_object(self):
-        user_email = self.request.query_params.get("user_email")
-        uid = get_user_id_by_email_cached(user_email)
-        if uid is None:
-            raise User.DoesNotExist()
-        return User.objects.only("email", "first_name", "last_name").get(pk=uid)
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+
+        if user.has_perm("accounts.can_communicate_internally"):
+            return qs
+
+        shared_project_ids = user.project_permissions.values("project")
+        return qs.filter(project_permissions__project__in=shared_project_ids).distinct()
 
     def retrieve(self, request, *args, **kwargs):
-        try:
-            instance = self.get_object()
-        except User.DoesNotExist:
+        params = UserDataQueryParamsSerializer(data=request.query_params)
+        params.is_valid(raise_exception=True)
+        user_email = params.validated_data["user_email"]
+
+        user = self.get_queryset().filter(email=user_email).first()
+        if user is None:
             return Response({"detail": "Email not found"}, status.HTTP_404_NOT_FOUND)
-        serializer = self.get_serializer(instance)
+
+        serializer = self.get_serializer(user)
         return Response(serializer.data)

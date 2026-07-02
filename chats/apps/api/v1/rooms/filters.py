@@ -6,8 +6,9 @@ from django.utils.translation import gettext_lazy as _
 from django_filters import rest_framework as filters
 from weni.feature_flags.shortcuts import is_feature_active
 
+from chats.apps.api.v1.msgs.enums import MessageMediaContentTypesFilterParams
 from chats.apps.projects.models.models import ProjectPermission
-from chats.apps.rooms.models import Room
+from chats.apps.rooms.models import Room, RoomNoteMedia
 from chats.core.cache_utils import get_user_id_by_email_cached
 
 User = get_user_model()
@@ -143,3 +144,53 @@ class RoomFilter(filters.FilterSet):
 
     def filter_is_active(self, queryset, name, value):
         return queryset.filter(is_active=value)
+
+
+class RoomNoteMediaFilter(filters.FilterSet):
+    class Meta:
+        model = RoomNoteMedia
+        fields = ["note"]
+
+    room = filters.UUIDFilter(
+        field_name="room",
+        required=False,
+        method="filter_room",
+        help_text=_("Room's UUID"),
+    )
+
+    project = filters.UUIDFilter(
+        field_name="project",
+        required=False,
+        method="filter_project",
+        help_text=_("Project's UUID"),
+    )
+
+    content_type = filters.CharFilter(
+        field_name="content_type",
+        required=False,
+        method="filter_content_type",
+        help_text=_("Content type"),
+    )
+
+    def filter_room(self, queryset, name, value):
+        return queryset.filter(note__room__uuid=value)
+
+    def filter_project(self, queryset, name, value):
+        return queryset.filter(note__room__queue__sector__project__uuid=value)
+
+    def filter_content_type(self, queryset, name, value):
+        if value == MessageMediaContentTypesFilterParams.AUDIO:
+            return queryset.filter(content_type__startswith="audio")
+        elif value == MessageMediaContentTypesFilterParams.MEDIA:
+            return queryset.filter(
+                Q(content_type__startswith="image")
+                | Q(content_type__startswith="video")
+            )
+        elif value == MessageMediaContentTypesFilterParams.DOCUMENTS:
+            return queryset.filter(
+                ~Q(content_type__startswith="image")
+                & ~Q(content_type__startswith="video")
+                & ~Q(content_type__startswith="audio")
+            )
+
+        return queryset

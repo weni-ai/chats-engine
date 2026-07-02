@@ -1,7 +1,18 @@
-from django.test import TestCase
+import uuid
+from unittest.mock import patch
 
-from chats.apps.api.v1.sectors.serializers import SectorUpdateSerializer
+from django.conf import settings
+from django.test import TestCase
+from rest_framework import serializers
+
+from chats.apps.api.v1.sectors.serializers import (
+    SectorInactivityTimeoutSerializer,
+    SectorSerializer,
+    SectorUpdateSerializer,
+    validate_custom_csat_flow_uuid,
+)
 from chats.apps.projects.models import Project
+from chats.apps.sectors.constants import get_default_inactivity_timeout
 from chats.apps.sectors.models import Sector
 
 
@@ -156,3 +167,271 @@ class TestSectorUpdateSerializer(TestCase):
 
         self.assertEqual(updated_sector.config["working_hours"], {})
         self.assertIsNone(updated_sector.config["existing_field"])
+
+
+class TestSectorInactivityTimeoutSerializer(TestCase):
+    """
+    Validates the cross-field rules for the nested `inactivity_timeout` payload.
+    """
+
+    @staticmethod
+    def _full_payload(**overrides):
+        payload = {
+            "is_message_timeout_enabled": True,
+            "message_timeout_text": "warn",
+            "message_timeout_time": 600,
+            "is_close_room_enabled": True,
+            "close_room_message_text": "bye",
+            "close_room_timeout_time": 60,
+        }
+        payload.update(overrides)
+        return payload
+
+    def test_valid_full_payload_passes(self):
+        serializer = SectorInactivityTimeoutSerializer(data=self._full_payload())
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+    def test_close_enabled_without_message_enabled_fails(self):
+        payload = self._full_payload(is_message_timeout_enabled=False)
+        serializer = SectorInactivityTimeoutSerializer(data=payload)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("is_close_room_enabled", serializer.errors)
+
+    def test_message_enabled_without_message_timeout_time_fails(self):
+        payload = self._full_payload(
+            is_close_room_enabled=False,
+            message_timeout_time=None,
+        )
+        serializer = SectorInactivityTimeoutSerializer(data=payload)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("message_timeout_time", serializer.errors)
+
+    def test_close_enabled_without_close_timeout_time_fails(self):
+        payload = self._full_payload(close_room_timeout_time=None)
+        serializer = SectorInactivityTimeoutSerializer(data=payload)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("close_room_timeout_time", serializer.errors)
+
+    def test_message_timeout_time_zero_is_rejected(self):
+        payload = self._full_payload(message_timeout_time=0)
+        serializer = SectorInactivityTimeoutSerializer(data=payload)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("message_timeout_time", serializer.errors)
+
+    def test_disabled_features_accept_null_times(self):
+        payload = self._full_payload(
+            is_message_timeout_enabled=False,
+            is_close_room_enabled=False,
+            message_timeout_time=None,
+            close_room_timeout_time=None,
+        )
+        serializer = SectorInactivityTimeoutSerializer(data=payload)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+    def test_blank_message_texts_are_accepted(self):
+        payload = self._full_payload(
+            message_timeout_text="",
+            close_room_message_text="",
+        )
+        serializer = SectorInactivityTimeoutSerializer(data=payload)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+
+
+class TestSectorSerializerInactivityTimeout(TestCase):
+    """
+    Covers reading and writing `inactivity_timeout` through the public CRUD
+    serializers.
+    """
+
+    def setUp(self):
+        self.project = Project.objects.create(
+            name="Test Project", timezone="America/Sao_Paulo"
+        )
+        self.sector = Sector.objects.create(
+            name="Test Sector",
+            project=self.project,
+            rooms_limit=5,
+            work_start="08:00",
+            work_end="18:00",
+        )
+
+    def test_returns_defaults_when_field_is_none(self):
+        self.assertIsNone(self.sector.inactivity_timeout)
+
+        data = SectorSerializer(self.sector).data
+
+        self.assertEqual(data["inactivity_timeout"], get_default_inactivity_timeout())
+        self.assertEqual(
+            data["inactivity_timeout"]["message_timeout_time"],
+            settings.DEFAULT_MESSAGE_TIMEOUT_TIME,
+        )
+        self.assertEqual(
+            data["inactivity_timeout"]["close_room_timeout_time"],
+            settings.DEFAULT_CLOSE_ROOM_TIMEOUT_TIME,
+        )
+        self.assertFalse(data["inactivity_timeout"]["is_message_timeout_enabled"])
+        self.assertFalse(data["inactivity_timeout"]["is_close_room_enabled"])
+
+    def test_returns_stored_value_when_configured(self):
+        stored = {
+            "is_message_timeout_enabled": True,
+            "message_timeout_text": "warn",
+            "message_timeout_time": 900,
+            "is_close_room_enabled": True,
+            "close_room_message_text": "bye",
+            "close_room_timeout_time": 120,
+        }
+        self.sector.inactivity_timeout = stored
+        self.sector.save()
+
+        data = SectorSerializer(self.sector).data
+        self.assertEqual(data["inactivity_timeout"], stored)
+
+    def test_update_writes_inactivity_timeout(self):
+        payload = {
+            "inactivity_timeout": {
+                "is_message_timeout_enabled": True,
+                "message_timeout_text": "warn",
+                "message_timeout_time": 1200,
+                "is_close_room_enabled": False,
+                "close_room_message_text": "",
+                "close_room_timeout_time": None,
+            }
+        }
+        serializer = SectorUpdateSerializer(
+            instance=self.sector, data=payload, partial=True
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        serializer.save()
+
+        self.sector.refresh_from_db()
+        self.assertEqual(
+            self.sector.inactivity_timeout, payload["inactivity_timeout"]
+        )
+
+    def test_update_with_invalid_payload_raises(self):
+        payload = {
+            "inactivity_timeout": {
+                "is_message_timeout_enabled": False,
+                "message_timeout_text": "warn",
+                "message_timeout_time": 600,
+                "is_close_room_enabled": True,
+                "close_room_message_text": "bye",
+                "close_room_timeout_time": 60,
+            }
+        }
+        serializer = SectorUpdateSerializer(
+            instance=self.sector, data=payload, partial=True
+        )
+        self.assertFalse(serializer.is_valid())
+
+    def test_update_with_null_clears_field_and_returns_defaults(self):
+        self.sector.inactivity_timeout = {
+            "is_message_timeout_enabled": True,
+            "message_timeout_text": "warn",
+            "message_timeout_time": 600,
+            "is_close_room_enabled": False,
+            "close_room_message_text": "",
+            "close_room_timeout_time": None,
+        }
+        self.sector.save()
+
+        serializer = SectorUpdateSerializer(
+            instance=self.sector, data={"inactivity_timeout": None}, partial=True
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        serializer.save()
+
+        self.sector.refresh_from_db()
+        self.assertIsNone(self.sector.inactivity_timeout)
+
+        data = SectorSerializer(self.sector).data
+        self.assertEqual(data["inactivity_timeout"], get_default_inactivity_timeout())
+
+    def test_update_without_inactivity_timeout_does_not_touch_field(self):
+        previous_value = {
+            "is_message_timeout_enabled": True,
+            "message_timeout_text": "warn",
+            "message_timeout_time": 600,
+            "is_close_room_enabled": False,
+            "close_room_message_text": "",
+            "close_room_timeout_time": None,
+        }
+        self.sector.inactivity_timeout = previous_value
+        self.sector.save()
+
+        serializer = SectorUpdateSerializer(
+            instance=self.sector, data={"name": "Renamed"}, partial=True
+        )
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        serializer.save()
+
+        self.sector.refresh_from_db()
+        self.assertEqual(self.sector.inactivity_timeout, previous_value)
+        self.assertEqual(self.sector.name, "Renamed")
+
+
+class TestValidateCustomCsatFlowUuid(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(
+            name="Test Project", timezone="America/Sao_Paulo"
+        )
+        self.flow_uuid = uuid.uuid4()
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active_for_attributes")
+    def test_allows_any_value_when_feature_flag_is_on(self, mock_flag):
+        mock_flag.return_value = True
+        result = validate_custom_csat_flow_uuid(self.project, self.flow_uuid)
+        self.assertEqual(result, self.flow_uuid)
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active_for_attributes")
+    def test_allows_none_when_feature_flag_is_on(self, mock_flag):
+        mock_flag.return_value = True
+        result = validate_custom_csat_flow_uuid(self.project, None)
+        self.assertIsNone(result)
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active_for_attributes")
+    def test_allows_clearing_existing_value_when_flag_is_off(self, mock_flag):
+        mock_flag.return_value = False
+        result = validate_custom_csat_flow_uuid(
+            self.project, None, current_value=self.flow_uuid
+        )
+        self.assertIsNone(result)
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active_for_attributes")
+    def test_raises_when_setting_value_and_flag_is_off(self, mock_flag):
+        mock_flag.return_value = False
+        with self.assertRaises(serializers.ValidationError) as ctx:
+            validate_custom_csat_flow_uuid(self.project, self.flow_uuid)
+        self.assertEqual(
+            ctx.exception.detail["custom_csat_flow_uuid"][0].code,
+            "custom_csat_flow_feature_flag_is_off",
+        )
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active_for_attributes")
+    def test_raises_when_changing_value_and_flag_is_off(self, mock_flag):
+        mock_flag.return_value = False
+        new_uuid = uuid.uuid4()
+        with self.assertRaises(serializers.ValidationError) as ctx:
+            validate_custom_csat_flow_uuid(
+                self.project, new_uuid, current_value=self.flow_uuid
+            )
+        self.assertEqual(
+            ctx.exception.detail["custom_csat_flow_uuid"][0].code,
+            "custom_csat_flow_feature_flag_is_off",
+        )
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active_for_attributes")
+    def test_allows_none_when_no_current_value_and_flag_is_off(self, mock_flag):
+        mock_flag.return_value = False
+        result = validate_custom_csat_flow_uuid(self.project, None)
+        self.assertIsNone(result)
+
+    @patch("chats.apps.api.v1.sectors.serializers.is_feature_active_for_attributes")
+    def test_passes_correct_attributes_to_feature_flag(self, mock_flag):
+        mock_flag.return_value = True
+        validate_custom_csat_flow_uuid(self.project, self.flow_uuid)
+        mock_flag.assert_called_once_with(
+            settings.CUSTOM_CSAT_FLOW_FEATURE_FLAG_KEY,
+            {"projectUUID": str(self.project.uuid)},
+        )

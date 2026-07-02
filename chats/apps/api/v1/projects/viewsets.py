@@ -49,10 +49,6 @@ from chats.apps.projects.models import (
     Project,
     ProjectPermission,
 )
-from chats.apps.projects.usecases.exceptions import (
-    FlowTemplateChannelsNotFound,
-    FlowTemplateNotFound,
-)
 from chats.apps.projects.usecases.flow_templates import GetFlowTemplatesDataUseCase
 from chats.apps.projects.usecases.integrate_ticketers import IntegratedTicketers
 from chats.apps.projects.usecases.status_service import InServiceStatusService
@@ -273,8 +269,13 @@ class ProjectViewset(
         """Return the Flow catalog for this project."""
         project = self.get_object()
         cursor = request.query_params.get("cursor", "")
+        verify_chats_tag = (
+            request.query_params.get("verify_chats_tag", "true").lower() == "true"
+        )
 
-        flow_list = FlowRESTClient().list_flows(project, cursor=cursor)
+        flow_list = FlowRESTClient().list_flows(
+            project, cursor=cursor, verify_chats_tag=verify_chats_tag
+        )
 
         return Response(flow_list, status.HTTP_200_OK)
 
@@ -304,20 +305,7 @@ class ProjectViewset(
 
         project = self.get_object()
         usecase = GetFlowTemplatesDataUseCase(project.uuid)
-
-        try:
-            result = usecase.execute(flow_uuid)
-        except (FlowTemplateNotFound, FlowTemplateChannelsNotFound) as exc:
-            logger.warning(
-                "Flow templates retrieval failed: project=%s flow=%s error=%s",
-                project.uuid,
-                flow_uuid,
-                exc,
-            )
-            return Response(
-                {"detail": str(exc)},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+        result = usecase.execute(flow_uuid)
 
         templates = [
             {
@@ -409,14 +397,17 @@ class ProjectViewset(
         chats_flow_start = project.flowstarts.create(**flow_start_data)
         self._create_flow_start_instances(data, chats_flow_start)
 
-        flow_start = FlowRESTClient().start_flow(project, data)
+        status_code, flow_start = FlowRESTClient().start_flow(project, data)
         chats_flow_start.external_id = flow_start.get("uuid")
         chats_flow_start.name = flow_start.get("flow").get("name")
         chats_flow_start.save()
         feedback = {"name": chats_flow_start.name}
         if chats_flow_start.room:
             create_room_feedback_message(
-                room, feedback, method=RoomFeedbackMethods.FLOW_START, requested_by=request.user
+                room,
+                feedback,
+                method=RoomFeedbackMethods.FLOW_START,
+                requested_by=request.user,
             )
             room.notify_room("update")
         return Response(flow_start, status.HTTP_200_OK)

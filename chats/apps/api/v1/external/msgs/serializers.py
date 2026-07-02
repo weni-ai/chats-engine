@@ -6,6 +6,7 @@ from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactRelationsSerializer
 from chats.apps.api.v1.msgs.serializers import MessageMediaSerializer
 from chats.apps.msgs.models import Message, MessageMedia
+from chats.apps.msgs.utils import extract_wamid_core
 
 
 class AttachmentSerializer(serializers.ModelSerializer):
@@ -131,3 +132,111 @@ class MsgFlowSerializer(serializers.ModelSerializer):
 
         create_reply_index(msg)
         return msg
+
+
+class RoomHistoryQuerySerializer(serializers.Serializer):
+    """Validates query params for the external room history endpoint."""
+
+    room = serializers.UUIDField(
+        required=True,
+        help_text="UUID of the room whose message history will be returned",
+    )
+
+
+class RoomHistoryUserSerializer(serializers.Serializer):
+    """Minimal user payload used inside the room history response."""
+
+    name = serializers.SerializerMethodField()
+    email = serializers.EmailField(read_only=True)
+
+    def get_name(self, user) -> str:
+        first_name = getattr(user, "first_name", "") or ""
+        last_name = getattr(user, "last_name", "") or ""
+        full_name = f"{first_name} {last_name}".strip()
+        return full_name or (getattr(user, "email", "") or "")
+
+
+class RoomHistoryContactSerializer(serializers.Serializer):
+    """Minimal contact payload used inside the room history response."""
+
+    uuid = serializers.UUIDField(read_only=True)
+    name = serializers.CharField(read_only=True)
+
+
+class RoomHistoryMessageMediaSerializer(serializers.ModelSerializer):
+    """Read-only media payload returned inside the room history response."""
+
+    url = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = MessageMedia
+        fields = ["content_type", "url", "created_on"]
+        read_only_fields = ["content_type", "url", "created_on"]
+        ref_name = "ExternalRoomHistoryMessageMediaSerializer"
+
+    def get_url(self, media: MessageMedia) -> str:
+        return media.public_url
+
+
+class RoomHistoryMessageSerializer(serializers.ModelSerializer):
+    """
+    Read-only serializer for messages of a closed room exposed via the
+    external room history endpoint.
+    """
+
+    user = RoomHistoryUserSerializer(read_only=True, allow_null=True)
+    contact = RoomHistoryContactSerializer(read_only=True, allow_null=True)
+    media = RoomHistoryMessageMediaSerializer(
+        many=True, read_only=True, source="medias"
+    )
+    replied_message = serializers.SerializerMethodField(read_only=True)
+    is_automatic_message = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = Message
+        fields = [
+            "uuid",
+            "text",
+            "user",
+            "contact",
+            "created_on",
+            "replied_message",
+            "media",
+            "is_automatic_message",
+        ]
+        read_only_fields = fields
+        ref_name = "ExternalRoomHistoryMessageSerializer"
+
+    def get_replied_message(self, obj: Message):
+        metadata = obj.metadata or {}
+        context = metadata.get("context") if isinstance(metadata, dict) else None
+        if not context or not isinstance(context, dict):
+            return None
+
+        replied_id = context.get("id")
+        if not replied_id:
+            return None
+
+        reply_index_map = self.context.get("reply_index_map")
+        if reply_index_map is None:
+            return None
+
+        reply_index = reply_index_map.get(replied_id)
+        if reply_index is None:
+            # Fall back to the stable WAMID core when the exact ``external_id``
+            # mapping is missing because Meta sent a different envelope
+            # (``HBgM`` vs ``HBgT``) inside ``context.id``. The viewset
+            # decides whether the core map is populated based on the project
+            # feature flag, so this branch is a no-op when the flag is off.
+            core_map = self.context.get("reply_index_core_map") or {}
+            core = extract_wamid_core(replied_id)
+            if core:
+                reply_index = core_map.get(core)
+
+        if reply_index is None:
+            return None
+
+        return {
+            "uuid": str(reply_index.message.uuid),
+            "text": reply_index.message.text or "",
+        }

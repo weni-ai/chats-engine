@@ -48,7 +48,6 @@ class QueueSerializer(AuditableModelSerializer):
             "is_deleted",
             "config",
             "name",
-            "default_message",
             "sector",
         ]
 
@@ -196,14 +195,38 @@ class QueueAgentsSerializer(serializers.ModelSerializer):
         ]
 
     def get_status(self, obj):
+        # Prefer annotations set by the view to avoid N+1 queries.
+        pause_name = getattr(obj, "_pause_name", None)
+        if pause_name:
+            return pause_name
+
+        is_online = getattr(obj, "_is_online", None)
+        if is_online is not None:
+            return "online" if is_online else "offline"
+
         project = self.context.get("project")
-        if project:
-            project_permission = obj.project_permissions.filter(project=project)
-            if (
-                project_permission.exists()
-                and project_permission.first().status == "ONLINE"
-            ):
-                return "online"
+        if not project:
+            return "offline"
+
+        from chats.apps.projects.models.models import CustomStatus
+
+        active_pause = (
+            CustomStatus.objects.filter(
+                user_id=obj.email, project=project, is_active=True
+            )
+            .exclude(status_type__name__iexact="in-service")
+            .select_related("status_type")
+            .order_by("-created_on")
+            .first()
+        )
+        if active_pause:
+            return active_pause.status_type.name
+
+        project_permission = obj.project_permissions.filter(
+            project=project, is_deleted=False
+        ).first()
+        if project_permission and project_permission.status == "ONLINE":
+            return "online"
         return "offline"
 
 
@@ -222,9 +245,6 @@ class QueuePermissionsListQueryParamsSerializer(serializers.Serializer):
 
 class BulkQueueItemSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=150)
-    default_message = serializers.CharField(
-        required=False, allow_null=True, allow_blank=True
-    )
     config = serializers.JSONField(required=False, allow_null=True)
     queue_limit = QueueLimitSerializer(required=False, allow_null=True)
     agents = serializers.ListField(

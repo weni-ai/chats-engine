@@ -1,0 +1,167 @@
+{% load i18n %}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>{% trans "Conversation export" %} - {{ room.protocol|default:room.uuid }}</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 2cm;
+    }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 12px;
+      color: #1a1a1a;
+      line-height: 1.4;
+    }
+    h1 { font-size: 18px; margin: 0 0 8px 0; }
+    h2 { font-size: 14px; margin: 16px 0 8px 0; border-bottom: 1px solid #e0e0e0; padding-bottom: 4px; }
+    .meta { color: #666; font-size: 11px; }
+    .meta strong { color: #1a1a1a; }
+    .section { margin-bottom: 20px; }
+    .kv-list { list-style: none; padding: 0; margin: 0; }
+    .kv-list li { padding: 2px 0; }
+    .agents-list { list-style: none; padding: 0; margin: 0; }
+    .agents-list li { padding: 2px 0; }
+    .agent-current { font-weight: bold; }
+    .bubble {
+      margin: 6px 0;
+      padding: 8px 12px;
+      border-radius: 8px;
+      max-width: 80%;
+    }
+    .bubble.contact { background: #eef4ff; }
+    .bubble.agent { background: #e8f7ee; margin-left: auto; }
+    .bubble.bot { background: #f3f3f3; }
+    .bubble-header { font-size: 11px; color: #555; margin-bottom: 4px; }
+    .bubble-header strong { color: #1a1a1a; }
+    .media-list { margin-top: 6px; }
+    .media-list img { max-width: 100%; max-height: 240px; }
+    .internal-note {
+      margin: 6px 0;
+      padding: 8px 12px;
+      background: #fff8c5;
+      border-left: 4px solid #d4a017;
+      border-radius: 0 6px 6px 0;
+    }
+    .internal-note-header { font-size: 11px; color: #7a5d00; margin-bottom: 4px; }
+    .chip {
+      text-align: center;
+      color: #666;
+      font-size: 11px;
+      margin: 10px 0;
+      padding: 4px 0;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="section">
+    <h1>{% trans "Conversation" %} {{ room.protocol|default:room.uuid }}</h1>
+    <p class="meta">
+      <strong>{% trans "Started at" %}:</strong> {{ room.started_at|date:"d/m/Y H:i" }}
+      &nbsp;|&nbsp;
+      <strong>{% trans "Ended at" %}:</strong> {{ room.ended_at|date:"d/m/Y H:i"|default:"-" }}
+    </p>
+    {% if room.ended_by %}
+      <p class="meta"><strong>{% trans "Ended by" %}:</strong> {{ room.ended_by }}</p>
+    {% endif %}
+    {% if room.tags %}
+      <p class="meta"><strong>{% trans "Tags" %}:</strong> {{ room.tags|join:", " }}</p>
+    {% endif %}
+    {% if room.custom_fields %}
+      <p class="meta"><strong>{% trans "Custom fields" %}:</strong></p>
+      <ul class="kv-list">
+        {% for key, value in room.custom_fields.items %}
+          <li><strong>{{ key }}:</strong> {{ value }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </header>
+
+  <section class="section">
+    <h2>{% trans "Contact" %}</h2>
+    <p>{{ contact.name|default:"-" }}</p>
+    <p class="meta">
+      {% if contact.email %}{{ contact.email }}{% endif %}
+      {% if contact.phone %}{% if contact.email %} &nbsp;|&nbsp; {% endif %}{{ contact.phone }}{% endif %}
+      {% if contact.external_id %}{% if contact.email or contact.phone %} &nbsp;|&nbsp; {% endif %}{{ contact.external_id }}{% endif %}
+    </p>
+    {% if contact.custom_fields %}
+      <ul class="kv-list">
+        {% for key, value in contact.custom_fields.items %}
+          <li><strong>{{ key }}:</strong> {{ value }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </section>
+
+  <section class="section">
+    <h2>{% trans "Agents" %}</h2>
+    {% if agents %}
+      <ul class="agents-list">
+        {% for agent in agents %}
+          <li class="{% if agent.is_current %}agent-current{% endif %}">
+            {{ agent.name }} ({{ agent.email }}){% if agent.is_current %} - {% trans "current" %}{% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="meta">{% trans "No agents handled this room" %}</p>
+    {% endif %}
+  </section>
+
+  <section class="section">
+    <h2>{% trans "Conversation" %}</h2>
+
+    {% for item in timeline %}
+
+      {% if item.type == "message" %}
+        <div class="bubble {{ item.sender_type }}">
+          <p class="bubble-header">
+            <strong>{{ item.sender_name|default:"-" }}</strong>
+            &nbsp;{{ item.created_on|date:"d/m/Y H:i" }}
+          </p>
+          {% if item.text %}<p>{{ item.text|linebreaksbr }}</p>{% endif %}
+          {% if item.medias %}
+            <div class="media-list">
+              {% for media in item.medias %}
+                {% if "image" in media.content_type %}
+                  <img src="{% if embed_media and media.data_uri %}{{ media.data_uri }}{% else %}{{ media.url }}{% endif %}" alt="{{ media.content_type }}" />
+                {% else %}
+                  <p><a href="{{ media.url }}">{{ media.content_type }}</a></p>
+                {% endif %}
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+
+      {% elif item.type == "internal_note" %}
+        <div class="internal-note">
+          <p class="internal-note-header">
+            <strong>{% trans "Internal note" %} - {{ item.sender_name|default:"-" }}</strong>
+            &nbsp;{{ item.created_on|date:"d/m/Y H:i" }}
+          </p>
+          <p>{{ item.text|linebreaksbr }}</p>
+        </div>
+
+      {% elif item.type == "transfer_chip" %}
+        <div class="chip">
+          {{ item.created_on|date:"d/m/Y H:i" }} &mdash;
+          {% if item.kind == "pick" %}
+            {{ item.to.name|default:"-" }} {% trans "took over the conversation" %}
+          {% elif item.kind == "transfer" %}
+            {% trans "Transferred to" %} {{ item.to.name|default:"-" }}{% if item.by.name %} {% trans "by" %} {{ item.by.name }}{% endif %}
+          {% elif item.kind == "forward" %}
+            {% trans "Forwarded to" %} {{ item.to.name|default:"-" }}
+          {% else %}
+            {{ item.kind|default:"-" }}
+          {% endif %}
+        </div>
+      {% endif %}
+
+    {% endfor %}
+  </section>
+
+</body>
+</html>

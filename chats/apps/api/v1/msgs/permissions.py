@@ -1,10 +1,12 @@
 from django.contrib.auth.models import AnonymousUser
 from rest_framework import permissions
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from django.utils.translation import gettext_lazy as _
 
 from chats.apps.projects.models import ProjectPermission
 from chats.apps.rooms.models import Room
+
+RESTRICT_OFFLINE_AGENTS = "restrict_offline_agents"
 
 
 class MessagePermission(permissions.BasePermission):
@@ -46,7 +48,17 @@ class MessagePermission(permissions.BasePermission):
         if isinstance(request.user, AnonymousUser):
             return False
 
-        return message.room.user == request.user
+        room = message.room
+        if room.user == request.user:
+            return True
+
+        if not room.queue:
+            return False
+
+        project = room.queue.sector.project
+        return request.user.project_permissions.filter(
+            project=project, role__gt=0
+        ).exists()
 
 
 class MessageMediaPermission(permissions.BasePermission):
@@ -105,4 +117,53 @@ class MessageMediaPermission(permissions.BasePermission):
         if isinstance(request.user, AnonymousUser):
             return False
 
-        return obj.message.room.user == request.user
+        room = obj.message.room
+        if room.user == request.user:
+            return True
+
+        if not room.queue:
+            return False
+
+        project = room.queue.sector.project
+        return request.user.project_permissions.filter(
+            project=project, role__gt=0
+        ).exists()
+
+
+class RestrictOfflineAgents(permissions.BasePermission):
+    def has_permission(self, request, view):
+        if view.action != "create":
+            return True
+
+        room_uuid = request.data.get("room")
+        if not room_uuid:
+            return True
+
+        room = (
+            Room.objects.filter(uuid=room_uuid)
+            .select_related("queue__sector__project")
+            .first()
+        )
+        if not room or not room.queue:
+            return True
+
+        project = room.queue.sector.project
+        if not project.get_config(RESTRICT_OFFLINE_AGENTS, False):
+            return True
+
+        is_online = request.user.project_permissions.filter(
+            project=project,
+            status=ProjectPermission.STATUS_ONLINE,
+        ).exists()
+
+        if not is_online:
+            raise PermissionDenied(
+                detail={
+                    "error_code": "agent_offline",
+                    "error_message": _(
+                        "Offline agents cannot send messages in this project"
+                    ),
+                }
+            )
+
+        return True

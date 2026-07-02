@@ -1,0 +1,434 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ LANGUAGE_CODE|default:'en' }}">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% blocktrans with uuid=room.uuid %}Conversation Report - {{ uuid }}{% endblocktrans %}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+    }
+
+    body {
+      color: #3d3d3d;
+      font-family: Arial, Helvetica, "Segoe UI", sans-serif;
+      font-size: 14px;
+      line-height: 20px;
+    }
+
+    .report {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 8px 16px 24px;
+    }
+
+    /* ---------- header / footer ---------- */
+
+    .report__header,
+    .report__footer {
+      display: flex;
+      align-items: center;
+      width: 100%;
+    }
+
+    .report__header {
+      padding: 8px 0 24px;
+      border-bottom: 1px solid #e0e0e0;
+      margin-bottom: 24px;
+    }
+
+    .report__footer { padding: 24px 0 0; }
+
+    .report__heading {
+      flex: 1 1 auto;
+      min-width: 0;
+      margin-right: 16px;
+    }
+
+    .report__title {
+      margin: 0 0 8px 0;
+      font-size: 24px;
+      line-height: 32px;
+      font-weight: 700;
+      color: #1f1f1f;
+    }
+
+    .report__subtitle {
+      margin: 0;
+      font-size: 14px;
+      line-height: 20px;
+      color: #3d3d3d;
+    }
+
+    .report__footer-title {
+      margin: 0 0 8px 0;
+      font-size: 24px;
+      line-height: 32px;
+      font-weight: 600;
+      color: #1f1f1f;
+    }
+
+    .vtex-logo {
+      flex: none;
+      width: 100px;
+      height: 36px;
+    }
+
+    /* ---------- body layout ---------- */
+
+    .report__body {
+      display: flex;
+      align-items: stretch;
+      width: 100%;
+    }
+
+    .panel {
+      background: #ffffff;
+      min-width: 0;
+    }
+
+    .panel__header {
+      padding: 16px;
+      font-size: 16px;
+      line-height: 24px;
+      font-weight: 600;
+      color: #1f1f1f;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    /* ---------- transcription ---------- */
+
+    .transcription {
+      flex: 1 1 auto;
+      border: 1px solid #e0e0e0;
+      border-right: 0;
+      border-radius: 8px 0 0 8px;
+    }
+
+    .transcription__list {
+      display: block;
+      padding: 12px 16px;
+    }
+
+    .msg-row,
+    .chip-row,
+    .note {
+      margin-bottom: 12px;
+    }
+
+    /* ---------- message rows ---------- */
+
+    .msg-row {
+      display: block;
+      width: 100%;
+    }
+
+    .msg-row--contact { text-align: left; }
+    .msg-row--agent   { text-align: right; }
+
+    .msg {
+      display: inline-block;
+      max-width: 90%;
+      padding: 8px 16px;
+      border-radius: 8px;
+      color: #1f1f1f;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .msg--contact { background: #f5f5f5; }
+    .msg--agent   { background: #cff8f4; }
+
+    .msg__header {
+      display: block;
+      overflow: hidden;
+      margin-bottom: 6px;
+    }
+
+    .msg__sender {
+      display: inline;
+      font-weight: 600;
+      font-size: 14px;
+      line-height: 20px;
+      color: #1f1f1f;
+    }
+
+    .msg__time {
+      float: right;
+      font-size: 12px;
+      line-height: 20px;
+      color: #6b6c6e;
+      margin-left: 8px;
+    }
+
+    .msg__body {
+      display: block;
+      font-size: 14px;
+      line-height: 20px;
+      color: #3d3d3d;
+      overflow-wrap: break-word;
+      white-space: pre-wrap;
+    }
+
+    .msg--agent .msg__body { color: #1f1f1f; }
+
+    .msg__media {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      margin-top: 6px;
+    }
+
+    /* ---------- chip ---------- */
+
+    .chip-row {
+      display: block;
+      text-align: center;
+      width: 100%;
+    }
+
+    .chip {
+      display: inline-block;
+      padding: 2px 12px;
+      border-radius: 600px;
+      font-size: 12px;
+      line-height: 16px;
+      font-weight: 500;
+      color: #6b6c6e;
+      text-align: center;
+    }
+
+    /* ---------- internal note ---------- */
+
+    .note {
+      display: block;
+      background: #fdf5ad;
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: #3d3d3d;
+      font-size: 14px;
+      line-height: 20px;
+      overflow-wrap: break-word;
+    }
+
+    .note__time {
+      font-weight: 600;
+      color: #1f1f1f;
+    }
+
+    /* ---------- sidebar ---------- */
+
+    .sidebar {
+      flex: none;
+      width: 300px;
+      border: 1px solid #e0e0e0;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .sidebar__list {
+      display: table;
+      width: 100%;
+      padding: 8px;
+      border-spacing: 0 8px;
+    }
+
+    .sidebar__row {
+      display: table-row;
+      font-size: 14px;
+      line-height: 20px;
+    }
+
+    .sidebar__label {
+      display: table-cell;
+      font-weight: 600;
+      color: #1f1f1f;
+      white-space: nowrap;
+      padding-right: 6px;
+      vertical-align: top;
+    }
+
+    .sidebar__value {
+      display: table-cell;
+      color: #3d3d3d;
+      overflow-wrap: break-word;
+      vertical-align: top;
+      width: 100%;
+    }
+
+    /* ---------- print ---------- */
+
+    @media screen and (max-width: 720px) {
+      .report__body { flex-direction: column; }
+      .transcription {
+        border: 1px solid #e0e0e0;
+        border-bottom: 0;
+        border-radius: 8px 8px 0 0;
+      }
+      .sidebar {
+        width: 100%;
+        border-top: 0;
+        border-radius: 0 0 8px 8px;
+      }
+    }
+
+    @media print {
+      body { background: #ffffff; }
+      .report { padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  <svg width="0" height="0" aria-hidden="true" style="position:absolute">
+    <symbol id="vtex-logo" viewBox="0 0 100 36">
+      <path d="M72.7662 13.7581H69.3093V25.5455C69.3091 25.6529 69.2661 25.7559 69.1898 25.8318C69.1134 25.9078 69.01 25.9505 68.902 25.9508H66.2361C66.1281 25.9505 66.0246 25.9078 65.9483 25.8318C65.872 25.7559 65.829 25.6529 65.8288 25.5455V13.7581H62.3516C62.2993 13.7602 62.247 13.7519 62.198 13.7335C62.1489 13.7152 62.104 13.6872 62.0661 13.6513C62.0281 13.6154 61.9977 13.5723 61.9768 13.5245C61.9559 13.4767 61.9449 13.4252 61.9443 13.373V11.2881C61.9449 11.2359 61.9559 11.1844 61.9768 11.1366C61.9977 11.0888 62.0281 11.0457 62.0661 11.0098C62.104 10.9739 62.1489 10.9459 62.198 10.9276C62.247 10.9092 62.2993 10.9009 62.3516 10.903H72.7653C72.8733 10.898 72.9788 10.9357 73.059 11.0078C73.1391 11.08 73.1872 11.1807 73.1929 11.2881V13.3739C73.187 13.4809 73.1389 13.5813 73.059 13.6533C72.9791 13.7252 72.8739 13.7629 72.7662 13.7581Z" fill="#F71963"/>
+      <path d="M83.8638 25.8659C83.1515 25.9668 81.9533 26.129 79.7555 26.129C77.1301 26.129 74.8105 25.4607 74.8105 21.7759V15.0503C74.8105 11.3655 77.1512 10.7173 79.7757 10.7173C81.9727 10.7173 83.1515 10.8795 83.8638 10.9804C84.1486 11.0208 84.2711 11.1225 84.2711 11.3856V13.2713C84.2709 13.3787 84.2279 13.4817 84.1516 13.5576C84.0753 13.6336 83.9718 13.6763 83.8638 13.6766H79.5729C78.6164 13.6766 78.2708 14.0002 78.2708 15.0536V16.8964H83.7016C83.8096 16.8967 83.913 16.9394 83.9894 17.0154C84.0657 17.0913 84.1087 17.1943 84.1089 17.3017V19.2252C84.1087 19.3326 84.0657 19.4355 83.9894 19.5115C83.913 19.5874 83.8096 19.6302 83.7016 19.6304H78.2708V21.7767C78.2708 22.8293 78.6164 23.1538 79.5729 23.1538H83.8638C83.9718 23.154 84.0753 23.1968 84.1516 23.2727C84.2279 23.3487 84.2709 23.4516 84.2711 23.559V25.4422C84.2711 25.7036 84.1486 25.8255 83.8638 25.8659Z" fill="#F71963"/>
+      <path d="M99.2181 25.9466H95.9826C95.7181 25.9466 95.5956 25.8626 95.4537 25.6431L92.6483 21.2118L90.1065 25.5456C89.9637 25.7886 89.8218 25.9508 89.5995 25.9508H86.588C86.3843 25.9508 86.2829 25.8289 86.2829 25.6877C86.2869 25.6381 86.3007 25.5898 86.3235 25.5456L90.7318 18.2315L86.2779 11.2865C86.2553 11.2494 86.2414 11.2077 86.2373 11.1646C86.2446 11.0902 86.2803 11.0214 86.337 10.9724C86.3938 10.9235 86.4673 10.8981 86.5423 10.9014H89.8184C90.0423 10.9014 90.2054 11.104 90.3254 11.2865L92.9288 15.3765L95.4486 11.2865C95.55 11.104 95.7333 10.9014 95.9556 10.9014H98.9671C99.0422 10.8981 99.1157 10.9235 99.1724 10.9724C99.2292 11.0214 99.2649 11.0902 99.2722 11.1646C99.2681 11.2077 99.2542 11.2494 99.2316 11.2865L94.7996 18.2744L99.4217 25.5456C99.4578 25.6074 99.4787 25.6768 99.4826 25.7482C99.4834 25.8659 99.3812 25.9466 99.2181 25.9466Z" fill="#F71963"/>
+      <path d="M57.0669 10.9434C56.9943 10.9436 56.9239 10.9689 56.8678 11.0148C56.8118 11.0608 56.7734 11.1247 56.7594 11.1957L53.8053 22.0735C53.7647 22.2963 53.7039 22.377 53.5205 22.377C53.3371 22.377 53.2763 22.2929 53.2357 22.0735L50.2782 11.1931C50.2642 11.1222 50.2258 11.0583 50.1698 11.0123C50.1137 10.9663 50.0433 10.9411 49.9707 10.9409H47.063C47.0157 10.941 46.9691 10.9516 46.9265 10.9721C46.8839 10.9926 46.8466 11.0224 46.8172 11.0592C46.7878 11.0961 46.7671 11.139 46.7567 11.1849C46.7463 11.2308 46.7465 11.2784 46.7571 11.3243C46.7571 11.3243 50.3653 23.7995 50.405 23.9222C50.8866 25.4086 52.0553 26.119 53.5425 26.119C54.9587 26.119 56.1949 25.3749 56.6782 23.9264C56.7357 23.7583 60.2636 11.3234 60.2636 11.3234C60.2741 11.2777 60.2741 11.2301 60.2637 11.1843C60.2532 11.1385 60.2325 11.0957 60.2031 11.0589C60.1737 11.0222 60.1364 10.9925 60.0939 10.9721C60.0514 10.9516 60.0049 10.941 59.9577 10.9409L57.0669 10.9434Z" fill="#F71963"/>
+      <path d="M39.1522 0H7.54939C5.09891 0 3.52975 2.59188 4.67641 4.7466L7.83754 10.7021H2.10678C1.74385 10.7022 1.38711 10.7956 1.0711 10.9732C0.755091 11.1507 0.490525 11.4065 0.303028 11.7156C0.115532 12.0248 0.0114599 12.3769 0.000893555 12.7378C-0.00967281 13.0987 0.0736236 13.4562 0.242716 13.7757L10.4106 32.9227C10.5898 33.2595 10.8579 33.5412 11.186 33.7378C11.5142 33.9343 11.8899 34.0381 12.2729 34.0381C12.6559 34.0381 13.0317 33.9343 13.3598 33.7378C13.6879 33.5412 13.956 33.2595 14.1353 32.9227L16.8967 27.7507L20.3612 34.2762C21.5805 36.5714 24.8836 36.5756 26.1072 34.283L41.9475 4.62638C43.0671 2.52883 41.5394 0 39.1522 0ZM24.9563 12.6711L18.1262 25.4615C18.0068 25.6854 17.8284 25.8728 17.6101 26.0034C17.3918 26.1341 17.1418 26.2032 16.887 26.2032C16.6322 26.2032 16.3823 26.1341 16.164 26.0034C15.9456 25.8728 15.7672 25.6854 15.6478 25.4615L8.88364 12.7249C8.77059 12.5125 8.71456 12.2747 8.72099 12.0345C8.72742 11.7943 8.79609 11.5598 8.92034 11.3537C9.0446 11.1476 9.22023 10.977 9.43023 10.8582C9.64024 10.7395 9.87749 10.6768 10.119 10.6761H23.7513C23.9868 10.6761 24.2183 10.7367 24.4233 10.8521C24.6282 10.9675 24.7997 11.1336 24.921 11.3345C25.0423 11.5353 25.1093 11.7639 25.1155 11.9981C25.1217 12.2323 25.0668 12.4642 24.9563 12.6711Z" fill="#F71963"/>
+    </symbol>
+  </svg>
+
+  <main class="report">
+    <header class="report__header">
+      <div class="report__heading">
+        <h1 class="report__title">{% trans "Conversation Report" %}</h1>
+        <p class="report__subtitle">
+          {% blocktrans with date=meta.generated_at|date:"SHORT_DATETIME_FORMAT" user=meta.generated_by %}Generated on {{ date }} from {{ user }}{% endblocktrans %}
+        </p>
+      </div>
+      <svg class="vtex-logo" aria-label="VTEX"><use href="#vtex-logo"/></svg>
+    </header>
+
+    <section class="report__body">
+      <article class="panel transcription">
+        <div class="panel__header">{% trans "Transcription of the conversation" %}</div>
+        <div class="transcription__list">
+          {% if room.started_at %}
+            <div class="chip-row">
+              <span class="chip">{% blocktrans with date=room.started_at|date:"SHORT_DATETIME_FORMAT" %}{{ date }} - Conversation started{% endblocktrans %}</span>
+            </div>
+          {% endif %}
+
+          {% for item in timeline %}
+            {% if item.type == "message" %}
+              {% if item.sender_type == "contact" %}
+                <div class="msg-row msg-row--contact">
+                  <div class="msg msg--contact">
+                    <header class="msg__header">
+                      <span class="msg__sender">{{ item.sender_name }}</span>
+                      <span class="msg__time">{{ item.created_on|date:"TIME_FORMAT" }}</span>
+                    </header>
+                    {% if item.text %}<div class="msg__body">{{ item.text|linebreaksbr }}</div>{% endif %}
+                    {% for media in item.medias %}
+                      <img class="msg__media" alt="" src="{{ media.data_uri|default:media.url }}">
+                    {% endfor %}
+                  </div>
+                </div>
+              {% else %}
+                <div class="msg-row msg-row--agent">
+                  <div class="msg msg--agent">
+                    <header class="msg__header">
+                      <span class="msg__sender">{{ item.sender_name }}</span>
+                      <span class="msg__time">{{ item.created_on|date:"TIME_FORMAT" }}</span>
+                    </header>
+                    {% if item.text %}<div class="msg__body">{{ item.text|linebreaksbr }}</div>{% endif %}
+                    {% for media in item.medias %}
+                      <img class="msg__media" alt="" src="{{ media.data_uri|default:media.url }}">
+                    {% endfor %}
+                  </div>
+                </div>
+              {% endif %}
+            {% elif item.type == "transfer_chip" %}
+              <div class="chip-row">
+                <span class="chip">
+                  {% with date=item.created_on|date:"SHORT_DATETIME_FORMAT" %}
+                    {% if item.kind == "pick" %}
+                      {% blocktrans with date=date queue=item.from.name user=item.by.name %}{{ date }} - Chat picked from queue {{ queue }} by {{ user }}{% endblocktrans %}
+                    {% elif item.to.type == "queue" %}
+                      {% blocktrans with date=date queue=item.to.name %}{{ date }} - Chat forwarded to the {{ queue }} queue{% endblocktrans %}
+                    {% else %}
+                      {% blocktrans with date=date user=item.to.name %}{{ date }} - Chat assigned to {{ user }}{% endblocktrans %}
+                    {% endif %}
+                  {% endwith %}
+                </span>
+              </div>
+            {% elif item.type == "internal_note" %}
+              <div class="note">
+                <span class="note__time">{{ item.created_on|date:"SHORT_DATE_FORMAT" }} - {{ item.created_on|date:"TIME_FORMAT" }}</span>
+                | {% trans "Internal note" %}: {{ item.text }}
+              </div>
+            {% endif %}
+          {% endfor %}
+
+          {% if room.ended_at %}
+            <div class="chip-row">
+              <span class="chip">
+                {% if room.ended_by %}
+                  {% blocktrans with date=room.ended_at|date:"SHORT_DATETIME_FORMAT" user=room.ended_by %}{{ date }} - Chat was ended by {{ user }}{% endblocktrans %}
+                {% else %}
+                  {% blocktrans with date=room.ended_at|date:"SHORT_DATETIME_FORMAT" %}{{ date }} - Chat ended{% endblocktrans %}
+                {% endif %}
+              </span>
+            </div>
+          {% endif %}
+        </div>
+      </article>
+
+      <aside class="panel sidebar">
+        <div class="panel__header">{% trans "Support Information" %}</div>
+        <div class="sidebar__list">
+          <div class="sidebar__row">
+            <span class="sidebar__label">{% trans "Started" %}:</span>
+            <span class="sidebar__value">{{ room.started_at|date:"SHORT_DATETIME_FORMAT"|default:"-" }}</span>
+          </div>
+          <div class="sidebar__row">
+            <span class="sidebar__label">{% trans "Ended" %}:</span>
+            <span class="sidebar__value">{{ room.ended_at|date:"SHORT_DATETIME_FORMAT"|default:"-" }}</span>
+          </div>
+          <div class="sidebar__row">
+            <span class="sidebar__label">{% trans "Representative" %}:</span>
+            <span class="sidebar__value">
+              {% for agent in agents %}{{ agent.email }}{% if agent.is_current %} {% trans "(current)" %}{% endif %}{% if not forloop.last %}, {% endif %}{% empty %}-{% endfor %}
+            </span>
+          </div>
+          <div class="sidebar__row">
+            <span class="sidebar__label">{% trans "Contact" %}:</span>
+            <span class="sidebar__value">{{ contact.name|default:"-" }}</span>
+          </div>
+          <div class="sidebar__row">
+            <span class="sidebar__label">{% trans "URN" %}:</span>
+            <span class="sidebar__value">{{ contact.phone|default:"-" }}</span>
+          </div>
+          <div class="sidebar__row">
+            <span class="sidebar__label">{% trans "Ticket ID" %}:</span>
+            <span class="sidebar__value">{{ room.protocol|default:"-" }}</span>
+          </div>
+          <div class="sidebar__row">
+            <span class="sidebar__label">{% trans "Tags" %}:</span>
+            <span class="sidebar__value">
+              {% for tag in room.tags %}[{{ tag }}]{% if not forloop.last %} {% endif %}{% empty %}-{% endfor %}
+            </span>
+          </div>
+          <div class="sidebar__row">
+            <span class="sidebar__label">{% trans "CSAT" %}:</span>
+            <span class="sidebar__value">-</span>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <footer class="report__footer">
+      <div class="report__heading">
+        <h2 class="report__footer-title">{% trans "VTEX CX Platform" %}</h2>
+        <p class="report__subtitle">{% trans "Document automatically generated for auditing and compliance purposes. Altering this document may result in penalties." %}</p>
+      </div>
+      <svg class="vtex-logo" aria-label="VTEX"><use href="#vtex-logo"/></svg>
+    </footer>
+  </main>
+</body>
+</html>

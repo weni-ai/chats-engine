@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Callable, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Tuple
 
 import requests
 from django.conf import settings
@@ -10,8 +10,11 @@ from rest_framework import status
 from chats.apps.api.v1.internal.rest_clients.internal_authorization import (
     InternalAuthentication,
 )
+from chats.apps.rooms.exceptions import (
+    FlowsChangeTicketerError,
+    FlowsTicketerNotFoundError,
+)
 from chats.core.requests import get_request_session_with_retries
-
 
 if TYPE_CHECKING:
     from chats.apps.projects.models.models import Project
@@ -237,7 +240,7 @@ class FlowRESTClient(
         )
         return response
 
-    def list_flows(self, project, cursor: str = ""):
+    def list_flows(self, project, cursor: str = "", verify_chats_tag: bool = True):
         response = retry_request_and_refresh_flows_auth_token(
             project=project,
             request_method=requests.get,
@@ -255,20 +258,21 @@ class FlowRESTClient(
             raise
         flows["next"] = get_cursor(flows.get("next") or "")
         flows["previous"] = get_cursor(flows.get("previous") or "")
-        results = flows["results"]
-        flows["results"] = [
-            flow
-            for flow in results
-            if flow["labels"] != [] and check_flows_labels(flow["labels"])
-        ]
+        if verify_chats_tag:
+            results = flows["results"]
+            flows["results"] = [
+                flow
+                for flow in results
+                if flow["labels"] != [] and check_flows_labels(flow["labels"])
+            ]
         return flows
 
-    def retrieve_flow_definitions(self, project, flow_uuid):
+    def retrieve_flow_definitions(self, project, flow_uuid, dependencies="all"):
         response = retry_request_and_refresh_flows_auth_token(
             project=project,
             request_method=requests.get,
             headers=self.project_headers(project.flows_authorization),
-            url=f"{self.base_url}/api/v2/definitions.json?flow={flow_uuid}",
+            url=f"{self.base_url}/api/v2/definitions.json?flow={flow_uuid}&dependencies={dependencies}",
         )
         try:
             flows = response.json()
@@ -281,7 +285,7 @@ class FlowRESTClient(
             raise
         return flows
 
-    def start_flow(self, project, data):
+    def start_flow(self, project, data) -> Tuple[int, dict]:
         response = retry_request_and_refresh_flows_auth_token(
             project=project,
             request_method=requests.post,
@@ -290,7 +294,7 @@ class FlowRESTClient(
             headers=self.project_headers(project.flows_authorization),
         )
         try:
-            return response.json()
+            return response.status_code, response.json()
         except ValueError as e:
             LOGGER.error(
                 "Failed to parse JSON response from start_flow: %s. Response content: %s",
@@ -321,6 +325,126 @@ class FlowRESTClient(
             ),
             headers=self.headers,
         )
+
+    def get_ticketer_by_sector(self, project, sector_uuid: str) -> str:
+        """
+        Discover the Flows ticketer UUID associated with a given sector_uuid.
+
+        Calls GET /api/v2/ticketers.json?sector_uuid=<uuid> using the
+        project-scoped Flows token (`Authorization: Token <project_token>`),
+        with auto-refresh on 401/403. Expects the standard Flows/RapidPro
+        paginated payload (`{"results": [...]}`) and returns the `uuid` field
+        of the first result.
+
+        Raises:
+            FlowsTicketerNotFoundError: if the request fails or no ticketer
+                is returned for the given sector_uuid.
+        """
+        url = f"{self.base_url}/api/v2/ticketers.json"
+        headers = self.project_headers(project.flows_authorization)
+
+        try:
+            response = retry_request_and_refresh_flows_auth_token(
+                project=project,
+                request_method=requests.get,
+                headers=headers,
+                url=url,
+                params={"sector_uuid": str(sector_uuid)},
+            )
+        except requests.RequestException as exc:
+            raise FlowsTicketerNotFoundError(
+                sector_uuid=str(sector_uuid),
+                message=(f"Failed to request ticketer for sector {sector_uuid}: {exc}"),
+            ) from exc
+
+        if response.status_code != status.HTTP_200_OK:
+            raise FlowsTicketerNotFoundError(
+                sector_uuid=str(sector_uuid),
+                message=(
+                    f"[{response.status_code}] Failed to fetch ticketer for "
+                    f"sector {sector_uuid}: {response.content!r}"
+                ),
+            )
+
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise FlowsTicketerNotFoundError(
+                sector_uuid=str(sector_uuid),
+                message=(
+                    f"Invalid JSON response when fetching ticketer for sector "
+                    f"{sector_uuid}: {exc}"
+                ),
+            ) from exc
+
+        results = payload.get("results") or []
+        if not results:
+            raise FlowsTicketerNotFoundError(sector_uuid=str(sector_uuid))
+
+        ticketer_uuid = results[0].get("uuid")
+        if not ticketer_uuid:
+            raise FlowsTicketerNotFoundError(
+                sector_uuid=str(sector_uuid),
+                message=(
+                    f"Ticketer entry for sector {sector_uuid} is missing the "
+                    f"'uuid' field: {results[0]!r}"
+                ),
+            )
+
+        return ticketer_uuid
+
+    def change_ticketer(self, project, ticket_uuids: list, ticketer_uuid: str):
+        """
+        Move tickets to another ticketer in Flows via ticket_actions.
+
+        Calls POST /api/v2/ticket_actions.json using the project-scoped Flows
+        token (`Authorization: Token <project_token>`), with auto-refresh on
+        401/403. Body:
+            {"tickets": [...], "action": "change_ticketer", "ticketer": "..."}
+
+        Raises:
+            FlowsChangeTicketerError: if the response status is not 2xx.
+        """
+        url = f"{self.base_url}/api/v2/ticket_actions.json"
+        headers = self.project_headers(project.flows_authorization)
+
+        body = {
+            "tickets": [str(uuid) for uuid in ticket_uuids],
+            "action": "change_ticketer",
+            "ticketer": str(ticketer_uuid),
+        }
+
+        try:
+            response = retry_request_and_refresh_flows_auth_token(
+                project=project,
+                request_method=requests.post,
+                headers=headers,
+                url=url,
+                json=body,
+            )
+        except requests.RequestException as exc:
+            raise FlowsChangeTicketerError(
+                ticket_uuids=body["tickets"],
+                ticketer_uuid=str(ticketer_uuid),
+                message=(
+                    f"Network error calling change_ticketer for tickets "
+                    f"{body['tickets']}: {exc}"
+                ),
+            ) from exc
+
+        if response.status_code not in [
+            status.HTTP_200_OK,
+            status.HTTP_201_CREATED,
+            status.HTTP_204_NO_CONTENT,
+        ]:
+            raise FlowsChangeTicketerError(
+                ticket_uuids=body["tickets"],
+                ticketer_uuid=str(ticketer_uuid),
+                status_code=response.status_code,
+                response_content=response.content.decode(errors="replace"),
+            )
+
+        return response
 
     def create_or_update_flow(self, project: "Project", definition: dict):
         payload = {
@@ -357,9 +481,7 @@ class FlowRESTClient(
         return response
 
     def get_templates(self, project, **kwargs):
-        params = {
-            key: value for key, value in kwargs.items() if value is not None
-        }
+        params = {key: value for key, value in kwargs.items() if value is not None}
         response = retry_request_and_refresh_flows_auth_token(
             project=project,
             request_method=requests.get,

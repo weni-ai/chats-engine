@@ -1,7 +1,5 @@
 import logging
 
-import sentry_sdk
-
 from chats.apps.api.v1.internal.rest_clients.flows_rest_client import FlowRESTClient
 from chats.apps.api.v1.internal.rest_clients.meta import MetaGraphAPIClient
 from chats.apps.projects.dataclass import (
@@ -10,10 +8,6 @@ from chats.apps.projects.dataclass import (
     FlowTemplatesData,
 )
 from chats.apps.projects.models import Project
-from chats.apps.projects.usecases.exceptions import (
-    FlowTemplateChannelsNotFound,
-    FlowTemplateNotFound,
-)
 from chats.apps.projects.usecases.flows_templates import FlowsTemplatesUseCase
 from chats.apps.projects.usecases.get_project_channels_info import (
     GetProjectChannelsInfoUseCase,
@@ -32,7 +26,19 @@ class GetFlowTemplatesDataUseCase:
 
     def _get_flow_definition(self, flow_uuid):
         project = Project.objects.get(uuid=self.project_uuid)
-        return self.flows_client.retrieve_flow_definitions(project, flow_uuid)
+
+        response_data = self.flows_client.retrieve_flow_definitions(
+            project, flow_uuid, dependencies="none"
+        )
+
+        definition = {}
+
+        for flow in response_data.get("flows", []):
+            if flow.get("uuid") == flow_uuid:
+                definition = flow
+                break
+
+        return definition
 
     TRIGGER_PARAMS_PREFIX = "@trigger.params."
 
@@ -40,39 +46,38 @@ class GetFlowTemplatesDataUseCase:
         seen_uuids = set()
         templates_info = []
 
-        for flow in definition.get("flows", []):
-            for node in flow.get("nodes", []):
-                for action in node.get("actions", []):
-                    templating = action.get("templating")
-                    if not templating:
-                        continue
+        for node in definition.get("nodes", []):
+            for action in node.get("actions", []):
+                templating = action.get("templating")
+                if not templating:
+                    continue
 
-                    template = templating.get("template", {})
-                    template_uuid = template.get("uuid")
-                    template_name = template.get("name")
+                template = templating.get("template", {})
+                template_uuid = template.get("uuid")
+                template_name = template.get("name")
 
-                    if not template_uuid or not template_name:
-                        continue
+                if not template_uuid or not template_name:
+                    continue
 
-                    if template_uuid in seen_uuids:
-                        continue
+                if template_uuid in seen_uuids:
+                    continue
 
-                    seen_uuids.add(template_uuid)
+                seen_uuids.add(template_uuid)
 
-                    prefix_len = len(self.TRIGGER_PARAMS_PREFIX)
-                    variables = [
-                        var[prefix_len:]
-                        for var in templating.get("variables", [])
-                        if var.startswith(self.TRIGGER_PARAMS_PREFIX)
-                    ]
+                prefix_len = len(self.TRIGGER_PARAMS_PREFIX)
+                variables = [
+                    var[prefix_len:]
+                    for var in templating.get("variables", [])
+                    if var.startswith(self.TRIGGER_PARAMS_PREFIX)
+                ]
 
-                    templates_info.append(
-                        {
-                            "uuid": template_uuid,
-                            "name": template_name,
-                            "variables": variables,
-                        }
-                    )
+                templates_info.append(
+                    {
+                        "uuid": template_uuid,
+                        "name": template_name,
+                        "variables": variables,
+                    }
+                )
 
         return templates_info
 
@@ -111,17 +116,13 @@ class GetFlowTemplatesDataUseCase:
         data = response.get("data", [])
 
         if not data:
-            exc = FlowTemplateNotFound(
-                f"Template '{template_name}' not found in WABA '{waba_id}'"
-            )
-            logger.error(
-                "Template not found in Meta Graph API: waba_id=%s, name=%s",
+            logger.warning(
+                "Flow template skipped: not found in Meta Graph API. "
+                "waba_id=%s name=%s",
                 waba_id,
                 template_name,
-                exc_info=exc,
             )
-            sentry_sdk.capture_exception(exc)
-            raise exc
+            return None
 
         return data[0]
 
@@ -138,32 +139,37 @@ class GetFlowTemplatesDataUseCase:
             for ch in project_channels
         }
 
+        collected: list[FlowTemplate] = []
+
         for template_info in templates_info:
             template_channels = self._get_template_channels(template_info)
 
             if not template_channels:
-                raise FlowTemplateChannelsNotFound(
-                    f"No channels found for template '{template_info['name']}' "
-                    f"in flow '{flow_uuid}'"
+                logger.warning(
+                    "Flow template skipped: not found in flows templates or has no channels. "
+                    "project=%s flow=%s template=%s uuid=%s",
+                    self.project_uuid,
+                    flow_uuid,
+                    template_info["name"],
+                    template_info["uuid"],
                 )
+                continue
 
-            waba_id = self._resolve_waba_id(
-                template_channels, project_channels_map
-            )
+            waba_id = self._resolve_waba_id(template_channels, project_channels_map)
             if not waba_id:
                 continue
 
-            meta_template = self._fetch_meta_template(
-                waba_id, template_info["name"]
-            )
-            flow_template = FlowTemplate(
-                id=meta_template["id"],
-                name=meta_template["name"],
-                data=meta_template,
-                variables=template_info.get("variables", []),
-            )
-            return FlowTemplatesData(
-                uuid=flow_uuid, templates=[flow_template]
+            meta_template = self._fetch_meta_template(waba_id, template_info["name"])
+            if meta_template is None:
+                continue
+
+            collected.append(
+                FlowTemplate(
+                    id=meta_template["id"],
+                    name=meta_template["name"],
+                    data=meta_template,
+                    variables=template_info.get("variables", []),
+                )
             )
 
-        return FlowTemplatesData(uuid=flow_uuid, templates=[])
+        return FlowTemplatesData(uuid=flow_uuid, templates=collected)

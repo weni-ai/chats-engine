@@ -10,7 +10,10 @@ from chats.apps.api.v1.external.agents.viewsets import (
 from chats.apps.api.v1.external.dashboard.viewsets import (
     ExternalFinishedRoomsStatusViewSet,
 )
-from chats.apps.api.v1.external.msgs.viewsets import MessageFlowViewset
+from chats.apps.api.v1.external.msgs.viewsets import (
+    MessageFlowViewset,
+    RoomHistoryMessagesViewSet,
+)
 from chats.apps.api.v1.external.queues.viewsets import QueueFlowViewset
 from chats.apps.api.v1.external.rooms.viewsets import (
     CustomFieldsUserExternalViewSet,
@@ -47,7 +50,11 @@ from chats.apps.api.v1.quickmessages.viewsets import (
     QuickMessageViewset,
     SectorQuickMessageViewset,
 )
-from chats.apps.api.v1.rooms.viewsets import RoomViewset, RoomNoteViewSet
+from chats.apps.api.v1.rooms.viewsets import (
+    RoomNoteMediaViewset,
+    RoomNoteViewSet,
+    RoomViewset,
+)
 from chats.apps.api.v1.sectors.viewsets import (
     SectorAuthorizationViewset,
     SectorHolidayViewSet,
@@ -120,6 +127,7 @@ router.register("accounts/profile", ProfileViewset)
 router.register("accounts/userdata", UserDataViewset, basename="user_data")
 router.register("room", RoomViewset)
 router.register("room_notes", RoomNoteViewSet)
+router.register("room_note_media", RoomNoteMediaViewset, basename="room_note_media")
 router.register("msg", MessageViewset)
 router.register("quick_messages", QuickMessageViewset)
 router.register(
@@ -203,6 +211,11 @@ router.register(
 
 # External
 router.register("external/msgs", MessageFlowViewset, basename="external_message")
+router.register(
+    "external/room_messages",
+    RoomHistoryMessagesViewSet,
+    basename="external_room_messages",
+)
 router.register("external/rooms", RoomFlowViewSet, basename="external_rooms")
 router.register(
     "external/room_agent", RoomUserExternalViewSet, basename="external_roomagent"
