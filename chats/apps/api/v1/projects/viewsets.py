@@ -12,8 +12,13 @@ from rest_framework.decorators import action
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.settings import api_settings
 from rest_framework.viewsets import GenericViewSet
 
+from chats.apps.api.authentication.classes import JWTAuthentication
+from chats.apps.api.authentication.permissions import (
+    IsAuthenticatedOrHasInternalJWT,
+)
 from chats.apps.api.v1.internal.projects.serializers import (
     CheckAccessReadSerializer,
     ProjectPermissionReadSerializer,
@@ -664,12 +669,16 @@ class CustomStatusTypeViewSet(viewsets.ModelViewSet):
     swagger_tag = "Custom Status"
     queryset = CustomStatusType.objects.all()
     serializer_class = CustomStatusTypeSerializer
-    permission_classes = [
-        IsAuthenticated,
-        ProjectAnyPermission,
-    ]
+    authentication_classes = [
+        JWTAuthentication
+    ] + api_settings.DEFAULT_AUTHENTICATION_CLASSES
     filter_backends = [DjangoFilterBackend]
     filterset_class = CustomStatusTypeFilterSet
+
+    def get_permissions(self):
+        if getattr(self.request, "jwt_payload", None):
+            return [IsAuthenticatedOrHasInternalJWT()]
+        return [IsAuthenticated(), ProjectAnyPermission()]
 
     def get_queryset(self):
         return CustomStatusType.objects.filter(
