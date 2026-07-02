@@ -533,9 +533,7 @@ INACTIVITY_MAX_WARNINGS_PER_RUN = env.int(
 INACTIVITY_MAX_CLOSURES_PER_RUN = env.int(
     "INACTIVITY_MAX_CLOSURES_PER_RUN", default=500
 )
-INACTIVITY_QUERYSET_CHUNK_SIZE = env.int(
-    "INACTIVITY_QUERYSET_CHUNK_SIZE", default=200
-)
+INACTIVITY_QUERYSET_CHUNK_SIZE = env.int("INACTIVITY_QUERYSET_CHUNK_SIZE", default=200)
 
 # Distributed lock used by `check_inactivity_rooms` to guarantee only one
 # instance of the task runs at a time, even if a previous run overlaps the
@@ -543,9 +541,7 @@ INACTIVITY_QUERYSET_CHUNK_SIZE = env.int(
 INACTIVITY_TASK_LOCK_NAME = env.str(
     "INACTIVITY_TASK_LOCK_NAME", default="inactivity_task_lock"
 )
-INACTIVITY_TASK_LOCK_TIMEOUT = env.int(
-    "INACTIVITY_TASK_LOCK_TIMEOUT", default=120
-)
+INACTIVITY_TASK_LOCK_TIMEOUT = env.int("INACTIVITY_TASK_LOCK_TIMEOUT", default=120)
 
 # Celery
 
@@ -583,7 +579,7 @@ CELERY_BEAT_SCHEDULE = {
     },
     "start-archive-rooms-messages": {
         "task": "start_archive_rooms_messages",
-        "schedule": crontab(hour="0-4", minute=0),
+        "schedule": crontab(hour="0-6", minute=0),
     },
     "check-inactivity-rooms": {
         "task": "check_inactivity_rooms",
@@ -591,9 +587,7 @@ CELERY_BEAT_SCHEDULE = {
     },
     "check-metric-goal-violations": {
         "task": "check_metric_goal_violations",
-        "schedule": env.float(
-            "METRIC_GOAL_SWEEP_INTERVAL_SECONDS", default=30.0
-        ),
+        "schedule": env.float("METRIC_GOAL_SWEEP_INTERVAL_SECONDS", default=30.0),
     },
 }
 
@@ -789,9 +783,7 @@ INSIGHTS_API_RETRY_DELAY = env.int("INSIGHTS_API_RETRY_DELAY", default=5)
 FEEDBACK_FEATURE_FLAG_KEY = env.str(
     "FEEDBACK_FEATURE_FLAG_KEY", default="weniChatsFeedback"
 )
-DISABLE_OLD_PROJECT_CONSUMER = env.bool(
-    "DISABLE_OLD_PROJECT_CONSUMER", default=True
-)
+DISABLE_OLD_PROJECT_CONSUMER = env.bool("DISABLE_OLD_PROJECT_CONSUMER", default=True)
 AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY = env.str(
     "AUTOMATIC_MESSAGE_FEATURE_FLAG_KEY", default="weniChatsAutomaticMessage"
 )
@@ -873,6 +865,15 @@ CHANGE_TICKETER_ON_TRANSFER_FEATURE_FLAG_KEY = env.str(
 AUDIT_LOG_FEATURE_FLAG_KEY = env.str(
     "AUDIT_LOG_FEATURE_FLAG_KEY", default="weniChatsAuditLog"
 )
+# When enabled for a project, ``get_replied_message`` falls back to matching
+# the stable WAMID core (``external_id_core``) when the exact ``external_id``
+# match against ``ChatMessageReplyIndex`` returns nothing. Mitigates the
+# observed WAMID envelope mismatch (``HBgM`` vs ``HBgT``) sent by Meta.
+REPLY_CORE_FALLBACK_FEATURE_FLAG_KEY = env.str(
+    "REPLY_CORE_FALLBACK_FEATURE_FLAG_KEY",
+    default="weniChatsReplyCoreFallback",
+)
+
 
 # REPORT STATUS CACHE
 REPORT_STATUS_CACHE_TTL = env.int("REPORT_STATUS_CACHE_TTL", default=300)

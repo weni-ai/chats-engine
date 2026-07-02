@@ -179,8 +179,12 @@ class RoomViewsetListTests(TestCase):
         pinned_room = self._create_room("PINNED", user=self.other_user)
         regular_room = self._create_room("REGULAR", user=self.other_user)
 
-        RoomPin.objects.create(room=pinned_room, user=self.other_user)
-        RoomPin.objects.create(room=regular_room, user=self.request_user)
+        RoomPin.objects.create(
+            room=pinned_room, user=self.other_user, project=self.project
+        )
+        RoomPin.objects.create(
+            room=regular_room, user=self.request_user, project=self.project
+        )
 
         response = self._list({"email": self.other_user.email, "limit": 10})
 
@@ -198,7 +202,10 @@ class RoomViewsetListTests(TestCase):
             if i < 3:
                 pinned_rooms.append(room)
         RoomPin.objects.bulk_create(
-            [RoomPin(room=room, user=self.request_user) for room in pinned_rooms]
+            [
+                RoomPin(room=room, user=self.request_user, project=self.project)
+                for room in pinned_rooms
+            ]
         )
 
         params = {"project": str(self.project.pk), "limit": 50}
@@ -251,13 +258,15 @@ class RoomViewsetListTests(TestCase):
         active_regular = self._create_room("ACTIVE-REGULAR", is_active=True)
         self._create_room("INACTIVE-REGULAR", is_active=False)
 
-        RoomPin.objects.create(room=active_pinned, user=self.request_user)
+        # Pin both pinned rooms
+        RoomPin.objects.create(
+            room=active_pinned, user=self.request_user, project=self.project
+        )
+        RoomPin.objects.create(
+            room=active_regular, user=self.request_user, project=self.project
+        )
 
-        params = {
-            "project": str(self.project.pk),
-            "is_active": "true",
-            "limit": 50
-        }
+        params = {"project": str(self.project.pk), "is_active": "true", "limit": 50}
 
         with CaptureQueriesContext(connection) as ctx:
             response = self._list(params)
@@ -272,10 +281,7 @@ class RoomViewsetListTests(TestCase):
         if len(results) >= 2:
             self.assertEqual(results[0]["uuid"], str(active_pinned.uuid))
 
-        self.assertLessEqual(
-            len(ctx), 50,
-            f"Too many queries with filters: {len(ctx)}"
-        )
+        self.assertLessEqual(len(ctx), 50, f"Too many queries with filters: {len(ctx)}")
 
     def test_optimized_no_pins_returns_filtered_results(self):
         room_a = self._create_room("A")
@@ -355,9 +361,7 @@ class RoomViewsetListTests(TestCase):
         self.assertIn(str(ongoing_room.uuid), result_uuids)
 
     def test_optimized_respects_max_pin_limit(self):
-        rooms = [
-            self._create_room(f"R{i}", user=self.request_user) for i in range(4)
-        ]
+        rooms = [self._create_room(f"R{i}", user=self.request_user) for i in range(4)]
         for room in rooms[:3]:
             RoomPin.objects.create(room=room, user=self.request_user)
 

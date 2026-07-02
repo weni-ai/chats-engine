@@ -51,12 +51,10 @@ class ModuleHasPermission(permissions.BasePermission):
                 )
                 return True
 
-        LOGGER.info(
-            "No cached value found for user %s or user does not have permission to communicate internally",
-            request.user.email,
-        )
-
-        has_perm = request.user.has_perm("accounts.can_communicate_internally")
+        has_perm = request.user.user_permissions.filter(
+            codename="can_communicate_internally",
+            content_type__app_label="accounts",
+        ).exists()
 
         if has_perm:
             LOGGER.info(

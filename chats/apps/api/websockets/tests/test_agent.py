@@ -13,7 +13,7 @@ from chats.apps.api.utils import create_user_and_token
 from chats.apps.api.websockets.rooms.consumers.agent import AgentRoomConsumer
 from chats.apps.api.websockets.rooms.routing import websocket_urlpatterns
 from chats.apps.contacts.models import Contact
-from chats.apps.projects.models import Project
+from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector, SectorAuthorization
 
@@ -52,6 +52,190 @@ class AgentConsumerTestCase(TestCase):
         connected, subprotocol = await agent_comunicator.connect()
         self.assertTrue(connected)
         await agent_comunicator.disconnect()
+
+
+class AgentMessageCreateWebSocketTestCase(AgentConsumerTestCase):
+    def setUp(self):
+        super().setUp()
+        self.room.user = self.user
+        self.room.save(update_fields=["user"])
+        self.user_permission.status = ProjectPermission.STATUS_ONLINE
+        self.user_permission.last_seen = timezone.now()
+        self.user_permission.save(update_fields=["status", "last_seen"])
+
+    async def _connect(self):
+        communicator = WebsocketCommunicator(
+            self.application,
+            f"/ws/agent/rooms?Token={self.token.pk}&project={self.project.pk}",
+        )
+        connected, _ = await communicator.connect()
+        self.assertTrue(connected)
+        return communicator
+
+    async def test_message_create_success(self):
+        communicator = await self._connect()
+        request_id = "tmp-test-success"
+
+        await communicator.send_json_to(
+            {
+                "type": "method",
+                "action": "message_create",
+                "content": {
+                    "request_id": request_id,
+                    "room": str(self.room.uuid),
+                    "text": "Hello from websocket",
+                },
+            }
+        )
+
+        response = await communicator.receive_json_from()
+        self.assertEqual(response["type"], "notify")
+        self.assertEqual(response["action"], "msg.create.success")
+        self.assertEqual(response["content"]["request_id"], request_id)
+        self.assertEqual(response["content"]["text"], "Hello from websocket")
+        self.assertEqual(response["content"]["room"], str(self.room.uuid))
+        self.assertTrue(response["content"]["uuid"])
+
+        await communicator.disconnect()
+
+    async def test_message_create_permission_denied(self):
+        other_user, _ = create_user_and_token(nickname="other-agent")
+        self.room.user = other_user
+        self.room.save(update_fields=["user"])
+
+        communicator = await self._connect()
+        request_id = "tmp-test-denied"
+
+        await communicator.send_json_to(
+            {
+                "type": "method",
+                "action": "message_create",
+                "content": {
+                    "request_id": request_id,
+                    "room": str(self.room.uuid),
+                    "text": "Should fail",
+                },
+            }
+        )
+
+        response = await communicator.receive_json_from()
+        self.assertEqual(response["action"], "msg.create.error")
+        self.assertEqual(response["content"]["request_id"], request_id)
+        self.assertEqual(response["content"]["error_code"], "permission_denied")
+
+        await communicator.disconnect()
+
+    async def test_message_create_room_closed(self):
+        self.room.is_active = False
+        self.room.save(update_fields=["is_active"])
+
+        communicator = await self._connect()
+        request_id = "tmp-test-closed"
+
+        await communicator.send_json_to(
+            {
+                "type": "method",
+                "action": "message_create",
+                "content": {
+                    "request_id": request_id,
+                    "room": str(self.room.uuid),
+                    "text": "Should fail",
+                },
+            }
+        )
+
+        response = await communicator.receive_json_from()
+        self.assertEqual(response["action"], "msg.create.error")
+        self.assertEqual(response["content"]["error_code"], "room_closed")
+
+        await communicator.disconnect()
+
+    async def test_message_create_agent_offline(self):
+        self.project.config = {"restrict_offline_agents": True}
+        self.project.save(update_fields=["config"])
+        self.user_permission.status = ProjectPermission.STATUS_OFFLINE
+        self.user_permission.save(update_fields=["status"])
+
+        communicator = await self._connect()
+        request_id = "tmp-test-offline"
+
+        await communicator.send_json_to(
+            {
+                "type": "method",
+                "action": "message_create",
+                "content": {
+                    "request_id": request_id,
+                    "room": str(self.room.uuid),
+                    "text": "Should fail",
+                },
+            }
+        )
+
+        response = await communicator.receive_json_from()
+        self.assertEqual(response["action"], "msg.create.error")
+        self.assertEqual(response["content"]["error_code"], "agent_offline")
+
+        await communicator.disconnect()
+
+    async def test_message_create_missing_request_id(self):
+        communicator = await self._connect()
+
+        await communicator.send_json_to(
+            {
+                "type": "method",
+                "action": "message_create",
+                "content": {
+                    "room": str(self.room.uuid),
+                    "text": "Should fail",
+                },
+            }
+        )
+
+        response = await communicator.receive_json_from()
+        self.assertEqual(response["action"], "msg.create.error")
+        self.assertEqual(response["content"]["error_code"], "validation_error")
+        self.assertEqual(response["content"]["error_message"], "request_id is required")
+
+        await communicator.disconnect()
+
+    async def test_disallowed_method_not_invokable(self):
+        communicator = await self._connect()
+
+        await communicator.send_json_to(
+            {
+                "type": "method",
+                "action": "set_user_status",
+                "content": {"status": "OFFLINE"},
+            }
+        )
+
+        response = await communicator.receive_json_from()
+        self.assertEqual(response["action"], "method.error")
+        self.assertEqual(response["content"]["error_code"], "method_not_allowed")
+
+        await communicator.disconnect()
+
+    @patch("chats.apps.msgs.models.Message.notify_room")
+    async def test_message_create_triggers_room_broadcast(self, mock_notify_room):
+        communicator = await self._connect()
+
+        await communicator.send_json_to(
+            {
+                "type": "method",
+                "action": "message_create",
+                "content": {
+                    "request_id": "tmp-test-broadcast",
+                    "room": str(self.room.uuid),
+                    "text": "Broadcast me",
+                },
+            }
+        )
+
+        response = await communicator.receive_json_from()
+        self.assertEqual(response["action"], "msg.create.success")
+        mock_notify_room.assert_called_once_with("create", True)
+
+        await communicator.disconnect()
 
 
 class PingTimeoutUnitTestCase(TestCase):

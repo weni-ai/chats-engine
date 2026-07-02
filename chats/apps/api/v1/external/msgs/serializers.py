@@ -6,6 +6,7 @@ from chats.apps.api.v1.accounts.serializers import UserSerializer
 from chats.apps.api.v1.contacts.serializers import ContactRelationsSerializer
 from chats.apps.api.v1.msgs.serializers import MessageMediaSerializer
 from chats.apps.msgs.models import Message, MessageMedia
+from chats.apps.msgs.utils import extract_wamid_core
 
 
 class AttachmentSerializer(serializers.ModelSerializer):
@@ -258,6 +259,17 @@ class RoomHistoryMessageSerializer(serializers.ModelSerializer):
             return None
 
         reply_index = reply_index_map.get(replied_id)
+        if reply_index is None:
+            # Fall back to the stable WAMID core when the exact ``external_id``
+            # mapping is missing because Meta sent a different envelope
+            # (``HBgM`` vs ``HBgT``) inside ``context.id``. The viewset
+            # decides whether the core map is populated based on the project
+            # feature flag, so this branch is a no-op when the flag is off.
+            core_map = self.context.get("reply_index_core_map") or {}
+            core = extract_wamid_core(replied_id)
+            if core:
+                reply_index = core_map.get(core)
+
         if reply_index is None:
             return None
 
