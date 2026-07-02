@@ -79,10 +79,9 @@ class SendRoomExportEmail:
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
         identifier = self._room_identifier(room)
         project_name = self._project_name(room)
-        subject = (
-            f"Error generating conversation export for room "
-            f"{identifier} - {timestamp}"
-        )
+        subject = _(
+            "Error generating conversation export for room %(identifier)s - %(timestamp)s"
+        ) % {"identifier": identifier, "timestamp": timestamp}
         message_plain, message_html = get_room_export_failed_email(
             project_name, error_message
         )
@@ -123,7 +122,9 @@ class SendRoomExportEmail:
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
         identifier = self._room_identifier(room)
         project_name = self._project_name(room)
-        subject = f"Conversation export for room {identifier} - {timestamp}"
+        subject = _(
+            "Conversation export for room %(identifier)s - %(timestamp)s"
+        ) % {"identifier": identifier, "timestamp": timestamp}
         message_plain, message_html = get_room_export_ready_email(
             project_name, download_url
         )
