@@ -1,3 +1,4 @@
+import json
 from datetime import time
 from unittest.mock import PropertyMock, patch
 
@@ -11,6 +12,7 @@ from chats.apps.msgs.models import Message
 from chats.apps.msgs.usecases.create_agent_message import (
     CreateAgentMessageUseCase,
     PostCreateAgentMessageUseCase,
+    SerializeMessageForWsUseCase,
 )
 from chats.apps.projects.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue
@@ -188,3 +190,33 @@ class TestPostCreateAgentMessageUseCase(TestCase):
         PostCreateAgentMessageUseCase().execute(message)
 
         mock_first_response_task.assert_called_once_with(str(room.uuid))
+
+
+class TestSerializeMessageForWsUseCase(TestCase):
+    def test_execute_returns_json_serializable_payload(self):
+        user = User.objects.create_user(email="agent@example.com", password="pass")
+        project = Project.objects.create(name="Test Project")
+        sector = Sector.objects.create(
+            name="Test Sector",
+            project=project,
+            rooms_limit=10,
+            work_start=time(9, 0),
+            work_end=time(18, 0),
+        )
+        queue = Queue.objects.create(name="Test Queue", sector=sector)
+        contact = Contact.objects.create(
+            name="Contact", email="contact@example.com"
+        )
+        room = Room.objects.create(
+            queue=queue,
+            contact=contact,
+            user=user,
+            is_active=True,
+        )
+        message = Message.objects.create(room=room, user=user, text="Hello")
+
+        payload = SerializeMessageForWsUseCase().execute(message)
+
+        json.dumps(payload)
+        self.assertIsInstance(payload["uuid"], str)
+        self.assertIsInstance(payload["room"], str)
