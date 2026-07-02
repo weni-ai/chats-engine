@@ -547,6 +547,9 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 
+ARCHIVE_CHATS_SCHEDULE_HOUR = env.str("ARCHIVE_CHATS_SCHEDULE_HOUR", default="0-6")
+ARCHIVE_CHATS_SCHEDULE_MINUTE = env.str("ARCHIVE_CHATS_SCHEDULE_MINUTE", default="0")
+
 CELERY_BEAT_SCHEDULE = {
     "process-pending-reports": {
         "task": "process_pending_reports",
@@ -558,7 +561,10 @@ CELERY_BEAT_SCHEDULE = {
     },
     "start-archive-rooms-messages": {
         "task": "start_archive_rooms_messages",
-        "schedule": crontab(hour="0-6", minute=0),
+        "schedule": crontab(
+            hour=ARCHIVE_CHATS_SCHEDULE_HOUR,
+            minute=ARCHIVE_CHATS_SCHEDULE_MINUTE,
+        ),
     },
     "check-inactivity-rooms": {
         "task": "check_inactivity_rooms",
