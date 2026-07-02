@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('queues', '0007_queue_created_by_queue_deleted_by_queue_modified_by_and_more'),
+        ("queues", "0008_queue_queue_purpose"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='queueauthorization',
-            name='is_deleted',
-            field=models.BooleanField(default=False, verbose_name='is deleted?'),
+            model_name="queueauthorization",
+            name="is_deleted",
+            field=models.BooleanField(default=False, verbose_name="is deleted?"),
         ),
     ]
