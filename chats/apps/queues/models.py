@@ -355,7 +355,9 @@ class QueueAuthorization(AuditableMixin, BaseSoftDeleteModel, BaseModel):
         verbose_name_plural = _("Sector Queues Authorization")
         constraints = [
             models.UniqueConstraint(
-                fields=["queue", "permission"], name="unique_queue_auth"
+                fields=["queue", "permission"],
+                condition=Q(is_deleted=False),
+                name="unique_queue_auth",
             )
         ]
 
