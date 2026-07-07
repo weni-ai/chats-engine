@@ -1,14 +1,15 @@
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 from django.utils import timezone
 
 from chats.apps.accounts.models import User
 from chats.apps.contacts.models import Contact
+from chats.apps.csat.models import CSATSurvey
 from chats.apps.history.serializers.rooms import (
     RoomDetailSerializer,
     RoomHistorySerializer,
     build_closed_by_payload,
 )
-from chats.apps.projects.models.models import Project
+from chats.apps.projects.models.models import Project, ProjectPermission
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
 from chats.apps.sectors.models import Sector
@@ -121,3 +122,123 @@ class TestRoomHistorySerializerClosedBy(TestCase):
 
         data = RoomHistorySerializer(room).data
         self.assertIsNone(data["closed_by"])
+
+
+class TestRoomDetailSerializerCsat(TestCase):
+    """
+    CSAT rating/comment must only be visible to moderators (project admins),
+    and must gracefully handle rooms without a completed CSAT survey.
+    """
+
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.project = Project.objects.create(name="Test Project")
+        self.sector = Sector.objects.create(
+            name="Sector",
+            project=self.project,
+            rooms_limit=5,
+            work_start="09:00",
+            work_end="18:00",
+        )
+        self.queue = Queue.objects.create(name="Queue", sector=self.sector)
+        self.contact = Contact.objects.create(name="Contact", external_id="c-1")
+
+        self.moderator = User.objects.create(email="moderator@example.com")
+        ProjectPermission.objects.create(
+            user=self.moderator, project=self.project, role=ProjectPermission.ROLE_ADMIN
+        )
+
+        self.attendant = User.objects.create(email="attendant@example.com")
+        ProjectPermission.objects.create(
+            user=self.attendant,
+            project=self.project,
+            role=ProjectPermission.ROLE_ATTENDANT,
+        )
+
+    def _make_room(self) -> Room:
+        room = Room.objects.create(queue=self.queue, contact=self.contact)
+        room.is_active = False
+        room.ended_at = timezone.now()
+        room.save()
+        return room
+
+    def _context_for(self, user) -> dict:
+        request = self.factory.get("/")
+        request.user = user
+        return {"request": request}
+
+    def test_moderator_sees_rating_and_comment(self):
+        room = self._make_room()
+        CSATSurvey.objects.create(
+            room=room,
+            rating=5,
+            comment="Great service",
+            answered_on=timezone.now(),
+        )
+
+        data = RoomDetailSerializer(
+            room, context=self._context_for(self.moderator)
+        ).data
+
+        self.assertEqual(data["csat_note"], 5)
+        self.assertEqual(data["csat_commentary"], "Great service")
+
+    def test_non_moderator_does_not_see_rating_or_comment(self):
+        room = self._make_room()
+        CSATSurvey.objects.create(
+            room=room,
+            rating=5,
+            comment="Great service",
+            answered_on=timezone.now(),
+        )
+
+        data = RoomDetailSerializer(
+            room, context=self._context_for(self.attendant)
+        ).data
+
+        self.assertIsNone(data["csat_note"])
+        self.assertIsNone(data["csat_commentary"])
+
+    def test_moderator_sees_none_when_no_csat_answered(self):
+        room = self._make_room()
+
+        data = RoomDetailSerializer(
+            room, context=self._context_for(self.moderator)
+        ).data
+
+        self.assertIsNone(data["csat_note"])
+        self.assertIsNone(data["csat_commentary"])
+
+    def test_moderator_sees_rating_without_comment(self):
+        room = self._make_room()
+        CSATSurvey.objects.create(
+            room=room,
+            rating=4,
+            comment=None,
+            answered_on=timezone.now(),
+        )
+
+        data = RoomDetailSerializer(
+            room, context=self._context_for(self.moderator)
+        ).data
+
+        self.assertEqual(data["csat_note"], 4)
+        self.assertIsNone(data["csat_commentary"])
+
+    def test_no_request_in_context_hides_csat_fields(self):
+        """
+        Defensive behavior: without a request in context we can't determine
+        the requester's role, so CSAT data must not leak.
+        """
+        room = self._make_room()
+        CSATSurvey.objects.create(
+            room=room,
+            rating=5,
+            comment="Great service",
+            answered_on=timezone.now(),
+        )
+
+        data = RoomDetailSerializer(room).data
+
+        self.assertIsNone(data["csat_note"])
+        self.assertIsNone(data["csat_commentary"])

@@ -114,6 +114,8 @@ class RoomDetailSerializer(serializers.ModelSerializer):
     tags = serializers.SerializerMethodField()
     archived_conversation_file_url = serializers.SerializerMethodField()
     closed_by = serializers.SerializerMethodField()
+    csat_note = serializers.SerializerMethodField()
+    csat_commentary = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -130,6 +132,8 @@ class RoomDetailSerializer(serializers.ModelSerializer):
             "is_archived",
             "archived_conversation_file_url",
             "closed_by",
+            "csat_note",
+            "csat_commentary",
         ]
 
     def get_closed_by(self, obj: Room) -> Optional[dict]:
@@ -150,3 +154,32 @@ class RoomDetailSerializer(serializers.ModelSerializer):
 
     def get_archived_conversation_file_url(self, obj: Room) -> Optional[str]:
         return obj.get_archived_conversation_file_url()
+
+    def _requester_is_moderator(self, obj: Room) -> bool:
+        """
+        CSAT rating/comment are only visible to moderators (project admins).
+        """
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+
+        if not user or not user.is_authenticated:
+            return False
+
+        try:
+            return obj.project.is_admin(user)
+        except AttributeError:
+            return False
+
+    def get_csat_note(self, obj: Room) -> Optional[int]:
+        if not self._requester_is_moderator(obj):
+            return None
+
+        csat_survey = getattr(obj, "csat_survey", None)
+        return csat_survey.rating if csat_survey else None
+
+    def get_csat_commentary(self, obj: Room) -> Optional[str]:
+        if not self._requester_is_moderator(obj):
+            return None
+
+        csat_survey = getattr(obj, "csat_survey", None)
+        return csat_survey.comment if csat_survey else None

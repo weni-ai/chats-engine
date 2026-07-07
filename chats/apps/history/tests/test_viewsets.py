@@ -8,6 +8,7 @@ from chats.apps.archive_chats.models import (
     ArchiveConversationsJob,
     RoomArchivedConversation,
 )
+from chats.apps.csat.models import CSATSurvey
 from chats.core.tests.test_base import BaseAPIChatsTestCase
 
 
@@ -145,6 +146,58 @@ class TestHistoryRoomViewsets(BaseAPIChatsTestCase):
         response = client.get(url, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def _retrieve(self, token, room):
+        client = self.client
+        client.credentials(HTTP_AUTHORIZATION="Token " + token.key)
+        url = (
+            reverse("history_room-detail", kwargs={"pk": str(room.pk)})
+            + f"?project={str(self.project.uuid)}"
+        )
+        return client.get(url, format="json")
+
+    def test_admin_sees_csat_note_and_commentary(self):
+        self.contact.rooms.update(is_active=False, ended_at=timezone.now())
+        CSATSurvey.objects.create(
+            room=self.room_1,
+            rating=5,
+            comment="Great service",
+            answered_on=timezone.now(),
+        )
+
+        response = self._retrieve(self.admin_token, self.room_1)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data.get("csat_note"), 5)
+        self.assertEqual(response.data.get("csat_commentary"), "Great service")
+
+    def test_agent_does_not_see_csat_note_and_commentary(self):
+        """
+        Room 1's assigned agent can retrieve the room (it's theirs), but as a
+        non-moderator they must not see the CSAT rating/comment.
+        """
+        self.contact.rooms.update(is_active=False, ended_at=timezone.now())
+        CSATSurvey.objects.create(
+            room=self.room_1,
+            rating=5,
+            comment="Great service",
+            answered_on=timezone.now(),
+        )
+
+        response = self._retrieve(self.agent_token, self.room_1)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data.get("csat_note"))
+        self.assertIsNone(response.data.get("csat_commentary"))
+
+    def test_admin_sees_null_csat_when_room_has_no_survey(self):
+        self.contact.rooms.update(is_active=False, ended_at=timezone.now())
+
+        response = self._retrieve(self.admin_token, self.room_1)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data.get("csat_note"))
+        self.assertIsNone(response.data.get("csat_commentary"))
 
     def test_handling_not_allowed_http_methods(self):
         url = reverse("history_room-detail", kwargs={"pk": 1})
