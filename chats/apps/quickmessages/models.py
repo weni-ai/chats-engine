@@ -17,7 +17,7 @@ class QuickMessage(AuditableMixin, BaseModel):
     text = models.TextField(_("text"))
     sector = models.ForeignKey(
         "sectors.Sector",
-        verbose_name=_("sector"),
+        verbose_name=_("Department"),
         related_name="quick_message",
         on_delete=models.CASCADE,
         null=True,
@@ -25,8 +25,8 @@ class QuickMessage(AuditableMixin, BaseModel):
     )
 
     class Meta:
-        verbose_name = _("Quick Message")
-        verbose_name_plural = _("Quick Messages")
+        verbose_name = _("Quick message")
+        verbose_name_plural = _("Quick messages")
 
     @property
     def project(self):

@@ -102,25 +102,25 @@ class Room(BaseModel, BaseConfigurableModel):
     )
 
     is_active = models.BooleanField(_("is active?"), default=True)
-    is_waiting = models.BooleanField(_("is waiting for answer?"), default=False)
+    is_waiting = models.BooleanField(_("is waiting for an answer?"), default=False)
 
     # Legacy, only stores the last transfer
-    transfer_history = models.JSONField(_("Transfer History"), null=True, blank=True)
+    transfer_history = models.JSONField(_("Transfer history"), null=True, blank=True)
     # New, stores the full transfer history
     full_transfer_history = models.JSONField(
-        _("Full Transfer History"), null=True, blank=True, default=list
+        _("Full transfer history"), null=True, blank=True, default=list
     )
 
     tags = models.ManyToManyField(
         "sectors.SectorTag",
         related_name="rooms",
-        verbose_name=_("tags"),
+        verbose_name=_("Tags"),
         blank=True,
     )
-    protocol = models.TextField(_("protocol"), null=True, blank=True, default="")
+    protocol = models.TextField(_("Protocol"), null=True, blank=True, default="")
 
     service_chat = models.TextField(
-        _("service chat"), null=True, blank=True, default=""
+        _("Service chat"), null=True, blank=True, default=""
     )
 
     first_user_assigned_at = models.DateTimeField(
@@ -317,7 +317,7 @@ class Room(BaseModel, BaseConfigurableModel):
         )
 
         if self._state.adding is False and current_is_active is False:
-            raise ValidationError({"detail": _("Closed rooms cannot receive updates")})
+            raise ValidationError({"detail": _("Closed rooms can't receive updates")})
 
         if self._state.adding:
             self.added_to_queue_at = timezone.now()
@@ -937,17 +937,17 @@ class RoomPin(BaseModel):
         verbose_name=_("user"),
         on_delete=models.CASCADE,
     )
+    created_on = models.DateTimeField(_("Created on"), auto_now_add=True)
     project = models.ForeignKey(
         "projects.Project",
         related_name="room_pins",
         verbose_name=_("project"),
         on_delete=models.CASCADE,
     )
-    created_on = models.DateTimeField(_("created on"), auto_now_add=True)
 
     class Meta:
-        verbose_name = _("Room Pin")
-        verbose_name_plural = _("Room Pins")
+        verbose_name = _("Room pin")
+        verbose_name_plural = _("Room pins")
         constraints = [
             models.UniqueConstraint(
                 fields=["room", "user"],
@@ -978,15 +978,15 @@ class RoomNote(BaseModel):
     message = models.OneToOneField(
         "msgs.Message",
         related_name="internal_note",
-        verbose_name=_("message"),
+        verbose_name=_("Message"),
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
     )
 
     class Meta:
-        verbose_name = _("Room Note")
-        verbose_name_plural = _("Room Notes")
+        verbose_name = _("Room note")
+        verbose_name_plural = _("Room notes")
         ordering = ["-created_on"]
 
     @property
