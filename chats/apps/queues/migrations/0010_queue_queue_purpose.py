@@ -4,7 +4,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("queues", "0008_queueauthorization_is_deleted"),
+        ("queues", "0009_remove_queueauthorization_unique_queue_auth_and_more"),
     ]
 
     operations = [
