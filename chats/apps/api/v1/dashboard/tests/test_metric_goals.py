@@ -179,6 +179,44 @@ class MetricGoalsViewsetTestCase(APITestCase):
         self.assertEqual(response.data["rooms_threshold_count"], 3)
         self.assertEqual(response.data["recipients"], [])
 
+    def test_rooms_threshold_count_zero_accepted_when_email_disabled(self):
+        self._auth(self.manager_token)
+
+        response = self.client.post(
+            self.upsert_url,
+            {
+                "threshold": 1,
+                "unit": MetricGoal.UNIT_MINUTE,
+                "is_active": True,
+                "email_enabled": False,
+                "rooms_threshold_count": 0,
+                "recipients": [],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["rooms_threshold_count"], 0)
+
+    def test_rooms_threshold_count_zero_rejected_when_email_enabled(self):
+        self._auth(self.manager_token)
+
+        response = self.client.post(
+            self.upsert_url,
+            {
+                "threshold": 1,
+                "unit": MetricGoal.UNIT_MINUTE,
+                "is_active": True,
+                "email_enabled": True,
+                "rooms_threshold_count": 0,
+                "recipients": [],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("rooms_threshold_count", response.data)
+
     def test_viewer_cannot_configure_goal(self):
         self._auth(self.viewer_token)
 
