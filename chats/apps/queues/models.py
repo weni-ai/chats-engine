@@ -322,7 +322,7 @@ class Queue(AuditableMixin, BaseSoftDeleteModel, BaseConfigurableModel, BaseMode
         return self.sector.required_tags
 
 
-class QueueAuthorization(AuditableMixin, BaseModel):
+class QueueAuthorization(AuditableMixin, BaseSoftDeleteModel, BaseModel):
     ROLE_NOT_SETTED = 0
     ROLE_AGENT = 1
 
@@ -356,7 +356,9 @@ class QueueAuthorization(AuditableMixin, BaseModel):
         verbose_name_plural = _("Sector Queues Authorization")
         constraints = [
             models.UniqueConstraint(
-                fields=["queue", "permission"], name="unique_queue_auth"
+                fields=["queue", "permission"],
+                condition=Q(is_deleted=False),
+                name="unique_queue_auth",
             )
         ]
 

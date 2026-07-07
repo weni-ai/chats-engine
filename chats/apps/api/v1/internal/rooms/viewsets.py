@@ -16,10 +16,15 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, permissions, viewsets
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.mixins import ListModelMixin
+from rest_framework.settings import api_settings
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.filters import SearchFilter, OrderingFilter
 from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
+from chats.apps.api.authentication.classes import JWTAuthentication
+from chats.apps.api.authentication.permissions import (
+    HasInternalAuthenticationPermission,
+)
 from chats.apps.api.v1.internal.permissions import ModuleHasPermission
 from chats.apps.api.v1.internal.rooms.serializers import (
     RoomInternalListSerializer,
@@ -43,7 +48,14 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Room.objects.all()
     serializer_class = RoomInternalListSerializer
     lookup_field = "uuid"
-    permission_classes = [permissions.IsAuthenticated, ModuleHasPermission]
+    authentication_classes = [
+        JWTAuthentication
+    ] + api_settings.DEFAULT_AUTHENTICATION_CLASSES
+
+    def get_permissions(self):
+        if getattr(self.request, "jwt_payload", None):
+            return [HasInternalAuthenticationPermission()]
+        return [permissions.IsAuthenticated(), ModuleHasPermission()]
 
     filter_backends = [
         filters.OrderingFilter,
@@ -94,7 +106,9 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
             return self._pending_response_feature_active_cached
 
         active = False
-        project_uuid = self.request.query_params.get("project") if self.request else None
+        project_uuid = (
+            self.request.query_params.get("project") if self.request else None
+        )
         try:
             attributes = {"projectUUID": str(project_uuid)} if project_uuid else {}
             active = is_feature_active_for_attributes(
@@ -102,9 +116,7 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
                 attributes=attributes,
             )
         except Exception as e:
-            logger.error(
-                "Error checking pending_response feature flag: %s", e
-            )
+            logger.error("Error checking pending_response feature flag: %s", e)
 
         self._pending_response_feature_active_cached = active
         return active
@@ -194,11 +206,18 @@ class InternalProtocolRoomsViewSet(ListModelMixin, GenericViewSet):
     serializer_class = InternalProtocolRoomsSerializer
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = InternalProtocolRoomsFilter
-    permission_classes = [permissions.IsAuthenticated, ModuleHasPermission]
+    authentication_classes = [
+        JWTAuthentication
+    ] + api_settings.DEFAULT_AUTHENTICATION_CLASSES
     search_fields = ["protocol"]
     ordering = ["protocol"]
     ordering_fields = ["protocol"]
     pagination_class = CustomCursorPagination
+
+    def get_permissions(self):
+        if getattr(self.request, "jwt_payload", None):
+            return [HasInternalAuthenticationPermission()]
+        return [permissions.IsAuthenticated(), ModuleHasPermission()]
 
     def get_queryset(self):
         return super().get_queryset().exclude(Q(protocol__isnull=True) | Q(protocol=""))

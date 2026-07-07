@@ -525,9 +525,7 @@ INACTIVITY_MAX_WARNINGS_PER_RUN = env.int(
 INACTIVITY_MAX_CLOSURES_PER_RUN = env.int(
     "INACTIVITY_MAX_CLOSURES_PER_RUN", default=500
 )
-INACTIVITY_QUERYSET_CHUNK_SIZE = env.int(
-    "INACTIVITY_QUERYSET_CHUNK_SIZE", default=200
-)
+INACTIVITY_QUERYSET_CHUNK_SIZE = env.int("INACTIVITY_QUERYSET_CHUNK_SIZE", default=200)
 
 # Distributed lock used by `check_inactivity_rooms` to guarantee only one
 # instance of the task runs at a time, even if a previous run overlaps the
@@ -535,9 +533,7 @@ INACTIVITY_QUERYSET_CHUNK_SIZE = env.int(
 INACTIVITY_TASK_LOCK_NAME = env.str(
     "INACTIVITY_TASK_LOCK_NAME", default="inactivity_task_lock"
 )
-INACTIVITY_TASK_LOCK_TIMEOUT = env.int(
-    "INACTIVITY_TASK_LOCK_TIMEOUT", default=120
-)
+INACTIVITY_TASK_LOCK_TIMEOUT = env.int("INACTIVITY_TASK_LOCK_TIMEOUT", default=120)
 
 # Celery
 
@@ -551,6 +547,9 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 
+ARCHIVE_CHATS_SCHEDULE_HOUR = env.str("ARCHIVE_CHATS_SCHEDULE_HOUR", default="0-6")
+ARCHIVE_CHATS_SCHEDULE_MINUTE = env.str("ARCHIVE_CHATS_SCHEDULE_MINUTE", default="0")
+
 CELERY_BEAT_SCHEDULE = {
     "process-pending-reports": {
         "task": "process_pending_reports",
@@ -562,7 +561,10 @@ CELERY_BEAT_SCHEDULE = {
     },
     "start-archive-rooms-messages": {
         "task": "start_archive_rooms_messages",
-        "schedule": crontab(hour="0-4", minute=0),
+        "schedule": crontab(
+            hour=ARCHIVE_CHATS_SCHEDULE_HOUR,
+            minute=ARCHIVE_CHATS_SCHEDULE_MINUTE,
+        ),
     },
     "check-inactivity-rooms": {
         "task": "check_inactivity_rooms",
@@ -788,6 +790,15 @@ ROOMS_COUNT_BY_QUEUE_FEATURE_FLAG_KEY = env.str(
 CHANGE_TICKETER_ON_TRANSFER_FEATURE_FLAG_KEY = env.str(
     "CHANGE_TICKETER_ON_TRANSFER_FEATURE_FLAG_KEY",
     default="weniChatsChangeTicketerOnTransfer",
+)
+
+# When enabled for a project, ``get_replied_message`` falls back to matching
+# the stable WAMID core (``external_id_core``) when the exact ``external_id``
+# match against ``ChatMessageReplyIndex`` returns nothing. Mitigates the
+# observed WAMID envelope mismatch (``HBgM`` vs ``HBgT``) sent by Meta.
+REPLY_CORE_FALLBACK_FEATURE_FLAG_KEY = env.str(
+    "REPLY_CORE_FALLBACK_FEATURE_FLAG_KEY",
+    default="weniChatsReplyCoreFallback",
 )
 
 

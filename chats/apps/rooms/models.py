@@ -761,10 +761,12 @@ class Room(BaseModel, BaseConfigurableModel):
         if self.pins.filter(user=user).exists():
             return
 
+        project = self.queue.sector.project
+
         if (
             RoomPin.objects.filter(
                 user=user,
-                room__queue__sector__project=self.queue.sector.project,
+                project=project,
                 room__is_active=True,
             ).count()
             >= settings.MAX_ROOM_PINS_LIMIT
@@ -777,7 +779,7 @@ class Room(BaseModel, BaseConfigurableModel):
         if not self.is_active:
             raise RoomIsNotActiveError
 
-        return RoomPin.objects.create(room=self, user=user)
+        return RoomPin.objects.create(room=self, user=user, project=project)
 
     def unpin(self, user: User):
         """
@@ -933,6 +935,12 @@ class RoomPin(BaseModel):
         "accounts.User",
         related_name="room_pins",
         verbose_name=_("user"),
+        on_delete=models.CASCADE,
+    )
+    project = models.ForeignKey(
+        "projects.Project",
+        related_name="room_pins",
+        verbose_name=_("project"),
         on_delete=models.CASCADE,
     )
     created_on = models.DateTimeField(_("created on"), auto_now_add=True)
