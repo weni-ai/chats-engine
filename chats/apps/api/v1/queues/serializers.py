@@ -70,10 +70,13 @@ class QueueSerializer(AuditableModelSerializer):
             "sector",
         ]
 
-    def _get_audit_project(self):
+    def _get_audit_project(self, data=None):
         if self.instance is not None:
             return self.instance.sector.project
-        sector = (self.validated_data or {}).get("sector")
+        source = data if data is not None else getattr(self, "_validated_data", None)
+        if not source:
+            return None
+        sector = source.get("sector")
         return sector.project if sector else None
 
     def _validate_queue_purpose(self, data):
@@ -81,7 +84,7 @@ class QueueSerializer(AuditableModelSerializer):
             return
 
         queue_purpose = data.get("queue_purpose", self.initial_data.get("queue_purpose"))
-        project = self._get_audit_project()
+        project = self._get_audit_project(data=data)
         request = self.context.get("request")
 
         if project:
