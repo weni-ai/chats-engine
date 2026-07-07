@@ -555,6 +555,22 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 
+# Dedicated Celery queue for the inactivity feature so a backlog on the
+# default queue (reports, exports, archives, etc.) cannot delay the
+# `check_inactivity_rooms` beat tick, and vice versa. Defaults to "celery"
+# so environments without a dedicated worker keep working unchanged.
+INACTIVITY_CELERY_QUEUE = env.str("INACTIVITY_CELERY_QUEUE", default="celery")
+
+# Dedicated Celery queue for metric goal / risk alert tasks so the periodic
+# sweep and alert emails are not delayed by backlog on the default queue.
+RISK_ALERT_CELERY_QUEUE = env.str("RISK_ALERT_CELERY_QUEUE", default="celery")
+
+CELERY_TASK_ROUTES = {
+    "check_inactivity_rooms": {"queue": INACTIVITY_CELERY_QUEUE},
+    "check_metric_goal_violations": {"queue": RISK_ALERT_CELERY_QUEUE},
+    "send_metric_goal_email": {"queue": RISK_ALERT_CELERY_QUEUE},
+}
+
 # celery beat
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60
@@ -573,10 +589,6 @@ CELERY_BEAT_SCHEDULE = {
         "task": "process_pending_room_exports",
         "schedule": 20.0,
     },
-    "process-pending-room-exports": {
-        "task": "process_pending_room_exports",
-        "schedule": 20.0,
-    },
     "start-archive-rooms-messages": {
         "task": "start_archive_rooms_messages",
         "schedule": crontab(hour="0-6", minute=0),
@@ -584,10 +596,12 @@ CELERY_BEAT_SCHEDULE = {
     "check-inactivity-rooms": {
         "task": "check_inactivity_rooms",
         "schedule": crontab(minute="*"),
+        "options": {"queue": INACTIVITY_CELERY_QUEUE},
     },
     "check-metric-goal-violations": {
         "task": "check_metric_goal_violations",
         "schedule": env.float("METRIC_GOAL_SWEEP_INTERVAL_SECONDS", default=30.0),
+        "options": {"queue": RISK_ALERT_CELERY_QUEUE},
     },
 }
 
