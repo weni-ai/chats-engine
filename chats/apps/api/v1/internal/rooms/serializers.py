@@ -6,7 +6,16 @@ from django.utils import timezone
 from chats.apps.api.v1.sectors.serializers import TagSimpleSerializer
 from chats.apps.csat.models import CSATSurvey
 from chats.apps.rooms.models import Room
-from chats.apps.dashboard.models import RoomMetrics
+from chats.apps.dashboard.models import MetricGoal, RoomMetrics
+
+# Maps each MetricGoal metric to the serializer method used to compute the
+# equivalent per-room value, so `goals_metrics` can reuse the exact same
+# figures already shown in `duration` / `waiting_time` / `first_response_time`.
+_GOAL_METRIC_TO_OUTPUT_KEY = {
+    MetricGoal.METRIC_WAITING_TIME: "waiting_time",
+    MetricGoal.METRIC_FIRST_RESPONSE_TIME: "first_response_time",
+    MetricGoal.METRIC_CONVERSATION_DURATION: "duration",
+}
 
 
 class RoomInternalListSerializer(serializers.ModelSerializer):
@@ -23,6 +32,7 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
     queue_time = serializers.SerializerMethodField()
     csat_rating = serializers.SerializerMethodField()
     pending_response = serializers.BooleanField(read_only=True, default=False)
+    goals_metrics = serializers.SerializerMethodField()
 
     class Meta:
         model = Room
@@ -46,6 +56,7 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
             "csat_rating",
             "pending_response",
             "protocol",
+            "goals_metrics",
         ]
 
     def _clean_soft_deleted_name(self, name: str) -> str:
@@ -156,6 +167,38 @@ class RoomInternalListSerializer(serializers.ModelSerializer):
             return csat_survey.rating
 
         return None
+
+    def get_goals_metrics(self, obj: Room) -> dict:
+        """Per-room breach flags for each metric with an active goal.
+
+        Mirrors the aggregate `{metric}_goal` payload exposed by
+        `time_metrics/`, but evaluated for this single room instead of the
+        whole project. A metric key is only included when the project has
+        an active `MetricGoal` configured for it.
+        """
+        goals_by_metric = self.context.get("active_goals_by_metric") or {}
+        if not goals_by_metric:
+            return {}
+
+        value_getters = {
+            MetricGoal.METRIC_WAITING_TIME: self.get_waiting_time,
+            MetricGoal.METRIC_FIRST_RESPONSE_TIME: self.get_first_response_time,
+            MetricGoal.METRIC_CONVERSATION_DURATION: self.get_duration,
+        }
+
+        goals_metrics = {}
+        for metric, goal in goals_by_metric.items():
+            output_key = _GOAL_METRIC_TO_OUTPUT_KEY.get(metric)
+            getter = value_getters.get(metric)
+            if not output_key or not getter:
+                continue
+
+            value = getter(obj) or 0
+            goals_metrics[output_key] = {
+                "exceeded": value >= goal.threshold_seconds,
+            }
+
+        return goals_metrics
 
 
 class InternalProtocolRoomsSerializer(serializers.ModelSerializer):

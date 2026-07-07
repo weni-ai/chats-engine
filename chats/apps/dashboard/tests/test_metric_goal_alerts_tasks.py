@@ -7,7 +7,6 @@ from django.core import mail
 from django.test import TestCase
 from django.utils import timezone
 
-from chats.apps.accounts.models import User
 from chats.apps.api.utils import create_user_and_token
 from chats.apps.contacts.models import Contact
 from chats.apps.dashboard import tasks as dashboard_tasks

@@ -55,7 +55,7 @@ class MetricGoalWriteSerializer(serializers.Serializer):
     is_active = serializers.BooleanField(default=True)
     email_enabled = serializers.BooleanField(default=False)
     rooms_threshold_count = serializers.IntegerField(
-        min_value=1,
+        min_value=0,
         default=MetricGoal.DEFAULT_ROOMS_THRESHOLD_COUNT,
     )
     rooms_threshold_percent = serializers.IntegerField(
@@ -80,6 +80,25 @@ class MetricGoalWriteSerializer(serializers.Serializer):
             attrs["threshold_seconds"] = threshold * UNIT_TO_SECONDS[unit]
         else:
             attrs["threshold_seconds"] = threshold_seconds
+
+        # `rooms_threshold_count` only gates the email notification (the
+        # WS/toast/widget alert fires with a single room in breach). The
+        # front sends `0` when email is disabled, since the field is
+        # meaningless in that case — we accept and store it as-is instead
+        # of silently rewriting the user's input. Whenever `email_enabled`
+        # is (re)enabled through this same serializer, a real (>=1) value
+        # is required below, so a stale `0` can never end up backing an
+        # active email notification.
+        email_enabled = attrs.get("email_enabled", False)
+        rooms_threshold_count = attrs.get("rooms_threshold_count")
+        if email_enabled and rooms_threshold_count == 0:
+            raise serializers.ValidationError(
+                {
+                    "rooms_threshold_count": [
+                        "Informe a quantidade de salas para o envio de e-mail"
+                    ]
+                }
+            )
 
         return attrs
 

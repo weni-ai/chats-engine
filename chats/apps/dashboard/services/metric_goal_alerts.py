@@ -5,6 +5,18 @@ metric type, we iterate over the configured (and active) ``MetricGoal``
 rows and run a small aggregate query against ``rooms_room``. Results are
 compared against the previous state stored in Redis so we can identify
 transitions and dispatch WebSocket broadcasts and emails accordingly.
+
+Rooms are scoped to a project via ``queue__sector__project`` (a join),
+not via the denormalized ``Room.project_uuid`` field, since that field
+is only populated by one of the room-creation paths and would otherwise
+undercount violations.
+
+``rooms_threshold_count`` / ``rooms_threshold_percent`` only gate the
+*email* notification. The WebSocket/toast alert (and the widget state)
+fires as soon as a single room breaches ``threshold_seconds`` — per the
+product epic, the "how many rooms" configuration is specific to the
+email channel, since email is opt-in and independent from the
+real-time alert.
 """
 
 from __future__ import annotations
@@ -41,6 +53,15 @@ TRANSITION_RESOLVED = "resolved"
 
 @dataclass(frozen=True)
 class Violation:
+    """A project currently in breach of a metric goal.
+
+    ``violating_count`` is the real-time count of rooms in breach and is
+    what drives the WebSocket/toast/widget alert — that alert fires as
+    soon as ``violating_count >= 1``. ``rooms_threshold_count`` /
+    ``rooms_threshold_percent`` are only used to decide whether the
+    *email* notification should also be sent (see ``meets_email_threshold``).
+    """
+
     project_uuid: str
     metric: str
     violating_count: int
@@ -51,6 +72,11 @@ class Violation:
     active_rooms_count: int | None = None
     email_enabled: bool = False
     detected_at: datetime = field(default_factory=timezone.now)
+
+    @property
+    def meets_email_threshold(self) -> bool:
+        """Whether enough rooms are in breach to justify sending an email."""
+        return self.violating_count >= self.rooms_threshold_count
 
     def as_broadcast_payload(self, state: str) -> dict:
         return {
@@ -70,12 +96,18 @@ class Violation:
 def _build_violation_queryset(metric: str, project_uuid: str, cutoff: datetime):
     """Return the queryset of rooms currently violating the metric.
 
-    All metrics are scoped to a single ``project_uuid`` so the partial
-    indexes ``rooms_waiting_violation_idx`` / ``rooms_frt_violation_idx``
-    can be picked up by the planner. Each filter intentionally mirrors
-    the index predicate.
+    Rooms are scoped to the project via ``queue__sector__project`` (the
+    same join used by ``MetricGoalBreachService``) instead of the
+    denormalized ``Room.project_uuid`` field. That field is only
+    populated by one of the room-creation paths (the Flows external
+    integration), so filtering by it silently excludes rooms created
+    through any other path (API v2, transfers, discussions, etc.),
+    undercounting violations and causing thresholds to behave
+    inconsistently with what the dashboard shows.
     """
-    base = Room.objects.filter(project_uuid=project_uuid, is_active=True)
+    base = Room.objects.filter(
+        queue__sector__project__uuid=project_uuid, is_active=True
+    )
 
     if metric == MetricGoal.METRIC_WAITING_TIME:
         return base.filter(
@@ -129,11 +161,15 @@ def _project_active_room_counts(project_uuids: Iterable[str]) -> dict[str, int]:
     if not project_uuids:
         return {}
     rows = (
-        Room.objects.filter(project_uuid__in=list(project_uuids), is_active=True)
-        .values("project_uuid")
+        Room.objects.filter(
+            queue__sector__project__uuid__in=list(project_uuids), is_active=True
+        )
+        .values("queue__sector__project__uuid")
         .annotate(count=Count("uuid"))
     )
-    return {row["project_uuid"]: row["count"] for row in rows}
+    return {
+        str(row["queue__sector__project__uuid"]): row["count"] for row in rows
+    }
 
 
 def detect_violations(
@@ -179,11 +215,12 @@ def detect_violations(
         if violating_count == 0:
             continue
 
+        # The WebSocket/toast/widget alert fires with a single room in
+        # breach. `threshold_count` is only computed here to carry it
+        # along on the Violation, so `process_violations` can later decide
+        # whether the email threshold was also met.
         active_count = active_counts.get(project_uuid)
         threshold_count = _resolve_threshold_count(goal, active_count)
-
-        if violating_count < threshold_count:
-            continue
 
         oldest = agg["oldest"]
         max_age = int((now - oldest).total_seconds()) if oldest else 0
@@ -268,6 +305,28 @@ class ProcessingResult:
     resolved: list[str]
 
 
+def _safe_call(
+    callback,
+    label: str,
+    project_uuid: str,
+    metric: str,
+    *args,
+) -> bool:
+    """Invoke ``callback`` when provided, logging failures.
+
+    Returns ``True`` only when the callback ran without raising. ``False``
+    when the callback is ``None`` or when it raised an exception.
+    """
+    if callback is None:
+        return False
+    try:
+        callback(*args)
+        return True
+    except Exception:  # noqa: BLE001
+        logger.exception(label, project_uuid, metric)
+        return False
+
+
 def process_violations(
     metric: str,
     *,
@@ -303,59 +362,54 @@ def process_violations(
 
         if is_new:
             new_alerts.append(violation)
-            if on_new_alert is not None:
-                try:
-                    on_new_alert(violation)
-                except Exception:  # noqa: BLE001
-                    logger.exception(
-                        "metric_goal: on_new_alert failed (project=%s metric=%s)",
-                        violation.project_uuid,
-                        metric,
-                    )
+            _safe_call(
+                on_new_alert,
+                "metric_goal: on_new_alert failed (project=%s metric=%s)",
+                violation.project_uuid,
+                metric,
+                violation,
+            )
 
             if (
                 on_email is not None
                 and violation.email_enabled
+                and violation.meets_email_threshold
                 and _claim_email_slot(
                     redis_conn,
                     violation.project_uuid,
                     metric,
                     email_cooldown_seconds,
                 )
+                and _safe_call(
+                    on_email,
+                    "metric_goal: on_email failed (project=%s metric=%s)",
+                    violation.project_uuid,
+                    metric,
+                    violation,
+                )
             ):
-                try:
-                    on_email(violation)
-                    emails_sent.append(violation)
-                except Exception:  # noqa: BLE001
-                    logger.exception(
-                        "metric_goal: on_email failed (project=%s metric=%s)",
-                        violation.project_uuid,
-                        metric,
-                    )
+                emails_sent.append(violation)
         else:
             updates.append(violation)
-            if on_update is not None:
-                try:
-                    on_update(violation)
-                except Exception:  # noqa: BLE001
-                    logger.exception(
-                        "metric_goal: on_update failed (project=%s metric=%s)",
-                        violation.project_uuid,
-                        metric,
-                    )
+            _safe_call(
+                on_update,
+                "metric_goal: on_update failed (project=%s metric=%s)",
+                violation.project_uuid,
+                metric,
+                violation,
+            )
 
     resolved_uuids = list(previously_violating - currently_violating)
     for project_uuid in resolved_uuids:
         _clear_state(redis_conn, project_uuid, metric)
-        if on_resolved is not None:
-            try:
-                on_resolved(project_uuid, metric)
-            except Exception:  # noqa: BLE001
-                logger.exception(
-                    "metric_goal: on_resolved failed (project=%s metric=%s)",
-                    project_uuid,
-                    metric,
-                )
+        _safe_call(
+            on_resolved,
+            "metric_goal: on_resolved failed (project=%s metric=%s)",
+            project_uuid,
+            metric,
+            project_uuid,
+            metric,
+        )
 
     logger.info(
         "metric_goal sweep: metric=%s new=%s updates=%s resolved=%s emails=%s",
