@@ -18,7 +18,13 @@ from .permissions import CanRetrieveRoomHistory
 class HistoryRoomViewset(ReadOnlyModelViewSet):
     swagger_tag = "History"
     queryset = Room.objects.select_related(
-        "user", "contact", "queue", "queue__sector", "closed_by"
+        "user",
+        "contact",
+        "queue",
+        "queue__sector",
+        "queue__sector__project",
+        "closed_by",
+        "csat_survey",
     ).prefetch_related("tags")
 
     serializer_class = RoomHistorySerializer
