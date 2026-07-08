@@ -11,7 +11,7 @@ from chats.apps.dashboard.models import MetricGoal, RoomMetrics
 # equivalent per-room value, so `goals_metrics` can reuse the exact same
 # figures already shown in `duration` / `waiting_time` / `first_response_time`.
 _GOAL_METRIC_TO_OUTPUT_KEY = {
-    MetricGoal.METRIC_WAITING_TIME: "waiting_time",
+    MetricGoal.METRIC_WAITING_TIME: "awaiting_time",
     MetricGoal.METRIC_FIRST_RESPONSE_TIME: "first_response_time",
     MetricGoal.METRIC_CONVERSATION_DURATION: "duration",
 }
