@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import TYPE_CHECKING, Callable, Tuple
+from typing import TYPE_CHECKING, Callable, Optional, Tuple
 
 import requests
 from django.conf import settings
@@ -62,11 +62,25 @@ def retry_request_and_refresh_flows_auth_token(
 
 
 class FlowsQueueMixin:
-    def create_queue(self, uuid: str, name: str, sector_uuid: str, project_uuid: str):
+    def create_queue(
+        self,
+        uuid: str,
+        name: str,
+        sector_uuid: str,
+        project_uuid: str,
+        queue_purpose: Optional[str] = None,
+    ):
+        payload = {
+            "uuid": uuid,
+            "name": name,
+            "project_uuid": project_uuid,
+        }
+        if queue_purpose is not None:
+            payload["queue_purpose"] = queue_purpose
         response = requests.post(
             url=f"{self.base_url}/api/v2/internals/ticketers/{sector_uuid}/queues/",
             headers=self.headers,
-            json={"uuid": uuid, "name": name, "project_uuid": project_uuid},
+            json=payload,
         )
         if response.status_code not in [
             status.HTTP_200_OK,
@@ -78,11 +92,20 @@ class FlowsQueueMixin:
             )
         return response
 
-    def update_queue(self, uuid: str, name: str, sector_uuid: str):
+    def update_queue(
+        self,
+        uuid: str,
+        name: str,
+        sector_uuid: str,
+        queue_purpose: Optional[str] = None,
+    ):
+        payload = {"name": name}
+        if queue_purpose is not None:
+            payload["queue_purpose"] = queue_purpose
         response = requests.patch(
             url=f"{self.base_url}/api/v2/internals/ticketers/{sector_uuid}/queues/{uuid}/",
             headers=self.headers,
-            json={"name": name},
+            json=payload,
         )
         if response.status_code not in [
             status.HTTP_200_OK,

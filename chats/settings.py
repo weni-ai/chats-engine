@@ -880,6 +880,9 @@ VTEX_INTERNAL_DOMAINS = env.list(
 QUEUE_LIMIT_FEATURE_FLAG_KEY = env.str(
     "QUEUE_LIMIT_FEATURE_FLAG_KEY", default="weniChatsQueueLimit"
 )
+QUEUE_PURPOSE_FEATURE_FLAG_KEY = env.str(
+    "QUEUE_PURPOSE_FEATURE_FLAG_KEY", default="weniChatsQueuePurpose"
+)
 
 # Bulk Queue Create Settings
 QUEUE_BULK_CREATE_MAX_ITEMS = env.int("QUEUE_BULK_CREATE_MAX_ITEMS", default=50)

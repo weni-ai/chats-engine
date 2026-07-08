@@ -131,6 +131,7 @@ class QueueViewset(ModelViewSet):
             content = {
                 "uuid": str(instance.uuid),
                 "name": instance.name,
+                "queue_purpose": instance.queue_purpose,
                 "sector_uuid": str(instance.sector.uuid),
                 "project_uuid": str(instance.sector.project.uuid),
             }
@@ -156,6 +157,7 @@ class QueueViewset(ModelViewSet):
         content = {
             "uuid": str(instance.uuid),
             "name": instance.name,
+            "queue_purpose": instance.queue_purpose,
             "sector_uuid": str(instance.sector.uuid),
         }
 
