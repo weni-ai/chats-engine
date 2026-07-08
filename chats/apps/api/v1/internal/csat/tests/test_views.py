@@ -16,7 +16,7 @@ from chats.apps.projects.models import Project
 from chats.apps.sectors.models import Sector
 from chats.apps.queues.models import Queue
 from chats.apps.rooms.models import Room
-from chats.apps.api.authentication.token import JWTTokenGenerator
+from chats.apps.api.authentication.token import CSATJWTTokenGenerator
 
 
 class BaseTestCSATWebhookView(APITestCase):
@@ -33,7 +33,7 @@ class BaseTestCSATWebhookView(APITestCase):
 
 class TestCSATWebhookView(BaseTestCSATWebhookView):
     def setUp(self):
-        self.jwt_generator = JWTTokenGenerator()
+        self.jwt_generator = CSATJWTTokenGenerator()
         self.project = Project.objects.create(name="Test Project")
         self.sector = Sector.objects.create(
             name="Test Sector",

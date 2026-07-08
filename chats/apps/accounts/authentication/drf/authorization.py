@@ -45,7 +45,7 @@ class ProjectAdminAuthentication(TokenAuthentication):
             msg = _("Invalid token header. No credentials provided.")
             raise exceptions.AuthenticationFailed(msg)
         elif len(auth) > 2:
-            msg = _("Invalid token header. Token string should not contain spaces.")
+            msg = _("Invalid token header. Token string shouldn't contain spaces.")
             raise exceptions.AuthenticationFailed(msg)
 
         try:
@@ -75,7 +75,7 @@ class ProjectAdminAuthentication(TokenAuthentication):
             )
             return (authorization.user_email, authorization)
         except ProjectPermission.DoesNotExist:
-            raise exceptions.AuthenticationFailed(_("Invalid token."))
+            raise exceptions.AuthenticationFailed(_("Invalid token"))
 
     def authenticate_credentials(self, key):
         if not self.cache_token:

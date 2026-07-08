@@ -190,7 +190,7 @@ class SectorSerializer(AuditableModelSerializer):
         if start is not None and end is not None:
             if end <= start:
                 raise serializers.ValidationError(
-                    {"detail": _("work_end date must be greater than work_start date.")}
+                    {"detail": _("work_end date must be greater than work_start date")}
                 )
 
         automatic_message = data.get("automatic_message")
@@ -265,13 +265,13 @@ class SectorSerializer(AuditableModelSerializer):
                 # For now, tags are created after the sector is created
                 # This may change in the future
                 raise serializers.ValidationError(
-                    [_("Sector must have at least one tag to require tags.")],
+                    [_("The department must have at least one tag before tags can be required")],
                     code="sector_must_have_at_least_one_tag_to_require_tags",
                 )
 
             if not self.instance.tags.exists():
                 raise serializers.ValidationError(
-                    [_("Sector must have at least one tag to require tags.")],
+                    [_("The department must have at least one tag before tags can be required")],
                     code="sector_must_have_at_least_one_tag_to_require_tags",
                 )
 
@@ -400,7 +400,7 @@ class SectorUpdateSerializer(AuditableModelSerializer):
         """
         if value is True and not self.instance.tags.exists():
             raise serializers.ValidationError(
-                [_("Sector must have at least one tag to require tags.")],
+                [_("The department must have at least one tag before tags can be required")],
                 code="sector_must_have_at_least_one_tag_to_require_tags",
             )
 
@@ -574,14 +574,14 @@ class SectorTagSerializer(AuditableModelSerializer):
                 sector=self.instance.sector, name=data["name"]
             ).exists():
                 raise serializers.ValidationError(
-                    {"detail": _("This tag already exists.")}
+                    {"detail": _("This tag already exists")}
                 )
         else:
             if SectorTag.objects.filter(
                 name=data["name"], sector=data["sector"]
             ).exists():
                 raise serializers.ValidationError(
-                    {"detail": _("This tag already exists.")}
+                    {"detail": _("This tag already exists")}
                 )
         return data
 
@@ -662,7 +662,7 @@ class SectorHolidaySerializer(AuditableModelSerializer):
         if day_type == SectorHoliday.CLOSED:
             if start_time is not None or end_time is not None:
                 raise serializers.ValidationError(
-                    {"detail": _("Closed days should not have start_time or end_time")}
+                    {"detail": _("Non-working days shouldn't have a start_time or end_time")}
                 )
 
         elif day_type == SectorHoliday.CUSTOM_HOURS:
@@ -676,7 +676,7 @@ class SectorHolidaySerializer(AuditableModelSerializer):
                 )
             if start_time >= end_time:
                 raise serializers.ValidationError(
-                    {"detail": _("End time must be greater than start time")}
+                    {"detail": _("End time must be greater than the start time")}
                 )
 
         return data

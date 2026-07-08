@@ -1,0 +1,1761 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: jira-tasks\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-05-20 17:27-0300\n"
+"PO-Revision-Date: 2026-05-07 12:29\n"
+"Last-Translator: \n"
+"Language-Team: Romanian\n"
+"Language: ro_RO\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=3; plural=(n==1 ? 0 : (n==0 || (n%100>0 && "
+"n%100<20)) ? 1 : 2);\n"
+"X-Crowdin-Project: jira-tasks\n"
+"X-Crowdin-Project-ID: 459590\n"
+"X-Crowdin-Language: ro\n"
+"X-Crowdin-File: /LOC-23756/LOC-23756_chats-"
+"engine_chats_locale_pt_BR_LC_MESSAGES_en.po\n"
+"X-Crowdin-File-ID: 20127\n"
+
+#: chats/apps/accounts/authentication/drf/authorization.py:45
+msgid "Invalid token header. No credentials provided."
+msgstr "Antet token invalid. Nu au fost furnizate acreditări."
+
+#: chats/apps/accounts/authentication/drf/authorization.py:48
+#| msgid "Invalid token header. Token string should not contain spaces."
+msgid "Invalid token header. Token string shouldn't contain spaces."
+msgstr "Antet token invalid. Șirul token nu trebuie să conțină spații."
+
+#: chats/apps/accounts/authentication/drf/authorization.py:55
+msgid ""
+"Invalid token header. Token string should not contain invalid characters."
+msgstr "Antet token invalid. Șirul token nu trebuie să conțină caractere invalide."
+
+#: chats/apps/accounts/authentication/drf/authorization.py:78
+msgid "Invalid token"
+msgstr "Token invalid"
+
+#: chats/apps/accounts/models.py:68 chats/apps/contacts/models.py:22
+msgid "first name"
+msgstr "prenume "
+
+#: chats/apps/accounts/models.py:69
+msgid "last name"
+msgstr "nume"
+
+#: chats/apps/accounts/models.py:70 chats/apps/contacts/models.py:24
+msgid "email"
+msgstr "e-mail"
+
+#: chats/apps/accounts/models.py:70
+msgid "User email"
+msgstr "E-mail utilizator"
+
+#: chats/apps/accounts/models.py:74
+msgid "staff status"
+msgstr "status personal"
+
+#: chats/apps/accounts/models.py:75
+msgid "active"
+msgstr "activ"
+
+#: chats/apps/accounts/models.py:79
+msgid "date joined"
+msgstr "data înscrierii"
+
+#: chats/apps/accounts/models.py:87
+#: chats/apps/discussions/models/discussion_message.py:18
+#: chats/apps/msgs/models.py:50 chats/apps/projects/models/models.py:668
+#: chats/apps/rooms/models.py:49 chats/apps/rooms/models.py:857
+#: chats/apps/rooms/models.py:887
+msgid "user"
+msgstr "utilizator"
+
+#: chats/apps/accounts/models.py:88 chats/apps/projects/models/models.py:330
+msgid "users"
+msgstr "utilizatori"
+
+#: chats/apps/accounts/models.py:105
+#: chats/apps/ai_features/audio_transcription/models.py:111
+#: chats/apps/ai_features/history_summary/models.py:63
+#: chats/apps/discussions/models/discussion_user.py:17
+#: chats/apps/projects/models/models.py:505 chats/apps/queues/models.py:345
+#: chats/apps/sectors/models.py:368
+msgid "User"
+msgstr "Utilizator"
+
+#: chats/apps/accounts/models.py:108
+msgid "Notification sound for new room messages"
+msgstr "Sunet de notificare pentru mesaje noi în camere"
+
+#: chats/apps/accounts/models.py:111
+msgid "Notification sound for chat messages"
+msgstr "Sunet de notificare pentru mesajele din chat"
+
+#: chats/apps/accounts/models.py:113
+msgid "Action sound"
+msgstr "Sunet acțiune"
+
+#: chats/apps/accounts/models.py:115 chats/core/models.py:80
+msgid "config"
+msgstr "config"
+
+#: chats/apps/accounts/models.py:121
+msgid "Profile"
+msgstr "Profile"
+
+#: chats/apps/accounts/models.py:122
+msgid "Profiles"
+msgstr "Profile"
+
+#: chats/apps/ai_features/audio_transcription/enums.py:10
+msgid "Incorrect transcription"
+msgstr "Transcriere incorectă"
+
+#: chats/apps/ai_features/audio_transcription/enums.py:11
+msgid "Incomplete transcription"
+msgstr "Transcriere incompletă"
+
+#: chats/apps/ai_features/audio_transcription/enums.py:12
+msgid "Hard to understand"
+msgstr "Dificil de înțeles"
+
+#: chats/apps/ai_features/audio_transcription/enums.py:13
+msgid "Did not load"
+msgstr "Nu s-a încărcat"
+
+#: chats/apps/ai_features/audio_transcription/models.py:44
+#: chats/apps/ai_features/audio_transcription/models.py:105
+#| msgid "Incorrect transcription"
+msgid "Audio Transcription"
+msgstr "Transcriere audio"
+
+#: chats/apps/ai_features/audio_transcription/models.py:45
+#| msgid "Incorrect transcription"
+msgid "Audio Transcriptions"
+msgstr "Transcrieri audio"
+
+#: chats/apps/ai_features/audio_transcription/models.py:115
+#: chats/apps/ai_features/history_summary/models.py:67
+msgid "Liked?"
+msgstr "Ți-a plăcut?"
+
+#: chats/apps/ai_features/audio_transcription/models.py:116
+#: chats/apps/ai_features/history_summary/models.py:68
+#: chats/apps/discussions/models/discussion_message.py:24
+#: chats/apps/msgs/models.py:64
+msgid "Text"
+msgstr "Text"
+
+#: chats/apps/ai_features/audio_transcription/models.py:120
+msgid "Audio Transcription Feedback"
+msgstr "Feedback transcriere audio"
+
+#: chats/apps/ai_features/audio_transcription/models.py:121
+msgid "Audio Transcription Feedbacks"
+msgstr "Feedback-uri transcriere audio"
+
+#: chats/apps/ai_features/audio_transcription/views.py:59
+#: chats/apps/ai_features/audio_transcription/views.py:149
+msgid "No audio media found in this message."
+msgstr "Nu s-a găsit conținut audio în acest mesaj."
+
+#: chats/apps/ai_features/audio_transcription/views.py:71
+msgid "Cannot transcribe audio from closed rooms."
+msgstr "Nu se poate transcrie audio din camere închise."
+
+#: chats/apps/ai_features/audio_transcription/views.py:83
+#, python-format
+msgid ""
+"Audio duration exceeds the maximum allowed (%(max)s seconds). Audio "
+"duration: %(duration)s seconds."
+msgstr "Durata audio depășește maximul permis (%(max)s secunde). Durata audio: %(duration)s secunde."
+
+#: chats/apps/ai_features/audio_transcription/views.py:162
+msgid "Transcription not found for this message."
+msgstr "Transcrierea nu a fost găsită pentru acest mesaj."
+
+#: chats/apps/ai_features/history_summary/enums.py:10
+msgid "Incorrect summary"
+msgstr "Rezumat incorect"
+
+#: chats/apps/ai_features/history_summary/enums.py:11
+msgid "Incomplete summary"
+msgstr "Rezumat incomplet"
+
+#: chats/apps/ai_features/history_summary/enums.py:12
+msgid "Confusing summary"
+msgstr "Rezumat neclar"
+
+#: chats/apps/ai_features/history_summary/enums.py:14
+msgid "I had to read the full conversation"
+msgstr "A trebuit să citesc întreaga conversație"
+
+#: chats/apps/ai_features/history_summary/enums.py:17
+#| msgid "Did not speed up the workflow"
+msgid "Didn't speed up the workflow"
+msgstr "Nu a accelerat fluxul de lucru"
+
+#: chats/apps/ai_features/history_summary/enums.py:20
+#| msgid "Hard to understand language"
+msgid "Hard to understand the language"
+msgstr "Dificil de înțeles limbajul"
+
+#: chats/apps/ai_features/history_summary/enums.py:22
+#| msgid "Did not load"
+msgid "Didn't load"
+msgstr "Nu s-a încărcat"
+
+#: chats/apps/ai_features/history_summary/enums.py:23
+msgid "Unclear interface"
+msgstr "Interfață neclară"
+
+#: chats/apps/ai_features/history_summary/models.py:39
+#: chats/apps/ai_features/history_summary/models.py:57
+#| msgid "History Summary"
+msgid "History summary"
+msgstr "Rezumat istoric"
+
+#: chats/apps/ai_features/history_summary/models.py:40
+#| msgid "History Summaries"
+msgid "History summaries"
+msgstr "Rezumate istoric"
+
+#: chats/apps/ai_features/history_summary/models.py:72
+#: chats/apps/ai_features/history_summary/models.py:73
+#| msgid "History Summary Feedback"
+msgid "History summary feedback"
+msgstr "Feedback rezumat istoric"
+
+#: chats/apps/ai_features/improve_user_message/choices.py:8
+msgid "Used"
+msgstr "Utilizat"
+
+#: chats/apps/ai_features/improve_user_message/choices.py:9
+msgid "Discarded"
+msgstr "Respins"
+
+#: chats/apps/ai_features/improve_user_message/choices.py:10
+msgid "Edited"
+msgstr "Editat"
+
+#: chats/apps/ai_features/improve_user_message/choices.py:16
+msgid "Grammar and spelling"
+msgstr "Gramatică și ortografie"
+
+#: chats/apps/ai_features/improve_user_message/choices.py:17
+msgid "More empathy"
+msgstr "Mai multă empatie"
+
+#: chats/apps/ai_features/improve_user_message/choices.py:18
+msgid "Clarity"
+msgstr "Claritate"
+
+#: chats/apps/ai_features/improve_user_message/models.py:18
+#: chats/apps/msgs/models.py:215 chats/apps/rooms/models.py:895
+#| msgid "message"
+msgid "Message"
+msgstr "Mesaj"
+
+#: chats/apps/ai_features/improve_user_message/models.py:24
+#: chats/apps/archive_chats/models.py:62 chats/apps/csat/models.py:17
+#: chats/apps/discussions/models/discussion.py:24
+#: chats/apps/rooms/models.py:266
+msgid "Room"
+msgstr "Cameră"
+
+#: chats/apps/ai_features/improve_user_message/models.py:30
+#: chats/apps/csat/models.py:46 chats/apps/feature_version/models.py:10
+#: chats/apps/projects/models/models.py:109
+#: chats/apps/projects/models/models.py:323
+#: chats/apps/projects/models/models.py:519
+#: chats/apps/projects/models/models.py:560
+#: chats/apps/projects/models/models.py:722
+#: chats/apps/projects/models/models.py:765 chats/apps/sectors/models.py:36
+#: chats/apps/sectors/models.py:509
+msgid "Project"
+msgstr "Proiect"
+
+#: chats/apps/ai_features/improve_user_message/models.py:35
+#: chats/apps/archive_chats/models.py:48
+msgid "Status"
+msgstr "Status"
+
+#: chats/apps/ai_features/improve_user_message/models.py:40
+#| msgid "Day Type"
+msgid "Type"
+msgstr "Tip"
+
+#: chats/apps/ai_features/improve_user_message/models.py:46
+#| msgid "Messages deleted at"
+msgid "Message Improvement Status"
+msgstr "Stare îmbunătățire mesaj"
+
+#: chats/apps/ai_features/improve_user_message/models.py:47
+msgid "Message Improvement Statuses"
+msgstr "Stări îmbunătățire mesaj"
+
+#: chats/apps/ai_features/models.py:12
+msgid "Feature"
+msgstr "Caracteristică"
+
+#: chats/apps/ai_features/models.py:13
+msgid "Model"
+msgstr "Model"
+
+#: chats/apps/ai_features/models.py:14
+msgid "Settings"
+msgstr "Setări"
+
+#: chats/apps/ai_features/models.py:15
+msgid "Prompt"
+msgstr "Mesaj de asistență vocală"
+
+#: chats/apps/ai_features/models.py:16 chats/apps/csat/models.py:51
+msgid "Version"
+msgstr "Versiune"
+
+#: chats/apps/ai_features/models.py:21
+#| msgid "AI Feature Prompt"
+msgid "AI feature prompt"
+msgstr "Solicitare pentru funcționalități IA"
+
+#: chats/apps/ai_features/models.py:22
+#| msgid "AI Feature Prompts"
+msgid "AI feature prompts"
+msgstr "Solicitări pentru funcționalități IA"
+
+#: chats/apps/api/v1/ai_features/views.py:66
+#| msgid "This feature is not available for this project."
+msgid "Feature not available for this project."
+msgstr "Funcționalitatea nu este disponibilă pentru acest proiect."
+
+#: chats/apps/api/v1/contacts/filters.py:20
+#: chats/apps/api/v1/external/msgs/filters.py:30
+#: chats/apps/api/v1/msgs/filters.py:32 chats/apps/api/v1/msgs/filters.py:88
+#: chats/apps/api/v1/queues/filters.py:16
+#: chats/apps/api/v1/quickmessages/filters.py:16
+#: chats/apps/api/v1/rooms/filters.py:29
+#: chats/apps/discussions/filters/discussion.py:28
+#: chats/apps/history/filters/rooms_filter.py:100
+#| msgid "Project's UUID"
+msgid "Project UUID"
+msgstr "UUID proiect"
+
+#: chats/apps/api/v1/contacts/filters.py:27
+#: chats/apps/api/v1/sectors/filters.py:49
+#: chats/apps/api/v1/sectors/filters.py:75
+#: chats/apps/history/filters/rooms_filter.py:106
+msgid "Department UUID"
+msgstr "UUID departament"
+
+#: chats/apps/api/v1/contacts/filters.py:33
+#: chats/apps/history/filters/rooms_filter.py:112
+#| msgid "Room Tags"
+msgid "Room tags"
+msgstr "Etichete camere"
+
+#: chats/apps/api/v1/contacts/filters.py:39
+#: chats/apps/history/filters/rooms_filter.py:118
+msgid "Room created on"
+msgstr "Cameră creată la"
+
+#: chats/apps/api/v1/contacts/filters.py:44
+#: chats/apps/history/filters/rooms_filter.py:124
+msgid "Room ended at"
+msgstr "Sala s-a încheiat la"
+
+#: chats/apps/api/v1/external/agents/filters.py:16
+msgid "Filter by queue UUID"
+msgstr "Filtrare după UUID coadă"
+
+#: chats/apps/api/v1/external/agents/filters.py:23
+msgid "Filter by sector UUID"
+msgstr "Filtrare după UUID departament"
+
+#: chats/apps/api/v1/external/msgs/filters.py:16
+#: chats/apps/api/v1/msgs/filters.py:18 chats/apps/api/v1/msgs/filters.py:74
+#| msgid "Contact's UUID"
+msgid "Contact UUID"
+msgstr "UUID contact"
+
+#: chats/apps/api/v1/external/msgs/filters.py:23
+#: chats/apps/api/v1/msgs/filters.py:25 chats/apps/api/v1/msgs/filters.py:81
+#| msgid "Room's UUID"
+msgid "Room UUID"
+msgstr "UUID cameră"
+
+#: chats/apps/api/v1/external/msgs/filters.py:37
+#: chats/apps/api/v1/msgs/filters.py:39
+msgid "Is room active"
+msgstr "Este activă sala"
+
+#: chats/apps/api/v1/external/msgs/serializers.py:33
+msgid "incoming"
+msgstr "intrare"
+
+#: chats/apps/api/v1/external/msgs/serializers.py:34
+msgid "outgoing"
+msgstr "ieșire"
+
+#: chats/apps/api/v1/external/rooms/serializers.py:521
+#| msgid "The contact already have an open room in the project"
+msgid "The contact already has an open room in the project"
+msgstr "Contactul are deja o cameră deschisă în proiect"
+
+#: chats/apps/api/v1/external/rooms/serializers.py:535
+#| msgid "Cannot create a room without queue_uuid or sector_uuid"
+msgid "Can't create a room without queue_uuid or sector_uuid"
+msgstr "Nu se poate crea o cameră fără queue_uuid sau sector_uuid"
+
+#: chats/apps/api/v1/external/rooms/serializers.py:544
+#| msgid "No active queue found for provided sector_uuid"
+msgid "No active queue found for the provided sector_uuid"
+msgstr "Nu a fost găsită nicio coadă activă pentru sector_uuid-ul furnizat"
+
+#: chats/apps/api/v1/external/rooms/serializers.py:550
+#| msgid "queue_uuid does not belong to provided sector_uuid"
+msgid "queue_uuid doesn't belong to the provided sector_uuid"
+msgstr "queue_uuid nu aparține sectorului furnizat sector_uuid"
+
+#: chats/apps/api/v1/external/rooms/serializers.py:580
+msgid "No chat can start while representatives are offline"
+msgstr "Niciun chat nu poate începe în timp ce reprezentanții sunt offline"
+
+#: chats/apps/api/v1/msgs/filters.py:94
+#: chats/apps/discussions/models/discussion_message.py:61
+#: chats/apps/msgs/models.py:218
+msgid "Content type"
+msgstr "Tipul conținutului"
+
+#: chats/apps/api/v1/msgs/permissions.py:70
+#| msgid "Either room or project query parameter is required"
+msgid "Either the room or the project query parameter is required"
+msgstr ""
+"Este necesar fie parametrul de interogare pentru cameră, fie pentru proiect"
+
+#: chats/apps/api/v1/queues/filters.py:32
+#| msgid "Queue's ID"
+msgid "Queue ID"
+msgstr "ID coadă"
+
+#: chats/apps/api/v1/queues/filters.py:39
+#: chats/apps/api/v1/sectors/filters.py:56
+#: chats/apps/projects/models/models.py:341
+#| msgid "User Status"
+msgid "User status"
+msgstr "Starea utilizatorului"
+
+#: chats/apps/api/v1/queues/serializers.py:26
+msgid "Limit is required when queue limit is active."
+msgstr "Limita este obligatorie când limita cozii este activă."
+
+#: chats/apps/api/v1/queues/serializers.py:69
+msgid "Enter a name"
+msgstr "Introdu un nume"
+
+#: chats/apps/api/v1/queues/serializers.py:76
+#: chats/apps/api/v1/queues/serializers.py:81
+#| msgid "This queue already exists."
+msgid "This queue already exists"
+msgstr "Această coadă există deja"
+
+#: chats/apps/api/v1/queues/serializers.py:155
+#| msgid "you cant add a user two times in same queue."
+msgid "You can't add a user twice to the same queue"
+msgstr "Nu poți adăuga un utilizator de două ori în aceeași coadă"
+
+#: chats/apps/api/v1/queues/serializers.py:255
+msgid "Bulk queue create feature is not active."
+msgstr "Funcționalitatea de creare în masă a cozilor nu este activă."
+
+#: chats/apps/api/v1/queues/serializers.py:261
+#| msgid "At least one room is required"
+msgid "At least one queue is required."
+msgstr "Este necesară cel puțin o coadă."
+
+#: chats/apps/api/v1/queues/serializers.py:269
+#, python-format
+msgid "A maximum of %(max)d queues can be created per request."
+msgstr "Se pot crea maximum %(max)d cozi per solicitare."
+
+#: chats/apps/api/v1/queues/serializers.py:279
+msgid "There are duplicate queue names in the request."
+msgstr "Există nume de coadă duplicate în solicitare."
+
+#: chats/apps/api/v1/queues/serializers.py:308
+msgid "Queue limit feature is not active."
+msgstr "Funcționalitatea de limită a cozii nu este activă."
+
+#: chats/apps/api/v1/rooms/filters.py:36
+#: chats/apps/discussions/models/discussion.py:33
+msgid "Is active?"
+msgstr "Este activă?"
+
+#: chats/apps/api/v1/rooms/filters.py:43
+msgid "Room status"
+msgstr "Stare cameră"
+
+#: chats/apps/api/v1/rooms/filters.py:49
+msgid "Filter by multiple queue UUIDs (comma-separated)"
+msgstr "Filtrare după mai multe UUID-uri de coadă (separate prin virgulă)"
+
+#: chats/apps/api/v1/rooms/filters.py:55
+msgid "Filter by multiple sector UUIDs (comma-separated)"
+msgstr "Filtrare după mai multe UUID-uri de departament (separate prin virgulă)"
+
+#: chats/apps/api/v1/rooms/serializers.py:682
+#: chats/apps/api/v1/rooms/serializers.py:719
+msgid "At least one room is required"
+msgstr "Este necesară cel puțin o cameră"
+
+#: chats/apps/api/v1/rooms/serializers.py:687
+#, python-format
+#| msgid "Cannot take more than %(max_rooms)s rooms at once"
+msgid "Cannot transfer more than %(max_rooms)s rooms at once"
+msgstr "Nu se pot transfera mai mult de %(max_rooms)s camere odată"
+
+#: chats/apps/api/v1/rooms/serializers.py:692
+#: chats/apps/api/v1/rooms/serializers.py:729
+msgid "Duplicate room UUIDs found"
+msgstr "S-au găsit UUID-uri duplicate pentru camere"
+
+#: chats/apps/api/v1/rooms/serializers.py:699
+#| msgid "At least one room is required"
+msgid "At least one of user_email or queue_uuid is required"
+msgstr "Este necesar cel puțin user_email sau queue_uuid"
+
+#: chats/apps/api/v1/rooms/serializers.py:708
+#| msgid "No active queue found for provided sector_uuid"
+msgid "No active rooms found with the provided UUIDs"
+msgstr "Nu s-au găsit camere active cu UUID-urile furnizate"
+
+#: chats/apps/api/v1/rooms/serializers.py:724
+#, python-format
+#| msgid "Cannot take more than %(max_rooms)s rooms at once"
+msgid "Can't take more than %(max_rooms)s rooms at once"
+msgstr "Nu poți prelua mai mult de %(max_rooms)s camere odată"
+
+#: chats/apps/api/v1/rooms/serializers.py:740
+#| msgid "No available rooms found in queue"
+msgid "No available rooms found in the queue"
+msgstr "Nu au fost găsite camere disponibile în coadă"
+
+#: chats/apps/api/v1/rooms/viewsets.py:416
+msgid "Agents cannot close queued rooms in this sector."
+msgstr "Agenții nu pot închide camerele din coadă în acest departament."
+
+#: chats/apps/api/v1/rooms/viewsets.py:665
+msgid "Room is not queued"
+msgstr "Sala nu este în coadă"
+
+#: chats/apps/api/v1/rooms/viewsets.py:703
+msgid "Room picked successfully"
+msgstr "Cameră selectată cu succes"
+
+#: chats/apps/api/v1/sectors/filters.py:18
+#| msgid "Project's ID"
+msgid "Project ID"
+msgstr "ID proiect"
+
+#: chats/apps/api/v1/sectors/filters.py:82
+#| msgid "Queue's UUID"
+msgid "Queue UUID"
+msgstr "UUID coadă"
+
+#: chats/apps/api/v1/sectors/serializers.py:84
+#| msgid "work_end date must be greater than work_start date."
+msgid "work_end date must be greater than work_start date"
+msgstr ""
+"Data de final (work_end) trebuie să fie ulterioară datei de început "
+"(work_start)"
+
+#: chats/apps/api/v1/sectors/serializers.py:115
+#: chats/apps/api/v1/sectors/serializers.py:121
+#: chats/apps/api/v1/sectors/serializers.py:195
+#| msgid "Sector must have at least one tag to require tags."
+msgid "The department must have at least one tag before tags can be required"
+msgstr ""
+"Departamentul trebuie să aibă cel puțin o etichetă înainte ca etichetele să "
+"poată fi solicitate"
+
+#: chats/apps/api/v1/sectors/serializers.py:344
+#: chats/apps/api/v1/sectors/serializers.py:351
+#| msgid "This tag already exists."
+msgid "This tag already exists"
+msgstr "Această etichetă există deja"
+
+#: chats/apps/api/v1/sectors/serializers.py:432
+#| msgid "Closed days should not have start_time or end_time"
+msgid "Non-working days shouldn't have a start_time or end_time"
+msgstr "Zilele nelucrătoare nu ar trebui să aibă un start_time sau end_time"
+
+#: chats/apps/api/v1/sectors/serializers.py:440
+msgid "Custom hours days must have both start_time and end_time"
+msgstr ""
+"Zilele cu ore personalizate trebuie să aibă atât start_time, cât și end_time"
+
+#: chats/apps/api/v1/sectors/serializers.py:446
+#| msgid "End time must be greater than start time"
+msgid "End time must be greater than the start time"
+msgstr "Ora de sfârșit trebuie să fie după ora de început"
+
+#: chats/apps/archive_chats/models.py:16 chats/apps/archive_chats/models.py:40
+#| msgid "Flow UUID"
+msgid "UUID"
+msgstr "UUID"
+
+#: chats/apps/archive_chats/models.py:18
+msgid "The UUID of the job"
+msgstr "UUID-ul sarcinii"
+
+#: chats/apps/archive_chats/models.py:24
+msgid "Started at"
+msgstr "Inițiat la"
+
+#: chats/apps/archive_chats/models.py:27
+#| msgid "The date and time when the job started"
+msgid "The date and time the job started"
+msgstr "Data și ora la care a început sarcina"
+
+#: chats/apps/archive_chats/models.py:31
+#| msgid "Archive Conversations Job"
+msgid "Archive conversation job"
+msgstr "Arhivare sarcină de conversații"
+
+#: chats/apps/archive_chats/models.py:32
+#| msgid "Archive Conversations Jobs"
+msgid "Archive conversation jobs"
+msgstr "Arhivare sarcini de conversații"
+
+#: chats/apps/archive_chats/models.py:42
+#| msgid "The job that archived the conversation"
+msgid "The UUID of the room archived conversation"
+msgstr "UUID-ul conversației arhivate a camerei"
+
+#: chats/apps/archive_chats/models.py:55
+msgid "Job"
+msgstr "Sarcină"
+
+#: chats/apps/archive_chats/models.py:58
+#| msgid "The job that archived the conversation"
+msgid "Job that archived the conversation"
+msgstr "Sarcina care a arhivat conversația"
+
+#: chats/apps/archive_chats/models.py:65
+msgid "Archived room"
+msgstr "Cameră arhivată"
+
+#: chats/apps/archive_chats/models.py:68
+msgid "File"
+msgstr "Fișier"
+
+#: chats/apps/archive_chats/models.py:70
+#| msgid "The file that contains the archived conversation"
+msgid "File containing the archived conversation"
+msgstr "Fișier care conține conversația arhivată"
+
+#: chats/apps/archive_chats/models.py:74
+#| msgid "Archive process started at"
+msgid "Archiving started at"
+msgstr "Arhivarea a început la"
+
+#: chats/apps/archive_chats/models.py:77
+#| msgid "The date and time when the archive process started"
+msgid "Date and time the archive process started"
+msgstr "Data şi ora la care a început procesul de arhivare"
+
+#: chats/apps/archive_chats/models.py:80
+msgid "Messages deleted at"
+msgstr "Mesaje șterse la"
+
+#: chats/apps/archive_chats/models.py:84
+#| msgid "The date and time when the messages were deleted from the database"
+msgid "Date and time the messages were deleted from the database"
+msgstr "Data și ora la care mesajele au fost șterse din baza de date"
+
+#: chats/apps/archive_chats/models.py:88
+#| msgid "Archive process finished at"
+msgid "Archiving finished at"
+msgstr "Arhivare finalizată la"
+
+#: chats/apps/archive_chats/models.py:91
+#| msgid "The date and time when the archive process failed"
+msgid "Date and time the archive process was completed"
+msgstr "Data și ora la care procesul de arhivare a fost finalizat"
+
+#: chats/apps/archive_chats/models.py:94
+msgid "Failed at"
+msgstr "Nereușit la"
+
+#: chats/apps/archive_chats/models.py:97
+#| msgid "The date and time when the archive process failed"
+msgid "Date and time the archive process failed"
+msgstr "Data și ora la care procesul de arhivare a eșuat"
+
+#: chats/apps/archive_chats/models.py:100
+msgid "Errors"
+msgstr "Erori"
+
+#: chats/apps/archive_chats/models.py:103
+#| msgid "The errors that occurred during the archive process"
+msgid "Errors that occurred during archiving"
+msgstr "Erori care au apărut în timpul arhivării"
+
+#: chats/apps/archive_chats/models.py:107
+#| msgid "Room Archived Conversation"
+msgid "Archived room conversation"
+msgstr "Conversație arhivată în cameră"
+
+#: chats/apps/archive_chats/models.py:108
+#| msgid "Room Archived Conversations"
+msgid "Archived room conversations"
+msgstr "Conversații arhivate în cameră"
+
+#: chats/apps/contacts/migrations/0012_contact_document.py:16
+#: chats/apps/contacts/models.py:27
+#| msgid "Comment"
+msgid "document"
+msgstr "document"
+
+#: chats/apps/contacts/models.py:20 chats/apps/msgs/models.py:67
+#: chats/apps/msgs/models.py:400 chats/apps/projects/models/models.py:554
+#: chats/apps/projects/models/models.py:595
+msgid "External ID"
+msgstr "ID extern"
+
+#: chats/apps/contacts/models.py:24
+msgid "Contact email"
+msgstr "E-mail contact"
+
+#: chats/apps/contacts/models.py:29
+msgid "status"
+msgstr "status"
+
+#: chats/apps/contacts/models.py:30
+msgid "phone"
+msgstr "telefon"
+
+#: chats/apps/contacts/models.py:33 chats/apps/rooms/models.py:73
+msgid "custom fields"
+msgstr "câmpuri personalizate"
+
+#: chats/apps/contacts/models.py:38
+#| msgid "Imported History URL"
+msgid "Imported history URL"
+msgstr "URL-ul istoricului importat"
+
+#: chats/apps/contacts/models.py:42 chats/apps/projects/models/models.py:513
+msgid "Contact"
+msgstr "Contact"
+
+#: chats/apps/contacts/models.py:43
+msgid "Contacts"
+msgstr "Contacte"
+
+#: chats/apps/csat/models.py:22
+msgid "Rating"
+msgstr "Evaluare"
+
+#: chats/apps/csat/models.py:24
+msgid "Comment"
+msgstr "Comentariu"
+
+#: chats/apps/csat/models.py:25
+msgid "Answered on"
+msgstr "Răspuns la"
+
+#: chats/apps/csat/models.py:28
+#| msgid "CSAT Survey"
+msgid "CSAT survey"
+msgstr "Sondaj CSAT"
+
+#: chats/apps/csat/models.py:29
+#| msgid "CSAT Surveys"
+msgid "CSAT surveys"
+msgstr "Sondaje CSAT"
+
+#: chats/apps/csat/models.py:50
+msgid "Flow UUID"
+msgstr "UUID flux"
+
+#: chats/apps/csat/models.py:56
+#| msgid "CSAT Flow Project Config"
+msgid "CSAT flow project config"
+msgstr "Configurarea proiectului fluxului CSAT"
+
+#: chats/apps/csat/models.py:57
+#| msgid "CSAT Flow Project Configs"
+msgid "CSAT flow project configs"
+msgstr "Configurații proiect flux CSAT"
+
+#: chats/apps/dashboard/email_templates.py:27
+#, python-format
+msgid ""
+"The custom report for the project %(project)s is ready.\n"
+"\n"
+"Copy and paste the URL below to download the report:\n"
+"\n"
+"%(url)s"
+msgstr ""
+"Raportul personalizat pentru proiectul %(project)s este gata. Copiază și "
+"inserează URL-ul de mai jos pentru a descărca raportul: %(url)s"
+
+#: chats/apps/dashboard/email_templates.py:54
+#, python-format
+msgid ""
+"An error occurred while generating the custom report for project "
+"%(project)s.\n"
+"\n"
+"Error: %(error)s\n"
+"\n"
+"Please try again later or contact support."
+msgstr ""
+"A apărut o eroare la generarea raportului personalizat pentru proiectul "
+"%(project)s. Eroare: %(error)s Încearcă din nou mai târziu sau contactează "
+"asistența tehnică."
+
+#: chats/apps/dashboard/email_templates.py:56
+msgid "Unknown error"
+msgstr "Eroare necunoscută"
+
+#: chats/apps/dashboard/models.py:11 chats/apps/dashboard/models.py:24
+#| msgid "Room Metric"
+msgid "Room metric"
+msgstr "Indicator cameră"
+
+#: chats/apps/dashboard/models.py:14
+#| msgid "Room Waiting time"
+msgid "Room waiting time"
+msgstr "Timp de așteptare în cameră"
+
+#: chats/apps/dashboard/models.py:15
+msgid "Queued count"
+msgstr "Număr de mesaje în așteptare"
+
+#: chats/apps/dashboard/models.py:16
+#| msgid "Messages response time"
+msgid "Message response time"
+msgstr "Timpul de răspuns al mesajului"
+
+#: chats/apps/dashboard/models.py:18
+msgid "First response time"
+msgstr "Timp până la primul răspuns"
+
+#: chats/apps/dashboard/models.py:20
+msgid "Room interaction time"
+msgstr "Timp interacțiune în cameră"
+
+#: chats/apps/dashboard/models.py:21
+msgid "Room transfer count"
+msgstr "Numărul de transferuri ale camerei"
+
+#: chats/apps/dashboard/models.py:25
+#| msgid "Rooms Metrics"
+msgid "Room metrics"
+msgstr "Indicatori cameră"
+
+#: chats/apps/discussions/filters/discussion.py:21
+#| msgid "Filter discussions by subject or contact's name"
+msgid "Filter discussions by subject or contact name"
+msgstr "Filtrează discuțiile după subiect sau numele contactului"
+
+#: chats/apps/discussions/models/discussion.py:11
+#| msgid "Subject Text"
+msgid "Subject text"
+msgstr "Subiectul mesajului"
+
+#: chats/apps/discussions/models/discussion.py:17 chats/core/models.py:134
+#| msgid "Created By"
+msgid "Created by"
+msgstr "Creat de"
+
+#: chats/apps/discussions/models/discussion.py:30
+#: chats/apps/queues/models.py:335 chats/apps/rooms/models.py:66
+msgid "Queue"
+msgstr "Coadă"
+
+#: chats/apps/discussions/models/discussion.py:32
+msgid "Is queued?"
+msgstr "În așteptare?"
+
+#: chats/apps/discussions/models/discussion_message.py:12
+msgid "discussion"
+msgstr "discuție"
+
+#: chats/apps/discussions/models/discussion_message.py:55
+msgid "discussion message"
+msgstr "mesaj de discuție"
+
+#: chats/apps/discussions/models/discussion_message.py:63
+#: chats/apps/msgs/models.py:220
+#| msgid "Media File"
+msgid "Media file"
+msgstr "Fișier media"
+
+#: chats/apps/discussions/models/discussion_message.py:71
+#: chats/apps/discussions/models/discussion_message.py:72
+#| msgid "Discussion Message Media"
+msgid "Discussion message media"
+msgstr "Media mesajelor din discuție"
+
+#: chats/apps/discussions/models/discussion_user.py:9
+msgid "Creator"
+msgstr "Creator"
+
+#: chats/apps/discussions/models/discussion_user.py:10
+msgid "Admin"
+msgstr "Administrator"
+
+#: chats/apps/discussions/models/discussion_user.py:11
+msgid "Participant"
+msgstr "Participant"
+
+#: chats/apps/discussions/models/discussion_user.py:23
+msgid "Discussion"
+msgstr "Discuție"
+
+#: chats/apps/discussions/models/discussion_user.py:26
+#: chats/apps/projects/models/models.py:337 chats/apps/queues/models.py:340
+#: chats/apps/sectors/models.py:379 chats/apps/sectors/models.py:559
+msgid "role"
+msgstr "rol"
+
+#: chats/apps/feature_version/models.py:14
+msgid "feature uuid"
+msgstr "uuid caracteristică"
+
+#: chats/apps/feature_version/models.py:16
+msgid "department list"
+msgstr "listă de departamente"
+
+#: chats/apps/history/filters/rooms_filter.py:93
+#| msgid "Contact's External ID"
+msgid "Contact external ID"
+msgstr "ID-ul extern al contactului"
+
+#: chats/apps/msgs/models.py:44 chats/apps/projects/models/models.py:573
+#: chats/apps/rooms/models.py:851 chats/apps/rooms/models.py:881
+msgid "room"
+msgstr "cameră"
+
+#: chats/apps/msgs/models.py:59 chats/apps/rooms/models.py:58
+msgid "contact"
+msgstr "contact"
+
+#: chats/apps/msgs/models.py:65
+msgid "Was it seen?"
+msgstr "A fost văzut?"
+
+#: chats/apps/msgs/models.py:70
+msgid "message metadata"
+msgstr "metadate mesaj"
+
+#: chats/apps/msgs/models.py:73
+msgid "message status"
+msgstr "starea mesajului"
+
+#: chats/apps/msgs/models.py:78
+#| msgid "message is read"
+msgid "message was read"
+msgstr "mesajul a fost citit"
+
+#: chats/apps/msgs/models.py:81
+#| msgid "message is delivered"
+msgid "message was delivered"
+msgstr "mesajul a fost livrat"
+
+#: chats/apps/msgs/models.py:91 chats/apps/msgs/models.py:243
+#| msgid "Closed rooms cannot receive messages"
+msgid "Closed rooms can't receive messages"
+msgstr "Camerele închise nu pot primi mesaje"
+
+#: chats/apps/msgs/models.py:96
+#| msgid "You cannot send messages after 24h from the last contact message"
+msgid "You can't send messages after 24h from the last contact message"
+msgstr "Nu poți trimite mesaje după 24 de ore de la ultimul mesaj de contact"
+
+#: chats/apps/msgs/models.py:226
+#| msgid "Media url"
+msgid "Media URL"
+msgstr "URL media"
+
+#: chats/apps/msgs/models.py:229 chats/apps/msgs/models.py:230
+#| msgid "MessageMedia"
+msgid "Message media"
+msgstr "Media mesaje"
+
+#: chats/apps/projects/models/models.py:34
+#| msgid "Template Setup"
+msgid "Template setup"
+msgstr "Configurare template"
+
+#: chats/apps/projects/models/models.py:70 chats/apps/queues/models.py:38
+#: chats/apps/sectors/models.py:33 chats/apps/sectors/models.py:435
+#: chats/apps/sectors/models.py:506
+msgid "Name"
+msgstr "Denumire"
+
+#: chats/apps/projects/models/models.py:71
+msgid "Timezone"
+msgstr "Fus orar"
+
+#: chats/apps/projects/models/models.py:73
+#| msgid "Flows Authorization Token"
+msgid "Flows authorization token"
+msgstr "Token de autorizare pentru fluxuri"
+
+#: chats/apps/projects/models/models.py:76
+#| msgid "Date Format"
+msgid "Date format"
+msgstr "Format dată"
+
+#: chats/apps/projects/models/models.py:80
+msgid "Choose whether dates show the day or month first"
+msgstr "Alege dacă datele afișează mai întâi ziua sau luna"
+
+#: chats/apps/projects/models/models.py:82
+msgid "is template?"
+msgstr "este template?"
+
+#: chats/apps/projects/models/models.py:85
+msgid "template type"
+msgstr "tip de template"
+
+#: chats/apps/projects/models/models.py:90
+msgid "org uuid"
+msgstr "uuid org"
+
+#: chats/apps/projects/models/models.py:92
+msgid "Room routing type"
+msgstr "Tipul rutării camerei"
+
+#: chats/apps/projects/models/models.py:99
+#| msgid "Whether to route rooms using the queue priority or general routing"
+msgid ""
+"Choose whether to route rooms based on queue priority or general routing"
+msgstr ""
+"Alege dacă să se direcționeze camerele în funcție de prioritatea cozii sau "
+"de rutarea generală"
+
+#: chats/apps/projects/models/models.py:103
+msgid "Is chats summary enabled?"
+msgstr "Este activat rezumatul chat-urilor?"
+
+#: chats/apps/projects/models/models.py:105
+msgid "Whether to enable the chats summary feature for this project"
+msgstr "Dacă se activează funcționalitatea de rezumat al chat-urilor pentru acest proiect"
+
+#: chats/apps/projects/models/models.py:110
+msgid "Projects"
+msgstr "Proiecte"
+
+#: chats/apps/projects/models/models.py:304 chats/apps/queues/models.py:329
+#: chats/apps/sectors/models.py:361 chats/apps/sectors/models.py:544
+msgid "not set"
+msgstr "nestabilit"
+
+#: chats/apps/projects/models/models.py:305
+msgid "admin"
+msgstr "admin"
+
+#: chats/apps/projects/models/models.py:306
+#: chats/apps/projects/models/models.py:728
+#: chats/apps/projects/models/models.py:757 chats/apps/queues/models.py:330
+#: chats/apps/sectors/models.py:546
+msgid "Representative"
+msgstr "Reprezentant"
+
+#: chats/apps/projects/models/models.py:315
+msgid "online"
+msgstr "online"
+
+#: chats/apps/projects/models/models.py:316
+msgid "offline"
+msgstr "offline"
+
+#: chats/apps/projects/models/models.py:317
+msgid "away"
+msgstr "plecat"
+
+#: chats/apps/projects/models/models.py:318
+msgid "busy"
+msgstr "ocupat"
+
+#: chats/apps/projects/models/models.py:345
+#| msgid "Is it the first access of user?"
+msgid "Is this the user's first access?"
+msgstr "Este aceasta prima accesare a utilizatorului?"
+
+#: chats/apps/projects/models/models.py:349
+#| msgid "Was it seen?"
+msgid "Last seen"
+msgstr "Ultima conectare"
+
+#: chats/apps/projects/models/models.py:352
+msgid "Last time the agent sent a ping (heartbeat)"
+msgstr "Ultima dată când agentul a trimis un ping (heartbeat)"
+
+#: chats/apps/projects/models/models.py:356
+#| msgid "Custom status timming"
+msgid "Custom rooms limit"
+msgstr "Limită personalizată de camere"
+
+#: chats/apps/projects/models/models.py:361
+#| msgid "Is room active"
+msgid "Is custom limit active?"
+msgstr "Este activă limita personalizată?"
+
+#: chats/apps/projects/models/models.py:369
+#| msgid "Project Permission"
+msgid "Project permission"
+msgstr "Permisiune proiect"
+
+#: chats/apps/projects/models/models.py:370
+#| msgid "Project Permissions"
+msgid "Project permissions"
+msgstr "Permisiuni proiect"
+
+#: chats/apps/projects/models/models.py:525
+#| msgid "Linked Contact"
+msgid "Linked contact"
+msgstr "Contact asociat"
+
+#: chats/apps/projects/models/models.py:526
+#| msgid "Linked Contacts"
+msgid "Linked contacts"
+msgstr "Contacte asociate"
+
+#: chats/apps/projects/models/models.py:556
+#| msgid "Flow UUID"
+msgid "Flow ID"
+msgstr "ID flux"
+
+#: chats/apps/projects/models/models.py:557
+#| msgid "flow name"
+msgid "Flow name"
+msgstr "Denumire flux"
+
+#: chats/apps/projects/models/models.py:566
+msgid "Permission"
+msgstr "Permisiune"
+
+#: chats/apps/projects/models/models.py:579 chats/apps/sectors/models.py:61
+#: chats/core/models.py:60
+msgid "is deleted?"
+msgstr "este șters?"
+
+#: chats/apps/projects/models/models.py:580
+msgid "contact data"
+msgstr "date contact"
+
+#: chats/apps/projects/models/models.py:583
+#: chats/apps/projects/models/models.py:599
+#| msgid "Flow Start"
+msgid "Flow start"
+msgstr "Inițiere flux"
+
+#: chats/apps/projects/models/models.py:584
+#| msgid "Flow Starts"
+msgid "Flow starts"
+msgstr "Inițieri flux"
+
+#: chats/apps/projects/models/models.py:592
+#| msgid "Receiver Type"
+msgid "Receiver type"
+msgstr "Tip destinatar"
+
+#: chats/apps/projects/models/models.py:605
+#| msgid "Flow contact/group Reference"
+msgid "Flow contact/group reference"
+msgstr "Referință contact/grup flux"
+
+#: chats/apps/projects/models/models.py:606
+#| msgid "Flow contact/group References"
+msgid "Flow contact/group references"
+msgstr "Referințe contact/grup flux"
+
+#: chats/apps/projects/models/models.py:678
+#| msgid "Custom status timming"
+msgid "Custom status timing"
+msgstr "Temporizarea stării personalizate"
+
+#: chats/apps/projects/models/models.py:735
+#| msgid "disconnected by"
+msgid "Disconnected by"
+msgstr "Deconectat de"
+
+#: chats/apps/projects/models/models.py:770
+#| msgid "log date"
+msgid "Log date"
+msgstr "Data jurnalului"
+
+#: chats/apps/projects/models/models.py:770
+#| msgid "Date of the log (agent's local timezone)"
+msgid "Log date (representative's local timezone)"
+msgstr "Data jurnalului (fus orar local al reprezentantului)"
+
+#: chats/apps/projects/models/models.py:774
+#| msgid "status changes"
+msgid "Status changes"
+msgstr "Modificări ale statusului"
+
+#: chats/apps/projects/models/models.py:777
+msgid ""
+"List of status change events: [{'timestamp': '...', 'status': 'ONLINE|"
+"OFFLINE', 'custom_status': 'status_name or null', 'status_type_uuid': '...'}]"
+msgstr ""
+"Listă de evenimente de schimbare a statusului: [{'timestamp': '...', "
+"'status': 'ONLINE|OFFLINE', 'custom_status': 'status_name sau nul', "
+"'status_type_uuid': '...'}]"
+
+#: chats/apps/projects/models/models.py:784
+msgid "Representative status log"
+msgstr "Jurnal de stare al agenților"
+
+#: chats/apps/projects/models/models.py:785
+#| msgid "Agent Status Logs"
+msgid "Representative status logs"
+msgstr "Jurnale de stare ale agenților"
+
+#: chats/apps/queues/models.py:34 chats/apps/quickmessages/models.py:20
+#: chats/apps/sectors/models.py:86 chats/apps/sectors/models.py:375
+#: chats/apps/sectors/models.py:438 chats/apps/sectors/models.py:606
+msgid "Department"
+msgstr "Departament"
+
+#: chats/apps/queues/models.py:40
+msgid "Default queue message"
+msgstr "Mesaj coadă implicită"
+
+#: chats/apps/queues/models.py:42
+msgid "Limit"
+msgstr "Limită"
+
+#: chats/apps/queues/models.py:43
+#| msgid "Is active?"
+msgid "Is limit active?"
+msgstr "Este activă limita?"
+
+#: chats/apps/queues/models.py:49
+msgid "Department queue"
+msgstr "Coadă departament"
+
+#: chats/apps/queues/models.py:50
+msgid "Department queues"
+msgstr "Cozi departament"
+
+#: chats/apps/queues/models.py:354
+#| msgid "Sector Queue Authorization"
+msgid "Department queue authorization"
+msgstr "Autorizare coadă departament"
+
+#: chats/apps/queues/models.py:355
+#| msgid "Sector Queue Authorization"
+msgid "Department queue authorizations"
+msgstr "Autorizări coadă sector"
+
+#: chats/apps/queues/usecases/bulk_queue_creation.py:157
+msgid "One or more queue names conflict with existing queues in this sector."
+msgstr "Unul sau mai multe nume de coadă intră în conflict cu cozile existente în acest departament."
+
+#: chats/apps/quickmessages/models.py:11
+msgid "quick_messages"
+msgstr "mesaje_rapide"
+
+#: chats/apps/quickmessages/models.py:15
+msgid "shortcut"
+msgstr "comandă rapidă"
+
+#: chats/apps/quickmessages/models.py:16
+msgid "title"
+msgstr "titlu"
+
+#: chats/apps/quickmessages/models.py:17 chats/apps/rooms/models.py:890
+msgid "text"
+msgstr "text"
+
+#: chats/apps/quickmessages/models.py:28
+#| msgid "Quick Message"
+msgid "Quick message"
+msgstr "Mesaj rapid"
+
+#: chats/apps/quickmessages/models.py:29
+#| msgid "Quick Messages"
+msgid "Quick messages"
+msgstr "Mesaje rapide"
+
+#: chats/apps/rooms/models.py:77
+msgid "urn"
+msgstr "urn"
+
+#: chats/apps/rooms/models.py:80
+msgid "project_uuid"
+msgstr "project_uuid"
+
+#: chats/apps/rooms/models.py:82
+msgid "ticket uuid"
+msgstr "uuid tichet"
+
+#: chats/apps/rooms/models.py:84
+msgid "Callback URL"
+msgstr "URL callback"
+
+#: chats/apps/rooms/models.py:87
+msgid "Ended at"
+msgstr "S-a finalizat la"
+
+#: chats/apps/rooms/models.py:90
+msgid "Ended by"
+msgstr "Finalizat de"
+
+#: chats/apps/rooms/models.py:94
+#| msgid "Closed"
+msgid "closed by"
+msgstr "închis de"
+
+#: chats/apps/rooms/models.py:100
+msgid "is active?"
+msgstr "este activă?"
+
+#: chats/apps/rooms/models.py:101
+#| msgid "is waiting for answer?"
+msgid "is waiting for an answer?"
+msgstr "așteaptă un răspuns?"
+
+#: chats/apps/rooms/models.py:104
+#| msgid "Transfer History"
+msgid "Transfer history"
+msgstr "Istoricul transferurilor"
+
+#: chats/apps/rooms/models.py:107
+#| msgid "Full Transfer History"
+msgid "Full transfer history"
+msgstr "Istoric complet al transferurilor"
+
+#: chats/apps/rooms/models.py:113
+#| msgid "Room Tags"
+msgid "Tags"
+msgstr "Etichete"
+
+#: chats/apps/rooms/models.py:116
+#| msgid "protocol"
+msgid "Protocol"
+msgstr "Protocol"
+
+#: chats/apps/rooms/models.py:119
+#| msgid "service chat"
+msgid "Service chat"
+msgstr "Chat de serviciu"
+
+#: chats/apps/rooms/models.py:123
+msgid "First user assigned at"
+msgstr "Primul utilizator atribuit la"
+
+#: chats/apps/rooms/models.py:126
+msgid "User assigned at"
+msgstr "Utilizator atribuit la"
+
+#: chats/apps/rooms/models.py:129
+msgid "Added to queue at"
+msgstr "Adăugat în coadă la"
+
+#: chats/apps/rooms/models.py:131
+msgid "Unread messages count"
+msgstr "Numărul mesajelor necitite"
+
+#: chats/apps/rooms/models.py:133
+msgid "Last unread message at"
+msgstr "Ultimul mesaj necitit la"
+
+#: chats/apps/rooms/models.py:136
+#| msgid "Room interaction time"
+msgid "Last interaction"
+msgstr "Ultima interacțiune"
+
+#: chats/apps/rooms/models.py:140
+#| msgid "message"
+msgid "Last message"
+msgstr "Ultimul mesaj"
+
+#: chats/apps/rooms/models.py:147
+#| msgid "automatic message text"
+msgid "Last message text"
+msgstr "Textul ultimului mesaj"
+
+#: chats/apps/rooms/models.py:151
+#| msgid "Last unread message at"
+msgid "Last message user"
+msgstr "Utilizatorul ultimului mesaj"
+
+#: chats/apps/rooms/models.py:159
+#| msgid "Last unread message at"
+msgid "Last message contact"
+msgstr "Contactul ultimului mesaj"
+
+#: chats/apps/rooms/models.py:166
+#| msgid "message metadata"
+msgid "Last message media"
+msgstr "Conținut media al ultimului mesaj"
+
+#: chats/apps/rooms/models.py:172
+#| msgid "automatic message text"
+msgid "Automatic message sent at"
+msgstr "Mesaj automat trimis la"
+
+#: chats/apps/rooms/models.py:267
+msgid "Rooms"
+msgstr "Camere"
+
+#: chats/apps/rooms/models.py:285
+#| msgid "Closed rooms cannot receive updates"
+msgid "Closed rooms can't receive updates"
+msgstr "Camerele închise nu pot primi actualizări"
+
+#: chats/apps/rooms/models.py:860 chats/core/models.py:38
+#: chats/core/models.py:52
+msgid "Created on"
+msgstr "Creat la"
+
+#: chats/apps/rooms/models.py:863
+#| msgid "Room Pin"
+msgid "Room pin"
+msgstr "Fixare cameră"
+
+#: chats/apps/rooms/models.py:864
+#| msgid "Room Pins"
+msgid "Room pins"
+msgstr "Fixări cameră"
+
+#: chats/apps/rooms/models.py:891
+msgid "is deletable"
+msgstr "se poate șterge"
+
+#: chats/apps/rooms/models.py:902
+#| msgid "Room Note"
+msgid "Room note"
+msgstr "Notă cameră"
+
+#: chats/apps/rooms/models.py:903
+#| msgid "Room Notes"
+msgid "Room notes"
+msgstr "Note cameră"
+
+#: chats/apps/rooms/services.py:195
+#, python-format
+#| msgid "Rooms report for project %(project)s - %(date)s"
+msgid "Room report for project %(project)s - %(date)s"
+msgstr "Raportul camerei pentru proiectul %(project)s - %(date)s"
+
+#: chats/apps/rooms/services.py:211
+#, python-format
+#| msgid ""
+msgid ""
+"The room report for project %(project)s is ready and attached to this email."
+msgstr ""
+"Raportul camerei pentru proiectul %(project)s este gata și este atașat "
+"acestui e-mail."
+
+#: chats/apps/rooms/services.py:245
+#, python-format
+#| msgid "Error generating rooms report for project %(project)s - %(date)s"
+msgid "Error generating room report for project %(project)s - %(date)s"
+msgstr ""
+"Eroare la generarea raportului camerelor pentru proiectul %(project)s - "
+"%(date)s"
+
+#: chats/apps/rooms/services.py:258
+#, python-format
+msgid ""
+"An error occurred while generating the rooms report for project "
+"%(project)s.\n"
+"\n"
+"Error: %(error)s\n"
+"\n"
+"Please try again later or contact support."
+msgstr ""
+"A apărut o eroare la generarea raportului pentru camere pentru proiectul "
+"%(project)s. Eroare: %(error)s Te rugăm să încerci din nou mai târziu sau să "
+"contactezi asistența."
+
+#: chats/apps/rooms/templates/rooms/emails/base.html:26
+msgid "All rights reserved."
+msgstr "Toate drepturile rezervate."
+
+#: chats/apps/rooms/templates/rooms/emails/base.html:30
+msgid ""
+"You are receiving this mail because you registered in VTEX CX Platform. This "
+"also shows that you agree to our Terms of use and Privacy Policies. If you "
+"no longer want to receive mails from use, click the unsubscribe link below "
+"to unsubscribe."
+msgstr ""
+"Primești acest email deoarece te-ai înregistrat în VTEX Agentic CX Platform. "
+"Acest lucru confirmă, de asemenea, că ești de acord cu Termenii de utilizare "
+"și Politica de confidențialitate. Dacă nu mai dorești să primești emailuri de "
+"la noi, apasă pe linkul de dezabonare de mai jos."
+
+#: chats/apps/rooms/templates/rooms/emails/base.html:33
+msgid "Privacy Policy"
+msgstr "Politica de confidențialitate"
+
+#: chats/apps/rooms/templates/rooms/emails/base.html:37
+#| msgid "Terms of use"
+msgid "Terms of Use"
+msgstr "Termeni de utilizare"
+
+#: chats/apps/rooms/templates/rooms/emails/base.html:41
+msgid "Help Center"
+msgstr "Centru de ajutor"
+
+#: chats/apps/rooms/templates/rooms/emails/base.html:45
+msgid "Unsubscribe"
+msgstr "Dezabonare"
+
+#: chats/apps/rooms/templates/rooms/emails/report_failed.html:16
+#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:16
+msgid "Hi, here is your data export"
+msgstr "Bună, iată exportul datelor tale"
+
+#: chats/apps/rooms/templates/rooms/emails/report_failed.html:31
+#, python-format
+msgid "Unable to generate export of %(project_name)s project data."
+msgstr "Nu s-a putut genera exportul datelor proiectului %(project_name)s."
+
+#: chats/apps/rooms/templates/rooms/emails/report_failed.html:34
+msgid "Use the following information to report to support:"
+msgstr "Folosește următoarele informații pentru a raporta echipei de suport:"
+
+#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:31
+#, python-format
+msgid ""
+"The data export for the %(project_name)s project is ready. Click the button "
+"below to download it."
+msgstr ""
+"Exportul de date pentru proiectul %(project_name)s este gata. Apasă butonul "
+"de mai jos pentru a-l descărca."
+
+#: chats/apps/rooms/templates/rooms/emails/report_is_ready.html:63
+msgid "Download report"
+msgstr "Descarcă raportul"
+
+#: chats/apps/sectors/models.py:41
+#| msgid "Secondary Project"
+msgid "Secondary project"
+msgstr "Proiect secundar"
+
+#: chats/apps/sectors/models.py:44
+msgid "Secondary project configuration for integrated ticketers"
+msgstr "Configurație secundară a proiectului pentru tichete integrate"
+
+#: chats/apps/sectors/models.py:46 chats/apps/sectors/models.py:519
+#| msgid "Rooms limit per employee"
+msgid "Room limit per employee"
+msgstr "Limită camere per angajat"
+
+#: chats/apps/sectors/models.py:48
+msgid "work start"
+msgstr "începutul activității"
+
+#: chats/apps/sectors/models.py:51
+msgid "work end"
+msgstr "sfârșitul activității"
+
+#: chats/apps/sectors/models.py:54
+msgid "Can trigger flows?"
+msgstr "Poate declanșa fluxuri?"
+
+#: chats/apps/sectors/models.py:56
+#| msgid ""
+msgid ""
+"Can I trigger flows (VTEX CX Platform flows integration) from this "
+"department?"
+msgstr "Pot declanșa fluxuri (integrarea fluxurilor VTEX Agentic CX Platform) din acest departament?"
+
+#: chats/apps/sectors/models.py:60
+msgid "Sign messages?"
+msgstr "Semnezi mesajele?"
+
+#: chats/apps/sectors/models.py:63
+#| msgid "Open room when all agents are offline?"
+msgid "Can a room be opened when all representatives are offline?"
+msgstr ""
+"Poate fi deschisă o cameră atunci când toți reprezentanții sunt offline?"
+
+#: chats/apps/sectors/models.py:66
+msgid "Can edit custom fields?"
+msgstr "Pot edita câmpuri personalizate?"
+
+#: chats/apps/sectors/models.py:69
+msgid "working_day"
+msgstr "working_day"
+
+#: chats/apps/sectors/models.py:72
+msgid "automatic message text"
+msgstr "text mesaj automat"
+
+#: chats/apps/sectors/models.py:75
+msgid "is automatic message active?"
+msgstr "este activ mesajul automat?"
+
+#: chats/apps/sectors/models.py:77
+msgid "is CSAT enabled?"
+msgstr "este CSAT activat?"
+
+#: chats/apps/sectors/models.py:78
+msgid "required tags?"
+msgstr "etichete obligatorii?"
+
+#: chats/apps/sectors/models.py:87
+msgid "Departments"
+msgstr "Departamente"
+
+#: chats/apps/sectors/models.py:362 chats/apps/sectors/models.py:545
+#| msgid "manager"
+msgid "Manager"
+msgstr "Manager"
+
+#: chats/apps/sectors/models.py:386
+#| msgid "Sector Authorization"
+msgid "Department authorization"
+msgstr "Autorizare departament"
+
+#: chats/apps/sectors/models.py:387
+#| msgid "Sector Authorizations"
+msgid "Department authorizations"
+msgstr "Autorizări departament"
+
+#: chats/apps/sectors/models.py:453
+msgid "Department tag"
+msgstr "Etichetă departament"
+
+#: chats/apps/sectors/models.py:454
+msgid "Department tags"
+msgstr "Etichete departament"
+
+#: chats/apps/sectors/models.py:492 chats/apps/sectors/models.py:522
+msgid "Department group"
+msgstr "Grup de departamente"
+
+#: chats/apps/sectors/models.py:493 chats/apps/sectors/models.py:523
+msgid "Department groups"
+msgstr "Grupuri de departamente"
+
+#: chats/apps/sectors/models.py:563
+#| msgid "Sector Authorization"
+msgid "Department group authorization"
+msgstr "Autorizare grup departament"
+
+#: chats/apps/sectors/models.py:564
+#| msgid "Sector Authorizations"
+msgid "Department group authorizations"
+msgstr "Autorizări grup departament"
+
+#: chats/apps/sectors/models.py:600
+msgid "Closed"
+msgstr "Închise"
+
+#: chats/apps/sectors/models.py:601
+#| msgid "Custom Hours"
+msgid "Custom hours"
+msgstr "Ore personalizate"
+
+#: chats/apps/sectors/models.py:610
+msgid "Date"
+msgstr "Dată"
+
+#: chats/apps/sectors/models.py:612
+#| msgid "End Date"
+msgid "End date"
+msgstr "Data de finalizare"
+
+#: chats/apps/sectors/models.py:615
+msgid "End date for holiday range"
+msgstr "Data de sfârșit pentru intervalul de sărbători legale"
+
+#: chats/apps/sectors/models.py:618
+#| msgid "Day Type"
+msgid "Day type"
+msgstr "Tip zi"
+
+#: chats/apps/sectors/models.py:621
+#| msgid "Start Time"
+msgid "Start time"
+msgstr "Ora de începere"
+
+#: chats/apps/sectors/models.py:624 chats/apps/sectors/models.py:630
+#| msgid "Leave empty if day is closed"
+msgid "Leave empty if there are no working hours"
+msgstr "Lasă necompletat dacă nu există ore de lucru"
+
+#: chats/apps/sectors/models.py:627
+#| msgid "End Time"
+msgid "End time"
+msgstr "Ora de finalizare"
+
+#: chats/apps/sectors/models.py:633
+msgid "Description"
+msgstr "Descriere"
+
+#: chats/apps/sectors/models.py:636
+#| msgid "Holiday name or reason for special hours"
+msgid "Holiday name or special hours reason"
+msgstr "Numele sărbătorii legale sau motivul orelor speciale"
+
+#: chats/apps/sectors/models.py:638
+#| msgid "Is Custom"
+msgid "Is custom"
+msgstr "Este personalizat"
+
+#: chats/apps/sectors/models.py:639
+#| msgid "Repeat Annually"
+msgid "Repeat annually"
+msgstr "Se repetă anual"
+
+#: chats/apps/sectors/models.py:642
+msgid "Department holiday"
+msgstr "Sărbătoare legală departament"
+
+#: chats/apps/sectors/models.py:643
+msgid "Department holidays"
+msgstr "Sărbătoare legale departament"
+
+#: chats/apps/sectors/utils.py:48 chats/apps/sectors/utils.py:72
+#: chats/apps/sectors/utils.py:150 chats/apps/sectors/utils.py:183
+#: chats/apps/sectors/utils.py:198 chats/apps/sectors/utils.py:206
+#: chats/apps/sectors/utils.py:226 chats/apps/sectors/utils.py:231
+#: chats/apps/sectors/utils.py:276 chats/apps/sectors/utils.py:289
+#: chats/apps/sectors/utils.py:297
+#| msgid "Contact cannot be done outside working hours"
+msgid "Contact can't be done outside working hours"
+msgstr "Contactul nu poate fi efectuat în afara orelor de lucru"
+
+#: chats/apps/sectors/utils.py:162
+#| msgid "Contact cannot be done outside working hours"
+msgid "Contact can't be done outside holiday working hours"
+msgstr "Contactul nu poate fi efectuat în afara orelor de lucru în zilele de sărbătoare"
+
+#: chats/apps/sectors/utils.py:171
+#| msgid "Contact couldn't be started because today is a holiday"
+msgid "Contact can't be done because today is a holiday"
+msgstr "Contactul nu poate fi efectuat deoarece astăzi este sărbătoare"
+
+#: chats/core/models.py:40
+msgid "Modified on"
+msgstr "Modificat la"
+
+#: chats/core/models.py:103
+msgid "config to use in project integration"
+msgstr "configurare de utilizat în integrarea proiectului"
+
+#: chats/core/models.py:143
+#| msgid "Modified on"
+msgid "Modified by"
+msgstr "Modificat de"
+
+#: chats/core/models.py:152
+#| msgid "Created By"
+msgid "Deleted by"
+msgstr "Șters de"
+

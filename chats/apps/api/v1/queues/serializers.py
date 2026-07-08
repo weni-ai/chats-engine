@@ -65,19 +65,19 @@ class QueueSerializer(AuditableModelSerializer):
         if name:
             if name == "":
                 raise serializers.ValidationError(
-                    {"detail": _("The name field can't be blank.")}
+                    {"detail": _("Enter a name")}
                 )
             if self.instance:
                 if Queue.objects.filter(
                     sector=self.instance.sector, name=name
                 ).exists():
                     raise serializers.ValidationError(
-                        {"detail": _("This queue already exists.")}
+                        {"detail": _("This queue already exists")}
                     )
             else:
                 if Queue.objects.filter(sector=data["sector"], name=name).exists():
                     raise serializers.ValidationError(
-                        {"detail": _("This queue already exists.")}
+                        {"detail": _("This queue already exists")}
                     )
 
         queue_limit = data.pop("queue_limit_info", None)
@@ -151,7 +151,7 @@ class QueueAuthorizationSerializer(AuditableModelSerializer):
         )
         if queue_user:
             raise serializers.ValidationError(
-                {"detail": _("you cant add a user two times in same queue.")}
+                {"detail": _("You can't add a user twice to the same queue")}
             )
         return data
 

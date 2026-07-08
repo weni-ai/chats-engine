@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Dict
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.mail import EmailMultiAlternatives
+from django.utils.translation import gettext as _
 
 from chats.apps.rooms.email_templates import (
     get_room_export_failed_email,
@@ -77,12 +78,12 @@ class SendRoomExportEmail:
         """Sends the failure notification email to the requester."""
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
         identifier = self._room_identifier(room)
-        subject = (
-            f"Error generating conversation export for room "
-            f"{identifier} - {timestamp}"
-        )
+        project_name = self._project_name(room)
+        subject = _(
+            "Error generating conversation export for room %(identifier)s - %(timestamp)s"
+        ) % {"identifier": identifier, "timestamp": timestamp}
         message_plain, message_html = get_room_export_failed_email(
-            identifier, error_message
+            project_name, error_message
         )
 
         email = EmailMultiAlternatives(
@@ -120,9 +121,12 @@ class SendRoomExportEmail:
     ) -> None:
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
         identifier = self._room_identifier(room)
-        subject = f"Conversation export for room {identifier} - {timestamp}"
+        project_name = self._project_name(room)
+        subject = _(
+            "Conversation export for room %(identifier)s - %(timestamp)s"
+        ) % {"identifier": identifier, "timestamp": timestamp}
         message_plain, message_html = get_room_export_ready_email(
-            identifier, download_url
+            project_name, download_url
         )
 
         email = EmailMultiAlternatives(
@@ -150,6 +154,17 @@ class SendRoomExportEmail:
 
     def _room_identifier(self, room: "Room") -> str:
         return room.protocol or str(room.uuid)
+
+    def _project_name(self, room: "Room") -> str:
+        # Falls back to the room identifier so the email still has a useful
+        # reference if the project relationship cannot be resolved for any
+        # reason (e.g. detached test fixtures).
+        try:
+            project = room.project
+        except Exception:
+            project = None
+        name = getattr(project, "name", None)
+        return name or self._room_identifier(room)
 
 
 __all__ = ["SendRoomExportEmail"]

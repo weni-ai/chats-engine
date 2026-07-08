@@ -1,5 +1,7 @@
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
+from django.shortcuts import get_object_or_404
+from django.utils.translation import gettext_lazy as _
 from django_filters.rest_framework import DjangoFilterBackend
 from pydub.exceptions import CouldntDecodeError
 from rest_framework import filters, mixins, parsers, status, viewsets
@@ -9,6 +11,10 @@ from rest_framework.response import Response
 
 from chats.apps.api.pagination import CustomCursorPagination
 from chats.apps.api.v1.msgs.filters import MessageFilter, MessageMediaFilter
+from chats.apps.api.v1.msgs.media_download import (
+    build_media_download_response,
+    resolve_message_media_for_download,
+)
 from chats.apps.api.v1.msgs.permissions import (
     MessageMediaPermission,
     MessagePermission,
@@ -125,6 +131,27 @@ class MessageViewset(
 
         return super().get_parsers()
 
+    @action(detail=True, methods=["GET"], url_path="download")
+    def download(self, request, *args, **kwargs):
+        message = get_object_or_404(
+            ChatMessage.objects.select_related(
+                "room__queue__sector__project"
+            ).prefetch_related("medias"),
+            uuid=kwargs["uuid"],
+        )
+        self.check_object_permissions(request, message)
+
+        media = resolve_message_media_for_download(message)
+        if not media:
+            return Response(
+                {"detail": _("Media file not found")},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return build_media_download_response(
+            media, log_context="MessageViewset.download"
+        )
+
 
 class MessageMediaViewset(
     mixins.CreateModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
@@ -173,3 +200,17 @@ class MessageMediaViewset(
                 message=message,
                 user=message.user,
             )
+
+    @action(detail=True, methods=["GET"], url_path="download")
+    def download(self, request, *args, **kwargs):
+        media = get_object_or_404(
+            MessageMedia.objects.select_related(
+                "message__room__queue__sector__project"
+            ),
+            uuid=kwargs["uuid"],
+        )
+        self.check_object_permissions(request, media)
+
+        return build_media_download_response(
+            media, log_context="MessageMediaViewset.download"
+        )

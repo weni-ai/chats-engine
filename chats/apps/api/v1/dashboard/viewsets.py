@@ -26,6 +26,10 @@ from chats.apps.api.v1.dashboard.serializers import (
     DashboardRoomSerializer,
     DashboardSectorSerializer,
 )
+from chats.apps.api.authentication.classes import JWTAuthentication
+from chats.apps.api.authentication.permissions import (
+    IsAuthenticatedOrHasInternalJWT,
+)
 from chats.apps.core.filters import get_filters_from_query_params
 from chats.apps.dashboard.models import ReportStatus
 from chats.apps.dashboard.usecases import GetReportStatusUseCase
@@ -55,6 +59,29 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
     lookup_field = "uuid"
     queryset = Project.objects.all()
     serializer_class = _DashboardEmptySerializer
+
+    def initialize_request(self, request, *args, **kwargs):
+        if hasattr(self, "action_map"):
+            self.action = self.action_map.get(request.method.lower())
+        return super().initialize_request(request, *args, **kwargs)
+
+    @property
+    def authentication_classes(self):
+        if getattr(self, "action", None) in (
+            "time_metrics",
+            "time_metrics_for_analysis",
+            "raw_data",
+        ):
+            classes = list(super().authentication_classes)
+            if JWTAuthentication not in classes:
+                classes.insert(0, JWTAuthentication)
+            return classes
+        return super().authentication_classes
+
+    def get_permissions(self):
+        if self.action in ("time_metrics", "raw_data"):
+            return [IsAuthenticatedOrHasInternalJWT()]
+        return super().get_permissions()
 
     @action(
         detail=True,
@@ -162,9 +189,19 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         """Raw data for the project, sector, queue and agent."""
         project = self.get_object()
         params = request.query_params.dict()
-        user_permission = ProjectPermission.objects.select_related(
-            "user", "project"
-        ).get(user=request.user, project=project)
+
+        is_anonymous = not request.user or request.user.is_anonymous
+        user_email = "" if is_anonymous else request.user.email
+
+        if getattr(request, "jwt_payload", None):
+            user_email = request.query_params.get("user_request", "")
+
+        user_permission = None
+        if not is_anonymous:
+            user_permission = ProjectPermission.objects.select_related(
+                "user", "project"
+            ).get(user=request.user, project=project)
+
         filters = Filters(
             start_date=params.get("start_date"),
             end_date=params.get("end_date"),
@@ -174,9 +211,7 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             tag=params.get("tag"),
             user_request=user_permission,
             project=project,
-            is_weni_admin=should_exclude_admin_domains(
-                request.user.email if request.user else ""
-            ),
+            is_weni_admin=should_exclude_admin_domains(user_email),
         )
 
         raw_service = RawDataService()
@@ -412,6 +447,13 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
         project = self.get_object()
         params = get_filters_from_query_params(request.query_params)
 
+        is_anonymous = not request.user or request.user.is_anonymous
+        user_email = "" if is_anonymous else request.user.email
+
+        if getattr(request, "jwt_payload", None):
+            # Is internal authentication call
+            user_email = request.query_params.get("user_request", "")
+
         filters = Filters(
             start_date=params.get("start_date"),
             end_date=params.get("end_date"),
@@ -419,11 +461,9 @@ class DashboardLiveViewset(viewsets.GenericViewSet):
             sector=params.get("sector"),
             tag=params.get("tag"),
             queue=params.get("queue"),
-            user_request=request.user,
+            user_request=None if is_anonymous else request.user,
             project=project,
-            is_weni_admin=should_exclude_admin_domains(
-                request.user.email if request.user else ""
-            ),
+            is_weni_admin=should_exclude_admin_domains(user_email),
         )
 
         time_metrics_service = TimeMetricsService()

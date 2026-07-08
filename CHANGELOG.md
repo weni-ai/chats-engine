@@ -1,3 +1,46 @@
+# 3.68.6
+# Add
+  - Media download endpoint for message attachments
+# Fix
+  - Message media permission logic for queue association
+  - Archive rooms messages task schedule extended to hours 0-6
+# Refactor
+  - Internal authentication verification to require explicit permission
+
+# 3.68.5
+# Fix
+  - External ID field type changed to text field for reply index
+
+# 3.68.4
+# Fix
+  - Additional WAMID trailer markers support
+
+# 3.68.3
+# Remove
+  - Return all flow templates feature (reverted)
+
+# 3.68.2
+# Refactor
+  - RoomPin creation updated to include project association and filters
+
+# 3.68.1
+# Add
+  - Return all flow templates
+
+# 3.68.0
+# Add
+  - Project association to RoomPin model
+  - Soft delete support to QueueAuthorization model
+
+# 3.67.5
+# Add
+  - JWT authentication and authorization
+# Fix
+  - Inactivity last message update on room closure
+  - Room filtering to exclude deleted entities
+# Refactor
+  - Optimized inactivity feature
+
 # 3.67.4
 # Add
   - Optimized media handling in archived chat messages
