@@ -15,6 +15,9 @@ from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from django.core.exceptions import ObjectDoesNotExist
 
+from chats.apps.dashboard.services.metric_goal_alerts import (
+    is_metric_goal_alerts_enabled,
+)
 from chats.apps.projects.models.models import ProjectPermission
 
 logger = logging.getLogger(__name__)
@@ -51,6 +54,12 @@ class MetricGoalAlertConsumer(AsyncJsonWebsocketConsumer):
             return
 
         if not await self._can_view_dashboard(permission):
+            await self.close()
+            return
+
+        if not await database_sync_to_async(is_metric_goal_alerts_enabled)(
+            self.project_uuid
+        ):
             await self.close()
             return
 

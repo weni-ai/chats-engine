@@ -27,14 +27,39 @@ from datetime import datetime, timedelta
 from math import ceil
 from typing import Iterable
 
+from django.conf import settings
 from django.db.models import Count, Exists, Max, OuterRef
 from django.utils import timezone
 from django_redis import get_redis_connection
+from weni.feature_flags.shortcuts import is_feature_active_for_attributes
 
 from chats.apps.dashboard.models import MetricGoal, RoomMetrics
 from chats.apps.rooms.models import Room
 
 logger = logging.getLogger(__name__)
+
+
+def is_metric_goal_alerts_enabled(project_uuid: str) -> bool:
+    """Whether the metric goal / risk alerts feature is enabled for a project.
+
+    Fails closed (returns ``False``) if the flag can't be evaluated, so a
+    GrowthBook outage never turns on alerts for projects that shouldn't
+    have them.
+    """
+    if not project_uuid:
+        return False
+    try:
+        return is_feature_active_for_attributes(
+            settings.METRIC_GOAL_ALERTS_FEATURE_FLAG_KEY,
+            {"projectUUID": str(project_uuid)},
+        )
+    except Exception:
+        logger.warning(
+            "metric_goal: failed to evaluate feature flag for project %s",
+            project_uuid,
+            exc_info=True,
+        )
+        return False
 
 
 STATE_VIOLATING = "violating"
@@ -182,15 +207,17 @@ def detect_violations(
     sweet spot and keeps query shapes index-friendly.
     """
     now = now or timezone.now()
-    goals = list(
-        MetricGoal.objects.filter(metric=metric, is_active=True).values(
+    goals = [
+        goal
+        for goal in MetricGoal.objects.filter(metric=metric, is_active=True).values(
             "project__uuid",
             "threshold_seconds",
             "rooms_threshold_count",
             "rooms_threshold_percent",
             "email_enabled",
         )
-    )
+        if is_metric_goal_alerts_enabled(str(goal["project__uuid"]))
+    ]
     if not goals:
         return []
 

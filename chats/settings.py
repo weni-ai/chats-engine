@@ -882,6 +882,12 @@ WENI_CHATS_INACTIVITY_TIMEOUT_FLAG_KEY = env.str(
     default="weniChatsInactivityTimeout",
 )
 
+# Metric Goal Alerts (risk alerts)
+METRIC_GOAL_ALERTS_FEATURE_FLAG_KEY = env.str(
+    "METRIC_GOAL_ALERTS_FEATURE_FLAG_KEY",
+    default="weniChatsMetricGoalAlerts",
+)
+
 IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL = env.int(
     "IMPROVE_USER_MESSAGE_FEATURE_PROMPT_CACHE_TTL", default=30
 )
