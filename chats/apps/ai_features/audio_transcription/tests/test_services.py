@@ -1,6 +1,6 @@
 import io
 import json
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 from django.test import TestCase
 
@@ -8,7 +8,9 @@ from chats.apps.ai_features.audio_transcription.models import (
     AudioTranscription,
     AudioTranscriptionStatus,
 )
-from chats.apps.ai_features.audio_transcription.services import AudioTranscriptionService
+from chats.apps.ai_features.audio_transcription.services import (
+    AudioTranscriptionService,
+)
 from chats.apps.contacts.models import Contact
 from chats.apps.msgs.models import Message, MessageMedia
 from chats.apps.projects.models.models import Project
@@ -55,9 +57,7 @@ class AudioTranscriptionServiceTests(TestCase):
                     }
                 }
             }
-        mock_response = {
-            "Payload": io.BytesIO(json.dumps(payload).encode("utf-8"))
-        }
+        mock_response = {"Payload": io.BytesIO(json.dumps(payload).encode("utf-8"))}
         return mock_response
 
     @patch("chats.apps.ai_features.audio_transcription.services.boto3.client")

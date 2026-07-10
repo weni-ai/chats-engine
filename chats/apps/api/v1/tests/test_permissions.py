@@ -38,9 +38,9 @@ def _request(user=None, data=None, query_params=None, method="GET"):
         data=data or {},
         query_params=query_params or {},
         method=method,
-        is_anonymous=getattr(user, "is_anonymous", False)
-        if user is not None
-        else False,
+        is_anonymous=(
+            getattr(user, "is_anonymous", False) if user is not None else False
+        ),
     )
 
 
@@ -53,7 +53,9 @@ class IsProjectAdminTests(SimpleTestCase):
     def test_has_permission_list_admin(self, mock_get_perm):
         mock_get_perm.return_value.permission = SimpleNamespace(is_admin=True)
         self.assertTrue(
-            IsProjectAdmin().has_permission(_request(data={"project": "p"}), _view("list"))
+            IsProjectAdmin().has_permission(
+                _request(data={"project": "p"}), _view("list")
+            )
         )
 
     @patch("chats.apps.api.v1.permissions.GetPermission")
@@ -66,9 +68,7 @@ class IsProjectAdminTests(SimpleTestCase):
         )
 
     def test_has_permission_other_action_delegates(self):
-        self.assertTrue(
-            IsProjectAdmin().has_permission(_request(), _view("retrieve"))
-        )
+        self.assertTrue(IsProjectAdmin().has_permission(_request(), _view("retrieve")))
 
     def test_has_object_permission_anonymous(self):
         self.assertFalse(
@@ -115,9 +115,7 @@ class IsSectorManagerTests(SimpleTestCase):
         )
 
     def test_has_permission_other_action(self):
-        self.assertTrue(
-            IsSectorManager().has_permission(_request(), _view("retrieve"))
-        )
+        self.assertTrue(IsSectorManager().has_permission(_request(), _view("retrieve")))
 
     def test_has_object_permission_anonymous(self):
         self.assertFalse(
@@ -297,9 +295,7 @@ class IsQueueAgentTests(SimpleTestCase):
         perm.is_agent.return_value = True
         mock_get_perm.return_value.permission = perm
         self.assertTrue(
-            IsQueueAgent().has_permission(
-                _request(data={"queue": "q1"}), _view("list")
-            )
+            IsQueueAgent().has_permission(_request(data={"queue": "q1"}), _view("list"))
         )
         perm.is_agent.assert_called_once_with("q1")
 
@@ -377,8 +373,6 @@ class SectorAnyPermissionTests(SimpleTestCase):
         )
 
     def test_authorized(self):
-        from chats.apps.sectors.models import SectorAuthorization
-
         obj = Mock()
         obj.get_permission.return_value = SimpleNamespace(is_authorized=True)
         self.assertTrue(
@@ -692,11 +686,11 @@ class ProjectQueryParamPermissionDBTests(TestCase):
 
     def test_anonymous(self):
         user = AnonymousUser()
-        request = _request(user=user, query_params={"project_uuid": str(self.project.uuid)})
-        request.is_anonymous = True
-        self.assertFalse(
-            ProjectQueryParamPermission().has_permission(request, _view())
+        request = _request(
+            user=user, query_params={"project_uuid": str(self.project.uuid)}
         )
+        request.is_anonymous = True
+        self.assertFalse(ProjectQueryParamPermission().has_permission(request, _view()))
 
     def test_missing_uuid_raises(self):
         request = _request(user=self.user, query_params={})
@@ -718,9 +712,7 @@ class ProjectQueryParamPermissionDBTests(TestCase):
             user=self.user, query_params={"project_uuid": str(uuid.uuid4())}
         )
         request.is_anonymous = False
-        self.assertFalse(
-            ProjectQueryParamPermission().has_permission(request, _view())
-        )
+        self.assertFalse(ProjectQueryParamPermission().has_permission(request, _view()))
 
 
 class ProjectBodyPermissionDBTests(TestCase):
@@ -735,7 +727,9 @@ class ProjectBodyPermissionDBTests(TestCase):
         )
 
     def test_anonymous(self):
-        request = _request(user=AnonymousUser(), data={"project_uuid": str(self.project.uuid)})
+        request = _request(
+            user=AnonymousUser(), data={"project_uuid": str(self.project.uuid)}
+        )
         request.is_anonymous = True
         self.assertFalse(ProjectBodyPermission().has_permission(request, _view()))
 

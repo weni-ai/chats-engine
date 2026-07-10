@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from django.test import SimpleTestCase, TestCase, override_settings
+from django.test import SimpleTestCase, override_settings
 
 from chats.apps.projects.usecases.dead_letter_handler import DeadLetterHandler
 from chats.apps.projects.usecases.exceptions import (
@@ -31,7 +31,9 @@ class DeadLetterHandlerTests(SimpleTestCase):
             DeadLetterHandler(message, {}).execute()
 
     def test_raises_on_reject_reason(self):
-        message = SimpleNamespace(headers={"x-death": [{"reason": "rejected", "count": 1}]})
+        message = SimpleNamespace(
+            headers={"x-death": [{"reason": "rejected", "count": 1}]}
+        )
         with self.assertRaises(InvalidDLQHeaders):
             DeadLetterHandler(message, {}).execute()
 

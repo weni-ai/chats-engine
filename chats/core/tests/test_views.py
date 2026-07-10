@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import patch
 
 from django.test import SimpleTestCase, TestCase, override_settings
 
@@ -39,7 +39,10 @@ class KeycloakViewsTests(TestCase):
         self.assertIn("Content-Type", headers)
 
     @patch("chats.core.views.requests.get")
-    @patch("chats.core.views.get_internal_headers", return_value={"Authorization": "Bearer x"})
+    @patch(
+        "chats.core.views.get_internal_headers",
+        return_value={"Authorization": "Bearer x"},
+    )
     def test_persist_keycloak_user_success(self, _headers, mock_get):
         mock_get.return_value.json.return_value = [
             {
@@ -58,7 +61,10 @@ class KeycloakViewsTests(TestCase):
         self.assertEqual(user.last_name, "Last")
 
     @patch("chats.core.views.requests.get")
-    @patch("chats.core.views.get_internal_headers", return_value={"Authorization": "Bearer x"})
+    @patch(
+        "chats.core.views.get_internal_headers",
+        return_value={"Authorization": "Bearer x"},
+    )
     def test_persist_keycloak_user_uses_username_fallback(self, _headers, mock_get):
         mock_get.return_value.json.return_value = [
             {"email": "kc2@example.com", "username": "onlyuser"}
@@ -72,7 +78,10 @@ class KeycloakViewsTests(TestCase):
 
     @patch("chats.core.views.LOGGER")
     @patch("chats.core.views.requests.get")
-    @patch("chats.core.views.get_internal_headers", return_value={"Authorization": "Bearer x"})
+    @patch(
+        "chats.core.views.get_internal_headers",
+        return_value={"Authorization": "Bearer x"},
+    )
     def test_persist_keycloak_user_not_found(self, _headers, mock_get, mock_logger):
         mock_get.return_value.json.return_value = []
         mock_get.return_value.status_code = 404
