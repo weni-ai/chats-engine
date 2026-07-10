@@ -125,3 +125,47 @@ class TestHistorySummaryService(TestCase):
         self.assertIsNone(result)
         self.assertEqual(self.history_summary.status, HistorySummaryStatus.UNAVAILABLE)
         self.mock_integration_client.generate_text.assert_not_called()
+
+    @patch("chats.apps.ai_features.history_summary.services.FeaturePrompt.objects")
+    def test_generate_summary_no_summary_available_tag(self, mock_feature_prompt_objects):
+        mock_feature_prompt_objects.filter.return_value.order_by.return_value.last.return_value = (
+            self.feature_prompt
+        )
+        self.mock_integration_client.generate_text.return_value = (
+            "<no_summary_available>too short</no_summary_available>"
+        )
+
+        result = self.service.generate_summary(self.room, self.history_summary)
+
+        self.assertEqual(result.status, HistorySummaryStatus.UNAVAILABLE)
+        self.assertIsNone(result.summary)
+
+    @patch("chats.apps.ai_features.history_summary.services.capture_message")
+    @patch("chats.apps.ai_features.history_summary.services.FeaturePrompt.objects")
+    def test_generate_summary_empty_response(
+        self, mock_feature_prompt_objects, mock_capture
+    ):
+        mock_feature_prompt_objects.filter.return_value.order_by.return_value.last.return_value = (
+            self.feature_prompt
+        )
+        self.mock_integration_client.generate_text.return_value = "   "
+
+        result = self.service.generate_summary(self.room, self.history_summary)
+
+        self.assertEqual(result.status, HistorySummaryStatus.UNAVAILABLE)
+        mock_capture.assert_called()
+
+    @patch("chats.apps.ai_features.history_summary.services.capture_message")
+    @patch("chats.apps.ai_features.history_summary.services.FeaturePrompt.objects")
+    def test_generate_summary_exception(
+        self, mock_feature_prompt_objects, mock_capture
+    ):
+        mock_feature_prompt_objects.filter.return_value.order_by.return_value.last.return_value = (
+            self.feature_prompt
+        )
+        self.mock_integration_client.generate_text.side_effect = RuntimeError("ai down")
+
+        result = self.service.generate_summary(self.room, self.history_summary)
+
+        self.assertEqual(result.status, HistorySummaryStatus.UNAVAILABLE)
+        mock_capture.assert_called()
