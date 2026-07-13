@@ -857,6 +857,11 @@ ARCHIVE_CHATS_BATCH_SIZE = env.int("ARCHIVE_CHATS_BATCH_SIZE", default=500)
 ARCHIVE_CHATS_BULK_CREATE_PENDING_BATCH_SIZE = env.int(
     "ARCHIVE_CHATS_BULK_CREATE_PENDING_BATCH_SIZE", default=2000
 )
+# Page size for keyset-paginated message iteration during archive.
+# Keeps peak memory bounded to one page of messages + their medias.
+ARCHIVE_CHATS_MESSAGE_PAGE_SIZE = env.int(
+    "ARCHIVE_CHATS_MESSAGE_PAGE_SIZE", default=500
+)
 # Soft-lock threshold used by ArchiveChatsService to decide whether an
 # in-progress RoomArchivedConversation is still being processed by another
 # worker or stale enough to be reclaimed.
