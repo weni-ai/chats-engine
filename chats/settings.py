@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     "chats.apps.history",
     "chats.apps.discussions",
     "chats.apps.feature_version",
+    "chats.apps.logs",
     "chats.core",
     "chats.apps.ai_features",
     "chats.apps.ai_features.history_summary",
