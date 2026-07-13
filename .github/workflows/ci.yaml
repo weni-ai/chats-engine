@@ -67,6 +67,9 @@ jobs:
           poetry config virtualenvs.create false --local
           poetry install
 
+      - name: Check migrations
+        run: python manage.py makemigrations --check --dry-run
+
       - name: Run migrations
         run: python manage.py migrate
 
