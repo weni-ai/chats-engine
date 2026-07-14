@@ -1,6 +1,6 @@
 from datetime import datetime
 from datetime import timezone as dt_timezone
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 from django.test import TestCase, override_settings
 
@@ -628,6 +628,81 @@ class ApplyRootFiltersTests(TestCase):
             fields_config["agent_status_logs"]["agents"], ["uuid-1", "uuid-2"]
         )
 
+    def test_propagates_root_users_emails_to_rooms_and_agent_status_logs(self):
+        users_filter = {
+            "emails": ["agent1@test.com", "agent2@test.com"],
+            "fields": [],
+        }
+        fields_config = {
+            "users": users_filter,
+            "rooms": {"fields": ["is_active"]},
+            "agent_status_logs": {"fields": ["agent__email"]},
+        }
+        request_data = {
+            "users": users_filter,
+            "rooms": {"fields": ["is_active"]},
+            "agent_status_logs": {"fields": ["agent__email"]},
+        }
+        self.viewset._apply_root_filters_to_rooms(fields_config, request_data)
+
+        self.assertEqual(fields_config["rooms"]["agents"], users_filter)
+        self.assertEqual(
+            fields_config["agent_status_logs"]["agents"], users_filter
+        )
+
+    def test_users_takes_precedence_over_agents(self):
+        users_filter = {"emails": ["user@test.com"], "fields": []}
+        fields_config = {
+            "users": users_filter,
+            "agents": ["legacy@test.com"],
+            "rooms": {"fields": ["is_active"]},
+        }
+        request_data = {
+            "users": users_filter,
+            "agents": ["legacy@test.com"],
+        }
+        self.viewset._apply_root_filters_to_rooms(fields_config, request_data)
+
+        self.assertEqual(fields_config["rooms"]["agents"], users_filter)
+
+    def test_propagates_root_sectors_and_queues_to_rooms(self):
+        sectors_filter = {"uuids": ["sector-uuid-1"], "fields": []}
+        queues_filter = {"uuids": ["queue-uuid-1"], "fields": []}
+        fields_config = {
+            "sectors": sectors_filter,
+            "queues": queues_filter,
+            "rooms": {"fields": ["is_active"]},
+        }
+        request_data = {
+            "sectors": sectors_filter,
+            "queues": queues_filter,
+            "rooms": {"fields": ["is_active"]},
+        }
+        self.viewset._apply_root_filters_to_rooms(fields_config, request_data)
+
+        self.assertEqual(fields_config["rooms"]["sectors"], sectors_filter)
+        self.assertEqual(fields_config["rooms"]["queues"], queues_filter)
+
+    def test_propagates_root_sector_tags_to_rooms(self):
+        sector_tags_filter = {"uuids": ["tag-uuid-1"], "fields": []}
+        fields_config = {
+            "sector_tags": sector_tags_filter,
+            "rooms": {"fields": ["is_active"]},
+        }
+        request_data = {
+            "sector_tags": sector_tags_filter,
+            "rooms": {"fields": ["is_active"]},
+        }
+        self.viewset._apply_root_filters_to_rooms(fields_config, request_data)
+
+        self.assertEqual(fields_config["rooms"]["tags"], sector_tags_filter)
+
+    def test_all_filter_does_not_restrict_sectors(self):
+        result = self.viewset._normalize_filter_value(
+            {"uuids": ["__all__"], "fields": []}
+        )
+        self.assertEqual(result, [])
+
     def test_no_dates_in_root_leaves_nested_untouched(self):
         fields_config = {
             "agent_status_logs": {"fields": ["agent__email"]},
@@ -636,3 +711,93 @@ class ApplyRootFiltersTests(TestCase):
 
         self.assertNotIn("start_date", fields_config["agent_status_logs"])
         self.assertNotIn("end_date", fields_config["agent_status_logs"])
+
+
+class NormalizeFilterValueTests(TestCase):
+    def setUp(self):
+        self.viewset = ReportFieldsValidatorViewSet()
+
+    def test_normalize_emails_dict(self):
+        result = self.viewset._normalize_filter_value(
+            {"emails": ["Agent1@Test.COM", " agent2@test.com "], "fields": []}
+        )
+        self.assertEqual(result, ["agent1@test.com", "agent2@test.com"])
+
+    def test_normalize_emails_all_returns_empty(self):
+        result = self.viewset._normalize_filter_value(
+            {"emails": ["__all__"], "fields": []}
+        )
+        self.assertEqual(result, [])
+
+    def test_normalize_uuids_still_works(self):
+        result = self.viewset._normalize_filter_value(
+            {"uuids": ["uuid-1", "uuid-2"], "fields": []}
+        )
+        self.assertEqual(result, ["uuid-1", "uuid-2"])
+
+
+class ApplyEntityFiltersByEmailTests(TestCase):
+    def setUp(self):
+        self.viewset = ReportFieldsValidatorViewSet()
+
+    def test_rooms_filter_uses_user_email(self):
+        queryset = Mock()
+        queryset.filter.return_value = queryset
+
+        result = self.viewset._apply_entity_filters(
+            queryset,
+            {"agents": {"emails": ["agent@test.com"], "fields": []}},
+        )
+
+        queryset.filter.assert_called_once_with(
+            user__email__in=["agent@test.com"]
+        )
+        self.assertEqual(result, queryset)
+
+    def test_rooms_filter_sectors_queues_and_tags_by_uuid(self):
+        queryset = Mock()
+        queryset.filter.return_value = queryset
+
+        result = self.viewset._apply_entity_filters(
+            queryset,
+            {
+                "sectors": {"uuids": ["sector-1"], "fields": []},
+                "queues": {"uuids": ["queue-1"], "fields": []},
+                "tags": {"uuids": ["tag-1"], "fields": []},
+            },
+        )
+
+        self.assertEqual(queryset.filter.call_count, 3)
+        queryset.filter.assert_any_call(queue__sector__uuid__in=["sector-1"])
+        queryset.filter.assert_any_call(queue__uuid__in=["queue-1"])
+        queryset.filter.assert_any_call(tags__uuid__in=["tag-1"])
+        self.assertEqual(result, queryset)
+
+    def test_all_sectors_does_not_call_sector_filter(self):
+        queryset = Mock()
+        queryset.filter.return_value = queryset
+
+        result = self.viewset._apply_entity_filters(
+            queryset,
+            {"sectors": {"uuids": ["__all__"], "fields": []}},
+        )
+
+        queryset.filter.assert_not_called()
+        self.assertEqual(result, queryset)
+
+    def test_agent_status_logs_filter_uses_agent_email(self):
+        queryset = Mock()
+        queryset.filter.return_value = queryset
+        project = Mock()
+        project.timezone = "UTC"
+
+        result = self.viewset._apply_agent_status_logs_filters(
+            queryset,
+            {"agents": {"emails": ["agent@test.com"], "fields": []}},
+            project,
+        )
+
+        queryset.filter.assert_called_once_with(
+            agent__email__in=["agent@test.com"]
+        )
+        self.assertEqual(result, queryset)
