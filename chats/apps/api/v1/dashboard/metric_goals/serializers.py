@@ -42,7 +42,7 @@ class MetricGoalReadSerializer(serializers.ModelSerializer):
 
 
 class MetricGoalRecipientWriteSerializer(serializers.Serializer):
-    uuid_project_permission = serializers.UUIDField()
+    email = serializers.EmailField()
 
 
 class MetricGoalWriteSerializer(serializers.Serializer):
@@ -104,16 +104,14 @@ class MetricGoalWriteSerializer(serializers.Serializer):
 
     def validate_recipients(self, recipients):
         project = self.context["project"]
-        permission_uuids = [
-            item["uuid_project_permission"] for item in recipients
-        ]
+        emails = [item["email"] for item in recipients]
         permissions = ProjectPermission.objects.filter(
-            uuid__in=permission_uuids,
+            user__email__in=emails,
             project=project,
             is_deleted=False,
         ).select_related("user")
 
-        if permissions.count() != len(permission_uuids):
+        if permissions.count() != len(set(emails)):
             raise serializers.ValidationError(
                 "Um ou mais destinatários não pertencem ao projeto"
             )

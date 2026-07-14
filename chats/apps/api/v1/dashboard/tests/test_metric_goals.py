@@ -127,13 +127,7 @@ class MetricGoalsViewsetTestCase(APITestCase):
                 "is_active": True,
                 "email_enabled": True,
                 "rooms_threshold_count": 5,
-                "recipients": [
-                    {
-                        "uuid_project_permission": str(
-                            self.viewer_permission.uuid
-                        )
-                    }
-                ],
+                "recipients": [{"email": self.viewer.email}],
             },
             format="json",
         )
@@ -247,10 +241,6 @@ class MetricGoalsViewsetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_attendant_cannot_be_recipient(self):
-        attendant_permission = ProjectPermission.objects.get(
-            project=self.project,
-            user=self.attendant,
-        )
         self._auth(self.manager_token)
 
         response = self.client.post(
@@ -258,13 +248,7 @@ class MetricGoalsViewsetTestCase(APITestCase):
             {
                 "threshold_seconds": 300,
                 "unit": MetricGoal.UNIT_SECOND,
-                "recipients": [
-                    {
-                        "uuid_project_permission": str(
-                            attendant_permission.uuid
-                        )
-                    }
-                ],
+                "recipients": [{"email": self.attendant.email}],
             },
             format="json",
         )
