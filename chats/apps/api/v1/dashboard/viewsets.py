@@ -600,6 +600,11 @@ class ReportFieldsValidatorViewSet(APIView):
         return [] if self._is_all_filter(out) else out
 
     def _normalize_dict_filter(self, value):
+        if "emails" in value:
+            email_list = [
+                str(email).strip().lower() for email in value["emails"] if email
+            ]
+            return [] if self._is_all_filter(email_list) else email_list
         if "uuids" in value:
             uuid_list = [str(uuid_val) for uuid_val in value["uuids"]]
             return [] if self._is_all_filter(uuid_list) else uuid_list
@@ -717,9 +722,9 @@ class ReportFieldsValidatorViewSet(APIView):
         if queues:
             queryset = queryset.filter(queue__uuid__in=queues)
         if agents:
-            queryset = queryset.filter(user__uuid__in=agents)
+            queryset = queryset.filter(user__email__in=agents)
         if tags:
-            queryset = queryset.filter(tags__name__in=tags)
+            queryset = queryset.filter(tags__uuid__in=tags)
 
         return queryset
 
@@ -751,7 +756,7 @@ class ReportFieldsValidatorViewSet(APIView):
             field_data.get("agents") or field_data.get("agent")
         )
         if agents:
-            queryset = queryset.filter(agent__uuid__in=agents)
+            queryset = queryset.filter(agent__email__in=agents)
 
         return queryset
 
@@ -922,13 +927,27 @@ class ReportFieldsValidatorViewSet(APIView):
             if root_end_date and "end_date" not in fields_config["agent_status_logs"]:
                 fields_config["agent_status_logs"]["end_date"] = root_end_date
 
-        root_agents = request_data.get("agents") or request_data.get("agent")
-        root_tags = request_data.get("tags") or request_data.get("tag")
+        root_agents = (
+            request_data.get("users")
+            or request_data.get("agents")
+            or request_data.get("agent")
+        )
+        root_sectors = request_data.get("sectors") or request_data.get("sector")
+        root_queues = request_data.get("queues") or request_data.get("queue")
+        root_tags = (
+            request_data.get("sector_tags")
+            or request_data.get("tags")
+            or request_data.get("tag")
+        )
         if "rooms" in fields_config:
             if not isinstance(fields_config["rooms"], dict):
                 fields_config["rooms"] = {}
             if root_agents is not None:
                 fields_config["rooms"]["agents"] = root_agents
+            if root_sectors is not None:
+                fields_config["rooms"]["sectors"] = root_sectors
+            if root_queues is not None:
+                fields_config["rooms"]["queues"] = root_queues
             if root_tags is not None:
                 fields_config["rooms"]["tags"] = root_tags
 
