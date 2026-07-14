@@ -396,26 +396,6 @@ def process_violations(
                 metric,
                 violation,
             )
-
-            if (
-                on_email is not None
-                and violation.email_enabled
-                and violation.meets_email_threshold
-                and _claim_email_slot(
-                    redis_conn,
-                    violation.project_uuid,
-                    metric,
-                    email_cooldown_seconds,
-                )
-                and _safe_call(
-                    on_email,
-                    "metric_goal: on_email failed (project=%s metric=%s)",
-                    violation.project_uuid,
-                    metric,
-                    violation,
-                )
-            ):
-                emails_sent.append(violation)
         else:
             updates.append(violation)
             _safe_call(
@@ -425,6 +405,30 @@ def process_violations(
                 metric,
                 violation,
             )
+
+        # Email is gated by rooms_threshold_count ("Quando"), which may be
+        # crossed on the first breach (new) or only later (update). The
+        # cooldown slot ensures we still send at most once per metric
+        # until the TTL expires.
+        if (
+            on_email is not None
+            and violation.email_enabled
+            and violation.meets_email_threshold
+            and _claim_email_slot(
+                redis_conn,
+                violation.project_uuid,
+                metric,
+                email_cooldown_seconds,
+            )
+            and _safe_call(
+                on_email,
+                "metric_goal: on_email failed (project=%s metric=%s)",
+                violation.project_uuid,
+                metric,
+                violation,
+            )
+        ):
+            emails_sent.append(violation)
 
     resolved_uuids = list(previously_violating - currently_violating)
     for project_uuid in resolved_uuids:
