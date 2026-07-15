@@ -20,6 +20,7 @@ from chats.apps.dashboard.email_templates import (
 from chats.apps.dashboard.models import MetricGoal, ReportStatus, RoomMetrics
 from chats.apps.dashboard.services.metric_goal_alerts import (
     Violation,
+    is_metric_goal_alerts_enabled,
     process_violations,
 )
 from chats.apps.dashboard.utils import (
@@ -979,6 +980,13 @@ def send_metric_goal_email(
         return
 
     if not goal.is_active or not goal.email_enabled:
+        return
+
+    if not is_metric_goal_alerts_enabled(project_uuid):
+        logger.info(
+            "send_metric_goal_email: feature flag disabled for project %s",
+            project_uuid,
+        )
         return
 
     recipients = _eligible_recipient_emails(goal)

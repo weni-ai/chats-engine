@@ -545,8 +545,9 @@ class TimeMetricsServiceGoalsIntegrationTest(TestCase):
 
         goal = result["waiting_time_goal"]
         self.assertEqual(goal["breached_rooms_count"], 3)
-        # Below `rooms_threshold_count` (5), so the goal is not breached.
-        self.assertFalse(goal["is_breached"])
+        # The widget alert is not gated by `rooms_threshold_count` (that
+        # only gates the email notification) — any room breaching is enough.
+        self.assertTrue(goal["is_breached"])
 
     def test_is_breached_when_count_meets_threshold(self):
         now = timezone.now()

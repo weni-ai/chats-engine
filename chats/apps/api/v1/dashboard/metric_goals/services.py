@@ -59,9 +59,11 @@ class MetricGoalBreachService:
             "breached_rooms_count": int,
         }
 
-    Goals are flagged as breached when the count of rooms above the
-    threshold reaches `rooms_threshold_count` — the same rule that drives
-    email and toast notifications later in the pipeline.
+    Goals are flagged as breached as soon as a single room is above the
+    threshold. `rooms_threshold_count` / `rooms_threshold_percent` do not
+    gate this widget alert — they only gate the email notification (see
+    `chats.apps.dashboard.services.metric_goal_alerts.Violation.meets_email_threshold`),
+    since email is opt-in and independent from the real-time alert.
     """
 
     def get_goals_payload(
@@ -88,7 +90,7 @@ class MetricGoalBreachService:
                 goal.threshold_seconds, goal.unit
             ),
             "unit": goal.unit,
-            "is_breached": breached_count >= goal.rooms_threshold_count,
+            "is_breached": breached_count >= 1,
             "breached_rooms_count": breached_count,
         }
 

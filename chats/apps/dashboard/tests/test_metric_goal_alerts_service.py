@@ -91,6 +91,13 @@ class DetectViolationsTestCase(TestCase):
             work_end="18:00",
         )
         self.queue = self.sector.queues.create(name="queue")
+        self.ff_patch = patch.object(
+            metric_goal_alerts,
+            "is_metric_goal_alerts_enabled",
+            return_value=True,
+        )
+        self.ff_patch.start()
+        self.addCleanup(self.ff_patch.stop)
 
     def test_returns_empty_when_no_active_goals(self):
         self.assertEqual(
@@ -116,7 +123,13 @@ class DetectViolationsTestCase(TestCase):
         self.assertGreaterEqual(violation.max_value_seconds, 60)
         self.assertEqual(violation.rooms_threshold_count, 2)
 
-    def test_skips_when_below_threshold(self):
+    def test_violation_is_reported_even_when_below_email_threshold(self):
+        """The WS/toast/widget alert fires with a single room in breach.
+
+        `rooms_threshold_count` only gates the email notification (see
+        `ProcessViolationsTestCase`) — it must not prevent the violation
+        itself from being detected.
+        """
         MetricGoal.objects.create(
             project=self.project,
             metric=MetricGoal.METRIC_WAITING_TIME,
@@ -126,7 +139,13 @@ class DetectViolationsTestCase(TestCase):
         for _ in range(2):
             _build_active_room(self.project, self.queue, age_seconds=300)
 
-        self.assertEqual(detect_violations(MetricGoal.METRIC_WAITING_TIME), [])
+        results = detect_violations(MetricGoal.METRIC_WAITING_TIME)
+
+        self.assertEqual(len(results), 1)
+        violation = results[0]
+        self.assertEqual(violation.violating_count, 2)
+        self.assertEqual(violation.rooms_threshold_count, 5)
+        self.assertFalse(violation.meets_email_threshold)
 
     def test_skips_inactive_goals(self):
         MetricGoal.objects.create(
@@ -221,6 +240,13 @@ class ProcessViolationsTestCase(TestCase):
         )
         self.redis_patch.start()
         self.addCleanup(self.redis_patch.stop)
+        self.ff_patch = patch.object(
+            metric_goal_alerts,
+            "is_metric_goal_alerts_enabled",
+            return_value=True,
+        )
+        self.ff_patch.start()
+        self.addCleanup(self.ff_patch.stop)
 
     def _seed_violation(self):
         _build_active_room(self.project, self.queue, age_seconds=300)
@@ -313,3 +339,56 @@ class ProcessViolationsTestCase(TestCase):
         )
         self.assertEqual(len(emails), 0)
         self.assertEqual(len(result.new_alerts), 1)
+
+    def test_alert_fires_but_email_skipped_when_below_rooms_threshold(self):
+        """A single breaching room is enough for the WS/toast alert, but the
+        email must wait until `rooms_threshold_count` rooms are breaching.
+        """
+        MetricGoal.objects.filter(
+            project=self.project,
+            metric=MetricGoal.METRIC_WAITING_TIME,
+        ).update(rooms_threshold_count=5)
+        self._seed_violation()
+
+        new_alerts: list[Violation] = []
+        emails: list[Violation] = []
+        result = process_violations(
+            MetricGoal.METRIC_WAITING_TIME,
+            on_new_alert=new_alerts.append,
+            on_email=emails.append,
+        )
+
+        self.assertEqual(len(new_alerts), 1)
+        self.assertEqual(len(emails), 0)
+        self.assertEqual(len(result.new_alerts), 1)
+
+    def test_email_fires_on_update_when_rooms_threshold_is_reached(self):
+        """Email must fire when violating_count first reaches the configured
+        "Quando" value, even if the alert was already active from an earlier
+        single-room breach.
+        """
+        MetricGoal.objects.filter(
+            project=self.project,
+            metric=MetricGoal.METRIC_WAITING_TIME,
+        ).update(rooms_threshold_count=2)
+
+        self._seed_violation()
+        emails: list[Violation] = []
+        first = process_violations(
+            MetricGoal.METRIC_WAITING_TIME,
+            on_new_alert=lambda v: None,
+            on_email=emails.append,
+        )
+        self.assertEqual(len(first.new_alerts), 1)
+        self.assertEqual(len(emails), 0)
+
+        self._seed_violation()
+        updates: list[Violation] = []
+        process_violations(
+            MetricGoal.METRIC_WAITING_TIME,
+            on_update=updates.append,
+            on_email=emails.append,
+        )
+        self.assertEqual(len(updates), 1)
+        self.assertEqual(len(emails), 1)
+        self.assertEqual(emails[0].violating_count, 2)
