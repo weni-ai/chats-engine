@@ -1,6 +1,7 @@
 """Tests for the MetricGoalAlertConsumer."""
 
 import json
+from unittest.mock import patch
 
 from channels.layers import get_channel_layer
 from channels.routing import URLRouter
@@ -65,6 +66,12 @@ class MetricGoalAlertConsumerTestCase(TestCase):
             user=self.attendant,
             role=ProjectPermission.ROLE_ATTENDANT,
         )
+        self.ff_patch = patch(
+            "chats.apps.dashboard.services.metric_goal_alerts.is_feature_active_for_attributes",
+            return_value=True,
+        )
+        self.ff_patch.start()
+        self.addCleanup(self.ff_patch.stop)
 
     def _ws_url(self, project_uuid, token):
         return (

@@ -1,6 +1,7 @@
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+from unittest.mock import patch
 
 from chats.apps.api.utils import create_user_and_token
 from chats.apps.dashboard.models import MetricGoal
@@ -69,6 +70,12 @@ class MetricGoalsViewsetTestCase(APITestCase):
                 "metric": MetricGoal.METRIC_WAITING_TIME,
             },
         )
+        self.ff_patch = patch(
+            "chats.apps.dashboard.services.metric_goal_alerts.is_feature_active_for_attributes",
+            return_value=True,
+        )
+        self.ff_patch.start()
+        self.addCleanup(self.ff_patch.stop)
 
     def _auth(self, token):
         self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")

@@ -28,6 +28,7 @@ from math import ceil
 from typing import Iterable
 
 from django.conf import settings
+from django.core.cache import cache
 from django.db.models import Count, Exists, Max, OuterRef
 from django.utils import timezone
 from django_redis import get_redis_connection
@@ -38,6 +39,9 @@ from chats.apps.rooms.models import Room
 
 logger = logging.getLogger(__name__)
 
+FEATURE_FLAG_CACHE_KEY_TEMPLATE = "metric_goal_alerts_ff:{project_uuid}"
+DEFAULT_FEATURE_FLAG_CACHE_TTL_SECONDS = 30
+
 
 def is_metric_goal_alerts_enabled(project_uuid: str) -> bool:
     """Whether the metric goal / risk alerts feature is enabled for a project.
@@ -45,13 +49,24 @@ def is_metric_goal_alerts_enabled(project_uuid: str) -> bool:
     Fails closed (returns ``False``) if the flag can't be evaluated, so a
     GrowthBook outage never turns on alerts for projects that shouldn't
     have them.
+
+    Results are cached briefly so the Celery sweep (and other hot paths)
+    do not re-hit GrowthBook on every metric/project check within the
+    same short window.
     """
     if not project_uuid:
         return False
+
+    project_uuid = str(project_uuid)
+    cache_key = FEATURE_FLAG_CACHE_KEY_TEMPLATE.format(project_uuid=project_uuid)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return bool(cached)
+
     try:
-        return is_feature_active_for_attributes(
+        enabled = is_feature_active_for_attributes(
             settings.METRIC_GOAL_ALERTS_FEATURE_FLAG_KEY,
-            {"projectUUID": str(project_uuid)},
+            {"projectUUID": project_uuid},
         )
     except Exception:
         logger.warning(
@@ -60,6 +75,15 @@ def is_metric_goal_alerts_enabled(project_uuid: str) -> bool:
             exc_info=True,
         )
         return False
+
+    ttl = getattr(
+        settings,
+        "METRIC_GOAL_ALERTS_FEATURE_FLAG_CACHE_TTL",
+        DEFAULT_FEATURE_FLAG_CACHE_TTL_SECONDS,
+    )
+    if ttl > 0:
+        cache.set(cache_key, enabled, ttl)
+    return bool(enabled)
 
 
 STATE_VIOLATING = "violating"

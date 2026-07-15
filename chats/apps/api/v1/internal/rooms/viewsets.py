@@ -127,13 +127,19 @@ class InternalListRoomsViewSet(viewsets.ReadOnlyModelViewSet):
 
         Fetched once per request (not per room) to avoid N+1 queries when
         computing the ``goals_metrics`` field on each serialized room.
+        Gated by the metric goal alerts feature flag so non-liberated
+        projects never expose goal breach data on this endpoint.
         """
         if hasattr(self, "_active_goals_by_metric_cached"):
             return self._active_goals_by_metric_cached
 
+        from chats.apps.dashboard.services.metric_goal_alerts import (
+            is_metric_goal_alerts_enabled,
+        )
+
         project_uuid = self.request.query_params.get("project") if self.request else None
         goals_by_metric: dict = {}
-        if project_uuid:
+        if project_uuid and is_metric_goal_alerts_enabled(str(project_uuid)):
             goals = MetricGoal.objects.filter(
                 project__uuid=project_uuid, is_active=True
             )

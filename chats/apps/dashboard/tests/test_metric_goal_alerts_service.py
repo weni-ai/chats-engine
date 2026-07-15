@@ -392,3 +392,39 @@ class ProcessViolationsTestCase(TestCase):
         self.assertEqual(len(updates), 1)
         self.assertEqual(len(emails), 1)
         self.assertEqual(emails[0].violating_count, 2)
+
+
+class FeatureFlagCacheTestCase(TestCase):
+    def setUp(self):
+        from django.core.cache import cache
+
+        cache.clear()
+        self.addCleanup(cache.clear)
+
+    @patch(
+        "chats.apps.dashboard.services.metric_goal_alerts.is_feature_active_for_attributes",
+        return_value=True,
+    )
+    def test_feature_flag_result_is_cached(self, mock_ff):
+        project_uuid = "11111111-1111-1111-1111-111111111111"
+
+        self.assertTrue(metric_goal_alerts.is_metric_goal_alerts_enabled(project_uuid))
+        self.assertTrue(metric_goal_alerts.is_metric_goal_alerts_enabled(project_uuid))
+
+        self.assertEqual(mock_ff.call_count, 1)
+
+    @patch(
+        "chats.apps.dashboard.services.metric_goal_alerts.is_feature_active_for_attributes",
+        return_value=False,
+    )
+    def test_negative_feature_flag_result_is_cached(self, mock_ff):
+        project_uuid = "22222222-2222-2222-2222-222222222222"
+
+        self.assertFalse(metric_goal_alerts.is_metric_goal_alerts_enabled(project_uuid))
+        self.assertFalse(metric_goal_alerts.is_metric_goal_alerts_enabled(project_uuid))
+
+        self.assertEqual(mock_ff.call_count, 1)
+
+    def test_empty_project_uuid_short_circuits(self):
+        self.assertFalse(metric_goal_alerts.is_metric_goal_alerts_enabled(""))
+        self.assertFalse(metric_goal_alerts.is_metric_goal_alerts_enabled(None))
